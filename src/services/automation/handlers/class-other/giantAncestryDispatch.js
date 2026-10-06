@@ -57,7 +57,7 @@ export async function handleFiresBurn(action, playerStats, campaignName, option)
     if (currentUses <= 0) return ancestryNoUsesPopup(optName, action.automation, currentUses);
 
     const lastAttack = await findLastAttack(campaignName);
-    const gateRefusal = attackerRollGate(optName, action.automation, playerStats, lastAttack);
+    const gateRefusal = attackerRollGate(optName, action.automation, playerStats, lastAttack, campaignName);
     if (gateRefusal) return gateRefusal;
 
     const targetName = lastAttack.targetName;
@@ -84,7 +84,7 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
     if (noUses) return noUses;
 
     const lastAttack = await findLastAttack(campaignName);
-    const gateRefusal = frostsChillAttackerGate(optName, action.automation, playerStats, lastAttack);
+    const gateRefusal = frostsChillAttackerGate(optName, action.automation, playerStats, lastAttack, campaignName);
     if (gateRefusal) return gateRefusal;
 
     const targetName = lastAttack.targetName;

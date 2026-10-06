@@ -37,7 +37,7 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
 
 vi.mock('../../common/damageRollback.js', () => ({
     findLastAttack: vi.fn(async () => ({
-        attackEvent: { rollType: 'attack', attackerName: 'TestHero' },
+        attackEvent: { rollType: 'attack', attackerName: 'TestHero', hit: true },
         attackerName: 'TestHero',
         targetName: 'Goblin',
         primaryDamage: 10,

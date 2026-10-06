@@ -1747,8 +1747,10 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §CLA-141 (2026-10-05, Fire's Burn FAIL — fires on miss) Recipe + pitfalls
 - Recipe: giant-ancestry hit-rider chip — the trigger is the Actions-panel "Fire's Burn:" chip (NOT a HIT-popup rider offer); gate = attackerRollGate (giantAncestryUtils.js:179 shared Fire's Burn/Frost's Chill). Manufacture a MISS by attacking high-AC Disciplined_Monk (AC22, +11 hit => raw<=8 miss). Self is not targetable.
-- PITFALL (BUG family): attackerRollGate checks attacker/rollType/target but NEVER lastAttack.hit — all hit-triggered giant-ancestry chips (Fire's Burn, Frost's Chill) fire and deal damage+spend uses on a MISS. See bug-CLA-141.
+- PITFALL (BUG family): attackerRollGate checks attacker/rollType/target but NEVER lastAttack.hit — all hit-triggered giant-ancestry chips (Fire's Burn, Frost's Chill) fire and deal damage+spend uses on a MISS. See bug-CLA-141. FIXED 2026-10-06: gate now requires attackEvent.hit===true AND findLastAttack totalDamage>0 (psionicStrike CLA-273 mirror); refusals log `<slug>_refused` (attack_missed/no_damage_dealt), gate gained campaignName 5th param, chips refuse-click (popup, zero spend).
 - Pitfall: NPC card HP edit commits only via real keystrokes+Enter (JS value-set+blur POSTs STALE combatSummary). Anchor creature cards via .creature-name exact match, not textContent (select options contain names).
+- PITFALL (CLA-141 verify): sheet has TWO "Attack (to hit):" b.clickable — the Spells-section one rolls a one-stage SPELL attack (no damage Done stage, lastAttack stays damage-less); the Actions-grid Longsword row is the 2-stage lane (row-aligned +N chip by rect.y match → Done → damage Done merges primaryDamage/actualDamage into lastAttack). The new no_damage_dealt gate honestly refuses a to-hit-only "hit" — complete the damage stage before chip proofs.
+- PITFALL (CLA-141 rig): ElderPaladin race.subrace drifts across sessions (CLA-169 Hill's Tumble run left it "Hill Giant" — Fire's Burn chip then renders nowhere). Verify race.subrace on disk + confirm the chip exists before giant-ancestry legs; restore via PUT /api/campaigns/test-campaign/ElderPaladin.json + reload.
 
 
 ## §CLA-405 (2026-10-05, Fleet Step FAIL(b) inert) Recipe + pitfalls
@@ -1803,7 +1805,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §CLA-148 (2026-10-05, Frost's Chill FAIL fires-on-miss) Recipe + pitfalls
 - Recipe: sheet page has NO visible target-select — attacks roll vs the card-armed target persisted from Initiative page. Re-arm on Initiative page (find card by walking up from input[aria-label="<Name> current HP"]), THEN navigate to sheet; sheet b.clickable "Attack (to hit):" / race-trait chip "Frost's Chill:".
 - PITFALL: DOM value-set of an off-page initiative select silently keeps OLD target (stale AC) — always re-arm on the Initiative page itself. Admin "Clear Campaign Log" confirm NOT auto-handled via locator click — use browser_handle_dialog.
-- Family bug (see CLA-141): giant-ancestry chips fire on miss; speed_reduction te value:N lands correctly on HIT path.
+- Family bug (see CLA-141): giant-ancestry chips fire on miss; speed_reduction te value:N lands correctly on HIT path. Gate FIXED with CLA-141 (shared attackerRollGate) — frosts_chill_refused refusal + frostsChill.test.js miss locks added 2026-10-06; CLA-148 E2E still owed.
 
 
 ## §SP-053 (2026-10-05, Friends PASS) Recipe + pitfalls

@@ -176,9 +176,29 @@ export function stormsThunderRangeRefusal({ campaignName, playerStats, optName, 
     return ancestryInfoPopup(optName, refusalText, automation);
 }
 
+// CLA-141: no-hit trigger refusals log `<feature>_refused` (zero-spend) with a
+// reason token, mirroring the stones_endurance_refused / storms_thunder_refused
+// pattern in this file. Shared Fire's Burn / Frost's Chill lane.
+function attackerHitRefusal({ campaignName, playerStats, optName, automation, reasonToken, refusalText }) {
+    const slug = optName.toLowerCase().replace(/'/g, '').replace(/\s+/g, '_');
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerStats.name,
+        automationType: `${slug}_refused`,
+        name: optName,
+        description: `${optName} refused — ${reasonToken}: ${refusalText}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+    return ancestryInfoPopup(optName, refusalText, automation);
+}
+
 // Shared attacker-trigger gate (Fire's Burn / Frost's Chill, dispatch + direct handlers).
+// CLA-141: the trigger is "When you hit a target with an attack roll and deal damage
+// to it" — so the last attack must have `hit === true` and have dealt damage
+// (canonical machine truth: attackEvent.hit + findLastAttack totalDamage,
+// mirroring the verified Psionic Strike CLA-273 gate).
 // Returns a refusal popup, or null when the trigger is valid.
-export function attackerRollGate(optName, automation, playerStats, lastAttack) {
+export function attackerRollGate(optName, automation, playerStats, lastAttack, campaignName) {
     if (!lastAttack?.attackEvent) {
         return ancestryInfoPopup(optName, `${optName} requires a recent attack. Use it after hitting a creature.`, automation);
     }
@@ -191,13 +211,33 @@ export function attackerRollGate(optName, automation, playerStats, lastAttack) {
     if (!lastAttack.targetName) {
         return ancestryInfoPopup(optName, `${optName} requires a target. No target found from the last attack.`, automation);
     }
+    if (lastAttack.attackEvent.hit !== true) {
+        return attackerHitRefusal({
+            campaignName,
+            playerStats,
+            optName,
+            automation,
+            reasonToken: 'attack_missed',
+            refusalText: `Your last attack missed ${lastAttack.targetName}. ${optName} triggers only when you hit a target with an attack roll and deal damage to it.`,
+        });
+    }
+    if ((lastAttack.totalDamage || 0) <= 0) {
+        return attackerHitRefusal({
+            campaignName,
+            playerStats,
+            optName,
+            automation,
+            reasonToken: 'no_damage_dealt',
+            refusalText: `${optName} requires your attack to deal damage. No damage was dealt to ${lastAttack.targetName}.`,
+        });
+    }
     return null;
 }
 
 // Shared Frost's Chill trigger gate (dispatch + direct handlers).
 // Returns a refusal popup, or null when the trigger is valid.
-export function frostsChillAttackerGate(optName, automation, playerStats, lastAttack) {
-    return attackerRollGate(optName, automation, playerStats, lastAttack);
+export function frostsChillAttackerGate(optName, automation, playerStats, lastAttack, campaignName) {
+    return attackerRollGate(optName, automation, playerStats, lastAttack, campaignName);
 }
 
 // Shared Storm's Thunder trigger gate (dispatch + direct handlers).

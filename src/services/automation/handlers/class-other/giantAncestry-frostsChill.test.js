@@ -37,7 +37,7 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
 
 vi.mock('../../common/damageRollback.js', () => ({
     findLastAttack: vi.fn(async () => ({
-        attackEvent: { rollType: 'attack', attackerName: 'TestHero' },
+        attackEvent: { rollType: 'attack', attackerName: 'TestHero', hit: true },
         attackerName: 'TestHero',
         targetName: 'Goblin',
         primaryDamage: 10,
@@ -146,6 +146,28 @@ describe('giantAncestry selection & dispatch', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('requires a target');
+        });
+
+        it('CLA-141 shared gate: refuses a MISS lastAttack with zero spend and logs frosts_chill_refused', async () => {
+            makeUsesMock('frostsChillUses', 3);
+            findLastAttack.mockResolvedValue({
+                attackEvent: { rollType: 'attack', hit: false },
+                attackerName: 'TestHero',
+                targetName: 'Goblin',
+                totalDamage: 0,
+            });
+
+            const result = await handleFrostsChill(makeAction(), makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('missed');
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'frostsChillUses', 2, 'campaign');
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'automation',
+                automationType: 'frosts_chill_refused',
+                name: "Frost's Chill",
+            }));
         });
 
         it('returns info popup when no uses remaining', async () => {

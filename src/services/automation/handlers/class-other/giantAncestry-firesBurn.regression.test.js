@@ -35,10 +35,11 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
     applyHealingToTarget: vi.fn(() => ({ actualHeal: 0, oldHp: 60, newHp: 60 })),
 }));
 
-import { handleFiresBurnDirect } from './giantAncestryHandler.js';
+import { handleFiresBurn, handleFiresBurnDirect } from './giantAncestryHandler.js';
 import { getRuntimeUsesKey } from './giantAncestryOptions.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { elementalHandlers } from '../../../combat/automation/automationInfoBuilder/elemental-handlers.js';
 import { routeAutomation } from '../../../combat/automation/automationRouter.js';
@@ -170,5 +171,87 @@ describe('CLA-141 Fire Burn regression (real findLastAttack parser)', () => {
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.description).toContain('requires a target');
         expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('CLA-141: a MISS lastAttack refuses with zero delta and logs fires_burn_refused', async () => {
+        seedRuntime({
+            uses: 3,
+            lastAttack: {
+                attackerName: PLAYER,
+                targetName: TARGET,
+                d20: 7,
+                bonus: 11,
+                total: 18,
+                targetAc: 22,
+                hit: false,
+                rollType: 'attack',
+            },
+        });
+
+        const result = await handleFiresBurnDirect(makeDirectAction(), makePlayerStats(), 'test-campaign');
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.description).toContain('missed');
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            type: 'automation',
+            characterName: PLAYER,
+            automationType: 'fires_burn_refused',
+            name: "Fire's Burn",
+        }));
+    });
+
+    it('CLA-141: a hit that dealt no damage refuses with zero delta and logs fires_burn_refused', async () => {
+        seedRuntime({
+            uses: 3,
+            lastAttack: {
+                attackerName: PLAYER,
+                targetName: TARGET,
+                d20: 15,
+                bonus: 11,
+                total: 26,
+                targetAc: 22,
+                hit: true,
+                rollType: 'attack',
+            },
+        });
+
+        const result = await handleFiresBurnDirect(makeDirectAction(), makePlayerStats(), 'test-campaign');
+
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.description).toContain('deal damage');
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            automationType: 'fires_burn_refused',
+        }));
+    });
+
+    it('CLA-141: direct MISS also refuses via the shared gate used by handleFiresBurn (dispatch)', async () => {
+        seedRuntime({
+            uses: 3,
+            lastAttack: {
+                attackerName: PLAYER,
+                targetName: TARGET,
+                d20: 7,
+                bonus: 11,
+                total: 18,
+                targetAc: 22,
+                hit: false,
+                rollType: 'attack',
+            },
+        });
+
+        const option = { name: "Fire's Burn", type: 'damage', damage: '1d10', damageType: 'Fire' };
+        const result = await handleFiresBurn(makeDirectAction(), makePlayerStats(), 'test-campaign', option);
+
+        expect(result.payload.type).toBe('automation_info');
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            automationType: 'fires_burn_refused',
+        }));
     });
 });
