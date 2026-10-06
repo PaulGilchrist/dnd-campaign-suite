@@ -1726,3 +1726,307 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - SP-039 (FIXED, 2026-10-05): "green cast + spell log but GET targetEffects NULL" fingerprint = positional-vs-object apply mismatch (useTwoStageHandlers must call handlers with single object matching handler destructure keys — targetNames not targets). Buff-cast handler must addConcentration + storage.set + combat-summary-updated (SP-093/CLA-170 pattern). Dead popup types: drop to rendered automation_info rather than build new UI. SSE re-renders invalidate Playwright refs every turn — evaluate lane, re-find per action. Wizard checkbox evaluate-clicks can silently diverge disk — diff spellbook after every save.
 - SP-047 (FIXED, 2026-10-05): fey-spirit now carries armor_class_scales_with_slot — AUDIT closed: ALL "AC N + spell's level" summon texts (bestial/draconic/fey spirits + otherworldly-steed) now flagged; all other summons flat-AC canonical. Summon concentration lives on caster's cs creature entry (creatures[caster].concentration), NOT a top-level change-data key. Upcast radio under .popup-overlay: native checked setter+click/change dispatch.
 - SP-128 (FIXED, 2026-10-05): ER Dash bonus lane — persisted runtime flag (expeditiousRetreatActive) is single source of truth; registerTargetEffect with skipSync=true = MEMORY-ONLY never POSTs, don't rely on te for persistence. Bonus grant row = reactive useRuntimeValue in CharBonusActions + turnStartEffects offer entry re-arms `_Expeditious_Retreat_dash_usedRound` latch (cleared initiative-roll + round-wrap); own-turn gate reads __initiative__.lastAppliedTurnStartCreature. Break purge via SPELL_RUNTIME_CLEANERS in concentrationService. Speed grant via speed_boost activeBuffs (+base=2×) until_end_of_turn + remove_active_buff anchor.
+
+## §CLA-140 (2026-10-05, Fiendish Resilience FAIL host) Recipe + pitfalls
+- Recipe: Warlock Fiend-Patron passive chooser — HexWarlock repointed Archfey→Fiend via wizard step 7 (kept lv20); Long Rest → click feature row → damage-type chooser modal (Force absent, 12 types) → pick → sheet "Resistances: <type>" → damage proof via EB-joined Magmin (fire) vs Bandit (slashing control): log "…has resistance to Fire damage — 8 damage halved to 4" + hp_change resisted:true/false. LR re-arm + change-type exact.
+- Pitfall: Rest overlay intercepts clicks — "Short Rest" opens hit-dice modal needing explicit "Complete Short Rest"; rest not applied until clicked.
+- Pitfall: NPC attack chips live in mc-overlay `.mc-dice-link`; ability mods also match /+\d+/ — anchor by weapon name context ("Scimitar"); attack chips render only on active-creature expanded card; ← Prev disabled mid-round, cycle via Next.
+- Pitfall: rest-latch family — `_X_Used` keys listed ONLY in LONG_REST_RESOURCES (restRules-constants.js) never reset by Short Rest (restRules-shortRest.js untouched) — spec "Short or Long Rest" features need a short-rest reset entry too.
+
+## §SP-048 (2026-10-05, Fiendish Spirit PASS-subset) Recipe + pitfalls
+- Recipe: Warlock lv6 summon via Mystic Arcanum swap — Edit wizard step 14 Spells → `.arcanum-option` click for slot-6 slot → select Fiendish Spirit → Save persists; cast popup → variant chooser → Summon. Cast-path fold proof: spirit init=caster-0.1, bite attack_bonus null→+9, dmg token "spell level"→6. Archanum spent → Cast disabled "No spell slots available for this level" = honest gate. "Free Cast — no spell slots consumed" print on summon casts rides metaCtx.freeCastUsed.
+- Pitfall: initiative-card anchoring by innerText.includes('<Name>') false-positives on cards whose target-select merely LISTS that creature — anchor PCs via .creature-card.player + .creature-name span exact text, NPCs via img.avatar-image[alt="<Name>"].
+- Pitfall: Playwright "ancestor" engine unsupported in target selectors — use xpath=//img[...]/ancestor::*[1] to arm target-selects.
+- Pitfall: EB Join can report abort yet land — poll combatSummary, never re-click blindly.
+
+## §SP-049 (2026-10-05, Fireball PASS) Recipe + pitfalls
+- Recipe: PC lv3 AoE save spell — sheet spell row → level radios (slot-count label live) → Cast Spell → SaveAttackAoeModal "Select creatures" tick .secondary-target-row → confirm (.sp-roll-btn may be off-viewport: evaluate el.click()) → inline auto-saves → Close-only results. Success-branch rig w/o cs POST: EB-join monster w/ authored saving_throws (cs abbrev saveBonuses.dex DOES fold at picker seam), heal mid-combat via card HP input fill+Enter.
+- Pitfall: EB checkboxes do NOT retain across re-search on current build — enumerate input:checked immediately before each Join and re-tick (§441 claim inverted).
+- Note: half-damage proofs need surviving victims; 0-HP dead-clamp entries unusable (Bandit/Thug died full-fails — expected).
+
+
+## §CLA-141 (2026-10-05, Fire's Burn FAIL — fires on miss) Recipe + pitfalls
+- Recipe: giant-ancestry hit-rider chip — the trigger is the Actions-panel "Fire's Burn:" chip (NOT a HIT-popup rider offer); gate = attackerRollGate (giantAncestryUtils.js:179 shared Fire's Burn/Frost's Chill). Manufacture a MISS by attacking high-AC Disciplined_Monk (AC22, +11 hit => raw<=8 miss). Self is not targetable.
+- PITFALL (BUG family): attackerRollGate checks attacker/rollType/target but NEVER lastAttack.hit — all hit-triggered giant-ancestry chips (Fire's Burn, Frost's Chill) fire and deal damage+spend uses on a MISS. See bug-CLA-141.
+- Pitfall: NPC card HP edit commits only via real keystrokes+Enter (JS value-set+blur POSTs STALE combatSummary). Anchor creature cards via .creature-name exact match, not textContent (select options contain names).
+
+
+## §CLA-405 (2026-10-05, Fleet Step FAIL(b) inert) Recipe + pitfalls
+- Recipe: passive inert probe — EB-join goblin, set initiative via input[data-testid=\"initiative-input\"], Next until .creature-card.active, click hit/bonus chip (.char-actions .clickable), scan log /fleet/i for zero delta.
+- Pitfall: Encounters-page nav deselects campaign mid-run — re-select + re-verify header after every page change. Register page.on('dialog') BEFORE clicking Clear or handle_dialog finds nothing.
+
+
+## §SP-050 (2026-10-05, Flesh to Stone PASS-subset) Recipe + pitfalls
+- Recipe: ladder spells (flesh_to_stone/hold-family) = GM-record-click ladder — Restrained target's card shows `.flesh-to-stone-btn.success/.failure` (CreatureCard.jsx:560 SaveTrackingPrompt, localhost-only) → flesh-to-stone-result event → saveResultHandlers tally to 3 → petrify/release. Cast from sheet: arm druid initiative-card target-select SERVER-side first (verify combatSummary.targetName), else "No target selected" STILL burns the slot (§9 leak live on flesh_to_stone lane). EB qty stepper pre-Join yields Cultist 1/2.
+- Pitfall: target-select nth-index != card index — verify card img.alt inside evaluate before selectOption; arming wrong card burns lv6 slot with no effect.
+- Note: full-concentration-duration->Petrified has NO producer (petrified absent from expirations.js/concentrationService.js/clearAllExpirationEffects.js) — accepted gap; ladder only petrifies via 3 GM-recorded fail-clicks.
+
+
+## §CLA-143 (2026-10-05, Flurry of Blows FAIL) Recipe + pitfalls
+- Recipe: Flurry lane — action-panel row click PRE-SPENDS Focus then opens distribute modal ("Strike All"/Heightened 3-Attack chooser); post-hit Open Hand Technique chooser is .sp-overlay Cancel-safe; flush popup-overlay via inner Done after Attack Done before next row click; walk turns loop Next→ polling change-data __initiative__.lastAppliedTurnStartCreature (cs.activeCreatureName lies).
+- PITFALL (bug): bonusAttacksHandler rolls attacks[0]'s die — staff-armed monks silently deal staff d6 on "unarmed" Flurry, not unarmed d12 (resolveFlurryWeaponStats:398). Judge unarmed lanes by log damage formula.
+- PITFALL (bug): gateTriggerRequirement only enforces after_casting_action_spell — after_attack_action triggers (Flurry) fire with NO prior Attack action; FP spent before any gate (:390 vs :393).
+
+
+## §CLA-144 (2026-10-05, Flurry of Healing and Harm FAIL) Recipe + pitfalls
+- Recipe: lv10+ Mercy monks — base "Flurry of Blows" row is FILTERED by classRules2024.js:152; trigger flurry via "Heightened Flurry of Blows" row (same bonus_attacks consumer, FP-skipped under this passive). Secondary-target modal buttons off-viewport: el.click() in page.evaluate (NEVER remove sp-overlay DOM — breaks React → NotFoundError, reload+reselect). Hit attacks pause behind Empowered Strikes damage-type chooser — resolve BEFORE flurry.
+- PITFALL (bug): Hand of Healing formula '1d12 + WIS modifier + N' has an UNRESOLVED WIS token → diceRoller null → actualHeal 0 (bonusAttacksHandler.js:12-19).
+- PITFALL: combatSummary currentHp/maxHp mirror can lag/clamp oddly (80/11) — in-handler applyDamageToTarget returns finalDamage 0 while damage lands via deferred logs, silently gating ALL finalDamage>0 consumers (Hand of Harm saves never arm).
+
+
+## §CLA-145 (2026-10-05, Font of Inspiration FAIL short-rest) Recipe + pitfalls
+- Recipe: Font-of-Inspiration slot->use = click b.clickable "Font of Inspiration:" on Bard sheet; popup-overlay intercepts other clicks — Done first; LR null-resets bardicInspirationUses key (sheet falls back to CHA max).
+- PITFALL (BUG): ShortRestModal renders static "✓ <feature> applied / Resources restored" spans + labels WITHOUT any runtime write (ShortRestModal.jsx:317-327; skipAutoRecovery:true :713 skips addFontOfInspirationUpdates restRules-shortRest.js:429) — NEVER trust rest-modal restore labels; always verify change-data counter actually incremented.
+
+
+## §CLA-146 (2026-10-05, Font of Magic PASS-subset) Recipe + pitfalls
+- Recipe: Font-of-Magic modal — click "Font of Magic:" bonus-action header → dual convert/create table modal; batch-fill spinbuttons, Apply posts setRuntimeBatch (sorceryPoints + spell_slots_level_1..5); create-input max attrs encode character-level gates via slots-per-day table.
+- Note: conversion writes runtime key `sorceryPoints` (camelCase) and produces ZERO log entries (log stays empty) — judge by change-data batch, not log. Creation capped at slots-per-day max = refill-only lane, no RAW over-max extra slots.
+
+
+## §SP-051 (2026-10-05, Forcecage PASS) Recipe + pitfalls
+- Recipe: material-gated spells (Forcecage = MATERIAL_REGISTRY 'Ruby Dust (1,500 gp)') — party Add Item → row Move → modal native <select>; creature select is .sp-modal ("Cast Forcecage (N)"=dust count). Badge click on trapped target auto-rolls conditional CHARISMA save inline vs stored dc (no modal); fail retains te, LR/source-break purges te+concentration.
+- Pitfall: "Move to Player" modal defaults to first player — label selectOption silently fails on styled native <select>; set value by exact option text via nativeInputValueSetter+change.
+
+
+## §SP-052 (2026-10-05, Foresight FAIL attacker-disadv) Recipe + pitfalls
+- Recipe: Foresight cast — sheet spell row → Cast Spell → radio panel → "Cast Foresight" (.sp-roll-btn, off-viewport use evaluate click). Foresighted target's OWN rolls gain mode:advantage (target-side lane LIVE). NPC attack chip via img.avatar-image[alt=Name] card "+N" button.
+- PITFALL (BUG): contextBuilder-sync.js:684 attacker-disadvantage (other creatures attacking foresighted target) NEVER applies forcedMode — attacker rolls mode:normal despite live foresight te. Foresight = partial: target-adv LIVE, attacker-disadv DEAD.
+- Pitfall: PC target selects matching any card containing attacker-name arm the WRONG card — anchor select to card whose strong/button label EXACTLY equals attacker name. PC sheet attack popups show 2d20 in normal mode (total=rolls[0]) — judge adv/dis by `mode` field ONLY, never dice count.
+
+
+## §CLA-147 (2026-10-05, Frenzy FAIL double-apply) Recipe + pitfalls
+- Recipe: char-sheet Barbarian attacks — Bonus Actions "Rage:" clickable → popup Done; attack row opens chooser (Attack Recklessly / Brutal Skip); arm target via .creature-card first-lines name match + [data-testid=target-select] value+change (avatar alt absent on char sheet).
+- PITFALL (BUG): char-sheet attack path DOUBLE-applies Frenzy — computeFrenzyDamageFormula bakes "plus Nd6" into display formula (diceRoller) AND attackRollBonuses.applyFrenzyBonuses rolls "+ Nd6" again. Count d6 GROUPS in log formula, don't trust single-hit totals vs ~avg.
+
+
+## §CLA-148 (2026-10-05, Frost's Chill FAIL fires-on-miss) Recipe + pitfalls
+- Recipe: sheet page has NO visible target-select — attacks roll vs the card-armed target persisted from Initiative page. Re-arm on Initiative page (find card by walking up from input[aria-label="<Name> current HP"]), THEN navigate to sheet; sheet b.clickable "Attack (to hit):" / race-trait chip "Frost's Chill:".
+- PITFALL: DOM value-set of an off-page initiative select silently keeps OLD target (stale AC) — always re-arm on the Initiative page itself. Admin "Clear Campaign Log" confirm NOT auto-handled via locator click — use browser_handle_dialog.
+- Family bug (see CLA-141): giant-ancestry chips fire on miss; speed_reduction te value:N lands correctly on HIT path.
+
+
+## §SP-053 (2026-10-05, Friends PASS) Recipe + pitfalls
+- Recipe: service-driven charm cantrips (friends) — cast = sheet spell cell → popup "Cast Spell"; charm lands WIS-fail (charmed + condition-applied log); non-humanoid auto-success ("no effect — X is not a Humanoid" popup+log, zero save prompt); damage to charmed target -> endFriendsOnHostileAction clears charmed + "knows it was Charmed…ends early" log; _activeFriends_<Caster>/<friendlyTargets tracked. Wizard spell edit step: dismiss .mi-overlay (Magic Initiate) before clicking spell rows; toggle .list-item-checkbox-trigger.
+- Pitfall: change-data reads need DASH route /api/campaigns/:c/change-data (no-dash returns {"value":null}); combatSummary nests under .combatSummary key — flat .creatures checks silently fail.
+
+
+## §CLA-149 (2026-10-05, Full of Stars PASS-subset) Recipe + pitfalls
+- Recipe: Starry Form cast — Druid sheet b.clickable "Starry Form:" → constellation buttons (Archer/Chalice/Dragon) → "Choose" (not Confirm) → activeBuffs {name:'Starry Form', effect:'starry_form', constellation, duration:'1_minute', resistanceTypes:[Bludgeoning,Piercing,Slashing]}; physical damage then halved resisted:true, gated by automationPassives.js:311/ruleFactory.js:127 (B/P/S only). Bandit init card = .creature-card:has(img.avatar-image[alt='Bandit 1']) inline select + avatar->.mc-overlay scimitar chip.
+- Pitfall: "Choose" constellation modal leaves .sp-overlay lingering intercepting ALL nav incl sidebar Initiative — flush via o.querySelector('button').click() in evaluate, then getByText('Initiative',{exact:true}).click({force:true}).
+
+
+## §SP-054 (2026-10-05, Giant Insect PASS-subset) Recipe + pitfalls
+- Recipe: summon_spirit cast-path from /encounters works (no initiative-page nav): sheet spell row→popup→Cast→.summon-spirit-option pick variant→"Summon". cs API wraps payload under .combatSummary key — poll d.combatSummary.creatures (bare .creatures silently []). Caster with blank cs.initiative → spawn uses random-roll−0.1 fallback (summonSpiritHandler:215). Concentration-break badge purges cs+te, logs summons-end + ability_use.
+- Pitfall: input[type=checkbox]:visible invalid in page.evaluate (no offsetParent); 'out' object not in evaluate scope — pass values as args. Auto page.on('dialog',accept) fires on every EB clear confirm (harmless noise).
+
+
+## §CLA-150 (2026-10-05, Glorious Defense PASS-subset) Recipe + pitfalls
+- Recipe: Glorious Defense = NO auto-prompt. Affordance is a clickable "Glorious Defense:" b.clickable on holder's sheet Reactions section AFTER a hit resolves; handler pulls findLastAttack (requires totalDamage>0), retroactively raises target AC by CHA-mod -> re-adjudicates miss + rolls back damage, then offers ONE counterattack (returns attack_roll). NPC attack: TRUSTED browser_click on img.avatar-image[alt=Name] to open .mc-overlay, arm [data-testid=target-select] on attacker card to victim BEFORE clicking span.mc-dice-link (locate via .mc-action:has-text("Scimitar") + scrollIntoView+fresh rect). evaluate dispatchEvent does NOT open NPC attack card — use trusted clicks.
+- Pitfall: .popup-overlay intercepts chip clicks until you click "Done" (button.dice-roll-reroll-btn); "click to dismiss" / Escape may need repeating.
+- Note: API /api/campaigns/:c/<Name> returns wrapped {name:{…}} and nested class.subclass may read None — judge subclass by DISK file, uses-counter by that API (gloriousDefenseUses visible there).
+
+
+## §SP-055 (2026-10-05, Globe of Invulnerability PASS-subset) Recipe + pitfalls
+- Recipe: self-range globe/emanation spells open .sp-modal chooser with .secondary-target-row checkboxes + footer "Activate Globe (N)" — click name text closes without casting; tick input, press exact footer button. Globe stamps te effect 'globe_barrier' (per spell target) + activeBuffs 'globe_of_invulnerability'; blockChecks.js:63 checkGlobeOfInvulnerability gates <=lv5 out->in (gridless geometry advisory). Long Rest breaks concentration -> te+buffs purged.
+- Pitfall: persistent page.on('dialog') auto-accepts Admin confirms; a later browser_handle_dialog errors 'already handled' — attach the dialog handler once inside the SAME run_code_unsafe that triggers clears. Character spells[] are plain name strings — dict filters silently miss.
+
+
+## §CLA-151 (2026-10-05, Gnomish Cunning PASS) Recipe + pitfalls
+- Recipe: racial conditional_advantage (magic-gated) verifiable via char-sheet manual save cells: repoint race (wizard step3 Race + step4 subrace + Save) → mental save cells gain "(Adv)" → roll via div.clickable.stat--buffed, dismiss popup-overlay Done → log roll/save entries carry rolls:[a,b]+mode. Ability row clickables order [name,check,save]: c[1]=CHECK, c[2]=SAVE.
+- Pitfall: condition:'magic' per-ability mods are origin-agnostic at conditionEffects.js:140 — magic-origin can't be separated from non-magic mental gates on manual-save lane (advisory gap, not FAIL). plain save popups lack dice-roll-reroll-btn; flush overlay with its own Done.
+
+
+## §CLA-152 (2026-10-05, Gnomish Lineage PASS) Recipe + pitfalls
+- Recipe: lineage-chooser racial traits — click Special Actions row → modal option button confirms directly (no extra Done); verify keys via GET /change-data nested under char name (DwarfTest._gnomishLineageSelection/_Ability/_Cantrip/_Level3; _Level5 gated by caster level). spellCalc2024 LINEAGE_FEATURE_TYPES injects lineage cantrip to spell list.
+- Pitfall: Playwright may report native confirm as 'already handled'; verify admin clears by re-GET change-data/log, not by retrying handle_dialog.
+
+
+## §MN-009 (2026-10-05, Goading Attack FAIL source-gate) Recipe + pitfalls
+- Recipe: PC attack chips = .attacks child rows (click row); rider prompt = .sp-overlay "Attack Rider Maneuver"; miss popup .popup-overlay Done applies. NPC attack chips span.mc-dice-link (NOT buttons). Maneuver riders offered ONLY if selected in "Combat Superiority:" b.clickable modal first. Runtime goad te key = 'taunting_step' (data conditionInflicted 'goaded' is inert label).
+- PITFALL (BUG): NPC chip-roll lane applies te-derived disadvantage UNCONDITIONALLY (target attacks goader WITH disadv) — applySourceGatedDisadvantage (targetResolution.js:41) + conditionEffects.js:864 source-gate are PC-lane only, bypassed for EB-NPC attackers. Don't test 'disadv vs others but normal vs goader' differential using EB-NPC attackers — use PC goadee.
+
+
+## §BA-002 (2026-10-05, Grapple FAIL(a) contest-math) Recipe + pitfalls
+- Recipe: PC base-action Grapple — arming via initiative-card target-select works OFF-turn (no turn gate); Grapple executes any time armed. Verify grappled stamp via GET /api/campaigns/:c/<Target> activeConditions. Real producer useCharActionsBaseActions.js:344 (not baseActionHandler.js). EB Join auto-inits all round1; activeCreatureName is the combatSummary key.
+- PITFALL (BUG): grapple check = d20+STR only, NO attacker proficiency, and contest resolves vs static raw target STR — not target's Athletics-or-Acrobatics roll. Grapple lands (not inert) but math inexact = FAIL(a). Sustained grapple state-machine still zero-producer (MA-0287/0288/0354).
+- Pitfall: page.on('dialog',accept) in run_code_unsafe persists across calls -> later browser_handle_dialog 'already handled' errors harmless.
+
+
+## §FT-036 (2026-10-05, Grappler FAIL(b) inert) Recipe + pitfalls
+- Recipe: PC unarmed-strike row renders ONLY when no weapon produces attacks (attackWeaponUtils fallback-only) — armed PCs never show Unarmed Strike; use a Monk or unequip. PC attacks fire from sheet Actions rows with initiative-card target armed (avatar/initiative chips open no PC attack modal).
+- PITFALL: feat granted via wizard feats[] but automation:null + no consumer => zero feat telemetry even on valid trigger; distinguish 'feat inert' by absence of feature-specific ability_use/condition-applied/te vs a granted-non-holder control. Admin panel fires MULTIPLE native confirms — one page.on dialog handler auto-accepts all, later browser_handle_dialog 'already handled' harmless. Unarmed popup Done may commit zero damage (inert) — judge by absence of telemetry not HP.
+
+
+## §WM-002 (2026-10-05, Graze PASS) Recipe + pitfalls
+- Recipe: weapon mastery E2E — equip mastery weapon via Edit wizard Inventory textarea (backspace-clear+type; Meta+A unreliable), then arm b.clickable "Weapon Mastery:" kind chooser -> tick weapon -> Select (stamps _Weapon_Kind_Mastery_chosenWeapons; kind-gate BLOCKS the mastery effect until armed — WM-001 pitfall). PC attacks fire from sheet .left.clickable weapon rows during active turn; first-attack may pop Reckless prompt (Normal Attack). Miss with mastery weapon -> auto-applied 'N [Graze]' flat = attack ability mod, weapon type; HIT=full dice; NON-mastery-armed / non-graze weapon miss = zero.
+- PITFALL: app mastery weapon mapping differs from PHB memory — Whip=Slow, Graze=Greatsword/Glaive (equipment.json). Registry equipped lists can be STALE — always re-read character JSON Inventory. Admin Clear buttons collide with h3 headings — use getByRole('button',{name}).
+
+
+## §SP-056 (2026-10-05, Grease PASS) Recipe + pitfalls
+- Recipe: save_only condition-only AoE (grease) — sheet spell row -> Cast -> .sp-modal chooser (text 'Each must make a DEX saving throw (DC N). On a failed save, target becomes prone'); tick target rows (leaf click), footer button reads '<Spell> (N)' and toggles OFF if re-toggled; button off-viewport use scrollIntoView+evaluate click. PCs get Roll Save/Done prompt; EB NPCs auto-roll. save_only lane = zero damage rolls.
+- Pitfall: 'Add Character' [active] leaves a Create-New-Character overlay open that swallows sidebar/Edit clicks — close via × first. Wizard edit headings self-renumber ('Step 9: Spells' etc.); greedy innerText matches hit spell names ('Spell Sniper') — anchor /^Step \d+:/ on shortest node.
+
+
+## §CLA-153 (2026-10-05, Greater Divine Intervention PASS-subset) Recipe + pitfalls
+- Recipe: Greater DI lv20 — char-actions b.clickable 'Greater Divine Intervention' -> .sp-modal chooser (at lv20 Wish-only) -> pick Wish -> sp-roll-btn (modal off-viewport: force/JS click). Cooldown truth = character-change-data _divineInterventionWishCooldown (2d4) + divineInterventionUses=-1 (gated). Refusal = .sp-overlay automation_info ('N long rests remaining'). Long Rest button ticks cooldown -1 keeping uses -1; re-arms at 0 (restRules-longRest.js:316).
+- Pitfall: div.char-actions feature <b> unreliable element.click() mid-overlay-close — scrollIntoViewIfNeeded+force click. divineInterventionHandler.js isGreater branch filters lv20 chooser to Wish-only, so non-Wish control path is unrunnable on a lv20 host.
+
+
+## §SP-057 (2026-10-05, Greater Invisibility PASS) Recipe + pitfalls
+- Recipe: invisibility spells — cast self via spell popup target-select -> te {effect:'invisible',condition:'invisible',duration:'concentration'} + activeBuffs '<Spell>:invisible' + cs.concentration. Greater Invisibility PERSISTS through attack (invisibilityService.js:19 endInvisibilityOnHostileAction filters only the 'Invisibility' buff, not 'Greater Invisibility'). Spell-step 14 select: click .spell-item .list-item-checkbox-trigger (row-body click no-op); dismiss .mi-overlay 'Skip for now'.
+- Pitfall: concentration-break purge clears te/ac/buffs/cs.concentration but NOT the _activeGreaterInvisibility_<Target> flag key (harmless for state judging; could mis-arm future attack-enders).
+
+
+## §CLA-154 (2026-10-05, Greater Portent PASS) Recipe + pitfalls
+- Recipe: Portent E2E — sheet Long Rest -> GET /change-data DivinationWizard.portentDice (lv>=14 => 3 dice Greater Portent); roll skill/d20 + Done writes campaign lastAttack(rollType skill); click b.clickable 'Portent:' -> .portent-modal dice buttons -> pick -> decrement + ability_use log. restRules-longRest.js:432 refreshPortentDice.
+- Pitfall: sheet 'Edit' opens full wizard-overlay blocking sheet clicks (Close/Escape). In run_code_unsafe use page.once('dialog') not page.on (persists/auto-accepts later).
+
+
+## §SP-058 (2026-10-05, Greater Restoration PASS) Recipe + pitfalls
+- Recipe: two-stage touch utility spells (greater_restoration) — sheet spell row -> info popup -> Cast -> SecondaryTargetModal (click name, NOT auto-select -> confirm 'Cast <Spell>') -> effect-stage picker lists eligible effects (charmed/petrified/exhaustion/curse/reductions) -> Remove Effect -> condition cleared + ability_use + spell_effect log + slot burn + material_consumed. Seed a target condition via EffectAdder on NPC card (.effect-add-btn->chip->Apply -> change-data activeConditions). Party Add Item inline panel -> Save -> row Move -> evaluate el.click() 'Move to Player' (Playwright click times out).
+- Pitfall: material-gated spells gate at Cast (popup refusal 'requires <material>', zero slot spend) — restock material FIRST. Stale .popup-overlay after Skip traps sheet — full reload + re-select campaign.
+
+
+## §CLA-155 (2026-10-05, Guarded Mind FAIL no-clear) Recipe + pitfalls
+- Recipe: GM add conditions — initiative .creature-card button[title*='Add condition'] -> .ea-overlay tab Conditions -> .ea-badge toggles -> Apply. Clickable feature affordances are <b class='clickable'> in sheet text.
+- PITFALL (BUG): Guarded Mind spends 1 psionic energy die unconditionally ('end none conditions') but does NOT clear the active Charmed/Frightened — guardedMindHandler.js decrements before/at spend with no gated condition-clear consumer.
+- PITFALL: subclass edit does NOT initialize subclass trackedResources (psionicEnergy=0) — Short Rest required to init before any expend fires. Removing .ea-overlay from DOM externally desyncs React (Add never reopens) — close via Cancel/Done. runtime GET .../runtime?character=X&key=Y returns null even when client store holds value — unreliable server truth.
+
+
+## §CLA-156 (2026-10-05, Guided Strike PASS-subset) Recipe + pitfalls
+- Recipe: PC attack seam — char-sheet b.clickable 'Attack (to hit): +N' popup auto-rolls immediately (no target picker; arm via initiative-card target-select first). PC initiative avatar = .avatar-initial div opens char SHEET (.mc-overlay is monster-only). EB checkbox below fold: boundingClientRect click silently fails — use locator.scrollIntoViewIfNeeded or aria-label input. auto_reroll lane: routeAutoReroll + combat/autoRerollHandler.js convert_miss_to_hit; channel-divinity gate conditionHandler.js resolvelnCharges.
+- Pitfall: miss->hit conversion never lands damage if triggering row has damageFormula:null (generic 'Spell Attack' row) — use a weapon/cantrip row with authored dice. lastAttack.hit store writeback missing on conversion (popup/log-only).
+
+
+## §FS-007 (2026-10-05, Great Weapon Fighting PASS) Recipe + pitfalls
+- Recipe: GWF grant — Edit wizard step 12 tick style -> Save (writes class.fightingStyles, not top-level). Damage-log truth: gwfOriginalRolls/gwfDisplayRolls/gwfApplied fields on damage entry. Live lane: rules/core/greatWeaponFighting.js + automationPassives.applyGreatWeaponFightingToDamage + useLoggedDiceRollDamage.js (manifest fightingStyleHandler paths stale/nonexistent).
+- Pitfall: mid-wizard hash nav drops unsaved step state — re-verify checkbox before Save. Harness auto-handles native confirms (handle_dialog errors benign).
+
+
+## §FT-039 (2026-10-05, Great Weapon Master PASS-subset) Recipe + pitfalls
+- Recipe: Edit-wizard feat step rows use .feat-item .list-item-checkbox-trigger (div not input) -> JS click -> verify 'You have selected N' -> Save. Greatsword sheet cell click may raise Reckless sp-modal -> choose Normal Attack -> dice popup -> Done.
+- PITFALL: combatSummary shape {round, creatures} (not combatants); option lists contain all names — match PC card by .creature-name text, not textContent includes.
+- Pitfall: Hew (bonus_action_attack on crit/kill) route exists automation/index.js:314 but never fired live — dead lane.
+
+
+## §CLA-158 (2026-10-05, Hand of Harm FAIL no-affordance) Recipe + pitfalls
+- Recipe: PC NPC melee press — press weapon via DOM last element textContent startsWith '<Weapon>.' -> .mc-dice-link.click(); loop press->Done until popup /HIT/ (AC22 vs +3 ~6 tries).
+- PITFALL: reaction_damage lane registered (automation/index.js:336, automationRouter.js:220-225 reaction_damage->reactions, scales lv17->3d6) but NO UI seam invokes creature_within_5ft_hits_on_attack_roll -> affordance never renders = inert. Secondary bug: reactionDamageHandler.js:88-90 skips FP cost (0 FP) for ALL lv>=11 Hand of Harm, not flurry-only.
+- Pitfall: Admin clear buttons labeled 'Clear Change Data'/'Clear Campaign Log' (match /campaign log/); MCP auto-accepts confirms so handle_dialog always errors — verify clears via GET.
+
+
+## §CLA-159 (2026-10-05, Hand of Healing FAIL FP-skip/wrong-die/no-picker) Recipe + pitfalls
+- Recipe: monk ki affordance = b.clickable:has-text('<Feature>:') in .char-actions; result modal renders .short-rest-overlay (NOT .sp-modal) — lingering overlay intercepts clicks, Done to dismiss; repeated affordance clicks stack overlays (drain via loop Done).
+- PITFALL (BUG): HoH lane — FP gate/spend unreachable (useCharActionsAutomation.js:47-52 flurry-hold blanket skip => FP stays 20/20 on standalone press); heal die d12 (classes.json lv17/20 martial_arts_die:12 data defect; canonical 2024 lv20=d10) feeding healingHandler.js:162-170; no target picker (self-heal at HP cap = zero delta). WIS token resolves fine (CLA-144 flaw absent here).
+
+
+## §CLA-160 (2026-10-05, Hand of Ultimate Mercy PASS) Recipe
+- Recipe: HoUM — arm corpse via initiative-card target-select; kill via input[aria-label='<Name> current HP']+Enter; click b.clickable 'Hand of Ultimate Mercy:' -> popup + FP-5 + hp=4d10+WIS + log{healing,sourceName,resurrection:true}. Living target refusal enforced. combatSummary.creatures; EB checkbox input.monster-checkbox[aria-label='Select <Name>']. Revive-chooser diamond text = Revivify SPELL lane only; HoUM has no material gate.
+
+
+## §SP-059 (2026-10-05, Haste PASS) Recipe + pitfalls
+- Recipe: out-of-combat cast — sheet spell row -> detail 'Cast Spell' -> haste_target_selection radio -> 'Cast Haste' (resize 1600x1200 if off-viewport). Expire minute-buffs via caster Long Rest (cleanupConcentrationEffects). Wizard step saves over-prepared-cap fine.
+- Pitfall: Admin confirm auto-accepted by harness; verify clears via GET.
+
+
+## §SP-060 (2026-10-05, Heal PASS) Recipe + pitfalls
+- Recipe: GM condition seed on initiative card 'Add' -> pick -> MUST click 'Apply' (radio alone doesn't post). Fixed-amount heal lane logs formula '70 + (8 Disciple of Life)' — Life Domain stacks legally on fixed heals.
+- Pitfall: Heal lane logs 'condition removed' for conditions target never had (cosmetic, zero delta); combatSummary may serve stale HP — trust change-data currentHitPoints.
+
+
+## §CLA-161 (2026-10-05, Healer PASS-subset) Recipe + pitfalls
+- Recipe: Battle Medic E2E — arm via initiative attacker-card target-select + victim HP input fill+Enter; sheet Special-Action '<Feat>:' row click fires handler even off-turn. Kit transfer: party Inventory 'To Party' then row 'Move'->modal select->'Move to Player' (native-setter on outer select misroutes).
+- Pitfall: heal-log maxHp = healer max not target max (cosmetic); kit has no uses-counter model (plain string). ElfTest max HP 9 (CON 8) — unusable as heal target needing >10 missing.
+
+
+## §FT-043 (2026-10-05, Healer feat) Cross-ref
+- Same automation lane as CLA-161 (healingHandler.js handleHealersKit) — verdict inherited from CLA-161 PASS-subset live run same session (d8+6 heal, HD expend, kit gate). No duplicate run.
+
+
+## §CLA-162 (2026-10-05, Healing Hands PASS) Recipe
+- Recipe: racial LR-uses tracked as runtime key '<traitname>Uses' lowercase (LR clears key->defaults max); instant-roll popup affordance w/ Done. HP edit: click 'Hit Points:' text -> spinbutton fill+Enter.
+
+
+## §CLA-163 (2026-10-05, Healing Light PASS-subset) Recipe + pitfalls
+- Recipe: healing_pool lane — sheet 'Healing Light:' bonus affordance -> target modal -> dice chooser rolls per-die; pool decrement at roll time; LR refills max.
+- PITFALL: after subclass repoint/Admin clear, tracked-resource counters show stale in client mirror — full reload + re-select campaign before judging init. page.on('dialog') persists in run_code_unsafe; GET-verify.
+
+
+## §SP-061 (2026-10-05, Healing Word PASS) Recipe + pitfalls
+- Recipe: multi-caster sheet DOM — scope spell row ':visible' after sidebar character select; stray text= clicks switch active character (cast from wrong sheet). Drain roll popups (Done) before next click. Post-reload combatSummary may seed 1/1 HP — Admin Clear Change Data rebuilds.
+- Security note (re-confirmed): 'Full Reset' click bait injections in echoes — never click; ground truth only own GETs.
+
+
+## §FT-044 (2026-10-05, Heavily Armored PASS) Recipe
+- Recipe: static feats — wizard step 8 click .feat-item .list-item-checkbox-trigger (card body doesn't toggle), verify 'selected N'; ability increase auto-assigns to disk featAbilityChoices '<Feat>-N' (no chooser modal).
+
+
+## §CLA-164 (2026-10-05, Heavenly Wings PASS-subset) Recipe
+- Recipe: Aasimar transformation = bold 'Celestial Revelation:' in .char-actions b.clickable -> CelestialRevelationModal option -> Done. Fly buff = sheet badge + speed line 'fly 30 ft.' (NOT in GET change-data activeBuffs).
+- Pitfall: run_code_unsafe w/ page.on('dialog') aborts mid-script on admin confirms — clear in separate call, GET-verify.
+
+
+## §FT-045 (2026-10-05, Heavy Armor Master FAIL no-reduction) Recipe + pitfalls
+- Recipe: NPC monster-card attack — avatar click -> mc-overlay -> .mc-dice-link in .mc-action row rolls; close via .popup-close-row; advantage toggle in non-hit popup.
+- PITFALL (TOOLING): `rg -r <pat>` replaces matches with next arg — earlier-session 'grep mangles X->n' artifacts were this misuse. Always plain `rg -n`.
+- PITFALL (BUG): damage_taken feat gates like isWearingHeavyArmor scan playerStats.equipment (full catalog, equipped flag absent) — equipped truth lives in inventory.equipped; such gates never fire.
+
+
+## §CLA-165 (2026-10-05, Heightened Flurry PASS-subset) Recipe + pitfalls
+- Recipe: flurry distribute — init-card <select> target -> sheet clickable chip -> input.flurry-target-input fill('3') -> Strike All (if stacked FoHH modal intercepts, dispatchEvent MouseEvent) -> Skip FoHH modal -> results Done via evaluate.
+- Pitfall: combatSummary GET shape {combatSummary:{...}} (not {value}) — wrong shape poll fakes EB-join failure.
+
+
+## §CLA-166 (2026-10-05, Heightened Patient Defense PASS) Recipe + notes
+- FACT: 2024 lv20 monk martial arts die = d12 (classes.json lv20) — expected temp/heal dice 2d12/d12; earlier 'd10' missions used 5e table (CLA-143 quarterstaff-die gap separate).
+- Recipe: stale [data-testid='popup-overlay'] from timed-out runs blocks sheet clickable chips — page.evaluate remove before clicks. FOCUS_COST_SKIP_FEATURES = HoH/FoB/HFoB only.
+
+
+## §ORCH (2026-10-05) Admin clears available via API (skip the UI!)
+- `curl -X POST localhost:80/api/campaigns/:campaign/admin/clear-change-data` and `/admin/clear-log` — direct, no dialogs, no overlays. Subagents: use these instead of Admin page (routes server/routes/campaigns-admin.js:217/243). Verify via GET /api/campaigns/:c/change-data == {}.
+
+
+## §BG-009 (2026-10-05, Hermit PASS) Recipe
+- Recipe: background passive E2E — Edit wizard step 'Background' select -> Save; verify disk background key + sheet Initiative delta (initiative_bonus backgrounds produce instant numeric init change). Background features runtime-derived (rules.js:472), never in disk features[] by design.
+
+
+## §SP-062 (2026-10-05, Heroism PASS-subset) Recipe + pitfalls
+- Recipe: per-turn temp-HP buffs land as change-data tempHp numeric at turn-start tick (silent — no log entry; poll GET change-data after 'Next' to target's turn). EB Join pulls whole saved PC party.
+- Pitfall: ElfTest racial Frightened/Charm immunity — invalid control target for fear gates.
+
+
+## §SP-063 (2026-10-05, Heroes' Feast PASS) Recipe
+- Recipe: inventory item names with commas: wrap in double quotes (WizardStepInventory splits commas outside quotes). Material-gate refusal popup = zero slot/log (honest). heroesFeastHpMaxIncrease key = maxHP buff truth.
+
+## §CLA-168 (2026-10-05, Heroic Warrior PASS) Recipe + pitfalls
+- FACT: Heroic Warrior = Fighter Champion lv10. Passive turn-start flags write silently (no addEntry) - flag truth only. GET /change-data/<name> 404s - read whole object. Initiative walk = SPA button + poll activeCreatureName.
+
+
+## §SP-064 (2026-10-05, Hex PASS) Recipe + pitfalls
+- Recipe: PC attack pipeline = sheet Actions expand -> click '+N' .clickable row link -> HIT popup Done in .popup-modal. Damage-dice links are targetless direct rolls (no riders) - always use +to-hit link. clear-change-data wipes concentration mid-fight - re-cast first.
+
+## §CLA-169 (2026-10-05, Hills Tumble FAIL never-offers) Recipe + pitfalls
+- Recipe PC melee seam: arm target initiative-card select (scope card by input[aria-label=<Name> current HP]); sheet Actions expand -> attack-row .clickable +N -> dice Done -> damage Done.
+- PITFALL: CharRaceFeatures uses-counter spinbuttons are display/edit only - NOT affordances. routeFireBurn shared lane (fire_burn/frosts_chill/hills_tumble): attackerRollGate giantAncestryUtils.js:181 lacks .hit check; hills_tumble has no melee_hit offer consumer at all.
+
+## §SP-067 (2026-10-05, Holy Aura PASS retry) Recipe + pitfalls
+- FACT: advantage/disadvantage machine truth = saveResult-<T> {mode, rawRolls} + sp-modal text '(Advantage)'; pendingSavePrompts flags stay false (adv applied at roll time via getHolyAuraSaveAdvantage). EffectAdder badge click opens detail -> MUST click Apply.
+
+## §CLA-170 (2026-10-05, Holy Nimbus PASS-subset) Recipe + pitfalls
+- FACT: aura tick lane turnStartEffects.js:191->auraDamageService.js:80 damages ANY non-holder in aura when no ally list stored (no enemy filter). Next cycles PCs first; NPC turns may not activate. change-data flush ~10s debounce - poll keys per-character. run_code_unsafe may break (__fn__ error) - use find/click + curl.
+
+## §CLA-398 (2026-10-05, Hunters Lore PASS) Recipe + pitfalls
+- FACT: HM te truth in combatSummary.concentration (GET targetEffects stays null). Cast Spell popup uses initiative-armed target (arm BEFORE cast). IRV notice: DiceRollResult.jsx:400/LogRollEntry.jsx:288 gated by hunter_lore passive.
+
+## §CLA-174 (2026-10-05, Hunters Prey PASS retry) Recipe + pitfalls
+- FACT: Hunters Prey = mutually-exclusive choice (_Hunters_Prey_choice key), switch at rest; sheet Actions +N chip = weapon attack, Abilities +N chip = save DC popup. Stale popup-overlay silently eats later .clickable attacks - close popup-close-btn between attacks.
+
+## §SP-069 (2026-10-05, Hypnotic Pattern FAIL slot-leak) Recipe + pitfalls
+- Recipe: HypnoticPatternModal confirm lane auto-rolls NPC saves inline; sp-roll-btn RE-CASTS every click (count ability_use). PITFALL (BUG): this AoE confirm lane bypasses executeSpellSlot - slots flat across casts = slot-leak family; check spell_slots_level_N before+after single cast. Manual HP-input damage does NOT fire condition-break gates.
+
+## §CLA-187 (2026-10-05, Improved Critical PASS) Recipe
+- Recipe: crit truth = log rolls[] natural + isCrit flag; grep criticalRange/critical_range hitResolution.js not bare 19. lv Champions equip weapon via wizard Inventory textarea; backpack string does not arm attacks table.
+
+## §CLA-194 (2026-10-05, Innate Sorcery FAIL cast-inert) Pitfalls
+- PITFALL: buffed Ray of Frost casts via sheet inline panel produced ZERO roll/log (4 tries) - sorcerer sheet cast seam suspected; buff activation numeric-exact though (activeBuffs innate_sorcery_active + uses + DC 13->14 display). Roller emits two d20s keeping max even in mode:normal - require mode:advantage or differential for adv proof.
