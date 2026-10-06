@@ -9,17 +9,29 @@ import { DEBUG_FORCE_CRIT } from '../../../ui/utils.js';
 import { applyHealingDirectly } from '../../common/healingRoll.js';
 import { createSaveListener, buildSaveDc } from '../../common/savePrompt.js';
 
-function resolveHealingStrikeFormula(handOfHarmAuto, playerStats) {
-    const healFormula = handOfHarmAuto?.healExpression || 'martial_arts_die + WIS modifier';
+// CLA-144: resolve EVERY token in the heal formula to a number before
+// rollExpression — the unresolved literal 'WIS modifier' made parseExpression
+// fail (null) so every Hand of Healing flurry strike healed 0. Mirrors the
+// verified token lane (rules/effects/turnStartEffects.js WIS modifier
+// substitution, summonSpiritHandler.js). The formula itself already carries
+// the WIS term, so nothing is appended a second time.
+function resolveHealingStrikeFormula(handOfHealingAuto, playerStats) {
+    const healFormula = handOfHealingAuto?.healExpression || 'martial_arts_die + WIS modifier';
     const martialArtsDie = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.martial_arts_die || 4;
     const wisBonus = playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0;
-    return { resolved: healFormula.replace(/martial_arts_die/gi, `1d${martialArtsDie}`), wisBonus };
+    const resolved = healFormula
+        .replace(/martial_arts_die/gi, `1d${martialArtsDie}`)
+        .replace(/WIS modifier/gi, String(wisBonus));
+    return { resolved, wisBonus };
 }
 
-async function applyHealingStrike({ featureName, playerName, playerStats, campaignName, healingTarget, handOfHarmAuto, flurryHealingHarmUses }) {
-    const { resolved: resolvedHealFormula, wisBonus } = resolveHealingStrikeFormula(handOfHarmAuto, playerStats);
-    const healResult = rollExpression(`${resolvedHealFormula} + ${wisBonus}`);
+async function applyHealingStrike({ featureName, playerName, playerStats, campaignName, healingTarget, handOfHealingAuto, flurryHealingHarmUses }) {
+    const { resolved: resolvedHealFormula, wisBonus } = resolveHealingStrikeFormula(handOfHealingAuto, playerStats);
+    const healResult = rollExpression(resolvedHealFormula);
     const healAmount = healResult?.total || 0;
+    if (!healResult) {
+        console.error('[bonusAttacksHandler:heal] rollExpression returned null for fully numeric formula — no heal applied:', { resolvedHealFormula, playerName, healingTarget });
+    }
 
     const healTargetStats = getRuntimeValue('characters', 'characters', campaignName)
         ?.find(c => c.name === healingTarget) || playerStats;
@@ -43,7 +55,7 @@ async function applyHealingStrike({ featureName, playerName, playerStats, campai
         characterName: playerName,
         rollType: 'damage',
         name: 'Hand of Healing',
-        formula: `${resolvedHealFormula} + ${wisBonus}`,
+        formula: resolvedHealFormula,
         rolls: healResult?.rolls || [],
         total: healAmount,
         modifier: wisBonus,
@@ -166,7 +178,14 @@ async function applyFlurryAttackDamage({ cs, targetName, damageFormula, damageTy
     const rawDamage = rollResult?.total || 0;
 
     const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    const applyResult = applyDamageToTarget(cs, targetName, rawDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
+    // CLA-144: applyDamageToTarget is ASYNC — calling it un-awaited made
+    // applyResult a Promise, so finalDamage read 0 on every flurry strike and
+    // silently gated every finalDamage>0 consumer (Hand of Harm saves never armed).
+    const applyResult = await applyDamageToTarget(cs, targetName, rawDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
+
+    if (!applyResult) {
+        console.error('[bonusAttacksHandler] applyFlurryAttackDamage: applyDamageToTarget returned null — damage not applied:', { targetName, rawDamage, playerName });
+    }
 
     const finalDamage = applyResult?.finalDamage || 0;
     const damageResult = {
@@ -195,21 +214,46 @@ function resolveHandOfHarmExpression(handOfHarmAuto, playerStats) {
     return damageExpression;
 }
 
-function registerHandOfHarmSave({ isHandOfHarmStrike, handOfHarmAuto, finalDamage, cs, targetName, playerName, playerStats, featureName, campaignName, targetSnapshots, handOfHarmSavePromises, totalDamageRef }) {
-    if (!isHandOfHarmStrike || !handOfHarmAuto || finalDamage <= 0) return;
+function logHandOfHarmRefusal(campaignName, playerName, description) {
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerName,
+        automationType: 'hand_of_harm_refused',
+        description,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[bonusAttacksHandler:harm-refused]', e); });
+}
+
+function registerHandOfHarmSave({ isHandOfHarmStrike, handOfHarmAuto, finalDamage, rawDamage, cs, targetName, playerName, playerStats, featureName, campaignName, targetSnapshots, handOfHarmSavePromises, totalDamageRef }) {
+    if (!isHandOfHarmStrike) return;
+
+    if (!handOfHarmAuto) {
+        logHandOfHarmRefusal(campaignName, playerName, `${playerName}'s Flurry strike hit ${targetName} but Hand of Harm automation could not be resolved — no CON save prompted.`);
+        return;
+    }
+
+    // RAW: Hand of Harm triggers when the strike "deals damage" — a strike
+    // zeroed by immunity/death-clamp legitimately prompts no save. Zero-silent:
+    // refusals log (CLA-107 no-fallback rule).
+    if (finalDamage <= 0) {
+        logHandOfHarmRefusal(campaignName, playerName, `Hand of Harm not triggered — the strike on ${targetName} dealt 0 damage (rolled ${rawDamage}, immunity or death-clamp), so no Constitution save is prompted.`);
+        return;
+    }
 
     const saveDc = buildSaveDc(handOfHarmAuto, playerStats);
+    const damageExpression = resolveHandOfHarmExpression(handOfHarmAuto, playerStats);
     const { promptId, promise } = createSaveListener(campaignName, {
         targetName,
         attackerName: playerName,
         saveType: handOfHarmAuto.saveType || 'CON',
         saveDc,
         sourceName: featureName,
+        damageFormula: damageExpression,
+        damageType: handOfHarmAuto.damageType || 'Necrotic',
     });
 
-    const damageExpression = resolveHandOfHarmExpression(handOfHarmAuto, playerStats);
-
-    const handleSaveResult = async (saveDetail) => {
+    const handleSaveResult = async (saveEvent) => {
+        const saveDetail = saveEvent?.detail || {};
         if (saveDetail.promptId !== promptId) return;
 
         if (!saveDetail.success) {
@@ -231,9 +275,14 @@ async function applyHandOfHarmDamage({ cs, targetName, damageExpression, handOfH
 
     const harmDamageType = handOfHarmAuto.damageType || 'Necrotic';
     const harmCharacters = getRuntimeValue('characters', 'characters', campaignName) || [];
-    const harmApplyResult = applyDamageToTarget(cs, targetName, necroticDamage, [harmDamageType], { campaignName, characters: harmCharacters, ignoreResistance: false, attackerName: playerName });
+    const harmApplyResult = await applyDamageToTarget(cs, targetName, necroticDamage, [harmDamageType], { campaignName, characters: harmCharacters, ignoreResistance: false, attackerName: playerName });
 
-    const finalHarmDamage = harmApplyResult?.finalDamage || 0;
+    if (!harmApplyResult) {
+        console.error('[bonusAttacksHandler:harm] applyDamageToTarget returned null — Hand of Harm necrotic damage not applied:', { targetName, necroticDamage, playerName });
+        return;
+    }
+
+    const finalHarmDamage = harmApplyResult.finalDamage || 0;
     totalDamageRef.value += finalHarmDamage;
 
     const snapshot = targetSnapshots[targetName] || {};
@@ -265,7 +314,7 @@ async function applyHandOfHarmDamage({ cs, targetName, damageExpression, handOfH
     }).catch((e) => { console.error("[bonusAttacksHandler:harm-log-error]", e); });
 
     if (handOfHarmAuto.alsoInflicts) {
-        const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+        const storedEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
         const newEffects = [...storedEffects, {
             target: targetName,
             source: featureName,
@@ -274,13 +323,22 @@ async function applyHandOfHarmDamage({ cs, targetName, damageExpression, handOfH
             duration: 'until_used',
         }];
         await setRuntimeValue('campaign', 'targetEffects', newEffects, campaignName);
+
+        addEntry(campaignName, {
+            type: 'condition',
+            characterName: targetName,
+            action: 'applied',
+            condition: 'Disadvantage on next attack roll',
+            reason: `${playerName}'s Hand of Harm (${featureName}, failed Constitution save)`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[bonusAttacksHandler:harm-condition]', e); });
     }
 }
 
 async function resolveFlurryHitStrike(ctx) {
     const {
         cs, targetName, damageFormula, damageType, isCrit, campaignName, playerName,
-        hasFlurryHealingHarm, healingTarget, handOfHarmAuto, openHandFeature,
+        hasFlurryHealingHarm, healingTarget, handOfHarmAuto, handOfHealingAuto, openHandFeature,
         pendingOpenHandTargets, playerStats, featureName,
     } = ctx;
 
@@ -294,7 +352,7 @@ async function resolveFlurryHitStrike(ctx) {
     if (isHealingStrike) {
         const outcome = await applyHealingStrike({
             featureName, playerName, playerStats, campaignName,
-            healingTarget, handOfHarmAuto, flurryHealingHarmUses,
+            healingTarget, handOfHealingAuto, flurryHealingHarmUses,
         });
         flurryHealingHarmUses = outcome.flurryHealingHarmUses;
         damageResult = outcome.damageResult;
@@ -308,7 +366,7 @@ async function resolveFlurryHitStrike(ctx) {
         ctx.totalRolledRef.value += damageResult.rawDamage;
 
         registerHandOfHarmSave({
-            isHandOfHarmStrike, handOfHarmAuto, finalDamage, cs, targetName,
+            isHandOfHarmStrike, handOfHarmAuto, finalDamage, rawDamage: damageResult.rawDamage, cs, targetName,
             playerName, playerStats, featureName, campaignName, targetSnapshots: ctx.targetSnapshots,
             handOfHarmSavePromises: ctx.handOfHarmSavePromises, totalDamageRef: ctx.totalDamageRef,
         });
@@ -380,20 +438,52 @@ function logFlurryStrikeRolls(attackResult, ctx) {
     }
 }
 
+// CLA-144: Hand of Harm has casting_time '1 reaction' so feature
+// categorization files it under playerStats.reactions (featureCategorizationUtils
+// CASTING_TIME_CATEGORY) — a specialActions-only search found nothing and the
+// Hand of Harm save never armed. Search the row arrays, then the built
+// automation.reactions (reaction_damage builder output already carries the
+// level-scaled damageExpression and the WIS-based saveDc).
+function resolveHandOfHarmAutomation(playerStats) {
+    const specialActionRow = (playerStats.specialActions || []).find(a => a.name === 'Hand of Harm');
+    if (specialActionRow?.automation) return specialActionRow.automation;
+
+    const reactionRow = (playerStats.reactions || []).find(a => a.name === 'Hand of Harm');
+    if (reactionRow?.automation) {
+        // Monk spellcasting ability is Wisdom — buildSaveDc's 'ability' path
+        // defaults to CON without this stamp.
+        return { ...reactionRow.automation, saveAbility: reactionRow.automation.saveAbility || 'WIS' };
+    }
+
+    const builtReaction = (playerStats.automation?.reactions || []).find(r => r.type === 'reaction_damage' && r.name === 'Hand of Harm');
+    if (builtReaction) return builtReaction;
+
+    return null;
+}
+
+function resolveHandOfHealingAutomation(playerStats) {
+    const row = (playerStats.bonusActions || []).find(a => a.name === 'Hand of Healing')
+        || (playerStats.specialActions || []).find(a => a.name === 'Hand of Healing')
+        || (playerStats.reactions || []).find(a => a.name === 'Hand of Healing');
+    return row?.automation || null;
+}
+
 function resolveFlurryHealingHarm(playerStats, campaignName) {
     const hasFlurryHealingHarm = playerStats.specialActions?.some(f => f.name === "Flurry of Healing and Harm");
     let flurryHealingHarmUses = 0;
     let handOfHarmAuto = null;
+    let handOfHealingAuto = null;
 
     if (hasFlurryHealingHarm) {
         flurryHealingHarmUses = Number(getRuntimeValue(playerStats.name, 'flurryHealingHarmUses', campaignName) || 0);
-        const handOfHarmAction = playerStats.specialActions?.find(a => a.name === "Hand of Harm");
-        if (handOfHarmAction) {
-            handOfHarmAuto = handOfHarmAction.automation;
+        handOfHarmAuto = resolveHandOfHarmAutomation(playerStats);
+        handOfHealingAuto = resolveHandOfHealingAutomation(playerStats);
+        if (!handOfHarmAuto) {
+            console.error('[bonusAttacksHandler] Flurry of Healing and Harm held but Hand of Harm automation not found in specialActions/reactions/automation.reactions — harm saves will refuse:', playerStats.name);
         }
     }
 
-    return { hasFlurryHealingHarm, flurryHealingHarmUses, handOfHarmAuto };
+    return { hasFlurryHealingHarm, flurryHealingHarmUses, handOfHarmAuto, handOfHealingAuto };
 }
 
 // CLA-143: attackType:'unarmed_strike' rows (Flurry of Blows / Heightened
@@ -466,7 +556,7 @@ export async function applyFlurryOfBlows({ action, playerStats, campaignName, _m
     const openHandFeature = playerStats.automation?.actions?.find(a => a.type === 'open_hand_technique');
 
     const flurryHarmSetup = resolveFlurryHealingHarm(playerStats, campaignName);
-    const { hasFlurryHealingHarm, handOfHarmAuto } = flurryHarmSetup;
+    const { hasFlurryHealingHarm, handOfHarmAuto, handOfHealingAuto } = flurryHarmSetup;
     let flurryHealingHarmUses = flurryHarmSetup.flurryHealingHarmUses;
 
     for (const [targetName, attackCount] of Object.entries(distribution)) {
@@ -484,7 +574,7 @@ export async function applyFlurryOfBlows({ action, playerStats, campaignName, _m
             if (hit) {
                 const outcome = await resolveFlurryHitStrike({
                     cs, targetName, damageFormula, damageType, isCrit, campaignName, playerName,
-                    hasFlurryHealingHarm, healingTarget, handOfHarmAuto, openHandFeature,
+                    hasFlurryHealingHarm, healingTarget, handOfHarmAuto, handOfHealingAuto, openHandFeature,
                     pendingOpenHandTargets, playerStats, featureName, targetSnapshots,
                     handOfHarmSavePromises, totalDamageRef, totalRolledRef, flurryHealingHarmUses, _mapName,
                 });
