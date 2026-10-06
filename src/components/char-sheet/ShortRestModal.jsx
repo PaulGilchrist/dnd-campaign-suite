@@ -118,10 +118,11 @@ function pushRequestedRestorationLabel({ ctx, passives, restoredResources, flag,
 }
 
 function collectFeatureRestorationLabels(playerStats, campaignName, ctx, restoredResources) {
-    const { hasFontOfInspiration } = ctx;
+    const { fontOfInspirationRestored } = ctx;
     const passives = playerStats.automation?.passives ?? [];
     if (playerStats.specialActions?.some(f => f.name === 'Improved Warding Flare')) restoredResources.push('Warding Flare');
-    if (hasFontOfInspiration) restoredResources.push('Bardic Inspiration (Font of Inspiration)');
+    // CLA-145: label only when applyShortRest actually restored a below-max pool.
+    if (fontOfInspirationRestored) restoredResources.push('Bardic Inspiration (Font of Inspiration)');
     pushRequestedRestorationLabel({ ctx, passives, restoredResources, flag: 'arcaneRecoveryRequested', resourceKey: 'arcaneRecoveryLevels', label: 'Arcane Recovery' });
     if (passives.some(p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats')) restoredResources.push('Bolstering Treats');
     if (playerStats.class?.name === 'Warlock') restoredResources.push('Pact Magic (Warlock spell slots)');
@@ -755,7 +756,8 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             : null;
 
         const { restoredResources, naturalRecoveryDetail } = collectRestoredResources(playerStats, campaignName, {
-            arcaneRecoveryRequested, restorationRequested, naturalRecovery, naturalRecoveryAvailable, naturalRecoverySelections, hasFontOfInspiration,
+            arcaneRecoveryRequested, restorationRequested, naturalRecovery, naturalRecoveryAvailable, naturalRecoverySelections,
+            fontOfInspirationRestored: !!restResult?.fontOfInspirationRestored,
         });
         const logEntries = buildShortRestLogEntries({
             playerStats, hitDie, rollLog, hpBeforeRest,

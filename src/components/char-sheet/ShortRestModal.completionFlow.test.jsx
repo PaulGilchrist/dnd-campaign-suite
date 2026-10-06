@@ -208,7 +208,13 @@ describe('ShortRestModal - Completion Flow', () => {
       expectLogContains('Warding Flare');
     });
 
-    it('logs Font of Inspiration when feature exists', async () => {
+    // CLA-145: pin inverted — the old version asserted the false "Resources
+    // restored: Bardic Inspiration" label with no runtime write. The label
+    // must now ride the actual restore (applyShortRest's write seam).
+    it('logs Font of Inspiration only when a below-max pool was restored', async () => {
+      setupGetRuntimeValue({ bardicInspirationUses: 0 });
+      const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
+      vi.mocked(applyShortRest).mockResolvedValueOnce({ fontOfInspirationRestored: true });
       renderModal({
         class: { name: 'Bard', major: { name: 'Bard' } },
         automation: { passives: [{ type: 'font_of_inspiration' }] },
@@ -216,7 +222,21 @@ describe('ShortRestModal - Completion Flow', () => {
       fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
       await act(() => Promise.resolve());
 
-      expectLogContains('Font of Inspiration');
+      expectLogContains('Bardic Inspiration (Font of Inspiration)');
+    });
+
+    it('does not log Font of Inspiration restored when nothing was written', async () => {
+      setupGetRuntimeValue({ bardicInspirationUses: 3 });
+      renderModal({
+        class: { name: 'Bard', major: { name: 'Bard' } },
+        automation: { passives: [{ type: 'font_of_inspiration' }] },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
+      await act(() => Promise.resolve());
+
+      const message = firstLogMessage();
+      expect(message).not.toContain('Bardic Inspiration');
+      expect(message).toContain('takes a short rest');
     });
 
     it('logs Pact Magic for Warlock', async () => {

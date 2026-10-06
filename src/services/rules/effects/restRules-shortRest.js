@@ -124,9 +124,15 @@ function resetReplenishingMeals(name, playerStats, campaignName) {
   }
 }
 
-function addFontOfInspirationUpdates(name, playerStats, updates, campaignName) {
+// CLA-145: Font of Inspiration (2024 classes.json lv5, "regain all expended
+// uses ... when you finish a Short or Long Rest"). Runs OUTSIDE the
+// skipAutoRecovery gate so the ShortRestModal lane writes the restore in the
+// same atomic batch (it was a false "Resources restored" label with no write).
+// Returns whether a below-max numeric pool was restored — the log label must
+// ride the actual write, not the passive's presence.
+export function addFontOfInspirationUpdates(name, playerStats, updates, campaignName) {
   const hasFontOfInspiration = (playerStats.automation?.passives ?? []).some(p => p.type === 'font_of_inspiration')
-  if (!hasFontOfInspiration) return
+  if (!hasFontOfInspiration) return false
   const charisma = playerStats.abilities?.find(a => a.name === 'Charisma')
   const maxBI = charisma?.bonus || 0
   const storedBI = getRuntimeValue(name, 'bardicInspirationUses', campaignName)
@@ -134,6 +140,7 @@ function addFontOfInspirationUpdates(name, playerStats, updates, campaignName) {
   if (storedBI == null || currentBI < maxBI) {
     updates.bardicInspirationUses = maxBI
   }
+  return storedBI != null && currentBI < maxBI
 }
 
 // CLA-011: budget model — remaining spell-slot levels (null = full/re-armed
@@ -426,8 +433,11 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
 
   resetReplenishingMeals(name, playerStats, campaignName)
 
+  // CLA-145: Font of Inspiration restores on EVERY short rest (modal lane
+  // included); only the UI-choice auto-recoveries stay behind the gate.
+  const fontOfInspirationRestored = addFontOfInspirationUpdates(name, playerStats, updates, campaignName)
+
   if (!skipAutoRecovery) {
-    addFontOfInspirationUpdates(name, playerStats, updates, campaignName)
     addArcaneRecoveryUpdates(name, playerStats, updates, campaignName)
   }
 
@@ -474,5 +484,8 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
 
   endInvisibilityEffects(name, campaignName)
 
-  return { celestialResilienceAllies: celestialGrant?.allies ?? null }
+  return {
+    celestialResilienceAllies: celestialGrant?.allies ?? null,
+    fontOfInspirationRestored,
+  }
 }
