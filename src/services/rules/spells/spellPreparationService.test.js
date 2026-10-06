@@ -82,6 +82,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { breakConcentration, addConcentration, cleanupConcentrationEffects } from '../../../services/combat/concentration/concentrationService.js';
 import * as storageService from '../../../services/ui/storage.js';
+import { addEntry } from '../../../services/ui/logService.js';
 
 describe('prepareSpellCast — cantrips', () => {
   beforeEach(() => {
@@ -337,5 +338,93 @@ describe('prepareSpellCast — Hunter\'s Mark / Hex buff tracking', () => {
       ]),
       'camp',
     );
+  });
+});
+
+describe('prepareSpellCast — Hunter\'s Mark re-mark after kill (CLA-398/SP-068)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getRuntimeValue.mockReturnValue(undefined);
+    addEntry.mockResolvedValue(undefined);
+  });
+
+  it('post-kill recast moves concentration to the newly armed target (new id, single entry)', async () => {
+    const cs = makeCombatSummary({
+      creatures: [
+        { name: 'TestWizard', concentration: { spell: "Hunter's Mark", dc: 17, target: 'Zombie 1' }, targetName: 'Bandit 1' },
+        { name: 'Zombie 1', currentHp: 0 },
+        { name: 'Bandit 1', currentHp: 11 },
+      ],
+    });
+    getCombatSummary.mockReturnValue(cs);
+
+    const spell = makeSpell({ name: "Hunter's Mark", level: 1, concentration: true });
+    const result = await prepareSpellCast(spell, makeMetaCtx(), {
+      playerName: 'TestWizard',
+      playerStats: makePlayerStats(),
+      campaignName: 'camp',
+    });
+
+    expect(result.metaCtx.shouldSetConcentration).toBe(true);
+    expect(result.metaCtx.oldConcentrationSpell).toBeNull();
+    expect(breakConcentration).not.toHaveBeenCalled();
+    expect(cleanupConcentrationEffects).not.toHaveBeenCalled();
+    expect(addConcentration).toHaveBeenCalledTimes(1);
+    expect(addConcentration).toHaveBeenCalledWith(cs, 'TestWizard', "Hunter's Mark", 17, 'Bandit 1');
+    expect(addEntry).toHaveBeenCalledWith(
+      'camp',
+      expect.objectContaining({
+        automationType: 'hunters_mark_remarked',
+        targetName: 'Bandit 1',
+      }),
+    );
+  });
+
+  it('recast against a still-living marked target does NOT move concentration', async () => {
+    const cs = makeCombatSummary({
+      creatures: [
+        { name: 'TestWizard', concentration: { spell: "Hunter's Mark", dc: 17, target: 'Zombie 1' }, targetName: 'Zombie 1' },
+        { name: 'Zombie 1', currentHp: 8 },
+      ],
+    });
+    getCombatSummary.mockReturnValue(cs);
+
+    const spell = makeSpell({ name: "Hunter's Mark", level: 1, concentration: true });
+    const result = await prepareSpellCast(spell, makeMetaCtx(), {
+      playerName: 'TestWizard',
+      playerStats: makePlayerStats(),
+      campaignName: 'camp',
+    });
+
+    expect(result.metaCtx.shouldSetConcentration).toBe(false);
+    expect(addConcentration).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+  });
+
+  it('re-mark does not stack a duplicate concentration buff row', async () => {
+    const cs = makeCombatSummary({
+      creatures: [
+        { name: 'TestWizard', concentration: { spell: "Hunter's Mark", dc: 17, target: 'Zombie 1' }, targetName: 'Bandit 1' },
+        { name: 'Zombie 1', currentHp: 0 },
+        { name: 'Bandit 1', currentHp: 11 },
+      ],
+    });
+    getCombatSummary.mockReturnValue(cs);
+    getRuntimeValue.mockImplementation((who, key) => {
+      if (key === 'activeBuffs') {
+        return [{ name: "Hunter's Mark", effect: 'hunters_mark_concentration', duration: 'concentration' }];
+      }
+      return undefined;
+    });
+
+    const spell = makeSpell({ name: "Hunter's Mark", level: 1, concentration: true });
+    await prepareSpellCast(spell, makeMetaCtx(), {
+      playerName: 'TestWizard',
+      playerStats: makePlayerStats(),
+      campaignName: 'camp',
+    });
+
+    const activeBuffWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeBuffs');
+    expect(activeBuffWrites).toHaveLength(0);
   });
 });

@@ -2097,3 +2097,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §SP-052 (2026-10-06, Foresight FIXED) Recipe + pitfalls
 - Foresight te write crashed on null `campaign.targetEffects` post-admin-clear (threw AFTER slot payment = lv9 leak, zero te) — null is known-empty; consumer null→[]. Confirm-lane `allTargets` default stamped every combatant + creatureTargets[0] targetName — a working radio can still log the wrong target; judge casts by te landing. Attacker-dis choke: `buildAttackContextSync` deferred dis accumulated then discarded — convert once post-resolver; holder's own adv rides conditionAttackMode upstream (resolver-first). Caster attacking own foresighted ally = disadvantage (other-creatures convention; Blindsight/Truesight exempt). 8h expiry unmodelled (§ residual).
+
+## §SP-068 (2026-10-06, Hunters Mark re-mark FIXED) Recipe + pitfalls
+- RAW re-mark lane = spellPreparationService.resolveConcentrationChange; same-spell-recast branch was inert except Eyebite. Fix: isReMark branch (old mark target currentHp<=0) → shouldSetConcentration=true + oldConcentrationSpell=null → applyConcentration swaps id+target in ONE combatSummary write (no break/purge); log `hunters_mark_remarked`. Verify by concentration id change, NOT spell-log presence.
+- Rig: bare seeded combatant needs `ac` or computeTargetAc throws `[AC] no AC defined` aborting damage pre-rider; anchor weapon to-hit chips by row, not text-is("+8") (matches Dex saves).

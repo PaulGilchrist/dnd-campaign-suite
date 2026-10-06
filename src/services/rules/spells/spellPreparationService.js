@@ -610,10 +610,18 @@ function getWarlockSlotLevel(playerName, playerStats, minLevel) {
 
 // Concentration management for an incoming cast: detect a replaced concentration
 // (breaks it + persists), a fresh concentration, or an Eyebite recast.
+function isConcentrationTargetDepleted(cs, targetName) {
+  if (!targetName) return false;
+  const target = cs.creatures.find(c => c.name === targetName);
+  if (!target) return true;
+  return Number(target.currentHp ?? target.currentHitPoints ?? 1) <= 0;
+}
+
 function resolveConcentrationChange(spell, playerName, playerStats, campaignName, isWgbSpell) {
   let shouldSetConcentration = false;
   let oldConcentrationSpell = null;
   let isEyebiteRecast = false;
+  let isReMark = false;
 
   if (!isWgbSpell && spell.concentration && spell.name !== 'Summon Aberration') {
     const cs = getCombatSummary(campaignName);
@@ -628,10 +636,18 @@ function resolveConcentrationChange(spell, playerName, playerStats, campaignName
         shouldSetConcentration = true;
       } else if (spell.name === 'Eyebite' && creature.concentration.spell === spell.name) {
         isEyebiteRecast = true;
+      } else if (spell.name === "Hunter's Mark" && creature.concentration.spell === spell.name
+        && isConcentrationTargetDepleted(cs, creature.concentration.target)) {
+        // CLA-398/SP-068: Hunter's Mark RAW re-mark — once the marked creature drops to
+        // 0 HP, recasting MOVES the same concentration slot to the newly armed target.
+        // oldConcentrationSpell stays null so the mark moves (new id + target) without a
+        // Concentration-break/purge; a recast against a still-living target is inert here.
+        shouldSetConcentration = true;
+        isReMark = true;
       }
     }
   }
-  return { shouldSetConcentration, oldConcentrationSpell, isEyebiteRecast };
+  return { shouldSetConcentration, oldConcentrationSpell, isEyebiteRecast, isReMark };
 }
 
 // Psionic Sorcery payment — SPs cover the spell level, components waived.
@@ -733,6 +749,9 @@ function trackConcentrationBuff(spellName, playerName, campaignName) {
   const existingBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
   const buff = { name: spellName, effect, duration: 'concentration' };
   const newBuffs = Array.isArray(existingBuffs) ? [...existingBuffs, buff] : [buff];
+  // CLA-398/SP-068: a re-mark re-stamps the same concentration buff — never stack a
+  // duplicate row for a spell already tracked.
+  if (Array.isArray(existingBuffs) && existingBuffs.some(b => b && b.effect === effect)) return;
   setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
 }
 
@@ -837,7 +856,7 @@ function isWarGodsBlessingSpell(playerName, spellName) {
 
 // Concentration tracking applied after slot consumption: new concentration, Hunter's
 // Mark / Hex buff tracking, and Eyebite's concentration buff stamp.
-function applyConcentrationTracking({ spell, shouldSetConcentration, oldConcentrationSpell, playerName, playerStats, campaignName }) {
+function applyConcentrationTracking({ spell, shouldSetConcentration, oldConcentrationSpell, isReMark, playerName, playerStats, campaignName }) {
   if (oldConcentrationSpell) {
     cleanupConcentrationEffects(playerName, oldConcentrationSpell, campaignName);
   }
@@ -845,6 +864,21 @@ function applyConcentrationTracking({ spell, shouldSetConcentration, oldConcentr
 
   applyNewConcentration(spell, playerName, playerStats, campaignName);
   trackConcentrationBuff(spell.name, playerName, campaignName);
+
+  if (isReMark) {
+    const newTarget = spell.name === "Hunter's Mark"
+      ? (getCombatSummary(campaignName)?.creatures.find(c => c.name === playerName)?.targetName || null)
+      : null;
+    addEntry(campaignName, {
+      type: 'automation',
+      automationType: 'hunters_mark_remarked',
+      characterName: playerName,
+      spellName: spell.name,
+      targetName: newTarget,
+      description: `Concentration moved — ${spell.name} re-marked on ${newTarget || 'a new creature'}.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
+  }
 
   if (spell.name === 'Eyebite') {
     const existingBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
@@ -884,6 +918,7 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
   const shouldSetConcentration = concentration.shouldSetConcentration && !featureDropsConcentration;
   const oldConcentrationSpell = concentration.oldConcentrationSpell;
   const isEyebiteRecast = concentration.isEyebiteRecast;
+  const isReMark = concentration.isReMark;
 
   result.metaCtx.oldConcentrationSpell = oldConcentrationSpell;
   result.metaCtx.shouldSetConcentration = shouldSetConcentration;
@@ -898,7 +933,7 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
 
   consumeSpellResource(spell, result, { isWgbSpell, isEyebiteRecast, isUpcast, isFreeCast, isQuickRitualCast, isWarlock, effectiveSpellLevel, playerName, playerStats, campaignName });
 
-  applyConcentrationTracking({ spell, shouldSetConcentration, oldConcentrationSpell, playerName, playerStats, campaignName });
+  applyConcentrationTracking({ spell, shouldSetConcentration, oldConcentrationSpell, isReMark, playerName, playerStats, campaignName });
 
   // Build modified spell
   const modifiedSpell = effectiveSpellLevel !== spell.level
