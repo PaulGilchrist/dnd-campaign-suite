@@ -27,6 +27,10 @@ vi.mock('../../../combat/buffs/buffService.js', () => ({
   isInnateSorceryActive: vi.fn(() => false),
 }));
 
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ── Imports ─────────────────────────────────────────────────────────
 
 import { handle } from './sorceryHandler.js';
@@ -35,6 +39,7 @@ import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as classFeatures from '../../../character/classFeatures.js';
 import * as useMetamagic from '../../../../hooks/combat/useMetamagic.js';
 import * as buffService from '../../../combat/buffs/buffService.js';
+import * as logService from '../../../ui/logService.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -413,6 +418,80 @@ describe('sorceryHandler.handle', () => {
         campaignName,
         0,
       );
+    });
+  });
+
+  // CLA-194: activation must log ability_use, refusals must log
+  // automation + innate_sorcery_refused (§5 log conventions).
+  describe('CLA-194 activation logging', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      buffService.isInnateSorceryActive.mockReturnValue(false);
+    });
+
+    it('sorcery_aura activation logs an ability_use entry', async () => {
+      const ps = makePlayerStats();
+      const action = makeSorceryAuraAction({ name: 'Innate Sorcery' });
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
+      classFeatures.getClassFeatures.mockReturnValue({ maxInnateSorcery: 2 });
+
+      await handle(action, ps, campaignName, null);
+
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'Sorcerer',
+        abilityName: 'Innate Sorcery',
+      }));
+      const entry = logService.addEntry.mock.calls.at(-1)[1];
+      expect(entry.description).toContain('activated');
+      expect(entry.description).toContain('1/2 uses remaining');
+    });
+
+    it('already-active refusal logs innate_sorcery_refused with zero spend', async () => {
+      const ps = makePlayerStats();
+      const action = makeSorceryAuraAction({ name: 'Innate Sorcery' });
+      buffService.isInnateSorceryActive.mockReturnValue(true);
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('already active');
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'automation',
+        characterName: 'Sorcerer',
+        description: expect.stringContaining('innate_sorcery_refused already_active'),
+      }));
+    });
+
+    it('no-remaining-uses refusal logs innate_sorcery_refused no_uses', async () => {
+      const ps = makePlayerStats();
+      const action = makeSorceryAuraAction({ name: 'Innate Sorcery' });
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      classFeatures.getClassFeatures.mockReturnValue({ maxInnateSorcery: 2 });
+
+      await handle(action, ps, campaignName, null);
+
+      expect(buffService.setInnateSorceryActive).not.toHaveBeenCalled();
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'automation',
+        description: expect.stringContaining('innate_sorcery_refused no_uses'),
+      }));
+    });
+
+    it('SP-lane activation logs ability_use with SP cost', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction({ type: 'metamagic_sorcery', automation: { type: 'metamagic_sorcery', cost: 2 } });
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      classFeatures.getClassFeatures.mockReturnValue({ maxInnateSorcery: 0, maxSorceryPoints: 6 });
+      useMetamagic.getCurrentSorceryPoints.mockReturnValue(2);
+
+      await handle(action, ps, campaignName, null);
+
+      const entry = logService.addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use');
+      expect(entry).toBeDefined();
+      expect(entry.characterName).toBe('Sorcerer');
+      expect(entry.description).toContain('activated');
+      expect(entry.description).toContain('2 SP');
     });
   });
 });
