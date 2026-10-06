@@ -2662,7 +2662,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-140-fiendish-resilience-short-rest-gate.md",
+      "verified": "verified",
       "class": "Warlock",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "Choose one damage type (other than Force) when you finish a Short or Long Rest. Resistance to that type until you choose a different one."

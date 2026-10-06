@@ -92,7 +92,11 @@ export const SHORT_REST_RESOURCES = [
         '_Hamstring_usedRound',
         '_friendsCastTargets',
    'illusorySelfUses',
-   'relentlessrageUses'
+   'relentlessrageUses',
+   // CLA-140: Fiendish Resilience re-chooses on a Short OR Long Rest (classes.json
+   // "when you finish a Short or Long Rest"). Short Rest clears ONLY the re-choose
+   // latch; _Fiendish_Resilience_chosenType persists ("until you choose a different one").
+   '_fiendishResilienceUsed'
  ]
 
 export function getShortRestResources() {

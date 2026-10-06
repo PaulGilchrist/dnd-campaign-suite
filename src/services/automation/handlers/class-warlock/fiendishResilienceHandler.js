@@ -16,12 +16,22 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const hasUsedThisRest = getRuntimeValue(playerStats.name, '_fiendishResilienceUsed');
 
     if (hasUsedThisRest) {
+        addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'fiendish_resilience_refused',
+            characterName: playerStats.name,
+            description: `${name} has already been chosen since your last rest. Finish a short or long rest to choose again.`,
+        }).catch(e => {
+                            console.error(`[automation] Failed to log entry:`, e);
+                            throw e;
+        })
+
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name,
-                description: `${name} has already been used this long rest. Finish a long rest to use it again.`,
+                description: `${name} has already been chosen since your last rest. Finish a short or long rest to choose again.`,
                 automation: auto,
             },
         };

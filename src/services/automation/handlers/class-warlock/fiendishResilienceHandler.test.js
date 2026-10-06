@@ -90,7 +90,7 @@ describe('fiendishResilienceHandler', () => {
             }));
         });
 
-        it('returns popup when feature has already been used this long rest', async () => {
+        it('refuses with a short-or-long-rest refusal popup and logs the refusal when used latch stands', async () => {
             getChosenRuntimeValue.mockReturnValue('Fire');
             getRuntimeValue.mockReturnValue(true);
 
@@ -99,8 +99,28 @@ describe('fiendishResilienceHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Fiendish Resilience');
-            expect(result.payload.description).toContain('already been used this long rest');
-            expect(addEntry).not.toHaveBeenCalled();
+            expect(result.payload.description).toContain('short or long rest');
+            expect(result.payload.description).not.toContain('Finish a long rest');
+            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+                type: 'automation',
+                automationType: 'fiendish_resilience_refused',
+                characterName: 'TestCharacter',
+            }));
+        });
+
+        // CLA-140: a completed Short Rest nulls _fiendishResilienceUsed via
+        // SHORT_REST_RESOURCES, so the latch reads falsy and handle() must
+        // re-open the chooser instead of refusing.
+        it('re-opens chooser after a short rest clears the used latch (CLA-140)', async () => {
+            getChosenRuntimeValue.mockReturnValue('Fire');
+            getRuntimeValue.mockImplementation((_name, key) =>
+                key === '_fiendishResilienceUsed' ? null : undefined);
+
+            const result = await handle(makeFeature(), makeStats(), CAMPAIGN);
+
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('fiendishResilience');
+            expect(result.payload.existingType).toBe('Fire');
         });
 
         it.each([
