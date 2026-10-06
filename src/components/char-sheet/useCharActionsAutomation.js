@@ -43,13 +43,17 @@ async function gateStunningStrike({ action, auto, playerName, campaignName, getR
     return { armed: true, round: stunningStrikeRound, blocked: false };
 }
 
-const FOCUS_COST_SKIP_FEATURES = ['Hand of Healing', 'Flurry of Blows', 'Heightened Flurry of Blows'];
+// CLA-159: 'Hand of Healing' removed — the FP-free Hand of Healing exemption is
+// only for HoH used AS PART of Flurry, which lives entirely in bonusAttacksHandler
+// (CLA-144/CLA-158). The standalone sheet lane always charges 1 Focus Point.
+const FOCUS_COST_SKIP_FEATURES = ['Flurry of Blows', 'Heightened Flurry of Blows'];
 
 function shouldSkipFocusPointCost(action, hasFlurryHealingHarm, cloakActive) {
-    // Skip FP cost for Hand of Healing / Flurry of Blows with Flurry of Healing and Harm,
-    // or for Flurry of Blows when Cloak of Shadows (Shadow Flurry) is active.
+    // Skip FP cost for Flurry of Blows / Heightened Flurry of Blows with Flurry of
+    // Healing and Harm, or for Flurry of Blows when Cloak of Shadows (Shadow Flurry)
+    // is active (CLA-166 skip list: flurry rows only).
     if (hasFlurryHealingHarm && FOCUS_COST_SKIP_FEATURES.includes(action.name)) return true;
-    return cloakActive && action.name !== 'Hand of Healing' && FOCUS_COST_SKIP_FEATURES.includes(action.name);
+    return cloakActive && FOCUS_COST_SKIP_FEATURES.includes(action.name);
 }
 
 function resolveCurrentFocusPoints(playerStats, campaignName, getRuntimeValue) {
@@ -83,7 +87,10 @@ async function spendMonkFocusPoint({ action, auto, playerStats, playerName, camp
     if (shouldSkipFocusPointCost(action, hasFlurryHealingHarm, cloakActive)) return true;
     const currentFP = resolveCurrentFocusPoints(playerStats, campaignName, getRuntimeValue);
     if (currentFP <= 0) {
-        setPopupHtml(`<b>${action.name}</b><br/>No ${playerStats.rules === '2024' ? "Focus Points" : 'ki points'} remaining.`);
+        // CLA-159: refusal must be logged with zero spend (§5 refusal convention)
+        await refuseTriggerGate({ action, playerStats, campaignName, setPopupHtml, addEntry,
+            message: `No ${playerStats.rules === '2024' ? 'Focus Points' : 'ki points'} remaining.`,
+            reasonToken: 'no_focus_points' });
         return false;
     }
     await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);

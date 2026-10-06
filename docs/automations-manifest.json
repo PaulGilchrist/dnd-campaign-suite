@@ -3103,7 +3103,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-159-hand-of-healing-fp-skip-wrong-die-no-picker.md",
+      "verified": "verified",
       "class": "Monk",
       "triggerConditions": "Action: 1 bonus action; Uses: undefined, Recharge: undefined",
       "expectedBehavior": "As a Bonus Action, or when you use Flurry of Healing and Harm, you can touch a creature and expend one use of your Focus Points. Roll a Martial Arts die, and the creature regains a number of Hit Points equal to that roll plus your Wisdom modifier."

@@ -2,6 +2,9 @@ import { rollExpression, rollExpressionMaximized } from '../../../dice/diceRolle
 import { getClassFeatures } from '../../../character/classFeatures.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../common/healingRoll.js';
+import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximizationForTarget, hasRerollHealingOnes, markFortifiedHealthUsed, hasTacticalShift } from '../../../combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -144,10 +147,24 @@ async function handleHealersKit(action, auto, playerStats, campaignName, charact
     return infoPopup(action, description);
 }
 
-async function resolveMonkHealTarget(playerStats, campaignName, isSelf) {
-    if (isSelf) return playerStats.name;
+// CLA-159: returns the armed initiative-card target (CLA-160 lane) or null —
+// no silent self-default; callers present a picker or self-heal explicitly.
+async function resolveArmedMonkHealTarget(playerStats, campaignName) {
     const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    return targetInfo?.target?.name || playerStats.name;
+    return targetInfo?.target?.name || null;
+}
+
+// Touch-range (5 ft) creature picker, mirroring the verified Healing Light
+// healingPool lane (CLA-163): self remains selectable.
+async function collectTouchTargets(cs, playerStats) {
+    if (!cs?.creatures?.length) return [];
+    const targets = [];
+    for (const creature of cs.creatures) {
+        if (creature.name === playerStats.name || await isWithinRange(playerStats.name, creature.name, 5)) {
+            targets.push({ name: creature.name, type: creature.type, currentHp: creature.currentHp, maxHp: creature.maxHp });
+        }
+    }
+    return targets;
 }
 
 async function markFortifiedHealthIfApplied(actualHeal, bonusDetails, playerStats, campaignName) {
@@ -157,34 +174,53 @@ async function markFortifiedHealthIfApplied(actualHeal, bonusDetails, playerStat
     }
 }
 
-async function handleMonkHealing(action, playerStats, campaignName, isSelf, slotLevel) {
-    const monkFeatures = getClassFeatures(playerStats);
-    const martialArtsDie = monkFeatures?.martialArtsDie || 4;
-    const wisdom = playerStats.abilities?.find(a => a.name === 'Wisdom');
-    const wisModifier = wisdom?.bonus || 0;
-
+function resolveMonkHealRoll({ action, playerStats, targetName, campaignName, martialArtsDie, wisModifier, slotLevel }) {
     const rerollOnes = hasRerollHealingOnes(playerStats);
-    const healTargetName = await resolveMonkHealTarget(playerStats, campaignName, isSelf);
-
-    const maximize = hasHealingMaximizationForTarget(playerStats, healTargetName, campaignName);
+    const maximize = hasHealingMaximizationForTarget(playerStats, targetName, campaignName);
     const rollResult = rollHeal(`1d${martialArtsDie}`, maximize, rerollOnes);
     if (!rollResult) {
         console.error(`[healingHandler] ${action.name}: monk rollExpression returned null for 1d${martialArtsDie}`);
         return null;
     }
-
-    const baseHeal = rollResult.total + wisModifier;
     const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName });
-    const healAmount = baseHeal + bonusHeal;
+    return { rerollOnes, maximize, rollResult, bonusHeal, bonusDetails, healAmount: rollResult.total + wisModifier + bonusHeal };
+}
 
-    const { newHp, maxHp, actualHeal } = applyHealingDirectly(playerStats, healTargetName, healAmount, campaignName);
+// CLA-092 canonical choke: combatants apply via applyHealingToTarget (clamps at
+// target max on the combatSummary entry); out-of-combat falls back to direct write.
+function applyMonkHeal({ cs, targetName, healAmount, playerStats, campaignName }) {
+    if (cs?.creatures?.some(c => c.name === targetName)) {
+        return applyHealingToTarget(cs, targetName, healAmount, campaignName);
+    }
+    return applyHealingDirectly(playerStats, targetName, healAmount, campaignName);
+}
+
+// CLA-159: standalone Hand of Healing heals a CHOSEN target (armed initiative-card
+// target honored, CLA-160 lane; picker otherwise, CLA-163 seam) via the canonical
+// applyHealingToTarget choke (CLA-092), and logs the Focus Point spend (§5).
+async function performMonkHeal({ action, playerStats, campaignName, targetName, cs, slotLevel }) {
+    const monkFeatures = getClassFeatures(playerStats);
+    const martialArtsDie = monkFeatures?.martialArtsDie || 4;
+    const wisdom = playerStats.abilities?.find(a => a.name === 'Wisdom');
+    const wisModifier = wisdom?.bonus || 0;
+
+    const roll = resolveMonkHealRoll({ action, playerStats, targetName, campaignName, martialArtsDie, wisModifier, slotLevel });
+    if (!roll) return null;
+    const { rerollOnes, maximize, rollResult, bonusHeal, bonusDetails, healAmount } = roll;
+
+    const applyResult = applyMonkHeal({ cs, targetName, healAmount, playerStats, campaignName });
+    if (!applyResult) {
+        console.error(`[healingHandler] ${action.name}: healing application failed for ${targetName}`);
+        return null;
+    }
+    const { newHp, maxHp, actualHeal } = applyResult;
 
     await markFortifiedHealthIfApplied(actualHeal, bonusDetails, playerStats, campaignName);
 
     const rollInfo = `1d${martialArtsDie}=${rollResult.total} (${rollDisplay(rollResult, maximize, rerollOnes)})`;
 
     logHealingToSSE(campaignName, {
-        targetName: healTargetName,
+        targetName,
         sourceName: action.name,
         actualHeal,
         newHp,
@@ -195,6 +231,15 @@ async function handleMonkHealing(action, playerStats, campaignName, isSelf, slot
         skipPopup: true,
         bonusDetails,
     });
+
+    const focusLabel = playerStats.rules === '2024' ? 'Focus Point' : 'ki point';
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${playerStats.name} expended 1 ${focusLabel} to use ${action.name} on ${targetName}: 1d${martialArtsDie} + ${wisModifier}${bonusHeal ? ` + ${bonusHeal}` : ''} = ${healAmount} (${healDesc(actualHeal)}).`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[healingHandler:Hand of Healing spend] Error logging:', e); });
 
     const hasPhysiciansTouch = playerStats.specialActions?.some(f => f.name === "Physician's Touch");
 
@@ -208,13 +253,45 @@ async function handleMonkHealing(action, playerStats, campaignName, isSelf, slot
             bonus: wisModifier + bonusHeal,
             healAmount,
             monkName: playerStats.name,
-            targetName: healTargetName,
+            targetName,
             targetCurrentHp: newHp,
             targetMaxHp: maxHp,
             hasPhysiciansTouch,
             rerollOnes: rerollOnes && !maximize,
         },
     };
+}
+
+async function handleMonkHealing(action, playerStats, campaignName, isSelf, slotLevel) {
+    const heal = (targetName, cs) => performMonkHeal({ action, playerStats, campaignName, targetName, cs, slotLevel });
+
+    if (isSelf) {
+        return heal(playerStats.name, null);
+    }
+
+    const armedTargetName = await resolveArmedMonkHealTarget(playerStats, campaignName);
+    if (armedTargetName) {
+        return heal(armedTargetName, await getCombatContext(campaignName));
+    }
+
+    const cs = await getCombatContext(campaignName);
+    const creatureTargets = await collectTouchTargets(cs, playerStats);
+    if (creatureTargets.length > 1) {
+        return {
+            type: 'modal',
+            modalName: 'handOfHealing',
+            payload: {
+                pending: true,
+                healName: action.name,
+                monkName: playerStats.name,
+                creatureTargets,
+                hasPhysiciansTouch: playerStats.specialActions?.some(f => f.name === "Physician's Touch") || false,
+                confirmHeal: async (targetName) => (await heal(targetName, cs))?.payload || null,
+            },
+        };
+    }
+
+    return heal(playerStats.name, cs);
 }
 
 async function triggerTacticalShift(playerStats, campaignName) {

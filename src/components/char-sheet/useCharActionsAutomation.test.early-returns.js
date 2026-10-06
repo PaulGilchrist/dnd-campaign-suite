@@ -68,7 +68,10 @@ describe('useCharActionsAutomation', () => {
             expect(hooks.executeHandler).not.toHaveBeenCalled();
         });
 
-        it('should skip FP cost when Flurry of Healing and Harm is active for Hand of Healing', async () => {
+        // CLA-159 INVERTED: standalone Hand of Healing always charges 1 Focus Point.
+        // The FP-free HoH exemption is only for HoH used AS PART of Flurry and lives
+        // entirely in bonusAttacksHandler (CLA-144/CLA-158).
+        it('should spend FP cost for standalone Hand of Healing even with Flurry of Healing and Harm active (CLA-159)', async () => {
             const srw = vi.fn();
             const hooks = createHooks({
                 playerStats: {
@@ -83,11 +86,47 @@ describe('useCharActionsAutomation', () => {
             const action = { name: 'Hand of Healing' };
             await handleAutomationAction(action);
 
+            expect(srw).toHaveBeenCalledWith(
+                'TestFighter',
+                'focusPoints',
+                2,
+                campaignName
+            );
+        });
+
+        // CLA-159: 0-FP standalone HoH refuses with popup + <feature>_refused log, zero spend.
+        it('should refuse Hand of Healing at 0 FP with refusal log and zero spend (CLA-159)', async () => {
+            const srw = vi.fn();
+            const hooks = createHooks({
+                playerStats: {
+                    ...basePlayerStats,
+                    specialActions: [{ name: 'Flurry of Healing and Harm' }],
+                    class: { class_levels: [{ level: 5, focus_points: 2 }] },
+                },
+                setRuntimeValue: srw,
+                getRuntimeValue: vi.fn((charKey, key, _cn) => {
+                    if (key === 'activeBuffs') return [];
+                    if (key === 'focusPoints') return 0;
+                    return undefined;
+                }),
+            });
+            const { handleAutomationAction } = useCharActionsAutomation(hooks);
+            const action = { name: 'Hand of Healing' };
+            await handleAutomationAction(action);
+
+            expect(hooks.setPopupHtml).toHaveBeenCalledWith(
+                '<b>Hand of Healing</b><br/>No ki points remaining.'
+            );
             expect(srw).not.toHaveBeenCalledWith(
                 'TestFighter',
                 'focusPoints',
                 expect.any(Number)
             );
+            expect(hooks.executeHandler).not.toHaveBeenCalled();
+            expect(hooks.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'automation',
+                automationType: 'hand_of_healing_refused',
+            }));
         });
 
         it('should skip FP cost when Flurry of Healing and Harm is active for Flurry of Blows', async () => {

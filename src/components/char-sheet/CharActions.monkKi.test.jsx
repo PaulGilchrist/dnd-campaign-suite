@@ -223,8 +223,30 @@ describe('CharActions monk ki focus point skip logic', () => {
     executeHandler.mockResolvedValue({ type: 'popup', payload: 'Action executed' });
   });
 
+  // CLA-159: 'Hand of Healing' removed from the skip list — the FP-free HoH
+  // exemption is only for HoH used AS PART of Flurry (bonusAttacksHandler lane,
+  // CLA-144/CLA-158). The standalone sheet affordance always charges 1 FP.
   describe('Flurry of Healing and Harm skip', () => {
-    it.each(['Hand of Healing', 'Flurry of Blows', 'Heightened Flurry of Blows'])('skips focus point spend for %s when Flurry of Healing and Harm is active', async (actionName) => {
+    it('spends focus point for standalone Hand of Healing when Flurry of Healing and Harm is active (CLA-159)', async () => {
+      mountAction('Hand of Healing', {
+        specialActions: ['Flurry of Healing and Harm'],
+      });
+
+      const actionEl = screen.getByText(/Hand of Healing:/);
+      await act(async () => { fireEvent.click(actionEl); });
+
+      await waitFor(() => {
+        expect(executeHandler).toHaveBeenCalled();
+      });
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCharacter',
+        'focusPoints',
+        1,
+        'test-campaign'
+      );
+    });
+
+    it.each(['Flurry of Blows', 'Heightened Flurry of Blows'])('skips focus point spend for %s when Flurry of Healing and Harm is active', async (actionName) => {
       mountAction(actionName, {
         specialActions: ['Flurry of Healing and Harm'],
       });

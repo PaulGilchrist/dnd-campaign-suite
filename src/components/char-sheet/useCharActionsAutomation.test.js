@@ -444,10 +444,15 @@ describe('useCharActionsAutomation', () => {
                 expect(deps.executeHandler).toHaveBeenCalled();
             });
 
-            it('should skip FP spending for Hand of Healing when Flurry of Healing and Harm is active', async () => {
+            // CLA-159 INVERTED: the old pin "standalone Hand of Healing is free when
+            // holding Flurry of Healing and Harm" was the bug — the FP-free exemption is
+            // only for HoH used AS PART of Flurry, which lives in bonusAttacksHandler
+            // (CLA-144/CLA-158: "FP-free reactions skip in the lane providing the free
+            // use ... NEVER in shared handlers (standalone always charges)").
+            it('should spend FP for standalone Hand of Healing even when Flurry of Healing and Harm is active (CLA-159)', async () => {
                 const grv = vi.fn((charKey, key, _cn) => {
                     if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 0;
+                    if (key === 'focusPoints') return 2;
                     if (key === 'lastActionSpellCast') return null;
                     return undefined;
                 });
@@ -462,10 +467,45 @@ describe('useCharActionsAutomation', () => {
 
                 await handleAutomationAction(action);
 
+                expect(deps.setRuntimeValue).toHaveBeenCalledWith(
+                    'TestFighter', 'focusPoints', 1, campaignName
+                );
+                expect(deps.executeHandler).toHaveBeenCalled();
+            });
+
+            // CLA-159: 0-FP refusal on standalone HoH must gate, popup, and log
+            // hand_of_healing_refused with zero spend (§5 refusal convention).
+            it('should refuse Hand of Healing at 0 FP with refusal log and zero spend (CLA-159)', async () => {
+                const grv = vi.fn((charKey, key, _cn) => {
+                    if (key === 'activeBuffs') return [];
+                    if (key === 'focusPoints') return 0;
+                    if (key === 'lastActionSpellCast') return null;
+                    return undefined;
+                });
+                const playerStats = {
+                    ...basePlayerStats,
+                    rules: '2024',
+                    specialActions: [{ name: 'Flurry of Healing and Harm' }],
+                };
+                const action = { name: 'Hand of Healing', automation: {} };
+
+                const deps = createDeps({ getRuntimeValue: grv, playerStats });
+                const { handleAutomationAction } = getHandlers(deps);
+
+                await handleAutomationAction(action);
+
+                expect(deps.setPopupHtml).toHaveBeenCalledWith(
+                    '<b>Hand of Healing</b><br/>No Focus Points remaining.'
+                );
                 expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
                     'TestFighter', 'focusPoints', expect.any(Number), campaignName
                 );
-                expect(deps.executeHandler).toHaveBeenCalled();
+                expect(deps.executeHandler).not.toHaveBeenCalled();
+                expect(deps.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                    type: 'automation',
+                    automationType: 'hand_of_healing_refused',
+                    description: expect.stringContaining('no_focus_points'),
+                }));
             });
 
             it('should skip FP spending for Flurry of Blows when Cloak of Shadows is active (Shadow Flurry)', async () => {
