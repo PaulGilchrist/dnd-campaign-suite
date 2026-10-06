@@ -15,7 +15,6 @@ import { resolveCreatureType } from '../combat/creatureTypeResolver.js';
 import { isDeathWardActive } from '../automation/handlers/buffs/deathWardHandler.js';
 import { collectWeaponMastery } from '../combat/automation/automationService.js';
 import { selectBrutalStrikeRiders } from '../combat/brutalStrikeSelection.js';
-import { resolveDiceExpression } from '../combat/automation/automationExpressions.js';
 import { isResilientSphereActive } from '../combat/automation/automationPassives.js';
 import { CONDITIONS_THAT_CANNOT_ACT } from '../combat/conditions/conditionEffects.js';
 import { addEntry } from '../ui/logService.js';
@@ -132,29 +131,6 @@ function computeStanceDamageBonus(activeBuffs, playerStats) {
         stanceDamageBonus += playerStats.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2;
     }
     return stanceDamageBonus;
-}
-
-function frenzyGatesSatisfied(activeBuffs, attack, playerStats) {
-    const isReckless = activeBuffs.some(b => b.effect === 'advantage_attacks_advantage_against');
-    const isRaging = activeBuffs.some(b => b.damageBonusExpression);
-    const attackAbilityName = attack?.abilityName;
-    const strMod = playerStats.abilities?.find(a => a.name === 'Strength')?.bonus ?? 0;
-    const dexMod = playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus ?? 0;
-    const isStrFinal = attackAbilityName ? attackAbilityName.toLowerCase() === 'strength' : strMod >= dexMod;
-    return isReckless && isRaging && isStrFinal;
-}
-
-// Frenzy: extra rage_damage_d6 when reckless, raging, strength-based (once per turn)
-function computeFrenzyDamageFormula(playerStats, attack, activeBuffs, campaignName) {
-    const frenzyActions = (playerStats.automation?.actions || []).filter(x => x.type === 'damage_bonus' && x.trigger === 'reckless_attack_hit_while_raging');
-    if (frenzyActions.length === 0) return null;
-    if (frenzyActions[0].oncePerTurn) {
-        const usedRound = getRuntimeValue(playerStats.name, '_frenzyUsedRound', campaignName);
-        const currentRound = getCurrentCombatRound(campaignName);
-        if (usedRound === currentRound) return null;
-    }
-    if (!frenzyGatesSatisfied(activeBuffs, attack, playerStats)) return null;
-    return resolveDiceExpression(frenzyActions[0].damageExpression, playerStats) || null;
 }
 
 // Grant attack advantage if Reckless Attack (or similar buff) is active
@@ -656,9 +632,13 @@ async function accumulateTargetAdvDis({ adv, dis, playerName, playerStats, targe
     return { adv, dis };
 }
 
-function buildAutoDamageFormula(attack, stanceDamageBonus, frenzyDamageFormula, brutalStrikeFormulaPart) {
+// CLA-147: Frenzy ('reckless_attack_hit_while_raging') is rolled ONCE by the
+// attack damage pipeline (attackRollBonuses.applyFrenzyBonuses — roll, application
+// and the _frenzyUsedRound latch all live there). Baking the rider dice into the
+// autoDamageFormula here double-rolled it on the triggering hit.
+function buildAutoDamageFormula(attack, stanceDamageBonus, brutalStrikeFormulaPart) {
     const primaryDamage = attack.damage || attack.damage_dice_primary || '';
-    return [primaryDamage, stanceDamageBonus > 0 ? stanceDamageBonus : null, frenzyDamageFormula, brutalStrikeFormulaPart].filter(v => v !== null).join(' plus ');
+    return [primaryDamage, stanceDamageBonus > 0 ? stanceDamageBonus : null, brutalStrikeFormulaPart].filter(v => v !== null).join(' plus ');
 }
 
 async function resolveBuffScanMode({ adv, dis, forcedMode, playerName, playerStats, targetName, activeBuffs, campaignName }) {
@@ -720,7 +700,6 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
 
         const activeBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
         const stanceDamageBonus = computeStanceDamageBonus(activeBuffs, playerStats);
-        const frenzyDamageFormula = computeFrenzyDamageFormula(playerStats, attack, activeBuffs, campaignName);
 
         const scanned = await resolveBuffScanMode({ adv, dis, forcedMode, playerName, playerStats, targetName, activeBuffs, campaignName });
         forcedMode = scanned.forcedMode;
@@ -748,7 +727,7 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
         dis += deferred.dis;
         const advantageReason = deferred.advantageReason;
 
-        const autoDamageFormula = buildAutoDamageFormula(attack, stanceDamageBonus, frenzyDamageFormula, brutalStrikeFormulaPart);
+        const autoDamageFormula = buildAutoDamageFormula(attack, stanceDamageBonus, brutalStrikeFormulaPart);
 
         let sunderingBonus = 0;
         const effectiveHitBonus = (attack.hitBonus ?? 0) + sacredWeaponBonus + blessedWarriorBonus + sunderingBonus;

@@ -2052,3 +2052,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §CLA-145 (2026-10-06, Font of Inspiration FIXED) Recipe + pitfalls
 - Fix shape: `addFontOfInspirationUpdates` moved OUT of skipAutoRecovery gate (rides the modal's atomic setRuntimeBatch); `applyShortRest` returns `fontOfInspirationRestored` (true only when stored numeric<CHA-max written). Rest-modal restore labels must read this return, never passive presence. Null-key LR semantics preserved (null re-arm reports nothing).
+
+## §CLA-147 (2026-10-06, Frenzy FIXED) Recipe + pitfalls
+- FIXED seam: frenzy single-owner = attackRollBonuses.applyFrenzyBonuses (roll+apply+latch); contextBuilder-sync contributes NO frenzy to autoDamageFormula — diceRoller rolls ' plus '-joined segments, a "display" bake is a REAL roll (CLA-120 idempotency family).
+- Ops: attacker's own initiative card = select whose options include victim and OMIT attacker; second same-round sheet attack re-arms target on Initiative page only; lingering `.sp-overlay` "Brutal Strike Apply/Skip" chooser intercepts chip click — Skip keeps advantage without spending.
