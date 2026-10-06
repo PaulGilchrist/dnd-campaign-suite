@@ -24,7 +24,12 @@ function parseItemName(name) {
     return name.includes('(') ? name.substring(0, name.indexOf('(')).trim() : name;
 }
 
-function checkHeavyArmor(equippedItems, allEquipment) {
+/**
+ * FT-045: equipped truth lives in inventory.equipped (names) — catalog entries
+ * never carry an `equipped` flag. Shared by speed gates and the damage-reduction
+ * gate (Heavy Armor Master) so both consult the same worn-armor source.
+ */
+export function checkHeavyArmor(equippedItems, allEquipment) {
     return equippedItems.some(itemName => {
         const item = allEquipment.find(eq => eq.name === parseItemName(itemName) || eq.name === itemName);
         return Boolean(item && item.armor_category === 'Heavy');

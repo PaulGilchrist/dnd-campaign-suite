@@ -587,6 +587,21 @@ describe('getDamageReduction', () => {
     expect(getDamageReduction(withCondition, 'fire', false)).toBeNull()
   })
 
+  it('FT-045: Heavy Armor Master reaction row reduces B/P/S by PB only while wearing heavy armor', () => {
+    evaluateAutoExpression.mockImplementation((expr) => (expr === 'proficiency_bonus' ? 5 : 0))
+    const ham = { automation: { reactions: [{
+      type: 'damage_reduction', name: 'Heavy Armor Master',
+      reductionExpression: 'proficiency_bonus',
+      damageTypes: ['Bludgeoning', 'Piercing', 'Slashing'],
+      condition: 'wearing_heavy_armor', reaction: false,
+    }] } }
+    expect(getDamageReduction(ham, 'Slashing', true)).toBe(5)
+    expect(getDamageReduction(ham, 'Bludgeoning', true)).toBe(5)
+    expect(getDamageReduction(ham, 'Piercing', true)).toBe(5)
+    expect(getDamageReduction(ham, 'Slashing', false)).toBeNull()
+    expect(getDamageReduction(ham, 'Fire', true)).toBeNull()
+  })
+
   it('respects damage_taken_of_chosen_resistance_type trigger', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'resistanceChosenDamageType') return 'fire'

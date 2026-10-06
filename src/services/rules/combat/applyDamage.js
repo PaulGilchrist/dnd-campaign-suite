@@ -8,6 +8,7 @@ import { rollConcentrationSave } from '../../combat/concentration/concentrationR
 import { cleanupConcentrationEffects } from '../../combat/concentration/concentrationService.js';
 import { addEntry } from '../../ui/logService.js';
 import { getDamageReduction, getDamageResistances } from '../../combat/automation/automationPassives.js';
+import { checkHeavyArmor } from '../core/speedUtils.js';
 import { getChosenRuntimeValue } from '../../automation/common/choiceStorage.js';
 import { computeAuraComboEffects } from '../../combat/auras/auraComboEffects.js';
 import { isCreatureInSilenceZone } from '../../rules/features/silenceService.js';
@@ -329,31 +330,79 @@ function logSilenceImmunity(creature, rawDamage, campaignName) {
   }).catch((e) => { console.error('[applyDamage] Silence immunity log failed:', e); });
 }
 
+// FT-045: Heavy Armor Master (2024) automation row — the reduction entry is the
+// only consumer of the wearing_heavy_armor condition. Detect it to decide whether
+// a hit resolution owes an applied/refused automation log (mission rule).
+function findHeavyArmorMasterPassive(playerComputed, playerStats) {
+  const automation = playerComputed?.automation || playerStats?.automation || {};
+  const all = [...(automation.passives || []), ...(automation.reactions || []), ...(automation.specialActions || [])];
+  return all.find(a => a && a.type === 'damage_reduction' && (a.condition || '') === 'wearing_heavy_armor');
+}
+
+function logHeavyArmorMaster({ creature, rawDamage, finalDamage, reduction, damageType, campaignName }) {
+  addEntry(campaignName, {
+    type: 'automation',
+    automationType: 'heavy_armor_master_applied',
+    characterName: creature.name,
+    name: 'Heavy Armor Master',
+    description: `${creature.name} wears Heavy armor — Heavy Armor Master reduces this ${damageType} damage by ${reduction}: ${rawDamage} reduced to ${finalDamage}.`,
+    reducedBy: reduction,
+    rawDamage,
+    appliedDamage: finalDamage,
+    damageType,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[applyDamage] Heavy Armor Master log failed:', e); });
+}
+
+function logHeavyArmorMasterRefused({ creature, reason, damageType, campaignName }) {
+  addEntry(campaignName, {
+    type: 'automation',
+    automationType: 'heavy_armor_master_refused',
+    characterName: creature.name,
+    name: 'Heavy Armor Master',
+    reason,
+    description: `Heavy Armor Master does not reduce this ${damageType} damage (${reason}).`,
+    damageType,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[applyDamage] Heavy Armor Master refusal log failed:', e); });
+}
+
+// FT-045: catalog entries never carry an `equipped` flag — worn-armor truth is
+// inventory.equipped (names). Reuse the shared speedUtils gate (CLA-405 era).
+function isTargetWearingHeavyArmor(playerComputed, playerStats) {
+  const allEquipment = playerComputed?.equipment || playerStats?.equipment || [];
+  const equippedItems = playerStats?.inventory?.equipped || playerComputed?.inventory?.equipped || [];
+  return checkHeavyArmor(equippedItems, allEquipment);
+}
+
+function markChosenResistanceUsed(playerComputed, creatureName, campaignName) {
+  const hasTrigger = (playerComputed?.automation?.passives || []).some(
+    p => p.type === 'damage_reduction' && p.trigger === 'damage_taken_of_chosen_resistance_type'
+  );
+  if (hasTrigger) {
+    setRuntimeValue(creatureName, 'resistanceUsedThisTurn', true, campaignName);
+  }
+}
+
 // Apply damage reduction from features (e.g., Heavy Armor Master)
 function applyFeatureDamageReduction({ creature, playerComputed, playerStats, damageTypes, finalDamage, campaignName }) {
-  let damageReducedByFeature = 0;
-  const allEquipment = (playerComputed?.equipment || playerStats?.equipment || []);
-  const equippedArmor = allEquipment.find(e => e.equipped);
-  const armorName = equippedArmor?.name;
-  let isWearingHeavyArmor = false;
-  if (armorName) {
-    const armor = allEquipment.find(e => e.name === armorName && e.equipped);
-    if (armor && ['Heavy', 'heavy'].includes(armor.armor_category)) {
-      isWearingHeavyArmor = true;
-    }
-  }
-  const reduction = getDamageReduction(playerComputed, damageTypes[0], isWearingHeavyArmor);
-  if (reduction !== null && reduction > 0) {
-    damageReducedByFeature = reduction;
+  const isWearingHeavyArmor = isTargetWearingHeavyArmor(playerComputed, playerStats);
+  const reduction = getDamageReduction(playerComputed, damageTypes[0], isWearingHeavyArmor) || 0;
+  const ham = findHeavyArmorMasterPassive(playerComputed, playerStats);
+  if (reduction > 0) {
+    const rawBeforeReduction = finalDamage;
     finalDamage = Math.max(0, finalDamage - reduction);
-    const hasResistanceTrigger = (playerComputed.automation?.passives || []).some(
-      p => p.type === 'damage_reduction' && p.trigger === 'damage_taken_of_chosen_resistance_type'
-    );
-    if (hasResistanceTrigger) {
-      setRuntimeValue(creature.name, 'resistanceUsedThisTurn', true, campaignName);
+    markChosenResistanceUsed(playerComputed, creature.name, campaignName);
+    if (ham) {
+      logHeavyArmorMaster({ creature, rawDamage: rawBeforeReduction, finalDamage, reduction, damageType: damageTypes[0], campaignName });
     }
+    return { finalDamage, damageReducedByFeature: reduction };
   }
-  return { finalDamage, damageReducedByFeature };
+  if (ham && finalDamage > 0) {
+    const reason = isWearingHeavyArmor ? 'non_bp_s_damage' : 'not_wearing_heavy_armor';
+    logHeavyArmorMasterRefused({ creature, reason, damageType: damageTypes[0], campaignName });
+  }
+  return { finalDamage, damageReducedByFeature: 0 };
 }
 
 // Self-damage: Arcane Ward absorbs damage to the wizard themselves
