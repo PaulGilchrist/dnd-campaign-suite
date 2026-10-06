@@ -5,8 +5,7 @@ import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { getRuntimeUsesKey } from './giantAncestryOptions.js';
-import { ancestryNoUsesPopup, frostsChillAttackerGate, stormsThunderTargetGate, attackerRollGate, resolveAncestryUses, applyAncestryDamage, logAncestryDamageRoll, ancestryDamagePopup, applySpeedReductionEffect, logSpeedReductionCondition, stonesEnduranceDamageGate, stonesEnduranceRoundRefusal, stonesEnduranceCapNote, stormsThunderRangeRefusal } from './giantAncestryUtils.js';
-import { addExpiration } from '../../../rules/effects/expirations.js';
+import { ancestryNoUsesPopup, frostsChillAttackerGate, stormsThunderTargetGate, attackerRollGate, resolveAncestryUses, applyAncestryDamage, logAncestryDamageRoll, ancestryDamagePopup, applySpeedReductionEffect, logSpeedReductionCondition, stonesEnduranceDamageGate, stonesEnduranceRoundRefusal, stonesEnduranceCapNote, stormsThunderRangeRefusal, applyHillsTumbleEffect } from './giantAncestryUtils.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
@@ -106,98 +105,25 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
     return ancestryDamagePopup({ optName, formula: opt.damage, damageResult, actualDamage, targetName, newHp, damageType });
 }
 
+// CLA-169: rides the shared Fire's Burn / Frost's Chill lane — attackerRollGate
+// refuses on click (miss / no damage / wrong attacker / no target) with a logged
+// hills_tumble_refused and ZERO spend; te stamped via applyHillsTumbleEffect.
 export async function handleHillsTumble(action, playerStats, campaignName, option) {
     const optName = (option?.name || action.name || "Hill's Tumble");
-    const usesKey = getRuntimeUsesKey(optName);
-    const usesMax = playerStats.proficiency || 0;
-    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+    const { usesKey, currentUses } = resolveAncestryUses(playerStats, optName, campaignName);
 
-    if (currentUses <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} has no uses remaining. Uses will reset on the next Long Rest.`,
-                automation: action.automation,
-            },
-        };
-    }
+    const noUses = ancestryNoUsesPopup(optName, action.automation, currentUses);
+    if (noUses) return noUses;
 
     const lastAttack = await findLastAttack(campaignName);
-    if (!lastAttack?.attackEvent) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} requires a recent attack. Use it after hitting a creature.`,
-                automation: action.automation,
-            },
-        };
-    }
-
-    if (lastAttack.attackerName !== playerStats.name) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} can only be used after you make an attack. Wait for your turn.`,
-                automation: action.automation,
-            },
-        };
-    }
-
-    if (lastAttack.attackEvent.rollType !== 'attack') {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} can only be used after an attack roll.`,
-                automation: action.automation,
-            },
-        };
-    }
+    const gateRefusal = attackerRollGate(optName, action.automation, playerStats, lastAttack, campaignName);
+    if (gateRefusal) return gateRefusal;
 
     const targetName = lastAttack.targetName;
-    if (!targetName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: optName,
-                description: `${optName} requires a target. No target found from the last attack.`,
-                automation: action.automation,
-            },
-        };
-    }
 
     await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
 
-    const allTargetEffects = [...getRuntimeValue('campaign', 'targetEffects') || []];
-    const existingIndex = allTargetEffects.findIndex(
-        te => te.target === targetName && te.effect === 'disadvantage_next_attack' && te.source === playerStats.name
-    );
-
-    const tumbleEffect = {
-        target: targetName,
-        source: playerStats.name,
-        effect: 'disadvantage_next_attack',
-    };
-
-    if (existingIndex >= 0) {
-        allTargetEffects[existingIndex] = tumbleEffect;
-    } else {
-        allTargetEffects.push(tumbleEffect);
-    }
-
-    setRuntimeValue('campaign', 'targetEffects', allTargetEffects, campaignName);
-
-    addExpiration({ attackerName: playerStats.name, targetName, effects: [
-        { type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerStats.name },
-    ], campaignName, rounds: undefined, expireOnCreatureName: playerStats.name });
+    applyHillsTumbleEffect(targetName, playerStats, campaignName);
 
     await addEntry(campaignName, {
         type: 'ability_use',

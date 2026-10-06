@@ -3354,7 +3354,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-169-never-offers-after-hit.md",
+      "verified": "verified",
       "class": "Hill Giant",
       "triggerConditions": "On hit with melee attack roll; Uses: proficiency_bonus, recharges on long rest",
       "expectedBehavior": "When you hit a Large or smaller creature with an attack roll and deal damage to it, you can give that creature Disadvantage on its next attack roll before the end of its next turn. (Hill Giant subrace of Goliath)"

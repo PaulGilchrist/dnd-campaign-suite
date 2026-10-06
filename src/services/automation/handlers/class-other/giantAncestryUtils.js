@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
+import { registerTargetEffect } from '../../../combat/conditions/targetEffectDefinitions.js';
 import { getRuntimeUsesKey, GIANT_ANCESTRY_KEY, GIANT_OPTIONS, getOptionByName } from './giantAncestryOptions.js';
 
 export async function confirmGiantAncestry(playerStats, chosenOption, campaignName) {
@@ -139,6 +140,28 @@ export async function logSpeedReductionCondition(campaignName, playerStats, optN
         source: optName,
         description: `${playerStats.name} used ${optName} to reduce ${targetName}'s speed by ${speedReduction} ft until the start of ${playerStats.name}'s next turn.`,
     }).catch((e) => { console.error("[giantAncestry] Error:", e); });
+}
+
+// CLA-169: Hill's Tumble grant (dispatch + direct handlers). RAW: Disadvantage
+// on the target's next attack roll before the end of ITS next turn — stamp the
+// registered te with duration until_end_of_next_turn and arm ONE target-anchored
+// rounds:2 clock (MA-0038/MA-0073 until_end_of_next_turn shape; the old
+// attacker-anchored expireOnCreatureName leg dropped the te at the ATTACKER's
+// next turn-start, off the target axis). te disadvantage_next_attack remains the
+// one-shot consumed by attackPostProcessing.clearSapDisadvantage on the target's
+// next attack roll; the clock is the backstop. Fixes the campaignName-less
+// getRuntimeValue('campaign','targetEffects') read (campaign pinned to default).
+export function applyHillsTumbleEffect(targetName, playerStats, campaignName) {
+    registerTargetEffect(campaignName, targetName, 'disadvantage_next_attack', playerStats.name, {
+        duration: 'until_end_of_next_turn',
+    });
+    addExpiration({
+        attackerName: playerStats.name,
+        targetName,
+        campaignName,
+        rounds: 2,
+        effects: [{ type: 'remove_target_effect', effectKey: 'disadvantage_next_attack', source: playerStats.name, target: targetName }],
+    });
 }
 
 // Shared Stone's Endurance trigger gate (dispatch handler).

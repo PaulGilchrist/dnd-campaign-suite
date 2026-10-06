@@ -32,7 +32,9 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
 
 vi.mock('../../common/damageRollback.js', () => ({
     findLastAttack: vi.fn(async () => ({
-        attackEvent: { rollType: 'attack', attackerName: 'TestHero' },
+        // CLA-169: attackerRollGate requires hit===true (CLA-141 lane) — the
+        // default trigger must be a valid HIT for hit-triggered ancestry rows.
+        attackEvent: { rollType: 'attack', attackerName: 'TestHero', hit: true },
         attackerName: 'TestHero',
         targetName: 'Goblin',
         primaryDamage: 10,

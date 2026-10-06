@@ -40,8 +40,10 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
 }));
 
 vi.mock('../../common/damageRollback.js', () => ({
+    // CLA-169: attackerRollGate (shared Fire's Burn lane, CLA-141) requires
+    // attackEvent.hit===true — the valid trigger is a HIT that dealt damage.
     findLastAttack: vi.fn(async () => ({
-        attackEvent: { rollType: 'attack', attackerName: 'TestHero' },
+        attackEvent: { rollType: 'attack', attackerName: 'TestHero', hit: true },
         attackerName: 'TestHero',
         targetName: 'Goblin',
         primaryDamage: 10,
@@ -89,8 +91,10 @@ describe('giantAncestry selection & dispatch', () => {
                     target: 'Goblin',
                     effect: 'disadvantage_next_attack',
                     source: 'TestHero',
+                    // CLA-169: RAW duration "before the end of its next turn"
+                    duration: 'until_end_of_next_turn',
                 }),
-            ]), 'campaign');
+            ]), 'campaign', true);
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'ability_use',
                 abilityName: "Hill's Tumble",
@@ -172,8 +176,10 @@ describe('giantAncestry selection & dispatch', () => {
                     target: 'Goblin',
                     effect: 'disadvantage_next_attack',
                     source: 'TestHero',
+                    // CLA-169: RAW duration "before the end of its next turn"
+                    duration: 'until_end_of_next_turn',
                 }),
-            ]), 'campaign');
+            ]), 'campaign', true);
         });
 
         it('returns info popup when no uses remaining', async () => {
@@ -214,8 +220,10 @@ describe('giantAncestry selection & dispatch', () => {
                     target: 'Goblin',
                     effect: 'disadvantage_next_attack',
                     source: 'TestHero',
+                    // CLA-169: RAW duration "before the end of its next turn"
+                    duration: 'until_end_of_next_turn',
                 }),
-            ]), 'campaign');
+            ]), 'campaign', true);
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'ability_use',
                 abilityName: "Hill's Tumble",
@@ -297,8 +305,10 @@ describe('giantAncestry selection & dispatch', () => {
                     target: 'Goblin',
                     effect: 'disadvantage_next_attack',
                     source: 'TestHero',
+                    // CLA-169: RAW duration "before the end of its next turn"
+                    duration: 'until_end_of_next_turn',
                 }),
-            ]), 'campaign');
+            ]), 'campaign', true);
         });
 
         it('returns info popup when no uses remaining', async () => {
