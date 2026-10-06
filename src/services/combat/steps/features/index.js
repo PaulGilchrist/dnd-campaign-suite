@@ -17,6 +17,7 @@ import { remarkableAthlete } from './remarkableAthlete.js';
 import { huntersMarkDamage } from './huntersMarkDamage.js';
 import { hexDamage } from './hexDamage.js';
 import { epitomeEmpoweredStrikes } from './epitomeEmpoweredStrikes.js';
+import { grappler } from './grappler.js';
 
 export const featureModules = [
   assassinate,
@@ -38,4 +39,5 @@ export const featureModules = [
   huntersMarkDamage,
   hexDamage,
   epitomeEmpoweredStrikes,
+  grappler,
 ];

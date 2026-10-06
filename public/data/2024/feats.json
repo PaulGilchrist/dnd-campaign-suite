@@ -1308,7 +1308,11 @@
         "description": "When you hit a creature with an Unarmed Strike as part of the Attack action on your turn, you can use both the Damage and the Grapple option. You can use this benefit only once per turn.",
         "type": "action",
         "automation": {
-          "casting_time": "1 action"
+          "type": "attack_rider",
+          "trigger": "unarmed_strike_hit",
+          "effect": "punch_and_grab",
+          "oncePerTurn": true,
+          "casting_time": "passive"
         }
       },
       {

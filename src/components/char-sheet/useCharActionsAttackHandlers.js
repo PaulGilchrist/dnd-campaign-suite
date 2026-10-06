@@ -59,6 +59,12 @@ export default function useCharActionsAttackHandlers({
         // Fleet Step (lv11+ 2024 Open Hand Monk) Step-of-the-Wind grant for the
         // rest of this turn (holder-keyed round latch, SP-128 flag-lane shape).
         if (attack?.type === 'Bonus Action') {
+            // FT-036: record the BA press round too — the auto-damage pipeline
+            // flattens BA unarmed rows to type 'Action' at resolution
+            // (normalizeAutoDamage), so the featureRiders-grappler consumer needs
+            // this press-time stamp to exclude BA unarmed strikes from
+            // Punch and Grab's "part of the Attack action" gate.
+            setRuntimeValue(playerName, '_bonusActionAttackRound', getCurrentCombatRound(campaignName), campaignName);
             grantFleetStep(playerStats, campaignName, attack?.name, attack?.automation)
                 .catch((e) => { console.error('[useCharActionsAttackHandlers:fleet-step]', e); });
         }

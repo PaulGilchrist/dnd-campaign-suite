@@ -2083,3 +2083,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## §CLA-405 (2026-10-06, Fleet Step FIXED) Recipe + pitfalls
 - Fleet Step grant rides SP-128 lane: new `fleetStepService.js`; BA≠Step (monk lv11+ 2024) → `_Fleet_Step_grantedRound` grant + `fleet_step_triggered` log + "Step of the Wind (Fleet Step):" row in Bonus lane → click = canonical Step of the Wind (FP −1, no_opportunity_attacks te) + `fleet_step_used`, latch cleared; round-keyed PLAYER_ROUND_LATCH_KEYS round-wrap clear.
 - Ops: "click does nothing" → suspect wrong `.char-actions` section (match exact .sectionHeader text) or stuck popup overlay (Done button closes; backdrop ignored). Dispatch MouseEvent('click',{bubbles:true}) + read getRuntimeValue sync to split "click never landed" vs "handler returned false".
+
+## §FT-036-2 (2026-10-06, Grappler FIXED) Recipe + pitfalls
+- Punch-and-Grab rides featureRiders lane; rider MUST author `automation:{type:'attack_rider', trigger:'unarmed_strike_hit'}` (untyped → buildAttackInfo null → inert by construction). BA exclusion needs PRESS-time `_bonusActionAttackRound` stamp — normalizeAutoDamage flattens BA rows to 'Action' at resolution. `addCondition` stamps meta only with dc/ability → source needs its own merged activeConditionMeta write. FP-chooser Flurry never touches featureRiders.
+- Ops: Actions vs Bonus Actions grids both render `Unarmed Strike +11` — disambiguate by y-rect gap, never by row-parent text. Cosmetic-zero unarmed Done (§FT-036) leaves HP untouched; grapple stamp is the adjudicated axis.

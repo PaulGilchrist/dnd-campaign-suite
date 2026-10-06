@@ -2935,7 +2935,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-FT-036-grappler-inert.md",
+      "verified": "verified",
       "triggerConditions": "Action: action",
       "expectedBehavior": "When you hit a creature with an Unarmed Strike as part of the Attack action on your turn, you can use both the Damage and the Grapple option. You can use this benefit only once per turn. (No dedicated automation: the app does not enforce single-action-per-turn, so the player achieves this by making the Unarmed Strike attack then using the Grapple action — a contested STR check that applies the Grappled condition, same as the standalone Grapple action.)"
     },

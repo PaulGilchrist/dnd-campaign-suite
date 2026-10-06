@@ -89,6 +89,10 @@ const PLAYER_ROUND_LATCH_KEYS = [
     '_fortifiedHealth_usedRound',
     '_Shield_Bash_usedRound',
     'piercerPunctureUsedThisTurn',
+    // FT-036: Grappler "Punch and Grab" once-per-turn grapple latch + Bonus-Action
+    // press stamp re-arm at round wrap.
+    '_Grappler_usedRound',
+    '_bonusActionAttackRound',
     // CLA-356: Telekinetic Master bonus-action weapon attack — once per turn latch re-arms at round wrap.
     '_Telekinetic_Master_attack_usedRound',
 ]
