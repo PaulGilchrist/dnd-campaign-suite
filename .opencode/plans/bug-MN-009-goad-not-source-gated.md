@@ -35,3 +35,6 @@ E2E in test-campaign with EvasiveFighter (lv18 Battle Master) vs Bandit 1 + Knig
 - Runtime te stamped TWICE for Knight 1 (duplicate entries accumulate; also Bandit 1 te persists post-death).
 - Bandit 1 died during test (scimitar 6 + goad). Superiority d8 on the Bandit leg = Relentless free-d8 (CLA-286), not a die-size bug; d12 size table itself is live (sheet "Superiority Die: d12").
 - Admin cleanup done: change-data cleared ({}), log cleared (one benign post-clear encounter-join entry remains).
+
+## Disproved (2026-10-06)
+Cannot reproduce on HEAD ac794c2e4. NPC lane consumes applySourceGatedDisadvantage via targetResolution.resolveTarget for every roll (threaded since 4ed65bf4a). Live differential replay: goadee vs goader = mode:normal + no badge (incl. active turn + duplicated te); vs other = disadvantage + badge; te expiry normal. No code change. Residuals (report-only): te duplicate accumulation proven harmless; post-death te = §70 family. Rig drift: EF subclass now Psi Warrior + Superior Technique (1×d6); sp-roll-btn disabled until radio checked; Done dispatches save-result→te stamp.

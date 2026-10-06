@@ -2090,3 +2090,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §FT-045 (2026-10-06, Heavy Armor Master FIXED) Recipe + pitfalls
 - Worn-armor truth = `inventory.equipped` names × catalog `armor_category`; `speedUtils.checkHeavyArmor` now exported shared gate (old `equipment.equipped` scan permanently dead — 289 catalog rows, zero flagged). Tokens `heavy_armor_master_applied|_refused`; clamp 0 still logs applied. Fighter lv18 PB=+6 — never derive PB from memory. Magmin Touch = pure-fire control; flush stuck miss-popup via `button.popup-close-btn`. `rg -r n` silently rewrites matches — plain `rg -n` only.
+
+## §MN-009 (2026-10-06, DISPROVED) Recipe + pitfalls
+- NPC chip-roll disadvantage IS source-gated (resolveTarget→applySourceGatedDisadvantage, since 4ed65bf4a) — do NOT re-file without a live mode:"disadvantage" vs-goader log line.
+- Rig drift: EvasiveFighter = Psi Warrior + Superior Technique (1×d6, chooser pre-row); Short Rest re-arms pool. Rider prompt: sp-roll-btn disabled until input[name="attackRiderManeuver"] radio check(); Done dispatches save-result→te stamp (abandon burns die, stamps zero). EB re-join re-rolls initiative; te survives multi-round Next-walk.
