@@ -130,23 +130,77 @@ function buildHideFailureMessages({ d20Val, stealthBonus, rollTotal, dc, skulker
     return { failDesc, failLog };
 }
 
-// Pure: resolve the grapple check ability + bonus (Monk uses DEX; JoAT adds half PB).
+// Pure: resolve the grapple check skill + bonus — Strength (Athletics)
+// (Monk uses Dexterity (Acrobatics)). Uses the canonical computed skill
+// channel (abilities[].skills bonus, as computed by abilityCalc.getAbilities),
+// falling back to ability modifier + proficiency when proficient.
+// JoAT adds half PB only when NOT proficient (no stacking).
 function abilityModOf(playerStats, abilityName) {
     return playerStats?.abilities?.find(a => a.name === abilityName)?.bonus || 0;
+}
+
+function proficiencyBonusForLevel(level) {
+    return Math.floor((level - 1) / 4 + 2);
 }
 
 function jackOfAllTradesHalfBonus(playerStats) {
     const isJackOfAllTrades = playerStats?.automation?.passives?.some(p => p.type === 'jack_of_all_trades');
     if (!isJackOfAllTrades) return 0;
-    const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-    return Math.floor(proficiency / 2);
+    return Math.floor(proficiencyBonusForLevel(playerStats.level) / 2);
+}
+
+function findSheetSkill(playerStats, skillName) {
+    return (playerStats?.abilities || []).flatMap(a => a.skills || []).find(s => s.name === skillName);
 }
 
 function computeGrappleCheckBonus(playerStats, exhaustionPenalty) {
     const isMonk = playerStats.class?.name === 'Monk';
     const useAbility = isMonk ? 'Dexterity' : 'Strength';
-    const checkBonus = abilityModOf(playerStats, useAbility) - exhaustionPenalty + jackOfAllTradesHalfBonus(playerStats);
-    return { isMonk, useAbility, checkBonus };
+    const skillName = isMonk ? 'Acrobatics' : 'Athletics';
+    const isProficient = !!playerStats.skillProficiencies?.includes(skillName);
+    const listedSkillBonus = findSheetSkill(playerStats, skillName)?.bonus;
+    let checkBonus;
+    if (listedSkillBonus != null) {
+        checkBonus = listedSkillBonus;
+    } else {
+        checkBonus = abilityModOf(playerStats, useAbility) + (isProficient ? proficiencyBonusForLevel(playerStats.level) : 0);
+    }
+    if (!isProficient) checkBonus += jackOfAllTradesHalfBonus(playerStats);
+    checkBonus -= exhaustionPenalty;
+    return { isMonk, useAbility, skillName, checkBonus };
+}
+
+// Pure: read a listed skill total from a target's skill data, supporting
+// array ([{name, bonus}]), dict keyed by skill ({modifier} or number) forms.
+function findListedSkillBonus(skills, skillName) {
+    if (!skills) return null;
+    if (Array.isArray(skills)) {
+        const hit = skills.find(s => s?.name === skillName);
+        return hit?.bonus ?? null;
+    }
+    const hit = skills[skillName];
+    if (hit == null) return null;
+    return typeof hit === 'number' ? hit : (hit.modifier ?? null);
+}
+
+// Pure: target's total for one contest skill from target-local data only
+// (monster skills dict from monsters.json, NPC skillBonuses, player computedStats).
+function resolveTargetListedSkillTotal(target, skillName) {
+    const totals = [
+        findListedSkillBonus(target?.skillBonuses, skillName),
+        findListedSkillBonus(target?.computedStats?.skillBonuses, skillName),
+        findListedSkillBonus(target?.skills, skillName),
+        findListedSkillBonus(target?.computedStats?.skills, skillName),
+        findSheetSkill({ abilities: target?.computedStats?.abilities }, skillName)?.bonus,
+        findSheetSkill({ abilities: target?.abilities }, skillName)?.bonus,
+    ];
+    return totals.find(total => total != null) ?? null;
+}
+
+function targetProficiencyBonus(target) {
+    if (target?.proficiency_bonus != null) return target.proficiency_bonus;
+    const level = target?.computedStats?.level ?? target?.level;
+    return level != null ? proficiencyBonusForLevel(level) : 0;
 }
 
 export default function useCharActionsBaseActions({
@@ -289,28 +343,66 @@ export default function useCharActionsBaseActions({
         return ctx;
     }
 
-    // Pure: player target — look up STR bonus from its combatSummary creature entry.
-    function resolvePlayerTargetStrBonus(target, cs) {
+    // Pure: player target — look up an ability bonus from its combatSummary creature entry.
+    function resolvePlayerTargetAbilityBonus(target, cs, abilityName) {
         const targetCharacter = cs?.creatures?.find(c => c.name === target.name);
-        const targetStr = targetCharacter?.computedStats?.abilities?.find(a => a.name === 'Strength') || targetCharacter?.abilities?.find(a => a.name === 'Strength');
-        return targetStr?.bonus || 0;
+        const ability = targetCharacter?.computedStats?.abilities?.find(a => a.name === abilityName) || targetCharacter?.abilities?.find(a => a.name === abilityName);
+        return ability?.bonus || 0;
     }
 
-    function findStrBonus(entries) {
-        const str = entries.find(a => a.name === 'Strength');
-        return str?.bonus || 0;
+    function findAbilityBonus(entries, abilityName) {
+        const ability = entries.find(a => a.name === abilityName);
+        return ability?.bonus;
     }
 
-    async function resolveTargetStrBonus(target, cs) {
-        if (target.computedStats?.abilities) return findStrBonus(target.computedStats.abilities);
-        if (target.abilities) return findStrBonus(target.abilities);
-        if (target.ability_score_modifiers?.str != null) return target.ability_score_modifiers.str;
-        if (target.type === 'player') return resolvePlayerTargetStrBonus(target, cs);
+    async function resolveTargetAbilityMod(target, cs, abilityName, modKey) {
+        if (target.computedStats?.abilities) {
+            const bonus = findAbilityBonus(target.computedStats.abilities, abilityName);
+            if (bonus != null) return bonus;
+        }
+        if (target.abilities) {
+            const bonus = findAbilityBonus(target.abilities, abilityName);
+            if (bonus != null) return bonus;
+        }
+        if (target.ability_score_modifiers?.[modKey] != null) return target.ability_score_modifiers[modKey];
+        if (target.type === 'player') return resolvePlayerTargetAbilityBonus(target, cs, abilityName);
         const monsterData = await getMonsterData(target.name, cs?.creatures || []);
-        return monsterData?.ability_score_modifiers?.str ?? 0;
+        return monsterData?.ability_score_modifiers?.[modKey] ?? null;
     }
 
-    async function applyGrappleSuccess({ target, cs, useAbility, checkBonus, rollTotal, d20Val, targetStrBonus }) {
+    // RAW PHB grapple: contested by the target's Strength (Athletics) or
+    // Dexterity (Acrobatics) check (target's choice). No contested-check
+    // chooser seam exists app-wide, so auto-resolve against the target's
+    // higher skill total and log which skill was used.
+    async function resolveTargetContest(target, cs) {
+        const candidates = [
+            { skillName: 'Athletics', abilityName: 'Strength', modKey: 'str' },
+            { skillName: 'Acrobatics', abilityName: 'Dexterity', modKey: 'dex' },
+        ];
+        let best = null;
+        for (const candidate of candidates) {
+            const profList = target.skillProficiencies || target.proficientSkills || target.computedStats?.skillProficiencies || [];
+            let total = resolveTargetListedSkillTotal(target, candidate.skillName);
+            if (total == null) {
+                const mod = await resolveTargetAbilityMod(target, cs, candidate.abilityName, candidate.modKey);
+                if (mod == null) continue;
+                total = mod + (profList.includes(candidate.skillName) ? targetProficiencyBonus(target) : 0);
+            }
+            if (!best || total > best.total) best = { skillName: candidate.skillName, total };
+        }
+        if (!best) {
+            console.error(`[useCharActionsBaseActions] grapple contest: no resolvable Athletics/Acrobatics data for ${target.name}`);
+            return { skillName: 'Athletics', total: 0 };
+        }
+        return best;
+    }
+
+    function buildGrappleContestPhrase(target, contest) {
+        const signed = contest.total >= 0 ? '+' : '';
+        return `${target.name} ${contest.skillName} (${signed}${contest.total})`;
+    }
+
+    async function applyGrappleSuccess({ target, cs, useAbility, skillName, checkBonus, rollTotal, d20Val, contest }) {
         const combatSummary = cs;
         if (combatSummary?.creatures) {
             const targetCreature = combatSummary.creatures.find(c => c.name === target.name);
@@ -320,24 +412,24 @@ export default function useCharActionsBaseActions({
                 await setRuntimeValue(targetCreature.name, 'activeConditions', [...filtered, 'grappled'], campaignName);
             }
         }
-        const signed = targetStrBonus >= 0 ? '+' : '';
-        setPopupHtml({ type: 'automation_info', name: 'Grapple', description: `Grapple successful! (d20: ${d20Val} + ${checkBonus} = ${rollTotal}) vs target STR (${signed}${targetStrBonus}). Target is now grappled.` });
+        const contestPhrase = buildGrappleContestPhrase(target, contest);
+        setPopupHtml({ type: 'automation_info', name: 'Grapple', description: `Grapple successful! (d20: ${d20Val} + ${checkBonus} = ${rollTotal}) vs ${contestPhrase}. Target is now grappled.` });
         await addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
             abilityName: 'Grapple',
-            description: `${useAbility} check: ${rollTotal} (d20: ${d20Val} + ${checkBonus}) vs target STR (${signed}${targetStrBonus}) — Success. Target is now grappled.`,
+            description: `${useAbility} (${skillName}) check: ${rollTotal} (d20: ${d20Val} + ${checkBonus}) vs ${contestPhrase} contest — Success. Target is now grappled.`,
         }).catch((e) => { console.error("[useCharActionsBaseActions:log-error]", e); });
     }
 
-    async function reportGrappleFailure(useAbility, checkBonus, rollTotal, d20Val, targetStrBonus) {
-        const signed = targetStrBonus >= 0 ? '+' : '';
-        setPopupHtml({ type: 'automation_info', name: 'Grapple', description: `Grapple failed! (d20: ${d20Val} + ${checkBonus} = ${rollTotal}) vs target STR (${signed}${targetStrBonus}). Target is not grappled.` });
+    async function reportGrappleFailure({ target, useAbility, skillName, checkBonus, rollTotal, d20Val, contest }) {
+        const contestPhrase = buildGrappleContestPhrase(target, contest);
+        setPopupHtml({ type: 'automation_info', name: 'Grapple', description: `Grapple failed! (d20: ${d20Val} + ${checkBonus} = ${rollTotal}) vs ${contestPhrase}. Target is not grappled.` });
         await addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
             abilityName: 'Grapple',
-            description: `${useAbility} check: ${rollTotal} (d20: ${d20Val} + ${checkBonus}) vs target STR (${signed}${targetStrBonus}) — Failure. Target is not grappled.`,
+            description: `${useAbility} (${skillName}) check: ${rollTotal} (d20: ${d20Val} + ${checkBonus}) vs ${contestPhrase} contest — Failure. Target is not grappled.`,
         }).catch((e) => { console.error("[useCharActionsBaseActions:log-error]", e); });
     }
 
@@ -355,19 +447,19 @@ export default function useCharActionsBaseActions({
             setPopupHtml({ type: 'automation_info', name: 'Grapple', description: 'Target is already grappled.' });
             return;
         }
-        const { isMonk, useAbility, checkBonus } = computeGrappleCheckBonus(playerStats, exhaustionPenalty);
+        const { isMonk, useAbility, skillName, checkBonus } = computeGrappleCheckBonus(playerStats, exhaustionPenalty);
         const checkContext = resolveGrappleCheckContext(isMonk, useAbility);
         await rollAbilityCheck(useAbility, checkBonus, checkContext);
         await new Promise(resolve => setTimeout(resolve, 50));
         const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);
         const rollTotal = lastAttack?.total;
         const d20Val = lastAttack?.d20 ?? '?';
-        const targetStrBonus = await resolveTargetStrBonus(target, cs);
-        const success = rollTotal > targetStrBonus;
+        const contest = await resolveTargetContest(target, cs);
+        const success = rollTotal > contest.total;
         if (success) {
-            await applyGrappleSuccess({ target, cs, useAbility, checkBonus, rollTotal, d20Val, targetStrBonus });
+            await applyGrappleSuccess({ target, cs, useAbility, skillName, checkBonus, rollTotal, d20Val, contest });
         } else {
-            await reportGrappleFailure(useAbility, checkBonus, rollTotal, d20Val, targetStrBonus);
+            await reportGrappleFailure({ target, useAbility, skillName, checkBonus, rollTotal, d20Val, contest });
         }
     }
 

@@ -2030,3 +2030,7 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## §CLA-194 (2026-10-05, Innate Sorcery FAIL cast-inert) Pitfalls
 - PITFALL: buffed Ray of Frost casts via sheet inline panel produced ZERO roll/log (4 tries) - sorcerer sheet cast seam suspected; buff activation numeric-exact though (activeBuffs innate_sorcery_active + uses + DC 13->14 display). Roller emits two d20s keeping max even in mode:normal - require mode:advantage or differential for adv proof.
+
+## §BA-002 (2026-10-06, Grapple FIXED) Recipe + pitfalls
+- Recipe: grapple base-action affordance = `span.base-action-clickable` (NOT b.clickable) on char sheet; lingering automation_info popup intercepts its clicks — flush via its Done first, judge fire by log delta. Contest channel: attacker bonus via `abilities[].skills[].bonus` (else STR+PB when proficient; JoAT half never stacks on PB); target contest vs higher Athletics-or-Acrobatics (EB-joined Bandit cs carries NO skills/ability_score_modifiers — resolution lands on getMonsterData monsters.json fallback dex+1). Tie-break strict `>` (CharActions.grapple.test.jsx:287 pins).
+- Pitfall: arming is ATTACKER-card→victim; victim-card select leaves getTargetFromAttacker null. Untrusted `.value=`+dispatchEvent reports ok but does NOT persist on initiative selects — Playwright selectOption required.

@@ -2923,7 +2923,7 @@
       "handler": "src/services/combat/automation/handlers/baseActionHandler.js",
       "router": "src/services/combat/automation/routers/baseActionRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/baseActionInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-BA-002-grapple-contest-math.md",
+      "verified": "verified",
       "class": "Base Action",
       "triggerConditions": "Take the Grapple action on your turn",
       "expectedBehavior": "When you take the Grapple action, use your action to make a Strength (Athletics) check contested by the target's Strength (Athletics) or Dexterity (Acrobatics) check. If you succeed, the target is Grappled."
