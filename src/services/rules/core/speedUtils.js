@@ -71,8 +71,29 @@ export function applySpeedIncreasePassives(playerStats) {
     for (const passive of passives) {
         bonus += speedPassiveBonus(passive, isWearingHeavyArmor, isWearingArmor, isWieldingShield);
     }
-    if (bonus > 0 && playerStats.speed != null) {
-        return playerStats.speed + bonus;
+    if (bonus > 0) {
+        // CLA-201: automation-layer playerStats may carry no speed (the sheet's
+        // canonical Speed is derived from the race JSON at the display layer —
+        // charSummaryCalc.getBaseSpeed), so a 2014-saved character's Fast
+        // Movement +10 folded to nothing and consumers fell back to 30.
+        // Fold into the same race JSON base the sheet lane uses.
+        const base = playerStats.speed ?? playerStats.race?.subrace?.speed ?? playerStats.race?.speed;
+        if (base != null) return base + bonus;
+        console.error('[speedUtils] speed passive bonus but no base speed to fold it into:', playerStats.name);
     }
     return playerStats.speed;
+}
+
+/**
+ * CLA-201: canonical half-Speed for movement advisories (Instinctive Pounce).
+ * Reads the rules-layer folded playerStats.speed first, then mirrors
+ * charSummaryCalc.getBaseSpeed's race JSON derivation.
+ */
+export function resolveHalfSpeedFeet(playerStats) {
+    const speed = playerStats.speed ?? playerStats.race?.subrace?.speed ?? playerStats.race?.speed;
+    if (speed == null) {
+        console.error('[speedUtils] no speed to halve for', playerStats.name);
+        return 15;
+    }
+    return Math.floor(speed / 2);
 }

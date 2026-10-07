@@ -3,6 +3,7 @@ import { grantTempHpOnRage } from '../buffs/tempHpBuffHandler.js';
 import { clearExtendedFlag } from '../class-warlock/tempTeleportHandler.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCurrentCombatRound } from '../../../encounters/combatData.js';
+import { resolveHalfSpeedFeet } from '../../../rules/core/speedUtils.js';
 
 function resolveResistanceTypes(resistanceTypes) {
     return resistanceTypes.flatMap(rt => {
@@ -372,17 +373,31 @@ async function runRageActivation(auto, playerStats, newBuffs, specialActions, ca
     // Last (superset) full-store POST: carries buffs + rage anchor + surge THP together.
     await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
 
+    const teleportFeature = specialActions.find(sa => sa.effect === 'teleport_on_rage');
+
+    // CLA-201: the pounce advisory is resolved and logged BEFORE the
+    // teleport_on_rage modal return so the number still reaches the log,
+    // and uses the canonical half-Speed (rules-folded playerStats.speed,
+    // race JSON fallback) instead of a hardcoded 30 fallback.
+    const instinctivePounce = specialActions.find(sa => sa.effect === 'rage_bonus_movement');
+    const pounceFeet = instinctivePounce ? resolveHalfSpeedFeet(playerStats) : 0;
+
+    let description = `${playerName} activated Rage.`;
+    if (surgeAmount > 0) {
+        description += ` ${surgeName} (Vitality Surge) grants ${surgeAmount} temporary hit points.`;
+    }
+    if (instinctivePounce) {
+        description += ` ${instinctivePounce.name}: can move up to ${pounceFeet} feet as part of entering Rage (move your token).`;
+    }
+
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: 'Rage',
-        description: surgeAmount > 0
-            ? `${playerName} activated Rage. ${surgeName} (Vitality Surge) grants ${surgeAmount} temporary hit points.`
-            : `${playerName} activated Rage.`,
+        description,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[combatStanceHandler:log-error]", e); });
 
-    const teleportFeature = specialActions.find(sa => sa.effect === 'teleport_on_rage');
     if (teleportFeature) {
         return {
             type: 'modal',
@@ -391,11 +406,8 @@ async function runRageActivation(auto, playerStats, newBuffs, specialActions, ca
         };
     }
 
-    const instinctivePounce = specialActions.find(sa => sa.effect === 'rage_bonus_movement');
     if (instinctivePounce) {
-        const speed = playerStats.speed || 30;
-        const maxMove = Math.floor(speed / 2);
-        auto._instinctivePounce = `${instinctivePounce.name}: You can move up to ${maxMove} feet as part of entering your Rage. Move your token on the combat map.`;
+        auto._instinctivePounce = `${instinctivePounce.name}: You can move up to ${pounceFeet} feet as part of entering your Rage. Move your token on the combat map.`;
     }
     return null;
 }

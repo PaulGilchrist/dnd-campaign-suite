@@ -13,6 +13,7 @@ import { hasUnlimitedWildShape } from '../../../rules/features/archdruidWildShap
 import { addEntry } from '../../../ui/logService.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { endDraconicFlightBuff } from '../../../rules/features/draconicFlightService.js';
+import { resolveHalfSpeedFeet } from '../../../rules/core/speedUtils.js';
 
 const FLY_SPEED_EFFECT = 'fly_speed_equals_walk_speed';
 
@@ -76,7 +77,52 @@ function getPsionicEnergy(playerStats, campaignName) {
     return Number(stored ?? defaultMax);
 }
 
+// CLA-201: the standalone "Instinctive Pounce:" row rides the generic
+// temp_buff lane, which stamped a 10-minute phantom buff with no movement
+// effect, no rage prerequisite, and no log. RAW: the movement happens ONLY
+// as part of the Bonus Action that enters Rage (advisory stamped there by
+// combatStanceHandler). Never grant a buff here — refuse outside Rage,
+// advisory-remind while raging, both logged.
+async function gateRageBonusMovement(action, auto, playerStats, campaignName) {
+    const playerName = playerStats.name;
+    const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(stored) ? stored : [];
+    const rageActive = activeBuffs.some(b => b.name === 'Rage');
+    const slug = String(action.name).toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const popup = (description) => ({
+        type: 'popup',
+        payload: { type: 'automation_info', name: action.name, automationType: auto.type, description, automation: auto },
+    });
+    if (!rageActive) {
+        const description = `${action.name} refused — requires Rage to be active. You can move up to half your Speed as part of the Bonus Action you take to enter your Rage.`;
+        await addEntry(campaignName, {
+            type: 'automation',
+            automationType: `${slug}_refused`,
+            characterName: playerName,
+            name: action.name,
+            description,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[buffHandler] Error logging rage_bonus_movement refusal:', e); });
+        return popup(description);
+    }
+    const maxMove = resolveHalfSpeedFeet(playerStats);
+    const description = `${action.name}: as part of entering your Rage you can move up to ${maxMove} feet. Move your token on the combat map.`;
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: `${slug}_advisory`,
+        characterName: playerName,
+        name: action.name,
+        description,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[buffHandler] Error logging rage_bonus_movement advisory:', e); });
+    return popup(description);
+}
+
 async function checkBuffGates(action, auto, playerStats, campaignName, _mapName) {
+    if (auto?.effect === 'rage_bonus_movement') {
+        return gateRageBonusMovement(action, auto, playerStats, campaignName);
+    }
+
     // dash_action trigger: temporary speed bonus
     if (auto?.trigger === 'dash_action' && auto?.effect === 'speed_bonus') {
         const dashPopup = await handleDashSpeedBonus(action, auto, playerStats, campaignName);

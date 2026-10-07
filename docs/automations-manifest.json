@@ -3772,7 +3772,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-201-instinctive-pounce.md",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "Action: 1 bonus action; Range: self",
       "expectedBehavior": "As part of the Bonus Action you take to enter your Rage, you can move up to half your Speed."
