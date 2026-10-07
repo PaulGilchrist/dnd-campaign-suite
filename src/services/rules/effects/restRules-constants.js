@@ -283,7 +283,11 @@ export const LONG_REST_RESOURCES = [
       // the 1-hour rounds clock or a retract already dropped the buff. The
       // handler reads `storedUses ?? auto.uses` (null = full uses).
       'dragonWingsUses',
-      'dragonWingsActive'
+      'dragonWingsActive',
+      // CLA-226: Memorize Spell is once per Short Rest — the swap latch must
+      // re-arm after ANY rest (CLA-130 rule: a latch missing from the reset
+      // lists dies permanently; the short-rest flag list covers SR, this the LR).
+      'memorizeSpellUsedSinceRest'
    ]
 
 export function getLongRestResources() {

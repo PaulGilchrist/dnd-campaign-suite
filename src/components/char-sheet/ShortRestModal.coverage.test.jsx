@@ -11,7 +11,7 @@ const setRuntimeBatchMock = vi.fn();
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getStore: vi.fn(() => new Map()),
   useSyncedState: vi.fn(() => [null, vi.fn()]),
-  useRuntimeValue: () => null,
+  useRuntimeValue: vi.fn((characterKey, propertyName) => getRuntimeValueMock(characterKey, propertyName)),
   listeners: new Map(),
   getRuntimeValue: vi.fn((...args) => getRuntimeValueMock(...args)),
   setRuntimeValue: vi.fn((...args) => setRuntimeValueMock(...args)),
@@ -111,9 +111,16 @@ function setupGetRuntimeValue(returns) {
 }
 
 describe('ShortRestModal - Memorize Spell Swap', () => {
+  // CLA-226: fake runtime store so latch stamping/gating behaves like production
+  // (setRuntimeBatch writes synchronously + notifies; modal re-reads on render).
+  let runtimeStore;
   beforeEach(() => {
     vi.clearAllMocks();
-    getRuntimeValueMock.mockImplementation(() => null);
+    runtimeStore = new Map();
+    getRuntimeValueMock.mockImplementation((name, key) => (runtimeStore.has(key) ? runtimeStore.get(key) : null));
+    setRuntimeBatchMock.mockImplementation((name, props) => {
+      Object.entries(props).forEach(([k, v]) => runtimeStore.set(k, v));
+    });
   });
 
   describe('rendering and entry', () => {
@@ -147,7 +154,7 @@ describe('ShortRestModal - Memorize Spell Swap', () => {
   });
 
   describe('swap mode', () => {
-    it('shows prepared spells in remove dropdown and non-prepared in add dropdown after spellbook loads', async () => {
+    it('shows prepared spells in remove dropdown and KNOWN non-prepared spells in add dropdown after spellbook loads', async () => {
       const { loadSpellData } = await import('../../services/ui/dataLoader.js');
       vi.mocked(loadSpellData).mockResolvedValueOnce([
         { name: 'Fireball', level: 3, classes: ['Wizard'] },
@@ -159,11 +166,11 @@ describe('ShortRestModal - Memorize Spell Swap', () => {
       renderModal({
         class: { name: 'Wizard', major: { name: 'Wizard' } },
         automation: { specialActions: [{ type: 'memorize_spell', name: 'Memorize Spell', casting_time: 'passive', hasAutomation: true }] },
+        // CLA-226: disk spellbook (known spells) — Shield is NOT in the book.
         spellAbilities: {
           spells: [
             { name: 'Fireball', prepared: 'Prepared', level: 3 },
             { name: 'Mage Armor', prepared: 'Not Prepared', level: 1 },
-            { name: 'Shield', prepared: 'Not Prepared', level: 1 },
           ],
         },
       });
@@ -175,7 +182,9 @@ describe('ShortRestModal - Memorize Spell Swap', () => {
       const addOptions = Array.from(addSelect.querySelectorAll('option')).map(o => o.textContent);
       expect(removeOptions).toContain('Fireball (level 3)');
       expect(addOptions).toContain('Mage Armor (level 1)');
-      expect(addOptions).toContain('Shield (level 1)');
+      // CLA-226: "from the book" = character's known spells only — a Wizard-list
+      // spell that is NOT in the spellbook (Shield) must not be offered.
+      expect(addOptions).not.toContain('Shield (level 1)');
       // Level 0 spells should be excluded
       expect(addOptions).not.toContain('True Strike (level 0)');
       // CLA-226: spellbook offers Wizard-list spells only — non-Wizard spells excluded
@@ -206,9 +215,9 @@ describe('ShortRestModal - Memorize Spell Swap', () => {
       expect(options.length).toBe(1);
     });
 
-    it('calls setRuntimeValue with updated preparedSpells when swap is executed', async () => {
+    it('writes preparedSpells + latch in ONE merged batch when swap is executed, then hides the swap button', async () => {
       const { loadSpellData } = await import('../../services/ui/dataLoader.js');
-      vi.mocked(loadSpellData).mockResolvedValueOnce([
+      vi.mocked(loadSpellData).mockResolvedValue([
         { name: 'Fireball', level: 3, classes: ['Wizard'] },
         { name: 'Mage Armor', level: 1, classes: ['Wizard'] },
       ]);
@@ -225,20 +234,108 @@ describe('ShortRestModal - Memorize Spell Swap', () => {
       });
       fireEvent.click(screen.getByText(/Swap Prepared Spell/));
       await act(() => Promise.resolve());
-      const removeSelect = screen.getByText(/Remove prepared spell:/).nextElementSibling;
-      const addSelect = screen.getByText(/Add from spellbook:/).nextElementSibling;
-      fireEvent.change(removeSelect, { target: { value: 'Fireball' } });
-      fireEvent.change(addSelect, { target: { value: 'Mage Armor' } });
+      fireEvent.change(screen.getByText(/Remove prepared spell:/).nextElementSibling, { target: { value: 'Fireball' } });
+      fireEvent.change(screen.getByText(/Add from spellbook:/).nextElementSibling, { target: { value: 'Mage Armor' } });
       await act(() => Promise.resolve());
-      const swapBtn = screen.getByText(/Swap Spell/);
-      fireEvent.click(swapBtn);
+      fireEvent.click(screen.getByText(/Swap Spell/));
       await act(() => Promise.resolve());
 
+      // CLA-226: no direct setRuntimeValue for preparedSpells — merged batch only (§39).
       const preparedCalls = setRuntimeValueMock.mock.calls.filter(
         (call) => call[1] === 'preparedSpells'
       );
-      expect(preparedCalls.length).toBeGreaterThan(0);
-      expect(preparedCalls[0][2]).toEqual(['Mage Armor']);
+      expect(preparedCalls).toHaveLength(0);
+      const batchCalls = setRuntimeBatchMock.mock.calls.filter(
+        (call) => call[1] && 'preparedSpells' in call[1]
+      );
+      expect(batchCalls.length).toBe(1);
+      expect(batchCalls[0][1].preparedSpells).toEqual(['Mage Armor']);
+      expect(batchCalls[0][1].memorizeSpellUsedSinceRest).toBe(true);
+      // CLA-226: latch stamped → once-per-rest consumed → swap button gone, used shown.
+      expect(screen.queryByText(/Swap Prepared Spell/)).not.toBeInTheDocument();
+      expect(screen.getByText(/Already used this rest/)).toBeInTheDocument();
+    });
+
+    it('refuses a second swap in the same rest: memorize_spell_refused log, zero runtime change', async () => {
+      const { loadSpellData } = await import('../../services/ui/dataLoader.js');
+      vi.mocked(loadSpellData).mockResolvedValue([
+        { name: 'Fireball', level: 3, classes: ['Wizard'] },
+        { name: 'Mage Armor', level: 1, classes: ['Wizard'] },
+        { name: 'Sleep', level: 1, classes: ['Wizard'] },
+      ]);
+
+      renderModal({
+        class: { name: 'Wizard', major: { name: 'Wizard' } },
+        automation: { specialActions: [{ type: 'memorize_spell', name: 'Memorize Spell', casting_time: 'passive', hasAutomation: true }] },
+        spellAbilities: {
+          spells: [
+            { name: 'Fireball', prepared: 'Prepared', level: 3 },
+            { name: 'Mage Armor', prepared: 'Not Prepared', level: 1 },
+          ],
+        },
+      });
+      fireEvent.click(screen.getByText(/Swap Prepared Spell/));
+      await act(() => Promise.resolve());
+      fireEvent.change(screen.getByText(/Remove prepared spell:/).nextElementSibling, { target: { value: 'Fireball' } });
+      fireEvent.change(screen.getByText(/Add from spellbook:/).nextElementSibling, { target: { value: 'Mage Armor' } });
+      await act(() => Promise.resolve());
+      // Race guard: latch appears while the swap is armed (stale render) —
+      // the click must refuse with zero preparedSpells write.
+      runtimeStore.set('memorizeSpellUsedSinceRest', true);
+      fireEvent.click(screen.getByText(/Swap Spell/));
+      await act(() => Promise.resolve());
+
+      const { addEntry } = await import('../../services/ui/logService.js');
+      const refusals = vi.mocked(addEntry).mock.calls.filter(
+        (call) => call[1]?.automationType === 'memorize_spell_refused'
+      );
+      expect(refusals.length).toBe(1);
+      expect(refusals[0][1].type).toBe('automation');
+      const preparedBatches = setRuntimeBatchMock.mock.calls.filter(
+        (call) => call[1] && 'preparedSpells' in call[1]
+      );
+      expect(preparedBatches).toHaveLength(0);
+      expect(runtimeStore.get('preparedSpells')).toBeUndefined();
+      expect(screen.queryByText(/Remove prepared spell:/)).not.toBeInTheDocument();
+      expect(screen.getByText(/Already used this rest/)).toBeInTheDocument();
+    });
+
+    it('re-arms the swap button when the latch is cleared (rest finished)', async () => {
+      const { loadSpellData } = await import('../../services/ui/dataLoader.js');
+      vi.mocked(loadSpellData).mockResolvedValue([
+        { name: 'Fireball', level: 3, classes: ['Wizard'] },
+        { name: 'Mage Armor', level: 1, classes: ['Wizard'] },
+      ]);
+
+      runtimeStore.set('memorizeSpellUsedSinceRest', true);
+      const { unmount } = renderModal({
+        class: { name: 'Wizard', major: { name: 'Wizard' } },
+        automation: { specialActions: [{ type: 'memorize_spell', name: 'Memorize Spell', casting_time: 'passive', hasAutomation: true }] },
+        spellAbilities: {
+          spells: [
+            { name: 'Fireball', prepared: 'Prepared', level: 3 },
+            { name: 'Mage Armor', prepared: 'Not Prepared', level: 1 },
+          ],
+        },
+      });
+      // Latched (rest already used, not yet finished): no swap affordance.
+      expect(screen.queryByText(/Swap Prepared Spell/)).not.toBeInTheDocument();
+      expect(screen.getByText(/Already used this rest/)).toBeInTheDocument();
+
+      // SHORT_REST/LONG_REST reset lists null the latch when the rest finishes.
+      runtimeStore.set('memorizeSpellUsedSinceRest', null);
+      unmount();
+      renderModal({
+        class: { name: 'Wizard', major: { name: 'Wizard' } },
+        automation: { specialActions: [{ type: 'memorize_spell', name: 'Memorize Spell', casting_time: 'passive', hasAutomation: true }] },
+        spellAbilities: {
+          spells: [
+            { name: 'Fireball', prepared: 'Prepared', level: 3 },
+            { name: 'Mage Armor', prepared: 'Not Prepared', level: 1 },
+          ],
+        },
+      });
+      expect(screen.getByText(/Swap Prepared Spell/)).toBeInTheDocument();
     });
 
     it('writes a dedicated campaign-log entry (old to new spell names) when the swap executes', async () => {

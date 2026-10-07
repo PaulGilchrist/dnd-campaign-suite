@@ -70,6 +70,10 @@ const SHORT_REST_NULL_FLAG_KEYS = [
   'epitomeEmpoweredUsedRound',
   'destructiveStrideActive',
   'destructiveStrideDamageType',
+  // CLA-226: Memorize Spell is once per Short Rest — the swap stamps the latch
+  // (ShortRestModal handleMemorizeSwap); null here when the rest actually
+  // finishes so the feature re-arms for the next rest.
+  'memorizeSpellUsedSinceRest',
 ]
 
 function findClassLevel(playerStats) {

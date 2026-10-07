@@ -436,17 +436,21 @@ function ArcaneRecoverySection({ arcaneRecovery, available, requested, maxSlots,
     );
 }
 
-function MemorizeSpellSection({ hasMemorizeSpell, available, mode, from, to, fromOptions, toOptions, onEnterMode, onChangeFrom, onChangeTo, onSwap, onCancel }) {
-    if (!hasMemorizeSpell || (!available && !mode)) return null;
+function MemorizeSpellSection({ hasMemorizeSpell, available, usedSinceRest, mode, from, to, fromOptions, toOptions, onEnterMode, onChangeFrom, onChangeTo, onSwap, onCancel }) {
+    if (!hasMemorizeSpell || (!available && !mode && !usedSinceRest)) return null;
     return (
         <div className="short-rest-section">
             <h4>Memorize Spell</h4>
             <p>Replace one prepared level 1+ spell with another from your spellbook.</p>
             <div className="short-rest-dice-row">
                 {!mode ? (
-                    <button className="char-btn" onClick={onEnterMode}>
-                        <i className="fas fa-book-journal-whills"></i> Swap Prepared Spell
-                    </button>
+                    usedSinceRest ? (
+                        <span className="short-rest-applied"><i className="fas fa-book"></i> Already used this rest</span>
+                      ) : (
+                        <button className="char-btn" onClick={onEnterMode}>
+                            <i className="fas fa-book-journal-whills"></i> Swap Prepared Spell
+                        </button>
+                      )
                   ) : (
                      <div>
                          <div className="short-rest-memorize-field">
@@ -511,6 +515,11 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const hasMeal = Number(replenishingMeals ?? 0) > 0;
     const [mealConsumed, setMealConsumed] = React.useState(false);
 
+    // CLA-226: once-per-rest latch — stamped on swap, nulled by the SHORT_REST/
+    // LONG_REST reset lists (restRules-shortRest.js / restRules-constants.js) so
+    // the feature re-arms when the rest actually finishes.
+    const memorizeSpellUsedSinceRest = useRuntimeValue(playerStats.name, 'memorizeSpellUsedSinceRest', campaignName);
+
 
     const { sorcRestoration, restorationAvailable, arcaneRecovery, arcaneRecoveryAvailable, arcaneRecoveryMaxSlots, naturalRecovery, naturalRecoveryAvailable, naturalRecoveryMaxLevels, hasMemorizeSpell, hasFontOfInspiration, bardicInspirationMax, fontOfInspirationAvailable, hasBolsteringTreats, maxHitDice, hitDie, conBonus, songOfRestDie, restoreAmount } = computeRestFlags(playerStats);
 
@@ -573,24 +582,45 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         return spells.filter(s => s.prepared === 'Prepared').map(s => s.name);
     }, [playerStats.spellAbilities?.spells, playerStats.name, campaignName]);
 
-    const memorizeSpellAvailable = hasMemorizeSpell && !memorizeSpellMode && preparedSpells.length > 0;
+    const memorizeSpellAvailable = hasMemorizeSpell && !memorizeSpellMode && !memorizeSpellUsedSinceRest && preparedSpells.length > 0;
 
     const memorizeSpellFromOptions = React.useMemo(() => {
         return allSpellbookSpells.filter(s => preparedSpells.includes(s.name) && s.level >= 1);
     }, [allSpellbookSpells, preparedSpells]);
 
     const memorizeSpellToOptions = React.useMemo(() => {
+        // CLA-226: "from the book" = spells this Wizard KNOWS — the canonical
+        // known list is PlayerStats.spellAbilities.spells (built from the disk
+        // character spells[]) — not the entire Wizard class list. Cantrips stay
+        // excluded (level >= 1); already-prepared spells cannot be re-added.
         const preparedSet = new Set(preparedSpells);
-        return allSpellbookSpells.filter(s => s.level >= 1 && !preparedSet.has(s.name));
-    }, [allSpellbookSpells, preparedSpells]);
+        const knownSet = new Set((playerStats.spellAbilities?.spells ?? []).map(s => s.name));
+        return allSpellbookSpells.filter(s => s.level >= 1 && !preparedSet.has(s.name) && knownSet.has(s.name));
+    }, [allSpellbookSpells, preparedSpells, playerStats.spellAbilities]);
 
     const handleMemorizeSwap = () => {
         if (!memorizeSpellFrom || !memorizeSpellTo) return;
+        // CLA-226: once per short rest — second attempt in the same rest refuses
+        // with zero runtime change (latch nulled by the rest reset lists to re-arm).
+        if (getRuntimeValue(playerStats.name, 'memorizeSpellUsedSinceRest')) {
+            addEntry(campaignName, {
+                type: 'automation',
+                automationType: 'memorize_spell_refused',
+                characterName: playerStats.name,
+                description: `${playerStats.name} cannot swap another prepared spell — Memorize Spell has already been used since the last rest.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[ShortRestModal] Error logging Memorize Spell refusal:', e); });
+            setMemorizeSpellMode(false);
+            setMemorizeSpellFrom(null);
+            setMemorizeSpellTo(null);
+            return;
+        }
         const newPrepared = preparedSpells.filter(n => n !== memorizeSpellFrom);
         if (!newPrepared.includes(memorizeSpellTo)) {
             newPrepared.push(memorizeSpellTo);
         }
-        setRuntimeValue(playerStats.name, 'preparedSpells', newPrepared, campaignName);
+        // CLA-226: prepared list + latch ride ONE merged batch write (§39).
+        setRuntimeBatch(playerStats.name, { preparedSpells: newPrepared, memorizeSpellUsedSinceRest: true }, campaignName);
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
@@ -814,7 +844,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
 
                      <ArcaneRecoverySection arcaneRecovery={arcaneRecovery} available={arcaneRecoveryAvailable} requested={arcaneRecoveryRequested} maxSlots={arcaneRecoveryMaxSlots} onRequest={() => setArcaneRecoveryRequested(true)} />
 
-                     <MemorizeSpellSection hasMemorizeSpell={hasMemorizeSpell} available={memorizeSpellAvailable} mode={memorizeSpellMode} from={memorizeSpellFrom} to={memorizeSpellTo} fromOptions={memorizeSpellFromOptions} toOptions={memorizeSpellToOptions} onEnterMode={() => setMemorizeSpellMode(true)} onChangeFrom={setMemorizeSpellFrom} onChangeTo={setMemorizeSpellTo} onSwap={handleMemorizeSwap} onCancel={() => {
+                     <MemorizeSpellSection hasMemorizeSpell={hasMemorizeSpell} available={memorizeSpellAvailable} usedSinceRest={!!memorizeSpellUsedSinceRest} mode={memorizeSpellMode} from={memorizeSpellFrom} to={memorizeSpellTo} fromOptions={memorizeSpellFromOptions} toOptions={memorizeSpellToOptions} onEnterMode={() => setMemorizeSpellMode(true)} onChangeFrom={setMemorizeSpellFrom} onChangeTo={setMemorizeSpellTo} onSwap={handleMemorizeSwap} onCancel={() => {
                          setMemorizeSpellMode(false);
                          setMemorizeSpellFrom(null);
                          setMemorizeSpellTo(null);
