@@ -309,6 +309,52 @@ describe('spellCalc2024-automation', () => {
       expect(light.spellCastingAbility).toBe('Charisma');
     });
 
+    // CLA-212: the tests above seed a caster container (class spellcasting or a
+    // non-empty spells list), which masks the zero-caster gap. A Rogue (Assassin)
+    // with no spellcasting table and spells: [] got null from
+    // ensureSpellAbilitiesContainer BEFORE applyAutomationSpellGrants could stamp
+    // the Light row — no Spells section rendered at all.
+    it('CLA-212: zero-caster host (Rogue Assassin, spells: []) gets a slotless container and the LightBearer Light row with Charisma math', () => {
+      const allSpells = [makeSpell('Light', 0)];
+      const stats = makePlayerStats({
+        level: 20,
+        proficiency: 6,
+        class: {
+          name: 'Rogue',
+          subclass: { name: 'Assassin' },
+          class_levels: Array.from({ length: 20 }, (_, i) => ({ level: i + 1 })),
+          // Mirror production classes.json Rogue — Intelligence (Arcane Trickster) must
+          // NOT overwrite the slotless trait container's Charisma (CLA-212).
+          spell_casting_ability: 'Intelligence',
+        },
+        abilities: [
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 1, bonus: 0 },
+          { name: 'Charisma', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 1, bonus: 3 },
+        ],
+        spells: [],
+        automation: {
+          passives: [{ type: 'cantrip_spellcasting_ability', name: 'LightBearer', cantripName: 'Light', spellcastingAbility: 'Charisma' }],
+        },
+      });
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      expect(result).not.toBeNull();
+      // Slotless: no spell slots granted to a zero-caster host.
+      expect(result._slotlessTraitContainer).toBe(true);
+      expect(result.spell_slots_level_1).toBeUndefined();
+      // Header math reflects the trait's Charisma casting ability (+3 mod, +9 to hit, DC 17).
+      expect(result.spellCastingAbility).toBe('Charisma');
+      expect(result.modifier).toBe(3);
+      expect(result.toHit).toBe(9);
+      expect(result.saveDc).toBe(17);
+
+      const light = result.spells.find(s => s.name === 'Light');
+      expect(light).toBeDefined();
+      expect(light.prepared).toBe('Always');
+      expect(light.spellCastingAbility).toBe('Charisma');
+    });
+
     // ── Mixed automation ──
 
     it('handles mixed automation features across all three arrays', () => {

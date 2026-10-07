@@ -562,6 +562,27 @@ function applyArcaneTricksterGrant(spellAbilities, playerStats) {
 // pattern above) BEFORE the fallback: no spell_slots_level_* keys, so the cast flow
 // never expends slots; the free-cast gate lives in spellPreparationService.
 //
+// CLA-212: cantrip_spellcasting_ability passives (LightBearer — "You know the
+// Light cantrip. Charisma is your spellcasting ability for it.") stamp their
+// cantrip row via applyCantripAbilityOverride in applyAutomationSpellGrants,
+// which runs AFTER the container gate. A zero-caster host (no class table, empty
+// persisted spells) got null there, so the row never rendered. Create a SLOTLESS
+// container (Shadow Arts pattern) AFTER the half-caster fallback so existing
+// persisted-spell hosts keep their slots, and stamp the trait's casting ability
+// so header math and cast resolution honour Charisma.
+function buildCantripAbilityContainer(playerStats) {
+    const cantripAbilityPassive = (playerStats.automation?.passives || [])
+        .find(f => f.type === 'cantrip_spellcasting_ability');
+    if (!cantripAbilityPassive) {
+        return null;
+    }
+    const cantripAbilityContainer = { ...SLOTLESS_CONTAINER(), _slotlessTraitContainer: true };
+    if (cantripAbilityPassive.spellcastingAbility) {
+        cantripAbilityContainer.spellCastingAbility = cantripAbilityPassive.spellcastingAbility;
+    }
+    return cantripAbilityContainer;
+}
+
 // FT-068: Ritual Master feat — mirror the Shadow Arts container pattern so a holder
 // with no class spellcasting table still gets the chosen ritual spell rows (castable
 // slot-free via Quick Ritual; slot casting stays gated on actual slots).
@@ -594,6 +615,11 @@ function ensureSpellAbilitiesContainer(spellAbilities, playerStats, allSpells) {
 
     if (playerStats.spells && playerStats.spells.length > 0) {
         return buildFallbackSpellAbilities(playerStats, allSpells);
+    }
+
+    const cantripAbilityContainer = buildCantripAbilityContainer(playerStats);
+    if (cantripAbilityContainer) {
+        return cantripAbilityContainer;
     }
 
     return null;
@@ -800,7 +826,11 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
     }
 
     const castingAbility = resolveCastingAbility(playerStats);
-    if (castingAbility) {
+    // CLA-212: a slotless trait-cantrip container (buildCantripAbilityContainer) already
+    // carries the trait's casting ability; a zero-caster host's class data (e.g. Rogue
+    // carries Intelligence for Arcane Trickster) must not overwrite it — the trait's
+    // Light row casts with Charisma.
+    if (castingAbility && !spellAbilities._slotlessTraitContainer) {
         spellAbilities.spellCastingAbility = castingAbility;
     }
 

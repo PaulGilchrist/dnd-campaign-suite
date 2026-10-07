@@ -3950,7 +3950,7 @@
       "handler": "src/services/rules/core/spellCalc2024.js (consumer: cantrip_spellcasting_ability :193-204; remap carries spellCastingAbility :477-491)",
       "router": "src/services/combat/automation/automationRouter.js (:430 cantrip_spellcasting_ability -> passives)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/core-handlers.js (:6)",
-      "verified": "broken — see .opencode/plans/bug-CLA-212-lightbearer.md",
+      "verified": "verified",
       "class": "Aasimar (2024 racial trait, races.json:37-44)",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "You know the Light cantrip. Charisma is your spellcasting ability for it."
