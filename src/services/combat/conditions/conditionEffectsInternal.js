@@ -335,11 +335,17 @@ const SAVE_EFFECT_APPLIERS = {
     } else if (mod.target === 'ability_check' || mod.target === 'check' || mod.target === 'd20') {
       effects.autoRerollForChecks = true;
       // A 'd20' target is a full d20 Test (Halfling Lucky: "a 1 on the d20 of a d20 Test") —
-      // covers sheet saving throws too (autoRerollForAttack intentionally NOT set here:
-      // that flag renders the manual Boon-of-Combat-Prowess button, and the attack
-      // context has no auto-reroll consumer — see bug-cla-216 notes).
+      // covers sheet attack rolls, ability checks and saving throws (CLA-216).
+      // autoRerollForAttack here is the CE-level marker consumed by the CharActions
+      // attack ctx plumb → ctx.autoReroll + ctx.autoRerollCondition='roll_equals_1'
+      // → d20RollComputation.js:214. It never maps to popup.autoRerollForAttack
+      // (that flag remains fed only by boonOfCombatProwess, keeping the manual
+      // Boon-of-Combat-Prowess button scoped to convert_miss_to_hit holders).
       if (mod.target === 'd20') {
         effects.autoRerollForSaves = true;
+        if (mod.condition === 'roll_equals_1') {
+          effects.autoRerollForAttack = true;
+        }
       }
     } else if (mod.target === 'attack' || mod.target === 'attack_roll') {
       effects.autoRerollForAttack = true;

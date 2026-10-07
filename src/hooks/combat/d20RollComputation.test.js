@@ -87,4 +87,28 @@ describe('computeD20Roll — Halfling Lucky auto reroll (CLA-216)', () => {
         expect(r.luckyRerolled).toBe(false);
         expect(r.effectiveD20Roll).toBe(15);
     });
+
+    it('rerolls a natural 1 on an attack roll (CLA-216 attack lane)', () => {
+        d20Queue = [1, 7, 14]; // r1=1, r2=7, lucky reroll=14
+        const r = computeD20Roll({ characterName: 'LightfootHalfling', campaignName: 'test-campaign', name: 'Shortsword', rollType: 'attack', context: LUCKY_CTX(), bonus: 4, isResilientSphereActive: () => false });
+        expect(r.luckyRerolled).toBe(true);
+        expect(r.luckyRerollValue).toBe(14);
+        expect(r.effectiveD20Roll).toBe(14);
+    });
+
+    it('does NOT reroll an attack natural 1 when autoRerollCondition is not roll_equals_1', () => {
+        d20Queue = [1, 9];
+        const ctx = { autoReroll: true, autoRerollCondition: 'convert_miss_to_hit' };
+        const r = computeD20Roll({ characterName: 'FighterTest', campaignName: 'test-campaign', name: 'Shortsword', rollType: 'attack', context: ctx, bonus: 4, isResilientSphereActive: () => false });
+        expect(r.luckyRerolled).toBe(false);
+        expect(r.effectiveD20Roll).toBe(1);
+    });
+
+    it('rerolls attack when disadvantage resolves to nat 1', () => {
+        d20Queue = [8, 1, 19]; // disadvantage → min(8,1)=1 → lucky reroll=19
+        const ctx = { ...LUCKY_CTX(), forcedMode: 'disadvantage' };
+        const r = computeD20Roll({ characterName: 'LightfootHalfling', campaignName: 'test-campaign', name: 'Shortsword', rollType: 'attack', context: ctx, bonus: 4, isResilientSphereActive: () => false });
+        expect(r.luckyRerolled).toBe(true);
+        expect(r.effectiveD20Roll).toBe(19);
+    });
 });

@@ -14,6 +14,7 @@ import { computeFeatRangeEffects } from '../../services/character/featRangeServi
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
+import { applyAttackFeatureContext } from './CharActions.attackFeatureContext.js';
 import { getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
@@ -214,12 +215,14 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
     });
 
     const buildCtxSync = React.useCallback(async (attack, opts) => {
-        return await buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, opts);
-    }, [playerStats, campaignName, conditionAttackMode]);
+        const ctx = await buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, opts);
+        return applyAttackFeatureContext(ctx, conditionEffects);
+    }, [playerStats, campaignName, conditionAttackMode, conditionEffects]);
 
     const buildCtx = React.useCallback(async (attack, opts) => {
-        return await buildAttackContext({ attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects: featRangeEffects || null, opts });
-    }, [playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects]);
+        const ctx = await buildAttackContext({ attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects: featRangeEffects || null, opts });
+        return applyAttackFeatureContext(ctx, conditionEffects);
+    }, [playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects, conditionEffects]);
 
     // Synced before useCharActionModals so its pause write can update this mirror
     // and TacticalMasterModal renders (CLA-351 / WM-003). Keyed on the valid shared

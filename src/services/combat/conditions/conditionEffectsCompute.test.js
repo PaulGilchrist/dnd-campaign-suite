@@ -485,12 +485,22 @@ describe('computeConditionEffects — applied modifier effects', () => {
     expect(result.autoRerollCondition).toBe('favored_enemy');
   });
 
-  it('sets autoRerollForChecks and autoRerollForSaves for reroll effect on d20 target (CLA-216: a d20 Test covers checks and saves)', () => {
+  it('sets autoRerollForChecks, autoRerollForSaves and autoRerollForAttack for reroll on d20 target (CLA-216: a d20 Test covers attacks, checks and saves)', () => {
     const modifiers = [{ target: 'd20', effect: 'reroll', condition: 'roll_equals_1' }];
     const result = computeConditionEffects({ saveModifiers: modifiers });
     expect(result.autoRerollForChecks).toBe(true);
     expect(result.autoRerollForSaves).toBe(true);
+    expect(result.autoRerollForAttack).toBe(true);
     expect(result.autoRerollCondition).toBe('roll_equals_1');
+  });
+
+  it('does NOT arm autoRerollForAttack for d20 reroll when condition is not roll_equals_1 (CLA-216)', () => {
+    const modifiers = [{ target: 'd20', effect: 'reroll', condition: 'convert_miss_to_hit' }];
+    const result = computeConditionEffects({ saveModifiers: modifiers });
+    expect(result.autoRerollForChecks).toBe(true);
+    expect(result.autoRerollForSaves).toBe(true);
+    expect(result.autoRerollForAttack).toBe(false);
+    expect(result.autoRerollCondition).toBe('convert_miss_to_hit');
   });
 
   it('sets autoRerollBonus when bonusExpression is provided', () => {

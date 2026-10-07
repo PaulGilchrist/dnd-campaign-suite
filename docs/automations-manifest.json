@@ -4009,7 +4009,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "verified (PASS-subset 2026-10-06: auto_reroll on nat1 LIVE checks [Arcana rolls[1,20]->9, [1,9]->6] + saves [INT->20,->14 banners verbatim], must-use adopted, fires only on nat1, per-character modifier gating; DEFECT attack-roll category inert — autoRerollForAttack never armed for target:d20 zero-producer [CharAbilities.jsx:114/:165 only, comment cites bug-cla-216]",
+      "verified": "verified",
       "race": "Halfling",
       "triggerConditions": "Trigger: failed roll",
       "expectedBehavior": "When you roll a 1 on the d20 of a D20 Test, you can reroll the die, and you must use the new roll."
