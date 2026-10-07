@@ -224,6 +224,10 @@ function computeSpellStats(playerStats, cantripSpellAbility) {
 // Generic spell cast log
 async function logGenericSpellCast({ spell, fullSpell, playerStats, campaignName, getTargetInfo, spellSaveDc, damageType, formula }) {
     if (spell.name === 'Hex') return;
+    // SP-079 (§CLA-208 pay-at-open family): Mass Suggestion's cast log is deferred to the
+    // chooser's confirm so a Skip/cancel emits no phantom spell log. The open lane
+    // (handleNonSorcererCast) stamps _deferChooserSlotPayment without paying.
+    if (spell._deferChooserSlotPayment) return;
     const resolvedTarget = await getTargetInfo();
     const resolvedTargetName = resolvedTarget?.name || null;
     const spellDescription = fullSpell.description ? fullSpell.description.join(' ') : '';

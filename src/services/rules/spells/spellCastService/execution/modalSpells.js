@@ -52,6 +52,12 @@ function handleMassSuggestion(spell, spellSaveDc, playerStats, campaignName) {
                         campaignName,
                         saveType: 'WIS',
                         saveDc: spellSaveDc,
+                        // SP-079 (§CLA-208 pay-at-open family): the open lane forwarded
+                        // _deferChooserSlotPayment without paying — the chooser's confirm
+                        // consumes the slot + logs the cast once (MassSuggestionModal).
+                        deferSlotPayment: !!spell._deferChooserSlotPayment,
+                        slotLevel: spell.slotLevel || spell.level || 6,
+                        castingTime: spell.casting_time || 'Action',
                     },
                 },
             },

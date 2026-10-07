@@ -1,13 +1,45 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
+import { prepareSpellCast, isFreeCastAuthorized } from '../../../../services/rules/spells/spellPreparationService.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 import { logConditionApplied, logSaveResultEntry } from './saveResultLogging.js';
+
+// SP-079 (§CLA-208 pay-at-open family): the lv6 spell slot is spent at chooser
+// CONFIRM, not at row-click/open. The open lane (handleNonSorcererCast) forwards
+// deferSlotPayment:true WITHOUT calling prepareSpellCast; a Skip/cancel therefore
+// spends nothing and emits no phantom cast log. This mirrors the confirmed
+// consumeBarkskinSlot / handleShapechangeConfirm pay-at-confirm template.
+async function consumeMassSuggestionSlot({ playerStats, campaignName, spellName, slotLevel, castingTime, saveDc }) {
+    const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spellName, slotLevel, playerStats, campaignName);
+    const slotResult = await prepareSpellCast({ name: spellName, level: slotLevel }, {}, {
+        playerName: playerStats.name,
+        playerStats,
+        campaignName,
+        isUpcast: false,
+        freeCastAuthorized,
+    });
+    if (!slotResult?.slotConsumed && !slotResult?.freeCastUsed) return false;
+    await addEntry(campaignName, {
+        type: 'spell',
+        characterName: playerStats.name,
+        targetName: null,
+        spellName,
+        spellLevel: slotLevel,
+        castingTime,
+        damageType: null,
+        damageFormula: null,
+        saveDC: saveDc,
+        concentration: false,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[MassSuggestionModal] Error logging spell cast:', e); });
+    return true;
+}
 
 function MassSuggestionModal({
     action,
@@ -15,9 +47,14 @@ function MassSuggestionModal({
     campaignName,
     saveType,
     saveDc,
+    deferSlotPayment,
+    slotLevel,
+    castingTime,
     onClose,
 }) {
     const [pendingPrompts, setPendingPrompts] = useState([]);
+    // SP-079: re-entry latch — a completed confirm pays once; a repeated click must not re-spend.
+    const confirmStartedRef = useRef(false);
 
     useEffect(() => {
         return () => {
@@ -260,6 +297,36 @@ function MassSuggestionModal({
     };
 
     const handleCreatureSelectionConfirm = useCallback(async (selectedNames) => {
+        if (confirmStartedRef.current) return;
+        confirmStartedRef.current = true;
+
+        // SP-079: pay-at-confirm. The open lane deferred the lv6 slot spend + cast log
+        // here so a Skip/cancel spends nothing. One completed confirm = one slot + one
+        // spell log; saves/stamps below are unchanged.
+        if (deferSlotPayment) {
+            const paid = await consumeMassSuggestionSlot({
+                playerStats,
+                campaignName,
+                spellName: action.name,
+                slotLevel: slotLevel || 6,
+                castingTime: castingTime || 'Action',
+                saveDc,
+            });
+            if (!paid) {
+                await addEntry(campaignName, {
+                    type: 'automation',
+                    automationType: 'mass_suggestion_refused',
+                    reason: 'no_slot',
+                    characterName: playerStats.name,
+                    spellName: action.name,
+                    description: `No level ${slotLevel || 6} spell slot available — ${action.name} is not cast.`,
+                    timestamp: Date.now(),
+                }).catch((e) => { console.error('[MassSuggestionModal] Error logging refusal:', e); });
+                onClose();
+                return;
+            }
+        }
+
         await addEntry(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
@@ -270,7 +337,7 @@ function MassSuggestionModal({
 
         const { prompts } = await resolveAllSaves(selectedNames);
         setPendingPrompts(prompts);
-    }, [campaignName, playerStats.name, action.name, saveDc, saveType, resolveAllSaves]);
+    }, [campaignName, playerStats, action.name, saveDc, saveType, resolveAllSaves, deferSlotPayment, slotLevel, castingTime, onClose]);
 
     const handleCreatureSelectionSkip = useCallback(() => {
         onClose();

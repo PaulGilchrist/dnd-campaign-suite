@@ -110,6 +110,20 @@ function stampPaidSlotLevelOn(carrier, upcastLevel) {
   carrier.slotLevel = upcastLevel;
 }
 
+// SP-079 (§CLA-208 pay-at-open family): Mass Suggestion pays at chooser CONFIRM,
+// not at row-click/open. The chooser is opened by executeSpellCast's automationPopup,
+// but the slot spend here (handleNonSorcererCast → prepareSpellCast) previously paid
+// BEFORE the chooser even rendered — a Skip/cancel left the lv6 slot spent, zero saves
+// resolved, plus a phantom cast log. This branch opens the chooser UNPAID and stamps
+// _deferChooserSlotPayment so executeSpellCast skips the cast log and the chooser's
+// confirm (MassSuggestionModal.handleCreatureSelectionConfirm) consumes the slot + logs
+// once. Mirrors the consumeBarkskinSlot / consumeProtectionFromPoisonSlot pay-at-confirm
+// template (useCustomHandlers.js). Same shared lane serves both 2024 and 5e rows.
+function isDeferredChooserPaymentSpell(spell) {
+  const lower = (spell?.name || '').toLowerCase();
+  return lower === 'mass suggestion' && spell?.automation?.type === 'mass_suggestion';
+}
+
 // Non-sorcerer cast path: cantrip auto-leveling, concentration-preserving casts,
 // and the generic prepareSpellCast slot payment. Mirrors the original ordering exactly.
 async function handleNonSorcererCast(spell, metaCtx, {
@@ -117,6 +131,12 @@ async function handleNonSorcererCast(spell, metaCtx, {
 }) {
   const isCantrip = spell.level === 0;
   const cantripAutoLevel = (isCantrip && spell.damage) ? resolveCantripAutoLevel(spell, playerStats) : null;
+
+  if (isDeferredChooserPaymentSpell(spell)) {
+    // SP-079: open the chooser unpaid — the spend + cast log move to confirm.
+    onExecute({ ...spell, _deferChooserSlotPayment: true, slotLevel: spell.upcastLevel || spell.level }, metaCtx);
+    return;
+  }
 
   if (isCantrip && cantripAutoLevel) {
     const preparedSpell = { ...spell, level: cantripAutoLevel, baseLevel: 0 };
