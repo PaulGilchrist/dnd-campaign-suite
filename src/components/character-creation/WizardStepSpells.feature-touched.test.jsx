@@ -74,7 +74,8 @@ vi.mock('../../services/rules/spells/spellLimits.js', () => ({
   validateSpellSelection: vi.fn().mockResolvedValue({ valid: true, violations: [] }),
 }));
 
-vi.mock('../../services/rules/spells/spellValidation.js', () => ({
+vi.mock('../../services/rules/spells/spellValidation.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   getSpellValidationInfo: vi.fn().mockResolvedValue({ warnings: [] }),
 }));
 

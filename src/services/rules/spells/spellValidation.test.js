@@ -22,6 +22,8 @@ import {
   getSpellSources,
   validateSpells,
   getSpellValidationInfo,
+  hasMagicalSecretsAccess,
+  MAGICAL_SECRETS_CLASS_LISTS,
 } from './spellValidation.js';
 
 // --- Helpers ---
@@ -469,6 +471,122 @@ describe('spellValidation', () => {
 
       expect(result.valid).toBe(true);
       expect(result.warnings).toEqual([]);
+    });
+  });
+
+  describe('2024 Bard Magical Secrets (CLA-221)', () => {
+    function mockBardSpellcaster() {
+      vi.mocked(dataLoader.loadClassData).mockResolvedValue([
+        { name: 'Bard', index: 'bard', class_levels: [{ level: 10, class_specific: { magical_secrets: 2 } }] },
+      ]);
+      vi.mocked(dataLoader.loadRaceData).mockResolvedValue([]);
+      vi.mocked(dataLoader.loadBackgroundData).mockResolvedValue([]);
+      vi.mocked(dataLoader.loadFeatData).mockResolvedValue([]);
+    }
+
+    const bardAt = (level) => ({ class: { name: 'Bard' }, level });
+
+    it('exposes the four canonical magical secrets lists', () => {
+      expect(MAGICAL_SECRETS_CLASS_LISTS).toEqual(['Bard', 'Cleric', 'Druid', 'Wizard']);
+    });
+
+    it('grants access for 2024 bards from level 10 onward only', () => {
+      expect(hasMagicalSecretsAccess('Bard', '2024', 10)).toBe(true);
+      expect(hasMagicalSecretsAccess('Bard', '2024', '20')).toBe(true);
+      expect(hasMagicalSecretsAccess('Bard', '2024', 9)).toBe(false);
+      expect(hasMagicalSecretsAccess('Bard', '5e', 20)).toBe(false);
+      expect(hasMagicalSecretsAccess('Cleric', '2024', 20)).toBe(false);
+    });
+
+    it('allows Cleric and Wizard spells for a level 20 bard (no lv10 key needed)', async () => {
+      mockBardSpellcaster();
+
+      const result = await validateSpells(
+        bardAt(20),
+        ['Cure Wounds', 'Fireball'],
+        allSpells,
+        '2024',
+      );
+
+      expect(result.valid).toBe(true);
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('allows four-list spells at the level that carries the magical_secrets key', async () => {
+      mockBardSpellcaster();
+
+      const result = await validateSpells(
+        bardAt(10),
+        ['Cure Wounds', 'Fireball'],
+        allSpells,
+        '2024',
+      );
+
+      expect(result.valid).toBe(true);
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('still restricts four-list picks for a bard below level 10', async () => {
+      mockBardSpellcaster();
+
+      const result = await validateSpells(
+        bardAt(9),
+        ['Cure Wounds'],
+        allSpells,
+        '2024',
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0].message).toContain('outside of the class spell list');
+    });
+
+    it('still restricts Sorcerer/Warlock-only spells for a level 20 bard', async () => {
+      mockBardSpellcaster();
+
+      const result = await validateSpells(
+        bardAt(20),
+        ['Darkness'],
+        allSpells,
+        '2024',
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0].message).toContain('outside of the class spell list');
+    });
+
+    it('does not widen 5e bard spell lists', async () => {
+      mockBardSpellcaster();
+
+      const result = await validateSpells(
+        bardAt(20),
+        ['Cure Wounds'],
+        allSpells,
+        '5e',
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.warnings).toHaveLength(1);
+    });
+
+    it('does not widen non-bard 2024 casters', async () => {
+      vi.mocked(dataLoader.loadClassData).mockResolvedValue([
+        { name: 'Sorcerer', class_levels: [{ level: 20 }] },
+      ]);
+      vi.mocked(dataLoader.loadRaceData).mockResolvedValue([]);
+      vi.mocked(dataLoader.loadBackgroundData).mockResolvedValue([]);
+      vi.mocked(dataLoader.loadFeatData).mockResolvedValue([]);
+
+      const result = await validateSpells(
+        { class: { name: 'Sorcerer' }, level: 20 },
+        ['Cure Wounds'],
+        allSpells,
+        '2024',
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.warnings).toHaveLength(1);
     });
   });
 

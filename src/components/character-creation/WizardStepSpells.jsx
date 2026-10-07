@@ -3,7 +3,7 @@ import SelectableList from './SelectableList.jsx';
 import SpellListItem from './SpellListItem.jsx';
 import WarningList from '../common/WarningList.jsx';
 import { getSpellLimits, validateSpellSelection } from '../../services/rules/spells/spellLimits.js';
-import { getSpellValidationInfo } from '../../services/rules/spells/spellValidation.js';
+import { getSpellValidationInfo, hasMagicalSecretsAccess, MAGICAL_SECRETS_CLASS_LISTS } from '../../services/rules/spells/spellValidation.js';
 import { renderMarkdown } from '../../services/ui/sanitize.js';
 import MagicInitiateModal from './MagicInitiateModal.jsx';
 import FeyTouchedModal, { ShadowTouchedModal } from './FeyTouchedModal.jsx';
@@ -41,6 +41,64 @@ function FeatEditBanner({ icon, children, onClick }) {
 const featNameMatches = (feat, name) =>
   feat === name || (typeof feat === 'object' && feat.name === name);
 
+// 2024 Bard Magical Secrets pool: spells on the Bard, Cleric, Druid, or Wizard lists
+function filterMagicalSecretsPool(spells) {
+  return spells.filter(spell => (spell.classes || []).some(c => MAGICAL_SECRETS_CLASS_LISTS.includes(c)));
+}
+
+// Selected spells not on the Bard list were drawn via Magical Secrets
+function countNonBardSpells(selectedNames, allSpells) {
+  return (selectedNames || []).filter(spellName => {
+    const spell = (allSpells || []).find(s => s.name === spellName || s.index === spellName);
+    return spell && !(spell.classes || []).includes('Bard');
+  }).length;
+}
+
+// 2024 Bard Magical Secrets pool state + filtered spell list (CLA-221)
+function useMagicalSecretsPool(formData, allSpells, charLevel) {
+  const enabled = hasMagicalSecretsAccess(formData?.class?.name, formData?.rules, charLevel);
+  const [poolOnly, setPoolOnly] = useState(false);
+
+  const availableSpells = useMemo(() => {
+    const spells = allSpells || [];
+    return enabled && poolOnly ? filterMagicalSecretsPool(spells) : spells;
+  }, [allSpells, enabled, poolOnly]);
+
+  const chosenCount = useMemo(
+    () => countNonBardSpells(formData?.spells, allSpells),
+    [formData?.spells, allSpells]
+  );
+
+  return { enabled, poolOnly, availableSpells, chosenCount, togglePool: () => setPoolOnly(prev => !prev) };
+}
+
+// Labeled Magical Secrets pool section (CLA-221)
+function MagicalSecretsSection({ chosenCount, poolCount, active, onToggle }) {
+  return (
+    <div className="magical-secrets-section">
+      <div className="magical-secrets-header">
+        <h3><i className="fa-solid fa-wand-magic-sparkles"></i> Magical Secrets</h3>
+        <span className="magical-secrets-count">
+          {chosenCount}/{poolCount} in pool
+        </span>
+      </div>
+      <p className="magical-secrets-description">
+        Choose your spells from the Bard, Cleric, Druid, and Wizard spell lists &mdash;
+        the chosen spells count as Bard spells for you.
+      </p>
+      <button
+        type="button"
+        className="magical-secrets-toggle-btn"
+        aria-pressed={active}
+        onClick={onToggle}
+      >
+        <i className={`fa-solid ${active ? 'fa-list' : 'fa-wand-magic-sparkles'}`}></i>
+        {active ? 'Show All Spells' : 'Show Magical Secrets Pool Only'}
+      </button>
+    </div>
+  );
+}
+
 // Edit banners shown when a feat is selected, configured, and its modal is closed
 function getEditBannerDescriptors({ formData, modals }) {
   const feats = formData.feats || [];
@@ -67,6 +125,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
   const preSelected = useMemo(() => preSelectedSpells || [], [preSelectedSpells]);
   const isWarlock = formData?.class?.name === 'Warlock';
   const charLevel = parseInt(formData?.level) || 1;
+  const magicalSecrets = useMagicalSecretsPool(formData, allSpells, charLevel);
   const [expandedArcanumSpell, setExpandedArcanumSpell] = useState(null);
   const [showMagicInitiateModal, setShowMagicInitiateModal] = useState(false);
   const [showFeyTouchedModal, setShowFeyTouchedModal] = useState(false);
@@ -222,7 +281,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
       setSpellCounts(counts);
       }, [formData.spells, allSpells, preSelected, miSpells, ftSpells, stSpells]);
 
-     const availableSpells = allSpells || [];
+     const availableSpells = magicalSecrets.availableSpells;
 
       // Calculate total prepared spells (non-cantrip), for classes with spellType === 'prepared'
      const totalPrepared = useMemo(() => {
@@ -547,6 +606,14 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
           {banner.label}
         </FeatEditBanner>
       ))}
+      {magicalSecrets.enabled && (
+        <MagicalSecretsSection
+          chosenCount={magicalSecrets.chosenCount}
+          poolCount={spellLimits.preparedSpells || 0}
+          active={magicalSecrets.poolOnly}
+          onToggle={magicalSecrets.togglePool}
+        />
+      )}
         <SelectableList
         items={availableSpells}
         fieldName="spells"

@@ -370,28 +370,28 @@ function buildAllowedSpells(sources, formData, grantedSpells) {
   return allowedSpells;
 }
 
-// 2024 Bard Magical Secrets level entry (class data loaded once), or null.
-async function getMagicalSecretsLevelEntry(className, version, formData) {
-  if (className !== 'Bard' || version !== '2024') return null;
-  const classData = await loadClassData(version);
-  const bardData = classData.find(c => c.name === className || c.index === 'bard');
-  if (!bardData) return null;
-  return bardData.class_levels?.find(entry => entry.level === formData.level) || null;
+// Canonical lists a 2024 Bard may draw Magical Secrets from (classes.json lv10 feature).
+export const MAGICAL_SECRETS_CLASS_LISTS = ['Bard', 'Cleric', 'Druid', 'Wizard'];
+
+// 2024 Bard Magical Secrets is gained at level 10 and re-opens whenever the
+// Prepared Spells number in the Bard Features table increases — so the four-list
+// pool is available at every level from 10 onward (CLA-221), not only the level
+// carrying the class_specific.magical_secrets key.
+export function hasMagicalSecretsAccess(className, version, level) {
+  return className === 'Bard' && version === '2024' && (parseInt(level, 10) || 0) >= 10;
 }
 
 // Is this spell allowed for the character by class, half/third-caster proxy,
 // subclass spell list, or 2024 Bard Magical Secrets?
 function isSpellAllowedByClass(spellData, spellClasses, ctx) {
-  const { className, isMagicalSecretsBard, magicalSecretsLevelEntry } = ctx;
+  const { className, isMagicalSecretsBard } = ctx;
   const MONK_SUBCLASS_SPELLS = ['Darkness', 'Darkvision', 'Pass Without Trace', 'Silence'];
   if (spellClasses.includes(className)) return true;
   if ((className === 'Fighter' || className === 'Rogue') && spellClasses.includes('Wizard')) return true;
   if (className === 'Monk' && MONK_SUBCLASS_SPELLS.includes(spellData.name)) return true;
 
   // 2024 Bard Magical Secrets: allow spells from Bard, Cleric, Druid, and Wizard lists
-  const magicalSecretsCount = magicalSecretsLevelEntry?.class_specific?.magical_secrets;
-  if (isMagicalSecretsBard && magicalSecretsCount != null && magicalSecretsCount > 0 &&
-    ['Bard', 'Cleric', 'Druid', 'Wizard'].some(c => spellClasses.includes(c))) return true;
+  if (isMagicalSecretsBard && MAGICAL_SECRETS_CLASS_LISTS.some(c => spellClasses.includes(c))) return true;
 
   return false;
 }
@@ -412,9 +412,8 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
   const allowedSpells = buildAllowedSpells(sources, formData, grantedSpells);
 
   const className = sources.class.name;
-  const isMagicalSecretsBard = className === 'Bard' && version === '2024';
-  const magicalSecretsLevelEntry = await getMagicalSecretsLevelEntry(className, version, formData);
-  const classCheckCtx = { className, isMagicalSecretsBard, magicalSecretsLevelEntry };
+  const isMagicalSecretsBard = hasMagicalSecretsAccess(className, version, formData.level);
+  const classCheckCtx = { className, isMagicalSecretsBard };
 
   // Check each selected spell
   const spellsOutsideClassList = [];
