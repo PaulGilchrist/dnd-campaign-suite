@@ -38,13 +38,16 @@ function dispatchSaveResult({ campaignName, promptId, targetName, saveType, save
 }
 
 // Shared WIS NPC save (also used by Crown of Madness).
-export function rollNpcSave(targetCreature, dc, advantage) {
+// CLA-219: disadvantage (Heightened Spell / Magical Ambush via metaCtx
+// transport) rides the inline adjudication — 2d20 keep-low, mirroring
+// rollSaveForCreature's mode resolution.
+export function rollNpcSave(targetCreature, dc, advantage, disadvantage = false) {
     if (targetCreature) {
-        return rollSaveForCreature(targetCreature, 'WIS', dc, false, advantage);
+        return rollSaveForCreature(targetCreature, 'WIS', dc, disadvantage, advantage);
     }
     const r1 = rollD20();
     const r2 = rollD20();
-    const roll = advantage ? Math.max(r1, r2) : r1;
+    const roll = disadvantage ? Math.min(r1, r2) : advantage ? Math.max(r1, r2) : r1;
     const total = roll;
     const success = total >= dc;
     return { roll, total, bonus: 0, success, rawRolls: [r1, r2] };
@@ -173,6 +176,8 @@ async function charmOneTarget({ campaignName, casterName, action, auto, config, 
     const targetCreature = cs.creatures.find(c => c.name === targetName);
     const isTargetNpc = targetCreature && targetCreature.type !== 'player';
     const targetAdvantage = charmAdvantages[targetName] || auto.advantage || false;
+    // CLA-219: Heightened Spell / Magical Ambush transport rides the charm lane once.
+    const targetDisadvantage = !!action.metaCtx?.metamagicHeighten;
 
     const { promptId, promise } = createSaveListener(campaignName, {
         targetName,
@@ -181,7 +186,7 @@ async function charmOneTarget({ campaignName, casterName, action, auto, config, 
         saveDc: dc,
         dcSuccess: 'none',
         advantage: targetAdvantage,
-        disadvantage: !!action.metaCtx?.metamagicHeighten,
+        disadvantage: targetDisadvantage,
         condition: 'charmed',
         ...(config.saveConditions ? { saveConditions: config.saveConditions } : {}),
     });
@@ -190,7 +195,7 @@ async function charmOneTarget({ campaignName, casterName, action, auto, config, 
         type: 'ability_use',
         characterName: casterName,
         abilityName: action.name,
-        description: `${casterName} casts ${action.name} on ${targetName}! ${targetName} must make a WIS save (DC ${dc})${targetAdvantage ? ' with Advantage' : ''} or become Charmed.`,
+        description: `${casterName} casts ${action.name} on ${targetName}! ${targetName} must make a WIS save (DC ${dc})${targetAdvantage ? ' with Advantage' : ''}${targetDisadvantage ? ' with Disadvantage' : ''} or become Charmed.`,
         promptId,
     }).catch((e) => { console.error(config.logPrefix, e); });
 
@@ -201,7 +206,7 @@ async function charmOneTarget({ campaignName, casterName, action, auto, config, 
     targetName,
     saveType: 'WIS',
     saveDc: dc,
-    saveResult: rollNpcSave(targetCreature, dc, targetAdvantage),
+            saveResult: rollNpcSave(targetCreature, dc, targetAdvantage, targetDisadvantage),
 });
     }
 
@@ -222,9 +227,23 @@ function buildCharmSummary({ charmedTargets, savedTargets, immuneTargets }) {
     return `No creatures charmed. ${savedTargets.length} creature(s) saved: ${savedTargets.join(', ')}.${immuneTail}`;
 }
 
+// CLA-219: Magical Ambush rides the charm lane here because the sheet's
+// charm chooser confirm rebuilds metaCtx (useSimpleSpellHandlers) and the
+// chooser never passes through executeSpellCast's choke-point fold.
+function foldMagicalAmbush(action, playerStats, campaignName) {
+    if (action.metaCtx?.metamagicHeighten) return;
+    const passives = playerStats.automation?.passives || [];
+    if (!passives.some(p => p.type === 'passive_rule' && p.effect === 'magical_ambush')) return;
+    const conditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
+    if (conditions.some(c => String(c).toLowerCase() === 'invisible')) {
+        action.metaCtx = { ...action.metaCtx, metamagicHeighten: true };
+    }
+}
+
 export async function handleCharmSpell(action, playerStats, campaignName, config) {
     const auto = action.automation || {};
     const dc = buildSaveDc(auto, playerStats);
+    foldMagicalAmbush(action, playerStats, campaignName);
 
     const cs = await getCombatContext(campaignName);
     if (!cs?.creatures || cs.creatures.length === 0) {

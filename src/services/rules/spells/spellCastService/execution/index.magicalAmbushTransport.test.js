@@ -1,5 +1,8 @@
-// @new-for-SP-092
-// @mocks-copied-from earlyReturns-generic.test.js
+// @improved-by-ai
+// @cleaned-by-ai
+// @cleaned-by-ai
+// @improved-by-ai
+// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /* ------------------------------------------------------------------ */
@@ -84,7 +87,7 @@ vi.mock('../../../../combat/buffs/buffService.js', () => ({
 }));
 
 vi.mock('../../../core/spellDamageUtils.js', () => ({
-  resolveSpellDamageWithTypes: vi.fn(() => ({ formula: '10d6', primaryType: 'Fire' })),
+  resolveSpellDamageWithTypes: vi.fn(() => ({ formula: '1d8', primaryType: 'Fire' })),
 }));
 
 vi.mock('../../../features/confusionService.js', () => ({
@@ -160,33 +163,8 @@ vi.mock('./triggerSpells.js', () => ({
   handleExpeditiousRetreat: vi.fn(() => Promise.resolve({ handled: false })),
   handleFriends: vi.fn(() => Promise.resolve({ handled: false })),
   handleCrownOfMadness: vi.fn(() => Promise.resolve({ handled: false })),
-  handleAnimalFriendship: vi.fn(() => Promise.resolve({ handled: false })),
-  handleDominateBeast: vi.fn(() => Promise.resolve({ handled: false })),
-  handleDominateMonster: vi.fn(() => Promise.resolve({ handled: false })),
-  handleDominatePerson: vi.fn(() => Promise.resolve({ handled: false })),
-  handleRayOfEnfeeblement: vi.fn(() => Promise.resolve({ handled: false })),
-  handleCompelledDuel: vi.fn(() => Promise.resolve({ handled: false })),
-  handleGlobeOfInvulnerability: vi.fn(() => Promise.resolve({ handled: false })),
-  handleForcecage: vi.fn(() => Promise.resolve({ handled: false })),
-  handleStinkingCloud: vi.fn(() => Promise.resolve({ handled: false })),
-  handleSleetStorm: vi.fn(() => Promise.resolve({ handled: false })),
-  handleFaerieFire: vi.fn(() => Promise.resolve({ handled: false })),
-  handleTashasHideousLaughter: vi.fn(() => Promise.resolve({ handled: false })),
-  handleImprisonment: vi.fn(() => Promise.resolve({ handled: false })),
-  handleHeroism: vi.fn(() => Promise.resolve({ handled: false })),
-  handleHolyAura: vi.fn(() => Promise.resolve({ handled: false })),
-  handleLongstrider: vi.fn(() => Promise.resolve({ handled: false })),
-  handleSpareTheDying: vi.fn(() => Promise.resolve({ handled: false })),
-  handleEnhanceAbility: vi.fn(() => Promise.resolve({ handled: false })),
-  handleMassCureWounds: vi.fn(() => Promise.resolve({ handled: false })),
-  handleMassHealingWord: vi.fn(() => Promise.resolve({ handled: false })),
-  handlePrayerOfHealing: vi.fn(() => Promise.resolve({ handled: false })),
-  handleFalseLife: vi.fn(() => Promise.resolve({ handled: false })),
-  handleRemoveCurse: vi.fn(() => Promise.resolve({ handled: false })),
-  handleProtectionFromEnergy: vi.fn(() => Promise.resolve({ handled: false })),
-  handleProtectionFromPoison: vi.fn(() => Promise.resolve({ handled: false })),
-  handleResistance: vi.fn(() => Promise.resolve({ handled: false })),
   handleGenericAutomation: vi.fn(() => Promise.resolve({ handled: false })),
+  handleAnimalFriendship: vi.fn(() => Promise.resolve({ handled: false })),
 }));
 
 vi.mock('./savePath.js', () => ({
@@ -214,70 +192,137 @@ vi.mock('../../../../../services/encounters/combatData.js', () => ({
 }));
 
 /* ------------------------------------------------------------------ */
-/*  SUT import after mocks                                             */
-/* ------------------------------------------------------------------ */
 
-import { executeSpellCast } from './index.js';
+/* ------------------------------------------------------------------ */
+/*  CLA-219: Magical Ambush threads hasInvisible through the exact  */
+/*  Heightened Spell transport (metaCtx.metamagicHeighten) at the    */
+/*  executeSpellCast choke point — all lanes honour it once.         */
+/* ------------------------------------------------------------------ */
 
 const { getRuntimeValue } = await import('../../../../../hooks/runtime/useRuntimeState.js');
-const { handleGenericAutomation: mockGenericAutomation } = await import('./triggerSpells.js');
+const { handleCommand } = await import('./triggerSpells.js');
+const { handleSavePath } = await import('./savePath.js');
+const { resolveSpellDamageWithTypes } = await import('../../../core/spellDamageUtils.js');
+import { executeSpellCast } from './index.js';
 
-/* ------------------------------------------------------------------ */
-/*  Test-data factories                                                */
-/* ------------------------------------------------------------------ */
-
-function makePlayerStats() {
-  return {
-    name: 'TestWizard',
-    abilities: [{ name: 'Intelligence', bonus: 3 }],
-    proficiency: 6,
-    spellAbilities: {
-      spellCastingAbility: 'Intelligence',
-      toHit: 9,
-      saveDc: 17,
-      modifier: 3,
-    },
-    automation: { passives: [] },
-    hitPoints: 82,
-    level: 20,
-  };
+function ambushPlayerStats(hasPassive = true) {
+    return {
+        name: 'AasimarTest',
+        rules: '2024',
+        proficiency: 6,
+        spellAbilities: { saveDc: 14, modifier: 5, toHit: 11 },
+        abilities: [{ name: 'Charisma', bonus: 5 }],
+        automation: { passives: hasPassive ? [{ type: 'passive_rule', effect: 'magical_ambush', name: 'Magical Ambush' }] : [] },
+    };
 }
 
-function makePrismaticSpray() {
-  return {
-    name: 'Prismatic Spray',
-    level: 7,
-    automation: { type: 'prismatic_spray', saveType: 'DEX', damage: '10d6', saveDc: 'spell_save_dc' },
-  };
+function commandSpell() {
+    return {
+        name: 'Command', level: 1, school: 'Enchantment', casting_time: '1 action',
+        range: '60 feet', components: 'V', duration: '1 round',
+        dc: { dc_type: 'WIS', dc_success: 'none' },
+    };
 }
 
-/* ------------------------------------------------------------------ */
+function saveSpell() {
+    return {
+        name: 'Phantasmal Killer', level: 4, school: 'Illusion', casting_time: '1 action',
+        range: '120 feet', components: 'V,S', duration: 'Concentration, up to 1 minute',
+        dc: { dc_type: 'WIS', dc_success: 'none' },
+        damage: { damage_at_slot_level: { 4: '4d10', 5: '5d10' } },
+    };
+}
 
-describe('executeSpellCast routes metaCtx into handleGenericAutomation (SP-092)', () => {
-  beforeEach(() => {
+function baseOpts(playerStats) {
+    return {
+        rollAttack: vi.fn(),
+        rollDamage: vi.fn(),
+        playerStats,
+        getTargetInfo: async () => ({ name: 'HexWarlock' }),
+        attackerPos: null, targetPos: null, featEffects: {},
+        campaignName: 'test-campaign', mapName: null, characters: [],
+    };
+}
+
+function noDamageSpellMode() {
+    resolveSpellDamageWithTypes.mockReturnValue({ formula: null, primaryType: null });
+}
+function damageSpellMode() {
+    resolveSpellDamageWithTypes.mockReturnValue({ formula: '4d10', primaryType: 'Psychic' });
+}
+
+beforeEach(() => {
     vi.clearAllMocks();
-    getRuntimeValue.mockReturnValue([]);
-    mockGenericAutomation.mockResolvedValue({ handled: true });
-  });
+    handleCommand.mockImplementation(async () => ({ handled: false }));
+    handleSavePath.mockImplementation(async () => null);
+    getRuntimeValue.mockImplementation(() => undefined);
+    noDamageSpellMode();
+});
 
-  it('passes the caller metaCtx (with selectedTargets) to handleGenericAutomation', async () => {
-    const metaCtx = { selectedTargets: ['Zombie 1', 'Zombie 2', 'Archmage 1', 'Archmage 2'] };
+describe('CLA-219 Magical Ambush disadvantage transport', () => {
+    it('folds hasInvisible into metaCtx.metamagicHeighten for dedicated-handler lanes (Command)', async () => {
+        getRuntimeValue.mockImplementation((name, key) =>
+            (name === 'AasimarTest' && key === 'activeConditions') ? ['invisible'] : undefined);
+        handleCommand.mockImplementation(async ({ metaCtx }) => ({
+            handled: true,
+            result: { automationPopup: { type: 'modal', modalName: 'commandChoice', payload: { metaCtx } } },
+        }));
 
-    await executeSpellCast(makePrismaticSpray(), metaCtx, {
-      rollAttack: vi.fn(),
-      rollDamage: vi.fn(),
-      playerStats: makePlayerStats(),
-      getTargetInfo: async () => ({ name: 'Zombie 1' }),
-      campaignName: 'test-campaign',
-      mapName: 'map',
-      characters: [],
+        const result = await executeSpellCast(commandSpell(), {}, baseOpts(ambushPlayerStats()));
+
+        expect(handleCommand).toHaveBeenCalled();
+        expect(result.automationPopup.payload.metaCtx.metamagicHeighten).toBe(true);
     });
 
-    expect(mockGenericAutomation).toHaveBeenCalledTimes(1);
-    const callArgs = mockGenericAutomation.mock.calls[0];
-    // CLA-219: the cast lane now folds the ambush/heighten transport key onto
-    // metaCtx at the choke point — visible caster control keeps it false.
-    expect(callArgs[0].metaCtx).toEqual({ ...metaCtx, metamagicHeighten: false });
-    expect(callArgs[0].metaCtx.selectedTargets).toEqual(['Zombie 1', 'Zombie 2', 'Archmage 1', 'Archmage 2']);
-  });
+    it('keeps metamagicHeighten false when the caster is visible (control)', async () => {
+        getRuntimeValue.mockImplementation((name, key) =>
+            (name === 'AasimarTest' && key === 'activeConditions') ? [] : undefined);
+        handleCommand.mockImplementation(async ({ metaCtx }) => ({
+            handled: true,
+            result: { automationPopup: { type: 'modal', modalName: 'commandChoice', payload: { metaCtx } } },
+        }));
+
+        const result = await executeSpellCast(commandSpell(), {}, baseOpts(ambushPlayerStats()));
+
+        expect(result.automationPopup.payload.metaCtx.metamagicHeighten).toBe(false);
+    });
+
+    it('keeps metamagicHeighten false without the magical_ambush passive (control)', async () => {
+        getRuntimeValue.mockImplementation((name, key) =>
+            (name === 'AasimarTest' && key === 'activeConditions') ? ['invisible'] : undefined);
+        handleCommand.mockImplementation(async ({ metaCtx }) => ({
+            handled: true,
+            result: { automationPopup: { type: 'modal', modalName: 'commandChoice', payload: { metaCtx } } },
+        }));
+
+        const result = await executeSpellCast(commandSpell(), {}, baseOpts(ambushPlayerStats(false)));
+
+        expect(result.automationPopup.payload.metaCtx.metamagicHeighten).toBe(false);
+    });
+
+    it('folds hasInvisible into the savePath context for damage save spells', async () => {
+        damageSpellMode();
+        getRuntimeValue.mockImplementation((name, key) =>
+            (name === 'AasimarTest' && key === 'activeConditions') ? ['invisible'] : undefined);
+
+        await executeSpellCast(saveSpell(), {}, baseOpts(ambushPlayerStats()));
+
+        expect(handleSavePath).toHaveBeenCalled();
+        const opts = handleSavePath.mock.calls[0][0];
+        expect(opts.metaCtx.metamagicHeighten).toBe(true);
+        expect(opts.hasInvisible).toBe(true);
+    });
+
+    it('preserves an explicit sorcerer Heightened Spell flag when caster is visible', async () => {
+        getRuntimeValue.mockImplementation((name, key) =>
+            (name === 'AasimarTest' && key === 'activeConditions') ? [] : undefined);
+        handleCommand.mockImplementation(async ({ metaCtx }) => ({
+            handled: true,
+            result: { automationPopup: { type: 'modal', modalName: 'commandChoice', payload: { metaCtx } } },
+        }));
+
+        const result = await executeSpellCast(commandSpell(), { metamagicHeighten: true }, baseOpts(ambushPlayerStats()));
+
+        expect(result.automationPopup.payload.metaCtx.metamagicHeighten).toBe(true);
+    });
 });

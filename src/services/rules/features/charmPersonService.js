@@ -72,7 +72,7 @@ async function executeCharmAction(action, playerStats, campaignName, mapName) {
 }
 
 // Multi-target path: charmPersonTargets array from CreatureSelectionModal
-async function charmMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel, characters }) {
+async function charmMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel, characters, metaCtx }) {
     const humanoidTargets = [];
     const nonHumanoidTargets = [];
     for (const targetName of targetNames) {
@@ -109,6 +109,8 @@ async function charmMultipleTargets({ spell, targetNames, playerStats, campaignN
             charmPersonTargets: humanoidTargets,
             charmPersonAdvantages: targetAdvantages,
             characters: characters || [],
+            // CLA-219: carry the Heightened Spell / Magical Ambush transport.
+            metamagicHeighten: !!metaCtx?.metamagicHeighten,
         },
         spell,
         spellSlotLevel: slotLevel,
@@ -136,6 +138,8 @@ async function charmSingleTarget({ spell, metaCtx, playerStats, campaignName, ma
         },
         metaCtx: {
             characters: metaCtx?.characters || [],
+            // CLA-219: carry the Heightened Spell / Magical Ambush transport.
+            metamagicHeighten: !!metaCtx?.metamagicHeighten,
         },
         spell,
         spellSlotLevel: slotLevel,
@@ -167,7 +171,7 @@ export async function triggerCharmPerson(spell, metaCtx, playerStats, campaignNa
 
     const targetNames = metaCtx?.charmPersonTargets;
     if (Array.isArray(targetNames) && targetNames.length > 0) {
-        return await charmMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel, characters: metaCtx?.characters });
+        return await charmMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel, characters: metaCtx?.characters, metaCtx });
     }
 
     const targetName = metaCtx?.targetName || await resolveCharmTarget(playerStats, campaignName);

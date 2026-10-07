@@ -4104,7 +4104,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-219-magical-ambush.md",
+      "verified": "verified",
       "triggerConditions": "Passive; When casting spell on creature while Invisible",
       "expectedBehavior": "If you have Invisible condition when you cast a spell on a creature, it has Disadvantage on saving throw against the spell on the same turn. (Rogue Arcane Trickster - Magical Ambush)"
     },

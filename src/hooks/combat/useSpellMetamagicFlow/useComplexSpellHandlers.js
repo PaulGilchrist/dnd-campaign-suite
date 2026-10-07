@@ -1,6 +1,6 @@
 import React from 'react'
 import { getCombatSummary } from '../../../services/encounters/combatData.js'
-import { setRuntimeValue } from '../../runtime/useRuntimeState.js'
+import { setRuntimeValue, getRuntimeValue } from '../../runtime/useRuntimeState.js'
 import { isFreeCastAuthorized } from '../../../services/rules/spells/spellPreparationService.js'
 import { prepareSpellCast } from '../../../services/rules/spells/spellPreparationService.js'
 import { triggerHealingWord } from '../../../services/rules/features/healingWordService.js'
@@ -12,6 +12,20 @@ import { triggerRevivify } from '../../../services/rules/features/revivifyServic
 import { applyPolymorph } from '../../../services/automation/handlers/spells/polymorphService.js'
 import { applyAnimalShapes } from '../../../services/automation/handlers/spells/animalShapesService.js'
 import { applyTruePolymorph } from '../../../services/automation/handlers/spells/truePolymorphService.js'
+
+// CLA-219: sheet-confirm charm lanes rebuild metaCtx — fold the Magical Ambush
+// gate (passive + caster invisible) onto the Heightened Spell transport so
+// charmSpellUtils honours it once. Null-safe for non-rogue casters.
+function hasMagicalAmbush(playerStats, campaignName) {
+  const passives = playerStats?.automation?.passives || []
+  if (!passives.some(p => p.type === 'passive_rule' && p.effect === 'magical_ambush')) return false
+  const conditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || []
+  return conditions.some(c => String(c).toLowerCase() === 'invisible')
+}
+
+function charmConfirmMetaCtx(pending, playerStats, campaignName, extra) {
+  return { ...extra, metamagicHeighten: hasMagicalAmbush(playerStats, campaignName) || !!pending?.metamagicHeighten }
+}
 
 export function useComplexSpellHandlers({ createConfirmHandler, playerStats, campaignName, cfClearPending, getPending, cfSetPending, setPopupHtml, onExecute }) {
   const handleHealingWordConfirm = React.useCallback(async (pending, result) => {
@@ -159,12 +173,12 @@ export function useComplexSpellHandlers({ createConfirmHandler, playerStats, cam
 
   const handleCharmPersonConfirm = React.useCallback(async (pending, result) => {
     const targetNames = Array.isArray(result) ? result : [result]
-    await triggerCharmPerson(pending.spell, { charmPersonTargets: targetNames, characters: pending.characters || [] }, playerStats, campaignName, null)
+    await triggerCharmPerson(pending.spell, charmConfirmMetaCtx(pending, playerStats, campaignName, { charmPersonTargets: targetNames, characters: pending.characters || [] }), playerStats, campaignName, null)
   }, [playerStats, campaignName])
 
   const handleCharmMonsterConfirm = React.useCallback(async (pending, result) => {
     const targetNames = Array.isArray(result) ? result : [result]
-    await triggerCharmMonster(pending.spell, { charmMonsterTargets: targetNames, characters: pending.characters || [] }, playerStats, campaignName, null)
+    await triggerCharmMonster(pending.spell, charmConfirmMetaCtx(pending, playerStats, campaignName, { charmMonsterTargets: targetNames, characters: pending.characters || [] }), playerStats, campaignName, null)
   }, [playerStats, campaignName])
 
   const handleBanishmentConfirm = React.useCallback(async (pending, result) => {

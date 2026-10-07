@@ -35,7 +35,7 @@ async function executeCharmMonsterAction(action, playerStats, campaignName, mapN
 }
 
 // Multi-target path: charmMonsterTargets array from CreatureSelectionModal
-async function charmMonsterMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel, characters }) {
+async function charmMonsterMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel, characters, metaCtx }) {
     const targetAdvantages = {};
     for (const targetName of targetNames) {
         targetAdvantages[targetName] = await getTargetHealthAdvantage(targetName, campaignName);
@@ -48,11 +48,11 @@ async function charmMonsterMultipleTargets({ spell, targetNames, playerStats, ca
             saveDc: spellSaveDc,
             advantage: false,
         },
-        metaCtx: {
+        metaCtx: charmActionMetaCtx(metaCtx, {
             charmMonsterTargets: targetNames,
             charmMonsterAdvantages: targetAdvantages,
             characters: characters || [],
-        },
+        }),
         spell,
         spellSlotLevel: slotLevel,
     };
@@ -76,6 +76,12 @@ function resolveCharmMonsterSaveDc(metaCtx, playerStats) {
     return 8 + (playerStats.proficiency || 2);
 }
 
+// CLA-219: carry the Heightened Spell / Magical Ambush disadvantage transport
+// across the action rebuilds so charmSpellUtils honours it exactly once.
+function charmActionMetaCtx(metaCtx, extra = {}) {
+    return { ...extra, characters: metaCtx?.characters || [], metamagicHeighten: !!metaCtx?.metamagicHeighten };
+}
+
 export async function triggerCharmMonster(spell, metaCtx, playerStats, campaignName, mapName) {
     if ((spell.name || '').toLowerCase() !== 'charm monster') return null;
 
@@ -84,7 +90,7 @@ export async function triggerCharmMonster(spell, metaCtx, playerStats, campaignN
 
     const targetNames = metaCtx?.charmMonsterTargets;
     if (Array.isArray(targetNames) && targetNames.length > 0) {
-        return await charmMonsterMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel, characters: metaCtx?.characters });
+        return await charmMonsterMultipleTargets({ spell, targetNames, playerStats, campaignName, mapName, spellSaveDc, slotLevel, characters: metaCtx?.characters, metaCtx });
     }
 
     const targetName = metaCtx?.targetName || await resolveCharmMonsterTarget(playerStats, campaignName);
@@ -103,9 +109,7 @@ export async function triggerCharmMonster(spell, metaCtx, playerStats, campaignN
             targetName: targetName,
             advantage: advantage,
         },
-        metaCtx: {
-            characters: metaCtx?.characters || [],
-        },
+        metaCtx: charmActionMetaCtx(metaCtx),
         spell,
         spellSlotLevel: slotLevel,
     };

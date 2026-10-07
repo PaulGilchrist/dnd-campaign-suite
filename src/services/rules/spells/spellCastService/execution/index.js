@@ -635,6 +635,11 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     // --- Spell resolution (inline) ---
     const hasInvisible = resolveMagicalAmbushInvisible(playerStats, campaignName);
+    // CLA-219: Magical Ambush folds into the verified Heightened Spell transport
+    // (metaCtx.metamagicHeighten) at this single choke point, so every save lane —
+    // dedicated handlers, PC save prompt, NPC inline adjudicator, charm lane —
+    // honours the disadvantage without per-lane threading.
+    metaCtx = { ...metaCtx, metamagicHeighten: hasInvisible || !!metaCtx?.metamagicHeighten };
 
     const silenceBlock = await checkSilenceBlock(spell, playerStats, campaignName);
     if (silenceBlock) return silenceBlock;
@@ -715,4 +720,4 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     return await runPostCastTriggers({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo });
 }
 
-export { refundSpellBreakerSlot };
+export { refundSpellBreakerSlot, resolveMagicalAmbushInvisible };

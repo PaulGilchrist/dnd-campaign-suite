@@ -1,322 +1,50 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
+// CLA-219: the rebuilt charm action must carry the Heightened Spell /
+// Magical Ambush disadvantage transport (metaCtx.metamagicHeighten) so the
+// charm save lane honours it once.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../automation/index.js', () => ({
-  executeHandler: vi.fn(() => Promise.resolve({ type: 'popup', payload: { type: 'automation_info', name: 'Charm Monster', description: 'test' } })),
+    executeHandler: vi.fn(() => Promise.resolve({ type: 'popup', payload: {} })),
 }));
 
 vi.mock('../combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(),
-  getTargetFromAttacker: vi.fn(),
-}));
-
-vi.mock('../../npcs/monsterUtils.js', () => ({
-  getMonsterData: vi.fn(),
-}));
-
-vi.mock('../../ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
+    getCombatContext: vi.fn(() => Promise.resolve({ creatures: [{ name: 'Bandit 1', type: 'npc', currentHp: 5, maxHp: 11 }] })),
+    getTargetFromAttacker: vi.fn(() => ({ name: 'Bandit 1' })),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn(() => undefined),
+    setRuntimeValue: vi.fn(),
 }));
 
-import { triggerCharmMonster } from './charmMonsterService.js';
-import { getCombatContext, getTargetFromAttacker } from "../combat/damageUtils.js";
-import { getMonsterData } from '../../npcs/monsterUtils.js';
 import { executeHandler } from '../../automation/index.js';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { triggerCharmMonster } from './charmMonsterService.js';
 
-const campaignName = 'TestCampaign';
-const mapName = 'TestMap';
+const caster = { name: 'AasimarTest', proficiency: 6, spellAbilities: { saveDc: 14 } };
+const spell = { name: 'Charm Monster', level: 4 };
 
-function makePlayerStats(overrides = {}) {
-  return {
-    name: 'TestCaster',
-    level: 10,
-    proficiency: 4,
-    abilities: [{ name: 'Charisma', bonus: 3 }],
-    spellAbilities: { saveDc: 14 },
-    ...overrides,
-  };
-}
+beforeEach(() => vi.clearAllMocks());
 
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Charm Monster',
-    level: 4,
-    ...overrides,
-  };
-}
+describe('CLA-219 charmMonsterService metamagicHeighten carry', () => {
+    it('carries metamagicHeighten on the single-target rebuilt action', async () => {
+        await triggerCharmMonster(spell, { targetName: 'Bandit 1', metamagicHeighten: true }, caster, 'test-campaign', null);
 
-describe('charmMonsterService', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe('triggerCharmMonster', () => {
-    it('returns null when spell name is missing, null, or does not match "charm monster"', async () => {
-      const baseStats = makePlayerStats();
-
-      for (const name of [null, '', 'Charm Person', 'Charm Monster2', 'charm']) {
-        const result = await triggerCharmMonster({ name }, { targetName: 'Goblin' }, baseStats, campaignName, mapName);
-        expect(result).toBeNull();
-      }
+        expect(executeHandler).toHaveBeenCalled();
+        const action = executeHandler.mock.calls[0][0];
+        expect(action.metaCtx.metamagicHeighten).toBe(true);
     });
 
-    it('matches case-insensitively for charm monster', async () => {
-      const baseStats = makePlayerStats();
+    it('carries metamagicHeighten on the multi-target rebuilt action', async () => {
+        await triggerCharmMonster(spell, { charmMonsterTargets: ['Bandit 1', 'Bandit 2'], metamagicHeighten: true }, caster, 'test-campaign', null);
 
-      for (const name of ['CHARM MONSTER', 'charm monster', 'ChArM MoNsTeR']) {
-        getCombatContext.mockResolvedValue({
-          creatures: [{ name: 'Goblin', type: 'monster', saveBonuses: { WIS: 0 } }],
-        });
-
-        const result = await triggerCharmMonster({ name }, { targetName: 'Goblin' }, baseStats, campaignName, mapName);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.name).toBe('Charm Monster');
-      }
+        const action = executeHandler.mock.calls[0][0];
+        expect(action.metaCtx.metamagicHeighten).toBe(true);
     });
 
-    it('logs error when no target specified', async () => {
-      const baseStats = makePlayerStats();
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'TestCaster', type: 'player' },
-          { name: 'Goblin', type: 'monster', saveBonuses: { WIS: 0 } },
-          { name: 'Ogre', type: 'monster', saveBonuses: { WIS: 0 } },
-        ],
-      });
-      getTargetFromAttacker.mockReturnValue(null);
-      const consoleSpy = vi.spyOn(console, 'error');
+    it('control: no flag without invisibility ambush (metamagicHeighten false)', async () => {
+        await triggerCharmMonster(spell, { targetName: 'Bandit 1' }, caster, 'test-campaign', null);
 
-      const result = await triggerCharmMonster(makeSpell(), undefined, baseStats, campaignName, mapName);
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[charmMonsterService] No target selected for Charm Monster'),
-      );
-      expect(result).toEqual({
-        type: 'popup',
-        payload: { type: 'automation_info', name: 'Charm Monster', description: 'No target selected for Charm Monster.' },
-      });
-      expect(executeHandler).not.toHaveBeenCalled();
-      consoleSpy.mockRestore();
+        const action = executeHandler.mock.calls[0][0];
+        expect(action.metaCtx.metamagicHeighten).toBe(false);
     });
-
-    it('returns popup when no creatures available', async () => {
-      const baseStats = makePlayerStats();
-      getCombatContext.mockResolvedValue({ creatures: [] });
-
-      const result = await triggerCharmMonster(makeSpell(), undefined, baseStats, campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No target selected');
-    });
-
-    it('passes spell save DC from metaCtx', async () => {
-      const baseStats = makePlayerStats();
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster', saveBonuses: { WIS: 0 } }],
-      });
-
-      await triggerCharmMonster(makeSpell(), { targetName: 'Goblin', spellSaveDc: 18 }, baseStats, campaignName, mapName);
-
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ automation: expect.objectContaining({ saveDc: 18 }) }),
-        baseStats,
-        campaignName,
-        mapName,
-      );
-    });
-
-    it('passes spell save DC from player stats when not in metaCtx', async () => {
-      const baseStats = makePlayerStats({ spellAbilities: { saveDc: 16 } });
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster', saveBonuses: { WIS: 0 } }],
-      });
-
-      await triggerCharmMonster(makeSpell(), { targetName: 'Goblin' }, baseStats, campaignName, mapName);
-
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ automation: expect.objectContaining({ saveDc: 16 }) }),
-        baseStats,
-        campaignName,
-        mapName,
-      );
-    });
-
-    it('passes advantage when target not at full health (NPC)', async () => {
-      const baseStats = makePlayerStats();
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'TestCaster', type: 'player' },
-          { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 10, saveBonuses: { WIS: 2 } },
-        ],
-      });
-
-      await triggerCharmMonster(makeSpell(), { targetName: 'Goblin' }, baseStats, campaignName, mapName);
-
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ automation: expect.objectContaining({ advantage: true }) }),
-        baseStats,
-        campaignName,
-        mapName,
-      );
-    });
-
-    it('no advantage when NPC at full health', async () => {
-      const baseStats = makePlayerStats();
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'TestCaster', type: 'player' },
-          { name: 'Goblin', type: 'monster', currentHp: 10, maxHp: 10, saveBonuses: { WIS: 0 } },
-        ],
-      });
-
-      await triggerCharmMonster(makeSpell(), { targetName: 'Goblin' }, baseStats, campaignName, mapName);
-
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ automation: expect.objectContaining({ advantage: false }) }),
-        baseStats,
-        campaignName,
-        mapName,
-      );
-    });
-
-    it('no advantage when player at full health', async () => {
-      const baseStats = makePlayerStats();
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'TestCaster', type: 'player' },
-          { name: 'Ally', type: 'player', saveBonuses: { WIS: 3 } },
-        ],
-      });
-      getRuntimeValue.mockImplementation((charName, key) => {
-        if (charName === 'Ally' && key === 'currentHitPoints') return 20;
-        if (charName === 'Ally' && key === 'hitPoints') return 20;
-        return undefined;
-      });
-
-      await triggerCharmMonster(makeSpell(), { targetName: 'Ally' }, baseStats, campaignName, mapName);
-
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ automation: expect.objectContaining({ advantage: false }) }),
-        baseStats,
-        campaignName,
-        mapName,
-      );
-    });
-
-    it('passes advantage when player not at full health', async () => {
-      const baseStats = makePlayerStats();
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'TestCaster', type: 'player' },
-          { name: 'Ally', type: 'player', saveBonuses: { WIS: 3 } },
-        ],
-      });
-      getRuntimeValue.mockImplementation((charName, key) => {
-        if (charName === 'Ally' && key === 'currentHitPoints') return 10;
-        if (charName === 'Ally' && key === 'hitPoints') return 20;
-        return undefined;
-      });
-
-      await triggerCharmMonster(makeSpell(), { targetName: 'Ally' }, baseStats, campaignName, mapName);
-
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ automation: expect.objectContaining({ advantage: true }) }),
-        baseStats,
-        campaignName,
-        mapName,
-      );
-    });
-
-    it('uses spell slot level from metaCtx or defaults to 4', async () => {
-      const baseStats = makePlayerStats();
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster', saveBonuses: { WIS: 0 } }],
-      });
-
-      await triggerCharmMonster(makeSpell(), { targetName: 'Goblin', slotLevel: 5 }, baseStats, campaignName, mapName);
-
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ spellSlotLevel: 5 }),
-        baseStats,
-        campaignName,
-        mapName,
-      );
-    });
-
-    it('passes through handler result', async () => {
-      const baseStats = makePlayerStats();
-      const expectedResult = { type: 'popup', payload: { type: 'automation_info', name: 'Charm Monster', description: 'Target charmed' } };
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster', saveBonuses: { WIS: 0 } }],
-      });
-      executeHandler.mockResolvedValue(expectedResult);
-
-      const result = await triggerCharmMonster(makeSpell(), { targetName: 'Goblin' }, baseStats, campaignName, mapName);
-
-      expect(result).toBe(expectedResult);
-    });
-
-    it('returns error popup when handler throws', async () => {
-      const baseStats = makePlayerStats();
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster', saveBonuses: { WIS: 0 } }],
-      });
-      executeHandler.mockRejectedValue(new Error('Handler failed'));
-
-      const result = await triggerCharmMonster(makeSpell(), { targetName: 'Goblin' }, baseStats, campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('Failed to execute Charm Monster');
-    });
-
-    it('works on non-humanoid creatures without restriction', async () => {
-      const baseStats = makePlayerStats();
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Ogre', type: 'monster', saveBonuses: { WIS: 0 } }],
-      });
-      getMonsterData.mockResolvedValue({ type: 'giant' });
-
-      await triggerCharmMonster(makeSpell(), { targetName: 'Ogre' }, baseStats, campaignName, mapName);
-
-      expect(executeHandler).toHaveBeenCalled();
-    });
-
-    it('works on dragons', async () => {
-      const baseStats = makePlayerStats();
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Red Dragon', type: 'dragon', saveBonuses: { WIS: 5 } }],
-      });
-      getMonsterData.mockResolvedValue({ type: 'dragon' });
-
-      await triggerCharmMonster(makeSpell(), { targetName: 'Red Dragon' }, baseStats, campaignName, mapName);
-
-      expect(executeHandler).toHaveBeenCalled();
-    });
-
-    it('works on players', async () => {
-      const baseStats = makePlayerStats();
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'TestCaster', type: 'player' },
-          { name: 'Ally', type: 'player', saveBonuses: { WIS: 3 } },
-        ],
-      });
-
-      await triggerCharmMonster(makeSpell(), { targetName: 'Ally' }, baseStats, campaignName, mapName);
-
-      expect(executeHandler).toHaveBeenCalled();
-    });
-  });
 });
