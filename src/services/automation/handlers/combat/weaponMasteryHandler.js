@@ -238,11 +238,19 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
 async function applyNickMastery(playerStats, campaignName, targetName) {
     const currentRound = getCurrentCombatRound(campaignName);
     if (getRuntimeValue(playerStats.name, '_Nick_UsedRound', campaignName) === currentRound) {
+        addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'nick_refused',
+            characterName: playerStats.name,
+            targetName: targetName || null,
+            description: `${playerStats.name} can use Nick only once per turn.`,
+        }).catch((e) => { console.error('[weaponMasteryHandler:log-error]', e); });
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: 'Nick',
+                refused: true,
                 description: `${playerStats.name} can use Nick only once per turn.`,
             },
         };

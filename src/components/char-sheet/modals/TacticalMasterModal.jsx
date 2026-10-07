@@ -3,11 +3,22 @@ import { MASTERY_EFFECTS } from '../../../services/automation/handlers/combat/we
 import { loadWeaponMasteries } from '../../../hooks/combat/useActionPopup.js';
 import '../CharSheet.css';
 
+// WM-003 F3: a once-per-turn refusal comes back as a popup without the
+// mastery_rider automation (or an explicit refused flag) — surface its
+// description instead of the generic success line.
+function refusalTextFor(result) {
+    if (!result || result.type !== 'popup') return null;
+    const payload = result.payload || {};
+    if (!payload.refused && payload.automation) return null;
+    return payload.description || 'Mastery not applied.';
+}
+
 function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetName, playerStats: _playerStats, campaignName: _campaignName, onConfirm, onClose, isChoiceMode, featureName }) {
     const featureTitle = featureName || 'Tactical Master';
     const defaultOption = isChoiceMode && replaceOptions?.[0] ? replaceOptions[0] : baseMastery;
     const [selected, setSelected] = useState(defaultOption);
     const [applied, setApplied] = useState(false);
+    const [refusalText, setRefusalText] = useState(null);
     const [masteryDescriptions, setMasteryDescriptions] = useState(null);
 
     useEffect(() => {
@@ -33,7 +44,7 @@ function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetNa
 
     const handleConfirm = async () => {
         if (!selected) return;
-        await onConfirm(selected);
+        setRefusalText(refusalTextFor(await onConfirm(selected)));
         setApplied(true);
     };
 
@@ -45,7 +56,7 @@ function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetNa
                         <i className="fa-solid fa-crosshairs"></i> {featureTitle}
                     </div>
                     <div className="sp-body">
-                        Mastery applied successfully.
+                        {refusalText || 'Mastery applied successfully.'}
                     </div>
                     <div className="sp-actions">
                         <button className="sp-roll-btn" onClick={onClose}>Done</button>

@@ -131,7 +131,7 @@ function PendingActionModalsHost({
                     featureName={tacticalMasterModal.featureName}
                     playerStats={playerStats}
                     campaignName={campaignName}
-                    onConfirm={async (chosenMastery) => { await handleTacticalMasterConfirm(chosenMastery); await resumeAttackPipeline(); }}
+                    onConfirm={async (chosenMastery) => { const result = await handleTacticalMasterConfirm(chosenMastery); await resumeAttackPipeline(); return result; }}
                     onClose={async () => { handleTacticalMasterDismiss(); await resumeAttackPipeline(); }}
                 />
             )}

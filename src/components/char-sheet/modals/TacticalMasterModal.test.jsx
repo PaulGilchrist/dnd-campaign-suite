@@ -229,6 +229,42 @@ describe('TacticalMasterModal - applied state', () => {
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   });
 
+  // WM-003 F3: a once-per-turn refusal must surface its payload text, not success.
+  it('surfaces a once-per-turn refusal description instead of the success message', async () => {
+    const refusal = {
+      type: 'popup',
+      payload: { type: 'automation_info', name: 'Nick', refused: true, description: 'Throg can use Nick only once per turn.' },
+    };
+    const onConfirm = vi.fn().mockResolvedValue(refusal);
+    render(<TacticalMasterModal {...makeProps({ onConfirm, baseMastery: 'Nick', replaceOptions: [] })} />);
+    fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
+    expect(await screen.findByText('Throg can use Nick only once per turn.')).toBeInTheDocument();
+    expect(screen.queryByText(/Mastery applied successfully/)).not.toBeInTheDocument();
+  });
+
+  it('treats a refusal popup lacking the mastery_rider automation as a refusal', async () => {
+    const refusal = {
+      type: 'popup',
+      payload: { type: 'automation_info', name: 'Cleave', description: 'Cleave can only be used once per turn.' },
+    };
+    const onConfirm = vi.fn().mockResolvedValue(refusal);
+    render(<TacticalMasterModal {...makeProps({ onConfirm, baseMastery: 'Cleave', replaceOptions: [] })} />);
+    fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
+    expect(await screen.findByText('Cleave can only be used once per turn.')).toBeInTheDocument();
+    expect(screen.queryByText(/Mastery applied successfully/)).not.toBeInTheDocument();
+  });
+
+  it('still shows the success message when onConfirm resolves with the mastery_rider popup', async () => {
+    const success = {
+      type: 'popup',
+      payload: { type: 'automation_info', name: 'Nick', description: 'Nick applied.', automation: { type: 'mastery_rider', masteries: ['Nick'] } },
+    };
+    const onConfirm = vi.fn().mockResolvedValue(success);
+    render(<TacticalMasterModal {...makeProps({ onConfirm, baseMastery: 'Nick', replaceOptions: [] })} />);
+    fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
+    expect(await screen.findByText(/Mastery applied successfully/)).toBeInTheDocument();
+  });
+
   it('does not call onConfirm again when Done is clicked', async () => {
     const onConfirm = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();

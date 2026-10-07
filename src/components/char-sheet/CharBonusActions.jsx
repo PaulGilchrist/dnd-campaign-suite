@@ -470,6 +470,23 @@ function buildHordeBreakerAttackItem(hordeBreakerMarker, hordeBreakerWeapon) {
     };
 }
 
+// WM-003: this Light row's extra attack was folded into the Attack action only
+// when Nick is latched this round AND this specific weapon carries Nick mastery
+// AND it passes the kind-bucket gate (_Weapon_Kind_Mastery_chosenWeapons —
+// parity with collectWeaponMastery's WM-008 kind gate). Non-Nick Light weapons
+// (e.g. Vex Shortsword) must keep their bonus row.
+function nickConsumedRow(attack, playerStats, campaignName) {
+    const nickUsedRound = getRuntimeValue(playerStats.name, '_Nick_UsedRound', campaignName);
+    if (nickUsedRound !== getCurrentCombatRound(campaignName)) return false;
+    if ((attack.mastery || null) !== 'Nick') return false;
+    const passives = playerStats.automation?.passives || [];
+    const hasKindGate = passives.some(p => p.type === 'weapon_kind_mastery');
+    if (!hasKindGate) return true;
+    const baseName = String(attack.weaponName || attack.name || '').replace(/^\+\d+\s+/, '');
+    const chosen = getRuntimeValue(playerStats.name, '_Weapon_Kind_Mastery_chosenWeapons', campaignName);
+    return Array.isArray(chosen) && chosen.includes(baseName);
+}
+
 function hasWeaponKindMastery(playerStats) {
     return (playerStats.automation?.passives || []).some(p => p.type === 'weapon_kind_mastery');
 }
@@ -850,14 +867,12 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         if (attack.type !== 'Bonus Action') return false;
         // Horde Breaker placeholder is rendered conditionally below (after a melee weapon hit)
         if (attack.isHordeBreaker) return false;
-        // Filter out Light weapon bonus action attack when Nick mastery has been used this turn
-        if (attack.properties?.includes('Light') && is2024Rules) {
-            const nickUsedKey = '_Nick_UsedRound';
-            const currentRound = getCurrentCombatRound(campaignName);
-            const nickUsedRound = getRuntimeValue(playerStats.name, nickUsedKey, campaignName);
-            if (nickUsedRound === currentRound) {
-                return false;
-            }
+        // WM-003: hide ONLY the Light row whose extra attack was folded into the
+        // Attack action by Nick (per-weapon mastery + kind-bucket gate parity
+        // with collectWeaponMastery/resolveOffHandActionType). Non-Nick Light
+        // weapons (e.g. Vex Shortsword) keep their bonus row.
+        if (attack.properties?.includes('Light') && is2024Rules && nickConsumedRow(attack, playerStats, campaignName)) {
+            return false;
         }
         return true;
     });

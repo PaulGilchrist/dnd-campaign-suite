@@ -169,9 +169,12 @@ export default function useCharActionsCleave({
         if (!actualTargetName) return;
         if (chosenMastery === 'Topple') {
             await applyToppleMastery(attackName, actualTargetName);
-        } else {
-            await applyMasteryEffect(chosenMastery, playerStats, campaignName, actualTargetName);
+            return null;
         }
+        // WM-003 F3: return the mastery result so TacticalMasterModal can surface
+        // once-per-turn refusal payloads ("Nick ... only once per turn") instead of
+        // mislabeling a refusal as "Mastery applied successfully."
+        return await applyMasteryEffect(chosenMastery, playerStats, campaignName, actualTargetName);
     }
 
     function handleTacticalMasterDismiss() {

@@ -292,6 +292,14 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const cotlLandTypeRuntime = useRuntimeValue(playerSummary?.name, '_circleOfTheLandType', campaignName);
     const fiendishResilienceType = useRuntimeValue(playerSummary?.name, '_Fiendish_Resilience_chosenType', campaignName);
     const boonEnergyResistanceTypes = useRuntimeValue(playerSummary?.name, '_Energy_Resistances_chosenTypes', campaignName);
+    // WM-003: the Nick latch and the weapon-kind mastery bucket are inputs to
+    // getAttacks' off-hand Nick branch (attackCalc2024 resolveOffHandActionType
+    // reads both at compute time). Subscribe so the full attack list recomputes
+    // the moment Nick is stamped or kinds are armed — same seam as
+    // cotlLandTypeRuntime / fiendishResilienceType above. Without this the live
+    // playerStats.attacks keeps stale 'Bonus Action' off-hand rows after Nick.
+    const nickUsedRoundRuntime = useRuntimeValue(playerSummary?.name, '_Nick_UsedRound', campaignName);
+    const weaponKindMasteryWeapons = useRuntimeValue(playerSummary?.name, '_Weapon_Kind_Mastery_chosenWeapons', campaignName);
     React.useEffect(() => {
         const fetchData = async () => {
             const spellData = playerSummary.rules === '2024' ? allSpells2024 : allSpells;
@@ -299,6 +307,10 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             const effectiveRaces = playerSummary.rules === '2024' ? allRaces2024 : allRaces;
             const effectiveMagicItems = playerSummary.rules === '2024' ? allMagicItems2024 : allMagicItems;
             const processingSummary = cloneDeep(playerSummary);
+            // WM-003: attackCalc reads playerStats.campaignName to honor the Nick
+            // latch in resolveOffHandActionType — without it the off-hand row can
+            // never promote from Bonus Action to Action.
+            processingSummary.campaignName = campaignName;
             applyCotlLandType(processingSummary, cotlLandTypeRuntime);
             const stats = await rulesFactory.getPlayerStats({ allClasses: effectiveClasses, allEquipment, allMagicItems: effectiveMagicItems, allRaces: effectiveRaces, allSpells: spellData, playerSummary: processingSummary });
 
@@ -312,7 +324,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             setPlayerStats(stats);
         };
         fetchData();
-    }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, biDieRuntime, biCombatOptRuntime, spellThiefStolenRuntime, spellThiefCasterBlockRuntime, cotlLandTypeRuntime, fiendishResilienceType, boonEnergyResistanceTypes, campaignName]);
+    }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, biDieRuntime, biCombatOptRuntime, spellThiefStolenRuntime, spellThiefCasterBlockRuntime, cotlLandTypeRuntime, fiendishResilienceType, boonEnergyResistanceTypes, nickUsedRoundRuntime, weaponKindMasteryWeapons, campaignName]);
 
     React.useEffect(() => {
         if (!playerStats) return;

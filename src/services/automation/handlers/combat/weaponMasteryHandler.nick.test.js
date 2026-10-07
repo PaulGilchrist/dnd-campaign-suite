@@ -60,13 +60,23 @@ describe('applyMasteryEffect — Nick', () => {
     expect(write[2]).toBe(getCurrentCombatRound('test-campaign'));
   });
 
-  it('blocks a second use in the same round and does not write again', async () => {
+  // WM-003 F3: the refusal is still a refusal (zero latch write) but must LOG
+  // nick_refused and flag the popup payload refused for the modal surface.
+  it('blocks a second use in the same round, logs nick_refused, and does not write the latch again', async () => {
     getRuntimeValue.mockImplementation((name, key) => (key === '_Nick_UsedRound' ? 4 : null));
 
     const result = await applyMasteryEffect('Nick', playerStats, 'test-campaign', 'Rug');
 
     expect(setRuntimeValue).not.toHaveBeenCalled();
-    expect(addEntry).not.toHaveBeenCalled();
+    expect(addEntry).toHaveBeenCalledWith(
+      'test-campaign',
+      expect.objectContaining({
+        type: 'automation',
+        automationType: 'nick_refused',
+        characterName: 'Fighter',
+      })
+    );
+    expect(result.payload.refused).toBe(true);
     expect(result.payload.description).toMatch(/once per turn/i);
   });
 

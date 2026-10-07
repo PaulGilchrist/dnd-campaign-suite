@@ -230,6 +230,51 @@ describe('useCharActionsCleave', () => {
             expect(applyMasteryEffect).not.toHaveBeenCalled();
         });
 
+        // WM-003 F3: the mastery result must reach TacticalMasterModal so a
+        // once-per-turn refusal is surfaced instead of being mislabeled success.
+        it('WM-003: returns the refusal popup payload from applyMasteryEffect', async () => {
+            const testDeps = createDeps();
+            const pending = { baseMastery: 'Nick', attackName: 'Scimitar', targetName: 'Bandit 1' };
+            const lastAttack = { targetName: 'Bandit 1' };
+            testDeps.getRuntimeValue
+                .mockReturnValueOnce(pending)
+                .mockReturnValueOnce(lastAttack);
+            const refusal = {
+                type: 'popup',
+                payload: { type: 'automation_info', name: 'Nick', refused: true, description: 'TestFighter can use Nick only once per turn.' },
+            };
+            const applyMasteryEffect = vi.fn().mockResolvedValue(refusal);
+            const { handleTacticalMasterConfirm } = useCharActionsCleave({
+                ...testDeps,
+                applyMasteryEffect,
+            });
+            const result = await handleTacticalMasterConfirm('Nick');
+
+            expect(applyMasteryEffect).toHaveBeenCalledWith('Nick', testDeps.playerStats, 'test-campaign', 'Bandit 1');
+            expect(result).toBe(refusal);
+        });
+
+        it('WM-003: returns the mastery_rider success popup on a successful apply', async () => {
+            const testDeps = createDeps();
+            const pending = { baseMastery: 'Nick', attackName: 'Scimitar', targetName: 'Bandit 1' };
+            const lastAttack = { targetName: 'Bandit 1' };
+            testDeps.getRuntimeValue
+                .mockReturnValueOnce(pending)
+                .mockReturnValueOnce(lastAttack);
+            const success = {
+                type: 'popup',
+                payload: { type: 'automation_info', name: 'Nick', description: 'Nick applied.', automation: { type: 'mastery_rider', masteries: ['Nick'] } },
+            };
+            const applyMasteryEffect = vi.fn().mockResolvedValue(success);
+            const { handleTacticalMasterConfirm } = useCharActionsCleave({
+                ...testDeps,
+                applyMasteryEffect,
+            });
+            const result = await handleTacticalMasterConfirm('Nick');
+
+            expect(result).toBe(success);
+        });
+
         it('applies Topple mastery with CON save and prone condition on failed save', async () => {
             const pending = { baseMastery: 'Piercing', attackName: 'Greataxe', targetName: 'Orc' };
             const lastAttack = { targetName: 'Orc' };

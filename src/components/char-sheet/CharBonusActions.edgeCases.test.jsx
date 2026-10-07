@@ -197,12 +197,14 @@ describe('CharBonusActions - Edge Cases', () => {
   describe('Nick mastery round check (2024 rules)', () => {
     const lightWeaponAttack = {
       name: 'Dagger',
+      weaponName: 'Dagger',
       range: 5,
       hitBonus: 5,
       damage: '1d4+3',
       damageType: 'Piercing',
       type: 'Bonus Action',
       properties: ['Light'],
+      mastery: 'Nick',
     };
 
     it.each([
@@ -229,6 +231,64 @@ describe('CharBonusActions - Edge Cases', () => {
         return null;
       });
       const stats = createStats({ rules: '5e', attacks: [lightWeaponAttack] });
+      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
+      expect(screen.getByText('Dagger')).toBeInTheDocument();
+    });
+
+    // WM-003 F2: the latch must hide ONLY the Nick-consumed weapon row.
+    it('WM-003: keeps non-Nick Light rows (Vex Shortsword) while hiding the Nick-consumed row', () => {
+      vi.mocked(getRuntimeValue).mockImplementation((name, key) => (key === '_Nick_UsedRound' ? 1 : null));
+      const shortswordRow = {
+        name: 'Shortsword',
+        weaponName: 'Shortsword',
+        range: 5,
+        hitBonus: 5,
+        damage: '1d6+2',
+        damageType: 'Piercing',
+        type: 'Bonus Action',
+        properties: ['Finesse', 'Light', 'Monk'],
+        mastery: 'Vex',
+      };
+      const stats = createStats({ attacks: [shortswordRow, lightWeaponAttack] });
+      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
+      expect(screen.getByText('Shortsword')).toBeInTheDocument();
+      expect(screen.queryByText('Dagger')).not.toBeInTheDocument();
+    });
+
+    it('WM-003: keeps a Nick weapon row when the kind-bucket gate excludes it (WM-008 parity)', () => {
+      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
+        if (key === '_Nick_UsedRound') return 1;
+        if (key === '_Weapon_Kind_Mastery_chosenWeapons') return ['Scimitar'];
+        return null;
+      });
+      const stats = createStats({
+        automation: { passives: [{ type: 'weapon_kind_mastery', name: 'Weapon Mastery' }], bonusActions: [] },
+        attacks: [lightWeaponAttack],
+      });
+      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
+      expect(screen.getByText('Dagger')).toBeInTheDocument();
+    });
+
+    it('WM-003: hides the Nick weapon row once the kind bucket includes it and Nick is latched', () => {
+      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
+        if (key === '_Nick_UsedRound') return 1;
+        if (key === '_Weapon_Kind_Mastery_chosenWeapons') return ['Scimitar', 'Dagger'];
+        return null;
+      });
+      const stats = createStats({
+        automation: { passives: [{ type: 'weapon_kind_mastery', name: 'Weapon Mastery' }], bonusActions: [] },
+        attacks: [lightWeaponAttack],
+      });
+      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
+      expect(screen.queryByText('Dagger')).not.toBeInTheDocument();
+    });
+
+    it('WM-003: keeps the Nick weapon row visible when the latch belongs to an earlier round', () => {
+      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
+        if (key === '_Nick_UsedRound') return 2;
+        return null;
+      });
+      const stats = createStats({ attacks: [lightWeaponAttack] });
       render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
       expect(screen.getByText('Dagger')).toBeInTheDocument();
     });
