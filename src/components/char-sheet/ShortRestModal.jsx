@@ -42,15 +42,23 @@ function recoverArcaneSlots(playerStats, campaignName) {
     return { slotsRecovered, detail };
 }
 
+// CLA-232: recovery + once-per-rest consumption ride ONE merged batch write (§39) —
+// the per-level setRuntimeValue loop POSTed full-store snapshots per key and the
+// lv2+ write was dropped by the same-tick overwrite. 0 = spent (computeDruidRestFlags
+// gate reads naturalRecoveryCur !== 0); LONG_REST_RESOURCES null re-arms it
+// (restRules-constants.js:181, restRules-longRest.js:446). Mirrors CLA-011 arcane.
 function applyNaturalRecoverySelections(playerStats, campaignName, naturalRecoverySelections) {
+    const updates = {};
     for (const [levelStr, count] of Object.entries(naturalRecoverySelections)) {
         if (count > 0) {
             const slotKey = `spell_slots_level_${levelStr}`;
             const max = playerStats.spellAbilities?.[slotKey] || 0;
             const current = Number(getRuntimeValue(playerStats.name, slotKey) ?? max);
-            setRuntimeValue(playerStats.name, slotKey, Math.min(max, current + count), campaignName);
+            updates[slotKey] = Math.min(max, current + count);
         }
     }
+    updates.naturalRecoverySlots = 0;
+    setRuntimeBatch(playerStats.name, updates, campaignName);
 }
 
 function applySorcerousRestorationState(playerStats, campaignName, restoreAmount) {
@@ -71,13 +79,31 @@ function applyRequestedRestorations(ctx) {
     if (ctx.arcaneRecovery && ctx.arcaneRecoveryAvailable && ctx.arcaneRecoveryRequested) {
         arcaneRecoveryResult = recoverArcaneSlots(playerStats, campaignName);
     }
-    // UI-driven: Natural Recovery
+    // UI-driven: Natural Recovery. CLA-232: gate on the FRESH runtime flag at
+    // completion time (a stale render-time available flag must not slip a spent
+    // feature past the gate) — 0 = spent, null/>0 = available.
     const selections = ctx.naturalRecoverySelections;
     const hasNaturalRecoverySelections = Object.keys(selections).some(k => selections[k] > 0);
-    if (ctx.naturalRecovery && ctx.naturalRecoveryAvailable && hasNaturalRecoverySelections) {
-        applyNaturalRecoverySelections(playerStats, campaignName, selections);
+    let naturalRecoveryApplied = false;
+    if (ctx.naturalRecovery && hasNaturalRecoverySelections) {
+        if (getRuntimeValue(playerStats.name, 'naturalRecoverySlots') !== 0) {
+            applyNaturalRecoverySelections(playerStats, campaignName, selections);
+            naturalRecoveryApplied = true;
+        } else {
+            // CLA-232: refusal must be visible — slot recovery is single-use
+            // (automation uses_max:1, resourceKey naturalRecoverySlots; data:
+            // public/data/2024/classes.json Circle of the Land lv6) until the
+            // long rest re-arms it. Zero runtime change.
+            addEntry(campaignName, {
+                type: 'automation',
+                automationType: 'natural_recovery_refused',
+                characterName: playerStats.name,
+                description: `${playerStats.name} cannot recover spell slots via Natural Recovery — already used since the last long rest.`,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[ShortRestModal] Error logging Natural Recovery refusal:', e); });
+        }
     }
-    return arcaneRecoveryResult;
+    return { arcaneRecoveryResult, naturalRecoveryApplied };
 }
 
 function findClassLevel(playerStats) {
@@ -131,9 +157,11 @@ function collectFeatureRestorationLabels(playerStats, campaignName, ctx, restore
     pushRequestedRestorationLabel({ ctx, passives, restoredResources, flag: 'restorationRequested', resourceKey: 'sorcerousRestorationUses', label: 'Sorcery Points (Sorcerous Restoration)' });
 }
 
-function buildNaturalRecoveryDetail(playerStats, naturalRecoveryAvailable, naturalRecoverySelections) {
+function buildNaturalRecoveryDetail(playerStats, naturalRecoveryApplied, naturalRecoverySelections) {
     const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(p => p.type === 'natural_recovery');
-    if (hasNaturalRecovery && naturalRecoveryAvailable && Object.keys(naturalRecoverySelections).some(k => naturalRecoverySelections[k] > 0)) {
+    // CLA-232: log the detail only when the recovery was actually written —
+    // a refused stale apply must not claim slots it never recovered.
+    if (hasNaturalRecovery && naturalRecoveryApplied && Object.keys(naturalRecoverySelections).some(k => naturalRecoverySelections[k] > 0)) {
         return Object.entries(naturalRecoverySelections)
             .filter(([_, count]) => count > 0)
             .map(([lvl, count]) => `${count}x level ${lvl}`)
@@ -151,7 +179,7 @@ function collectRestoredResources(playerStats, campaignName, ctx) {
     });
     collectClassResourceLabels(playerStats, campaignName, restoredResources);
     collectFeatureRestorationLabels(playerStats, campaignName, ctx, restoredResources);
-    const naturalRecoveryDetail = buildNaturalRecoveryDetail(playerStats, ctx.naturalRecoveryAvailable, ctx.naturalRecoverySelections);
+    const naturalRecoveryDetail = buildNaturalRecoveryDetail(playerStats, ctx.naturalRecoveryApplied, ctx.naturalRecoverySelections);
     if (naturalRecoveryDetail) restoredResources.push(`Natural Recovery (${naturalRecoveryDetail})`);
     return { restoredResources, naturalRecoveryDetail };
 }
@@ -365,8 +393,20 @@ function MealSections({ hasMeal, mealConsumed }) {
     );
 }
 
-function NaturalRecoverySection({ naturalRecovery, maxLevels, budgetRemaining, slotLevels, selections, onChange }) {
+function NaturalRecoverySection({ naturalRecovery, available, maxLevels, budgetRemaining, slotLevels, selections, onChange }) {
     if (!naturalRecovery) return null;
+    if (!available) {
+        // CLA-232: consumed state — no live recovery controls until the long rest re-arms.
+        return (
+            <div className="short-rest-section">
+                <h4>Natural Recovery</h4>
+                <p>Recover expended spell slots with combined level up to {maxLevels}.</p>
+                <div className="short-rest-dice-row">
+                    <span className="short-rest-applied"><i className="fas fa-leaf"></i> Already used since the last long rest</span>
+                </div>
+            </div>
+        );
+    }
     return (
         <div className="short-rest-section">
             <h4>Natural Recovery</h4>
@@ -763,7 +803,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         setRuntimeValue(playerStats.name, 'currentHitPoints', Math.min(playerStats.hitPoints, currentHp), campaignName);
         setRuntimeValue(playerStats.name, 'shortRestHitDice', remainingHitDice, campaignName);
 
-        const arcaneRecoveryResult = applyRequestedRestorations({
+        const { arcaneRecoveryResult, naturalRecoveryApplied } = applyRequestedRestorations({
             playerStats, campaignName, restoreAmount,
             sorcRestoration, restorationAvailable, restorationRequested,
             arcaneRecovery, arcaneRecoveryAvailable, arcaneRecoveryRequested,
@@ -787,6 +827,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
 
         const { restoredResources, naturalRecoveryDetail } = collectRestoredResources(playerStats, campaignName, {
             arcaneRecoveryRequested, restorationRequested, naturalRecovery, naturalRecoveryAvailable, naturalRecoverySelections,
+            naturalRecoveryApplied,
             fontOfInspirationRestored: !!restResult?.fontOfInspirationRestored,
         });
         const logEntries = buildShortRestLogEntries({
@@ -840,7 +881,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
 
                      <ResourceLabelsSection labels={resourceLabels} />
 
-                     <NaturalRecoverySection naturalRecovery={naturalRecovery} maxLevels={naturalRecoveryMaxLevels} budgetRemaining={naturalRecoveryBudgetRemaining} slotLevels={naturalRecoverySlotLevels} selections={naturalRecoverySelections} onChange={handleNaturalRecoveryChange} />
+                     <NaturalRecoverySection naturalRecovery={naturalRecovery} available={naturalRecoveryAvailable} maxLevels={naturalRecoveryMaxLevels} budgetRemaining={naturalRecoveryBudgetRemaining} slotLevels={naturalRecoverySlotLevels} selections={naturalRecoverySelections} onChange={handleNaturalRecoveryChange} />
 
                      <ArcaneRecoverySection arcaneRecovery={arcaneRecovery} available={arcaneRecoveryAvailable} requested={arcaneRecoveryRequested} maxSlots={arcaneRecoveryMaxSlots} onRequest={() => setArcaneRecoveryRequested(true)} />
 

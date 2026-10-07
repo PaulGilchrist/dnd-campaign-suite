@@ -1,7 +1,7 @@
 // @improved-by-ai
 // @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import ShortRestModal from './ShortRestModal.jsx';
 
 const getRuntimeValueMock = vi.fn(() => null);
@@ -289,6 +289,96 @@ describe('ShortRestModal - Natural Recovery', () => {
       expect(screen.getByText(/Budget: 4 of 5 levels remaining/)).toBeInTheDocument();
       fireEvent.click(minusButtons[0]);
       expect(screen.getByText(/Budget: 5 of 5 levels remaining/)).toBeInTheDocument();
+    });
+  });
+
+  describe('CLA-232: apply + consumption', () => {
+    const landDruid = {
+      level: 20,
+      class: { name: 'Druid', major: { name: 'Druid' }, subclass: { name: 'Circle of the Land' } },
+      automation: { passives: [{ type: 'natural_recovery' }] },
+      spellAbilities: {
+        spell_slots_level_1: 4,
+        spell_slots_level_2: 3,
+        spell_slots_level_3: 3,
+        spells: [],
+      },
+    };
+
+    function tick(level, times) {
+      const plusButtons = screen.getAllByRole('button', { name: '+' });
+      const index = [1, 2, 3].indexOf(level);
+      for (let i = 0; i < times; i++) fireEvent.click(plusButtons[index]);
+    }
+
+    it('writes lv1+lv2 recoveries AND consumes naturalRecoverySlots in ONE merged batch', async () => {
+      setupGetRuntimeValue({ spell_slots_level_1: 0, spell_slots_level_2: 1, spell_slots_level_3: 2, naturalRecoverySlots: 10 });
+      renderModal(landDruid);
+      tick(1, 4);
+      tick(2, 2);
+      fireEvent.click(screen.getByText('Complete Short Rest'));
+      await act(async () => {});
+      const batchCall = setRuntimeBatchMock.mock.calls.find(
+        (call) => call[1] && typeof call[1] === 'object'
+          && 'spell_slots_level_1' in call[1] && 'spell_slots_level_2' in call[1]
+      );
+      expect(batchCall).toBeDefined();
+      expect(batchCall[1].spell_slots_level_1).toBe(4);
+      expect(batchCall[1].spell_slots_level_2).toBe(3);
+      expect(batchCall[1].naturalRecoverySlots).toBe(0);
+      // Defect A: the per-level setRuntimeValue loop must be gone.
+      const slotLoop = setRuntimeValueMock.mock.calls.filter(
+        (call) => String(call[1]).startsWith('spell_slots_level_')
+      );
+      expect(slotLoop).toHaveLength(0);
+    });
+
+    it('logs the recovery detail on a successful apply', async () => {
+      setupGetRuntimeValue({ spell_slots_level_1: 0, spell_slots_level_2: 1, spell_slots_level_3: 2, naturalRecoverySlots: 10 });
+      const { addEntry } = await import('../../services/ui/logService.js');
+      renderModal(landDruid);
+      tick(1, 4);
+      tick(2, 2);
+      fireEvent.click(screen.getByText('Complete Short Rest'));
+      await act(async () => {});
+      const log = addEntry.mock.calls.map(c => c[1]).find(e => e && e.type === 'short_rest');
+      expect(log.message).toContain('Natural Recovery: 4x level 1, 2x level 2');
+    });
+
+    it('shows the consumed state and refuses a stale apply with zero runtime change', async () => {
+      setupGetRuntimeValue({ spell_slots_level_1: 0, spell_slots_level_2: 1, spell_slots_level_3: 2, naturalRecoverySlots: 10 });
+      renderModal(landDruid);
+      tick(1, 2);
+      // Feature consumed out-of-band between tick and Complete.
+      setupGetRuntimeValue({ spell_slots_level_1: 0, spell_slots_level_2: 1, spell_slots_level_3: 2, naturalRecoverySlots: 0 });
+      const { addEntry } = await import('../../services/ui/logService.js');
+      fireEvent.click(screen.getByText('Complete Short Rest'));
+      await act(async () => {});
+      const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e && e.automationType === 'natural_recovery_refused');
+      expect(refusal).toBeDefined();
+      const slotBatch = setRuntimeBatchMock.mock.calls.filter(
+        (call) => call[1] && typeof call[1] === 'object' && 'spell_slots_level_1' in call[1]
+      );
+      expect(slotBatch).toHaveLength(0);
+      const log = addEntry.mock.calls.map(c => c[1]).find(e => e && e.type === 'short_rest');
+      expect(log.message).not.toContain('Natural Recovery:');
+    });
+
+    it('renders unavailable section (no live + buttons) when naturalRecoverySlots is 0', () => {
+      setupGetRuntimeValue({ spell_slots_level_1: 2, spell_slots_level_2: 2, naturalRecoverySlots: 0 });
+      renderModal(landDruid);
+      expect(screen.getByText('Natural Recovery')).toBeInTheDocument();
+      expect(screen.getByText(/Already used since the last long rest/)).toBeInTheDocument();
+      expect(screen.queryByText(/Budget: \d+ of 10 levels remaining/)).not.toBeInTheDocument();
+      expect(screen.queryAllByRole('button', { name: '+' })).toHaveLength(0);
+    });
+
+    it('re-arms when naturalRecoverySlots is null (long rest reset)', () => {
+      setupGetRuntimeValue({ spell_slots_level_1: 2, spell_slots_level_2: 2, naturalRecoverySlots: null });
+      renderModal(landDruid);
+      expect(screen.getByText(/Budget: 10 of 10 levels remaining/)).toBeInTheDocument();
+      const plusButtons = screen.getAllByRole('button', { name: '+' });
+      expect(plusButtons[1]).not.toBeDisabled();
     });
   });
 });
