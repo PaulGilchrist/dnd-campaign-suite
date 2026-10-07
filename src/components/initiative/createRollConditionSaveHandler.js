@@ -146,7 +146,7 @@ async function handleForcecageSuccess({ creatureName, condition, campaignName })
     })
 }
 
-async function handleMazeSuccess({ creatureName, condition, campaignName, r1, bonus }) {
+async function handleMazeSuccess({ combatSummary, creatureName, condition, campaignName, r1, bonus }) {
     const mazeEffect = findTargetEffect(creatureName, 'maze')
     if (!mazeEffect) return
     removeMazeEffect(creatureName, mazeEffect.source, campaignName)
@@ -174,6 +174,20 @@ async function handleMazeSuccess({ creatureName, condition, campaignName, r1, bo
         note: `${creatureName} escaped the Maze and is no longer Incapacitated.`,
         timestamp: Date.now(),
     })
+    if (mazeEffect.source) {
+        const caster = combatSummary?.creatures?.find(c => c.name === mazeEffect.source)
+        if (caster?.concentration && String(caster.concentration.spell).toLowerCase() === 'maze') {
+            caster.concentration = null
+            await logEntry(campaignName, {
+                type: 'automation',
+                automationType: 'maze_concentration_released',
+                characterName: mazeEffect.source,
+                abilityName: 'Maze',
+                description: `${mazeEffect.source}'s concentration on Maze ends — ${creatureName} escaped the Maze.`,
+                timestamp: Date.now(),
+            })
+        }
+    }
 }
 
 async function handleEnfeeblementSuccess({ combatSummary, creatureName, condition, campaignName }) {

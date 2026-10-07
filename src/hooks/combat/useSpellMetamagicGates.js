@@ -8,6 +8,8 @@ import { getCurrentSorceryPoints, getMaxSorceryPoints } from './useMetamagic.js'
 import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/metamagicRules.js';
 import { tryGateSpell } from './spellGates.js';
 import { getCreatureTargets } from './useSpellMetamagicHelpers.js';
+import { resolveTarget } from '../../services/automation/common/targetResolver.js';
+import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 
 // CLA-388: Wild Companion casts Find Familiar "without Material components" — a paid
 // grant stamp waives the consumed-material requirement AND its consumption. Without the
@@ -122,6 +124,60 @@ function stampPaidSlotLevelOn(carrier, upcastLevel) {
 function isDeferredChooserPaymentSpell(spell) {
   const lower = (spell?.name || '').toLowerCase();
   return lower === 'mass suggestion' && spell?.automation?.type === 'mass_suggestion';
+}
+
+// SP-080: Maze has no chooser modal — mazeHandler resolves the armed initiative
+// Target combobox via targetResolver.resolveTarget and refuses unarmed casts,
+// but handleNonSorcererCast below paid the slot + caster concentration via
+// prepareSpellCast BEFORE the handler ran (pay-no-effect leak, §CLA-208 /
+// SP-079 deferred-pay family). Resolve the exact same target the handler will
+// use and refuse with the handler's own refusal faces (§41 `maze_refused`
+// automation log, zero spend, no phantom cast). A valid target keeps the
+// paid lane below byte-identical.
+function isMazeSpell(spell) {
+  const lower = (spell?.name || '').toLowerCase();
+  return lower === 'maze' || spell?.automation?.type === 'maze';
+}
+
+// Returns true when the cast was refused (unpaid) — mirrors mazeHandler's
+// refusal faces, which run only after this gate has already refused.
+async function refuseUnarmedMazeCastGate(spell, playerStats, campaignName, setPopupHtml) {
+  if (!isMazeSpell(spell)) return false;
+  const cs = await getCombatContext(campaignName);
+  if (!cs?.creatures || cs.creatures.length === 0) {
+    refuseUnarmedMazeCast(spell, playerStats, campaignName, setPopupHtml, 'No creatures in combat.');
+    return true;
+  }
+  const resolved = await resolveTarget(campaignName, playerStats.name);
+  if (!resolved?.target?.name) {
+    refuseUnarmedMazeCast(spell, playerStats, campaignName, setPopupHtml, 'No target selected.');
+    return true;
+  }
+  if (!cs.creatures.some(c => c.name === resolved.target.name)) {
+    refuseUnarmedMazeCast(spell, playerStats, campaignName, setPopupHtml, `Target "${resolved.target.name}" not found in combat.`);
+    return true;
+  }
+  return false;
+}
+
+function refuseUnarmedMazeCast(spell, playerStats, campaignName, setPopupHtml, head) {
+  if (setPopupHtml) {
+    setPopupHtml({
+      type: 'automation_info',
+      name: spell.name,
+      automationType: 'maze_refused',
+      description: `${head} ${spell.name} has no effect.`,
+    });
+  }
+  addEntry(campaignName, {
+    type: 'automation',
+    automationType: 'maze_refused',
+    reason: head.startsWith('No creatures') ? 'no_creatures' : 'no_target',
+    characterName: playerStats.name,
+    abilityName: spell.name,
+    description: `${spell.name} refused: ${head.charAt(0).toLowerCase()}${head.slice(1)} Nothing spent.`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error("[useSpellMetamagicGates:maze_refused]", e); });
 }
 
 // Non-sorcerer cast path: cantrip auto-leveling, concentration-preserving casts,
@@ -264,6 +320,11 @@ export async function gateMetamagic(spell, metaCtx, {
   if (multiTargetSpread && await handleMultiTargetGate(spell, metaCtx, { campaignName, cfSetPending, characters, freeCastAuthorized, multiTargetSpread, onExecute, playerStats, setSecondaryTargetModal })) {
     return;
   }
+
+  // SP-080: refuse an unarmed Maze cast BEFORE any payment lane (slot + caster
+  // concentration). Short-circuit on spell identity so non-Maze lanes keep their
+  // exact sync timing (other-paths tests assert onExecute inside a sync act()).
+  if (isMazeSpell(spell) && await refuseUnarmedMazeCastGate(spell, playerStats, campaignName, setPopupHtml)) return;
 
   if (!isSorcerer) {
     await handleNonSorcererCast(spell, metaCtx, { campaignName, consumedMaterial, freeCastAuthorized, materialsWaived, onExecute, playerStats });

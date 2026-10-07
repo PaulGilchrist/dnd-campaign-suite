@@ -538,6 +538,72 @@ describe('createRollConditionSaveHandler', () => {
                 'Alice', 'mazeData', null, 'test-campaign'
             );
         });
+
+        // SP-080: spell ends on escape — caster concentration must break too.
+        it('SP-080: clears the caster Maze concentration and logs release on escape success', async () => {
+            mockCombatSummary.creatures.find(c => c.name === 'Goblin').concentration = { spell: 'Maze', dc: 19 };
+            const handler = createHandler();
+            rollConditionSave.mockResolvedValue(makeSuccessRoll({ roll: 18, bonus: 5 }));
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'campaign' && prop === 'targetEffects') {
+                    return defaultTargetEffects('Alice', 'maze', 'Goblin', 20);
+                }
+                if (key === 'Alice' && prop === 'activeConditions') {
+                    return ['incapacitated'];
+                }
+                return null;
+            });
+
+            await handler('Alice', { key: 'incapacitated', label: 'Incapacitated', dc: 20, ability: 'int' });
+
+            const goblin = mockCombatSummary.creatures.find(c => c.name === 'Goblin');
+            expect(goblin.concentration).toBeNull();
+            expect(addEntry).toHaveBeenCalledWith(
+                'test-campaign', expect.objectContaining({
+                    type: 'automation',
+                    automationType: 'maze_concentration_released',
+                    characterName: 'Goblin',
+                    abilityName: 'Maze',
+                })
+            );
+        });
+
+        it('SP-080: keeps unrelated caster concentration when maze save succeeds', async () => {
+            mockCombatSummary.creatures.find(c => c.name === 'Goblin').concentration = { spell: 'Hex', dc: 13 };
+            const handler = createHandler();
+            rollConditionSave.mockResolvedValue(makeSuccessRoll({ roll: 18, bonus: 5 }));
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'campaign' && prop === 'targetEffects') {
+                    return defaultTargetEffects('Alice', 'maze', 'Goblin', 20);
+                }
+                return null;
+            });
+
+            await handler('Alice', { key: 'incapacitated', label: 'Incapacitated', dc: 20, ability: 'int' });
+
+            const goblin = mockCombatSummary.creatures.find(c => c.name === 'Goblin');
+            expect(goblin.concentration.spell).toBe('Hex');
+        });
+
+        it('SP-080: keeps caster Maze concentration when the escape save fails', async () => {
+            mockCombatSummary.creatures.find(c => c.name === 'Goblin').concentration = { spell: 'Maze', dc: 19 };
+            const handler = createHandler();
+            rollConditionSave.mockResolvedValue(makeFailureRoll());
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'campaign' && prop === 'targetEffects') {
+                    return defaultTargetEffects('Alice', 'maze', 'Goblin', 20);
+                }
+                return null;
+            });
+
+            await handler('Alice', { key: 'incapacitated', label: 'Incapacitated', dc: 20, ability: 'int' });
+
+            const goblin = mockCombatSummary.creatures.find(c => c.name === 'Goblin');
+            expect(goblin.concentration.spell).toBe('Maze');
+            expect(addEntry).not.toHaveBeenCalledWith(
+                'test-campaign', expect.objectContaining({ automationType: 'maze_concentration_released' })
+            );
+        });
     });
 
     // ------------------------------------------------------------------

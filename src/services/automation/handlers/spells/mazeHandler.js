@@ -5,7 +5,9 @@ import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { storeSpellLastAttack } from '../../common/damageRollback.js';
-import { addConcentration } from '../../../combat/concentration/concentrationService.js';
+import { addConcentration, breakConcentration } from '../../../combat/concentration/concentrationService.js';
+import storage from '../../../ui/storage.js';
+import { getCombatSummary } from '../../../encounters/combatData.js';
 
 function mazePopup(name, description) {
     return {
@@ -243,6 +245,27 @@ function clearMazeIncapacitated(targetName, campaignName) {
  * - On success: target escapes, spell ends, target reappears in original space
  * - On failure: target remains trapped
  */
+// SP-080: the spell ends when the target escapes — the caster's Maze
+// concentration must break here too (mirrors handleMazeSuccess in
+// createRollConditionSaveHandler and the handleEnfeeblementSuccess pattern).
+function releaseCasterMazeConcentration(campaignName, casterName, targetName) {
+    if (!casterName) return;
+    const cs = getCombatSummary(campaignName);
+    const casterCreature = cs?.creatures?.find(c => c.name === casterName);
+    if (casterCreature?.concentration && String(casterCreature.concentration.spell).toLowerCase() === 'maze') {
+        breakConcentration(cs, casterCreature.name);
+        storage.set('combatSummary', cs, campaignName);
+        addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'maze_concentration_released',
+            characterName: casterName,
+            abilityName: 'Maze',
+            description: `${casterName}'s concentration on Maze ends — ${targetName} escaped the Maze.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[mazeEscape:maze_concentration_released]", e); });
+    }
+}
+
 export async function handleEscape(action, playerStats, campaignName, _mapName) {
     const targetName = action.metaCtx?.mazeTargetName;
 
@@ -313,6 +336,8 @@ export async function handleEscape(action, playerStats, campaignName, _mapName) 
 
         // Remove incapacitated condition from the target
         clearMazeIncapacitated(targetName, campaignName);
+
+        releaseCasterMazeConcentration(campaignName, mazeEffect.source, targetName);
 
         addEntry(campaignName, {
             type: 'condition',
