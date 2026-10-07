@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
+  setRuntimeObject: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
@@ -32,6 +33,7 @@ import { campaignName, makePlayerStats, makeAction } from './tempHpBuff.test-uti
 function resetMocks() {
   useRuntimeState.getRuntimeValue.mockClear().mockReset();
   useRuntimeState.setRuntimeValue.mockClear().mockResolvedValue(undefined);
+  useRuntimeState.setRuntimeObject.mockClear().mockResolvedValue(undefined);
   automationService.evaluateAutoExpression.mockClear().mockReset();
   damageUtils.getCombatContext.mockClear().mockReset();
 }
@@ -491,5 +493,159 @@ describe('confirmBolsteringPerformance', () => {
     );
     expect(tempHpCalls.length).toBe(1);
     expect(tempHpCalls[0][0]).toBe('First');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// FT-046: featName threading (amount) + once-per-rest latch
+// ────────────────────────────────────────────────────────────────
+
+function makeInspiringLeaderSetup() {
+  const ps = makePlayerStats({
+    level: 20,
+    name: 'HeroesFeastBard',
+    featAbilityChoices: {
+      'Inspiring Leader-0': { assignment: 'Wisdom' },
+    },
+    abilities: [
+      { name: 'Charisma', score: 21, bonus: 5 },
+      { name: 'Wisdom', score: 10, bonus: 0 },
+    ],
+  });
+  const action = makeAction({
+    tempHpExpression: 'level + Math.max(CHA modifier, WIS modifier)',
+    targets: 6,
+    includesSelf: true,
+    multiTargetAlly: true,
+  }, { name: 'Bolstering Performance', featName: 'Inspiring Leader' });
+  return { ps, action };
+}
+
+describe('FT-046 Inspiring Leader — featName resolves chosen ability', () => {
+  beforeEach(() => resetMocks());
+
+  it('uses featName (not benefit name) for featAbilityChoices lookup: level 20 + WIS +0 = 20', async () => {
+    const { ps, action } = makeInspiringLeaderSetup();
+    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
+
+    const result = await handle(action, ps, campaignName, 'test-map');
+
+    expect(result.type).toBe('modal');
+    expect(result.payload.tempHp).toBe(20);
+  });
+
+  it('documents the fingerprint: without featName the fallback yields level + max(CHA,WIS) = 25', async () => {
+    const { ps, action } = makeInspiringLeaderSetup();
+    delete action.featName;
+    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
+
+    const result = await handle(action, ps, campaignName, 'test-map');
+
+    expect(result.type).toBe('modal');
+    expect(result.payload.tempHp).toBe(25);
+  });
+});
+
+describe('FT-046 Inspiring Leader — once-per-rest latch', () => {
+  beforeEach(() => resetMocks());
+
+  it('refuses while latched: popup not modal, inspiring_leader_refused log, zero runtime writes', async () => {
+    const { ps, action } = makeInspiringLeaderSetup();
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) =>
+      (name === 'HeroesFeastBard' && key === 'inspiringLeaderUsedSinceRest') ? true : undefined,
+    );
+
+    const result = await handle(action, ps, campaignName, 'test-map');
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Already used this rest');
+    const { addEntry } = await import('../../../ui/logService.js');
+    expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      type: 'automation',
+      automationType: 'inspiring_leader_refused',
+      characterName: 'HeroesFeastBard',
+    }));
+    expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(useRuntimeState.setRuntimeObject).not.toHaveBeenCalled();
+  });
+
+  it('opens the chooser when not latched', async () => {
+    const { ps, action } = makeInspiringLeaderSetup();
+    damageUtils.getCombatContext.mockResolvedValue({ creatures: [{ name: 'HeroesFeastBard' }] });
+
+    const result = await handle(action, ps, campaignName, 'test-map');
+
+    expect(result.type).toBe('modal');
+    expect(result.payload.tempHp).toBe(20);
+  });
+
+  it('stamps the latch merged with self tempHp in one awaited write when bard included', async () => {
+    const { ps, action } = makeInspiringLeaderSetup();
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) =>
+      (name === 'HeroesFeastBard' && key === 'tempHp') ? 5 : 0,
+    );
+
+    await confirmBolsteringPerformance(
+      action, ps, campaignName, ['HeroesFeastBard', 'Ally1'], 20,
+    );
+
+    expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledTimes(1);
+    expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledWith(
+      'HeroesFeastBard',
+      { inspiringLeaderUsedSinceRest: true, tempHp: 20 },
+      campaignName,
+    );
+    const tempHpCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
+      (c) => c[1] === 'tempHp',
+    );
+    expect(tempHpCalls.length).toBe(1);
+    expect(tempHpCalls[0][0]).toBe('Ally1');
+    expect(tempHpCalls[0][2]).toBe(20);
+  });
+
+  it('keeps higher existing self tempHp (replace-if-larger) while stamping the latch', async () => {
+    const { ps, action } = makeInspiringLeaderSetup();
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) =>
+      (name === 'HeroesFeastBard' && key === 'tempHp') ? 30 : 0,
+    );
+
+    await confirmBolsteringPerformance(
+      action, ps, campaignName, ['HeroesFeastBard'], 20,
+    );
+
+    expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledWith(
+      'HeroesFeastBard',
+      { inspiringLeaderUsedSinceRest: true, tempHp: 30 },
+      campaignName,
+    );
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('stamps the latch on allies-only grants too', async () => {
+    const { ps, action } = makeInspiringLeaderSetup();
+
+    await confirmBolsteringPerformance(
+      action, ps, campaignName, ['Ally1', 'Ally2'], 20,
+    );
+
+    expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledTimes(1);
+    expect(useRuntimeState.setRuntimeObject).toHaveBeenCalledWith(
+      'HeroesFeastBard',
+      { inspiringLeaderUsedSinceRest: true },
+      campaignName,
+    );
+  });
+
+  it('does NOT stamp the latch when nothing is granted (empty selection)', async () => {
+    const { ps, action } = makeInspiringLeaderSetup();
+
+    const result = await confirmBolsteringPerformance(
+      action, ps, campaignName, [], 20,
+    );
+
+    expect(result.payload.description).toContain('no targets selected');
+    expect(useRuntimeState.setRuntimeObject).not.toHaveBeenCalled();
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 });

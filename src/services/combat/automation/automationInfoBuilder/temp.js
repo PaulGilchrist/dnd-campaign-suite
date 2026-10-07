@@ -50,6 +50,10 @@ export const tempHandlers = {
         return {
             type: 'temp_hp_buff',
             name: feature.name,
+            // FT-046: carry the originating feat name (featBuffService tags every
+            // feat feature with featName) so tempHpBuffHandler can resolve
+            // featAbilityChoices keys like "Inspiring Leader-0".
+            featName: feature.featName || '',
             description: feature.description || '',
             buffExpression: auto.buffExpression || '',
             range: auto.range || '60_ft',

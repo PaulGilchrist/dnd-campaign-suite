@@ -74,6 +74,10 @@ const SHORT_REST_NULL_FLAG_KEYS = [
   // (ShortRestModal handleMemorizeSwap); null here when the rest actually
   // finishes so the feature re-arms for the next rest.
   'memorizeSpellUsedSinceRest',
+  // FT-046: Inspiring Leader (Bolstering Performance) is once per Short or
+  // Long Rest — confirmBolsteringPerformance stamps the latch; null here when
+  // the rest finishes so the row re-arms (CLA-226 twin).
+  'inspiringLeaderUsedSinceRest',
 ]
 
 function findClassLevel(playerStats) {

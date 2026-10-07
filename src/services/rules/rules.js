@@ -237,6 +237,10 @@ function addFeatFeatures(playerStats, playerSummary, featFeatures, allFeatures) 
             type: featFeature.type || 'passive',
             source: 'feat',
             automation: processedAutomation || featFeature.automation,
+            // FT-046: keep the originating feat name on the row so handlers can
+            // resolve featAbilityChoices keys ("<Feat>-<idx>") — the benefit name
+            // ("Bolstering Performance") never prefix-matches "Inspiring Leader-0".
+            featName: featFeature.featName,
         };
 
         categorizeFeatEntry(playerStats, featFeature, featEntry, featureCategories);

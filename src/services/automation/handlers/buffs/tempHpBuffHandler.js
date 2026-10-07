@@ -93,8 +93,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
+// FT-046: the row action.name is the BENEFIT name ("Bolstering Performance") —
+// featAbilityChoices keys are "<Feat>-<idx>" ("Inspiring Leader-0"), so the
+// featName threaded from featBuffService/rules.js must drive the lookup;
+// resolveFeatChosenAbility prefix-match then finds the Wisdom/CHA assignment.
+export const INSPIRING_LEADER_LATCH_KEY = 'inspiringLeaderUsedSinceRest';
+
 function resolveInspiringLeaderTempHp(action, playerStats) {
-    const featName = action.name || 'Inspiring Leader';
+    const featName = action.featName || action.name || 'Inspiring Leader';
     const chosenAbility = resolveFeatChosenAbility(featName, playerStats.featAbilityChoices);
 
     const level = playerStats.level || 1;
@@ -114,6 +120,31 @@ function resolveInspiringLeaderTempHp(action, playerStats) {
 
 async function handleMultiTargetAllyTempHp(action, playerStats, campaignName) {
     const auto = action.automation;
+    const playerName = playerStats.name;
+
+    // FT-046: RAW once per Short or Long Rest — refuse while latched, zero
+    // runtime change (latch cleared on rest completion: SHORT_REST_NULL_FLAG_KEYS
+    // + LONG_REST_RESOURCES, CLA-226 memorizeSpellUsedSinceRest precedent).
+    if (getRuntimeValue(playerName, INSPIRING_LEADER_LATCH_KEY)) {
+        await addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'inspiring_leader_refused',
+            characterName: playerName,
+            name: action.name,
+            description: `${action.name} refused — already used since your last rest. Available again after a Short or Long Rest.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[inspiringLeader] Error logging refusal:', e); });
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name}: Already used this rest. You can inspire again after finishing a Short or Long Rest.`,
+                automation: auto,
+            },
+        };
+    }
 
     const amount = resolveInspiringLeaderTempHp(action, playerStats);
     if (typeof amount !== 'number' || amount <= 0) {
@@ -151,10 +182,25 @@ async function handleMultiTargetAllyTempHp(action, playerStats, campaignName) {
 
 export async function confirmBolsteringPerformance(action, playerStats, campaignName, selectedTargets, tempHp) {
     const auto = action.automation;
+    const playerName = playerStats.name;
     const finalTargets = (selectedTargets || []).slice(0, auto?.targets || 6);
 
     for (const targetName of finalTargets) {
+        if (targetName === playerName) continue;
         setTempHp(targetName, tempHp, campaignName);
+    }
+
+    // FT-046: stamp the once-per-rest latch on a successful grant. When the
+    // bard is also a target, merge the tempHp (replace-if-larger) into the
+    // SINGLE awaited write to their store — two un-awaited same-endpoint POSTs
+    // can reorder network-side and drop a key (playbook §39).
+    if (finalTargets.length > 0) {
+        const bardUpdates = { [INSPIRING_LEADER_LATCH_KEY]: true };
+        if (finalTargets.includes(playerName)) {
+            const existingTempHp = Number(getRuntimeValue(playerName, 'tempHp') || 0);
+            bardUpdates.tempHp = Math.max(existingTempHp, tempHp);
+        }
+        await setRuntimeObject(playerName, bardUpdates, campaignName);
     }
 
     const targetList = finalTargets.length > 0 ? finalTargets.join(', ') : 'no targets selected';

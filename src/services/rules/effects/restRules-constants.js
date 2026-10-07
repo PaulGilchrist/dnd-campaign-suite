@@ -287,8 +287,11 @@ export const LONG_REST_RESOURCES = [
       // CLA-226: Memorize Spell is once per Short Rest — the swap latch must
       // re-arm after ANY rest (CLA-130 rule: a latch missing from the reset
       // lists dies permanently; the short-rest flag list covers SR, this the LR).
-      'memorizeSpellUsedSinceRest'
-   ]
+      'memorizeSpellUsedSinceRest',
+      // FT-046: Inspiring Leader once-per-rest latch — null re-arm after a
+      // Long Rest (CLA-226 twin; short-rest flag list covers SR).
+      'inspiringLeaderUsedSinceRest'
+    ]
 
 export function getLongRestResources() {
   return [...LONG_REST_RESOURCES]

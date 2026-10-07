@@ -24,7 +24,7 @@ export function mergeAutomationSpecialActions(playerStats) {
     for (const sa of automationSpecialActions) {
         if (!existingNames.has(sa.name)) {
             if (!playerStats.specialActions) playerStats.specialActions = [];
-            playerStats.specialActions.push({ name: sa.name, description: sa.description || '', automation: sa, hasAutomation: true });
+            playerStats.specialActions.push({ name: sa.name, description: sa.description || '', automation: sa, featName: sa.featName, hasAutomation: true });
         }
     }
 }
