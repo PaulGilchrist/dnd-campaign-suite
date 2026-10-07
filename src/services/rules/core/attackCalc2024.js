@@ -7,6 +7,7 @@ import {
     buildFallbackUnarmedAttacks,
 } from './attackWeaponUtils.js';
 import classRules from '../../character/classRules2024.js';
+import { checkAnyArmor, checkShieldEquipped } from './speedUtils.js';
 import { getCombatSummary, getCurrentCombatRound } from '../../encounters/combatData.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { collectWeaponMastery } from '../../combat/automation/automationPassives.js';
@@ -491,6 +492,43 @@ function buildSwiftQuiverAttacks(allEquipment, playerStats, proficiency) {
 }
 
 /**
+ * CLA-225: canonical 2024 Martial Arts gate (classes.json lv1) — "Benefits
+ * while unarmed or wielding only Monk weapons and not wearing armor or
+ * wielding a Shield".
+ * @param {Object} playerStats
+ * @param {Array} allEquipment
+ * @returns {boolean}
+ */
+function canUseMartialArts(playerStats, allEquipment) {
+    if (playerStats.class?.name !== 'Monk') return false;
+    const equippedItems = playerStats.inventory?.equipped || [];
+    if (checkAnyArmor(equippedItems, allEquipment) || checkShieldEquipped(equippedItems)) return false;
+    return equippedItems.every(itemName => {
+        const { weapon } = resolveWeapon(allEquipment, itemName);
+        const isWeapon = weapon && weapon.equipment_category === 'Weapon';
+        return !isWeapon || (weapon.properties || []).some(p => String(p).toLowerCase() === 'monk');
+    });
+}
+
+/**
+ * CLA-225: with the gate open the Martial Arts die replaces the normal
+ * damage dice of every Monk weapon attack row, mirroring how the Unarmed
+ * Strike rows already receive it from buildMonkAttacks.
+ * @param {Object[]} attacks
+ * @param {string} diceStr e.g. '1d12'
+ */
+function applyMartialArtsDie(attacks, diceStr) {
+    for (const attack of attacks) {
+        if (attack.weaponType === 'unarmed') continue;
+        if (!(attack.properties || []).some(p => String(p).toLowerCase() === 'monk')) continue;
+        const diceMatch = String(attack.damage || '').match(/^\d+d\d+/);
+        if (!diceMatch) continue;
+        attack.damage = diceStr + attack.damage.slice(diceMatch[0].length);
+        attack.damageFormula = String(attack.damageFormula || '').replace(diceMatch[0], diceStr);
+    }
+}
+
+/**
  * Build all attack entries for a character (2024 rules).
  * @param {Array} allEquipment
  * @param {Array} allSpells
@@ -530,13 +568,14 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
         ...buildMeleeAttacks(ctx),
     ];
 
-    // Monk unarmed strikes (2024: delegates to classRules)
-    if (playerStats.class?.name === 'Monk') {
-        const martialArtsDie = classRules.getMartialArtsDie(playerStats);
-        if (martialArtsDie) {
-            const diceStr = `1d${martialArtsDie}`;
-            attacks.push(...buildMonkAttacks({ diceStr, dexterityBonus: dexterity.bonus, proficiency }));
-        }
+    // CLA-225: Martial Arts rows and the Monk weapon die swap are offered
+    // only while the canonical gate passes (no armor, no Shield, unarmed or
+    // only Monk weapons); armored monks get plain weapon rows with no MA
+    // unarmed strikes.
+    if (canUseMartialArts(playerStats, allEquipment)) {
+        const diceStr = `1d${classRules.getMartialArtsDie(playerStats)}`;
+        applyMartialArtsDie(attacks, diceStr);
+        attacks.push(...buildMonkAttacks({ diceStr, dexterityBonus: dexterity.bonus, proficiency }));
     }
 
     // Tavern Brawler: Add unarmed strike attacks for non-monk characters

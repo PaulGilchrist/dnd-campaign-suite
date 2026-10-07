@@ -29,11 +29,33 @@ function parseItemName(name) {
  * never carry an `equipped` flag. Shared by speed gates and the damage-reduction
  * gate (Heavy Armor Master) so both consult the same worn-armor source.
  */
+function armorCategoryOf(itemName, allEquipment) {
+    const item = allEquipment.find(eq => eq.name === parseItemName(itemName) || eq.name === itemName);
+    return item ? item.armor_category : null;
+}
+
 export function checkHeavyArmor(equippedItems, allEquipment) {
+    return equippedItems.some(itemName => armorCategoryOf(itemName, allEquipment) === 'Heavy');
+}
+
+/**
+ * CLA-225: any worn armor category (Light/Medium/Heavy) — Shields are their
+ * own 2024 category and checked separately so gates like Martial Arts can
+ * test both halves of "not wearing armor or wielding a Shield".
+ */
+export function checkAnyArmor(equippedItems, allEquipment) {
     return equippedItems.some(itemName => {
-        const item = allEquipment.find(eq => eq.name === parseItemName(itemName) || eq.name === itemName);
-        return Boolean(item && item.armor_category === 'Heavy');
+        const category = armorCategoryOf(itemName, allEquipment);
+        return Boolean(category) && category !== 'Shield';
     });
+}
+
+/**
+ * CLA-225: equipped truth for the Shield slot — mirrors the shield checks in
+ * attackCalc.js and charSummaryCalc.js (name match after magic-suffix strip).
+ */
+export function checkShieldEquipped(equippedItems) {
+    return equippedItems.some(name => parseItemName(name) === 'Shield');
 }
 
 function speedConditionAllows(passive, isWearingHeavyArmor, isWearingArmor, isWieldingShield) {
@@ -66,7 +88,7 @@ export function applySpeedIncreasePassives(playerStats) {
     const allEquipment = playerStats.equipment || [];
     const isWearingHeavyArmor = checkHeavyArmor(equippedItems, allEquipment);
     const isWearingArmor = allEquipment.some(eq => equippedItems.includes(eq.name) && eq.equipment_category === 'Armor');
-    const isWieldingShield = equippedItems.some(name => parseItemName(name) === 'Shield');
+    const isWieldingShield = checkShieldEquipped(equippedItems);
     let bonus = 0;
     for (const passive of passives) {
         bonus += speedPassiveBonus(passive, isWearingHeavyArmor, isWearingArmor, isWieldingShield);
