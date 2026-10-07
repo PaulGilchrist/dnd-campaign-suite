@@ -94,16 +94,32 @@ function sharesEvasionWithTarget(character, targetName, normalizedSaveType) {
     return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5) || false;
 }
 
-function resolveEvasionFlags({ pending, targetChar, normalizedSaveType, selectedAllies, allCharacters, campaignName }) {
+// CLA-211: the Leading Evasion chooser is authoritative — once it ran
+// (evasionOptions present), ONLY the GM-ticked allies fold; Skip
+// (evasionDeclined) grants nobody, and an unselected quick-roll target pays
+// full on a failed save. The presence fallback survives ONLY on legacy
+// chooser-less lanes (evasionOptions undefined), where no shareable holder
+// surfaced by definition and folding was already inert.
+// Hoisted sibling to keep resolveEvasionFlags under the §45 complexity ceiling.
+function resolveSharedEvasionFlags({ pending, evasionOptions, allCharacters, normalizedSaveType, halfDamage, isIncapacitated, hasOwnEvasion }) {
+    const { selectedAllies, evasionDeclined } = evasionOptions || {};
+    if (hasOwnEvasion || evasionDeclined) return { hasSelectedEvasion: false, hasSharedEvasion: false };
+    if (evasionOptions) {
+        return { hasSelectedEvasion: !isIncapacitated && (selectedAllies?.has?.(pending.targetName) || false), hasSharedEvasion: false };
+    }
+    const hasSharedEvasion = !isIncapacitated && halfDamage &&
+        allCharacters.some(c => sharesEvasionWithTarget(c, pending.targetName, normalizedSaveType));
+    return { hasSelectedEvasion: false, hasSharedEvasion };
+}
+
+function resolveEvasionFlags({ pending, targetChar, normalizedSaveType, evasionOptions, allCharacters, campaignName }) {
     const targetConditions = getRuntimeValue(pending.targetName, 'activeConditions', campaignName) || [];
     const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
     const halfDamage = pending.dcSuccess === 'half';
 
     const ownEvasion = targetChar?.computedStats?.evasionEffects;
     const hasOwnEvasion = !isIncapacitated && halfDamage && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
-    const hasSelectedEvasion = selectedAllies?.has?.(pending.targetName) || false;
-    const hasSharedEvasion = !hasOwnEvasion && !hasSelectedEvasion && !isIncapacitated && halfDamage &&
-        allCharacters.some(c => sharesEvasionWithTarget(c, pending.targetName, normalizedSaveType));
+    const { hasSelectedEvasion, hasSharedEvasion } = resolveSharedEvasionFlags({ pending, evasionOptions, allCharacters, normalizedSaveType, halfDamage, isIncapacitated, hasOwnEvasion });
     const hasEvasion = [hasOwnEvasion, hasSelectedEvasion, hasSharedEvasion].some(Boolean) || isCircleOfPowerActive(pending.targetName, campaignName);
     return { hasEvasion, hasOwnEvasion, hasSelectedEvasion, isIncapacitated };
 }
@@ -310,7 +326,7 @@ export function createSaves(deps) {
 
         logAndShow(attack.name, attack.hitBonus, 'attack', { targetName: attackerName, forcedMode: undefined });
     }
-    async function quickRollPlayerSave(promptId, targetName, saveType, saveDc, selectedAllies) {
+    async function quickRollPlayerSave(promptId, targetName, saveType, saveDc, evasionOptions) {
         const pending = pendingSaves[promptId];
         if (!pending) return;
 
@@ -331,7 +347,7 @@ export function createSaves(deps) {
         saveResult.total += baneSave.penalty + blessSaveBonus + baneAttacker.bonus;
 
         const normalizedSaveType = normalizeSaveType(saveType);
-        const evasionFlags = resolveEvasionFlags({ pending, targetChar, normalizedSaveType, selectedAllies, allCharacters: charactersRef.current || [], campaignName });
+        const evasionFlags = resolveEvasionFlags({ pending, targetChar, normalizedSaveType, evasionOptions, allCharacters: charactersRef.current || [], campaignName });
         // MA-0298: Soul Tome combo hit damage is unconditional — full damage on
         // a successful save (the save gates only the trap). MA-0218 semantics
         // (no trap arm) stay byte-identical.

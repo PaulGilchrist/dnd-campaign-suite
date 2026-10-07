@@ -5,6 +5,7 @@ import { createSaveListener } from '../../services/automation/common/savePrompt.
 import { addEntry } from '../../services/ui/logService.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { normalizeSaveType, computeDamageAfterEvasion, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
+import { isLeadingEvasionSelected } from '../../services/rules/combat/evasionUtils.js';
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { getAuraConditionImmunities, splitAuraCoveredConditions, logAuraConditionImmunity } from '../../services/combat/auras/auraConditionImmunity.js';
@@ -160,7 +161,7 @@ async function processPlayerSave({ target, characterName, campaignName, context,
     logEntry(buildPlayerSaveLogData({ targetName, characterName, actionName, effectiveD20ForSave, saveResult, saveSuccess, saveType, saveDc, attackerName, context }));
 
     // Apply save-triggered damage and conditions
-    await applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal: saveResult.total, logEntry, setPopupHtml });
+    await applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal: saveResult.total, logEntry, setPopupHtml, promptId: saveResult.promptId, evasionActive: saveResult.evasionActive });
 
     return { saveSuccess, effectiveD20ForSave, saveTotal, saveResult };
 }
@@ -329,16 +330,21 @@ async function processNpcSave({ target, characterName, campaignName, context, bo
     return { saveSuccess, effectiveD20ForSave, saveTotal };
 }
 
-function resolveSaveEvasion({ context, characters, applyTarget, normalizedSaveType, isIncapacitated, campaignName }) {
+// CLA-211: shared Leading Evasion folds ONLY on the GM's chooser selection.
+// The modal's own adjudicated flag (saveResult.evasionActive — dispatched
+// synchronously with the save-result event) is preferred; the runtime stamp
+// (leadingEvasionSelections[promptId], persisted at chooser confirm) covers
+// lanes whose dispatch carries no flag. A flagless prompt-less inline lane
+// never folds shared evasion: unselected targets fall through to
+// computeDamageAfterSave (full on fail / half on success). The flag must be
+// preferred because submitResultAndClear prunes the stamp synchronously
+// after dispatch, while this lane's continuation runs as a later microtask.
+function resolveSaveEvasion({ context, characters, applyTarget, normalizedSaveType, isIncapacitated, campaignName, promptId, evasionActive }) {
     const targetChar = (characters || []).find(c => c.name === applyTarget);
     const ownEvasion = targetChar?.computedStats?.evasionEffects;
     const hasOwnEvasion = !isIncapacitated && context?.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
-    const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && context?.dcSuccess === 'half' &&
-        (characters || []).some(c => {
-            if (c.name === applyTarget) return false;
-            const ev = c?.computedStats?.evasionEffects;
-            return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
-        });
+    const hasSelectedEvasion = evasionActive != null ? evasionActive === true : isLeadingEvasionSelected(campaignName, promptId, applyTarget);
+    const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && context?.dcSuccess === 'half' && hasSelectedEvasion;
     const hasEvasion = hasOwnEvasion || hasSharedEvasion || isCircleOfPowerActive(applyTarget, campaignName);
     return { targetChar, hasOwnEvasion, hasEvasion };
 }
@@ -656,7 +662,7 @@ async function armRepeatSaveClause({ saveSuccess, context, campaignName, attacke
     await trackFrightfulPresence({ campaignName, attackerName, targetName: applyTarget, saveType: context.repeatSave.save_type || saveType, saveDc });
 }
 
-async function applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml }) {
+async function applySaveOutcome({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, promptId = null, evasionActive }) {
     // MA-0020: ability N/Day spend lands here — prompt-confirm seam (reaches
     // this point only once the save has resolved), regardless of the outcome.
     if (context?.monsterAbilityUse) {
@@ -665,7 +671,7 @@ async function applySaveOutcome({ context, characterName, campaignName, attacker
     await applyAuthoredClauseGrants({ context, saveSuccess, campaignName, attackerName, applyTarget: targetName || characterName });
     if (context?.autoDamageFormula && saveDc != null) {
         if (!await maybeApplyThresholdKillLeg({ context, characterName, campaignName, attackerName, targetName, saveSuccess, effectiveD20ForSave, saveTotal, saveType, saveDc, setPopupHtml, characters: context._characters })) {
-            await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters });
+            await applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters: context._characters, promptId, evasionActive });
         }
     } else {
         await applyDamagelessSaveConditions({ context, saveDc, saveSuccess, saveTotal, applyTarget: targetName || characterName, attackerName, campaignName });
@@ -1420,7 +1426,7 @@ async function applySaveAttackerRecoverLeg({ context, applyTarget, riderDamage, 
     return result;
 }
 
-async function applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters }) {
+async function applySaveDamage({ context, characterName, campaignName, attackerName, targetName, saveType, saveDc, saveSuccess, effectiveD20ForSave, saveTotal, logEntry, setPopupHtml, characters, promptId, evasionActive }) {
     const damageFormula = context.autoDamageFormula;
     const damageType = context?.autoDamageDamageType || 'Slashing';
     const saveConditions = context?.saveConditions || [];
@@ -1431,7 +1437,7 @@ async function applySaveDamage({ context, characterName, campaignName, attackerN
     const normalizedSaveType = normalizeSaveType(saveType);
     const targetConditions = getRuntimeValue(applyTarget, 'activeConditions', campaignName) || [];
     const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
-    const { targetChar, hasOwnEvasion, hasEvasion } = resolveSaveEvasion({ context, characters, applyTarget, normalizedSaveType, isIncapacitated, campaignName });
+    const { targetChar, hasOwnEvasion, hasEvasion } = resolveSaveEvasion({ context, characters, applyTarget, normalizedSaveType, isIncapacitated, campaignName, promptId, evasionActive });
     if (hasEvasion) {
         logSaveEvasionRoll({ applyTarget, hasOwnEvasion, saveType, saveDc, saveSuccess, context, logEntry });
     }

@@ -9,9 +9,42 @@
 // byte-for-byte in gate order. detail.evasionActive is preferred when present
 // (the prompt roller already answered from full stats — useLoggedDiceRollEve
 // ntHandlers.determineEvasion :51 convention).
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { isCircleOfPowerActive } from '../../automation/handlers/buffs/circleOfPowerHandler.js';
 import { normalizeSaveType } from './applyDamage.js';
+
+// CLA-211: Leading Evasion per-save share selection. The chooser's GM-chosen
+// set is persisted to the runtime store at chooser-confirm (server-first,
+// broadcast to every client) keyed by the savePromptId the selection was made
+// for: campaign key `leadingEvasionSelections` = { [promptId]: [targetName] }.
+// Resolvers gate shared evasion on explicit selection instead of the old
+// blanket some(shareable) presence check, which folded EVERY non-holder
+// making the same half-damage save while a holder was in the fight.
+export const LEADING_EVASION_KEY = 'leadingEvasionSelections';
+
+export function stampLeadingEvasionSelections(campaignName, selections) {
+    const existing = getRuntimeValue('campaign', LEADING_EVASION_KEY, campaignName) || {};
+    const merged = { ...existing };
+    for (const [promptId, targetNames] of selections) {
+        merged[promptId] = [...(merged[promptId] || []), ...targetNames.filter(n => !(merged[promptId] || []).includes(n))];
+    }
+    setRuntimeValue('campaign', LEADING_EVASION_KEY, merged, campaignName);
+}
+
+export function isLeadingEvasionSelected(campaignName, promptId, targetName) {
+    if (!promptId || !targetName) return false;
+    const selections = getRuntimeValue('campaign', LEADING_EVASION_KEY, campaignName) || {};
+    const names = selections[promptId];
+    return Array.isArray(names) && names.includes(targetName);
+}
+
+export function clearLeadingEvasionSelection(campaignName, promptId) {
+    const selections = getRuntimeValue('campaign', LEADING_EVASION_KEY, campaignName) || {};
+    if (!promptId || !(promptId in selections)) return;
+    const next = { ...selections };
+    delete next[promptId];
+    setRuntimeValue('campaign', LEADING_EVASION_KEY, next, campaignName);
+}
 
 export function isSaveTargetIncapacitated(targetName, campaignName) {
     const targetConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
@@ -28,23 +61,19 @@ function matchesSaveType(evasionEffects, normalizedSaveType) {
     return evasionEffects.some(ef => ef.saveType === normalizedSaveType);
 }
 
-function sharesEvasionWithTarget(character, targetName, normalizedSaveType) {
-    if (character.name === targetName) return false;
-    return character.computedStats && Array.isArray(character.computedStats.evasionEffects)
-        && character.computedStats.evasionEffects.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
-}
-
-// Mirrors resolveSaveEvasion (saveProcessing.js:332-343): own evasion is
+// Mirrors resolveSaveEvasion (saveProcessing.js:332): own evasion is
 // gated on NOT Incapacitated + dcSuccess 'half' + matching save type;
-// shared evasion (shareRange >= 5) fills in; Circle of Power stacks last
-// and is NOT Incapacitated-gated (the aura protects regardless).
+// shared Leading Evasion fills in ONLY when the GM ticked the target at
+// the chooser (CLA-211 — leadingEvasionSelections[promptId] runtime stamp;
+// shareable-holder presence alone no longer folds); Circle of Power stacks
+// last and is NOT Incapacitated-gated (the aura protects regardless).
 export function resolveAoESaveEvasion({ characters, detail, targetName, saveType, dcSuccess, campaignName }) {
     const normalizedSaveType = normalizeSaveType(saveType);
     const isIncapacitated = isSaveTargetIncapacitated(targetName, campaignName);
     const halfDamage = dcSuccess === 'half';
     const hasOwnEvasion = !isIncapacitated && halfDamage && matchesSaveType(computedEvasionEffects(characters, targetName), normalizedSaveType);
-    const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && halfDamage &&
-        (characters || []).some(c => sharesEvasionWithTarget(c, targetName, normalizedSaveType));
+    const hasSelectedEvasion = isLeadingEvasionSelected(campaignName, detail?.promptId, targetName);
+    const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && halfDamage && hasSelectedEvasion;
     const hasCircleOfPower = isCircleOfPowerActive(targetName, campaignName);
     // detail.evasionActive includes the prompt roller's Circle of Power roll
     // (SavePromptModal computeHasEvasion) — count it as feature evasion ONLY

@@ -2519,15 +2519,18 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     if (!pendingSaveRef.current) return;
     const { promptId, targetName, saveType, saveDc } = pendingSaveRef.current;
     const selectedAllies = new Set(selectedNames);
-    quickRollPlayerSave(promptId, targetName, saveType, saveDc, selectedAllies);
+    quickRollPlayerSave(promptId, targetName, saveType, saveDc, { selectedAllies });
     setEvasionSelection(null);
     pendingSaveRef.current = null;
   }, [quickRollPlayerSave]);
 
+  // CLA-211: explicit Skip must NOT fold the shared-evasion presence
+  // fallback — the declined quick-roll passes evasionDeclined so only the
+  // target's OWN Evasion/Circle of Power can fold (unselected = full on fail).
   const handleEvasionSkip = useCallback(() => {
     if (!pendingSaveRef.current) return;
     const { promptId, targetName, saveType, saveDc } = pendingSaveRef.current;
-    quickRollPlayerSave(promptId, targetName, saveType, saveDc);
+    quickRollPlayerSave(promptId, targetName, saveType, saveDc, { evasionDeclined: true });
     setEvasionSelection(null);
     pendingSaveRef.current = null;
   }, [quickRollPlayerSave]);

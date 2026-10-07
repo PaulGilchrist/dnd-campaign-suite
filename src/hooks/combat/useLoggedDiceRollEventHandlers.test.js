@@ -253,6 +253,49 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, expect.anything(), 'half', false);
         });
 
+        // --- save-result: CLA-211 Leading Evasion chooser-selection gate ---
+        it('CLA-211: shareable-holder presence alone does NOT fold without the runtime stamp', async () => {
+            setup();
+            computeDamageAfterEvasion.mockReset();
+            computeDamageAfterEvasion.mockImplementation((raw, success, dcSuccess, evasion) => {
+                if (evasion && !success) return Math.floor(raw / 2);
+                return success ? Math.floor(raw / 2) : raw;
+            });
+            deps.charactersRef.current = [
+                { name: 'Bard', computedStats: { evasionEffects: [{ saveType: 'DEX', shareable: true, shareRange: 5 }] } },
+                { name: 'Ally', computedStats: {} },
+            ];
+            const pid = 'p211a';
+            testPendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'Ally' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Ally', success: false, roll: 5, total: 8, saveBonus: 3, rawDamage: 15, dcSuccess: 'half', saveType: 'DEX' } }));
+            await flushPromises();
+            expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, false, 'half', false);
+        });
+
+        it('CLA-211: GM-stamped prompt/target folds shared Leading Evasion', async () => {
+            setup();
+            computeDamageAfterEvasion.mockReset();
+            computeDamageAfterEvasion.mockImplementation((raw, success, dcSuccess, evasion) => {
+                if (evasion && !success) return Math.floor(raw / 2);
+                return success ? Math.floor(raw / 2) : raw;
+            });
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (prop === 'leadingEvasionSelections') return { 'p211b': ['Ally'] };
+                if (key === 'test-campaign' && prop === 'pendingSavePrompts') return testPendingSaves;
+                if (key === 'test-campaign' && prop === 'pendingSaveListenerPrompts') return new Set();
+                return null;
+            });
+            deps.charactersRef.current = [
+                { name: 'Bard', computedStats: { evasionEffects: [{ saveType: 'DEX', shareable: true, shareRange: 5 }] } },
+                { name: 'Ally', computedStats: {} },
+            ];
+            const pid = 'p211b';
+            testPendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'Ally' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Ally', success: false, roll: 5, total: 8, saveBonus: 3, rawDamage: 15, dcSuccess: 'half', saveType: 'DEX' } }));
+            await flushPromises();
+            expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, false, 'half', true);
+        });
+
         // --- save-result: shield / intervene ---
         it('applies shield immunity for magic missile', async () => {
             setup();

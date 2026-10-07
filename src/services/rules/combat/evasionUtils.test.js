@@ -5,10 +5,11 @@
 // (shareable, shareRange >= 5) fills in; Circle of Power stacks regardless;
 // detail.evasionActive honored for remote-SSE dispatches (SP-023 family).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { resolveAoESaveEvasion, evasionLedgerName } from './evasionUtils.js';
+import { resolveAoESaveEvasion, evasionLedgerName, isLeadingEvasionSelected, stampLeadingEvasionSelections, LEADING_EVASION_KEY } from './evasionUtils.js';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => []),
+  setRuntimeValue: vi.fn(),
 }));
 
 vi.mock('../../automation/handlers/buffs/circleOfPowerHandler.js', async (importOriginal) => {
@@ -16,7 +17,7 @@ vi.mock('../../automation/handlers/buffs/circleOfPowerHandler.js', async (import
   return { ...actual, isCircleOfPowerActive: vi.fn(() => false) };
 });
 
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { isCircleOfPowerActive } from '../../automation/handlers/buffs/circleOfPowerHandler.js';
 
 const EVASION = [{ source: 'Evasion', saveType: 'DEX', shareable: false, shareRange: 0 }];
@@ -62,11 +63,36 @@ describe('evasionUtils.resolveAoESaveEvasion (CLA-124/CLA-125)', () => {
     expect(r.isIncapacitated).toBe(true);
   });
 
-  it('shared Leading Evasion: nearby shareable holder covers a non-holder target', () => {
+  it('CLA-211: shareable-holder presence alone does NOT fold (no stamp)', () => {
+    getRuntimeValue.mockImplementation((_key, rk) => (rk === LEADING_EVASION_KEY ? {} : []));
     const r = resolveAoESaveEvasion({ ...baseArgs, targetName: 'Dwarf' });
+    expect(r.hasOwnEvasion).toBe(false);
+    expect(r.hasSharedEvasion).toBe(false);
+    expect(r.evasionActive).toBe(false);
+  });
+
+  it('CLA-211: GM-stamped target folds shared Leading Evasion', () => {
+    getRuntimeValue.mockImplementation((_key, rk) => (rk === LEADING_EVASION_KEY ? { 'p-1': ['Dwarf'] } : []));
+    const r = resolveAoESaveEvasion({ ...baseArgs, targetName: 'Dwarf', detail: { promptId: 'p-1' } });
     expect(r.hasOwnEvasion).toBe(false);
     expect(r.hasSharedEvasion).toBe(true);
     expect(evasionLedgerName(r)).toBe('Leading Evasion');
+  });
+
+  it('CLA-211: stamp for a different promptId does not leak across saves', () => {
+    getRuntimeValue.mockImplementation((_key, rk) => (rk === LEADING_EVASION_KEY ? { 'p-1': ['Dwarf'] } : []));
+    const r = resolveAoESaveEvasion({ ...baseArgs, targetName: 'Dwarf', detail: { promptId: 'p-2' } });
+    expect(r.hasSharedEvasion).toBe(false);
+  });
+
+  it('CLA-211: Incapacitated stamped target still does not fold', () => {
+    getRuntimeValue.mockImplementation((name, rk) => {
+      if (rk === LEADING_EVASION_KEY) return { 'p-1': ['Dwarf'] };
+      if (name === 'Dwarf') return ['Incapacitated'];
+      return [];
+    });
+    const r = resolveAoESaveEvasion({ ...baseArgs, targetName: 'Dwarf', detail: { promptId: 'p-1' } });
+    expect(r.hasSharedEvasion).toBe(false);
   });
 
   it('Circle of Power stacks on an otherwise-unprotected target and names itself', () => {
@@ -92,5 +118,35 @@ describe('evasionUtils.resolveAoESaveEvasion (CLA-124/CLA-125)', () => {
     const r = resolveAoESaveEvasion({ ...baseArgs, characters: [{ name: 'Monk', type: 'player', currentHp: 1, maxHp: 1 }] });
     expect(r.featureEvasionActive).toBe(false);
     expect(r.evasionActive).toBe(false);
+  });
+});
+
+describe('evasionUtils CLA-211 share-selection stamp helpers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getRuntimeValue.mockReturnValue([]);
+  });
+
+  it('stampLeadingEvasionSelections merges into existing store and writes once', () => {
+    getRuntimeValue.mockReturnValue({ 'p-1': ['Dwarf'] });
+    stampLeadingEvasionSelections('test-campaign', [['p-1', ['Elf']], ['p-2', ['Goblin']]]);
+    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', LEADING_EVASION_KEY, {
+      'p-1': ['Dwarf', 'Elf'],
+      'p-2': ['Goblin'],
+    }, 'test-campaign');
+  });
+
+  it('stampLeadingEvasionSelections never duplicates names', () => {
+    getRuntimeValue.mockReturnValue({ 'p-1': ['Dwarf'] });
+    stampLeadingEvasionSelections('test-campaign', [['p-1', ['Dwarf']]]);
+    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', LEADING_EVASION_KEY, { 'p-1': ['Dwarf'] }, 'test-campaign');
+  });
+
+  it('isLeadingEvasionSelected: true only for stamped prompt/target pairs', () => {
+    getRuntimeValue.mockReturnValue({ 'p-1': ['Dwarf'] });
+    expect(isLeadingEvasionSelected('test-campaign', 'p-1', 'Dwarf')).toBe(true);
+    expect(isLeadingEvasionSelected('test-campaign', 'p-1', 'Elf')).toBe(false);
+    expect(isLeadingEvasionSelected('test-campaign', null, 'Dwarf')).toBe(false);
+    expect(isLeadingEvasionSelected('test-campaign', 'p-1', null)).toBe(false);
   });
 });

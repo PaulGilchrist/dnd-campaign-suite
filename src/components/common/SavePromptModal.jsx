@@ -10,6 +10,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntime
 import { getPendingSavePrompt } from '../../services/combat/auras/pendingSaveRegistry.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { normalizeSaveType } from '../../services/rules/combat/applyDamage.js';
+import { stampLeadingEvasionSelections, clearLeadingEvasionSelection } from '../../services/rules/combat/evasionUtils.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import storage from '../../services/ui/storage.js';
 import './SavePromptModal.css';
@@ -393,6 +394,11 @@ function submitResultAndClear(campaignName, current, result, { includeBaneRoll, 
     },
   }));
 
+  // CLA-211: consume the per-prompt Leading Evasion share stamp AFTER the
+  // adjudication dispatch — synchronous listeners read it during dispatch,
+  // and the prune POST stays ordered behind sendSaveResult for remote lanes.
+  clearLeadingEvasionSelection(campaignName, current.promptId);
+
   clearSavePrompt(campaignName, current.targetName);
   advance();
 }
@@ -617,6 +623,8 @@ function EvasionSelectionOverlay({ prompts, evasionSelection, onSelectionChange,
                 <input
                   type="checkbox"
                   checked={selected.includes(prompt.targetName)}
+                  readOnly
+                  tabIndex={-1}
                 />
                 <span className="secondary-target-name">
                   <strong>{prompt.targetName}</strong>
@@ -809,15 +817,39 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     });
   }, [campaignName, current, lastEvasionState, advance]);
 
+  // CLA-211: persist the GM's per-save share selection to the runtime store
+  // (broadcast, skipSync=false) keyed by promptId so every adjudication lane
+  // gates Leading Evasion on the explicit choice — presence of a shareable
+  // holder alone no longer folds. Skip grants nothing and is logged declined.
   const handleEvasionConfirm = useCallback((selectedNames) => {
     selectedAlliesRef.current = new Set(selectedNames);
+    const chosen = prompts
+      .filter(p => selectedNames.includes(p.targetName))
+      .map(p => [p.promptId, [p.targetName]]);
+    if (chosen.length > 0) {
+      stampLeadingEvasionSelections(campaignName, chosen);
+      addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'leading_evasion_shared',
+        characterName: current?.targetName || null,
+        description: `Leading Evasion shared with ${selectedNames.join(', ')} — DC ${current?.saveDc} ${current?.saveType} save${current?.sourceName ? ` (${current.sourceName})` : ''}. Selected allies take half damage on a failed save and no damage on a successful save.`,
+        timestamp: Date.now(),
+      }).catch((e) => { console.error('[SavePromptModal] Error logging Leading Evasion share:', e); });
+    }
     setEvasionSelection(null);
-  }, []);
+  }, [campaignName, current, prompts]);
 
   const handleEvasionSkip = useCallback(() => {
     selectedAlliesRef.current = new Set();
+    addEntry(campaignName, {
+      type: 'automation',
+      automationType: 'leading_evasion_declined',
+      characterName: current?.targetName || null,
+      description: `Leading Evasion share declined for DC ${current?.saveDc} ${current?.saveType} save${current?.sourceName ? ` (${current.sourceName})` : ''} — no allies selected; every unselected target pays normal save damage.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[SavePromptModal] Error logging Leading Evasion decline:', e); });
     setEvasionSelection(null);
-  }, []);
+  }, [campaignName, current]);
 
   const { abilityLabel, promptHasDisadvantage, promptHasAdvantage } = computePromptDisplayState(current, campaignName);
   const hasResult = current?.result != null;

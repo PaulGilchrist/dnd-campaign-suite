@@ -19,6 +19,7 @@ import { getPendingPopupSetter } from '../../services/combat/auras/pendingPopupR
 import { getPendingSavePrompt } from '../../services/combat/auras/pendingSaveRegistry.js';
 import storage from '../../services/ui/storage.js';
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
+import { isLeadingEvasionSelected } from '../../services/rules/combat/evasionUtils.js';
 import { cleanupConcentrationEffects } from '../../services/combat/concentration/concentrationService.js';
 import { isResilientSphereActive } from '../../services/combat/automation/automationPassives.js';
 import { triggerViciousMockeryForGeneric } from '../../services/rules/features/viciousMockeryService.js';
@@ -39,15 +40,17 @@ function syncListenerPromptFilters(detail, pending, campaignName) {
     setRuntimeValue('campaign', 'pendingSaveListenerPrompts', filteredPrompts, saveCampaignName);
 }
 
-function determineEvasion({ detail, pending, targetChar, charactersRef, isIncapacitated, normalizedSaveType }) {
+// CLA-211: shared Leading Evasion folds ONLY when the GM ticked the target
+// at the chooser (leadingEvasionSelections[promptId] runtime stamp persisted
+// at chooser-confirm). A shareable-holder presence check folded EVERY
+// non-holder making the same half-damage save — unselected controls now fall
+// through to computeDamageAfterSave (full on fail / half on success, no
+// evasion ledger entry).
+function determineEvasion({ detail, pending, targetChar, isIncapacitated, normalizedSaveType }) {
     const ownEvasion = targetChar?.computedStats?.evasionEffects;
     const hasOwnEvasion = !isIncapacitated && pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === normalizedSaveType);
     const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && pending.dcSuccess === 'half' &&
-        (charactersRef.current || []).some(c => {
-            if (c.name === detail.targetName) return false;
-            const ev = c?.computedStats?.evasionEffects;
-            return ev?.some(ef => ef.saveType === normalizedSaveType && ef.shareable && ef.shareRange >= 5);
-        });
+        isLeadingEvasionSelected(pending.campaignName, detail.promptId || pending.promptId, detail.targetName);
     const hasEvasion = detail.evasionActive ?? (hasOwnEvasion || hasSharedEvasion || isCircleOfPowerActive(detail.targetName, pending.campaignName));
     return { hasEvasion, hasOwnEvasion };
 }
@@ -478,7 +481,7 @@ async function handleSaveResult(detail, { characterName, campaignName, logEntry,
 
     const { isShieldActive, isMagicMissile } = resolveShieldVsMagicMissile(detail, pending);
 
-    const { hasEvasion, hasOwnEvasion } = determineEvasion({ detail, pending, targetChar, charactersRef, isIncapacitated, normalizedSaveType });
+    const { hasEvasion, hasOwnEvasion } = determineEvasion({ detail, pending, targetChar, isIncapacitated, normalizedSaveType });
     const finalDamage = computeInitialSaveDamage({ isSoulstitchProtected, isShieldActive, isMagicMissile, detail, pending, hasEvasion });
 
     logEvasionIfNeeded({ detail, targetName: detail.targetName, normalizedSaveType, hasEvasion, hasOwnEvasion, logEntry });

@@ -162,6 +162,34 @@ describe('createSaves (useLoggedDiceRollSaves) - Evasion & Shields', () => {
             expect(computeDamageAfterEvasion).toHaveBeenCalledWith(20, true, 'half', true);
         });
 
+        it('CLA-211: chooser-confirm folds ONLY ticked allies — unselected target pays full', async () => {
+            deps.pendingSaves['prompt-1'] = { ...basePending, targetName: 'Goblin' };
+            deps.pendingSaves['prompt-2'] = { ...basePending, targetName: 'UntickedAlly' };
+            deps.charactersRef.current = [
+                { name: 'Bard', computedStats: { evasionEffects: [{ saveType: 'DEX', source: 'Leading Evasion', shareable: true, shareRange: 5 }] } },
+                { name: 'Goblin' },
+                { name: 'UntickedAlly' },
+            ];
+            rollSaveForCreature.mockReturnValue({ success: false, roll: 8, total: 11, bonus: 3 });
+            loadCombatSummary.mockResolvedValue({
+                creatures: [
+                    { name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 },
+                    { name: 'UntickedAlly', type: 'player', ac: 12, currentHp: 40, maxHp: 40 },
+                ],
+            });
+            const { quickRollPlayerSave } = createFn();
+            // GM ticks Goblin only → Goblin folds half-on-fail
+            await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15, { selectedAllies: new Set(['Goblin']) });
+            expect(computeDamageAfterEvasion).toHaveBeenLastCalledWith(20, false, 'half', true);
+            // Unticked control quick-roll → NO fold (full on fail), the CLA-211 over-grant
+            await quickRollPlayerSave('prompt-2', 'UntickedAlly', 'DEX', 15, { selectedAllies: new Set(['Goblin']) });
+            expect(computeDamageAfterEvasion).toHaveBeenLastCalledWith(20, false, 'half', false);
+            // Explicit Skip (declined) → no fold even for a previously ticked target
+            deps.pendingSaves['prompt-3'] = { ...basePending, targetName: 'Goblin' };
+            await quickRollPlayerSave('prompt-3', 'Goblin', 'DEX', 15, { evasionDeclined: true });
+            expect(computeDamageAfterEvasion).toHaveBeenLastCalledWith(20, false, 'half', false);
+        });
+
         it('skips evasion when target is incapacitated or effect not shareable', async () => {
             deps.pendingSaves['prompt-1'] = {
                 ...basePending,
