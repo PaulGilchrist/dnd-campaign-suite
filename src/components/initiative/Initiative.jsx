@@ -104,6 +104,8 @@ function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, '_Riposte_usedRound', null, campaignName)
     setRuntimeValue(creatureName, '_Riposte_appliedAttack', null, campaignName)
     setRuntimeValue(creatureName, 'pendingRiposteDieValue', null, campaignName)
+    // MN-013: Parry reaction round latch re-arms on initiative roll / combat reset.
+    setRuntimeValue(creatureName, '_Parry_usedRound', null, campaignName)
     // MN-003: Commander's Strike once-per-turn grant latch re-arms at round wrap.
     setRuntimeValue(creatureName, '_Commanders_Strike_usedRound', null, campaignName)
     // MN-004: Commanding Presence reaction round latch re-arms at round wrap.

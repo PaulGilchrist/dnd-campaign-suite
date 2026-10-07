@@ -4681,7 +4681,7 @@
       "handler": "src/services/combat/automation/handlers/maneuverHandler.js",
       "router": "src/services/combat/automation/routers/maneuverRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/maneuverInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-MN-013-parry.md",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Action type: reaction; Trigger: melee_damage_taken; Uses: superiority_die",
       "expectedBehavior": "When another creature damages you with a melee attack roll, you can use your Reaction and expend one Superiority Die to reduce the damage by the number rolled on the die + your Strength or Dexterity modifier (your choice)."

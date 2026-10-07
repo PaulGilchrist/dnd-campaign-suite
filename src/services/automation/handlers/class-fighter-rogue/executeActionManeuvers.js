@@ -523,8 +523,90 @@ async function executeRiposteReaction(maneuver, playerStats, campaignName, super
     };
 }
 
-// Parry ("damage_reduction"): reduce damage by die + best STR/DEX modifier,
-// heal the difference back up, and return the appended description text.
+// ── Parry Reaction (MN-013) ─────────────────────────────────────────────
+
+// MN-013 Defect 1: reaction-economy round latch on the holder
+// (CLA-383 Warding Flare / MN-004 _Commanding_Presence_usedRound latch
+// shape, riposte twin at RIPOSTE_USED_ROUND_KEY above) — stamped when the
+// die is spent (parry pay), re-armed at round wrap via
+// PLAYER_ROUND_LATCH_KEYS (navigationHandlers.js) + Initiative.jsx
+// clearPlayerRoundFlags. The triggering hit is marked parried on the
+// campaign lastAttack (MA-0341 parryResolved identity shape) so a second
+// press can never re-dip the same hit. Refusals are automation_info
+// popups + `parry_refused` automation logs (§5 refusal convention):
+// no roll, no spend, no stamp, no HP write.
+const PARRY_USED_ROUND_KEY = '_Parry_usedRound';
+
+function buildParryRefusal(maneuver, description, reason) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: maneuver.name,
+            description,
+        },
+        logEntries: [{
+            type: 'automation',
+            automationType: 'parry_refused',
+            name: maneuver.name,
+            reason,
+            description,
+            timestamp: Date.now(),
+        }],
+    };
+}
+
+// Trigger is RAW "when another creature damages you" — the campaign
+// lastAttack must be a resolved HIT that applied damage to the holder
+// (target/hit/damageApplied — adjudicated field set), and still un-parried.
+function parryTriggerRefusal(lastAttack, playerName) {
+    if (!lastAttack || lastAttack.targetName !== playerName || lastAttack.hit !== true || lastAttack.damageApplied !== true) {
+        return { reason: 'no_qualifying_hit', message: 'No pending hit is damaging you — this reaction triggers when another creature damages you with a melee attack roll. Nothing spent.' };
+    }
+    if (lastAttack.parryResolved === true) {
+        return { reason: 'already_parry_this_attack', message: 'You have already parried that attack — one parry per triggering hit. Nothing spent.' };
+    }
+    return null;
+}
+
+async function gateParryReaction(maneuver, playerStats, campaignName) {
+    const playerName = playerStats.name;
+    const combatContext = await getCombatContext(campaignName);
+    const currentRound = combatContext?.round || 1;
+    const usedRound = Number(getRuntimeValue(playerName, PARRY_USED_ROUND_KEY, campaignName) ?? 0);
+    if (usedRound === currentRound) {
+        return { refusal: buildParryRefusal(maneuver, `You have already used ${maneuver.name} this round — your Reaction is spent until your next turn. Nothing spent.`, 'already_used_this_round') };
+    }
+    const lastAttackResult = await findLastAttack(campaignName);
+    const refusal = parryTriggerRefusal(lastAttackResult.attackEvent, playerName);
+    if (refusal) {
+        return { refusal: buildParryRefusal(maneuver, `${maneuver.name}: ${refusal.message}`, refusal.reason) };
+    }
+    return { currentRound, lastAttack: lastAttackResult.attackEvent };
+}
+
+// MN-013 Defect 2: the heal raced attacker-side lastAttack/HP flushes on
+// the full-store replace route (playbook §39) — the popup printed the
+// restored total while a stale flush reverted the server key. The
+// pendingParryHeal seam (attackPostProcessing consume-AFTER-lastAttack-
+// flush, consumeParryAcBonus lineage) cannot host this lane:
+// processAttackAfterResult runs on PC dice-roll lanes only, and the
+// manual press arrives POST-commit (the gate requires damageApplied:true),
+// so there is no later flush to ride. Read-modify-write instead: GET
+// server-fresh change-data HP, write fresh+reduction in one awaited write
+// so the parry lane is the last writer of the freshest value.
+async function fetchServerCharacterEntry(playerName, campaignName) {
+    try {
+        const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/change-data`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        return data?.[playerName] || null;
+    } catch (err) {
+        console.error('[MN-013 Parry] server-fresh HP read failed:', err);
+        return null;
+    }
+}
+
 async function applyManeuverDamageReduction(playerStats, campaignName, dieValue) {
     const abilities = playerStats.abilities || [];
     const strMod = (abilities.find(a => a.name === 'Strength') || {}).bonus || 0;
@@ -532,8 +614,9 @@ async function applyManeuverDamageReduction(playerStats, campaignName, dieValue)
     const mod = Math.max(strMod, dexMod);
     const reduction = dieValue + mod;
     let description = ` Damage reduced by ${reduction} (${dieValue} + ${mod} from STR/DEX modifier).`;
-    const storedMaxHp = getRuntimeValue(playerStats.name, 'hitPoints', campaignName);
-    const storedCurrentHp = getRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
+    const fresh = (await fetchServerCharacterEntry(playerStats.name, campaignName)) || {};
+    const storedMaxHp = fresh.hitPoints != null ? fresh.hitPoints : getRuntimeValue(playerStats.name, 'hitPoints', campaignName);
+    const storedCurrentHp = fresh.currentHitPoints != null ? fresh.currentHitPoints : getRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
     const maxHp = storedMaxHp != null ? Number(storedMaxHp) : (storedCurrentHp || 10);
     const currentHp = storedCurrentHp != null ? Number(storedCurrentHp) : 10;
     const newHp = Math.min(maxHp, currentHp + reduction);
@@ -542,6 +625,46 @@ async function applyManeuverDamageReduction(playerStats, campaignName, dieValue)
     }
     description += ` HP restored: ${currentHp} → ${newHp}.`;
     return description;
+}
+
+async function executeParryReaction(maneuver, playerStats, campaignName, superiorityDice) {
+    const gate = await gateParryReaction(maneuver, playerStats, campaignName);
+    if (gate.refusal) return gate.refusal;
+
+    const { dieValue, dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);
+    await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
+
+    // Reaction consumed at pay time — latch stamp awaited BEFORE consumers
+    // read (§5: races lose writes; MN-003 stamp-then-await shape).
+    await setRuntimeValue(playerStats.name, PARRY_USED_ROUND_KEY, gate.currentRound, campaignName);
+
+    let description = `<b>${maneuver.name}</b> (Reaction)<br/>${dieDescription}`;
+    description += await applyManeuverDamageReduction(playerStats, campaignName, dieValue);
+
+    // Mark the triggering hit parried (MA-0341 parryResolved identity
+    // shape) — campaign lastAttack rides its own endpoint, no char-store race.
+    await setRuntimeValue('campaign', 'lastAttack', {
+        ...gate.lastAttack,
+        parryResolved: true,
+        parriedBy: playerStats.name,
+    }, campaignName);
+
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuver.name,
+        description: `Used ${maneuver.name} as a reaction. ${dieDescription} ${maneuver.description}`,
+    };
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: maneuver.name,
+            description,
+        },
+        logEntries: [logEntry],
+    };
 }
 
 export async function executeReactionManeuver(action, playerStats, campaignName, maneuverName) {
@@ -561,39 +684,13 @@ export async function executeReactionManeuver(action, playerStats, campaignName,
         return executeRiposteReaction(maneuver, playerStats, campaignName, superiorityDice);
     }
 
-    const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    const target = targetInfo && targetInfo.target;
-    const targetName = target ? target.name : null;
-
-    const { dieValue, dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);
-    await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
-
-    const logEntry = {
-        type: 'ability_use',
-        characterName: playerStats.name,
-        abilityName: maneuver.name,
-        description: `Used ${maneuver.name} as a reaction. ${dieDescription} ${maneuver.description}`,
-    };
-
-    let description = `<b>${maneuver.name}</b> (Reaction)<br/>${dieDescription}`;
-
-    if (targetName && maneuver.effect !== 'damage_reduction') {
-        description += ` Target: ${targetName}.`;
-    }
-
     if (maneuver.effect === 'damage_reduction') {
-        description += await applyManeuverDamageReduction(playerStats, campaignName, dieValue);
+        return executeParryReaction(maneuver, playerStats, campaignName, superiorityDice);
     }
 
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: maneuver.name,
-            description,
-        },
-        logEntries: [logEntry],
-    };
+    // No other reaction executor exists (maneuvers.json reactions are
+    // Parry + Riposte only) — spend nothing rather than pay blindly.
+    return buildParryRefusal(maneuver, `${maneuver.name}: no reaction executor for effect "${maneuver.effect}" — nothing spent.`, 'no_executor');
 }
 
 // ── Commanding Presence Reaction ────────────────────────────────────────
