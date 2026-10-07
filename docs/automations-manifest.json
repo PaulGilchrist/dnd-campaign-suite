@@ -4500,7 +4500,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "verified (PASS-subset 2026-10-06: Land lv6 nature_ward passive live — land-pick chooser stamps _circleOfTheLandType Temperate, sheet 'Resistances: Lightning'+'Immunities: Poisoned', Poisoned GM-add silently refused, slashing gate clean resisted:false; DEFECT: save-AoE lightning 25->25 NOT halved [SaveAttackAoeModal PC-stub missing .automation CLA-119 family], hostile-PK 148-120 unhalved)",
+      "verified": "verified",
       "class": "Druid",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "Immune to Poisoned condition. Resistance to a damage type based on land choice: Arid=Fire, Polar=Cold, Temperate=Lightning, Tropical=Poison."

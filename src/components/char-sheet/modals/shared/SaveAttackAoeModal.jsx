@@ -337,14 +337,17 @@ function resolvePromptSecondaryOutcome(args) {
     return applySecondaryPromptDamage(args);
 }
 
-function applySecondaryPromptDamage({ campaignName, combatSummary, playerStats, actionName, targetName, saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, secondary, evasion }) {
+function applySecondaryPromptDamage({ campaignName, combatSummary, playerStats, actionName, targetName, saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, secondary, evasion, characters }) {
     if (!secondary) return null;
     // SP-023: Circle of Power zeroes every half-damage leg of the same save;
     // CLA-124/125: so does evasion on a success (floor-half on a fail).
     const finalDamage = resolveEvasionFinalDamage({ evasion, targetName, rawDamage: secondary.rawDamage, success, dcSuccess, campaignName });
     if (finalDamage <= 0) return { rawDamage: secondary.rawDamage, finalDamage: 0, damageType: secondary.damageType };
-    const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
-    applyDamageToTarget(combatSummary, targetName, finalDamage, [secondary.damageType], { campaignName, characters, ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
+    // CLA-237 twin: the secondary leg must resolve defenses from the full-stat
+    // characters (threaded from the modal prop), not the CLA-119 combatSummary
+    // player stubs — same applyDamageToTarget seam as the primary leg.
+    if (!characters?.length) console.error(`[SaveAttackAoeModal] CLA-237 no full-stat characters provided for the ${targetName} secondary save-damage lane — passive resistances may be missed.`);
+    applyDamageToTarget(combatSummary, targetName, finalDamage, [secondary.damageType], { campaignName, characters: characters || [], ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
     addEntry(campaignName, {
         type: 'roll',
         rollType: 'save-damage',
@@ -1614,7 +1617,7 @@ function SaveAttackAoeModal({
         }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging soulstitch auto-save:', e); });
     }
 
-    function applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey, zeroReason }) {
+    function applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey, zeroReason, characters }) {
         const saveResult = success ? 'success' : 'failure';
         const detailRoll = detail.roll ?? 0;
         // SP-023: adopt SavePromptModal's dispatch fidelity — distinct raw dice
@@ -1643,8 +1646,15 @@ function SaveAttackAoeModal({
         // outcomes, evasion AND Circle-of-Power zero legs.
 
         if (finalDamage > 0) {
-            const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
-            applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
+            // CLA-237: persisted combatSummary player entries are minimal stubs
+            // (CLA-119 family — no automation/computedStats), so the CLA-336
+            // land_resistance fold in resolveCreatureDefenses was inert on this
+            // lane. Pass the full-stat characters prop instead — the verified
+            // monster-attack/quick-roll lane seam (useLoggedDiceRollSaves.js:367
+            // charactersRef.current). HP writes still ride the cs creature entry
+            // inside applyDamageToTarget — unchanged.
+            if (!characters?.length) console.error(`[SaveAttackAoeModal] CLA-237 no full-stat characters provided for the ${targetName} save-damage lane — passive resistances may be missed.`);
+            applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters || [], ignoreResistance: false, attackerName: playerStats.name, suppressHpLog: false });
 
             if (isRadiantSoulTarget) {
                 logRadiantSoulOncePerTurn({ campaignName, playerStats, damageType, targetName, radiantSoulChaMod, radiantSoulFlagKey });
@@ -1702,12 +1712,12 @@ function SaveAttackAoeModal({
         consumeEmpoweredEvocationStamp(playerStats, campaignName, isEmpoweredEvocationTarget);
 
         if (finalDamage > 0 || zeroReason) {
-            applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey, zeroReason });
+            applyPlayerSaveDamage({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, detail, success, saveBonus, saveDc, saveType, dcSuccess, damageType, rawDamage, targetDamageFormula, damageRoll, finalDamage, isRadiantSoulTarget, radiantSoulChaMod, radiantSoulFlagKey, zeroReason, characters });
         }
 
         // MA-0563: secondary pool pays its own adjudicated leg (soulstitch
         // protection zeroes it); null when no secondary rides the prompt.
-        const secondary = resolvePromptSecondaryOutcome({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, saveType: detail.saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, isSoulstitchProtected, secondary: pendingPrompts[pendingIndex].secondary, evasion });
+        const secondary = resolvePromptSecondaryOutcome({ campaignName, combatSummary, playerStats, actionName: action.name, targetName, saveType: detail.saveType, saveDc, dcSuccess, success, saveBonus, saveRoll, isSoulstitchProtected, secondary: pendingPrompts[pendingIndex].secondary, evasion, characters });
 
         if (!success && pullMarkerEffect) {
             // CLA-384: feature-flagged save-fail marker (e.g. Warping Implosion pull).
