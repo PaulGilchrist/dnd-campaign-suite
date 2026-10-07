@@ -8,6 +8,7 @@ import * as combatData from '../../../../services/rules/combat/damageUtils.js';
 import * as rangeValidation from '../../../../services/rules/combat/rangeValidation.js';
 import * as targetResolver from '../../common/targetResolver.js';
 import * as logService from '../../../../services/ui/logService.js';
+import * as expirations from '../../../rules/effects/expirations.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -28,6 +29,10 @@ vi.mock('../../common/targetResolver.js', () => ({
 
 vi.mock('../../../../services/ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('../../../rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
 }));
 
 const CAMPAIGN_NAME = 'test-campaign';
@@ -362,6 +367,43 @@ describe('mageArmorHandler.applyMageArmor', () => {
         expect(buffsCall[2]).toContainEqual(
             expect.objectContaining({ name: 'Mage Armor' }),
         );
+    });
+
+    it('SP-074 D3: registers ONE addExpiration clock rounds=4800 (8 hours × 600, §38) per stamped target', async () => {
+        runtimeState.getRuntimeValue.mockReturnValue([]);
+
+        await applyMageArmor(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Ally1']);
+
+        expect(expirations.addExpiration).toHaveBeenCalledTimes(1);
+        expect(expirations.addExpiration).toHaveBeenCalledWith({
+            attackerName: PLAYER_NAME,
+            targetName: 'Ally1',
+            effects: [{ type: 'remove_active_buff', buffName: 'Mage Armor' }],
+            campaignName: CAMPAIGN_NAME,
+            rounds: 4800,
+        });
+    });
+
+    it('SP-074 D3: no clock registered when the target already has Mage Armor (no existing-buff write)', async () => {
+        runtimeState.getRuntimeValue.mockReturnValue([{ name: 'Mage Armor', effect: 'mage_armor' }]);
+
+        await applyMageArmor(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Ally1']);
+
+        expect(expirations.addExpiration).not.toHaveBeenCalled();
+    });
+
+    it('SP-074 D3: custom durations encode hours×600 / minutes×10, unparseable stays undefined', async () => {
+        // fresh [] per read — the handler splices the returned array in place
+        runtimeState.getRuntimeValue.mockImplementation(() => []);
+
+        await applyMageArmor(makeAction({ spell: { duration: '1 hour' } }), makePlayerStats(), CAMPAIGN_NAME, null, ['Ally1']);
+        expect(expirations.addExpiration.mock.calls[0][0].rounds).toBe(600);
+
+        await applyMageArmor(makeAction({ spell: { duration: '10 minutes' } }), makePlayerStats(), CAMPAIGN_NAME, null, ['Ally2']);
+        expect(expirations.addExpiration.mock.calls[1][0].rounds).toBe(100);
+
+        await applyMageArmor(makeAction({ spell: { duration: 'special' } }), makePlayerStats(), CAMPAIGN_NAME, null, ['Ally3']);
+        expect(expirations.addExpiration.mock.calls[2][0].rounds).toBeUndefined();
     });
 
     it('posts a log entry for each target', async () => {

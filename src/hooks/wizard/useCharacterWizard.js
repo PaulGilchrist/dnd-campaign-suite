@@ -3,6 +3,7 @@ import cloneDeep from 'lodash/cloneDeep';
 import * as campaignService from '../../services/campaign/campaignService.js';
 import { stampElfishLineageRuntime } from '../../services/automation/handlers/class-other/elfishLineageHandler.js';
 import { stampFiendishLegacyRuntime } from '../../services/automation/handlers/class-other/fiendishLegacyHandler.js';
+import { endMageArmorOnDonning } from '../../services/rules/features/mageArmorService.js';
 
 // CLA-118/CLA-139: the wizard persists race.subrace only — stamp the runtime
 // lineage/legacy keys in one merged write so nothing keeps granting the old choice.
@@ -70,6 +71,9 @@ export function useCharacterWizard(campaignName) {
       const originalFileName = `${originalCharacter.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
       const fileName = `${characterData.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
       await campaignService.updateCharacter(campaignName, fileName, characterData, originalFileName);
+      // SP-074: inventory step (16) saves are the donning seam — armor newly added
+      // to equipped[] ends Mage Armor before any consumer re-reads the sheet (§39).
+      await endMageArmorOnDonning(originalCharacter, characterData, campaignName);
       stampLineageRuntime(originalCharacter, characterData, campaignName);
       callbacksRef.current.setActiveCharacter(cloneDeep(characterData));
       setShowEditCharacterWizard(false);

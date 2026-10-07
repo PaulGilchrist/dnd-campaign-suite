@@ -4045,7 +4045,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-SP-074-mage-armor.md",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Action: 1 action; Range: Touch; Duration: 8 hours",
       "expectedBehavior": "You touch a willing creature who isn't wearing armor. Until the spell ends, the target's base AC becomes 13 plus its Dexterity modifier. The spell ends early if the target dons armor."

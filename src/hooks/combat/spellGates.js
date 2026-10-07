@@ -3,6 +3,9 @@ import { getAllyList } from '../useAllySelection.js';
 import { getCsAndTargets, extractMaxTargets, resolveHumanoids, resolveBeasts, makePending, isSpareTheDyingTarget } from './spellGateHelpers.js';
 import { isCreatureDead } from '../../services/shared/hpModifier.js';
 import { resolveAuraOfLifeParty } from '../../services/automation/handlers/buffs/auraOfLifeHandler.js';
+import { checkAnyArmor } from '../../services/rules/core/speedUtils.js';
+import { loadEquipment } from '../../services/ui/dataLoader.js';
+import { addEntry } from '../../services/ui/logService.js';
 
 // ── Spell gate handlers ──────────────────────────────────────────────────────
 // All gates take a single options object:
@@ -414,13 +417,65 @@ function gateHeroesFeast({ spell, campaignName, cfSetPending }) {
   return false;
 }
 
-function gateMageArmor({ spell, campaignName, cfSetPending }) {
-  const { creatureTargets } = getCsAndTargets(campaignName);
-  if (creatureTargets.length > 0) {
-    cfSetPending('mageArmor', makePending('mageArmor', spell, { range: spell.range || 'Touch', creatureTargets }));
-    return true;
+// SP-074: RAW "You touch a willing creature who isn't wearing armor" — the picker
+// only offers unarmored targets, decided by the CLA-225 armor-category predicate
+// (speedUtils.checkAnyArmor catalog lookup, not name heuristics). Combatants whose
+// character JSON is not loaded (EB joins) pass leniently (gridless-lenient §42).
+// Refusals log `mage_armor_refused` with reason (§41, zero spend); when nobody is
+// eligible an automation_info refusal face shows and the cast never falls through
+// to the slot-spending generic path (gateRevivify/gateSpareTheDying precedent).
+async function logMageArmorRefusals(refusedNames, spellName, campaignName) {
+  for (const name of refusedNames) {
+    await addEntry(campaignName, {
+      type: 'automation',
+      automationType: 'mage_armor_refused',
+      characterName: name,
+      abilityName: spellName,
+      description: `${spellName} refused: ${name} is wearing armor — the spell requires a willing creature who isn't wearing armor. Nothing spent.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[gateMageArmor:mage_armor_refused]', e); });
   }
-  return false;
+}
+
+async function resolveMageArmorTargets({ spell, campaignName, cfSetPending, characters, setPopupHtml, creatureTargets }) {
+  const allEquipment = await loadEquipment();
+  const refused = [];
+  const eligible = creatureTargets.filter(name => {
+    const equipped = (characters || []).find(c => c.name === name)?.inventory?.equipped;
+    if (Array.isArray(equipped) && checkAnyArmor(equipped, allEquipment)) {
+      refused.push(name);
+      return false;
+    }
+    return true;
+  });
+
+  if (refused.length > 0) {
+    await logMageArmorRefusals(refused, spell.name || 'Mage Armor', campaignName);
+  }
+  if (eligible.length > 0) {
+    cfSetPending('mageArmor', makePending('mageArmor', spell, { range: spell.range || 'Touch', creatureTargets: eligible }));
+    return;
+  }
+  if (setPopupHtml) {
+    setPopupHtml({
+      type: 'automation_info',
+      name: spell.name,
+      automationType: 'mageArmor',
+      description: `No unarmored creature is in range. ${spell.name || 'Mage Armor'} can only target a willing creature who isn't wearing armor, and ends early if the target dons armor. No spell slot was expended.`,
+    });
+  }
+}
+
+// Synchronous false on empty cs keeps the generic-path fallthrough byte-compatible
+// (useSpellMetamagicFlow.console-error pin) — an async gate's Promise would be
+// truthy and swallow it. The armor catalog filter (loadEquipment) then resolves the
+// picker async (gateHoldPerson precedent — the awaited slot spend only happens at
+// picker confirm, so nothing burns before eligibility is known).
+function gateMageArmor({ spell, campaignName, cfSetPending, characters, setPopupHtml }) {
+  const { creatureTargets } = getCsAndTargets(campaignName);
+  if (creatureTargets.length === 0) return false;
+  resolveMageArmorTargets({ spell, campaignName, cfSetPending, characters, setPopupHtml, creatureTargets });
+  return true;
 }
 
 function gateProtectionFromEnergy({ spell, campaignName, cfSetPending }) {

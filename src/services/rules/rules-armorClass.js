@@ -1,5 +1,6 @@
 import { parseMagicItemName } from './core/attackCalc.js';
 import { is2024 } from './rules-helpers.js';
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 function replaceContributions(contributions, items) {
     contributions.length = 0;
@@ -46,7 +47,22 @@ function computeAddedBonus(allEquipment, playerStats, playerSummary, armorName, 
     return addedBonus;
 }
 
+// SP-074 cosmetic: Mage Armor (runtime buff, effect 'mage_armor') sets base AC to
+// 13 + Dex — thread it through the contribution lane so the AC popup agrees with the
+// CharSummary cell. The cast gate prevents armored coexistence, so no stacking ambiguity.
+function getMageArmorBuff(playerStats) {
+    const buffs = getRuntimeValue(playerStats.name, 'activeBuffs');
+    if (!Array.isArray(buffs)) return null;
+    return buffs.find(b => b.effect === 'mage_armor') || null;
+}
+
 function computeBaseArmorClass({ allEquipment, playerStats, playerSummary, armorName, addedBonus, dexterity, charisma, contributions }) {
+    const mageArmor = getMageArmorBuff(playerStats);
+    if (mageArmor) {
+        const baseAc = mageArmor.baseAc || 13;
+        replaceContributions(contributions, [`Mage Armor (${baseAc}) + Dexterity Bonus (${dexterity.bonus})`]);
+        return baseAc + dexterity.bonus + addedBonus;
+    }
     if (armorName) {
         let parsedArmor = parseMagicItemName(armorName);
         contributions.push(`Armor Magic Bonus (${parsedArmor.magicBonus})`);

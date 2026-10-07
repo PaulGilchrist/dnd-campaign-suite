@@ -3,12 +3,25 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { addEntry } from '../../../ui/logService.js';
-
+import { addExpiration } from '../../../rules/effects/expirations.js';
 
 const MAGE_ARMOR_BUFF_NAME = 'Mage Armor';
 
 function getMageArmorDuration(spell) {
     return spell.duration || '8 hours';
+}
+
+// SP-074 (§38 hours×600 clock family, mirrors parseBarkskinDurationRounds):
+// '8 hours' → 4800 rounds; unparseable durations stay Infinity (undefined rounds).
+function parseMageArmorDurationRounds(duration) {
+    const lower = String(duration || '').toLowerCase();
+    const hourMatch = lower.match(/(\d+)\s*_?\s*hour/);
+    if (hourMatch) return parseInt(hourMatch[1], 10) * 600;
+    const minuteMatch = lower.match(/(\d+)\s*_?\s*minute/);
+    if (minuteMatch) return parseInt(minuteMatch[1], 10) * 10;
+    const roundMatch = lower.match(/(\d+)\s*_?round/);
+    if (roundMatch) return parseInt(roundMatch[1], 10);
+    return undefined;
 }
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -56,6 +69,7 @@ export async function applyMageArmor(action, playerStats, campaignName, _mapName
 
     const spell = action.spell || {};
     const duration = getMageArmorDuration(spell);
+    const rounds = parseMageArmorDurationRounds(duration);
 
     for (const targetName of targetNames) {
         const activeBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
@@ -70,6 +84,12 @@ export async function applyMageArmor(action, playerStats, campaignName, _mapName
                 sourceCharacter: playerStats.name,
             });
             setRuntimeValue(targetName, 'activeBuffs', buffs, campaignName);
+            // SP-074 D3: ONE addExpiration clock ('8 hours' → rounds 4800, §38
+            // hours×600; long-buff shape drops the anchor) registered in the same
+            // pass as the activeBuffs stamp — barkskinHandler remove_active_buff twin.
+            addExpiration({ attackerName: playerStats.name, targetName, effects: [
+                { type: 'remove_active_buff', buffName: MAGE_ARMOR_BUFF_NAME }
+            ], campaignName, rounds });
         }
 
         addEntry(campaignName, {
