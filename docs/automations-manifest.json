@@ -4593,12 +4593,12 @@
     {
       "id": "CLA-243",
       "name": "Otherworldly Presence",
-      "type": "classFeature",
+      "type": "racialTrait",
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-243-otherworldly-presence.md",
-      "class": "Rogue",
+      "verified": "verified",
+      "class": "Tiefling (2024 racial trait, races.json:910-918)",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "You know the Thaumaturgy cantrip. When you cast it with this trait, the spell uses the same spellcasting ability you use for your Fiendish Legacy trait."
     },
