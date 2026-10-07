@@ -234,7 +234,13 @@ export function useComplexSpellHandlers({ createConfirmHandler, playerStats, cam
     const hasAnyTargets = Object.values(distribution).some(v => v > 0)
     if (!hasAnyTargets) return
 
-    const slotLevel = spell.level || 1
+    // SP-075: thread the popup's chosen upcast level through the lane (CLA-312
+    // byte-shape, mirrors consumeBarkskinSlot) — previously isUpcast:false made
+    // prepareSpellCast pay the base lv1 slot and executeMagicMissile roll 3 darts
+    // even when a higher level was selected.
+    const upcastLevel = spell.upcastLevel
+    const isUpcast = upcastLevel != null && upcastLevel !== spell.level
+    const slotLevel = isUpcast ? upcastLevel : (spell.level || 1)
     const finalMetaCtx = { magicMissileDistribution: distribution, slotLevel }
     // CLA-389: the magic-missile gate early-returns before gateMetamagic's generic
     // prepareSpellCast, so the slot was never paid here. Mirror handleAnimalFriendshipConfirm.
@@ -243,7 +249,8 @@ export function useComplexSpellHandlers({ createConfirmHandler, playerStats, cam
       playerName: playerStats.name,
       playerStats,
       campaignName,
-      isUpcast: false,
+      isUpcast,
+      upcastLevel,
       freeCastAuthorized,
     })
     onExecute(preparedResult.modifiedSpell, preparedResult.metaCtx)

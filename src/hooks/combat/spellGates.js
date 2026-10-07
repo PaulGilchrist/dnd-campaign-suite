@@ -504,10 +504,13 @@ function gateResistance({ spell, campaignName, cfSetPending }) {
   return false;
 }
 
+// SP-075: the popup carries the chosen level as spell.upcastLevel (SpellDetailPopup
+// onCast), not spell.level — read the EFFECTIVE level so the Distribute popup's
+// dart total matches the slot about to be paid (CLA-312 effective-level convention).
 function gateMagicMissile({ spell, campaignName, cfSetPending }) {
   const { creatureTargets } = getCsAndTargets(campaignName);
   if (creatureTargets.length > 0) {
-    const slotLevel = spell.level || 1;
+    const slotLevel = spell.upcastLevel || spell.level || 1;
     const totalMissiles = 3 + (slotLevel - 1);
     cfSetPending('magicMissile', {
       spell,
