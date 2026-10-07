@@ -464,6 +464,31 @@
     font-size: 0.85em;
 }
 
+.mount-badge {
+    display: inline-block;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 8px;
+    border: 1px solid var(--color-link);
+    border-radius: 4px;
+    background-color: transparent;
+    color: var(--color-link);
+    font-size: 0.8em;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    white-space: nowrap;
+    margin-top: 6px;
+    margin-left: 4px;
+}
+
+.mount-badge:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.mount-badge .fa-horse {
+    font-size: 0.85em;
+}
+
 .wild-surge-badge {
     margin-top: 6px;
     padding: 4px 8px;

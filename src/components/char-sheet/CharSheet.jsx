@@ -428,6 +428,11 @@ function CharSheetContent({
     // te consumed by attackPostProcessing after an attack roll recomputes
     // conditionAttackMode immediately (no sheet remount needed for the next attack).
     void useRuntimeValue('campaign', 'targetEffects', campaignName);
+    // FT-107: subscribe to mountName so Mounted Strike's
+    // mounted_and_target_one_size_smaller modifier recomputes the moment the
+    // sheet Mount/Dismount affordance stamps the rider (the cs stamp rides
+    // the same event loop via setCombatSummaryCache).
+    void useRuntimeValue(playerSummary?.name, 'mountName', campaignName);
     const { conditionEffects, cannotAct, cannotActActions, cannotActReason, conditionAttackMode, isRaging, exhaustionPenalty } = computeCharConditionEffects(playerSummary, playerStats, campaignName, activeBuffs);
 
     const luckyAdvantageActive = useRuntimeValue(playerStats?.name, 'luckyAdvantageActive', campaignName);

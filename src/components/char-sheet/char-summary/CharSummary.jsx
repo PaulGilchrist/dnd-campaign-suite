@@ -27,6 +27,8 @@ import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import CharConditions from './CharConditions.jsx'
 import AllySelectionModal from '../../common/AllySelectionModal.jsx'
+import MountSelectionModal from '../../common/MountSelectionModal.jsx'
+import { getMountCandidates, mountRider, dismountRider } from '../../../services/rules/features/mountService.js'
 import TrackedResourceInput from './TrackedResourceInput.jsx';
 import CreatureBadge from '../../common/CreatureBadge.jsx'
 import ConditionEffectBadges from '../../initiative/ConditionEffectBadges.jsx'
@@ -444,7 +446,7 @@ function showFeatDetailPopup(feat, setPopupHtml) {
     setPopupHtml(html);
 }
 
-function SummaryProficiencyColumn({ playerStats, ctx, exhaustionLevel, effectiveInitiative, hasInspiration, handleInitiative, handleToggleInspiration, handleAllyModalOpen, currentAllies, setPopupHtml, campaignName }) {
+function SummaryProficiencyColumn({ playerStats, ctx, exhaustionLevel, effectiveInitiative, hasInspiration, handleInitiative, handleToggleInspiration, handleAllyModalOpen, currentAllies, setPopupHtml, campaignName, mountName, handleMountModalOpen, handleDismount }) {
     return (
         <div>
             <b>Proficiency: </b>+{playerStats.proficiency}<br />
@@ -455,6 +457,20 @@ function SummaryProficiencyColumn({ playerStats, ctx, exhaustionLevel, effective
             <span className="ally-badge clickable no-print" onClick={handleAllyModalOpen} title="Manage allies">
                 <i className="fa-solid fa-users"></i> Allies ({currentAllies.length})
             </span>
+            {mountName ? (
+                <>
+                    <span className="mount-badge clickable no-print" onClick={handleDismount} title="Dismount">
+                        <i className="fa-solid fa-horse"></i> Mounted on {mountName} — Dismount
+                    </span>
+                    <span className="mount-badge clickable no-print" onClick={handleMountModalOpen} title="Change mount">
+                        <i className="fa-solid fa-sync"></i> Change mount
+                    </span>
+                </>
+            ) : (
+                <span className="mount-badge clickable no-print" onClick={handleMountModalOpen} title="Mount">
+                    <i className="fa-solid fa-horse"></i> Mount
+                </span>
+            )}
             <ContextFeatureBadges ctx={ctx} playerName={playerStats.name} campaignName={campaignName} />
         </div>
     );
@@ -465,6 +481,26 @@ function readBadgeCreatures(campaignName, playerName) {
     const allCreaturesForBadges = rawCreaturesForBadges || [];
     const concentrationForBadges = allCreaturesForBadges.find(c => c.name === playerName)?.concentration ?? null;
     return { rawCreaturesForBadges, allCreaturesForBadges, concentrationForBadges };
+}
+
+// FT-107: Mount/Dismount producer affordance — stamps mountName/mountSize on
+// the rider store, mountedBy on the mount store, and isMounted/mountSize on
+// the rider's combatSummary entry (mountService owns the writes + logs).
+function useMountAffordances(playerStats, campaignName) {
+    const [showMountModal, setShowMountModal] = React.useState(false);
+    const [mountModalCreatures, setMountModalCreatures] = React.useState([]);
+    const mountName = useRuntimeValue(playerStats.name, 'mountName', campaignName);
+    const handleMountModalOpen = () => {
+        setMountModalCreatures(getMountCandidates(campaignName));
+        setShowMountModal(true);
+    };
+    const handleMountConfirm = (selectedMountName) => {
+        setShowMountModal(false);
+        return mountRider(playerStats.name, selectedMountName, campaignName, playerStats.size);
+    };
+    const handleDismount = () => dismountRider(playerStats.name, campaignName);
+    const handleMountModalClose = () => setShowMountModal(false);
+    return { showMountModal, mountModalCreatures, mountName, handleMountModalOpen, handleMountConfirm, handleMountModalClose, handleDismount };
 }
 
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, conditionEffects, onConditionsChange, auraComboEffects }) {
@@ -479,6 +515,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const [showAllyModal, setShowAllyModal] = React.useState(false);
     const [allyModalCreatures, setAllyModalCreatures] = React.useState([]);
     const storedAllies = useRuntimeValue(playerStats.name, 'selectedAllies', campaignName);
+    const { showMountModal, mountModalCreatures, mountName, handleMountModalOpen, handleMountConfirm, handleMountModalClose, handleDismount } = useMountAffordances(playerStats, campaignName);
     const [surgeEffects, setSurgeEffects] = useSyncedState(playerStats.name, 'wildMagicSurgeEffects', null, campaignName);
     const currentAllies = resolveCurrentAllies(storedAllies, playerStats.name);
     React.useEffect(() => {
@@ -660,6 +697,9 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     handleAllyModalOpen={handleAllyModalOpen}
                     currentAllies={currentAllies}
                     setPopupHtml={setPopupHtml}
+                    mountName={mountName}
+                    handleMountModalOpen={handleMountModalOpen}
+                    handleDismount={handleDismount}
                 />
                 <div>
                     <TrackedResourceInput label="Short Rest Hit Dice" resourceKey="shortRestHitDice" playerName={playerStats.name} getMax={() => playerStats.level} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
@@ -731,6 +771,14 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                       currentAllies={currentAllies}
                       onConfirm={handleAllyModalConfirm}
                       onCancel={handleAllyModalCancel}
+                  />
+              )}
+              {showMountModal && (
+                  <MountSelectionModal
+                      creatures={mountModalCreatures}
+                      riderName={playerStats.name}
+                      onConfirm={handleMountConfirm}
+                      onCancel={handleMountModalClose}
                   />
               )}
   </div>
