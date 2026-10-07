@@ -3759,7 +3759,7 @@
       "handler": "src/services/automation/handlers/class-cleric-paladin/inspiringSmiteHandler.js",
       "router": "src/services/combat/automation/automationRouter.js",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/core-handlers.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-200-inspiring-smite.md",
+      "verified": "verified",
       "note": "FIXED+VERIFIED 2026-08-31: Oath of Glory lv3 (majors[1].features[0]). Auto post-cast trigger now reachable - spellCastService/execution/index.js no-dc branch falls through to the post-cast trigger block (CLA-200 fix), and post_cast_inspiring_smite added to INTERACTIVE_HANDLER_TYPES (automationService.js) so the row dispatches handleAutomationClick -> executeHandler -> inspiringSmiteHandler. E2E: Divine Smite cast -> sp-overlay distributor auto-surfaces; row click re-opens; allocate 34/34 -> tempHp=34 + CD 3->2 + ability_use log. CD spent only at modal confirm.",
       "class": "Paladin",
       "triggerConditions": "Action: passive; Range: 30 ft",

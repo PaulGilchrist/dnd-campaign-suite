@@ -1,4 +1,5 @@
-import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { resolveDiceExpression } from '../../../combat/automation/automationService.js';
 import { loadMapData } from '../../../maps/mapsService.js';
@@ -86,6 +87,35 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const isDivineSmiteCast = lastAttack?.attackName?.toLowerCase() === 'divine smite';
     const isPlayerAttack = lastAttack?.attackerName === playerName;
 
+    // CLA-200: once-per-cast latch. triggerInspiringSmite stamps a fresh
+    // inspiringSmiteCastToken on every Divine Smite cast; the distributor
+    // confirm stamps inspiringSmiteUsedToken = that token. While they match,
+    // this cast has already been answered — refuse instead of rolling another
+    // 2d8+level pool spendable for another Channel Divinity.
+    let castToken = await getRuntimeValue(playerName, 'inspiringSmiteCastToken', campaignName);
+    if (castToken == null) {
+        castToken = Date.now();
+        await setRuntimeValue(playerName, 'inspiringSmiteCastToken', castToken, campaignName);
+    }
+    const usedToken = await getRuntimeValue(playerName, 'inspiringSmiteUsedToken', campaignName);
+
+    if (isDivineSmiteCast && isPlayerAttack && usedToken === castToken) {
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerName,
+            description: `${action.name} refused (inspiring_smite_refused): already expended for this Divine Smite cast.`,
+        }).catch((e) => { console.error("[inspiringSmiteHandler:log-error]", e); });
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name} has already been used for this Divine Smite. It re-arms when you cast Divine Smite again.`,
+                automation: auto,
+            },
+        };
+    }
+
     if (!isDivineSmiteCast || !isPlayerAttack) {
         return {
             type: 'popup',
@@ -130,6 +160,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             tempHp: tempHpAmount,
             roll: `2d8 + ${playerStats.level}`,
             channelDivinityCharges: currentCharges,
+            castToken,
         },
     }));
 

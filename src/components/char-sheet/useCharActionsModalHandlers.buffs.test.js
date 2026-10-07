@@ -390,6 +390,25 @@ describe('useCharActionsModalHandlers - buffs', () => {
       expect(mockSetModalState).toHaveBeenCalledWith({ inspiringSmiteModal: null });
     });
 
+    it('CLA-200: latches the confirmed cast (inspiringSmiteUsedToken = castToken)', async () => {
+      addEntry.mockResolvedValue({});
+      setRuntimeValue.mockResolvedValue(undefined);
+      const modalState = {
+        inspiringSmiteModal: {
+          action: { name: 'Inspiring Smite' },
+          playerStats: makePlayerStats(),
+          campaignName: 'test-campaign',
+          channelDivinityCharges: 3,
+          castToken: 4242,
+        },
+      };
+      const handlers = getHandlers(modalState);
+      await handlers.handleInspiringSmiteConfirm({ TestChar: 6 });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', 'channelDivinityCharges', 2, 'test-campaign');
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', 'inspiringSmiteUsedToken', 4242, 'test-campaign');
+    });
+
     it('handles single target distribution correctly', async () => {
       addEntry.mockResolvedValue({});
       const modalState = {

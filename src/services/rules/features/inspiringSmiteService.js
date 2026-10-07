@@ -1,4 +1,5 @@
 import { executeHandler } from '../../automation/index.js';
+import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { isDivineSmite } from './spellUtils.js';
 
 export function getInspiringSmitePassives(playerStats) {
@@ -23,6 +24,12 @@ export async function triggerInspiringSmite(spell, metaCtx, playerStats, campaig
     if (inspiringSmites.length === 0) {
         return null;
     }
+
+    // CLA-200: stamp a fresh per-cast arm token BEFORE the handler runs.
+    // Each Divine Smite cast re-arms Inspiring Smite; the consumed latch
+    // (inspiringSmiteUsedToken) is compared against this token by the
+    // handler so a single cast can only ever fund one distributor.
+    await setRuntimeValue(playerStats.name, 'inspiringSmiteCastToken', Date.now(), campaignName);
 
     const results = [];
     for (const inspiringSmite of inspiringSmites) {

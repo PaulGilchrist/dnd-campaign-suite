@@ -11,6 +11,10 @@ vi.mock('../../automation/index.js', () => ({
     executeHandler: vi.fn(),
 }));
 
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+    setRuntimeValue: vi.fn(() => Promise.resolve()),
+}));
+
 describe('inspiringSmiteService', () => {
     beforeEach(() => {
         vi.resetAllMocks();
@@ -127,6 +131,26 @@ describe('inspiringSmiteService', () => {
 
             const [action] = vi.mocked(executeHandler).mock.calls[0];
             expect(action.automation.casting_time).toBe('passive');
+        });
+
+        it('CLA-200: stamps a fresh inspiringSmiteCastToken before dispatching the handler', async () => {
+            const { setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
+            executeHandler.mockResolvedValue({ success: true });
+            const stats = { name: 'ElderPaladin', automation: { passives: [{ type: 'post_cast_inspiring_smite', name: 'Inspire' }] } };
+
+            await triggerInspiringSmite({ name: 'Divine Smite', level: 1 }, {}, stats, campaignName, mapName);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'ElderPaladin', 'inspiringSmiteCastToken', expect.any(Number), campaignName
+            );
+        });
+
+        it('CLA-200: does not stamp a cast token when the spell is not Divine Smite', async () => {
+            const { setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
+
+            await triggerInspiringSmite({ name: 'Fireball', level: 3 }, {}, createStats(), campaignName, mapName);
+
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
         it('returns null when all executeHandler results are falsy', async () => {

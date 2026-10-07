@@ -332,7 +332,7 @@ export default function useCharActionsModalHandlers({
 
     async function handleInspiringSmiteConfirm(distribution) {
         if (!distribution || !modalState.inspiringSmiteModal) return;
-        const { action, playerStats: ps, campaignName: cn, channelDivinityCharges } = modalState.inspiringSmiteModal;
+        const { action, playerStats: ps, campaignName: cn, channelDivinityCharges, castToken } = modalState.inspiringSmiteModal;
         const playerName = ps.name;
 
         const targetNames = Object.keys(distribution);
@@ -344,6 +344,11 @@ export default function useCharActionsModalHandlers({
         }
 
         setRuntimeValue(playerName, 'channelDivinityCharges', channelDivinityCharges - 1, cn);
+
+        // CLA-200: latch this Divine Smite cast as answered so the gated
+        // row cannot re-open a fresh 2d8+level pool for the same cast.
+        // Awaited sequentially (same-store writes race otherwise).
+        await setRuntimeValue(playerName, 'inspiringSmiteUsedToken', castToken ?? Date.now(), cn);
 
         const totalDistributed = Object.values(distribution).reduce((sum, v) => sum + v, 0);
         addEntry(cn, {
