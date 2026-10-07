@@ -4645,7 +4645,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-CLA-244-overchannel.md",
+      "verified": "verified",
       "class": "Wizard",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "When you cast a Wizard spell with spell slot of levels 1-5 that deals damage, you can deal maximum damage with that spell on the turn you cast it. First time: no adverse effect. If used again before Long Rest, take 2d12 Necrotic damage per level of spell slot immediately after casting. This damage ignores Resistance and Immunity. Each additional use increases Necrotic damage per spell level by 1d12."

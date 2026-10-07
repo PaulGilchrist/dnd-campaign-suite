@@ -161,7 +161,7 @@ export function buildOverchannelStep() {
     emit: 'damage:ready',
     condition: (ctx) => ctx.overchannelActive && ctx.overchannelUseCount > 1,
     handler: async (ctx) => {
-      const dicePerLevel = 2 + (ctx.overchannelUseCount - 1);
+      const dicePerLevel = Math.max(2, ctx.overchannelUseCount);
       const totalDice = dicePerLevel * ctx.overchannelSpellLevel;
       const r = rollExpression(`${totalDice}d12`);
       if (r) {

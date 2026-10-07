@@ -204,7 +204,7 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
     });
 
     describe('handler', () => {
-      it('rolls correct dice for level 1 spell with useCount 2', async () => {
+      it('rolls correct dice for level 1 spell with useCount 2 (CLA-244 RAW)', async () => {
         const ctx = makeCtx({
           overchannelActive: true,
           overchannelUseCount: 2,
@@ -213,11 +213,11 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
         });
         const result = await steps[17].handler(ctx);
 
-        expect(rollExpression).toHaveBeenCalledWith('3d12');
+        expect(rollExpression).toHaveBeenCalledWith('2d12');
         expect(result.data).toEqual({});
       });
 
-      it('rolls correct dice for level 2 spell with useCount 2', async () => {
+      it('rolls correct dice for level 2 spell with useCount 2 (CLA-244 RAW)', async () => {
         const ctx = makeCtx({
           overchannelActive: true,
           overchannelUseCount: 2,
@@ -226,10 +226,10 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
         });
         await steps[17].handler(ctx);
 
-        expect(rollExpression).toHaveBeenCalledWith('6d12');
+        expect(rollExpression).toHaveBeenCalledWith('4d12');
       });
 
-      it('rolls correct dice for level 3 spell with useCount 3', async () => {
+      it('rolls correct dice for level 3 spell with useCount 3 (CLA-244 RAW)', async () => {
         const ctx = makeCtx({
           overchannelActive: true,
           overchannelUseCount: 3,
@@ -238,8 +238,8 @@ describe('buildAttackRollDamageSteps - overchannel, proceedToDamage', () => {
         });
         await steps[17].handler(ctx);
 
-        // dicePerLevel = 2 + (3-1) = 4, totalDice = 4 * 3 = 12
-        expect(rollExpression).toHaveBeenCalledWith('12d12');
+        // dicePerLevel = useCount = 3, totalDice = 3 * 3 = 9
+        expect(rollExpression).toHaveBeenCalledWith('9d12');
       });
 
       it('logs a damage entry', async () => {

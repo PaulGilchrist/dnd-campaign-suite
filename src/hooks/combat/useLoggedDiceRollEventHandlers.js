@@ -151,7 +151,7 @@ async function applyFailedSaveStatusEffects({ detail, pending, combatSummary, ch
 async function applyOverchannelSelfDamage({ pending, characterName, campaignName, charactersRef, logEntry }) {
     if (!pending.overchannelActive || !(pending.overchannelUseCount > 1)) return;
     const overchannelSpellLevel = pending.overchannelSpellLevel || 1;
-    const dicePerLevel = 2 + (pending.overchannelUseCount - 1);
+    const dicePerLevel = Math.max(2, pending.overchannelUseCount);
     const totalDice = dicePerLevel * overchannelSpellLevel;
     const necroticFormula = `${totalDice}d12`;
     const necroticResult = rollExpression(necroticFormula);

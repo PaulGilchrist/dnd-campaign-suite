@@ -9,7 +9,7 @@ export async function handle(action, playerStats, _campaignName, _mapName) {
 
     const nextUseCount = currentUseCount + 1;
     const useLabel = nextUseCount === 1 ? 'First use' : `Use #${nextUseCount}`;
-    const damageNote = nextUseCount === 1 ? 'no adverse effect' : `take ${nextUseCount * 2}d12 necrotic damage`;
+    const damageNote = nextUseCount === 1 ? 'no adverse effect' : `take ${Math.max(2, nextUseCount)}d12 necrotic damage per spell slot level`;
 
     return {
         type: 'popup',
@@ -48,8 +48,7 @@ export function getOverchannelNecroticDamage(spellLevel, useCount) {
     if (useCount <= 1) {
         return 0;
     }
-    const additionalUses = useCount - 1;
-    const dicePerLevel = 2 + additionalUses;
+    const dicePerLevel = Math.max(2, useCount);
     return {
         formula: `${dicePerLevel}d12`,
         damageType: 'Necrotic',

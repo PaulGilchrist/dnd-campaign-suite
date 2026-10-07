@@ -55,13 +55,13 @@ describe('overchannelHandler', () => {
             expect(result.payload.description).toContain('no adverse effect');
         });
 
-        it('describes subsequent uses with escalating necrotic damage', async () => {
+        it('describes subsequent uses with escalating necrotic damage per spell slot level', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(5);
 
             const result = await handle(makeAction(), mockPlayerStats, campaignName, null);
 
             expect(result.payload.description).toContain('Use #6');
-            expect(result.payload.description).toContain('12d12 necrotic damage');
+            expect(result.payload.description).toContain('6d12 necrotic damage per spell slot level');
         });
 
         it('uses custom action name when provided', async () => {
@@ -158,35 +158,43 @@ describe('overchannelHandler', () => {
             expect(getOverchannelNecroticDamage(3, -1)).toBe(0);
         });
 
-        it('returns correct formula for first additional use (useCount=2)', () => {
+        it('returns RAW 2d12-per-slot formula for useCount=2', () => {
             const result = getOverchannelNecroticDamage(3, 2);
 
-            expect(result.formula).toBe('3d12');
+            expect(result.formula).toBe('2d12');
             expect(result.damageType).toBe('Necrotic');
             expect(result.ignoresResistance).toBe(true);
             expect(result.ignoresImmunity).toBe(true);
             expect(result.perSpellLevel).toBe(true);
-            expect(result.expression).toBe('9d12');
+            expect(result.expression).toBe('6d12');
         });
 
-        it('increments the formula based on useCount', () => {
+        it('use #2 level 2 slot scales to 4d12 (CLA-244)', () => {
+            expect(getOverchannelNecroticDamage(2, 2).expression).toBe('4d12');
+        });
+
+        it('increments dice per spell level by 1d12 per additional use (dicePerLevel = useCount)', () => {
             const result2 = getOverchannelNecroticDamage(3, 2);
             const result3 = getOverchannelNecroticDamage(3, 3);
             const result4 = getOverchannelNecroticDamage(3, 4);
 
-            expect(result2.formula).toBe('3d12');
-            expect(result3.formula).toBe('4d12');
-            expect(result4.formula).toBe('5d12');
+            expect(result2.formula).toBe('2d12');
+            expect(result3.formula).toBe('3d12');
+            expect(result4.formula).toBe('4d12');
 
-            expect(result2.expression).toBe('9d12');
-            expect(result3.expression).toBe('12d12');
-            expect(result4.expression).toBe('15d12');
+            expect(result2.expression).toBe('6d12');
+            expect(result3.expression).toBe('9d12');
+            expect(result4.expression).toBe('12d12');
+        });
+
+        it('use #3 level 3 slot scales to 9d12 (CLA-244)', () => {
+            expect(getOverchannelNecroticDamage(3, 3).expression).toBe('9d12');
         });
 
         it('defaults spellLevel to 1 when falsy', () => {
-            expect(getOverchannelNecroticDamage(null, 2).expression).toBe('3d12');
-            expect(getOverchannelNecroticDamage(undefined, 2).expression).toBe('3d12');
-            expect(getOverchannelNecroticDamage(0, 2).expression).toBe('3d12');
+            expect(getOverchannelNecroticDamage(null, 2).expression).toBe('2d12');
+            expect(getOverchannelNecroticDamage(undefined, 2).expression).toBe('2d12');
+            expect(getOverchannelNecroticDamage(0, 2).expression).toBe('2d12');
         });
     });
 });

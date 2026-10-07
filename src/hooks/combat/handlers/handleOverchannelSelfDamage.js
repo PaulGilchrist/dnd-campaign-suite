@@ -6,7 +6,7 @@ export async function handleOverchannelSelfDamage(characterName, campaignName, c
     if (context?.overchannelActive) {
         if (context?.overchannelUseCount > 1) {
             const overchannelSpellLevel = context?.overchannelSpellLevel || 1;
-            const dicePerLevel = 2 + (context.overchannelUseCount - 1);
+            const dicePerLevel = Math.max(2, context.overchannelUseCount);
             const totalDice = dicePerLevel * overchannelSpellLevel;
             const necroticFormula = `${totalDice}d12`;
             const necroticResult = rollExpression(necroticFormula);

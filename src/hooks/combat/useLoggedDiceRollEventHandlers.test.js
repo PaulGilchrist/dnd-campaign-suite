@@ -432,7 +432,7 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             expect(combinedEntry.secondaryName).toBe('Secondary');
         });
 
-        it('handles overchannel self-damage', async () => {
+        it('handles overchannel self-damage (CLA-244 RAW dicePerLevel = useCount)', async () => {
             setup();
             getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestWizard', type: 'player', currentHp: 20, maxHp: 20 }] });
             applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 10, damageReduced: false });
@@ -440,7 +440,18 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             testPendingSaves = { [pid]: createSavePrompt(pid, { overchannelActive: true, overchannelUseCount: 3, overchannelSpellLevel: 2 }) };
             window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
             await flushPromises();
-            expect(rollExpression).toHaveBeenCalledWith('8d12');
+            expect(rollExpression).toHaveBeenCalledWith('6d12');
+        });
+
+        it('rolls 4d12 backlash on overchannel use #2 level 2 slot (CLA-244)', async () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestWizard', type: 'player', currentHp: 20, maxHp: 20 }] });
+            applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 10, damageReduced: false });
+            const pid = 'p20b';
+            testPendingSaves = { [pid]: createSavePrompt(pid, { overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 2 }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            await flushPromises();
+            expect(rollExpression).toHaveBeenCalledWith('4d12');
         });
 
         // --- save-result: status effects ---
