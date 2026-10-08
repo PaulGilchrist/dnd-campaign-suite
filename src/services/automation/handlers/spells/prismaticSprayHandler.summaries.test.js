@@ -75,7 +75,7 @@ function makeAction(automation = {}) {
       type: 'prismatic_spray',
       saveType: 'DEX',
       saveDc: 15,
-      damage: '10d6',
+      damage: '12d6',
       ...automation,
     },
   };
@@ -344,7 +344,7 @@ describe('prismaticSprayHandler.handle - summaries and edge cases', () => {
       );
     });
 
-    it('falls back to 10d6 when damage is not in automation', async () => {
+    it('falls back to 12d6 when damage is not in automation', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 30 });
@@ -360,7 +360,7 @@ describe('prismaticSprayHandler.handle - summaries and edge cases', () => {
       expect(savePrompt.createSaveListener).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({
-          damageFormula: '10d6',
+          damageFormula: '12d6',
         }),
       );
     });

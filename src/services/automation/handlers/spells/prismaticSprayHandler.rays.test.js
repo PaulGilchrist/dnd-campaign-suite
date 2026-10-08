@@ -76,7 +76,7 @@ function makeAction(automation = {}) {
       type: 'prismatic_spray',
       saveType: 'DEX',
       saveDc: 15,
-      damage: '10d6',
+      damage: '12d6',
       ...automation,
     },
   };
@@ -129,7 +129,7 @@ describe('prismaticSprayHandler ray effects', () => {
           saveType: 'DEX',
           saveDc: 15,
           dcSuccess: 'half',
-          damageFormula: '10d6',
+          damageFormula: '12d6',
           damageType: 'fire',
         }),
       );

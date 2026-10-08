@@ -12,23 +12,22 @@ import { applyDamageToTarget, computeDamageAfterSave } from '../../../rules/comb
  * Mechanics:
  * - 60-foot Cone AoE
  * - DEX save (dc_success: none — all effects happen on fail)
- * - For each target, roll 2d7 to determine ray effects:
- *   1=Red: 10d6 Fire damage (half on save)
- *   2=Orange: 10d6 Acid damage (half on save)
- *   3=Yellow: 10d6 Lightning damage (half on save)
- *   4=Green: 10d6 Poison damage (half on save)
- *   5=Blue: 10d6 Cold damage (half on save)
+ * - For each target, roll 1d8 to determine ray effect (8 = two rays, re-roll 8s):
+ *   1=Red: 12d6 Fire damage (half on save)
+ *   2=Orange: 12d6 Acid damage (half on save)
+ *   3=Yellow: 12d6 Lightning damage (half on save)
+ *   4=Green: 12d6 Poison damage (half on save)
+ *   5=Blue: 12d6 Cold damage (half on save)
  *   6=Indigo: Restrained; recurring CON saves (3 successes=end, 3 failures=Petrified)
  *   7=Violet: Blinded; WIS save at start of caster's next turn (success=end, fail=banished)
- * - Each die roll is 1d7 (no re-roll needed since range is 1-7)
  */
 
 const PRISMATIC_RAYS = {
-    1: { name: 'Red', type: 'fire', damage: '10d6', saveType: 'DEX' },
-    2: { name: 'Orange', type: 'acid', damage: '10d6', saveType: 'DEX' },
-    3: { name: 'Yellow', type: 'lightning', damage: '10d6', saveType: 'DEX' },
-    4: { name: 'Green', type: 'poison', damage: '10d6', saveType: 'DEX' },
-    5: { name: 'Blue', type: 'cold', damage: '10d6', saveType: 'DEX' },
+    1: { name: 'Red', type: 'fire', damage: '12d6', saveType: 'DEX' },
+    2: { name: 'Orange', type: 'acid', damage: '12d6', saveType: 'DEX' },
+    3: { name: 'Yellow', type: 'lightning', damage: '12d6', saveType: 'DEX' },
+    4: { name: 'Green', type: 'poison', damage: '12d6', saveType: 'DEX' },
+    5: { name: 'Blue', type: 'cold', damage: '12d6', saveType: 'DEX' },
     6: { name: 'Indigo', type: 'restrained', saveType: 'DEX' },
     7: { name: 'Violet', type: 'banished', saveType: 'DEX' },
 };
@@ -69,7 +68,7 @@ function selectSprayTargets(action, cs, casterName) {
 
 function queueRaySave(ctx) {
     const { action, auto, campaignName, casterName, targetName, ray, rollDescription, immunityList, disadvantage, dc, savePromises, saveResults } = ctx;
-    const damageFormula = auto.damage || '10d6';
+    const damageFormula = auto.damage || '12d6';
 
     if (DAMAGE_RAY_TYPES.has(ray.type)) {
         // Check elemental immunity for damage rays (1-5)
@@ -132,6 +131,11 @@ async function applyRayDamage({ cs, campaignName, characters, casterName, target
     }
 }
 
+function spraySaveDescription(targetName, ray, type, damageFormula, success) {
+    if (type !== 'damage') return `${targetName} ${success ? 'succeeded' : 'failed'} DEX save against ${ray.name} ray.`;
+    return `${targetName} ${success ? 'succeeded' : 'failed'} DEX save against ${ray.name} ray, taking ${success ? 'half' : 'full'} ${damageFormula} ${ray.type} damage.`;
+}
+
 async function resolveSpraySaveOutcome(ctx) {
     const { campaignName, casterName, cs, characters, dc, info, saveResult, results } = ctx;
     const { targetName, ray, type, damageFormula } = info;
@@ -153,7 +157,7 @@ async function resolveSpraySaveOutcome(ctx) {
             saveDc: dc,
             saveType: 'DEX',
             success: true,
-            description: `${targetName} succeeded on DEX save against ${ray.name} ray, taking half damage.`,
+            description: spraySaveDescription(targetName, ray, type, damageFormula, true),
         }).catch((e) => { console.error(`[prismaticSpray] Error:`, e); });
 
         // Apply half damage for damage rays
@@ -181,7 +185,7 @@ async function resolveSpraySaveOutcome(ctx) {
         saveDc: dc,
         saveType: 'DEX',
         success: false,
-        description: `${targetName} failed DEX save against ${ray.name} ray, taking full ${damageFormula} ${ray.type} damage.`,
+        description: spraySaveDescription(targetName, ray, type, damageFormula, false),
     }).catch((e) => { console.error(`[prismaticSpray] Error:`, e); });
 
     // Apply full damage for damage rays

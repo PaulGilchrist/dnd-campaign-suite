@@ -10382,7 +10382,7 @@
         "automation": {
             "type": "prismatic_spray",
             "saveType": "DEX",
-            "damage": "10d6",
+            "damage": "12d6",
             "saveDc": "spell_save_dc"
         }
     },

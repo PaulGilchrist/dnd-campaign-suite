@@ -76,7 +76,7 @@ function makeAction(automation = {}) {
       type: 'prismatic_spray',
       saveType: 'DEX',
       saveDc: 15,
-      damage: '10d6',
+      damage: '12d6',
       ...automation,
     },
   };
