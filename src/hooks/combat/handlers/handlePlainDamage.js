@@ -3,7 +3,8 @@ import { addEntry } from '../../../services/ui/logService.js';
 import utils from '../../../services/ui/utils.js';
 import { applyDamageToTarget, clearReTriggeredSequence } from '../../../services/rules/combat/applyDamage.js';
 import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
-import { hasIgnoreResistance } from '../../../services/combat/automation/automationService.js';
+import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../../services/combat/automation/automationService.js';
+import { resolveCreatureType } from '../../../services/combat/creatureTypeResolver.js';
 import { endInvisibilityOnHostileAction } from '../../../services/rules/features/invisibilityService.js';
 import { hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInspirationDieSizeFromClass } from '../../../services/combat/auras/bardicInspirationState.js';
 import { hasEmpoweredSpell } from '../../../services/rules/spells/empoweredSpellService.js';
@@ -570,10 +571,51 @@ function maybeApplyRamProne({ context, target, applyResult, campaignName, logEnt
 // with activeConditionMeta {dc, ability} so the target's condition badge
 // (CharConditions) offers the escape save. Escape is a badge click —
 // GM-enforced re-save; no token/movement grapple subsystem.
-function applyHitClauseConditions({ hitClause, target, campaignName, logEntry, attackerName }) {
+// SP-094: split hit-clause conditions by the victim's condition immunities so a
+// Protection from Evil and Good ward (or any static/feature immunity) suppresses
+// a Charmed/Frightened-on-hit rider from a warded attacker. Blocked conditions land
+// an `automation blocked` refusal; the byte-identical path holds when nothing is
+// immune (and when the attacker has no resolvable type).
+function logWardedHitClauseBlock({ target, attackerName, sourceCreatureType, conditionKey, hitClause, campaignName, logEntry }) {
+    if (!sourceCreatureType) return;
+    if (conditionKey !== 'charmed' && conditionKey !== 'frightened') return;
+    const pfegActive = (getRuntimeValue(target.name, 'activeBuffs', campaignName) || []).some(b => b.effect === 'protection_from_evil_and_good');
+    if (!pfegActive) return;
+    const wardedTypes = getRuntimeValue(target.name, 'protectionFromEvilAndGoodWardedTypes', campaignName) || [];
+    if (!wardedTypes.some(t => String(t).toLowerCase() === String(sourceCreatureType).toLowerCase())) return;
+    logEntry({
+        type: 'automation blocked',
+        characterName: target.name,
+        sourceName: attackerName,
+        abilityName: hitClause.attackName,
+        description: `${target.name} can't be ${conditionKey.charAt(0).toUpperCase() + conditionKey.slice(1)} by ${attackerName} (${sourceCreatureType}) — Protection from Evil and Good.`,
+        timestamp: Date.now(),
+    });
+}
+
+function resolveHitClauseApplicableConditions({ hitClause, target, characters, combatSummary, attackerName, campaignName, logEntry }) {
+    const targetCharacter = (characters || []).find(c => c.name === target.name);
+    // SP-094: guarantee playerStats.name (computedStats omits it) so the PFEG
+    // ward lookup keys correctly; preserve computedStats→character precedence.
+    const targetStats = { ...(targetCharacter?.computedStats || targetCharacter || {}), name: target.name };
+    const sourceCreatureType = resolveCreatureType((combatSummary?.creatures || []).find(c => c.name === attackerName));
+    const applicable = [];
+    for (const cond of hitClause.conditions) {
+        if (targetStats && playerIsImmuneToCondition({ conditionKey: cond, playerStats: targetStats, getRuntimeValue, campaignName, sourceCreatureType })) {
+            logWardedHitClauseBlock({ target, attackerName, sourceCreatureType, conditionKey: cond, hitClause, campaignName, logEntry });
+            continue;
+        }
+        applicable.push(cond);
+    }
+    return applicable;
+}
+
+function applyHitClauseConditions({ hitClause, target, campaignName, logEntry, attackerName, characters, combatSummary }) {
+    const conditions = resolveHitClauseApplicableConditions({ hitClause, target, characters, combatSummary, attackerName, campaignName, logEntry });
+    if (conditions.length <= 0) return;
     const currentConditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
     const newConditions = [...currentConditions];
-    for (const cond of hitClause.conditions) {
+    for (const cond of conditions) {
         if (!newConditions.some(c => String(c).toLowerCase() === cond)) {
             newConditions.push(cond);
         }
@@ -584,7 +626,7 @@ function applyHitClauseConditions({ hitClause, target, campaignName, logEntry, a
     // prerequisites can be enforced. Additive for existing dc consumers.
     const existingMeta = getRuntimeValue(target.name, 'activeConditionMeta', campaignName) || {};
     const newMeta = { ...existingMeta };
-    for (const cond of hitClause.conditions) {
+    for (const cond of conditions) {
         newMeta[cond] = { ...(existingMeta[cond] || {}), source: attackerName };
         if (hitClause.escapeDc != null) {
             newMeta[cond].dc = hitClause.escapeDc;
@@ -592,7 +634,7 @@ function applyHitClauseConditions({ hitClause, target, campaignName, logEntry, a
         }
     }
     setRuntimeValue(target.name, 'activeConditionMeta', newMeta, campaignName);
-    const conditionLabels = hitClause.conditions.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
+    const conditionLabels = conditions.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
     logEntry({
         type: 'condition',
         action: 'applied',
@@ -939,7 +981,7 @@ async function maybeApplyHitClause({ context, target, applyResult, secondaryFina
     const hasConditions = Array.isArray(effectiveClause.conditions) && effectiveClause.conditions.length > 0;
     if (!hasConditions && !hitClause.targetEffect) return;
     if (hasConditions) {
-        applyHitClauseConditions({ hitClause: effectiveClause, target, campaignName, logEntry, attackerName: characterName });
+        applyHitClauseConditions({ hitClause: effectiveClause, target, campaignName, logEntry, attackerName: characterName, characters, combatSummary });
     }
     if (riderChoice) {
         addExpiration({

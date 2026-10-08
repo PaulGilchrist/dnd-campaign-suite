@@ -1,7 +1,7 @@
-import { toggleBuff } from '../../common/buffToggle.js';
+import { computeToggledBuffs } from '../../common/buffToggle.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { addConcentration } from '../../../combat/concentration/concentrationService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeObject, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { rangeToFeet } from '../../../../services/rules/combat/rangeValidation.js';
@@ -82,14 +82,20 @@ export async function applyProtectionFromEvilAndGood(action, playerStats, campai
 }
 
 async function activateProtection(spell, casterName, targetName, combatSummary, campaignName) {
-    // Toggle the buff on
-    toggleBuff(targetName, SPELL_NAME, {
+    // SP-094: activeBuffs + warded types land in ONE merged store write so they
+    // persist together (§5 single-write discipline — no racing per-key POSTs).
+    const activeBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+    const { buffs: newBuffs } = computeToggledBuffs(activeBuffs, SPELL_NAME, {
         type: 'protection_from_evil_and_good',
         effect: 'protection_from_evil_and_good',
         wardedCreatureTypes: WARDED_CREATURE_TYPES,
         duration: getProtectionDuration(spell),
         casting_time: spell.casting_time || '1 action',
         range: spell.range || 'Touch',
+    }, casterName);
+    setRuntimeObject(targetName, {
+        activeBuffs: newBuffs,
+        [PROTECTION_FROM_EVIL_AND_GOOD_KEY]: WARDED_CREATURE_TYPES,
     }, campaignName);
 
     // Register concentration
@@ -113,9 +119,6 @@ async function activateProtection(spell, casterName, targetName, combatSummary, 
     };
     setRuntimeValue('campaign', 'targetEffects', [...existingFiltered, newEffect], campaignName);
 
-    // Store warded types on the target
-    setRuntimeValue(targetName, PROTECTION_FROM_EVIL_AND_GOOD_KEY, WARDED_CREATURE_TYPES, campaignName);
-
     // Register expiration: expires on initiative roll (when target's turn starts), concentration loss, short rest, long rest
     addExpiration({ attackerName: casterName, targetName, effects: [
         { type: 'remove_active_buff', buffName: SPELL_NAME },
@@ -132,16 +135,18 @@ async function activateProtection(spell, casterName, targetName, combatSummary, 
 }
 
 async function deactivateProtection(spell, casterName, targetName, combatSummary, campaignName) {
-    // Toggle off — deactivate
-    toggleBuff(targetName, SPELL_NAME, {
+    // SP-094: remove the buff and clear warded types in ONE merged store write.
+    const activeBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+    const { buffs: newBuffs } = computeToggledBuffs(activeBuffs, SPELL_NAME, {
         type: 'protection_from_evil_and_good',
         effect: 'protection_from_evil_and_good',
         wardedCreatureTypes: [],
         duration: getProtectionDuration(spell),
+    }, casterName);
+    setRuntimeObject(targetName, {
+        activeBuffs: newBuffs,
+        [PROTECTION_FROM_EVIL_AND_GOOD_KEY]: [],
     }, campaignName);
-
-    // Clear warded types
-    setRuntimeValue(targetName, PROTECTION_FROM_EVIL_AND_GOOD_KEY, [], campaignName);
 
     // Remove target effect
     const storedEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];

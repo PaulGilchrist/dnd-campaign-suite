@@ -430,7 +430,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
     const saveMod = getSaveModifierForSaveType(saveType, target, characters, creatures);
     rollSavingThrow(saveAbilityAbbr(saveType), saveMod, buildAbilitySaveRollContext({
       monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType: spellInfo?.damageType, animalSpiritVariant, animalSpiritFortifyHp,
-      conditionDurationNote: blockSaveConditionDurationNote(action, spellInfo, saveVariant),
+      conditionDurationNote: blockSaveConditionDurationNote(action, spellInfo, saveVariant), characters,
     }));
   };
   const sleepStaging = sleepStagingForAction(spellInfo, action);
@@ -1612,7 +1612,7 @@ function resolveSaveLegDamageFields(action, saveDamageFormula, primaryDamageType
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType, animalSpiritVariant = null, animalSpiritFortifyHp = null, conditionDurationNote = null }) {
+export function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType, animalSpiritVariant = null, animalSpiritFortifyHp = null, conditionDurationNote = null, characters = [] }) {
   const primaryDamageType = savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction);
   const actionName = spellName || action.name;
   const saveEffect = action?.save_effect ?? null;
@@ -1633,6 +1633,11 @@ export function buildAbilitySaveRollContext({ monsterName, target, spellName, ac
     ...resolveSaveLegDamageFields(action, saveDamageFormula, primaryDamageType, actionName),
     autoDamageName: actionName,
     saveConditions,
+    // SP-094: carry the full character list (with computedStats) so the save
+    // lane's condition-immunity checks (PFEG ward, aura, static, feature) have
+    // a real targetStats to consult. Threaded from executeBlockSaveRoll's
+    // `characters`. Byte-inert when empty.
+    _characters: characters,
     isSpellDamage: !!spellName,
     consumeMemoriesClause: !!prerequisite,
     // MA-0020: spend marker lands at prompt-confirm (saveProcessing); the

@@ -8,6 +8,7 @@ import { normalizeSaveType, computeDamageAfterEvasion, applyDamageToTarget } fro
 import { isLeadingEvasionSelected } from '../../services/rules/combat/evasionUtils.js';
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
+import { resolveCreatureType } from '../../services/combat/creatureTypeResolver.js';
 import { getAuraConditionImmunities, splitAuraCoveredConditions, logAuraConditionImmunity } from '../../services/combat/auras/auraConditionImmunity.js';
 import { spendMonsterAbilityUse } from '../../services/encounters/monsterAbilityUses.js';
 import { registerTargetEffect, getActiveTargetEffect, getEffectDefinition, abilitySaveDisadvantageActive } from '../../services/combat/conditions/targetEffectDefinitions.js';
@@ -1086,18 +1087,44 @@ async function resolveAuraConditionSplit({ saveConditions, applyTarget, context,
     return applicable;
 }
 
-async function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName }) {
+// SP-094: playerIsImmuneToCondition keys its Protection-from-Evil-and-Good
+// lookups off playerStats.name. computedStats does not reliably carry a name,
+// so guarantee the canonical identity from applyTarget while preserving the
+// computedStats → targetChar precedence for static/feature immunities.
+function buildWardPlayerStats(targetChar, applyTarget) {
+    return { ...(targetChar?.computedStats || targetChar || {}), name: targetChar?.name || applyTarget };
+}
+
+// SP-094: attacker creature-type lookup for PFEG ward immunity. Loads the combat
+// summary only when the caller did not already carry one (damage lane threads it).
+async function resolveAttackerCreatureType(attackerName, combatSummary, campaignName) {
+    if (!attackerName) return undefined;
+    const cs = combatSummary || await loadCombatSummary(campaignName);
+    return resolveCreatureType((cs?.creatures || []).find(c => c.name === attackerName));
+}
+
+async function applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName, combatSummary }) {
     if (saveConditions.length <= 0 || saveSuccess) return false;
-    const targetStats = targetChar?.computedStats || targetChar;
+    const targetStats = buildWardPlayerStats(targetChar, applyTarget);
     const applicable = await resolveAuraConditionSplit({ saveConditions, applyTarget, context, campaignName });
     if (applicable.length <= 0) return false;
+    // SP-094: resolve the attacking creature's real type so Protection from Evil
+    // and Good ward immunity (Charmed/Frightened from Aberration/Celestial/
+    // Elemental/Fey/Fiend/Undead) is enforced on the monster save-chip lane too.
+    // EB-joined monsters carry type:'npc' with the true type in monsterType; PCs
+    // fall through unchanged → byte-inert null for every non-warded attacker.
+    const sourceCreatureType = await resolveAttackerCreatureType(attackerName, combatSummary, campaignName);
     const isImmune = targetStats && playerIsImmuneToCondition({
         conditionKey: applicable[0],
         playerStats: targetStats,
         getRuntimeValue,
         campaignName,
+        sourceCreatureType,
     });
-    if (isImmune) return false;
+    if (isImmune) {
+        logWardedConditionImmunity({ applyTarget, attackerName, sourceCreatureType, conditionKey: applicable[0], context, campaignName });
+        return false;
+    }
     const currentConditions = getRuntimeValue(applyTarget, 'activeConditions') || [];
     const newConditions = [...currentConditions];
     for (const cond of applicable) {
@@ -1120,7 +1147,27 @@ async function applyFailedSaveConditions({ saveConditions, saveSuccess, targetCh
     return true;
 }
 
-// MA-0019 provenance: stamp the inflicting creature into condition meta so
+// SP-094: PFEG suppresses Charmed/Frightened from warded creature types. Reads the
+// target's persisted warded-types + active-buff runtime keys (string keys — no PFEG
+// handler import, so existing saveProcessing mocks stay byte-inert) and logs the
+// refusal only when the ward is genuinely what blocked the condition.
+function logWardedConditionImmunity({ applyTarget, attackerName, sourceCreatureType, conditionKey, context, campaignName }) {
+    if (!sourceCreatureType) return;
+    if (conditionKey !== 'charmed' && conditionKey !== 'frightened') return;
+    const pfegActive = (getRuntimeValue(applyTarget, 'activeBuffs', campaignName) || []).some(b => b.effect === 'protection_from_evil_and_good');
+    if (!pfegActive) return;
+    const wardedTypes = getRuntimeValue(applyTarget, 'protectionFromEvilAndGoodWardedTypes', campaignName) || [];
+    if (!wardedTypes.some(t => String(t).toLowerCase() === String(sourceCreatureType).toLowerCase())) return;
+    addEntry(campaignName, {
+        type: 'automation blocked',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        abilityName: context?.actionName || context.name,
+        description: `${applyTarget} can't be ${conditionKey.charAt(0).toUpperCase() + conditionKey.slice(1)} by ${attackerName} (${sourceCreatureType}) — Protection from Evil and Good.`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:pfeg-block]', e); });
+}
+
 // "by <source>" prerequisites (target_prerequisite.by_attacker) can be
 // enforced. MA-0020: an authored "until …" clause (Dominate Mind) rides the
 // same stamp as a durationNote — advisory only, no auto-expiry subsystem
@@ -1475,7 +1522,7 @@ async function applySaveDamage({ context, characterName, campaignName, attackerN
         ...buildSecondarySaveDamagePopupFields({ secondaryOutcome, effectiveD20ForSave, saveTotal, saveSuccess }),
     });
 
-    const applied = await applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName });
+    const applied = await applyFailedSaveConditions({ saveConditions, saveSuccess, targetChar, applyTarget, attackerName, context, campaignName, combatSummary: combatSummaryForSave });
     // MA-1351: damage-bearing save legs (Pseudodragon Sting — the save
     // adjudicates its own 2d4 pool, unlike the MA-0560/MA-1000 rider-only
     // composites) reach applySaveDamage, NOT applyDamagelessSaveConditions —

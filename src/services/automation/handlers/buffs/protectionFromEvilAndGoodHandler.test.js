@@ -4,9 +4,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../common/buffToggle.js', () => ({
-  toggleBuff: vi.fn(),
-}));
+vi.mock('../../common/buffToggle.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, toggleBuff: vi.fn() };
+});
 
 vi.mock('../../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock('../../../combat/concentration/concentrationService.js', () => ({
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  setRuntimeObject: vi.fn(),
 }));
 
 vi.mock('../../../../services/ui/logService.js', () => ({
@@ -223,22 +225,27 @@ describe('protectionFromEvilAndGoodHandler', () => {
         TARGET_NAME
       );
 
-      expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-        TARGET_NAME,
-        'Protection from Evil and Good',
-        expect.objectContaining({
-          effect: 'protection_from_evil_and_good',
-          wardedCreatureTypes: [
-            'Aberration',
-            'Celestial',
-            'Elemental',
-            'Fey',
-            'Fiend',
-            'Undead',
-          ],
-        }),
-        CAMPAIGN_NAME
+      // SP-094: activeBuffs + warded types now land in ONE merged store write.
+      const merged = runtimeState.setRuntimeObject.mock.calls.find(
+        (call) => call[0] === TARGET_NAME
       );
+      expect(merged).toBeTruthy();
+      expect(merged[1].activeBuffs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'Protection from Evil and Good',
+            effect: 'protection_from_evil_and_good',
+          }),
+        ])
+      );
+      expect(merged[1].protectionFromEvilAndGoodWardedTypes).toEqual([
+        'Aberration',
+        'Celestial',
+        'Elemental',
+        'Fey',
+        'Fiend',
+        'Undead',
+      ]);
 
       expect(concentrationService.addConcentration).toHaveBeenCalled();
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
@@ -252,20 +259,6 @@ describe('protectionFromEvilAndGoodHandler', () => {
             duration: 'concentration',
           }),
         ]),
-        CAMPAIGN_NAME
-      );
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        TARGET_NAME,
-        'protectionFromEvilAndGoodWardedTypes',
-        [
-          'Aberration',
-          'Celestial',
-          'Elemental',
-          'Fey',
-          'Fiend',
-          'Undead',
-        ],
         CAMPAIGN_NAME
       );
 
@@ -338,21 +331,13 @@ describe('protectionFromEvilAndGoodHandler', () => {
         TARGET_NAME
       );
 
-      expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-        TARGET_NAME,
-        'Protection from Evil and Good',
-        expect.objectContaining({
-          wardedCreatureTypes: [],
-        }),
-        CAMPAIGN_NAME
+      expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
+      const merged = runtimeState.setRuntimeObject.mock.calls.find(
+        (call) => call[0] === TARGET_NAME
       );
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        TARGET_NAME,
-        'protectionFromEvilAndGoodWardedTypes',
-        [],
-        CAMPAIGN_NAME
-      );
+      expect(merged).toBeTruthy();
+      expect(merged[1].activeBuffs.some(b => b.effect === 'protection_from_evil_and_good')).toBe(false);
+      expect(merged[1].protectionFromEvilAndGoodWardedTypes).toEqual([]);
 
       expect(result.payload.description).toContain('deactivated');
     });
@@ -580,11 +565,13 @@ describe('protectionFromEvilAndGoodHandler', () => {
 
       await applyProtectionFromEvilAndGood(action, ps, CAMPAIGN_NAME, null, TARGET_NAME);
 
-      expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-        TARGET_NAME,
-        'Protection from Evil and Good',
-        expect.objectContaining({ duration: 'Up to 1 hour' }),
-        CAMPAIGN_NAME
+      const merged = runtimeState.setRuntimeObject.mock.calls.find(
+        (call) => call[0] === TARGET_NAME
+      );
+      expect(merged[1].activeBuffs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'Protection from Evil and Good', duration: 'Up to 1 hour' }),
+        ])
       );
     });
   });

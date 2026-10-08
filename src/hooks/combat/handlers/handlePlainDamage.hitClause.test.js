@@ -94,6 +94,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.
 import { loadCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
+import { playerIsImmuneToCondition } from '../../../services/combat/automation/automationService.js';
 import { buildHitConditionClause } from '../../../components/encounter/MonsterCardHelpers.js';
 import { registerTargetEffect, getEffectDefinition } from '../../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
@@ -5710,5 +5711,75 @@ describe('MA-1727 Worg Bite distracting_strike_advantage hit-clause', () => {
         });
         expect(targetEffects.targetAdvantageCount).toBeGreaterThanOrEqual(1);
         expect(combineAttackModes(computeConditionEffects({}), targetEffects, null, 'Bandit 1')).toBe('advantage');
+    });
+});
+
+// SP-094: PFEG ward immunity twin of the failed-save lane — a Charmed/Frightened
+// on-hit rider from a warded creature type is suppressed, refusal logged; every
+// non-warded hit-clause stays byte-identical.
+const CHARMFING_HIT_ACTION = { name: 'Touch', attack_bonus: 7, damage_dice_primary: '1d8 + 4', damage_type_primary: 'Psychic', hit_conditions: ['charmed'] };
+const WARDED_HIT_TYPES = ['Aberration', 'Celestial', 'Elemental', 'Fey', 'Fiend', 'Undead'];
+
+describe('SP-094 hit-clause PFEG ward immunity', () => {
+    const deps = {
+        characterName: 'Succubus 1',
+        campaignName: 'test-campaign',
+        characters: [
+            { name: 'Succubus 1', computedStats: { armorClass: 15 } },
+            { name: 'War_Cleric', computedStats: { armorClass: 12, name: 'War_Cleric', immunities: [] } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+        pendingSaves: {},
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        applyDamageToTarget.mockReturnValue({ finalDamage: 12, newHp: 47, damageReduced: false });
+        loadCombatSummary.mockResolvedValue({
+            creatures: [
+                { name: 'War_Cleric', type: 'player', size: 'Medium', ac: 12, currentHp: 59, maxHp: 59 },
+                { name: 'Succubus 1', type: 'npc', monsterType: 'Fiend', size: 'Medium' },
+            ],
+        });
+        playerIsImmuneToCondition.mockImplementation(({ conditionKey, playerStats }) => {
+            const buffs = (playerStats && playerStats.name === 'War_Cleric') ? [{ effect: 'protection_from_evil_and_good' }] : [];
+            const active = buffs.some(b => b.effect === 'protection_from_evil_and_good');
+            if (!active) return false;
+            return (conditionKey === 'charmed' || conditionKey === 'frightened');
+        });
+        getRuntimeValue.mockImplementation((name, prop) => {
+            if (prop === 'activeConditions') return [];
+            if (prop === 'activeBuffs') return [{ effect: 'protection_from_evil_and_good' }];
+            if (prop === 'protectionFromEvilAndGoodWardedTypes') return WARDED_HIT_TYPES;
+            return null;
+        });
+    });
+
+    it('fiend charmed-on-hit is blocked: no condition write, refusal logged', async () => {
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Touch', formula: '1d8 + 4', total: 12, rolls: [8], modifier: 4, context: {
+            targetName: 'War_Cleric', damageType: 'Psychic', attackerName: 'Succubus 1',
+            hitClause: buildHitConditionClause(CHARMFING_HIT_ACTION),
+        } });
+
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('War_Cleric', 'activeConditions', expect.anything(), 'test-campaign');
+        const blocked = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.type === 'automation blocked');
+        expect(blocked).toBeTruthy();
+        expect(blocked).toMatchObject({ characterName: 'War_Cleric', sourceName: 'Succubus 1', abilityName: 'Touch' });
+        expect(blocked.description).toMatch(/Fiend/);
+    });
+
+    it('non-warded attacker charmed-on-hit lands (immunity not consulted → inert)', async () => {
+        playerIsImmuneToCondition.mockReturnValue(false);
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Touch', formula: '1d8 + 4', total: 12, rolls: [8], modifier: 4, context: {
+            targetName: 'War_Cleric', damageType: 'Psychic', attackerName: 'Succubus 1',
+            hitClause: buildHitConditionClause(CHARMFING_HIT_ACTION),
+        } });
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[2]).toEqual(['charmed']);
     });
 });
