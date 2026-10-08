@@ -4633,7 +4633,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Range: 30 feet; Duration: Concentration, up to 1 minute",
       "expectedBehavior": "One creature that you can see within range must make a Wisdom saving throw. On a successful save, the target dances comically until the end of its next turn, during which it must spend all its movement to dance in place. On a failed save, the target has the Charmed condition for the duration. While Charmed, the target dances comically, must use all its movement to dance in place, and has Disadvantage on Dexterity saving throws and attack rolls, and other creatures have Advantage on attack rolls against it. On each of its turns, the target can take an action to collect itself and repeat the save, ending the spell on itself on a success."
@@ -4693,7 +4693,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Duration: Concentration, up to 1 hour",
       "expectedBehavior": "You radiate a concealing aura in a 30-foot emanation for the duration. While in the aura, you and each creature you choose have a +10 bonus to Dexterity (Stealth) checks and leave no tracks."
@@ -4789,7 +4789,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "triggerConditions": "Action: reaction",
       "expectedBehavior": "Once per turn, when you hit a creature with an attack that deals Piercing damage, you can reroll one of the attack's damage dice, and you must use the new roll."
     },
@@ -4800,7 +4800,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "triggerConditions": "Automation type: ignore_resistance",
       "expectedBehavior": "When you make a damage roll that deals Poison damage, it ignores Resistance to Poison damage."
     },
@@ -4811,7 +4811,7 @@
       "handler": "src/services/automation/handlers/combat/bonusActionAttackHandler.js",
       "router": "src/services/automation/index.js (bonus_action_attack :312)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/attack.js (bonus_action_attack)",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-FT-102-pole-strike-stale-attack-gate.md",
       "class": "Feat",
       "triggerConditions": "Bonus Action: after the Attack action with a Quarterstaff, Spear, or Heavy+Reach weapon",
       "expectedBehavior": "Immediately after you take the Attack action and attack with a Quarterstaff, a Spear, or a weapon that has the Heavy and Reach properties, you can use a Bonus Action to make a melee attack with the opposite end of the weapon. The weapon deals Bludgeoning damage, and the weapon's damage die for this attack is a d4."
@@ -4823,7 +4823,7 @@
       "handler": "src/services/automation/handlers/reactions/reactionDamageHandler.js",
       "router": "src/services/automation/index.js (reaction_damage :334)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/reaction.js (reaction_damage)",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-FT-103-reactive-strike-no-reach-entry-trigger-row-blocked.md",
       "class": "Feat",
       "triggerConditions": "Reaction: while holding a polearm, a creature enters the 5 ft reach you have with it",
       "expectedBehavior": "While you're holding a Quarterstaff, a Spear, or a weapon that has the Heavy and Reach properties, you can take a Reaction to make one melee attack against a creature that enters the 5-foot reach you have with that weapon."
@@ -4835,7 +4835,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "",
       "expectedBehavior": "You attempt to transform a creature that you can see within range into a Beast. The target must succeed on a Wisdom saving throw or shape-shift into a Beast form for the duration. That form can be any Beast you choose that has a Challenge Rating equal to or less than the target's (or the target's level if it doesn't have a Challenge Rating). The target's game statistics are replaced by the stat block of the chosen Beast, but the target retains its alignment, personality, creature type, Hit Points, and Hit Point Dice. The target gains a number of Temporary Hit Points equal to the Hit Points of the Beast form. These Temporary Hit Points vanish if any remain when the spell ends.The spell ends early on the target if it has no Temporary Hit Points left. The target is limited in the actions it can perform by the anatomy of its new form, and it can't speak or cast spells. The target's gear melds into the new form. The creature can't use or otherwise benefit from any of that equipment."
@@ -4894,7 +4894,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-SP-087-power-word-fortify-allocation-gates-unenforced.md",
       "class": "Spell",
       "triggerConditions": "Range: 60 feet",
       "expectedBehavior": "You fortify up to six creatures you can see within range. The spell bestows 120 Temporary Hit Points, which you divide among the spell's recipients."
@@ -4906,7 +4906,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Automation type: power_word_heal",
       "expectedBehavior": "A wave of healing energy washes over one creature you can see within range. The target regains all its Hit Points. If the creature has the Charmed, Frightened, Paralyzed, Poisoned, or Stunned condition, the condition ends. If the creature has the Prone condition, it can use its Reaction to stand up."
@@ -4918,7 +4918,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "",
       "expectedBehavior": "You compel one creature you can see within range to die. If the target has 100 Hit Points or fewer, it dies. Otherwise, it takes 12d12 Psychic damage."
@@ -4930,7 +4930,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "",
       "expectedBehavior": "You overwhelm the mind of one creature you can see within range. If the target has 150 Hit Points or fewer, it has the Stunned condition. Otherwise, its Speed is 0 until the start of your next turn. The Stunned target makes a Constitution saving throw at the end of each of its turns, ending the condition on itself on a success."
@@ -4942,7 +4942,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-SP-091-prayer-of-healing-short-rest-and-latch-missing.md",
       "class": "Spell",
       "triggerConditions": "Automation type: prayer_of_healing",
       "expectedBehavior": "Up to five creatures of your choice who remain within range for the spell's entire casting gain the benefits of a Short Rest and also regain 2d8 Hit Points. A creature can't be affected by this spell again until that creature finishes a Long Rest."
@@ -4954,7 +4954,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Ranger",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "You have Advantage on attack rolls against the creature currently marked by your Hunter's Mark."
@@ -4966,7 +4966,7 @@
       "handler": "src/services/combat/automation/handlers/maneuverHandler.js",
       "router": "src/services/combat/automation/routers/maneuverRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/maneuverInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-MN-014-precision-attack-trigger-inverted-never-on-miss.md",
       "class": "Fighter",
       "triggerConditions": "Action type: attack_rider; Trigger: attack_roll_miss; Uses: superiority_die",
       "expectedBehavior": "When you miss with an attack roll, you can expend one Superiority Die, roll the die, and add it to the attack roll, potentially turning the miss into a hit."
@@ -4978,7 +4978,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Cleric",
       "triggerConditions": "Action: action; Pool: 5 * cleric_level; Range: 30 ft",
       "expectedBehavior": "As a Action, you present your Holy Symbol and expend a use of your Channel Divinity to evoke healing energy that can restore a number of Hit Points equal to five times your Cleric level. Choose Bloodied creatures within 30 feet of yourself and divide those Hit Points among them."
@@ -4990,7 +4990,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "",
       "expectedBehavior": "You embody primal power. Your Strength and Constitution scores increase by 4, to a maximum of 25."
@@ -5002,7 +5002,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Ranger",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Magically summon a primal beast. Choose stat block: Beast of the Land (Medium, AC 13+Wis, HP 5+5xRanger level, Speed 40 ft climb, Beast's Strike 1d8+2+Wis Bludgeoning/Piercing/Slashing) Beast of the Sea (Medium, AC 13+Wis, HP 5+5xRanger level, Speed 5 ft swim 60 ft, Beast's Strike 1d6+2+Wis Bludgeoning/Piercing + Grappled) Beast of the Sky (Small, AC 13+Wis, HP 4+4xRanger level, Speed 10 ft fly 60 ft, Beast's Strike 1d4+3+Wis Slashing). The beast is Friendly to you and your allies. In combat, acts during your turn. Dodge action unless you take Bonus Action to command it. You can sacrifice one of your attacks to command Beast's Strike. Restoring: Action, touch dead beast (within 1 hour), expend spell slot, beast returns after 1 minute with all HP restored."
@@ -5014,7 +5014,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "You gain proficiency in another skill of your choice from the skill list available to Barbarians at level 1. In addition, while your Rage is active, you can channel primal power when you attempt certain tasks; whenever you make an ability check using one of the following skills, you can make it as a Strength check even if it normally uses a different ability: Acrobatics, Intimidation, Perception, Stealth, or Survival. When you use this ability, your Strength represents primal power coursing through you, honing your agility, bearing, and senses."
@@ -5026,7 +5026,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Druid",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "You have dedicated yourself to one of the following sacred roles of your choice. Magician: You know one extra cantrip from the Druid spell list. In addition, your mystical connection to nature gives you a bonus to your Intelligence (Arcana or Nature) checks. The bonus equals your Wisdom modifier (minimum bonus of +1). Warden: Trained for battle, you gain proficiency with Martial weapons and training with Medium armor."
@@ -5038,7 +5038,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-SP-092-prismatic-spray-10d6-not-12d6.md",
       "class": "Spell",
       "triggerConditions": "Automation type: prismatic_spray",
       "expectedBehavior": "Eight rays of light flash from you in a 60-foot Cone. Each creature in the Cone makes a Dexterity saving throw. For each target, roll 1d8 to determine which color ray affects it, consulting the Prismatic Rays table. Red. Failed Save: 12d6 Fire damage. Successful Save: Half as much damage. Orange. Failed Save: 12d6 Acid damage. Successful Save: Half as much damage. Yellow. Failed Save: 12d6 Lightning damage. Successful Save: Half as much damage. Green. Failed Save: 12d6 Poison damage. Successful Save: Half as much damage. Blue. Failed Save: 12d6 Cold damage. Successful Save: Half as much damage. Indigo. Failed Save: The target has the Restrained condition and makes a Constitution saving throw at the end of each of its turns. If it successfully saves three times the condition ends. If it fails three times1 it has the Petrified condition until it is freed by an effect like the Greater Restoration spell. The successes and failures needn't be consecutive; keep track of both until the target collects three of a kind. Violet. Failed Save: The target has the Blinded condition and makes a Wisdom saving throw at the start of your next turn. On a successful save the condition ends. On a failed save, the condition ends, and the creature teleports to another plane of existence (DM1 s choice). Special. The target is struck by two rays. Roll twice re-rolling any 8."
@@ -5050,7 +5050,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Wizard",
       "triggerConditions": "Action: 1 reaction; Range: 30",
       "expectedBehavior": "When a creature you can see within 30 feet takes damage, take Reaction to cause Arcane Ward to absorb damage. If ward reduced to 0 HP, warded creature takes remaining damage."
@@ -5062,7 +5062,7 @@
       "handler": "src/services/combat/automation/handlers/fightingStyleHandler.js",
       "router": "src/services/combat/automation/routers/fightingStyleRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/fightingStyleInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Fighting Style",
       "triggerConditions": "",
       "expectedBehavior": "When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield."
@@ -5074,7 +5074,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Action: 1 action; Range: Touch; Duration: Concentration, up to 1 hour",
       "expectedBehavior": "For the duration, the willing creature you touch has Resistance to one damage type of your choice: Acid, Cold, Fire, Lightning, or Thunder."
@@ -5086,7 +5086,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-SP-094-pfeg-charm-immunity-not-enforced-on-monster-save-chip-lane.md",
       "class": "Spell",
       "triggerConditions": "Action: 1 action; Range: Touch; Duration: Concentration, up to 10 minutes",
       "expectedBehavior": "Until the spell ends, one willing creature you touch is protected against creatures that are Aberrations, Celestials, Elementals, Fey, Fiends, or Undead. The protection grants several benefits. Creatures of those types have Disadvantage on attack rolls against the target. The target also can't be possessed by or gain the Charmed or Frightened conditions from them. If the target is already possessed, Charmed, or Frightened by such a creature, the target has Advantage on any new saving throw against the relevant effect."
@@ -5098,7 +5098,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Action: 1 action; Range: Touch; Duration: 1 hour",
       "expectedBehavior": "You touch a creature and end the Poisoned condition on it. For the duration, the target has Advantage on saving throws to avoid or end the Poisoned condition, and it has Resistance to Poison damage."
@@ -5110,7 +5110,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Trigger: any_damage; Action: 1 reaction",
       "expectedBehavior": "Reaction to reduce damage by Psionic Energy Die roll + Intelligence modifier."
@@ -5122,7 +5122,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Warlock",
       "triggerConditions": "Automation type: psychic_spells",
       "expectedBehavior": "When you cast a Warlock spell that deals damage, you can change its damage type to Psychic. When you cast a Warlock spell that is an Enchantment or Illusion, you can do so without Verbal or Somatic components."
@@ -5134,7 +5134,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Rogue",
       "triggerConditions": "Action: action; Range: self",
       "expectedBehavior": "Action, gain Invisible condition for 1 hour. Ends after dealing damage or forcing saving throw. Once per Long Rest (or expend Psionic Energy Die to restore)."
@@ -5146,7 +5146,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Rogue",
       "triggerConditions": "Failed ability check using a proficient skill/tool",
       "expectedBehavior": "If you fail an ability check using a skill or tool you have proficiency with, roll one Psionic Energy Die and add it to the check total; the die is expended only if the roll then succeeds. (Psionic Energy Dice per class_levels energy blocks: lv3 d6x4, lv5 d8x6, lv9 d8x8, lv11 d10x8, lv13 d10x10, lv17 d12x12. Psychic Whispers is CLA-276.)"
@@ -5158,7 +5158,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Sorcerer",
       "triggerConditions": "Automation type: psionic_sorcery",
       "expectedBehavior": "When you cast any level 1+ spell from Psionic Spells feature, cast by expending spell slot normally or spending Sorcery Points equal to spell's level. If cast using Sorcery Points, no Verbal or Somatic components, no Material components unless consumed or have cost."
@@ -5170,7 +5170,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Sorcerer",
       "triggerConditions": "Automation type: psionic_spells_list",
       "expectedBehavior": "Level 3: Arms of Hadar, Calm Emotions, Detect Thoughts, Dissonant Whispers, Mind Sliver. Level 5: Hunger of Hadar, Sending. Level 7: Evard's Black Tentacles, Summon Aberration. Level 9: Rary's Telepathic Bond, Telekinesis."
@@ -5182,7 +5182,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Action: 1 reaction",
       "expectedBehavior": "Psionic Strike. You can propel your weapons with psionic force. Once on each of your turns, immediately after you hit a target within 30 feet of yourself with an attack and deal damage to it with a weapon, you can expend one Psionic Energy Die, rolling it and dealing Force damage to the target equal to the number rolled plus your Intelligence modifier."
@@ -5194,7 +5194,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Rogue",
       "triggerConditions": "Action: bonus_action; Uses: psionic_energy_die",
       "expectedBehavior": "Manifest shimmering blades of psychic energy. When you take Attack action or make Opportunity Attack, manifest Psychic Blade in free hand. Simple Melee, 1d6 Psychic + ability modifier, Finesse, Thrown (60/120), Mastery: Vex (doesn't count against Weapon Mastery). Vanishes after hit/miss. After attacking, can make melee or ranged attack with second psychic blade as Bonus Action (1d4 damage)."
@@ -5206,7 +5206,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Sorcerer",
       "triggerConditions": "Passive",
       "expectedBehavior": "Resistance to Psychic damage. Advantage on saving throws to avoid/end Charmed or Frightened condition. (Sorcerer Aberrant Sorcery - Psychic Defenses)"
@@ -5218,7 +5218,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Rogue",
       "triggerConditions": "Passive; Rogue Psychic Blades feature",
       "expectedBehavior": "Your psychic blades whisper secrets to you. You can communicate telepathically with creatures within range, and your psychic blades deal extra psychic damage. (Rogue Soulknife feature - Psychic Whispers)"
@@ -5230,7 +5230,7 @@
       "handler": "src/services/combat/automation/handlers/weaponMasteryHandler.js",
       "router": "src/services/combat/automation/routers/weaponMasteryRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/weaponMasteryInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "",
       "expectedBehavior": "If you hit a creature with this weapon, you can push the creature up to 10 feet straight away from yourself if it is Large or smaller."
@@ -5242,7 +5242,7 @@
       "handler": "src/services/combat/automation/handlers/maneuverHandler.js",
       "router": "src/services/combat/automation/routers/maneuverRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/maneuverInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Action type: attack_rider; Trigger: weapon_attack_hit; Uses: superiority_die",
       "expectedBehavior": "When you hit a creature with an attack roll using a weapon or an Unarmed Strike, you can expend one Superiority Die to attempt to push the target. Add the Superiority Die to the attack's damage roll. If the target is Large or smaller, it must succeed on a Strength saving throw or be pushed up to 15 feet directly away from you."
@@ -5254,7 +5254,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Monk",
       "triggerConditions": "Trigger: action; Action: passive",
       "expectedBehavior": "You gain the ability to set up lethal vibrations in someone's body. When you hit a creature with an Unarmed Strike, you can expend 4 Focus Points to start these imperceptible vibrations, which last for a number of days equal to your Monk level. The vibrations are harmless unless you take an action to end them. Alternatively, when you take the Attack action on your turn, you can forgo one of the attacks to end the vibrations. To end them, you and the target must be on the same plane of existence. When you end them, the target must make a Constitution saving throw, taking 10d12 Force damage on a failed save or half as much damage on a successful one. You can have only one creature under the effect of this feature at a time. You can end the vibrations harmlessly (no action required)."
@@ -5266,7 +5266,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Cleric",
       "triggerConditions": "Action: 1 action",
       "expectedBehavior": "As a Action, you present your Holy Symbol and expend a use of your Channel Divinity to emit a flash of light in a 30-foot Emanation originating from yourself. Any magical Darkness in that area is dispelled. Each creature of your choice in that area must make a Constitution saving throw or take Radiant damage equal to 2d10 plus your Cleric level."
@@ -5278,7 +5278,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Warlock",
       "triggerConditions": "Automation type: radiant_soul",
       "expectedBehavior": "Resistance to Radiant damage. Once per turn, when a spell you cast deals Radiant or Fire damage, add Charisma modifier to that spell's damage against one of the spell's targets."
@@ -5290,7 +5290,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Paladin",
       "triggerConditions": "Trigger: melee_weapon_hit; Once per turn: no",
       "expectedBehavior": "Your strikes now carry supernatural power. When you hit a target with an attack roll using a Melee weapon or Unarmed Strike, the target takes extra 1d8 Radiant damage."
@@ -5302,7 +5302,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "Action: undefined; Duration: until_next_turn_extendable",
       "expectedBehavior": "You can imbue yourself with a primal power called Rage, a force that grants you extraordinary might and resilience. You can enter it as a Bonus Action if you aren't wearing Heavy armor. You can enter your Rage the number of times shown for your Barbarian level in the Rages column of the Barbarian Features table. You Regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. While active, your Rage follows the rules below. Damage Resistance: You have Resistance to Bludgeoning, Piercing, and Slashing damage. Rage Damage: When you make an attack using Strength with either a weapon or an Unarmed Strike and deal damage to the target, you gain a bonus to the damage that increases as you gain levels as a Barbarian, as shown in the Rage Damage column of the Barbarian Features table. Strength Advantage: You have Advantage on Strength checks and Strength saving throws. No Concentration or Spells: You can't maintain Concentration, and you can't cast spells. Duration: The Rage lasts until the end of your next turn, and it ends early if you don Heavy armor or have the Incapacitated condition. If your Rage is still active on your next turn, you can extend the Rage for another round by doing one of the following: Make an attack roll against an enemy. Force an enemy to make a saving throw. Take a Bonus Action to extend your Rage. Each time the Rage is extended, it lasts until the end of your next turn. You can maintain a Rage for up to 10 minutes."
@@ -5314,7 +5314,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "Action: undefined; Duration: 1_minute",
       "expectedBehavior": "When you activate your Rage, you can assume the form of a divine warrior. This form lasts for 1 minute or until you drop to 0 Hit Points. Once you use this feature, you can't do so again until you finish a Long Rest. While in this form, you gain the benefits below. Flight: You have a Fly Speed equal to your Speed and can hover. Resistance: You have Resistance to Necrotic, Psychic, and Radiant damage. Revivification: When a creature within 30 feet of you would drop to 0 Hit Points, you can take a Reaction to expend a use of your Rage to instead change the target's Hit Points to a number equal to your Barbarian level."
@@ -5326,7 +5326,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "Action: undefined; Duration: while_raging",
       "expectedBehavior": "Your Rage taps into the primal power of animals. Whenever you activate your Rage, you gain one of the following options of your choice. Bear: While your Rage is active, you have Resistance to every damage type except Force, Necrotic, Psychic, and Radiant. Eagle: When you activate your Rage, you can take the Disengage and Dash actions as part of that Bonus Action. While your Rage is active, you can take a Bonus Action to take both of those actions. Wolf: While your Rage is active, your allies have Advantage on attack rolls against any enemy of yours within 5 feet of you."
@@ -5338,7 +5338,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-SP-096-regenerate-pc-initial-heal-negative.md",
       "class": "Spell",
       "triggerConditions": "Automation type: healing_start_of_turn",
       "expectedBehavior": "A creature you touch regains 4d8 + 15 Hit Points. For the duration, the target regains 1 Hit Point at the start of each of its turns, and any severed body parts regrow after 2 minutes."
@@ -5350,7 +5350,7 @@
       "handler": "src/services/combat/automation/handlers/maneuverHandler.js",
       "router": "src/services/combat/automation/routers/maneuverRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/maneuverInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Action type: bonus_action; Uses: superiority_die",
       "expectedBehavior": "As a Bonus Action, you can expend one Superiority Die to bolster the resolve of a companion. Choose an ally within 30 feet who can see or hear you. That creature gains Temporary Hit Points equal to the Superiority Die roll + half your Fighter level (rounded down)."
@@ -5362,7 +5362,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "",
       "expectedBehavior": "A beam of enervating energy shoots from you toward a creature within range. The target must make a Constitution saving throw. On a successful save, the target has Disadvantage on the next attack roll it makes until the start of your next turn. On a failed save, the target has Disadvantage on Strength-based d20 tests for the duration. During that time, it also subtracts 1d8 from all its damage rolls. The target repeats the save at the end of each of its turns, ending the spell on a success."
@@ -5374,7 +5374,7 @@
       "handler": "src/services/automation/handlers/reactions/reactionSpellHandler.js",
       "router": "src/services/combat/automation/automationRouter.js",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/reaction.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "War Caster Feat (misattributed — not a Wizard class feature)",
       "triggerConditions": "Reaction; when creature_leaves_reach provokes opportunity attack (2024 War Caster feat benefits[2] automation type reaction_spell)",
       "expectedBehavior": "CANONICAL 2024 War Caster feat benefit (feats.json benefits[2], automation type reaction_spell, trigger creature_leaves_reach) — misattributed to Wizard classFeature in manifest; no class grants it. When a creature provokes an Opportunity Attack from you by leaving your reach, use your Reaction to cast a spell at that creature instead of the Opportunity Attack. Spell must have casting time 1 action and target only that creature. Real impl: automationRouter.js:384 -> handlers/reactions/reactionSpellHandler.js -> CharReactions.jsx (applyWarCasterReaction)."
@@ -5386,7 +5386,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "Action: passive; Range: self",
       "expectedBehavior": "You can throw aside all concern for defense to attack with increased ferocity. When you make your first attack roll on your turn, you can decide to attack recklessly. Doing so gives you Advantage on attack rolls using Strength until the start of your next turn, but attack rolls against you have Advantage during that time."
@@ -5398,7 +5398,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Once per turn, when you use a maneuver, roll 1d8 and use the number instead of expending a Superiority Die."
@@ -5410,7 +5410,7 @@
       "handler": "src/services/automation/handlers/class-cleric-paladin/relentlessAvengerHandler.js (speed_zero on target until end of current turn)",
       "router": "src/services/automation/index.js (relentless_avenger :412)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/core-handlers.js (relentless_avenger)",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Paladin",
       "triggerConditions": "Reaction: after your Opportunity Attack hits a creature (per classes.json description)",
       "expectedBehavior": "When you hit a creature with an Opportunity Attack, reduce creature's Speed to 0 until end of current turn. Move up to half Speed as part of same Reaction."
@@ -5422,7 +5422,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Orc (2024) / Half-Orc (5e) racial trait",
       "triggerConditions": "Trigger: reduced_to_0_hp; Action: passive",
       "expectedBehavior": "When you are reduced to 0 Hit Points but not killed outright, you can drop to 1 Hit Point instead. Once you use this trait, you can't do so again until you finish a Long Rest."
@@ -5434,7 +5434,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Ranger",
       "triggerConditions": "",
       "expectedBehavior": "Taking damage can't break your Concentration on Hunter's Mark."
@@ -5446,7 +5446,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "Your Rage can keep you fighting despite grievous wounds. If you drop to 0 Hit Points while your Rage is active and don't die outright, you can make a DC 10 Constitution saving throw. If you succeed, your Hit Points instead change to a number equal to twice your Barbarian level. Each time you use this feature after the first, the DC increases by 5. When you finish a Short or Long Rest, the DC resets to 10."
@@ -5458,7 +5458,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Rogue",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "Whenever you make an ability check that uses one of your skill or tool proficiencies, you can treat a d20 roll of 9 or lower as a 10."
@@ -5470,7 +5470,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "passive_rule initiative_advantage; conditional_advantage STR ability_check (remarkable_athlete_athletics); auto_effect crit_hit remarkable_athlete_movement — Fighter Champion major lv3 (2024 classes.json)",
       "expectedBehavior": "Advantage on Initiative and Strength (Athletics) checks. After Critical Hit, move up to half Speed without Opportunity Attacks."
