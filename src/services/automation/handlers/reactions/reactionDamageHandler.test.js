@@ -97,7 +97,10 @@ function makeAction(overrides = {}) {
 }
 
 describe('reactionDamageHandler', () => {
-    describe('polearm trigger validation', () => {
+    // FT-103: polearm lane re-keyed to EQUIPPED state (playerStats.inventory.equipped)
+    // + armed-target (resolveTarget) — the campaign-global lastAttack weapon identity
+    // and lastAttack.attackerName target-piggyback are gone (FT-102 stale-gate family).
+    describe('polearm trigger validation (FT-103 equipped-state gate)', () => {
         it('returns popup when isPolearmWeapon returns false', async () => {
             const action = makeAction({ automation: { trigger: 'creature_enters_reach_while_holding_polearm' } });
 
@@ -108,18 +111,26 @@ describe('reactionDamageHandler', () => {
             const result = await handle(action, makePlayerStats(), 'test-campaign', null, []);
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('requires you to be holding');
+            // FT-103: no lastAttack identity and no target slot — the holding refusal
+            // fires from equipped state and the Reaction spends nothing.
+            expect(findLastAttack).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                automationType: 'reactive_strike_refused',
+            }));
         });
 
         it('passes polearm check with Quarterstaff, Spear, or Heavy+Reach weapon', async () => {
             const action = makeAction({ automation: { trigger: 'creature_enters_reach_while_holding_polearm' } });
             const { isPolearmWeapon } = await import('../../common/polearmUtils.js');
+            resolveTarget.mockResolvedValue({ target: { name: 'Bandit 1' } });
+            getCombatContext.mockResolvedValue({ round: 1, creatures: [{ name: 'Bandit 1', currentHp: 11 }] });
 
             // Quarterstaff
             const ps1 = makePlayerStats({
                 inventory: { equipped: ['Quarterstaff'] },
                 attacks: [{ name: 'Shortsword', type: 'Action', range: 5, damage: '1d6+3' }],
             });
-            findLastAttack.mockResolvedValue({ attackEvent: { damageName: 'Quarterstaff' } });
             isPolearmWeapon.mockResolvedValue(true);
             let result = await handle(action, ps1, 'test-campaign', null, []);
             expect(result.payload.attack.name).toBe('Shortsword');
@@ -129,7 +140,6 @@ describe('reactionDamageHandler', () => {
                 inventory: { equipped: ['Spear'] },
                 attacks: [{ name: 'Spear', type: 'Action', range: 5, damage: '1d6+3' }],
             });
-            findLastAttack.mockResolvedValue({ attackEvent: { damageName: 'Spear' } });
             result = await handle(action, ps2, 'test-campaign', null, []);
             expect(result.payload.attack.name).toBe('Spear');
 
@@ -138,7 +148,6 @@ describe('reactionDamageHandler', () => {
                 inventory: { equipped: ['Greatclub'] },
                 attacks: [{ name: 'Greatclub', type: 'Action', range: 5, damage: '1d8+3' }],
             });
-            findLastAttack.mockResolvedValue({ attackEvent: { damageName: 'Greatclub' } });
             result = await handle(action, ps3, 'test-campaign', null, []);
             expect(result.payload.attack.name).toBe('Greatclub');
         });

@@ -63,8 +63,10 @@ function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, '_Nick_UsedRound', null, campaignName)
     setRuntimeValue(creatureName, '_PsychicBlade_attack_round', null, campaignName)
     setRuntimeValue(creatureName, '_PsychicBlade_secondBlade_round', null, campaignName)
-    setRuntimeValue(creatureName, '_Retaliation_usedRound', null, campaignName)
-    setRuntimeValue(creatureName, '_ShadowyDodge_usedRound', null, campaignName)
+    // FT-103: Reactive Strike round latch joins the CLA-297 Retaliation family here.
+    for (const latchKey of ['_Retaliation_usedRound', '_Reactive_Strike_usedRound', '_ShadowyDodge_usedRound']) {
+        setRuntimeValue(creatureName, latchKey, null, campaignName)
+    }
     setRuntimeValue(creatureName, '_ShadowyDodge_appliedAttack', null, campaignName)
     setRuntimeValue(creatureName, '_Slow_Fall_usedRound', null, campaignName)
     // FT-104: Dual Wielder once-per-turn extra attack latch re-arms on initiative roll.

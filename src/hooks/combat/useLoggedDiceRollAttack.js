@@ -185,6 +185,12 @@ function secondaryConditionTransportField(context) {
     return { secondaryCondition: context?.secondaryCondition ?? null };
 }
 
+// FT-103: reaction-lane marker rides the popup auto-damage transport so the
+// standalone damage pipeline skips own-turn-only riders (Charger, Shield Bash).
+function opportunityAttackTransportField(context) {
+    return { isOpportunityAttack: context?.isOpportunityAttack || false };
+}
+
 function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRef, targetName }) {
     if (!context?.autoDamageFormula) return undefined;
     return {
@@ -218,6 +224,7 @@ function buildAutoDamage({ context, name, characterName, ctx, autoDamageSourceRe
         ripostePopup: context.ripostePopup,
         source: autoDamageSourceRef?.current || characterName,
         isAutoCrit: ctx.isCrit,
+        ...opportunityAttackTransportField(context),
         sneakAttackDice: context?.sneakAttackDice || 0,
         d20Roll: ctx.effectiveD20Roll,
         hitClause: context?.hitClause || null,

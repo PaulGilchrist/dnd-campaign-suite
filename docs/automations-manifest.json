@@ -4823,7 +4823,7 @@
       "handler": "src/services/automation/handlers/reactions/reactionDamageHandler.js",
       "router": "src/services/automation/index.js (reaction_damage :334)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/reaction.js (reaction_damage)",
-      "verified": "broken — see .opencode/plans/bug-FT-103-reactive-strike-no-reach-entry-trigger-row-blocked.md",
+      "verified": "verified",
       "class": "Feat",
       "triggerConditions": "Reaction: while holding a polearm, a creature enters the 5 ft reach you have with it",
       "expectedBehavior": "While you're holding a Quarterstaff, a Spear, or a weapon that has the Heavy and Reach properties, you can take a Reaction to make one melee attack against a creature that enters the 5-foot reach you have with that weapon."

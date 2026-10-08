@@ -26,6 +26,14 @@ const THOUGHT_SHIELD_ROUND_KEY = '_Thought_Shield_usedRound';
 // initiative.jsx / navigationHandlers.js).
 const ADJACENT_DAMAGE_REACTION_ROUND_KEY = '_Retaliation_usedRound';
 
+// FT-103: Reactive Strike ("While you're holding a Quarterstaff, a Spear, or a
+// weapon that has the Heavy and Reach properties... one melee attack against a
+// creature that enters the 5-foot reach") — once-per-round Reaction latch on the
+// holder's name, round from a FRESH getCombatContext (CLA-361/CLA-297 family).
+// Cleared at round wrap in Initiative.jsx clearPlayerRoundFlags +
+// navigationHandlers.js PLAYER_ROUND_LATCH_KEYS.
+const REACTIVE_STRIKE_ROUND_KEY = '_Reactive_Strike_usedRound';
+
 // CLA-158: Hand of Harm ("When a creature you can see within 5 feet of you hits
 // on an attack roll...") — holder-targeted round latch, CLA-361/CLA-383 family.
 // Cleared at round wrap in Initiative.jsx clearPlayerRoundFlags +
@@ -120,7 +128,9 @@ function refusalPopup(action, auto, description) {
 
 // Gates for the generic no-save reaction_damage consumers whose data declares
 // trigger 'damage_from_adjacent_creature' (CLA-297 Retaliation). Other triggers
-// (Guardian's ally-defense OA, Reactive Strike's polearm reach) are NOT gated here.
+// (Guardian's ally-defense OA) are NOT gated here; Reactive Strike's
+// creature_enters_reach_while_holding_polearm trigger rides its own dedicated
+// FT-103 lane (gateReactiveStrike) and never reaches handleMeleeReactionAttack.
 async function gateAdjacentDamageReaction(action, auto, playerStats, lastAttackResult, campaignName) {
     const playerName = playerStats.name;
     const lastAttack = lastAttackResult.attackEvent;
@@ -244,8 +254,7 @@ export async function handle(action, playerStats, campaignName, _mapName, charac
     }
 
     if (auto?.trigger === 'creature_enters_reach_while_holding_polearm') {
-        const refusal = await gatePolearmReachTrigger(action, auto, campaignName);
-        if (refusal) return refusal;
+        return await handleReactiveStrike(action, auto, playerStats, campaignName);
     }
 
     if (auto?.trigger === 'damage_taken_of_chosen_resistance_type') {
@@ -373,19 +382,128 @@ async function applySaveFailureEffects({ auto, action, playerStats, campaignName
     applyFailPhysiciansTouch({ playerStats, campaignName, targetName });
 }
 
-async function gatePolearmReachTrigger(action, auto, campaignName) {
-    const lastAttackResult = await findLastAttack(campaignName);
-    const lastAttack = lastAttackResult.attackEvent;
-    const weaponName = lastAttack?.damageName || lastAttack?.attackName;
-    const hasWeapon = await isPolearmWeapon(weaponName);
-    if (hasWeapon) return null;
+// FT-102 (FIXED, ea10fa115): refusals log `automation` + `<feature>_refused`
+// with a reason token (playbook §5, CLA-337 shape) — popup-only refusals were
+// the §7 gap. FT-103 Reactive Strike spends its Reaction as a round latch on
+// the holder, so refusals are zero-spend: nothing stamped, nothing logged spent.
+function reactiveStrikeRefuse(action, playerName, campaignName, description) {
+    addEntry(campaignName, {
+        type: 'automation',
+        characterName: playerName,
+        automationType: 'reactive_strike_refused',
+        name: action.name,
+        description,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[reactiveStrike] Error logging refusal:', e); });
+    return refusalPopup(action, action.automation, description);
+}
+
+// FT-103: resolve the Reactive Strike attack — the RAW says "one melee attack
+// against a creature that enters the 5-foot reach you have WITH THAT WEAPON",
+// so the equipped polearm's action row is the canonical dice source (Glaive =
+// 1d10+Slashing+STR). Equipped state comes from playerStats.inventory.equipped,
+// NEVER the campaign-global lastAttack weapon identity (FT-102 stale-gate family:
+// ~12 rider/consume seams re-stamp lastAttack full-replacement — playbook §2523).
+async function findEquippedPolearmAttack(playerStats) {
+    const equipped = playerStats.inventory?.equipped || [];
+    const polearmNames = [];
+    for (const name of equipped) {
+        const baseName = String(name).replace(/\s*\+\s*\d+\b.*$/, '').trim();
+        if (await isPolearmWeapon(name) || await isPolearmWeapon(baseName)) {
+            polearmNames.push(name);
+        }
+    }
+    if (polearmNames.length === 0) return null;
+    const attacks = playerStats.attacks || [];
+    const polearmMelee = attacks.filter(a =>
+        a.type === 'Action' && polearmNames.includes(a.weaponName || a.name));
+    // RAW Reactive Strike is a MELEE attack with that weapon — prefer the
+    // melee row over a thrown-Spear ranged row of the same name.
+    return polearmMelee.find(a => a.range === MELEE_REACH_FEET)
+        || polearmMelee[0]
+        || attacks.find(a => a.type === 'Action' && a.range === MELEE_REACH_FEET)
+        || attacks[0]
+        || null;
+}
+
+// FT-103: target-identity refusals for the reach-entry gate (target rides the
+// armed-target slot — the entering creature the GM selected on the initiative
+// card, same seam the OA lane uses).
+function reactiveStrikeTargetRefusal(action, cs, targetName, playerName, refuse) {
+    if (!targetName) {
+        return refuse(`${action.name} requires a target — select the entering creature as your target and try again. Nothing was spent.`);
+    }
+    if (targetName === playerName) {
+        return refuse(`${action.name}: you cannot attack yourself — the triggering creature must be another creature.`);
+    }
+    const targetCreature = cs?.creatures?.find(c => c.name === targetName);
+    if (targetCreature && targetCreature.currentHp <= 0) {
+        return refuse(`${targetName} is already defeated. Cannot make a Reactive Strike against a creature that's already down.`);
+    }
+    return null;
+}
+
+// FT-103: gridless GM-adjudicated reach-entry model — token movement is grep-zero
+// app-wide (playbook §70) and EB-joined combatants arrive tokenless (CLA-046), so
+// the GM clicks the row when a creature enters reach and the entering creature rides
+// the armed-target slot (same verified seam the OA lane uses, CharReactions.jsx
+// handleOpportunityAttack / resolveTarget). Gate order: round latch → equipped
+// polearm → target identity → range. Refusals spend nothing.
+async function gateReactiveStrike(action, auto, playerStats, campaignName) {
+    const playerName = playerStats.name;
+    const refuse = (description) => reactiveStrikeRefuse(action, playerName, campaignName, description);
+
+    const cs = await getCombatContext(campaignName);
+    const currentRound = Number(cs?.round ?? 1);
+    const usedRound = Number(getRuntimeValue(playerName, REACTIVE_STRIKE_ROUND_KEY, campaignName) ?? 0);
+    if (usedRound === currentRound) {
+        return { refusal: refuse(`You have already used ${action.name} this round — your Reaction is spent until your next turn.`) };
+    }
+
+    const attack = await findEquippedPolearmAttack(playerStats);
+    if (!attack) {
+        return { refusal: refuse(`${action.name} requires you to be holding a Quarterstaff, Spear, or a weapon with the Heavy and Reach properties.`) };
+    }
+
+    const targetInfo = await resolveTarget(campaignName, playerName);
+    const targetName = targetInfo?.target?.name || null;
+    const targetRefusal = reactiveStrikeTargetRefusal(action, cs, targetName, playerName, refuse);
+    if (targetRefusal) return { refusal: targetRefusal };
+
+    const rangeFt = rangeToFeet(auto.range) ?? 5;
+    const inRange = await isWithinRange(playerName, targetName, rangeFt);
+    if (!inRange) {
+        return { refusal: refuse(`${targetName} is not within ${rangeFt} feet of you. ${action.name} attacks a creature entering the ${rangeFt}-foot reach you have with your polearm.`) };
+    }
+
+    return { attack, targetName, currentRound, rangeFt };
+}
+
+async function handleReactiveStrike(action, auto, playerStats, campaignName) {
+    const gate = await gateReactiveStrike(action, auto, playerStats, campaignName);
+    if (gate.refusal) return gate.refusal;
+    const { attack, targetName, currentRound, rangeFt } = gate;
+
+    // Stamp the latch BEFORE the attack resolves (CLA-361 order) so a spent
+    // Reaction cannot refire within the round even if the attack popup is
+    // abandoned mid-flight.
+    await setRuntimeValue(playerStats.name, REACTIVE_STRIKE_ROUND_KEY, currentRound, campaignName);
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: `${playerStats.name} used ${action.name} (Reaction) — melee attack against ${targetName}, who entered the ${rangeFt}-foot reach of their ${attack.name}.`,
+        targetName,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[reactiveStrike] Error logging ability_use:', e); });
+
     return {
-        type: 'popup',
+        type: 'attack_roll',
         payload: {
-            type: 'automation_info',
-            name: action.name,
-            description: `${action.name} requires you to be holding a Quarterstaff, Spear, or a weapon with the Heavy and Reach properties.`,
-            automation: auto,
+            attack,
+            targetName,
+            sourceName: action.name,
         },
     };
 }

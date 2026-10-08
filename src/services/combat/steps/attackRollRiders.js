@@ -120,7 +120,10 @@ export function buildChargerStep() {
     name: 'charger',
     subscribe: 'cunning:checked',
     emit: 'charger:checked',
-    condition: (ctx) => ctx.hit && ['melee', 'unarmed'].includes(ctx.attack?.weaponType) && !!ctx.playerStats.automation?.passives,
+    // FT-103: Charger requires the Attack action on your own turn — never a
+    // reaction/opportunity attack, and the standalone popup-Done pipeline has
+    // no modal renderer, so an un-gated chooser also wedges the damage chain.
+    condition: (ctx) => ctx.hit && !ctx.isOpportunityAttack && ['melee', 'unarmed'].includes(ctx.attack?.weaponType) && !!ctx.playerStats.automation?.passives,
     handler: async (ctx) => {
       const a = (ctx.playerStats.automation?.passives || []).find(
         p => p.type === 'attack_rider' && p.trigger === 'melee_hit_after_10ft_charge' && p.chooseOne

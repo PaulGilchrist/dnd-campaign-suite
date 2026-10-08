@@ -2,7 +2,7 @@
 // @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CharReactions from './CharReactions.jsx';
 
 vi.mock('../common/popup.jsx', () => ({
@@ -260,7 +260,32 @@ describe('CharReactions - Edge Cases', () => {
         expect(screen.getByText('Custom Reaction:')).toHaveClass('clickable');
     });
 
-    it('renders reactive strike as non-clickable', () => {
+    // FT-103 (inverted pin): the `reaction.name !== 'Reactive Strike'` hard-block
+    // was removed — the automation-backed row is clickable and dispatches through
+    // the generic hasAutomation → executeHandler lane.
+    it('renders reactive strike as clickable when it carries automation (FT-103)', async () => {
+        hasAutomation.mockImplementation((r) => !!(r && r.automation));
+        executeHandler.mockResolvedValue(null);
+        const props = createProps({
+            playerStats: {
+                ...basePlayerStats,
+                reactions: [
+                    {
+                        name: 'Reactive Strike',
+                        description: 'Reactive strike desc',
+                        automation: { type: 'reaction_damage', trigger: 'creature_enters_reach_while_holding_polearm' },
+                    },
+                ],
+            },
+        });
+        render(<CharReactions {...props} />);
+        const row = screen.getByText('Reactive Strike:');
+        expect(row).toHaveClass('clickable');
+        fireEvent.click(row);
+        await waitFor(() => expect(executeHandler).toHaveBeenCalled());
+    });
+
+    it('renders automation-less reactive strike as non-clickable', () => {
         const props = createProps({
             playerStats: {
                 ...basePlayerStats,

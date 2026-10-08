@@ -69,7 +69,10 @@ function logShieldBashSaveResult(ctx, saveResult, targetName, saveDc, success) {
 
 export const shieldBash = {
   name: 'shieldBash',
-  condition: (ctx) => !!ctx.playerStats.automation?.passives,
+  // FT-103: Shield Bash rides the Attack action on your own turn — never a
+  // reaction; un-gated it self-selects off campaign lastAttack in the
+  // standalone popup-Done lane and wedges the damage chain on its save prompt.
+  condition: (ctx) => !!ctx.playerStats.automation?.passives && !ctx.isOpportunityAttack,
   handler: async (ctx, prevData) => {
     const passives = ctx.playerStats.automation?.passives || [];
 

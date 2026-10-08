@@ -162,6 +162,7 @@ function buildNormalizedCtx(autoDamage, isCrit, empoweredEvocationModifier) {
     metamagicTwinTarget: autoDamage.metamagicTwinTarget || null,
     autoDamageSchool: autoDamage.autoDamageSchool || '',
     d20Roll: autoDamage.d20Roll,
+    isOpportunityAttack: autoDamage.isOpportunityAttack || false,
   };
 }
 

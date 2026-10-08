@@ -36,6 +36,8 @@ const PLAYER_ROUND_LATCH_KEYS = [
     '_PsychicBlade_attack_round',
     '_PsychicBlade_secondBlade_round',
     '_Retaliation_usedRound',
+    // FT-103: Polearm Master Reactive Strike once-per-round Reaction latch re-arms at round wrap.
+    '_Reactive_Strike_usedRound',
     '_ShadowyDodge_usedRound',
     '_ShadowyDodge_appliedAttack',
     '_Slow_Fall_usedRound',
