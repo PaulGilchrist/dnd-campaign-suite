@@ -4811,7 +4811,7 @@
       "handler": "src/services/automation/handlers/combat/bonusActionAttackHandler.js",
       "router": "src/services/automation/index.js (bonus_action_attack :312)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/attack.js (bonus_action_attack)",
-      "verified": "broken — see .opencode/plans/bug-FT-102-pole-strike-stale-attack-gate.md",
+      "verified": "verified",
       "class": "Feat",
       "triggerConditions": "Bonus Action: after the Attack action with a Quarterstaff, Spear, or Heavy+Reach weapon",
       "expectedBehavior": "Immediately after you take the Attack action and attack with a Quarterstaff, a Spear, or a weapon that has the Heavy and Reach properties, you can use a Bonus Action to make a melee attack with the opposite end of the weapon. The weapon deals Bludgeoning damage, and the weapon's damage die for this attack is a d4."

@@ -29,18 +29,53 @@ function pickBonusAttackWeapon(playerStats) {
         || null;
 }
 
-async function checkPolearmRequirement(action, campaignName) {
+// FT-102: "Immediately after you take the Attack action and attack with a
+// Quarterstaff, Spear, or a Heavy and Reach weapon" (2024 feats.json). The old
+// gate only matched the weapon name on the campaign-global lastAttack — no
+// attacker identity, no turn freshness — so a stale polearm lastAttack from a
+// previous turn (or another creature's polearm lastAttack) fired the bonus
+// attack. Gate now requires: (1) lastAttack is a polearm (existing refusal
+// popup byte-identical), (2) lastAttack.attackerName is the player, and (3)
+// the CLA-143 round latch `_attackActionTakenRound` (armed by the
+// Attack-action row lane, useCharActionsAttackHandlers.js) is stamped at the
+// current round read fresh from getCombatContext (playbook §5). Once-per-Attack
+// action stays enforced by lastAttack identity: once Pole Strike resolves,
+// lastAttack.attackName is 'Pole Strike' (not a polearm) until the next
+// Attack-action polearm attack re-arms.
+async function checkPolearmRequirement(action, playerStats, campaignName, logRefusal) {
     const lastAttackResult = await findLastAttack(campaignName);
     const lastAttack = lastAttackResult.attackEvent;
     const weaponName = lastAttack?.damageName || lastAttack?.attackName;
     const isPolearm = await isPolearmWeapon(weaponName);
-    if (isPolearm) return null;
+    if (!isPolearm) {
+        const reason = `${action.name} requires you to be holding a Quarterstaff, Spear, or a weapon with the Heavy and Reach properties.`;
+        await logRefusal(reason);
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: reason,
+                automation: action.automation,
+            },
+        };
+    }
+
+    const cs = await getCombatContext(campaignName);
+    const currentRound = Number(cs?.round ?? 0);
+    const armedRound = Number(getRuntimeValue(playerStats.name, '_attackActionTakenRound', campaignName) ?? 0);
+    if (armedRound > 0 && armedRound === currentRound && lastAttack?.attackerName === playerStats.name) {
+        return null;
+    }
+
+    const reason = `${action.name} must be taken immediately after you attack with a Quarterstaff, Spear, or a Heavy and Reach weapon as part of the Attack action on your current turn.`;
+    await logRefusal(reason);
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: action.name,
-            description: `${action.name} requires you to be holding a Quarterstaff, Spear, or a weapon with the Heavy and Reach properties.`,
+            description: reason,
             automation: action.automation,
         },
     };
@@ -240,19 +275,8 @@ export async function handle(action, playerStats, campaignName, _mapName, _allEq
     const auto = action.automation;
     const isPolearm = auto?.trigger === 'after_attack_action_with_polearm';
 
-    if (isPolearm || auto?.weaponRequirement === 'quarterstaff_spear_heavy_reach') {
-        const invalid = await checkPolearmRequirement(action, campaignName);
-        if (invalid) return invalid;
-    }
-
-    // CLA-382: bonus-action-attack rows dispatch the RAW classes.json automation,
-    // which carries only `uses_expression` ("WIS modifier_min_1"), never a baked
-    // usesMax — the old gate saw usesMax=0 and skipped, so War Priest was an
-    // unlimited popup-only row. Resolve the expression here (mirrors the verified
-    // bardicInspiration/stepsOfTheFey pattern).
-    const usesMax = resolveUsesMax(auto, playerStats);
-    const usesKey = auto.resourceKey || 'warPriestUses';
-
+    // FT-102: hoisted above the polearm gate so trigger refusals also log
+    // `automation` + `<feature>_refused` (playbook §5, zero spend).
     const logRefusal = async (reason) => {
         await addEntry(campaignName, {
             type: 'automation',
@@ -274,6 +298,19 @@ export async function handle(action, playerStats, campaignName, _mapName, _allEq
             automation: auto,
         },
     });
+
+    // CLA-382: bonus-action-attack rows dispatch the RAW classes.json automation,
+    // which carries only `uses_expression` ("WIS modifier_min_1"), never a baked
+    // usesMax — the old gate saw usesMax=0 and skipped, so War Priest was an
+    // unlimited popup-only row. Resolve the expression here (mirrors the verified
+    // bardicInspiration/stepsOfTheFey pattern).
+    const usesMax = resolveUsesMax(auto, playerStats);
+    const usesKey = auto.resourceKey || 'warPriestUses';
+
+    if (isPolearm || auto?.weaponRequirement === 'quarterstaff_spear_heavy_reach') {
+        const invalid = await checkPolearmRequirement(action, playerStats, campaignName, logRefusal);
+        if (invalid) return invalid;
+    }
 
     if (usesMax > 0) {
         const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);

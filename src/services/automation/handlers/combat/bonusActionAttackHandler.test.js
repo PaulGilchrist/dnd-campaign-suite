@@ -98,6 +98,14 @@ function armCombat(targetName = 'Goblin') {
     getTargetFromAttacker.mockImplementation((cs, attackerName) => cs?.creatures?.find(c => c.name === cs?.creatures?.find(x => x.name === attackerName)?.targetName) || null);
 }
 
+// FT-102: arms the fresh-turn gate inputs (latch round + fresh cs round);
+// preserves any uses-key mock via previous implementation.
+function armCombatPole(round = 1) {
+    getCombatContext.mockResolvedValue({ round });
+    const prev = getRuntimeValue.getMockImplementation() || (() => null);
+    getRuntimeValue.mockImplementation((name, key) => (key === '_attackActionTakenRound' ? round : prev(name, key)));
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('bonusActionAttackHandler', () => {
@@ -504,7 +512,7 @@ describe('bonusActionAttackHandler', () => {
         describe('polearm trigger validation', () => {
             it('should reject when isPolearmWeapon returns false', async () => {
                 isPolearmWeapon.mockResolvedValue(false);
-                findLastAttack.mockResolvedValue({ attackEvent: { bonus: 5 }, targetName: 'Goblin' });
+                findLastAttack.mockResolvedValue({ attackEvent: { attackerName: 'TestHero', bonus: 5 }, targetName: 'Goblin' });
                 const action = makeAction({ automation: { trigger: 'after_attack_action_with_polearm' } });
 
                 const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
@@ -519,9 +527,16 @@ describe('bonusActionAttackHandler', () => {
         });
 
         describe('polearm trigger attack_roll path', () => {
+            // FT-102: the fresh-turn gate reads _attackActionTakenRound (player)
+            // + round from a fresh getCombatContext + lastAttack.attackerName.
+            // Arm all three so the attack_roll path stays reachable.
+            beforeEach(() => {
+                armCombatPole();
+            });
+
             it('should return attack_roll with Quarterstaff and explicit damage', async () => {
                 isPolearmWeapon.mockResolvedValue(true);
-                findLastAttack.mockResolvedValue({ attackEvent: { bonus: 7 }, targetName: 'Goblin' });
+                findLastAttack.mockResolvedValue({ attackEvent: { attackerName: 'TestHero', bonus: 7 }, targetName: 'Goblin' });
                 const action = makeAction({
                     automation: {
                         trigger: 'after_attack_action_with_polearm',
@@ -550,7 +565,7 @@ describe('bonusActionAttackHandler', () => {
 
             it('should return attack_roll with Spear using default damage', async () => {
                 isPolearmWeapon.mockResolvedValue(true);
-                findLastAttack.mockResolvedValue({ attackEvent: { bonus: 5 }, targetName: 'Orc' });
+                findLastAttack.mockResolvedValue({ attackEvent: { attackerName: 'TestHero', bonus: 5 }, targetName: 'Orc' });
                 const action = makeAction({
                     automation: { trigger: 'after_attack_action_with_polearm' },
                     name: 'Polearm Master',
@@ -571,7 +586,7 @@ describe('bonusActionAttackHandler', () => {
 
             it('should return attack_roll with Heavy + Reach weapon', async () => {
                 isPolearmWeapon.mockResolvedValue(true);
-                findLastAttack.mockResolvedValue({ attackEvent: { bonus: 6 }, targetName: 'Troll' });
+                findLastAttack.mockResolvedValue({ attackEvent: { attackerName: 'TestHero', bonus: 6 }, targetName: 'Troll' });
                 const action = makeAction({
                     automation: {
                         trigger: 'after_attack_action_with_polearm',
@@ -589,7 +604,10 @@ describe('bonusActionAttackHandler', () => {
                 expect(result.payload.attack.autoDamageFormula).toBe('1d4');
             });
 
-            it('should fall back to proficiency bonus when no lastAttack', async () => {
+            // FT-102 stale-pin inversion: a null lastAttack can never satisfy
+            // the RAW trigger — the old mock let isPolearmWeapon(true) on an
+            // undefined weapon name paper over the refusal that fires live.
+            it('should refuse with no polearm Attack action when lastAttack is null', async () => {
                 isPolearmWeapon.mockResolvedValue(true);
                 findLastAttack.mockResolvedValue({ attackEvent: null, targetName: null });
                 const action = makeAction({
@@ -601,14 +619,14 @@ describe('bonusActionAttackHandler', () => {
 
                 const result = await handle(action, stats, CAMPAIGN_NAME, 'map', allEquipment);
 
-                expect(result.type).toBe('attack_roll');
-                expect(result.payload.attack.hitBonus).toBe(4);
-                expect(result.payload.targetName).toBeNull();
+                expect(result.type).toBe('popup');
+                expect(result.payload.description).toContain('on your current turn');
+                expect(setRuntimeValue).not.toHaveBeenCalled();
             });
 
             it('should fall back to action name "Pole Strike" when action has no name', async () => {
                 isPolearmWeapon.mockResolvedValue(true);
-                findLastAttack.mockResolvedValue({ attackEvent: { bonus: 5 }, targetName: 'Goblin' });
+                findLastAttack.mockResolvedValue({ attackEvent: { attackerName: 'TestHero', bonus: 5 }, targetName: 'Goblin' });
                 const action = makeAction({
                     automation: { trigger: 'after_attack_action_with_polearm' },
                     name: undefined,
@@ -625,7 +643,7 @@ describe('bonusActionAttackHandler', () => {
 
             it('should prefer damage over extraDamageExpression', async () => {
                 isPolearmWeapon.mockResolvedValue(true);
-                findLastAttack.mockResolvedValue({ attackEvent: { bonus: 5 }, targetName: 'Goblin' });
+                findLastAttack.mockResolvedValue({ attackEvent: { attackerName: 'TestHero', bonus: 5 }, targetName: 'Goblin' });
                 const action = makeAction({
                     automation: {
                         trigger: 'after_attack_action_with_polearm',
@@ -646,7 +664,9 @@ describe('bonusActionAttackHandler', () => {
         describe('weaponRequirement trigger', () => {
             it('should return attack_roll when weaponRequirement is set and polearm check passes', async () => {
                 isPolearmWeapon.mockResolvedValue(true);
-                findLastAttack.mockResolvedValue({ attackEvent: { bonus: 8 }, targetName: 'Dragon' });
+                getCombatContext.mockResolvedValue({ round: 1 });
+                getRuntimeValue.mockReturnValue(1);
+                findLastAttack.mockResolvedValue({ attackEvent: { attackerName: 'TestHero', bonus: 8 }, targetName: 'Dragon' });
                 const action = makeAction({
                     automation: {
                         weaponRequirement: 'quarterstaff_spear_heavy_reach',
@@ -670,7 +690,8 @@ describe('bonusActionAttackHandler', () => {
         describe('combined trigger + uses tracking', () => {
             it('should validate polearm, decrement uses, then return attack_roll', async () => {
                 isPolearmWeapon.mockResolvedValue(true);
-                findLastAttack.mockResolvedValue({ attackEvent: { bonus: 5 }, targetName: 'Goblin' });
+                getCombatContext.mockResolvedValue({ round: 2 });
+                findLastAttack.mockResolvedValue({ attackEvent: { attackerName: 'TestHero', bonus: 5 }, targetName: 'Goblin' });
                 getRuntimeValue.mockReturnValue(2);
                 const action = makeAction({
                     automation: {
@@ -698,8 +719,11 @@ describe('bonusActionAttackHandler', () => {
 
             it('should return popup when polearm valid but uses exhausted', async () => {
                 isPolearmWeapon.mockResolvedValue(true);
-                findLastAttack.mockResolvedValue({ attackEvent: { bonus: 5 }, targetName: 'Goblin' });
-                getRuntimeValue.mockReturnValue(0);
+                getCombatContext.mockResolvedValue({ round: 1 });
+                findLastAttack.mockResolvedValue({ attackEvent: { attackerName: 'TestHero', bonus: 5 }, targetName: 'Goblin' });
+                // FT-102: latch armed this round; uses exhausted — gate passes,
+                // uses check pays the pinned refusal message.
+                getRuntimeValue.mockImplementation((name, key) => (key === '_attackActionTakenRound' ? 1 : 0));
                 const action = makeAction({
                     automation: {
                         trigger: 'after_attack_action_with_polearm',
