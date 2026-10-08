@@ -5338,7 +5338,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-SP-096-regenerate-pc-initial-heal-negative.md",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Automation type: healing_start_of_turn",
       "expectedBehavior": "A creature you touch regains 4d8 + 15 Hit Points. For the duration, the target regains 1 Hit Point at the start of each of its turns, and any severed body parts regrow after 2 minutes."

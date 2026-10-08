@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 
@@ -68,12 +69,38 @@ function stampRegenerateEffect(targetName, casterName, campaignName) {
 }
 
 function resolveRegenerateHealAmount(initialRoll) {
-    return typeof initialRoll === 'number' && initialRoll > 0 ? initialRoll : 33;
+    if (typeof initialRoll === 'number' && initialRoll > 0) return initialRoll;
+    console.error('[regenerate] Initial heal expression did not resolve to a positive number, defaulting to 33:', initialRoll);
+    return 33;
+}
+
+// evaluateAutoExpression returns dice notation un-rolled; roll it for a
+// numeric total + individual dice so the rolled result can be surfaced.
+function rollInitialHeal(expression, playerStats) {
+    const evaluated = evaluateAutoExpression(expression, playerStats);
+    if (typeof evaluated === 'number') {
+        return { total: resolveRegenerateHealAmount(evaluated), rolls: null };
+    }
+    const roll = rollExpression(String(evaluated));
+    if (!roll || typeof roll.total !== 'number' || Number.isNaN(roll.total)) {
+        return { total: resolveRegenerateHealAmount(null), rolls: null };
+    }
+    return { total: roll.total, rolls: roll.rolls };
+}
+
+// PC max HP truth is runtime/change-data `hitPoints` — combatSummary player
+// entries are 1/1 placeholders (hpModifier.js canonical pattern); monsters
+// carry real HP on the combatSummary entry.
+function resolveRegenerateMaxHp({ creature, targetName, playerStats, campaignName }) {
+    if (creature?.type === 'player') {
+        return getRuntimeValue(targetName, 'hitPoints', campaignName) ?? creature?.maxHp ?? playerStats.hitPoints ?? 0;
+    }
+    return creature?.maxHp || playerStats.hitPoints || 0;
 }
 
 function resolveRegenerateHp({ combatSummary, targetName, playerStats, campaignName }) {
     const creature = combatSummary?.creatures?.find(c => c.name === targetName);
-    const maxHp = creature?.maxHp || playerStats.hitPoints || 0;
+    const maxHp = resolveRegenerateMaxHp({ creature, targetName, playerStats, campaignName });
     const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
     const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : (creature?.currentHp ?? maxHp);
     return { maxHp, currentHp };
@@ -90,32 +117,38 @@ export async function applyRegenerateEffect(action, playerStats, campaignName, m
     // Calculate initial heal: 4d8 + 15
     const initialHealExpression = resolveInitialHealExpression(spell);
 
-    const initialRoll = evaluateAutoExpression(initialHealExpression, playerStats);
-    const healAmount = resolveRegenerateHealAmount(initialRoll);
+    const { total: healAmount, rolls: initialRolls } = rollInitialHeal(initialHealExpression, playerStats);
 
     // Get creature max HP / current HP
     const combatSummary = getCombatSummary(campaignName);
     const { maxHp, currentHp } = resolveRegenerateHp({ combatSummary, targetName, playerStats, campaignName });
-    const actualHeal = Math.min(healAmount, maxHp - currentHp);
+    const actualHeal = Math.max(0, Math.min(healAmount, maxHp - currentHp));
 
-    // Apply initial healing
+    // Apply initial healing through the canonical heal path
+    let applyResult = null;
     if (actualHeal > 0 && combatSummary) {
-        applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
+        applyResult = applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
     }
+    const appliedHeal = applyResult ? Math.max(0, applyResult.actualHeal) : actualHeal;
+    const newHp = applyResult ? applyResult.newHp : Math.min(maxHp, currentHp + appliedHeal);
 
-    // Log the initial heal
-    addEntry(campaignName, {
-        type: 'hp_change',
-        targetName,
-        delta: actualHeal,
-        currentHp: Math.min(maxHp, currentHp + actualHeal),
-        maxHp,
-        isHealing: true,
-        sourceName: casterName,
-        note: 'Regenerate',
-        formula: initialHealExpression,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error("[regenerate] Error logging heal:", e); });
+    // Log the initial heal (skip when nothing was restored — the popup carries the honest zero-heal message)
+    if (appliedHeal > 0) {
+        addEntry(campaignName, {
+            type: 'hp_change',
+            targetName,
+            delta: appliedHeal,
+            currentHp: newHp,
+            maxHp,
+            isHealing: true,
+            sourceName: casterName,
+            note: 'Regenerate',
+            formula: initialHealExpression,
+            rollTotal: healAmount,
+            rolls: initialRolls || undefined,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[regenerate] Error logging heal:", e); });
+    }
 
     // Set regenerateActive on target to trigger turn-start healing
     setRuntimeValue(targetName, 'regenerateActive', true, campaignName);
@@ -123,7 +156,10 @@ export async function applyRegenerateEffect(action, playerStats, campaignName, m
     stampRegenerateEffect(targetName, casterName, campaignName);
 
     // Log ability use
-    const popupText = `Regenerate on ${targetName}: Regained ${actualHeal} HP. Target gains 1 HP per turn and is restored to full HP when the effect ends.`;
+    const healText = appliedHeal > 0
+        ? `Regained ${appliedHeal} HP (rolled ${initialHealExpression} = ${healAmount})`
+        : `Already at full HP (rolled ${initialHealExpression} = ${healAmount}, no HP restored)`;
+    const popupText = `Regenerate on ${targetName}: ${healText}. Target gains 1 HP per turn and is restored to full HP when the effect ends.`;
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: casterName,
@@ -139,7 +175,7 @@ export async function applyRegenerateEffect(action, playerStats, campaignName, m
         characterName: casterName,
         spellName: action.name,
         targetName,
-        effects: [`Initial heal: ${actualHeal} HP, Ongoing: 1 HP/turn`],
+        effects: [`Initial heal: ${appliedHeal} HP (rolled ${initialHealExpression} = ${healAmount}), Ongoing: 1 HP/turn`],
         timestamp: Date.now(),
     }).catch((e) => { console.error("[regenerate] Error logging spell effect:", e); });
 
