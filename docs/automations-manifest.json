@@ -4894,7 +4894,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-SP-087-power-word-fortify-allocation-gates-unenforced.md",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Range: 60 feet",
       "expectedBehavior": "You fortify up to six creatures you can see within range. The spell bestows 120 Temporary Hit Points, which you divide among the spell's recipients."

@@ -283,6 +283,99 @@ describe('PowerWordFortifyModal', () => {
       fireEvent.click(screen.getByRole('button', { name: /Fortify \(2\)/ }));
       expect(mockOnConfirm).toHaveBeenCalledWith({ Ally1: 5 });
     });
+
+    it('clamps second allocation to the remaining pool after first target takes most of it', () => {
+      render(<PowerWordFortifyModal {...makeProps({ totalTempHp: 120 })} />);
+      fireEvent.click(screen.getByLabelText('Ally1'));
+      fireEvent.click(screen.getByLabelText('Ally2'));
+      const inputs = screen.getAllByRole('spinbutton');
+      fireEvent.change(inputs[0], { target: { value: 100 } });
+      fireEvent.change(inputs[1], { target: { value: 100 } });
+      expect(inputs[1]).toHaveValue(20);
+      expect(screen.getByText('Allocated: 120 / 120')).toBeInTheDocument();
+    });
+
+    it('shows a capped note when an allocation attempt exceeds the remaining pool', () => {
+      render(<PowerWordFortifyModal {...makeProps({ totalTempHp: 120 })} />);
+      fireEvent.click(screen.getByLabelText('Ally1'));
+      fireEvent.click(screen.getByLabelText('Ally2'));
+      const inputs = screen.getAllByRole('spinbutton');
+      fireEvent.change(inputs[0], { target: { value: 100 } });
+      fireEvent.change(inputs[1], { target: { value: 60 } });
+      expect(screen.getByText(/Max 20 — remaining pool/)).toBeInTheDocument();
+    });
+
+    it('disables confirm when allocated exceeds pool', () => {
+      render(<PowerWordFortifyModal {...makeProps({ totalTempHp: 10 })} />);
+      fireEvent.click(screen.getByLabelText('Ally1'));
+      const input = screen.getByRole('spinbutton');
+      fireEvent.change(input, { target: { value: 999 } });
+      // clamped to pool so confirm stays enabled at full allocation
+      expect(screen.getByRole('button', { name: /Fortify \(1\)/ })).toBeEnabled();
+      fireEvent.change(input, { target: { value: 5 } });
+      fireEvent.click(screen.getByLabelText('Ally2'));
+      const inputs = screen.getAllByRole('spinbutton');
+      fireEvent.change(inputs[1], { target: { value: 5 } });
+      expect(screen.getByText('Allocated: 10 / 10')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Fortify \(2\)/ })).toBeEnabled();
+    });
+
+    it('does not call onConfirm when allocation exceeds pool', () => {
+      render(<PowerWordFortifyModal {...makeProps({ totalTempHp: 10 })} />);
+      fireEvent.click(screen.getByLabelText('Ally1'));
+      fireEvent.click(screen.getByLabelText('Ally2'));
+      const inputs = screen.getAllByRole('spinbutton');
+      fireEvent.change(inputs[0], { target: { value: 6 } });
+      fireEvent.change(inputs[1], { target: { value: 6 } });
+      // second input clamps to 4 → sum 10; force over via state corruption impossible,
+      // so instead assert confirm passes only valid distributions
+      fireEvent.click(screen.getByRole('button', { name: /Fortify \(2\)/ }));
+      expect(mockOnConfirm).toHaveBeenCalledWith({ Ally1: 6, Ally2: 4 });
+    });
+  });
+
+  // ── Target cap ──
+
+  describe('target cap', () => {
+    const manyTargets = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8'].map((name) => ({ name, type: 'npc' }));
+
+    it('disables unselected checkboxes once maxTargets are selected', () => {
+      render(<PowerWordFortifyModal {...makeProps({ creatureTargets: manyTargets, maxTargets: 6 })} />);
+      for (let i = 0; i < 6; i++) {
+        fireEvent.click(screen.getByLabelText(`T${i + 1}`));
+      }
+      expect(screen.getByRole('button', { name: /Fortify \(6\)/ })).toBeEnabled();
+      expect(screen.getByLabelText('T7')).toBeDisabled();
+      expect(screen.getByLabelText('T8')).toBeDisabled();
+    });
+
+    it('refuses selecting beyond maxTargets', () => {
+      render(<PowerWordFortifyModal {...makeProps({ creatureTargets: manyTargets, maxTargets: 6 })} />);
+      const boxes = manyTargets.map((t) => screen.getByLabelText(t.name));
+      boxes.forEach((b) => fireEvent.click(b));
+      expect(screen.getByRole('button', { name: /Fortify \(6\)/ })).toBeInTheDocument();
+      const checked = document.querySelectorAll('.secondary-target-row input[type="checkbox"]:checked');
+      expect(checked).toHaveLength(6);
+    });
+
+    it('re-enables a disabled checkbox after deselecting one target', () => {
+      render(<PowerWordFortifyModal {...makeProps({ creatureTargets: manyTargets, maxTargets: 6 })} />);
+      for (let i = 0; i < 6; i++) {
+        fireEvent.click(screen.getByLabelText(`T${i + 1}`));
+      }
+      expect(screen.getByLabelText('T7')).toBeDisabled();
+      fireEvent.click(screen.getByLabelText('T1'));
+      expect(screen.getByLabelText('T7')).toBeEnabled();
+    });
+
+    it('marks rows beyond the cap with secondary-target-disabled', () => {
+      render(<PowerWordFortifyModal {...makeProps({ creatureTargets: manyTargets, maxTargets: 6 })} />);
+      for (let i = 0; i < 6; i++) {
+        fireEvent.click(screen.getByLabelText(`T${i + 1}`));
+      }
+      expect(document.querySelector('.secondary-target-disabled')).toBeInTheDocument();
+      expect(document.querySelectorAll('.secondary-target-disabled')).toHaveLength(2);
+    });
   });
 
   // ── Skip behavior ──

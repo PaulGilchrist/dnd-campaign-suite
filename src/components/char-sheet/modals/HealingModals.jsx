@@ -116,6 +116,7 @@ export default function HealingModals({
                 <PowerWordFortifyModal
                     creatureTargets={powerWordFortifyModal.creatureTargets}
                     totalTempHp={powerWordFortifyModal.totalTempHp}
+                    maxTargets={powerWordFortifyModal.maxTargets}
                     onConfirm={handlePowerWordFortifyConfirm}
                     onSkip={() => setModalState({ powerWordFortifyModal: null })}
                 />

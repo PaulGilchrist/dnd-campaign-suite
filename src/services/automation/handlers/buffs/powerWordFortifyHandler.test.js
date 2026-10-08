@@ -57,10 +57,11 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeAction(automation = {}) {
+function makeAction(automation = {}, extra = {}) {
   return {
     name: 'Power Word Fortify',
     automation: { type: 'power_word_fortify', ...automation },
+    ...extra,
   };
 }
 
@@ -106,7 +107,7 @@ describe('powerWordFortifyHandler', () => {
       expect(result.payload.totalTempHp).toBe(45);
     });
 
-    it('substitutes spellSlotLevel with auto.slotLevel when provided', async () => {
+    it('evaluates arithmetic expression with auto.slotLevel when provided', async () => {
       const result = await handle(
         makeAction({ tempHpExpression: 'spellSlotLevel * 10', slotLevel: 8 }),
         makePlayerStats(),
@@ -114,10 +115,32 @@ describe('powerWordFortifyHandler', () => {
         null,
       );
 
-      expect(result.payload.totalTempHp).toBe(8);
+      expect(result.payload.totalTempHp).toBe(80);
     });
 
-    it('substitutes spellSlotLevel with playerStats.level when no auto.slotLevel', async () => {
+    it('uses paid spell.level over playerStats.level', async () => {
+      const result = await handle(
+        makeAction({ tempHpExpression: 'spellSlotLevel * 10' }, { spell: { level: 9 } }),
+        makePlayerStats({ level: 20 }),
+        campaignName,
+        null,
+      );
+
+      expect(result.payload.totalTempHp).toBe(90);
+    });
+
+    it('uses metaCtx.slotLevel for upcast when spell.level absent', async () => {
+      const result = await handle(
+        makeAction({ tempHpExpression: 'spellSlotLevel * 10' }, { metaCtx: { slotLevel: 8 } }),
+        makePlayerStats({ level: 20 }),
+        campaignName,
+        null,
+      );
+
+      expect(result.payload.totalTempHp).toBe(80);
+    });
+
+    it('substitutes spellSlotLevel with playerStats.level when no paid slot info', async () => {
       const result = await handle(
         makeAction({ tempHpExpression: 'spellSlotLevel * 10' }),
         makePlayerStats({ level: 7 }),
@@ -125,10 +148,10 @@ describe('powerWordFortifyHandler', () => {
         null,
       );
 
-      expect(result.payload.totalTempHp).toBe(7);
+      expect(result.payload.totalTempHp).toBe(70);
     });
 
-    it('substitutes spellSlotLevel with default level 7 when no slotLevel or player level', async () => {
+    it('substitutes spellSlotLevel with default level 7 when no slot info at all', async () => {
       const result = await handle(
         makeAction({ tempHpExpression: 'spellSlotLevel * 10' }),
         makePlayerStats({ level: undefined }),
@@ -136,7 +159,21 @@ describe('powerWordFortifyHandler', () => {
         null,
       );
 
-      expect(result.payload.totalTempHp).toBe(7);
+      expect(result.payload.totalTempHp).toBe(70);
+    });
+
+    it('computes the canonical 2024 pool: 120 at lv7, 125 at lv8, 130 at lv9', async () => {
+      const expr = '120 + ((spellSlotLevel - 7) * 5)';
+      const atLevel = async (level) => (await handle(
+        makeAction({ tempHpExpression: expr, maxTargets: 6 }, { spell: { level } }),
+        makePlayerStats({ level: 20 }),
+        campaignName,
+        null,
+      )).payload.totalTempHp;
+
+      expect(await atLevel(7)).toBe(120);
+      expect(await atLevel(8)).toBe(125);
+      expect(await atLevel(9)).toBe(130);
     });
 
     it('handles plain numeric expressions without rolling dice', async () => {
@@ -259,8 +296,8 @@ describe('powerWordFortifyHandler', () => {
       expect(result.payload.description).toContain('No allies within range');
     });
 
-    it('excludes the player from creatureTargets', async () => {
-      allySelection.getAllyList.mockReturnValue(['Ally1', 'Ally2']);
+    it('includes the caster as a valid target', async () => {
+      allySelection.getAllyList.mockReturnValue([playerName, 'Ally1', 'Ally2']);
 
       damageUtils.getCombatContext.mockResolvedValue(
         makeCombatContext([playerName, 'Ally1', 'Ally2']),
@@ -269,7 +306,7 @@ describe('powerWordFortifyHandler', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       const targetNames = result.payload.creatureTargets.map((t) => t.name);
-      expect(targetNames).not.toContain(playerName);
+      expect(targetNames).toContain(playerName);
     });
 
     it('skips allies not found in combat context', async () => {
@@ -647,5 +684,59 @@ describe('confirmPowerWordFortify', () => {
     expect(result.payload.description).toContain('Ally1: 10');
     expect(result.payload.description).toContain('Ally2: 10');
     expect(result.payload.description).toContain('Ally3: 10');
+  });
+
+  it('refuses distributions exceeding maxTargets with zero temp HP writes', async () => {
+    const distribution = { A: 10, B: 10, C: 10, D: 10, E: 10, F: 10, G: 10 };
+    const action = makeAction({ maxTargets: 6 });
+    const ps = makePlayerStats();
+
+    const result = await confirmPowerWordFortify({
+    action,
+    playerStats: ps,
+    campaignName,
+    distribution,
+    totalTempHp: 120,
+    tempHpExpression: '120',
+});
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('max 6');
+    expect(tempHpService.setTempHp).not.toHaveBeenCalled();
+    expect(logService.addEntry).toHaveBeenCalledWith(
+      campaignName,
+      expect.objectContaining({
+        type: 'automation',
+        automationType: 'power_word_fortify_refused',
+        description: expect.stringContaining('target_cap_exceeded'),
+      }),
+    );
+  });
+
+  it('refuses pooled distributions exceeding totalTempHp with zero temp HP writes', async () => {
+    const distribution = { Ally1: 100, Ally2: 100 };
+    const action = makeAction({ maxTargets: 6 });
+    const ps = makePlayerStats();
+
+    const result = await confirmPowerWordFortify({
+    action,
+    playerStats: ps,
+    campaignName,
+    distribution,
+    totalTempHp: 120,
+    tempHpExpression: '120',
+});
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('exceeds the pool of 120');
+    expect(tempHpService.setTempHp).not.toHaveBeenCalled();
+    expect(logService.addEntry).toHaveBeenCalledWith(
+      campaignName,
+      expect.objectContaining({
+        type: 'automation',
+        automationType: 'power_word_fortify_refused',
+        description: expect.stringContaining('pool_exceeded'),
+      }),
+    );
   });
 });
