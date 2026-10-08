@@ -2537,3 +2537,9 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - PITFALL: attacks with initiative-card Target combobox at "— No Target —" resolve `targetName:null`/`hit:undefined` — strict attack_roll_miss matcher correctly dissolves the miss prompt; always arm attacker's Target dropdown first (extends §28).
 - Poller mount gated on miss-popup dismissal (popupHtmlRef + 200/500ms loops) — offer can appear seconds later and intercepts pointers; `popup-overlay button` timeout with `.sp-modal ... intercepts` = modal already mounted, snapshot/read directly.
 - RTL: `getByText(/on miss|on hit/)` matches group h4 AND row hint span — pin exact `'— on miss'` strings.
+
+## SP-091 (FIXED, Prayer of Healing LR latch + short-rest benefit)
+- PITFALL: char-sheet switch updates header name immediately but the race/class row ("Orc, Rogue (soulknife)…") can render stale from the previous sheet — judge *who is displayed* by the `char-header` name generic, never the race/class line.
+- PITFALL: sheet "Long Rest"/"Short Rest" buttons fire instantly, NO confirm dialog — only Admin Full Reset / Clear carry native confirm; verify effect by change-data GET deltas, never by expecting a dialog.
+- PITFALL: a new shared module imported into a live lane breaks every partial `vi.mock('useRuntimeState.js')` in its test graph unless it exports ALL named deps the new module imports (e.g. `setRuntimeBatch`) — extend every mock in one pass, not just the direct consumer's.
+- Short-rest benefit write pattern: latch stamp + `SHORT_REST_RESOURCES` null re-arm must land in ONE merged `setRuntimeBatch` per target (§5); readers use `stored ?? max` so null = re-armed (value 0 → null is the visible proof a 0-pool was re-armed).

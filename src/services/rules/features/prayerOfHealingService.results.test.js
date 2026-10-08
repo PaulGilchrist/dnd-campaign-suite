@@ -22,6 +22,7 @@ vi.mock('../combat/applyHealing.js', () => ({
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
+    setRuntimeBatch: vi.fn(),
 }));
 
 vi.mock('../../ui/logService.js', () => ({

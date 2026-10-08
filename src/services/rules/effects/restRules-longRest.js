@@ -698,6 +698,12 @@ export async function applyLongRest(playerStats, campaignName) {
     ['boonOfFateUsed', false],
     // FT-015: Boon of Recovery (Last Stand) recharges on a long rest.
     ['boonOfRecoveryLastStandUsed', false],
+    // SP-091: Prayer of Healing once-per-Long-Rest latch — the ONLY clear is the
+    // AFFECTED creature finishing its own Long Rest ("can't be affected by this
+    // spell again until that creature finishes a Long Rest"). CLA-288 byte-twin:
+    // relentlessEnduranceUsed, re-armed here (CLA-130 rule: a latch missing from
+    // the LR reset lists never re-arms). Short Rest must NOT clear it (CLA-048).
+    ['prayerOfHealingAffected', null],
   ])
 
   resetSignatureSpells(name, campaignName)

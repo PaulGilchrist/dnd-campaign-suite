@@ -22,6 +22,7 @@ vi.mock('../combat/applyHealing.js', () => ({
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
+    setRuntimeBatch: vi.fn(),
 }));
 
 vi.mock('../../ui/logService.js', () => ({
@@ -47,7 +48,7 @@ vi.mock('../../combat/automation/automationService.js', () => ({
 import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
 
@@ -55,6 +56,7 @@ const CAMPAIGN_NAME = 'TestCampaign';
 const MAP_NAME = 'testMap';
 const CLERIC_STATS = {
     name: 'Cleric',
+    rules: '2024',
     spellAbilities: {
         spellCastingAbility: 'Wisdom',
         modifier: 3,
@@ -222,6 +224,58 @@ describe('prayerOfHealingService', () => {
 
             expect(result.targets.every(t => t.targetName !== 'Cleric')).toBe(true);
             expect(result.targets.length).toBe(1);
+        });
+
+        it('SP-091: stamps the Long-Rest latch + short-rest benefit per 2024 target', async () => {
+            await triggerPrayerOfHealing(
+                buildPrayerSpell(),
+                {},
+                CLERIC_STATS,
+                CAMPAIGN_NAME,
+                MAP_NAME,
+            );
+
+            expect(setRuntimeBatch).toHaveBeenCalledWith(
+                'Ally1',
+                expect.objectContaining({ prayerOfHealingAffected: 1, channelDivinityCharges: null }),
+                CAMPAIGN_NAME,
+            );
+        });
+
+        it('SP-091: refuses targets already affected, 5e twin stays inert', async () => {
+            getRuntimeValue.mockImplementation((name, prop) => {
+                if (prop === 'currentHitPoints') return 10;
+                if (prop === 'prayerOfHealingAffected') return name === 'Ally1' ? 1 : undefined;
+                return null;
+            });
+
+            const refused = await triggerPrayerOfHealing(
+                buildPrayerSpell(),
+                {},
+                CLERIC_STATS,
+                CAMPAIGN_NAME,
+                MAP_NAME,
+            );
+
+            expect(refused.targets.some(t => t.targetName === 'Ally1')).toBe(false);
+            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
+                automationType: 'prayer_of_healing_refused',
+            }));
+
+            getRuntimeValue.mockImplementation((name, prop) => {
+                if (prop === 'currentHitPoints') return 10;
+                if (prop === 'prayerOfHealingAffected') return name === 'Ally1' ? 1 : undefined;
+                return null;
+            });
+            const twin = await triggerPrayerOfHealing(
+                buildPrayerSpell(),
+                {},
+                { ...CLERIC_STATS, rules: '5e' },
+                CAMPAIGN_NAME,
+                MAP_NAME,
+            );
+
+            expect(twin.targets.some(t => t.targetName === 'Ally1')).toBe(true);
         });
 
         it('limits targets to 5 maximum', async () => {

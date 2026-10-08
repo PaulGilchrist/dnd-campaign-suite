@@ -1,10 +1,11 @@
 import { rollExpression, rollExpressionMaximized } from '../../../dice/diceRoller.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { resolveHealingBonusesWithDetails, hasHealingMaximization, hasHealingMaximizationForTarget, markFortifiedHealthUsed } from '../../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximization, hasHealingMaximizationForTarget } from '../../../combat/automation/automationService.js';
 import { triggerPostCastSelfHeals } from '../../../rules/spells/postCastHealService.js';
+import { isAffectedByPrayerOfHealing, refusePrayerOfHealingTarget, applyPrayerOfHealingShortRestBenefit, finalizePrayerPostCast } from './prayerOfHealingLatch.js';
 
 export function getSpellCastingMod(playerStats, spell) {
     const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
@@ -48,11 +49,22 @@ export function createMassHealHandler(config) {
         modalName,
         logPrefix,
         emptyMessage = 'No allies within range.',
-        useCurrentRound = false,
+        oncePerLongRest = false,
+        defaultMaxTargets5e = null,
     } = config;
 
-    function resolveMaxTargets(auto) {
-        return auto?.maxTargets || defaultMaxTargets;
+    // SP-091: the once-per-Long-Rest latch + short-rest benefit clauses are
+    // 2024 canonical ("gain the benefits of a Short Rest ... until that creature
+    // finishes a Long Rest"). The 5e twin ("up to six creatures ... regain 2d8 +
+    // MOD") has neither clause — latch/SR benefit stay byte-inert for 5e casts.
+    function enforcementEnabled(playerStats) {
+        return oncePerLongRest && playerStats.rules === '2024';
+    }
+
+    function resolveMaxTargets(auto, playerStats) {
+        if (auto?.maxTargets) return auto.maxTargets;
+        if (defaultMaxTargets5e != null && playerStats?.rules !== '2024') return defaultMaxTargets5e;
+        return defaultMaxTargets;
     }
 
     function resolveSlotLevel(auto, action) {
@@ -62,7 +74,7 @@ export function createMassHealHandler(config) {
     async function handle(action, playerStats, campaignName, _mapName) {
         const auto = action.automation;
         const slotLevel = resolveSlotLevel(auto, action);
-        const maxTargets = resolveMaxTargets(auto);
+        const maxTargets = resolveMaxTargets(auto, playerStats);
 
         const spellCastingMod = getSpellCastingMod(playerStats, action.spell);
         const healExpression = resolveHealExpression(action.spell, slotLevel, spellCastingMod);
@@ -79,7 +91,8 @@ export function createMassHealHandler(config) {
         const combatSummary = await getCombatContext(campaignName);
         if (!combatSummary) return null;
 
-        const currentRound = useCurrentRound ? (combatSummary?.round || 1) : undefined;
+        const enforcement = enforcementEnabled(playerStats);
+        const currentRound = enforcement ? (combatSummary?.round || 1) : undefined;
 
         const allCreatures = combatSummary.creatures || [];
         const eligible = allCreatures.filter(c => c.name);
@@ -111,65 +124,93 @@ export function createMassHealHandler(config) {
                 bonusHeal,
                 bonusDetails,
                 slotLevel,
-                ...(useCurrentRound && { currentRound }),
+                ...(enforcement && { currentRound }),
             },
         };
     }
 
+    async function healMassTarget(targetName, ctx) {
+        const { combatSummary, playerStats, healExpression, maximize, bonusHeal, bonusDetails, playerName, campaignName, enforcement, roundStamp } = ctx;
+        const maxHp = resolveTargetMaxHp(combatSummary, playerStats, targetName, campaignName);
+        const currentHp = resolveStoredCurrentHp(targetName, campaignName, maxHp);
+        const rollResult = rollMassHealDice(healExpression, maximize, playerStats, targetName, campaignName);
+        if (!rollResult) return null;
+
+        const targetHealAmount = rollResult.total + bonusHeal;
+        const actualHeal = Math.min(targetHealAmount, maxHp - currentHp);
+
+        if (actualHeal > 0) {
+            applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
+        }
+
+        // SP-091 short-rest benefit: an affected creature gains the benefit
+        // even when the roll is clamped to zero at max HP — the spell still
+        // affects it. Latch + short-rest re-arm keys land in ONE merged
+        // write per target (§5 single-write rule).
+        if (enforcement) {
+            await applyPrayerOfHealingShortRestBenefit(targetName, playerName, campaignName, roundStamp);
+        }
+
+        const newHp = Math.min(maxHp, currentHp + actualHeal);
+
+        await addEntry(campaignName, {
+            type: 'hp_change',
+            targetName,
+            delta: actualHeal,
+            currentHp: newHp,
+            maxHp,
+            isHealing: true,
+            sourceName: playerName,
+            note: spellName,
+            formula: buildHealFormula(healExpression, bonusDetails),
+            bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error(`[${logPrefix}] Error:`, e); });
+
+        return { targetName, healAmount: actualHeal, rolls: rollResult.rolls, rawTotal: targetHealAmount };
+    }
+
     async function confirmFn({ action, playerStats, campaignName, selectedTargetNames, healExpression, maximize, bonusHeal, bonusDetails, slotLevel, currentRound }) {
         const playerName = playerStats.name;
-        const maxTargets = resolveMaxTargets(action.automation);
+        const maxTargets = resolveMaxTargets(action.automation, playerStats);
         const finalTargets = selectedTargetNames.slice(0, maxTargets);
+        const enforcement = enforcementEnabled(playerStats);
+        const roundStamp = enforcement ? (currentRound || (await getCombatContext(campaignName))?.round || 1) : undefined;
         const combatSummary = await getCombatContext(campaignName);
+        const ctx = { combatSummary, playerStats, healExpression, maximize, bonusHeal, bonusDetails, playerName, campaignName, enforcement, roundStamp };
         const results = [];
+        const refused = [];
         const allRolls = [];
         let totalHealed = 0;
 
         for (const targetName of finalTargets) {
-            if (alreadyHealedThisRound(targetName, campaignName, currentRound, useCurrentRound)) continue;
-
-            const maxHp = resolveTargetMaxHp(combatSummary, playerStats, targetName, campaignName);
-            const currentHp = resolveStoredCurrentHp(targetName, campaignName, maxHp);
-            const rollResult = rollMassHealDice(healExpression, maximize, playerStats, targetName, campaignName);
-            if (!rollResult) continue;
-
-            const targetHealAmount = rollResult.total + bonusHeal;
-            const actualHeal = Math.min(targetHealAmount, maxHp - currentHp);
-
-            if (actualHeal > 0) {
-                applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
-                stampHealedThisRound(targetName, campaignName, currentRound, useCurrentRound);
+            // SP-091 once-per-Long-Rest latch: already-affected 2024 targets are
+            // refused with a visible popup + prayer_of_healing_refused log, zero
+            // heal / zero short-rest benefit / zero latch mutation.
+            if (enforcement && isAffectedByPrayerOfHealing(targetName, campaignName)) {
+                refused.push(targetName);
+                await refusePrayerOfHealingTarget(targetName, playerName, campaignName);
+                continue;
             }
 
-            const newHp = Math.min(maxHp, currentHp + actualHeal);
-
-            const joinedBonuses = joinBonusDetails(bonusDetails, ' + ');
-            const formulaParts = [healExpression];
-            if (joinedBonuses) {
-                formulaParts.push(`(${joinedBonuses})`);
-            }
-
-            await addEntry(campaignName, {
-                type: 'hp_change',
-                targetName,
-                delta: actualHeal,
-                currentHp: newHp,
-                maxHp,
-                isHealing: true,
-                sourceName: playerName,
-                note: spellName,
-                formula: formulaParts.join(' + '),
-                bonusDetails: bonusDetails && bonusDetails.length > 0 ? bonusDetails : undefined,
-                timestamp: Date.now(),
-            }).catch((e) => { console.error(`[${logPrefix}] Error:`, e); });
-
-            results.push({ targetName, healAmount: actualHeal, rolls: rollResult.rolls, rawTotal: rollResult.total + bonusHeal });
-            allRolls.push(...rollResult.rolls);
-            totalHealed += actualHeal;
+            const result = await healMassTarget(targetName, ctx);
+            if (!result) continue;
+            results.push(result);
+            allRolls.push(...result.rolls);
+            totalHealed += result.healAmount;
         }
 
-        if (results.some(r => r.healAmount > 0) && bonusDetails?.some(d => d.name === 'Fortified Health')) {
-            await markFortifiedHealthUsed(playerStats, campaignName);
+        await finalizePrayerPostCast({ playerStats, results, bonusDetails, campaignName, enforcement });
+
+        if (results.length === 0 && refused.length > 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: spellName,
+                    description: `${spellName}: no effect — ${refused.join(', ')} ${refused.length === 1 ? 'is' : 'are'} already affected by ${spellName} and can't be affected again until ${refused.length === 1 ? 'they finish' : 'they all finish'} a Long Rest.`,
+                },
+            };
         }
 
         // CLA-038: mass heals restore HP to creatures other than the caster,
@@ -201,17 +242,6 @@ export function createMassHealHandler(config) {
     return { handle, confirmFn };
 }
 
-function alreadyHealedThisRound(targetName, campaignName, currentRound, useCurrentRound) {
-    if (!useCurrentRound) return false;
-    const usedRound = getRuntimeValue(targetName, `prayerOfHealing_lastUsedRound_${targetName}`, campaignName);
-    return Boolean(usedRound && usedRound === currentRound);
-}
-
-function stampHealedThisRound(targetName, campaignName, currentRound, useCurrentRound) {
-    if (!useCurrentRound) return;
-    setRuntimeValue(targetName, `prayerOfHealing_lastUsedRound_${targetName}`, currentRound, campaignName);
-}
-
 // PC combatSummary entries are 1/1 placeholders (campaign-select re-seed); player max HP
 // truth is the runtime 'hitPoints' key — mirror MassHealModal.jsx / hpModifier.js.
 function resolveTargetMaxHp(combatSummary, playerStats, targetName, campaignName) {
@@ -234,4 +264,9 @@ function rollMassHealDice(healExpression, maximize, playerStats, targetName, cam
 
 function joinBonusDetails(bonusDetails, separator) {
     return bonusDetails && bonusDetails.length > 0 ? bonusDetails.map(d => `${d.amount} ${d.name}`).join(separator) : '';
+}
+
+function buildHealFormula(healExpression, bonusDetails) {
+    const joinedBonuses = joinBonusDetails(bonusDetails, ' + ');
+    return joinedBonuses ? `${healExpression} + (${joinedBonuses})` : healExpression;
 }

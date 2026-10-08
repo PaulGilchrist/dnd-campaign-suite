@@ -1,11 +1,12 @@
 import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
 import { isDistanceInRange } from '../combat/rangeCheck.js';
-import { resolveHealingBonusesWithDetails, hasHealingMaximization, hasHealingMaximizationForTarget, markFortifiedHealthUsed } from '../../combat/automation/automationService.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximization, hasHealingMaximizationForTarget } from '../../combat/automation/automationService.js';
+import { isAffectedByPrayerOfHealing, refusePrayerOfHealingTarget, applyPrayerOfHealingShortRestBenefit, finalizePrayerPostCast } from '../../automation/handlers/healing/prayerOfHealingLatch.js';
 
 const PRAYER_OF_HEALING_NAME = 'Prayer of Healing';
 
@@ -47,18 +48,10 @@ function resolveHealExpression(spell, slotLevel, spellCastingMod) {
     return expression;
 }
 
-function getAffectedKey(targetName) {
-    return `prayerOfHealing_lastUsedRound_${targetName}`;
-}
-
-function isAffectedByPrayerOfHealing(targetName, campaignName, currentRound) {
-    const usedRound = getRuntimeValue(targetName, getAffectedKey(targetName), campaignName);
-    if (!usedRound) return false;
-    return usedRound === currentRound;
-}
-
-function markPrayerOfHealingUsed(targetName, campaignName, currentRound) {
-    setRuntimeValue(targetName, getAffectedKey(targetName), currentRound, campaignName);
+// SP-091: the once-per-LONG-Rest enforcement is 2024 canonical; the 5e twin has
+// neither the latch nor the short-rest clause (six creatures, 2d8 + MOD).
+function enforcementEnabled(playerStats) {
+    return playerStats.rules === '2024';
 }
 
 function requireCreatures(combatSummary) {
@@ -114,12 +107,14 @@ function buildHealFormula(healExpression, bonusDetails) {
 }
 
 // Heals one target in the prayer: rolls (maximized per target/global flag), applies,
-// logs, and records the affected round. Returns null when the target is skipped.
+// logs, and stamps the once-per-Long-Rest affected latch (+ canonical short-rest
+// benefit) via the shared prayerOfHealingLatch seam. Returns null when refused/skipped.
 async function healPrayerTarget(target, ctx) {
-    const { combatSummary, playerStats, healExpression, maximize, bonusHeal, bonusDetails, casterName, currentRound, campaignName } = ctx;
+    const { combatSummary, playerStats, healExpression, maximize, bonusHeal, bonusDetails, casterName, campaignName, enforce } = ctx;
     const targetName = target.name;
 
-    if (isAffectedByPrayerOfHealing(targetName, campaignName, currentRound)) {
+    if (enforce && isAffectedByPrayerOfHealing(targetName, campaignName)) {
+        await refusePrayerOfHealingTarget(targetName, casterName, campaignName);
         return null;
     }
 
@@ -135,7 +130,10 @@ async function healPrayerTarget(target, ctx) {
 
     if (actualHeal > 0) {
         applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
-        markPrayerOfHealingUsed(targetName, campaignName, currentRound);
+    }
+
+    if (enforce) {
+        await applyPrayerOfHealingShortRestBenefit(targetName, casterName, campaignName, ctx.latchStamp);
     }
 
     const newHp = Math.min(maxHp, currentHp + actualHeal);
@@ -180,12 +178,12 @@ export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campai
         return null;
     }
 
-    const cs = await getCombatContext(campaignName);
-    const currentRound = cs?.round || 1;
     const casterName = playerStats.name;
+    const enforce = enforcementEnabled(playerStats);
     const rangeFt = rangeToFeet(spell.range || '30 feet');
+    const maxTargets = enforce ? 5 : 6;
     const casterGridPos = getCasterGridPos(combatSummary, casterName);
-    const targets = collectTargets(combatSummary, casterName, casterGridPos, rangeFt, 5);
+    const targets = collectTargets(combatSummary, casterName, casterGridPos, rangeFt, maxTargets);
 
     if (targets.length === 0) {
         return { noTargets: true };
@@ -193,7 +191,7 @@ export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campai
 
     const maximize = hasHealingMaximization(playerStats);
     const { totalBonus: bonusHeal, details: bonusDetails } = resolveHealingBonusesWithDetails(playerStats, { prof: playerStats.proficiency || 0, level: playerStats.level || 1, slotLevel, campaignName });
-    const ctx = { combatSummary, playerStats, healExpression, maximize, bonusHeal, bonusDetails, casterName, currentRound, campaignName };
+    const ctx = { combatSummary, playerStats, healExpression, maximize, bonusHeal, bonusDetails, casterName, campaignName, enforce, latchStamp: combatSummary.round || 1 };
 
     const results = [];
     const allRolls = [];
@@ -207,9 +205,7 @@ export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campai
         totalHealed += result.healAmount;
     }
 
-    if (results.some(r => r.healAmount > 0) && bonusDetails?.some(d => d.name === 'Fortified Health')) {
-        await markFortifiedHealthUsed(playerStats, campaignName);
-    }
+    await finalizePrayerPostCast({ playerStats, results, bonusDetails, campaignName, enforcement: enforce });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
