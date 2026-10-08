@@ -126,6 +126,89 @@ describe('CombatSuperiorityModal - availableManeuvers override', () => {
   });
 });
 
+// ── MN-014: trigger-contextual labels ──
+
+describe('CombatSuperiorityModal - MN-014 trigger-contextual labels', () => {
+  it('labels a miss-triggered offer group "Attack Riders (on miss)" with an "on miss" hint', () => {
+    renderModalDirect({
+      payload: {
+        allManeuvers: [],
+        knownManeuvers: ['Precision Attack'],
+        availableManeuvers: [
+          { name: 'Precision Attack', actionType: 'attack_rider', trigger: 'attack_roll_miss' },
+        ],
+        maxOptions: 3,
+        selectionMode: false,
+        attackContext: { hit: false, weaponType: 'melee', attackerName: 'TestChar' },
+      },
+      onConfirm: vi.fn(),
+      onClose: vi.fn(),
+    });
+    expect(screen.getByText('Attack Riders (on miss)')).toBeInTheDocument();
+    expect(screen.queryByText('Attack Riders (on hit)')).not.toBeInTheDocument();
+    expect(screen.getByText('— on miss')).toBeInTheDocument();
+  });
+
+  it('labels a hit-triggered offer group "Attack Riders (on hit)" with an "on hit" hint', () => {
+    renderModalDirect({
+      payload: {
+        allManeuvers: [],
+        knownManeuvers: ['Menacing Attack'],
+        availableManeuvers: [
+          { name: 'Menacing Attack', actionType: 'attack_rider', trigger: 'weapon_attack_hit' },
+        ],
+        maxOptions: 3,
+        selectionMode: false,
+        attackContext: { hit: true, weaponType: 'melee', attackerName: 'TestChar' },
+      },
+      onConfirm: vi.fn(),
+      onClose: vi.fn(),
+    });
+    expect(screen.getByText('Attack Riders (on hit)')).toBeInTheDocument();
+    expect(screen.getByText('— on hit')).toBeInTheDocument();
+  });
+
+  it('labels a mixed trigger group plain "Attack Riders"', () => {
+    renderModalDirect({
+      payload: {
+        allManeuvers: [
+          { name: 'Precision Attack', actionType: 'attack_rider', trigger: 'attack_roll_miss' },
+          { name: 'Trip Attack', actionType: 'attack_rider', trigger: 'melee_weapon_attack_hit' },
+        ],
+        knownManeuvers: ['Precision Attack', 'Trip Attack'],
+        maxOptions: 3,
+        selectionMode: true,
+      },
+      onConfirm: vi.fn(),
+      onClose: vi.fn(),
+    });
+    const headings = Array.from(document.querySelectorAll('h4')).map(h => h.textContent);
+    expect(headings).toContain('Attack Riders');
+    expect(headings).not.toContain('Attack Riders (on hit)');
+    expect(headings).not.toContain('Attack Riders (on miss)');
+  });
+
+  it('hints miss-triggered maneuvers with "on miss" and hit-triggered with "on hit" in the same list', () => {
+    renderModalDirect({
+      payload: {
+        allManeuvers: [],
+        knownManeuvers: ['Precision Attack', 'Trip Attack'],
+        availableManeuvers: [
+          { name: 'Precision Attack', actionType: 'attack_rider', trigger: 'attack_roll_miss' },
+          { name: 'Trip Attack', actionType: 'attack_rider', trigger: 'melee_weapon_attack_hit' },
+        ],
+        maxOptions: 3,
+        selectionMode: false,
+        attackContext: { hit: false, weaponType: 'melee', attackerName: 'TestChar' },
+      },
+      onConfirm: vi.fn(),
+      onClose: vi.fn(),
+    });
+    expect(screen.getByText('— on miss')).toBeInTheDocument();
+    expect(screen.getByText('— on hit')).toBeInTheDocument();
+  });
+});
+
 // ── Prompt mode with attackContext / skillContext ──
 
 describe('CombatSuperiorityModal - prompt mode', () => {

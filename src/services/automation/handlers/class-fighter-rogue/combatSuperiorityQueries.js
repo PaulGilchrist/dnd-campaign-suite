@@ -15,15 +15,18 @@ export async function getManeuversForRules(rules) {
 
 export function getManeuversByType(playerStats, campaignName, knownNames, actionType, attackInfo) {
     const allManeuvers = allManeuversCache.get(`${playerStats.rules || '2024'}`) || [];
+    const ctx = {
+        attackInfo,
+        isWeaponAttack: attackInfo?.weaponType === 'melee' || attackInfo?.weaponType === 'ranged' || attackInfo?.isUnarmedStrike,
+        isMeleeAttack: attackInfo?.weaponType === 'melee' || attackInfo?.isUnarmedStrike,
+    };
     return allManeuvers.filter(m => {
         if (!knownNames.includes(m.name)) return false;
         if (actionType && m.actionType !== actionType) return false;
-        if (attackInfo && m.trigger && m.trigger !== 'any') {
-            const isWeaponAttack = attackInfo.weaponType === 'melee' || attackInfo.weaponType === 'ranged' || attackInfo.isUnarmedStrike;
-            const isMeleeAttack = attackInfo.weaponType === 'melee' || attackInfo.isUnarmedStrike;
-            if (m.trigger === 'weapon_attack_hit' && !isWeaponAttack) return false;
-            if (m.trigger === 'melee_weapon_attack_hit' && !isMeleeAttack) return false;
-        }
+        // MN-014: the trigger matcher (built for MN-018) is the single source
+        // of truth here. The old gate only checked weapon/melee TYPE, so
+        // attack_roll_miss maneuvers (Precision Attack) failed open on HITS.
+        if (attackInfo) return matchesManeuverTrigger(m, ctx);
         return true;
     });
 }
@@ -66,15 +69,9 @@ export function getAvailableAttackRiderManeuversByTrigger(playerStats, campaignN
     const superiorityDice = getSuperiorityDice(playerStats, campaignName);
     if (superiorityDice <= 0) return [];
 
-    const allManeuvers = getManeuversByType(playerStats, campaignName, knownNames, 'attack_rider', attackInfo);
-
-    const ctx = {
-        attackInfo,
-        isWeaponAttack: attackInfo?.weaponType === 'melee' || attackInfo?.weaponType === 'ranged' || attackInfo?.isUnarmedStrike,
-        isMeleeAttack: attackInfo?.weaponType === 'melee' || attackInfo?.isUnarmedStrike,
-    };
-
-    return allManeuvers.filter(m => matchesManeuverTrigger(m, ctx));
+    // MN-014: getManeuversByType now applies matchesManeuverTrigger itself —
+    // one filter, both entry points identical.
+    return getManeuversByType(playerStats, campaignName, knownNames, 'attack_rider', attackInfo);
 }
 
 export function getAvailableSkillCheckManeuvers(playerStats, campaignName, skillName, isInitiative) {

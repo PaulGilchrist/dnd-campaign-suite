@@ -175,10 +175,20 @@ export function normalizeAutoDamage(autoDamage, isCrit, playerStats) {
     return { attack, ctx };
 }
 
-async function handlePrecisionAttackMiss({ popupHtml, maneuver, currentFormula, currentTotal, currentRolls, playerStats, resumeRef, setModalState, setPopupHtml, resumeAttackPipeline }) {
-    const dieExpr = maneuver.dieExpression || 'superiority_die';
-    const dieRoll = rollExpression(dieExpr);
-    const dieValue = dieRoll?.total || evaluateAutoExpression(dieExpr, playerStats);
+// MN-014: prefer the die the executor already rolled + expended — never
+// re-roll (a second roll would invent a value the ledger never spent).
+function precisionMissDieValue(result, dieExpr, playerStats) {
+    const spent = Number(result?.dieValue);
+    if (spent > 0) return spent;
+    return rollExpression(dieExpr)?.total || evaluateAutoExpression(dieExpr, playerStats);
+}
+
+async function handlePrecisionAttackMiss({ popupHtml, maneuver, result, campaignName, currentFormula, currentTotal, currentRolls, playerStats, resumeRef, setModalState, setPopupHtml, resumeAttackPipeline }) {
+    // MN-014: the executor already rolled + expended the die — flush its
+    // spend log ("Rolled dN for X (Relentless) / Expend 1 Superiority Die")
+    // so the miss conversion leaves a full ledger trail.
+    await flushRiderManeuverLogEntries(result, campaignName);
+    const dieValue = precisionMissDieValue(result, maneuver.dieExpression || 'superiority_die', playerStats);
     const origD20 = popupHtml.rolls?.[0] ?? 0;
     const origBonus = popupHtml.bonus || 0;
     const origTotal = origD20 + origBonus;
@@ -209,6 +219,13 @@ async function handlePrecisionAttackMiss({ popupHtml, maneuver, currentFormula, 
 
     setModalState({ attackRiderManeuverPrompt: null });
     setPopupHtml(updatedPopup);
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        name: 'Precision Attack',
+        description: dieDesc,
+    }).catch((e) => { console.error('[precisionAttackMiss:log-error]', e); });
 
     if (newHit) {
         await resumeAttackPipeline();
@@ -513,7 +530,7 @@ export default function useAttackDamageResolution({
 
         if (popupHtmlData?.isMiss && popupHtml) {
             if (maneuver && maneuver.effect === 'attack_roll_bonus') {
-                return await handlePrecisionAttackMiss({ popupHtml, maneuver, currentFormula: updatedFormula, currentTotal: updatedTotal, currentRolls: updatedRolls, playerStats, resumeRef, setModalState, setPopupHtml, resumeAttackPipeline });
+                return await handlePrecisionAttackMiss({ popupHtml, maneuver, result, campaignName, currentFormula: updatedFormula, currentTotal: updatedTotal, currentRolls: updatedRolls, playerStats, resumeRef, setModalState, setPopupHtml, resumeAttackPipeline });
             }
         } else {
             return await applyRiderManeuverPostResolution({ result, maneuver, attack, popupHtmlData, attackInfo, playerStats, campaignName, setModalState, setPopupHtml, updatedFormula, updatedTotal, updatedRolls, resumeAttackPipeline });

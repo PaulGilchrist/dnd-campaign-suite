@@ -208,6 +208,12 @@ export async function getAttackRiderOptionsByContext(playerStats, campaignName, 
     const maneuvers = getAvailableAttackRiderManeuversByTrigger(playerStats, campaignName, attackInfo);
     return maneuvers.map(m => ({
         name: m.name,
+        // MN-014: consumers of miss-context options key off these fields
+        // (handleAttackRiderManeuverUse routes effect==='attack_roll_bonus'
+        // into handlePrecisionAttackMiss; applyRiderDieBonusToFormula reads
+        // damageBonus) — they were stripped here, stranding the miss lane.
+        effect: m.effect || null,
+        damageBonus: !!m.damageBonus,
         dieExpression: m.dieExpression || 'superiority_die',
         trigger: m.trigger || 'any',
         actionType: m.actionType,

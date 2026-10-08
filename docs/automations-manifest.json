@@ -4966,7 +4966,7 @@
       "handler": "src/services/combat/automation/handlers/maneuverHandler.js",
       "router": "src/services/combat/automation/routers/maneuverRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/maneuverInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-MN-014-precision-attack-trigger-inverted-never-on-miss.md",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Action type: attack_rider; Trigger: attack_roll_miss; Uses: superiority_die",
       "expectedBehavior": "When you miss with an attack roll, you can expend one Superiority Die, roll the die, and add it to the attack roll, potentially turning the miss into a hit."

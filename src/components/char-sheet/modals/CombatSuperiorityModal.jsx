@@ -19,6 +19,31 @@ const ACTION_TYPE_HINTS = {
     skill_check: 'skill check',
 };
 
+// MN-014: hints must reflect the maneuver's OWN trigger, not its actionType —
+// Precision Attack (attack_roll_miss) was labelled "on hit" in the miss modal.
+const TRIGGER_HINTS = {
+    weapon_attack_hit: 'on hit',
+    melee_weapon_attack_hit: 'on hit',
+    attack_roll_miss: 'on miss',
+    melee_attack_miss: 'on miss',
+    melee_damage_taken: 'when hit in melee',
+    replace_attack: 'to replace an attack',
+};
+
+function maneuverHint(m) {
+    return TRIGGER_HINTS[m.trigger] || ACTION_TYPE_HINTS[m.actionType] || '';
+}
+
+// "Attack Riders (on miss)" when every rider in the offered group is miss-triggered,
+// "(on hit)" when all are hit-triggered, plain when mixed.
+function groupLabel(type, maneuvers) {
+    if (type !== 'attack_rider') return ACTION_TYPE_LABELS[type] || type;
+    const missCount = maneuvers.filter(m => m.trigger === 'attack_roll_miss' || m.trigger === 'melee_attack_miss').length;
+    if (maneuvers.length > 0 && missCount === maneuvers.length) return 'Attack Riders (on miss)';
+    if (missCount === 0) return 'Attack Riders (on hit)';
+    return 'Attack Riders';
+}
+
 // MN-018: HIT-triggered riders require the attack to have actually hit.
 const TRIGGER_PREDICATES = {
     weapon_attack_hit: (attack, playerName) => attack.attackerName === playerName && attack.hit === true && (attack.weaponType === 'melee' || attack.weaponType === 'ranged' || attack.isUnarmedStrike),
@@ -195,7 +220,7 @@ function ManeuverRadioItem({ maneuver, isSelected, onSelect }) {
                 <div>
                     <strong>{maneuver.name}</strong>
                     <span style={{ opacity: 0.7, marginLeft: '6px', fontSize: '0.85em' }}>
-                        — {ACTION_TYPE_HINTS[maneuver.actionType] || ''}
+                        — {maneuverHint(maneuver)}
                     </span>
                 </div>
                 {maneuver.description && (
@@ -228,7 +253,7 @@ function SelectionView({ isPrompt, knownManeuvers, maxOptions, selectedForSelect
                 {ACTION_TYPE_ORDER.filter(t => groupedManeuvers[t]).map(type => (
                     <div key={type} style={{ marginTop: '12px' }}>
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em', opacity: 0.9 }}>
-                            {ACTION_TYPE_LABELS[type] || type}
+                            {groupLabel(type, groupedManeuvers[type])}
                         </h4>
                         {groupedManeuvers[type].map(m => (
                             <SelectionGroupCheckbox
@@ -272,7 +297,7 @@ function UseView({ isPrompt, groupedManeuvers, knownManeuvers, selectedForUse, s
                 {ACTION_TYPE_ORDER.filter(t => shouldShowUseGroup(t, isPrompt, groupedManeuvers, knownManeuvers)).map(type => (
                     <div key={type} style={{ marginTop: '12px' }}>
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em', opacity: 0.9 }}>
-                            {ACTION_TYPE_LABELS[type] || type}
+                            {groupLabel(type, groupedManeuvers[type])}
                         </h4>
                         {groupedManeuvers[type].filter(m => knownManeuvers.includes(m.name)).map(m => (
                             <ManeuverRadioItem
