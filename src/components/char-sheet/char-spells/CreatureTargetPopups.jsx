@@ -5,6 +5,7 @@ import TruePolymorphPathModal from '../modals/TruePolymorphPathModal.jsx';
 import { confirmShapechangeTransform } from '../../../services/automation/handlers/spells/shapechangeService.js';
 import { prepareSpellCast, isFreeCastAuthorized } from '../../../services/rules/spells/spellPreparationService.js';
 import { rangeToFeet } from '../../../services/rules/combat/rangeValidation.js';
+import { getCombatSummary } from '../../../services/encounters/combatData.js';
 
 function renderCreaturePopup(spec, props) {
     if (!spec.guard) return null;
@@ -83,8 +84,10 @@ const CreatureTargetPopups = function CreatureTargetPopups(props) {
     } = props;
 
     const handleShapechangeConfirm = async (form) => {
+        // SP-103: recast while transformed is a free RAW form change — no slot spend.
+        const isFormChange = !!getCombatSummary(campaignName)?.creatures?.find(c => c.name === playerStats.name)?.shapechangeOriginal;
         const isCantrip = pendingShapechange.spell.level === 0;
-        if (!isCantrip) {
+        if (!isCantrip && !isFormChange) {
             const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, pendingShapechange.spell.name, pendingShapechange.spell.level, playerStats, campaignName);
             const isUpcast = pendingShapechange.spell.isUpcast;
             const upcastLevel = pendingShapechange.spell.upcastLevel;
@@ -105,6 +108,7 @@ const CreatureTargetPopups = function CreatureTargetPopups(props) {
             spellLevel: pendingShapechange.spellLevel,
             playerStats,
             campaignName,
+            formChange: isFormChange,
         });
     };
 

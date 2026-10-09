@@ -249,6 +249,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             spellLevel: popupData.spellLevel,
             playerStats,
             campaignName: popupData.campaignName,
+            formChange: !!popupData.formChange,
         });
     }, [playerStats]);
 

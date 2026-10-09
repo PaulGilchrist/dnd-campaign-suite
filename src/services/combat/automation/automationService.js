@@ -90,6 +90,11 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     // turn latch + 30-ft gate + die roll/spend + commanderStrikeChoice chooser →
     // executeCommanderStrikeChoice arms commanderStrikeBonus on the ally).
     'combat_superiority_grant_attack',
+    // SP-103: the runtime-derived "Shape-Shift:" row (visible while a shapechange
+    // targetEffect is active) dispatches shapechangeHandler UNPAID (formChange:true)
+    // → chooser reopens and confirmShapechangeTransform swaps forms free (RAW:
+    // "an action to shape-shift into a different eligible form").
+    'shapechange_form_change',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

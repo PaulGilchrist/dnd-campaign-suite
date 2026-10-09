@@ -228,6 +228,9 @@ async function logGenericSpellCast({ spell, fullSpell, playerStats, campaignName
     // chooser's confirm so a Skip/cancel emits no phantom spell log. The open lane
     // (handleNonSorcererCast) stamps _deferChooserSlotPayment without paying.
     if (spell._deferChooserSlotPayment) return;
+    // SP-103: a Shapechange form change is a free action, not a new casting —
+    // confirmShapechangeTransform logs the ability_use instead.
+    if (spell._shapechangeFormChange) return;
     const resolvedTarget = await getTargetInfo();
     const resolvedTargetName = resolvedTarget?.name || null;
     const spellDescription = fullSpell.description ? fullSpell.description.join(' ') : '';

@@ -67,11 +67,18 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     const existingEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    const alreadyTransformed = existingEffects.some(te => {
+    const selfEffects = existingEffects.filter(te => {
         const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
-        return teTarget === targetName && (te.effect === SHAPECHANGE_EFFECT || te.effect === 'polymorph' || te.effect === 'true_polymorph');
+        return teTarget === targetName;
     });
-    if (alreadyTransformed) {
+    // SP-103: an active shapechange is NOT a refusal — RAW allows "an action to
+    // change form" while the spell runs. Recast of Shapechange reopens the chooser
+    // (formChange:true) unpaid; confirmShapechangeTransform swaps forms without
+    // re-granting THP. Only polymorph-family effects (a DIFFERENT spell's control)
+    // still refuse.
+    const blockedByPolymorph = selfEffects.some(te => te.effect === 'polymorph' || te.effect === 'true_polymorph');
+    const shapechangeActive = selfEffects.some(te => te.effect === SHAPECHANGE_EFFECT) || !!targetCreature.shapechangeOriginal;
+    if (blockedByPolymorph) {
         addEntry(campaignName, {
             type: 'ability_use',
             characterName: casterName,
@@ -84,6 +91,23 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 type: 'automation_info',
                 name: action.name,
                 description: `${targetName} is already transformed.`,
+            },
+        };
+    }
+
+    if (action.metaCtx?._shapechangeFormChange && !shapechangeActive) {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: casterName,
+            abilityName: action.name,
+            description: `${casterName} attempts to shape-shift, but ${targetName} is not transformed.`,
+        }).catch((e) => { console.error("[shapechange] Error:", e); });
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${targetName} is not transformed. Shapechange the caster first.`,
             },
         };
     }
@@ -118,6 +142,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             campaignName,
             spell: action.spell,
             spellLevel: action.spellSlotLevel,
+            ...(shapechangeActive ? { formChange: true } : {}),
         },
     };
 }

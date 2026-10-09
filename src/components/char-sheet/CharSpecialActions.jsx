@@ -25,7 +25,16 @@ import { confirmEncouragingSong, skipEncouragingSong } from '../../services/auto
 import { confirmElfisLineage } from '../../services/automation/handlers/class-other/elfishLineageHandler.js';
 import { confirmGnomishLineage } from '../../services/automation/handlers/class-other/gnomishLineageHandler.js';
 import CharSpecialActionsModals from './CharSpecialActionsModals.jsx';
+import { handle as runShapechangeHandler } from '../../services/automation/handlers/spells/shapechangeHandler.js';
 import './CharSpecialActions.css';
+
+// SP-103: runtime-only row shown while a shapechange targetEffect is active.
+// Click reopens the shapechange chooser UNPAID (form change is a free RAW action).
+const SHAPE_SHIFT_ACTION = {
+    name: 'Shape-Shift',
+    automation: { type: 'shapechange_form_change' },
+    description: 'Shape-shift into a different eligible form (free action, no spell slot).',
+};
 
 // modalName -> setter for automation 'modal' results (exact-match dispatch map).
 const MODAL_DISPATCH = {
@@ -318,6 +327,8 @@ const AUTOMATION_CLICK_DELEGATES = [
     { match: (auto) => auto?.type === 'brew_poison', run: (h) => h.handleBrewPoisonClick() },
     // CLA-226: the swap UI lives in the Short Rest modal — open it (CharSummary listens).
     { match: (auto) => auto?.type === 'memorize_spell', run: () => window.dispatchEvent(new CustomEvent('open-short-rest')) },
+    // SP-103: unpaid shapechange chooser reopen (free RAW form change).
+    { match: (auto) => auto?.type === 'shapechange_form_change', run: (h) => h.handleShapeShiftClick() },
 ];
 
 function delegateAutomationClick(auto, h) {
@@ -760,11 +771,30 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         handleAspectOfTheWildsConfirm,
         handleAspectOfTheWildsSkip,
     } = useAspectOfTheWildsHandlers({ setAspectOfTheWildsModal, playerStats, campaignName, setPopupHtml });
+    // SP-103: reopens the shapechange chooser UNPAID while transformed (RAW free
+    // form-change action). shapechangeHandler routes cs/targetEffects state and the
+    // refusal face covers a row whose effect vanished mid-click.
+    const shapechangeActiveEffects = useRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const isShapechanged = shapechangeActiveEffects.some(te => {
+        const teTarget = Array.isArray(te.target) ? te.target[0] : te.target;
+        return teTarget === playerStats?.name && te.effect === 'shapechange';
+    });
+    const handleShapeShiftClick = useCallback(async () => {
+        if (cannotAct) return;
+        const action = {
+            name: 'Shapechange',
+            spell: { name: 'Shapechange', level: 9 },
+            spellSlotLevel: null,
+            metaCtx: { characters, _shapechangeFormChange: true },
+        };
+        const result = await runShapechangeHandler(action, playerStats, campaignName, mapName);
+        if (result?.type === 'popup') setPopupHtml(result.payload);
+    }, [cannotAct, characters, playerStats, campaignName, mapName, setPopupHtml]);
     const handleAutomationClick = useCallback(async (action) => {
         if (cannotAct) return;
         const auto = action.automation;
         if (openChoicePromptIfNeeded(action, auto, playerStats, campaignName, { setFeatureChoiceModal, setPopupHtml, setAspectOfTheWildsModal })) return;
-        if (delegateAutomationClick(auto, { handleReplenishingMealClick, handleBolsteringTreatsClick, handleBrewPoisonClick })) return;
+        if (delegateAutomationClick(auto, { handleReplenishingMealClick, handleBolsteringTreatsClick, handleBrewPoisonClick, handleShapeShiftClick })) return;
         const result = await executeHandler(action, playerStats, campaignName, mapName, characters);
         if (!result) return;
         // MN-002: grid previously dropped handler logEntries — flush the die
@@ -790,7 +820,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         } else if (result.type === 'popup') {
             setPopupHtml(buildAutomationPopupHtml(result.payload, action));
         }
-    }, [playerStats, campaignName, cannotAct, mapName, characters, setCombatSuperiorityModal, setPopupHtml, handleReplenishingMealClick, handleBolsteringTreatsClick, handleBrewPoisonClick, setFeyReinforcementsModal, setGnomishLineageModal]);
+    }, [playerStats, campaignName, cannotAct, mapName, characters, setCombatSuperiorityModal, setPopupHtml, handleReplenishingMealClick, handleBolsteringTreatsClick, handleBrewPoisonClick, handleShapeShiftClick, setFeyReinforcementsModal, setGnomishLineageModal]);
     const {
         handleStrideConfirm,
         handleMoonlightStepFallbackConfirm,
@@ -818,6 +848,9 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
         handlePortentModalClose,
     } = usePortentHandlers({ portentModal, setPortentModal, setPopupHtml });
     const uniqueActions = buildUniqueSpecialActions(playerStats, fightingStylesMap);
+    if (isShapechanged && !uniqueActions.find(a => a.name === SHAPE_SHIFT_ACTION.name)) {
+        uniqueActions.push(SHAPE_SHIFT_ACTION);
+    }
     return (
             <div className='char-special-actions'>
                 <div className='sectionHeader'>Special Actions</div>

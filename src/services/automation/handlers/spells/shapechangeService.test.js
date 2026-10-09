@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  setRuntimeObject: vi.fn(),
 }));
 
 vi.mock('../../../encounters/combatData.js', () => ({
@@ -47,7 +48,7 @@ import {
   confirmShapechangeTransform,
   revertShapechange,
 } from './shapechangeService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary, setCombatSummaryCache } from '../../../encounters/combatData.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addConcentration } from '../../../combat/concentration/concentrationService.js';
@@ -256,12 +257,11 @@ describe('shapechangeService.confirmShapechangeTransform', () => {
     expect(cs.creatures[0].ac).toBe(10);
   });
 
-  it('sets temp HP to the full form HP', async () => {
+  it('SP-103: first transform sets temp HP to the full form HP (batched)', async () => {
     const cs = { creatures: [{ name: targetName, type: 'monster', currentHp: 5, maxHp: 7, ac: 15, speed: 30 }] };
     getCombatContext.mockResolvedValue(cs);
     await confirmShapechangeTransform({ targetName, form, casterName, spell: { name: 'Shapechange' }, playerStats: makePlayerStats(), campaignName });
-    expect(setRuntimeValue).toHaveBeenCalledWith(targetName, 'tempHp', 59, campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith(targetName, 'shapechangeTempHp', 59, campaignName);
+    expect(setRuntimeObject).toHaveBeenCalledWith(targetName, { tempHp: 59, shapechangeTempHp: 59 }, campaignName);
   });
 
   it('persists the combat summary', async () => {
@@ -302,10 +302,14 @@ describe('shapechangeService.confirmShapechangeTransform', () => {
     expect(effectsCall[2][0].source).toBe(casterName);
   });
 
-  it('registers concentration on the caster', async () => {
+  it('SP-103: registers concentration with the canonical spell-save DC fallback', async () => {
     await confirmShapechangeTransform({ targetName, form, casterName, spell: { name: 'Shapechange' }, playerStats: makePlayerStats(), campaignName });
-    const concentrationDc = 8 + makePlayerStats().proficiency + makePlayerStats().abilities.CON.bonus;
-    expect(addConcentration).toHaveBeenCalledWith(expect.any(Object), casterName, 'Shapechange', concentrationDc);
+    expect(addConcentration).toHaveBeenCalledWith(expect.any(Object), casterName, 'Shapechange', 8 + makePlayerStats().proficiency);
+  });
+
+  it('SP-103: prefers playerStats.spellAbilities.saveDc (caster WIS DC, not CON math)', async () => {
+    await confirmShapechangeTransform({ targetName, form, casterName, spell: { name: 'Shapechange' }, playerStats: makePlayerStats({ spellAbilities: { saveDc: 17 } }), campaignName });
+    expect(addConcentration).toHaveBeenCalledWith(expect.any(Object), casterName, 'Shapechange', 17);
   });
 
   it('uses spell name from spell param for concentration', async () => {
@@ -324,10 +328,10 @@ describe('shapechangeService.confirmShapechangeTransform', () => {
     expect(addConcentration).not.toHaveBeenCalled();
   });
 
-  it('writes a shapechange pending expiration with infinite rounds', async () => {
+  it('SP-103: writes a shapechange pending expiration anchored at 600 rounds (1 hour)', async () => {
     await confirmShapechangeTransform({ targetName, form, casterName, spell: { name: 'Shapechange' }, playerStats: makePlayerStats(), campaignName });
     const expCall = vi.mocked(setRuntimeValue).mock.calls.find(call => call[1] === 'pendingExpirations' && call[0] === casterName);
-    expect(expCall[2]).toEqual(expect.arrayContaining([expect.objectContaining({ target: targetName, effects: expect.arrayContaining([expect.objectContaining({ type: 'shapechange' })]), appliedRound: 5, expiryRounds: Infinity, expireOnCreatureName: null })]));
+    expect(expCall[2]).toEqual(expect.arrayContaining([expect.objectContaining({ target: targetName, effects: expect.arrayContaining([expect.objectContaining({ type: 'shapechange' })]), appliedRound: 5, expiryRounds: 600, expireOnCreatureName: null })]));
   });
 
   it('filters existing expirations to remove old shapechange entries for the same target', async () => {
@@ -340,7 +344,7 @@ describe('shapechangeService.confirmShapechangeTransform', () => {
     const expCall = vi.mocked(setRuntimeValue).mock.calls.find(call => call[1] === 'pendingExpirations' && call[0] === casterName);
     expect(expCall[2]).toHaveLength(2);
     expect(expCall[2].find(e => e.target === 'Orc')).toBeTruthy();
-    expect(expCall[2].find(e => e.target === targetName).expiryRounds).toBe(Infinity);
+    expect(expCall[2].find(e => e.target === targetName).expiryRounds).toBe(600);
   });
 
   it('logs the transformation', async () => {
@@ -357,6 +361,86 @@ describe('shapechangeService.confirmShapechangeTransform', () => {
 
   it('returns { ok: true } on success', async () => {
     expect(await confirmShapechangeTransform({ targetName, form, casterName, spell: { name: 'Shapechange' }, playerStats: makePlayerStats(), campaignName })).toEqual({ ok: true });
+  });
+});
+
+describe('shapechangeService.confirmShapechangeTransform — SP-103 form change', () => {
+  const secondForm = {
+    name: 'Panther', index: 'panther', size: 'Medium', hit_points: 41,
+    armor_class: 12, speed: '50 ft.', challenge_rating: '1/4', type: 'beast',
+  };
+
+  function transformedMocks() {
+    defaultMocks();
+    getCombatContext.mockResolvedValue({
+      creatures: [
+        {
+          name: targetName, type: 'monster', currentHp: 5, maxHp: 59, ac: 12, speed: '40 ft.',
+          shapechangeOriginal: { maxHp: 7, ac: 15, speed: 30 },
+          shapechangeSource: casterName,
+          shapechangeForm: { name: 'Elephant' }, formName: 'Elephant',
+          concentration: { spell: 'Shapechange', dc: 13 },
+        },
+        { name: casterName, type: 'player' },
+      ],
+    });
+    getRuntimeValue.mockImplementation((key, subKey) => {
+      if (key === 'campaign' && subKey === 'targetEffects') return [{ target: targetName, source: casterName, effect: 'shapechange', formName: 'Elephant' }];
+      if (key === casterName && subKey === 'pendingExpirations') return [{ target: targetName, effects: [{ type: 'shapechange' }], appliedRound: 2, expiryRounds: 600 }];
+      return undefined;
+    });
+  }
+
+  it('swaps stat block to the new form, originals untouched', async () => {
+    transformedMocks();
+    const cs = await getCombatContext(campaignName);
+    const result = await confirmShapechangeTransform({ targetName, form: secondForm, casterName, spell: { name: 'Shapechange' }, playerStats: makePlayerStats(), campaignName, formChange: true });
+    const creature = cs.creatures.find(c => c.name === targetName);
+    expect(result).toEqual({ ok: true });
+    expect(creature.maxHp).toBe(41);
+    expect(creature.formName).toBe('Panther');
+    expect(creature.shapechangeOriginal).toEqual({ maxHp: 7, ac: 15, speed: 30 });
+  });
+
+  it('does NOT re-grant THP on a form change', async () => {
+    transformedMocks();
+    await confirmShapechangeTransform({ targetName, form: secondForm, casterName, spell: { name: 'Shapechange' }, playerStats: makePlayerStats(), campaignName, formChange: true });
+    expect(setRuntimeObject).not.toHaveBeenCalled();
+    const tHpCalls = vi.mocked(setRuntimeValue).mock.calls.filter(call => call[0] === targetName && (call[1] === 'tempHp' || call[1] === 'shapechangeTempHp'));
+    expect(tHpCalls.length).toBe(0);
+  });
+
+  it('does NOT re-stamp concentration or the expiry clock', async () => {
+    transformedMocks();
+    await confirmShapechangeTransform({ targetName, form: secondForm, casterName, spell: { name: 'Shapechange' }, playerStats: makePlayerStats(), campaignName, formChange: true });
+    expect(addConcentration).not.toHaveBeenCalled();
+    const expCalls = vi.mocked(setRuntimeValue).mock.calls.filter(call => call[1] === 'pendingExpirations');
+    expect(expCalls.length).toBe(0);
+  });
+
+  it('logs ability_use form change and no cast save_result', async () => {
+    transformedMocks();
+    await confirmShapechangeTransform({ targetName, form: secondForm, casterName, spell: { name: 'Shapechange' }, playerStats: makePlayerStats(), campaignName, formChange: true });
+    const entries = vi.mocked(addEntry).mock.calls.map(c => c[1]);
+    const ability = entries.filter(e => e.type === 'ability_use');
+    expect(ability.length).toBe(1);
+    expect(ability[0].description).toContain('shape-shifts into Panther');
+    expect(entries.some(e => e.type === 'save_result')).toBe(false);
+  });
+
+  it('updates the shapechange targetEffect formName', async () => {
+    transformedMocks();
+    await confirmShapechangeTransform({ targetName, form: secondForm, casterName, spell: { name: 'Shapechange' }, playerStats: makePlayerStats(), campaignName, formChange: true });
+    const effectsCall = vi.mocked(setRuntimeValue).mock.calls.find(call => call[0] === 'campaign' && call[1] === 'targetEffects');
+    expect(effectsCall[2].find(te => te.effect === 'shapechange').formName).toBe('Panther');
+  });
+
+  it('refuses an unpaid form-change confirm when never transformed', async () => {
+    defaultMocks();
+    const result = await confirmShapechangeTransform({ targetName, form, casterName, spell: { name: 'Shapechange' }, playerStats: makePlayerStats(), campaignName, formChange: true });
+    expect(result).toEqual({ ok: false, reason: 'not_shapechanged' });
+    expect(setRuntimeObject).not.toHaveBeenCalled();
+    expect(storage.set).not.toHaveBeenCalled();
   });
 });
 
@@ -398,6 +482,20 @@ describe('shapechangeService.revertShapechange', () => {
     const effectsCall = vi.mocked(setRuntimeValue).mock.calls.find(call => call[0] === 'campaign' && call[1] === 'targetEffects');
     expect(effectsCall).toBeTruthy();
     expect(effectsCall[2].every(te => !(te.target === targetName && te.effect === 'shapechange'))).toBe(true);
+  });
+
+  it('SP-103: clears the Shapechange concentration stamp on revert', () => {
+    const cs = getCombatSummary(campaignName);
+    cs.creatures[0].concentration = { spell: 'Shapechange', dc: 17 };
+    revertShapechange(targetName, campaignName);
+    expect(cs.creatures[0].concentration).toBeUndefined();
+  });
+
+  it('SP-103: leaves another spell\'s concentration untouched on revert', () => {
+    const cs = getCombatSummary(campaignName);
+    cs.creatures[0].concentration = { spell: 'Bless', dc: 13 };
+    revertShapechange(targetName, campaignName);
+    expect(cs.creatures[0].concentration?.spell).toBe('Bless');
   });
 
   it('returns leftover temp HP by subtracting the shapechange buffer', () => {

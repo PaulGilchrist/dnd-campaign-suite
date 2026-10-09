@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary, setCombatSummaryCache, getCurrentCombatRound } from '../../../encounters/combatData.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addConcentration } from '../../../combat/concentration/concentrationService.js';
@@ -45,13 +45,15 @@ export async function applyShapechange(spell, metaCtx, playerStats, campaignName
 async function stampShapechangeConcentration({ cs, casterName, spell, playerStats, campaignName }) {
     const casterCreature = cs.creatures.find(c => c.name === casterName);
     if (!casterCreature) return;
-    const concentrationDc = 8 + (playerStats.proficiency || 2) + (playerStats.abilities?.CON?.bonus ?? 0);
+    // SP-103: stamp the caster's spell-save DC (WIS for druids), the app-wide
+    // canonical pattern (polymorph/truePolymorph/antimagicField twins) — not 8+prof+CON.
+    const concentrationDc = playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
     addConcentration(cs, casterName, spell?.name || 'Shapechange', concentrationDc);
     await storage.set('combatSummary', cs, campaignName);
     setCombatSummaryCache(cs, campaignName);
 }
 
-export async function confirmShapechangeTransform({ targetName, form, casterName, spell, playerStats, campaignName }) {
+export async function confirmShapechangeTransform({ targetName, form, casterName, spell, playerStats, campaignName, formChange }) {
     const cs = await getCombatContext(campaignName) || { creatures: [] };
     const creature = cs.creatures.find(c => c.name === targetName);
     if (!creature) {
@@ -62,11 +64,25 @@ export async function confirmShapechangeTransform({ targetName, form, casterName
     const formHp = typeof form.hit_points === 'number' ? form.hit_points : 0;
     const formAc = typeof form.armor_class === 'number' ? form.armor_class : 10;
 
-    creature.shapechangeOriginal = {
-        maxHp: creature.maxHp ?? formHp,
-        ac: creature.ac ?? formAc,
-        speed: creature.speed,
-    };
+    // SP-103: shapechangeOriginal is the single source of truth for "this spell's
+    // transform is already running" (animalShapesService isFirstTransform twin). A form
+    // change swaps stat blocks only — originals, first-form THP, concentration and the
+    // expiry clock all stay anchored to the original cast.
+    const isFormChange = !!creature.shapechangeOriginal;
+    if (formChange && !isFormChange) {
+        console.error(`[shapechangeService] Form change requested but ${targetName} is not transformed.`);
+        return { ok: false, reason: 'not_shapechanged' };
+    }
+
+    if (!isFormChange) {
+        creature.shapechangeOriginal = {
+            maxHp: creature.maxHp ?? formHp,
+            ac: creature.ac ?? formAc,
+            speed: creature.speed,
+        };
+        // RAW: THP equal to the Hit Points of the FIRST form — never re-granted.
+        setRuntimeObject(targetName, { tempHp: formHp, shapechangeTempHp: formHp }, campaignName);
+    }
     creature.shapechangeSource = casterName;
     creature.shapechangeForm = {
         name: form.name,
@@ -82,9 +98,6 @@ export async function confirmShapechangeTransform({ targetName, form, casterName
     creature.maxHp = formHp;
     creature.ac = formAc;
     creature.speed = form.speed;
-
-    setRuntimeValue(targetName, 'tempHp', formHp, campaignName);
-    setRuntimeValue(targetName, 'shapechangeTempHp', formHp, campaignName);
 
     await storage.set('combatSummary', cs, campaignName);
     setCombatSummaryCache(cs, campaignName);
@@ -103,30 +116,47 @@ export async function confirmShapechangeTransform({ targetName, form, casterName
     });
     setRuntimeValue('campaign', 'targetEffects', cleaned, campaignName, true);
 
-    await stampShapechangeConcentration({ cs, casterName, spell, playerStats, campaignName });
+    if (!isFormChange) {
+        await stampShapechangeConcentration({ cs, casterName, spell, playerStats, campaignName });
+    }
 
-    const expirations = getRuntimeValue(casterName, 'pendingExpirations', campaignName);
-    const expList = Array.isArray(expirations) ? expirations : [];
-    const filteredExp = expList.filter(e => !(e.target === targetName && (e.effects || []).some(ef => ef.type === SHAPECHANGE_EFFECT)));
-    filteredExp.push({
-        target: targetName,
-        effects: [{ type: SHAPECHANGE_EFFECT }],
-        appliedRound: getCurrentCombatRound(campaignName),
-        expiryRounds: Infinity,
-        expireOnCreatureName: null,
-    });
-    setRuntimeValue(casterName, 'pendingExpirations', filteredExp, campaignName);
+    if (!isFormChange) {
+        // SP-103 / CLA-033 no-anchor family: "Concentration, up to 1 hour" gets a
+        // real clock (600 rounds, §37 hours×600). clearExpirationEffects.js already
+        // routes shapechange expiry → revertShapechange. Infinity JSON-serialized to
+        // null and never expired.
+        const expirations = getRuntimeValue(casterName, 'pendingExpirations', campaignName);
+        const expList = Array.isArray(expirations) ? expirations : [];
+        const filteredExp = expList.filter(e => !(e.target === targetName && (e.effects || []).some(ef => ef.type === SHAPECHANGE_EFFECT)));
+        filteredExp.push({
+            target: targetName,
+            effects: [{ type: SHAPECHANGE_EFFECT }],
+            appliedRound: getCurrentCombatRound(campaignName),
+            expiryRounds: 600,
+            expireOnCreatureName: null,
+        });
+        setRuntimeValue(casterName, 'pendingExpirations', filteredExp, campaignName);
+    }
 
-    addEntry(campaignName, {
-        type: 'save_result',
-        characterName: casterName,
-        rollType: 'save-shapechange',
-        targetName,
-        saveDc: 0,
-        saveType: 'WIS',
-        success: false,
-        description: `${targetName} uses Shapechange to transform into ${form.name} (CR ${form.challenge_rating}) cast by ${casterName}.`,
-    }).catch((e) => { console.error("[shapechangeService:log-error]", e); });
+    if (isFormChange) {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: targetName,
+            abilityName: 'Shapechange',
+            description: `${targetName} shape-shifts into ${form.name} (CR ${form.challenge_rating}) using Shapechange. No spell slot expended.`,
+        }).catch((e) => { console.error("[shapechangeService:log-error]", e); });
+    } else {
+        addEntry(campaignName, {
+            type: 'save_result',
+            characterName: casterName,
+            rollType: 'save-shapechange',
+            targetName,
+            saveDc: 0,
+            saveType: 'WIS',
+            success: false,
+            description: `${targetName} uses Shapechange to transform into ${form.name} (CR ${form.challenge_rating}) cast by ${casterName}.`,
+        }).catch((e) => { console.error("[shapechangeService:log-error]", e); });
+    }
 
     return { ok: true };
 }
@@ -168,6 +198,8 @@ function revertShapechangeCreature(cs, targetName) {
     delete creature.shapechangeOriginal;
     delete creature.shapechangeForm;
     delete creature.formName;
+    // SP-103 / SP-086 twin: badge-revert must also clear the concentration stamp it ends.
+    if (creature.concentration?.spell === 'Shapechange') delete creature.concentration;
     return { changed: true, caster };
 }
 

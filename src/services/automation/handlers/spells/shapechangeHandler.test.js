@@ -137,7 +137,7 @@ describe('shapechangeHandler.handle', () => {
       expect(result.payload.description).toContain(casterName);
     });
 
-    it('returns popup when target is already transformed (shapechange effect)', async () => {
+    it('SP-103: active shapechange effect reopens the chooser as a free form change', async () => {
       setupBaseMocks({
         existingEffects: [{ target: casterName, effect: 'shapechange', source: 'OldCaster' }],
       });
@@ -145,8 +145,44 @@ describe('shapechangeHandler.handle', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('shapechange_select');
+      expect(result.payload.formChange).toBe(true);
+    });
+
+    it('SP-103: shapechangeOriginal without a targetEffect still routes form change', async () => {
+      setupBaseMocks();
+      getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: targetName, type: 'monster', currentHp: 5, maxHp: 7, traits: [] },
+          { name: casterName, type: 'player', currentHp: 10, maxHp: 10, traits: [], shapechangeOriginal: { maxHp: 10, ac: 12, speed: 30 } },
+        ],
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.payload.type).toBe('shapechange_select');
+      expect(result.payload.formChange).toBe(true);
+    });
+
+    it('SP-103: stale form-change request without transform state refuses unpaid', async () => {
+      setupBaseMocks();
+
+      const result = await handle(makeAction({ _shapechangeFormChange: true }), makePlayerStats(), campaignName, null);
+
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('already transformed');
+      expect(result.payload.description).toContain('not transformed');
+      const abilityCalls = vi.mocked(addEntry).mock.calls.filter(call => call[1]?.type === 'ability_use');
+      expect(abilityCalls.length).toBe(1);
+      expect(abilityCalls[0][1].description).toContain('not transformed');
+    });
+
+    it('SP-103: fresh cast (no transform state) opens chooser without formChange', async () => {
+      setupBaseMocks();
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.payload.type).toBe('shapechange_select');
+      expect(result.payload.formChange).toBeUndefined();
     });
 
     it('returns popup when target is already transformed (polymorph effect)', async () => {
@@ -169,14 +205,15 @@ describe('shapechangeHandler.handle', () => {
       expect(result.payload.description).toContain('already transformed');
     });
 
-    it('handles array target in existing effects check', async () => {
+    it('SP-103: handles array target in existing effects check (form change)', async () => {
       setupBaseMocks({
         existingEffects: [{ target: [casterName, 'extra'], effect: 'shapechange', source: 'OldCaster' }],
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('already transformed');
+      expect(result.payload.type).toBe('shapechange_select');
+      expect(result.payload.formChange).toBe(true);
     });
 
     it('does not flag different target as already transformed', async () => {
@@ -351,9 +388,9 @@ describe('shapechangeHandler.handle', () => {
   });
 
   describe('logging', () => {
-    it('logs ability_use when target is already transformed', async () => {
+    it('SP-103: logs ability_use refusal only for polymorph-family effects', async () => {
       setupBaseMocks({
-        existingEffects: [{ target: casterName, effect: 'shapechange', source: 'OldCaster' }],
+        existingEffects: [{ target: casterName, effect: 'polymorph', source: 'OldCaster' }],
       });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -365,6 +402,16 @@ describe('shapechangeHandler.handle', () => {
       expect(abilityCalls[0][1].characterName).toBe(casterName);
       expect(abilityCalls[0][1].abilityName).toBe('Shapechange');
       expect(abilityCalls[0][1].description).toContain('already transformed');
+    });
+
+    it('SP-103: opening the form-change chooser logs nothing (confirm logs the shift)', async () => {
+      setupBaseMocks({
+        existingEffects: [{ target: casterName, effect: 'shapechange', source: casterName }],
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(vi.mocked(addEntry).mock.calls.filter(call => call[1]?.type === 'ability_use').length).toBe(0);
     });
 
     it('logs ability_use when target has 0 hit points', async () => {

@@ -25,6 +25,7 @@ function hasWildCompanionWaiver(playerStats, spell, freeCastAuthorized) {
 
 // Highest damage-progression level applicable to a cantrip for this caster.
 function resolveCantripAutoLevel(spell, playerStats) {
+  if (spell.level !== 0 || !spell.damage) return null;
   const charDmg = spell.damage?.damage_at_character_level;
   const slotDmg = spell.damage?.damage_at_slot_level;
   const dmgObj = (charDmg && Object.keys(charDmg).length) ? charDmg : (slotDmg && Object.keys(slotDmg).length ? slotDmg : null);
@@ -180,13 +181,42 @@ function refuseUnarmedMazeCast(spell, playerStats, campaignName, setPopupHtml, h
   }).catch((e) => { console.error("[useSpellMetamagicGates:maze_refused]", e); });
 }
 
+// SP-103: recasting Shapechange while already transformed is RAW "an action to
+// shape-shift into a different eligible form" — a free form change, not a new
+// casting. cs.shapechangeOriginal is the transform-state source of truth; when it
+// exists the chooser reopens UNPAID (no slot, no second concentration, no THP
+// re-grant — confirmShapechangeTransform swaps forms only) and stamps
+// _shapechangeFormChange so executeSpellCast skips the cast log (mirror
+// _deferChooserSlotPayment). Fresh casts (no originals) keep the paid lane intact.
+function isShapechangeSpell(spell) {
+  const lower = (spell?.name || '').toLowerCase();
+  return lower === 'shapechange' || spell?.automation?.type === 'shapechange';
+}
+
+async function isShapechangeTransformActive(playerStats, campaignName) {
+  const cs = await getCombatContext(campaignName);
+  const creature = cs?.creatures?.find(c => c.name === playerStats.name);
+  return !!creature?.shapechangeOriginal;
+}
+
+async function tryUnpaidShapechangeRecast(spell, metaCtx, { campaignName, onExecute, playerStats }) {
+  if (!await isShapechangeTransformActive(playerStats, campaignName)) return false;
+  onExecute({ ...spell, _shapechangeFormChange: true }, { ...metaCtx, _shapechangeFormChange: true });
+  return true;
+}
+
+
+
 // Non-sorcerer cast path: cantrip auto-leveling, concentration-preserving casts,
 // and the generic prepareSpellCast slot payment. Mirrors the original ordering exactly.
 async function handleNonSorcererCast(spell, metaCtx, {
   campaignName, consumedMaterial, freeCastAuthorized, materialsWaived, onExecute, playerStats
 }) {
-  const isCantrip = spell.level === 0;
-  const cantripAutoLevel = (isCantrip && spell.damage) ? resolveCantripAutoLevel(spell, playerStats) : null;
+  const cantripAutoLevel = resolveCantripAutoLevel(spell, playerStats);
+
+  // Spell-identity short-circuit BEFORE the await (SP-080 timing family): non-
+  // shapechange lanes keep their exact sync onExecute timing.
+  if (isShapechangeSpell(spell) && await tryUnpaidShapechangeRecast(spell, metaCtx, { campaignName, onExecute, playerStats })) return;
 
   if (isDeferredChooserPaymentSpell(spell)) {
     // SP-079: open the chooser unpaid — the spend + cast log move to confirm.
@@ -194,7 +224,7 @@ async function handleNonSorcererCast(spell, metaCtx, {
     return;
   }
 
-  if (isCantrip && cantripAutoLevel) {
+  if (cantripAutoLevel) {
     const preparedSpell = { ...spell, level: cantripAutoLevel, baseLevel: 0 };
     if (consumedMaterial && !materialsWaived) await consumeMaterial(playerStats, consumedMaterial.itemName, campaignName);
     onExecute(preparedSpell, metaCtx);
