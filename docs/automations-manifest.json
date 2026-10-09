@@ -5506,7 +5506,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-ft-067-resilient.md",
+      "verified": "verified",
       "triggerConditions": "Automation type: save_proficiency",
       "expectedBehavior": "You gain saving throw proficiency with the chosen ability."
     },

@@ -2752,3 +2752,4 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 ## FT-087 Spell Sniper (2026-10-08 PASS-subset) notes
 - PC sheet chips adjudicate NO cover/range/melee-dis (useActionSpellMetamagic omits pos/featEffects; resolveMapMode skips forcedMode-null) — cover/range truth only via monster-card lane or page-evaluate computeCover/computeRange probes. Spell lane drops range 'disadvantage' band. mapName re-arms ONLY via maps-manager Open (App.jsx:181), Activate insufficient. Grid resize 20->60->20 lossless.
+- PITFALL (PC lanes): char-summary speed mocks — when `rulesFactory.getPlayerStats` is mocked, the rules-layer speed fold never runs in the rig, so mock `speed` must carry the FOLDED total (CLA-300 fix flips `applyRovingSpeeds` to climb/swim = folded stats.speed, no re-add +10; stale pins in CharSheet.rendering-state.test.jsx must be inverted same pass §216).
