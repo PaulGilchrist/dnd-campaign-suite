@@ -304,6 +304,47 @@ describe('handleSavageAttacker', () => {
     expect(result).toEqual({ kept: 'reroll', damageDifference: 2 });
   });
 
+  // FT-069: rawDamage carries the rider-inflated adjustedTotal (d10 2 +
+  // flat mod 2 + Heavy Weapon Mastery 6 = 10, already applied as -10).
+  // Keeping reroll 8 must pay the dice-vs-dice delta of +6.
+  it('keep-reroll pays dice-vs-dice delta when rawDamage includes mastery riders', async () => {
+    const { applyDamageToTarget } = await import('../../services/rules/combat/applyDamage.js');
+    const { getCombatContext } = await import('../../services/rules/combat/damageUtils.js');
+    const { addEntry } = await import('../../services/ui/logService.js');
+
+    getCombatContext.mockResolvedValue({ creatures: [] });
+    applyDamageToTarget.mockReturnValue({});
+
+    const setPopupHtml = vi.fn();
+    const result = await handleSavageAttackerChoice({
+      playerStats: mockPlayerStats,
+      campaignName: mockCampaignName,
+      characters: [],
+      popupHtml: { modifier: 2, damageType: 'Slashing', finalDamage: 10, targetCurrentHp: 15 },
+      setPopupHtml,
+      choiceData: {
+        keep: 'reroll',
+        originalRolls: [2],
+        newRolls: [8],
+        originalTotal: 2,
+        newTotal: 8,
+        rawDamage: 10,
+        modifier: 2,
+        targetName: 'Bandit 1',
+        damageTypes: ['Slashing'],
+      }
+    });
+
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Bandit 1', 6, ['Slashing'], { campaignName: mockCampaignName, characters: [], ignoreResistance: false, attackerName: 'Test Character' });
+    expect(setPopupHtml.mock.calls[0][0].total).toBe(16);
+    expect(setPopupHtml.mock.calls[0][0].finalDamage).toBe(16);
+    expect(setPopupHtml.mock.calls[0][0].targetCurrentHp).toBe(9);
+
+    expect(addEntry.mock.calls[0][1].description).toContain('+6 damage to Bandit 1');
+    expect(addEntry.mock.calls[0][1].description).not.toContain('+0 damage');
+    expect(result).toEqual({ kept: 'reroll', damageDifference: 6 });
+  });
+
   it('keep-original choice never touches target hp', async () => {
     const { applyDamageToTarget } = await import('../../services/rules/combat/applyDamage.js');
     const { addEntry } = await import('../../services/ui/logService.js');

@@ -5711,7 +5711,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-ft-069-savage-attacker.md",
+      "verified": "verified",
       "class": "Feat",
       "triggerConditions": "Automation type: reroll_damage_once_per_turn",
       "expectedBehavior": "Once per turn when you hit a target with a weapon, you can roll the weapon's damage dice twice and use either roll against the target."

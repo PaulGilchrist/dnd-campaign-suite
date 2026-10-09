@@ -293,7 +293,7 @@ export async function handleSavageAttackerChoice({ playerStats, campaignName, ch
     if (!playerStats || !campaignName || !choiceData) return null;
 
     const playerName = playerStats.name;
-    const { keep, originalRolls, newRolls, rawDamage, modifier, targetName, damageTypes } = choiceData;
+    const { keep, originalRolls, newRolls, rawDamage, targetName, damageTypes } = choiceData;
 
     const originalTotal = originalRolls.reduce((s, r) => s + r, 0);
     const newTotal = newRolls.reduce((s, r) => s + r, 0);
@@ -302,7 +302,11 @@ export async function handleSavageAttackerChoice({ playerStats, campaignName, ch
         const combatSummary = await getCombatContext(campaignName);
         if (!combatSummary || !targetName) return null;
 
-        const damageDifference = (newTotal + (modifier || 0)) - rawDamage;
+        // FT-069: rawDamage is the popup total (adjustedTotal — flat mod and
+        // mastery/feature riders baked in) and was already applied to the
+        // target. The reroll swaps only the weapon dice, so the delta to
+        // apply on top must be dice-vs-dice, never dice+mod vs rawDamage.
+        const damageDifference = newTotal - originalTotal;
         if (damageDifference > 0) {
             applyDamageToTarget(combatSummary, targetName, damageDifference, damageTypes || [popupHtml?.damageType || 'Slashing'], { campaignName, characters: characters, ignoreResistance: false, attackerName: playerName });
         }
