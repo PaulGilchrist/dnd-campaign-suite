@@ -4439,7 +4439,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "broken — duplicate of CLA-232 lane; see .opencode/plans/bug-CLA-232-natural-recovery.md",
+      "verified": "verified",
       "class": "Druid",
       "triggerConditions": "Short Rest; Druid level 6+ Circle of the Land",
       "expectedBehavior": "You can cast one level 1+ prepared spell from Circle Spells without expending a spell slot, once per Long Rest. When you finish a Short Rest, you can recover expended spell slots with combined levels equal to half your Druid level (min 1). (Druid Circle of the Land class feature)",
