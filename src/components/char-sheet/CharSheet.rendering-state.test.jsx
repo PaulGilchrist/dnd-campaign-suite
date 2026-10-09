@@ -393,7 +393,10 @@ describe('passive effect speed modifications', () => {
   });
 
   it('applies Roving climb and swim speeds when not wearing heavy armor', async () => {
+    // CLA-300: stats.speed is the rules-layer folded walk speed (base 30 +
+    // Roving +10). Climb/swim equal that folded total without re-adding the +10.
     const stats = createMockPlayerStats({
+      speed: 40,
       automation: { passives: [{ name: 'Roving' }] },
       inventory: { equipped: ['Longsword'] },
       equipment: [{ name: 'Longsword' }, { name: 'Chain Mail', armor_category: 'Heavy' }],

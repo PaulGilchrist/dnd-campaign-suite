@@ -111,11 +111,14 @@ function applyRovingSpeeds(stats) {
         }
     }
     if (isWearingHeavyArmor) return;
+    // CLA-300: climb/swim equal your SPEED — stats.speed already carries the
+    // Roving +10 (and any other speed passives) folded by the rules layer
+    // (rules.js applySpeedIncreasePassives), so re-adding 10 double-counted it.
     if (!stats.climbSpeed) {
-        stats.climbSpeed = fallbackSpeed(stats) + 10;
+        stats.climbSpeed = fallbackSpeed(stats);
     }
     if (!stats.swimSpeed) {
-        stats.swimSpeed = fallbackSpeed(stats) + 10;
+        stats.swimSpeed = fallbackSpeed(stats);
     }
 }
 
