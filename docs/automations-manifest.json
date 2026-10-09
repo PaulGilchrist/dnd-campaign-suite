@@ -5601,7 +5601,7 @@
       "handler": "src/services/automation/handlers/class-fighter-rogue/executeActionManeuvers.js (executeReactionManeuver — gated CLA-297/310 house standard: holder-target + miss (hit===false) + melee/5ft + own-turn refuse + _Riposte_appliedAttack instance latch + _Riposte_usedRound round latch; miss clears pendingRiposteDieValue in hooks/combat/attackPostProcessing.js; CharReactions.jsx flushes logEntries)",
       "router": "src/services/automation/index.js (combat_superiority_reaction) + handlers/class-fighter-rogue/dispatchers.js",
       "infoBuilder": "src/services/rules/core/maneuvers.js (processManeuvers reaction rows)",
-      "verified": "broken — see .opencode/plans/bug-mn-017-riposte.md",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Action type: reaction; Trigger: melee_attack_miss; Uses: superiority_die",
       "expectedBehavior": "When a creature misses you with a melee attack roll, you can use your Reaction and expend one Superiority Die to make a melee attack with a weapon or an Unarmed Strike against the creature. If you hit, add the Superiority Die to the attack's damage roll."

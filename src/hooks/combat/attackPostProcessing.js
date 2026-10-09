@@ -1,6 +1,6 @@
-import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../runtime/useRuntimeState.js';
 import { rollExpression } from '../../services/dice/diceRoller.js';
-import { loadCombatSummary } from '../../services/encounters/combatData.js';
+import { loadCombatSummary, getCurrentCombatRound } from '../../services/encounters/combatData.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { hasPotentCantrip, applyMinDamageAdjustment } from './loggedDiceRollUtils.js';
@@ -168,7 +168,16 @@ function clearRiposteDieOnMiss({ finalHit, characterName, targetName, campaignNa
     if (finalHit !== false) return;
     const pendingRiposteDie = getRuntimeValue(characterName, 'pendingRiposteDieValue', campaignName);
     if (!(pendingRiposteDie != null && Number(pendingRiposteDie) > 0)) return;
-    setRuntimeValue(characterName, 'pendingRiposteDieValue', null, campaignName);
+    // MN-017 Defect 1 heal: an armed pending die proves a Riposte press this
+    // round, so the reaction-economy latch is re-stamped in this SAME merged
+    // full-store write — a stale-snapshot flush from this miss lane can no
+    // longer persist a server entry that lost _Riposte_usedRound (live
+    // 2026-10-09: same-round re-fire with the die spent twice).
+    const usedRound = getRuntimeValue(characterName, '_Riposte_usedRound', campaignName) ?? getCurrentCombatRound(campaignName);
+    const heal = { pendingRiposteDieValue: null, _Riposte_usedRound: usedRound };
+    const appliedAttack = getRuntimeValue(characterName, '_Riposte_appliedAttack', campaignName);
+    if (appliedAttack != null) heal._Riposte_appliedAttack = appliedAttack;
+    setRuntimeBatch(characterName, heal, campaignName);
     addEntry(campaignName, {
         type: 'ability_use',
         characterName,

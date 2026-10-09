@@ -1,7 +1,7 @@
 // MN-017: Riposte trigger gates — gated arm-then-row (CLA-297/CLA-310 house standard)
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeReactionManeuver } from './executeActionManeuvers.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../../../../hooks/runtime/useRuntimeState.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
@@ -10,6 +10,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(async () => {}),
+    setRuntimeBatch: vi.fn(),
 }));
 
 vi.mock('../../../ui/dataLoader.js', () => ({
@@ -97,9 +98,13 @@ describe('executeReactionManeuver — MN-017 Riposte gates', () => {
         expect(result.payload.targetName).toBe('Thug 1');
         expect(result.payload.attack.name).toBe('Shortsword');
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'superiorityDice', 5, 'test-campaign');
-        expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'pendingRiposteDieValue', 7, 'test-campaign');
-        expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', '_Riposte_appliedAttack', 'd20:2+3:Thug 1', 'test-campaign');
-        expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', '_Riposte_usedRound', 1, 'test-campaign');
+        // MN-017 Defect 1 fix: die arm + both latches land in ONE merged batch.
+        expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+        expect(setRuntimeBatch).toHaveBeenCalledWith('EvasiveFighter', {
+            pendingRiposteDieValue: 7,
+            _Riposte_appliedAttack: 'd20:2+3:Thug 1',
+            _Riposte_usedRound: 1,
+        }, 'test-campaign');
         expect(result.logEntries).toHaveLength(1);
         expect(result.logEntries[0].type).toBe('ability_use');
         expect(result.logEntries[0].description).toContain('Riposte (Reaction)');
@@ -212,7 +217,7 @@ describe('executeReactionManeuver — MN-017 Riposte gates', () => {
         const result = await executeReactionManeuver({ name: 'Riposte' }, makePlayerStats(), 'test-campaign', 'Riposte');
 
         expect(result.type).toBe('attack_roll');
-        expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', '_Riposte_usedRound', 2, 'test-campaign');
+        expect(setRuntimeBatch).toHaveBeenCalledWith('EvasiveFighter', expect.objectContaining({ _Riposte_usedRound: 2 }), 'test-campaign');
     });
 
     it('pool-0 gate keeps the exact verified popup and consults no trigger data', async () => {
@@ -238,7 +243,7 @@ describe('executeReactionManeuver — MN-017 Riposte gates', () => {
         expect(rollExpression).toHaveBeenCalledWith('1d8');
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'relentlessUsedRound', 1, 'test-campaign');
         expect(setRuntimeValue).not.toHaveBeenCalledWith('EvasiveFighter', 'superiorityDice', 5, 'test-campaign');
-        expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'pendingRiposteDieValue', 5, 'test-campaign');
+        expect(setRuntimeBatch).toHaveBeenCalledWith('EvasiveFighter', expect.objectContaining({ pendingRiposteDieValue: 5 }), 'test-campaign');
     });
 
     it('timestamped lastAttack identity is honored for the instance latch', async () => {
@@ -252,5 +257,38 @@ describe('executeReactionManeuver — MN-017 Riposte gates', () => {
 
         expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('already riposted this attack roll');
+    });
+
+    it('refuses on the holder\'s own turn via __initiative__ authority even when the cs mirror is stale (live defect 2)', async () => {
+        // Live 2026-10-09: turn-start gate stamped "7:EvasiveFighter" but
+        // combatSummary.activeCreatureName still lagged "Thug 1" → press FIRED.
+        getCombatContext.mockResolvedValue({ creatures: [], round: 7, activeCreatureName: 'Bandit 1' });
+        mockKeys({ '__initiative__': null });
+        getRuntimeValue.mockImplementation((name, key) => {
+            if (name === '__initiative__' && key === 'lastAppliedTurnStartCreature') return '7:EvasiveFighter';
+            if (key === 'superiorityDice') return 6;
+            return null;
+        });
+
+        const result = await executeReactionManeuver({ name: 'Riposte' }, makePlayerStats(), 'test-campaign', 'Riposte');
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('you cannot use it on your own turn');
+        expect(setRuntimeBatch).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('EvasiveFighter', 'superiorityDice', expect.anything(), 'test-campaign');
+    });
+
+    it('fires when __initiative__ gate names another creature even if the cs mirror stale-shows the holder', async () => {
+        getCombatContext.mockResolvedValue({ creatures: [], round: 7, activeCreatureName: 'EvasiveFighter' });
+        getRuntimeValue.mockImplementation((name, key) => {
+            if (name === '__initiative__' && key === 'lastAppliedTurnStartCreature') return '7:Thug 1';
+            if (key === 'superiorityDice') return 6;
+            return null;
+        });
+
+        const result = await executeReactionManeuver({ name: 'Riposte' }, makePlayerStats(), 'test-campaign', 'Riposte');
+
+        expect(result.type).toBe('attack_roll');
+        expect(setRuntimeBatch).toHaveBeenCalledWith('EvasiveFighter', expect.objectContaining({ _Riposte_usedRound: 7 }), 'test-campaign');
     });
 });

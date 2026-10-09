@@ -11,11 +11,12 @@ import {
     executeReactionManeuver,
     executeCommandingPresenceReaction,
 } from './combatSuperiorityHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../../../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(async () => {}),
+    setRuntimeBatch: vi.fn(),
 }));
 
 vi.mock('../../../../services/ui/dataLoader.js', () => ({
@@ -207,9 +208,12 @@ describe('executeReactionManeuver', () => {
         expect(result.type).toBe('attack_roll');
         expect(result.payload.attack).toBeDefined();
         expect(result.payload.targetName).toBe('Goblin');
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'pendingRiposteDieValue', expect.any(Number), 'test-campaign');
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Riposte_appliedAttack', expect.any(String), 'test-campaign');
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Riposte_usedRound', 1, 'test-campaign');
+        // MN-017 Defect 1 fix: die + latches land in ONE merged batch write.
+        expect(setRuntimeBatch).toHaveBeenCalledWith('TestFighter', {
+            pendingRiposteDieValue: expect.any(Number),
+            _Riposte_appliedAttack: expect.any(String),
+            _Riposte_usedRound: 1,
+        }, 'test-campaign');
         expect(result.logEntries[0].description).toContain('Goblin');
     });
 });

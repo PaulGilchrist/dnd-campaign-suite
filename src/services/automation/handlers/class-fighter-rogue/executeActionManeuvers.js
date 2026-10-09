@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../../../../hooks/runtime/useRuntimeState.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
@@ -440,6 +440,15 @@ function riposteAttackIdentity(attackEvent, attackerName) {
     return `d20:${attackEvent?.d20 ?? '?'}+${attackEvent?.bonus ?? 0}:${attackerName ?? ''}`;
 }
 
+// Turn-walk authority: __initiative__.lastAppliedTurnStartCreature ("<round>:<name>")
+// is written at every turn-start (navigationHandlers/sseHandlers); the combatSummary
+// mirror lags ~10s and must only be a fallback.
+function isOwnTurn(playerName, campaignName, combatContext) {
+    const gate = getRuntimeValue('__initiative__', 'lastAppliedTurnStartCreature', campaignName);
+    const owner = String(gate || '').includes(':') ? String(gate).split(':').slice(1).join(':') : (gate || combatContext?.activeCreatureName || '');
+    return !!owner && owner === playerName;
+}
+
 async function gateRiposteReaction(maneuver, playerStats, campaignName) {
     const playerName = playerStats.name;
     const name = maneuver.name;
@@ -467,7 +476,11 @@ async function gateRiposteReaction(maneuver, playerStats, campaignName) {
         return { refusal: buildRiposteRefusalPopup(name, `${attackerName} is not within 5 feet of you. ${name} requires the attacker to be adjacent.`) };
     }
     const combatContext = await getCombatContext(campaignName);
-    if (combatContext?.activeCreatureName === playerName) {
+    // MN-017 Defect 2: turn-walk authority is __initiative__.lastAppliedTurnStartCreature
+    // ("<round>:<name>", dualWielder/expeditiousRetreat precedent) — cs.activeCreatureName
+    // is a ~10s-stale mirror and let Riposte fire on the holder's own turn (live
+    // 2026-10-09: gate stamp "7:EvasiveFighter", mirror still "Bandit 1", press FIRED).
+    if (isOwnTurn(playerName, campaignName, combatContext)) {
         return { refusal: buildRiposteRefusalPopup(name, `${name} is a Reaction — you cannot use it on your own turn.`) };
     }
     const identity = riposteAttackIdentity(attackEvent, attackerName);
@@ -498,11 +511,17 @@ async function executeRiposteReaction(maneuver, playerStats, campaignName, super
     const { dieValue, dieDescription, expendedDie } = rollManeuverDie(maneuver, playerStats, campaignName);
     await expendSuperiorityDie(playerStats, campaignName, expendedDie, superiorityDice);
 
-    // Reaction consumed: arm the die and stamp both latches — sequential
-    // awaits (pitfall 21: concurrent full-store POSTs race).
-    await setRuntimeValue(playerStats.name, 'pendingRiposteDieValue', dieValue, campaignName);
-    await setRuntimeValue(playerStats.name, RIPOSTE_APPLIED_ATTACK_KEY, gate.identity, campaignName);
-    await setRuntimeValue(playerStats.name, RIPOSTE_USED_ROUND_KEY, gate.currentRound, campaignName);
+    // MN-017 Defect 1 (CLA-266 merged-write pattern): ONE atomic full-store
+    // batch arms the die and both latches. Three sequential setRuntimeValue
+    // POSTs each race their own snapshot; a stale full-store flush from the
+    // reaction attack's miss lane (attackPostProcessing.js) could land between
+    // them and drop _Riposte_usedRound while applied survived (live 2026-10-09:
+    // same-round re-fire, die spent twice).
+    setRuntimeBatch(playerStats.name, {
+        pendingRiposteDieValue: dieValue,
+        [RIPOSTE_APPLIED_ATTACK_KEY]: gate.identity,
+        [RIPOSTE_USED_ROUND_KEY]: gate.currentRound,
+    }, campaignName);
 
     const logEntry = {
         type: 'ability_use',
