@@ -5832,7 +5832,7 @@
       "handler": "src/services/automation/handlers/combat/sentinelHaltHandler.js",
       "router": "src/services/automation/index.js (sentinel :616)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/passive.js (passive_rule)",
-      "verified": "broken — see .opencode/plans/bug-ft-101-sentinel-halt.md",
+      "verified": "verified",
       "class": "Feat",
       "triggerConditions": "Passive: your Opportunity Attack hits a creature",
       "expectedBehavior": "When you hit a creature with an Opportunity Attack, the creature's Speed becomes 0 for the rest of the current turn."

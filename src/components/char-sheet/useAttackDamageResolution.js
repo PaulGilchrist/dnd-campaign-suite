@@ -52,6 +52,9 @@ export async function resolveAttackDamageStandalone(attack, ctxOverrides, { play
             dcSuccess: o.dcSuccess || null,
             metamagicTwinTarget: o.metamagicTwinTarget || null,
             metamagicHeighten: o.metamagicHeighten || false,
+            // FT-101: OA marker must reach the plain-damage seam — the
+            // handlePlainDamage Sentinel (Halt) gate reads context.isOpportunityAttack.
+            isOpportunityAttack: o.isOpportunityAttack || false,
         };
         rollDamage({ name: attack.name, formula: formula, total: total, rolls: rolls, modifier: modifier, context: minimalCtx });
     };

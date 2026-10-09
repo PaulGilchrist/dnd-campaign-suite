@@ -10,7 +10,7 @@ import { hasBardicInspirationOffense, getBardicInspirationDieSize, getBardicInsp
 import { hasEmpoweredSpell } from '../../../services/rules/spells/empoweredSpellService.js';
 import { getChaModifier } from '../../../services/rules/spells/metamagicRules.js';
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
-import { registerTargetEffect, getEffectDefinition } from '../../../services/combat/conditions/targetEffectDefinitions.js';
+import { registerTargetEffect, getEffectDefinition, getActiveTargetEffect } from '../../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
 import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 import { consumePendingRedirectOnResolve } from '../../../services/encounters/monsterRedirectAttack.js';
@@ -25,23 +25,52 @@ const ABILITY_LABELS = { str: 'Strength', dex: 'Dexterity', con: 'Constitution',
 const SECONDARY_LOG_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
 const SECONDARY_POPUP_SUFFIXES = ['Name', 'Formula', 'Rolls', 'Total', 'Modifier', 'DamageType', 'FinalDamage'];
 
-function applySentinelHalt(context, target, characterName, characters, campaignName) {
-    const allFeatures = (() => {
-        const playerCharacter = (characters || []).find(c => c.name === characterName || c.name.startsWith(characterName + ' '));
-        const computed = playerCharacter?.computedStats || playerCharacter;
-        return computed?.characterAdvancement || [];
-    })();
-    if (!allFeatures.some(f => f.name === 'Sentinel')) return;
-    const sentinelStoredEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    const newEffect = {
-        target: target.name,
-        source: 'Sentinel',
+// FT-101: Sentinel — Halt ("When you hit a creature with an Opportunity
+// Attack, the creature's Speed becomes 0 for the rest of the current turn").
+// OA-hit gate lives at the applyDamageForTarget seam (context.isOpportunityAttack
+// + lastAttack identity). Producer mirrors the verified MA-0146 speed_zero
+// shape: registry te + activeConditions speed_zero (live consumers:
+// conditionEffects speedZero → CharSummary Speed 0), ONE anchor expiry clock
+// (expireOnCreatureName=target fires via expireStaleEffects at the target's
+// next turn-start — remove_target_effect + registered 'speed_zero' clears),
+// plus a granted log row.
+function attackerHasSentinel(characterName, characters) {
+    const attacker = (characters || []).find(c => c.name === characterName || c.name.startsWith(characterName + ' '));
+    return (attacker?.feats || []).some(f => String(f) === 'Sentinel');
+}
+
+async function applySentinelHalt(target, characterName, characters, campaignName) {
+    if (!attackerHasSentinel(characterName, characters)) return;
+    registerTargetEffect(campaignName, target.name, 'speed_zero', characterName, {
         option: 'Halt',
-        effect: 'speed_zero',
-        value: null,
         duration: 'end_of_turn',
-    };
-    setRuntimeValue('campaign', 'targetEffects', [...sentinelStoredEffects, newEffect], campaignName);
+    });
+    const stored = getRuntimeValue(target.name, 'activeConditions');
+    const conditions = Array.isArray(stored) ? stored : [];
+    if (!conditions.some(c => String(c).toLowerCase() === 'speed_zero')) {
+        await setRuntimeValue(target.name, 'activeConditions', [...conditions, 'speed_zero'], campaignName);
+    }
+    addExpiration({
+        attackerName: characterName,
+        targetName: target.name,
+        campaignName,
+        rounds: undefined,
+        expireOnCreatureName: target.name,
+        effects: [
+            { type: 'remove_target_effect', effectKey: 'speed_zero', source: characterName, target: target.name },
+            { type: 'speed_zero' },
+        ],
+    });
+    const granted = getActiveTargetEffect(campaignName, target.name, 'speed_zero');
+    await addEntry(campaignName, {
+        type: 'automation',
+        automationType: 'speed_zero_granted',
+        characterName: target.name,
+        sourceName: characterName,
+        abilityName: 'Sentinel',
+        description: `${target.name} was hit by ${characterName}'s Opportunity Attack — Sentinel (Halt): Speed is 0 until the end of the current turn.${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[handlePlainDamage:sentinel-halt-granted]', e); });
 }
 
 function rollRayOfEnfeebleReduction(attacker) {
@@ -349,7 +378,7 @@ async function applyDamageForTarget({ context, target, combatSummary, characters
     const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName) || null;
     const attackHit = context?.isOpportunityAttack && lastAttack?.hit === true && lastAttack?.attackerName === characterName;
     if (attackHit) {
-        applySentinelHalt(context, target, characterName, characters, campaignName);
+        await applySentinelHalt(target, characterName, characters, campaignName);
     }
     const attacker = attackerName || characterName;
     const { rayReduction, rayOfEnfeebleRoll } = rollRayOfEnfeebleReduction(attacker);
