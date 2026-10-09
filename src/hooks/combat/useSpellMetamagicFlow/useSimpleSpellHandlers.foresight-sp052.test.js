@@ -30,6 +30,7 @@ vi.mock('../../runtime/useRuntimeState.js', () => ({
 vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
     prepareSpellCast: vi.fn(() => Promise.resolve({ modifiedSpell: {}, metaCtx: {} })),
     isFreeCastAuthorized: vi.fn(() => false),
+  isWizardRitualAdeptSpell: vi.fn(() => false),
 }));
 
 import { useSimpleSpellHandlers } from './useSimpleSpellHandlers.js';

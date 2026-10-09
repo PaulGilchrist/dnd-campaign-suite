@@ -5613,7 +5613,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-cla-299-ritual-adept.md",
+      "verified": "verified",
       "class": "Wizard",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "You can cast any spell as a Ritual if that spell has the Ritual tag and the spell is in your spellbook. You needn't have the spell prepared, but you must read from the book to cast a spell in this way."

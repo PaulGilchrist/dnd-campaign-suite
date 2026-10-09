@@ -26,6 +26,7 @@ vi.mock('../../services/rules/spells/materialComponents.js', () => ({
 vi.mock('../../services/rules/spells/spellPreparationService.js', () => ({
   prepareSpellCast: vi.fn(() => Promise.resolve({ modifiedSpell: { name: 'Find Familiar' }, metaCtx: {}, slotConsumed: false, freeCastUsed: true })),
   isFreeCastAuthorized: vi.fn(() => false),
+  isWizardRitualAdeptSpell: vi.fn(() => false),
   incrementFreeCastResource: vi.fn(),
 }));
 

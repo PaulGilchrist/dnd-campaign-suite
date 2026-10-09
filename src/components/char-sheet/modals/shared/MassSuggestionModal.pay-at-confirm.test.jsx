@@ -33,6 +33,7 @@ vi.mock('../../../../services/rules/effects/expirations.js', () => ({
 vi.mock('../../../../services/rules/spells/spellPreparationService.js', () => ({
     prepareSpellCast: vi.fn(),
     isFreeCastAuthorized: vi.fn(() => false),
+  isWizardRitualAdeptSpell: vi.fn(() => false),
 }));
 
 vi.mock('./AreaEffectTargetModalBase.utils.jsx', () => ({

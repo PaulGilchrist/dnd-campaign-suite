@@ -34,6 +34,7 @@ vi.mock('../../../services/rules/spells/metamagicRules.js', () => ({
 
 vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
   isFreeCastAuthorized: vi.fn(() => Promise.resolve(false)),
+  isWizardRitualAdeptSpell: vi.fn(() => false),
 }));
 
 const baseMockPlayerStats = {

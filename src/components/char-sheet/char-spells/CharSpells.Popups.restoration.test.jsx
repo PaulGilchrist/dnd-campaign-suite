@@ -85,6 +85,7 @@ vi.mock('../../../services/automation/handlers/spells/shapechangeService.js', ()
 vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
   prepareSpellCast: vi.fn().mockResolvedValue(undefined),
   isFreeCastAuthorized: vi.fn(() => false),
+  isWizardRitualAdeptSpell: vi.fn(() => false),
 }));
 
 vi.mock('../useAttackDamageResolution.js', () => ({

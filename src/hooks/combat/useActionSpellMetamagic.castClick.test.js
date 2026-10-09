@@ -29,6 +29,7 @@ vi.mock('../../services/rules/spells/metamagicRules.js', () => ({
 vi.mock('../../services/rules/spells/spellPreparationService.js', () => ({
   prepareSpellCast: vi.fn(() => Promise.resolve({ modifiedSpell: {}, metaCtx: {} })),
   isFreeCastAuthorized: vi.fn(() => false),
+  isWizardRitualAdeptSpell: vi.fn(() => false),
 }));
 
 vi.mock('../../services/rules/spells/spellCastService.js', () => ({

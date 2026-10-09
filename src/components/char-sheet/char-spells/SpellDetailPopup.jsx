@@ -4,14 +4,14 @@ import { getRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRunt
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 import { getOverchannelNecroticDamage } from '../../../services/automation/handlers/class-wizard/overchannelHandler.js';
 import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/spells/metamagicRules.js';
-import { isFreeCastAuthorized } from '../../../services/rules/spells/spellPreparationService.js';
+import { isFreeCastAuthorized, isWizardRitualAdeptSpell } from '../../../services/rules/spells/spellPreparationService.js';
 import { getConsumedMaterial } from '../../../services/rules/spells/materialComponents.js';
 import { hasMaterial } from '../../../services/rules/spells/materialComponents.js';
 import { isSpellBreakerBonusActionSpell } from '../../../services/ui/spellSectionUtils.js';
 
-function computeCanCast({ isRaging, isCantrip, quickRitualActive, isUpcastable, hasAnySlots, freeCastAuthorized, spell, playerStats, isWarlock, warlockSlotLevel, psionicSorceryAvailable }) {
+function computeCanCast({ isRaging, isCantrip, quickRitualActive, ritualCastActive, isUpcastable, hasAnySlots, freeCastAuthorized, spell, playerStats, isWarlock, warlockSlotLevel, psionicSorceryAvailable }) {
   if (!isRaging) {
-    if (isCantrip || quickRitualActive) return true;
+    if (isCantrip || quickRitualActive || ritualCastActive) return true;
     if (isUpcastable) return hasAnySlots;
     return freeCastAuthorized || (() => {
       const baseKey = `spell_slots_level_${spell.level}`;
@@ -39,13 +39,30 @@ function SlotsRemainingText({ isWarlock, warlockSlotLevel, spell, playerStats, p
   return <>{slots > 0 ? `${slots} slot${slots !== 1 ? 's' : ''}` : slots}{psionicSuffix}</>;
 }
 
-function FreeCastNotices({ freeCastAuthorized, isShadowArtsFreeCast, isPhantasmalFreeCast, shadowArtsFreeCastCount, spell, canCast, isCantrip }) {
+// CLA-299: Ritual Adept banner pair — unprepared spellbook rituals cast automatically as a
+// Ritual (slotless); a ticked "Cast as Ritual" checkbox echoes its own confirmation.
+function RitualAdeptNotices({ ritualAutoCast, freeCastAuthorized, ritualTicked }) {
+  if (ritualAutoCast && freeCastAuthorized) {
+    return (
+      <>
+        <p className="spell-detail-free-cast"><i className="fa-solid fa-scroll"></i> Ritual Cast — no spell slot consumed</p>
+        <p className="spell-detail-free-cast"><i className="fa-solid fa-book-open"></i> Ritual Adept: read from your spellbook — casting time +10 minutes.</p>
+      </>
+    );
+  }
+  if (ritualTicked) {
+    return <p className="spell-detail-free-cast"><i className="fa-solid fa-scroll"></i> Ritual Cast — no spell slot consumed (+10 minutes, read from your spellbook)</p>;
+  }
+  return null;
+}
+
+function FreeCastNotices({ freeCastAuthorized, isShadowArtsFreeCast, isPhantasmalFreeCast, shadowArtsFreeCastCount, spell, canCast, isCantrip, ritualAutoCast }) {
   return (
     <>
       {freeCastAuthorized && spell._ritualOnly && (
         <p className="spell-detail-free-cast"><i className="fa-solid fa-scroll"></i> Ritual Cast — cast as a Ritual, no spell slot consumed</p>
       )}
-      {freeCastAuthorized && !spell._ritualOnly && !isShadowArtsFreeCast && (
+      {freeCastAuthorized && !spell._ritualOnly && !isShadowArtsFreeCast && !ritualAutoCast && (
         <p className="spell-detail-free-cast"><i className="fa-solid fa-bolt"></i> Free Cast — no spell slot consumed</p>
       )}
       {freeCastAuthorized && isShadowArtsFreeCast && (
@@ -161,6 +178,39 @@ function QuickRitualSection({ isRitualMasterSpell, quickRitualActive, quickRitua
   );
 }
 
+// CLA-299: Ritual Adept (2024 Wizard lv1) popup channel — an UNPREPARED spellbook
+// ritual auto-casts as a Ritual (RAW: ritual-only, slotless); a PREPARED spellbook
+// ritual offers an explicit "Cast as Ritual" opt-in, and unchecked keeps the normal
+// slot payment byte-identical. Rituals are always cast at their base level.
+function computeRitualAdeptUIState({ playerStats, spell, isUpcastable, selectedUpcastLvl, useCastAsRitual }) {
+  const eligible = spell.level !== 0 && isWizardRitualAdeptSpell(playerStats, spell.name, spell.level);
+  const unprepared = spell.prepared !== 'Prepared' && spell.prepared !== 'Always';
+  const ritualOfferCheckbox = eligible && !unprepared;
+  const isUpcastSelected = isUpcastable && Number(selectedUpcastLvl) !== spell.level;
+  return {
+    ritualAutoCast: eligible && unprepared,
+    ritualOfferCheckbox,
+    ritualNoticesTicked: ritualOfferCheckbox && useCastAsRitual && !isUpcastSelected,
+    ritualCastActive: eligible && !isUpcastSelected && (unprepared || useCastAsRitual),
+  };
+}
+
+function CastAsRitualSection({ show, checked, onToggle }) {
+  if (!show) return null;
+  return (
+    <div className="spell-detail-upcast">
+      <label>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onToggle}
+        />
+        <span><i className="fa-solid fa-scroll"></i> Cast as Ritual — +10 minutes, read from your spellbook, no spell slot consumed</span>
+      </label>
+    </div>
+  );
+}
+
 function PsychicDamageCheckbox({ usePsychicDamage, onTogglePsychicDamage }) {
   return (
     <div className="spell-detail-upcast">
@@ -252,6 +302,12 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
   const [useQuickRitual, setUseQuickRitual] = useState(false);
   const quickRitualActive = isRitualMasterSpell && useQuickRitual && !quickRitualUsed;
 
+  // CLA-299: Wizard Ritual Adept popup channel — unprepared spellbook rituals auto-cast
+  // as a Ritual (slotless); prepared ones offer the opt-in checkbox, and unchecked casts
+  // keep the byte-identical slot payment.
+  const [useCastAsRitual, setUseCastAsRitual] = useState(false);
+  const ritualAdept = computeRitualAdeptUIState({ playerStats, spell, isUpcastable, selectedUpcastLvl, useCastAsRitual, freeCastAuthorized });
+
   const _psionicSorceryAvailable = (() => {
     const isSorcerer = playerStats.class?.name === 'Sorcerer';
     if (!isSorcerer) return 0;
@@ -328,11 +384,11 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
       return;
     }
 
-    onCast({ ...spell, isUpcast, upcastLevel, freeCastAuthorized, usePsionicPayment, usePsychicDamage, overchannel: useOverchannel, quickRitual: quickRitualActive }, metaCtx);
+    onCast({ ...spell, isUpcast, upcastLevel, freeCastAuthorized, usePsionicPayment, usePsychicDamage, overchannel: useOverchannel, quickRitual: quickRitualActive, ritualCast: ritualAdept.ritualCastActive }, metaCtx);
   };
 
   const isRaging = getActiveBuffs(playerStats.name, campaignName).some(b => b.name === 'Rage');
-  const canCast = computeCanCast({ isRaging, isCantrip, quickRitualActive, isUpcastable, hasAnySlots, freeCastAuthorized, spell, playerStats, isWarlock, warlockSlotLevel, psionicSorceryAvailable: _psionicSorceryAvailable });
+  const canCast = computeCanCast({ isRaging, isCantrip, quickRitualActive, ritualCastActive: ritualAdept.ritualCastActive, isUpcastable, hasAnySlots, freeCastAuthorized, spell, playerStats, isWarlock, warlockSlotLevel, psionicSorceryAvailable: _psionicSorceryAvailable });
 
   const showUpcastSelector = isUpcastable && upcastLevels.length > 1;
 
@@ -376,6 +432,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
         )}
         <OverchannelSection isOverchannelApplicable={isOverchannelApplicable} useOverchannel={useOverchannel} onToggleOverchannel={() => setUseOverchannel(!useOverchannel)} overchannelDamage={overchannelDamage} nextOverchannelUse={nextOverchannelUse} />
         <QuickRitualSection isRitualMasterSpell={isRitualMasterSpell} quickRitualActive={quickRitualActive} quickRitualUsed={quickRitualUsed} onToggleQuickRitual={() => setUseQuickRitual(!useQuickRitual)} />
+        <CastAsRitualSection show={ritualAdept.ritualOfferCheckbox} checked={useCastAsRitual} onToggle={() => setUseCastAsRitual(!useCastAsRitual)} />
         {noVSComponents && (
           <div className="spell-detail-free-cast">
             <i className="fa-solid fa-ghost"></i> No Verbal or Somatic components (Psychic Spells)
@@ -409,7 +466,8 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
             <i className="fa-solid fa-times"></i> Close
           </button>
         </div>
-          <FreeCastNotices freeCastAuthorized={freeCastAuthorized} isShadowArtsFreeCast={isShadowArtsFreeCast} isPhantasmalFreeCast={isPhantasmalFreeCast} shadowArtsFreeCastCount={shadowArtsFreeCastCount} spell={spell} canCast={canCast} isCantrip={isCantrip} />
+          <RitualAdeptNotices ritualAutoCast={ritualAdept.ritualAutoCast} freeCastAuthorized={freeCastAuthorized} ritualTicked={ritualAdept.ritualNoticesTicked} />
+          <FreeCastNotices freeCastAuthorized={freeCastAuthorized} isShadowArtsFreeCast={isShadowArtsFreeCast} isPhantasmalFreeCast={isPhantasmalFreeCast} shadowArtsFreeCastCount={shadowArtsFreeCastCount} spell={spell} canCast={canCast} isCantrip={isCantrip} ritualAutoCast={ritualAdept.ritualAutoCast} />
       </div>
     </div>
   );

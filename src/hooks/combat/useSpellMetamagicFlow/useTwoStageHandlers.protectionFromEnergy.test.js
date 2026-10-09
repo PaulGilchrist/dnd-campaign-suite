@@ -22,6 +22,7 @@ vi.mock('../../../services/automation/index.js', () => ({
 vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
   prepareSpellCast: vi.fn(() => Promise.resolve({ slotConsumed: true, modifiedSpell: {} })),
   isFreeCastAuthorized: vi.fn(() => false),
+  isWizardRitualAdeptSpell: vi.fn(() => false),
 }))
 
 const CAMPAIGN = 'test-campaign'

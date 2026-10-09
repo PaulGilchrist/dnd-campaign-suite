@@ -225,6 +225,42 @@ function findAutomationPassive(playerStats, type) {
   return playerStats?.automation?.passives?.find(p => p.type === type);
 }
 
+// CLA-299: Ritual Adept (2024 Wizard lv1) — "You can cast any spell as a Ritual if that
+// spell has the Ritual tag and the spell is in your spellbook. You needn't have the spell
+// prepared, but you must read from the book to cast a spell in this way." Eligible = a
+// Ritual-tagged spell at its base level in the wizard's spellbook. The slotless free-cast
+// channel is only auto-authorized when the spell is NOT prepared (RAW: unprepared =
+// ritual-only); a PREPARED wizard ritual keeps paying its slot unless the popup explicitly
+// opts into "Cast as Ritual" (spell.ritualCast, FT-068 popup-payment pattern).
+export function isWizardRitualAdeptSpell(playerStats, spellName, spellLevel) {
+  if (!playerStats || playerStats.rules !== '2024' || playerStats.class?.name !== 'Wizard') return false;
+  const entry = (playerStats.spellAbilities?.spells || []).find(s => s.name === spellName);
+  if (!entry || entry.ritual !== true) return false;
+  return Number(spellLevel ?? entry.level) === Number(entry.level);
+}
+
+function isSpellbookUnprepared(playerStats, spellName) {
+  const entry = (playerStats.spellAbilities?.spells || []).find(s => s.name === spellName);
+  return !!entry && entry.prepared !== 'Prepared' && entry.prepared !== 'Always';
+}
+
+function isRitualAdeptAutoCast(playerStats, spellName, spellLevel) {
+  return isWizardRitualAdeptSpell(playerStats, spellName, spellLevel) && isSpellbookUnprepared(playerStats, spellName);
+}
+
+// CLA-299: every ritual resolution logs (CLA-234 ability_use template, spellPreparationService
+// consumeFreeCast) — cast as a Ritual, read from the spellbook, +10 minutes, no slot spent.
+function consumeRitualAdeptCast(spell, playerName, campaignName) {
+  addEntry(campaignName, {
+    type: 'ability_use',
+    characterName: playerName,
+    abilityName: 'Ritual Casting',
+    spellName: spell.name,
+    note: `Ritual Adept: cast ${spell.name} as a Ritual — read from your spellbook, +10 minutes casting time, no spell slot consumed.`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
+}
+
 // Checks consulted in order by isFreeCastAuthorized. Each returns true (authorized),
 // false (explicit deny — stop scanning), or undefined (not applicable — keep scanning).
 // Break/continue points are rule-significant: the scan order is preserved exactly.
@@ -247,6 +283,13 @@ const FREE_CAST_CHECKS = [
 
   // CLA-231 arcanum — tri-state: a known arcanum decides the cast (free or spent).
   ({ playerName, spellName, spellLevel, playerStats }) => arcanumFreeCast(playerName, spellName, spellLevel, playerStats),
+
+  // CLA-299: Ritual Adept (2024 Wizard lv1) — an UNPREPARED Ritual-tagged spell in your
+  // spellbook is ritual-only: it casts as a Ritual (+10 minutes, read from the book),
+  // unlimited, and NEVER consumes a spell slot (CLA-234 _ritualOnly pattern). Prepared
+  // wizard rituals fall through — their slot payment stays byte-identical — unless the
+  // popup ticks "Cast as Ritual" (spell.ritualCast, handled at the payment seam).
+  ({ spellName, spellLevel, playerStats }) => isRitualAdeptAutoCast(playerStats, spellName, spellLevel) || undefined,
 
   // CLA-252: Phantasmal Creatures — one free cast PER SPELL per Long Rest.
   ({ playerName, spellName, playerStats, campaignName }) => perSpellFreeCastAvailable(
@@ -708,6 +751,14 @@ function consumeFreeCast(spell, playerName, playerStats, campaignName) {
       note: `Cast ${spell.name} as a Ritual — no spell slot consumed.`,
       timestamp: Date.now(),
     }).catch((e) => { console.error('[spellPreparationService:log-error]', e); });
+  } else if (spell.ritualCast === true && isWizardRitualAdeptSpell(playerStats, spell.name, spell.level)) {
+    // CLA-299: Wizard Ritual Adept ritual cast over another free-cast lane
+    // (popup-ticked "Cast as Ritual", including the unprepared auto face).
+    consumeRitualAdeptCast(spell, playerName, campaignName);
+  } else if (isRitualAdeptAutoCast(playerStats, spell.name, spell.level)) {
+    // CLA-299: authorized by the FREE_CAST_CHECKS ritual channel without a popup flag
+    // (non-popup lanes recompute authorization) — the resolution still logs the ritual.
+    consumeRitualAdeptCast(spell, playerName, campaignName);
   }
 }
 
@@ -790,6 +841,13 @@ function consumeSpellResource(spell, result, { isWgbSpell, isEyebiteRecast, isUp
     consumeFreeCast(spell, playerName, playerStats, campaignName);
     result.freeCastUsed = true;
     result.metaCtx.freeCastUsed = true;
+  } else if (spell.ritualCast === true && !isUpcast && isWizardRitualAdeptSpell(playerStats, spell.name, spell.level)) {
+    // CLA-299: PREPARED wizard spellbook ritual ticked "Cast as Ritual" in the popup —
+    // slotless ritual cast (FT-068 Quick Ritual popup-payment pattern). Unchecked casts
+    // fall through to the byte-identical slot payment below.
+    consumeRitualAdeptCast(spell, playerName, campaignName);
+    result.freeCastUsed = true;
+    result.metaCtx.ritualCastUsed = true;
   } else if (!result.metaCtx._psionicUsed) {
     result.slotConsumed = consumeBaseSlot(spell, playerName, playerStats, isWarlock, campaignName);
   }

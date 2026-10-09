@@ -20,6 +20,7 @@ vi.mock('../../../services/combat/buffs/buffService.js', () => ({
 
 vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
   isFreeCastAuthorized: vi.fn(() => false),
+  isWizardRitualAdeptSpell: vi.fn(() => false),
 }));
 
 vi.mock('../../../services/rules/spells/materialComponents.js', () => ({
