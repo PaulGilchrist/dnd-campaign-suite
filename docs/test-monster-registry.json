@@ -71,7 +71,7 @@
  },
  "Gazer": {
   "monsterIndex": "gazer",
-  "placedIn": "SP-014 2026-10-02: Dazing Ray DC12 WIS = reliable save-prompt carrier for advantage probes; removed post-run, re-joinable. | test-campaign initiative via EB Join Encounter (Gazer 1 cs AC13; victims Bandit 1 AC12 + Knight 1 AC18 both maxHp999 via full-store cs POST, armed on Gazer own-card target-select 2026-09-21)",
+  "placedIn": "CLA-324 2026-10-09: Frost Ray DC12 DEX save chip = live spell-origin save+damage carrier vs PC wizard (prompt isSpellDamage stamp via processPlayerSave); ray save chips land first-click on active card; mc-overlay popup-overlay intercepts Next-btn clicks \u2014 close before round-nav. | SP-014 2026-10-02: Dazing Ray DC12 WIS = reliable save-prompt carrier for advantage probes; removed post-run, re-joinable. | test-campaign initiative via EB Join Encounter (Gazer 1 cs AC13; victims Bandit 1 AC12 + Knight 1 AC18 both maxHp999 via full-store cs POST, armed on Gazer own-card target-select 2026-09-21)",
   "config": {
    "name": "Gazer 1",
    "csIndex": 0,
@@ -423,7 +423,7 @@
  },
  "Bandit": {
   "monsterIndex": "bandit",
-  "placedIn": "SP-016 2026-10-03 crossbow attacker vs Blade Ward wizard (fresh d4 fold 10/10); SP-017 2026-10-03 Blessed attack-fold victim; SP-018 2026-10-03 CON-save blindness victim (deafened too); SP-021 2026-10-03 charm victim (normal+advantage+wounded legs); SP-022 2026-10-03 charm-person gated lane victim. | test-campaign initiative via EB Join Encounter | CLA-289 2026-10-08 attacker vs FeyRanger: Scimitar +3, miss4/hit19 7dmg/hit18 5dmg + crit nat20 '1d6*2+1'=5 drop->0; killed 11dmg 1d8+3+1d6force by ranger; revived via GM anchor, removed, full-reset.",
+  "placedIn": "CLA-310 2026-10-09 attacker vs Gloom Stalker FeyRanger (scimitar +3 press lane, joined idx0, removed+admin-cleared quiet) | SP-100 2026-10-08 killed-by-attacker victim: EF Glaive crit +8 (1d10*2+8=18) cs 11->0 isUnconscious; then revived EXACT-1HP by War_Cleric Revivify (cs 0->1, hp_change +1 note Revivify, lv3 3->2, diamond consumed); dead-only picker listed Bandit 1 verbatim; removed+admin cleared cd{} log[] quiet. | SP-016 2026-10-03 crossbow attacker vs Blade Ward wizard (fresh d4 fold 10/10); SP-017 2026-10-03 Blessed attack-fold victim; SP-018 2026-10-03 CON-save blindness victim (deafened too); SP-021 2026-10-03 charm victim (normal+advantage+wounded legs); SP-022 2026-10-03 charm-person gated lane victim. | test-campaign initiative via EB Join Encounter | CLA-289 2026-10-08 attacker vs FeyRanger: Scimitar +3, miss4/hit19 7dmg/hit18 5dmg + crit nat20 '1d6*2+1'=5 drop->0; killed 11dmg 1d8+3+1d6force by ranger; revived via GM anchor, removed, full-reset.",
   "config": {
    "name": "Bandit 1",
    "csIndex": 0,

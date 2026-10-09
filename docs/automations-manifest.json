@@ -5482,7 +5482,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08: GM-added Cursed on Bandit 1 -> cast lv3 -> activeConditions+meta cleared, lv3 slot 3->2, condition removed + ability_use logs exact; cursed-buff/attunement branches code-only, no UI producers; manifest handler paths stale — real chain spellGates.js:220 -> removeCurseService.js)",
       "class": "Spell",
       "triggerConditions": "Action: 1 action; Range: Touch",
       "expectedBehavior": "At your touch, all curses affecting one creature or object end. If the object is a cursed magic item, its curse remains, but the spell breaks its owner's Attunement to the object so it can be removed or discarded."
@@ -5494,7 +5494,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: LR re-arm FIXED live (_RendMind_Used in LONG_REST_RESOURCES, restRules-constants.js:257); DC16=8+DEX2+PB6 WIS fail->stunned+badge+logs exact; once-per-rest gate holds; GAP: 3_psionic_energy restore classes.json:10203 grep-zero consumers, text non-clickable)",
       "class": "Rogue",
       "triggerConditions": "Trigger: psychic_blade_sneak_attack_hit; Once per turn: no",
       "expectedBehavior": "When you use Psychic Blades to deal Sneak Attack damage, force target to make Wisdom save (DC 8 + Dex mod + Prof Bonus). On fail, target has Stunned condition for 1 minute (repeats save at end of each turn). Once per Long Rest (or expend 3 Psionic Energy Dice to restore)."
@@ -5506,7 +5506,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-ft-067-resilient.md",
       "triggerConditions": "Automation type: save_proficiency",
       "expectedBehavior": "You gain saving throw proficiency with the chosen ability."
     },
@@ -5517,7 +5517,7 @@
       "handler": "src/services/automation/handlers/buffs/resistanceHandler.js",
       "router": "src/services/automation/index.js",
       "infoBuilder": "src/hooks/combat/useSpellMetamagicFlow/useTwoStageHandlers.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: cast->11-type chooser -> te resistance_damage_reduction chosenType exact; chosen-type hits reduced by rolled 1d4 exact (2-1=1, 7-4=3), once/turn cap + turn-boundary re-arm + type gate + GM-badge removal all live vs EB Bandit 1 on HexWarlock; GAPS: concentration never stamped (addConcentration async no-op), no 1-min clock expiryRounds:null, chooser header wrong prose)",
       "class": "Spell",
       "triggerConditions": "Trigger: damage_taken_of_chosen_resistance_type; Action: 1 action",
       "expectedBehavior": "You touch a willing creature and choose a damage type: Acid, Bludgeoning, Cold, Fire, Lightning, Necrotic, Piercing, Poison, Radiant, Slashing, or Thunder. When the creature takes damage of the chosen type before the spell ends, the creature reduces the total damage taken by 1d4. A creature can benefit from this spell only once per turn."
@@ -5529,7 +5529,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: RACIAL trait not classFeature — races.json humans[7]; LR on DivinationWizard -> hasInspiration=True + Inspiration checkbox live both ways, SR control absent, Orc control absent; GAP: spend-as-advantage grep-zero app-wide, checkbox is only consumption surface)",
       "race": "Human",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "You gain Heroic Inspiration whenever you finish a Long Rest."
@@ -5541,7 +5541,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08 RE-TEST on rewritten impl: row-click arms restoreBalanceArmed + spends uses, consumeArmedRestoreBalance forces mode:normal at logAndShow seam, third-party rollers reachable, NO passive auto-cancel (2026-09-04 defect gone), once-per-trigger + 0-uses refusal + LR re-arm exact; host AberrantSorcerer temp-Clockwork reverted)",
       "class": "Sorcerer",
       "triggerConditions": "Action: 1 reaction; Range: 60_ft",
       "expectedBehavior": "Your connection to the plane of absolute order allows you to equalize chaotic moments. When a creature you can see within 60 feet of yourself is about to roll a d20 with Advantage or Disadvantage, you can take a Reaction to prevent the roll from being affected by Advantage and Disadvantage. Real impl: Reactions row click -> handlers/class-sorcerer/restoreBalanceHandler.js arms restoreBalanceArmed + spends restorebalanceUses (cosmicOmenPendingBonus armed-flag pattern); consumed by consumeArmedRestoreBalance (combat/restoreBalanceState.js) at the logAndShow seam (useLoggedDiceRollAttack.js) forcing forcedMode:'normal' gated by isWithinRange 60 ft + Blinded check; no passive modifier collection (CLA-295)."
@@ -5553,7 +5553,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: lv14 BASE Paladin passive_rule/cure_conditions_on_heal (not subclass, manifest stale); HealingPoolModal 'Cure Conditions (5 HP each)' offered removable conds only, pool 100->90 heal->80 2x5 cures, activeConditions cleared, condition|broken x3 logs; GAPS: activeConditionMeta persists, logs healing_pool not ability_use, lv1 alsoCures baseline unproducible)",
       "class": "Paladin",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "When you use Lay On Hands on a creature, you can also remove one or more conditions: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. Must expend 5 Hit Points from the healing pool for each condition."
@@ -5565,7 +5565,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: canonical Berserker lv10 majors[0] reaction_damage; manual Reactions row -> melee attack vs attacker, dmg landed Bandit 11->4->0; control no-damage refusal verbatim; once/round latch _Retaliation_usedRound + round-wrap re-arm exact; GAP: ranged/non-adjacent refusal branch unreachable gridless (EB crossbow stamps weaponType:melee))",
       "class": "Barbarian",
       "triggerConditions": "Trigger: damage_from_adjacent_creature; Action: 1 reaction; Range: 5 ft",
       "expectedBehavior": "When you take damage from a creature that is within 5 feet of you, you can take a Reaction to make one melee attack against that creature, using a weapon or an Unarmed Strike."
@@ -5577,7 +5577,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08 re-confirm: Special Actions row -> 4-benefit SP chooser; 1SP aquatic swim=2x walk, 2SP see_invisible+wormhole badges+logs, SP spend persisted, replace-on-2nd-activation re-confirmed vs RAW-cumulative; GAPS: no 10-min clock (display-only), no separate breathe-underwater consumer; host AberrantSorcerer lv13 left 13/16 SP)",
       "class": "Sorcerer",
       "triggerConditions": "Action: 1 bonus action; Action: bonus_action; Duration: 10_minutes",
       "expectedBehavior": "Bonus Action, spend 1+ Sorcery Points to magically alter body for 10 minutes. For each SP spent, gain one benefit: Aquatic Adaptation (Swim Speed = 2x Speed, breathe underwater) Glistening Flight (Fly Speed = Speed, hover) See the Invisible (see Invisible creatures within 60 feet) Wormhole Movement (move through spaces as narrow as 1 inch, escape nonmagical restraints)."
@@ -5589,7 +5589,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: dead-target picker verbatim, revive cs currentHp=1 EXACT, lv3 slot 3->2, diamond consumed, hp_change+spell logs, live-target + no-diamond refusals verbatim zero-spend; GAPS: isCreatureDead re-gate unexposed live, refusals popup-only, 1-min/old-age clauses unmodelled; War_Cleric +Revivify KEPT)",
       "class": "Spell",
       "triggerConditions": "",
       "expectedBehavior": "You touch a creature that has died within the last minute. That creature revives with 1 Hit Point. This spell can't revive a creature that has died of old age, nor does it restore any missing body parts."
@@ -5601,7 +5601,7 @@
       "handler": "src/services/automation/handlers/class-fighter-rogue/executeActionManeuvers.js (executeReactionManeuver — gated CLA-297/310 house standard: holder-target + miss (hit===false) + melee/5ft + own-turn refuse + _Riposte_appliedAttack instance latch + _Riposte_usedRound round latch; miss clears pendingRiposteDieValue in hooks/combat/attackPostProcessing.js; CharReactions.jsx flushes logEntries)",
       "router": "src/services/automation/index.js (combat_superiority_reaction) + handlers/class-fighter-rogue/dispatchers.js",
       "infoBuilder": "src/services/rules/core/maneuvers.js (processManeuvers reaction rows)",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-mn-017-riposte.md",
       "class": "Fighter",
       "triggerConditions": "Action type: reaction; Trigger: melee_attack_miss; Uses: superiority_die",
       "expectedBehavior": "When a creature misses you with a melee attack roll, you can use your Reaction and expend one Superiority Die to make a melee attack with a weapon or an Unarmed Strike against the creature. If you hit, add the Superiority Die to the attack's damage roll."
@@ -5613,7 +5613,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-cla-299-ritual-adept.md",
       "class": "Wizard",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "You can cast any spell as a Ritual if that spell has the Ritual tag and the spell is in your spellbook. You needn't have the spell prepared, but you must read from the book to cast a spell in this way."
@@ -5625,7 +5625,7 @@
       "handler": "src/services/rules/spells/spellPreparationService.js",
       "router": "src/services/combat/automation/automationRouter.js",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/passive.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: PB-enforced RitualMasterModal persists 6 spells, all prepared Always _ritualMasterRitual + chosen-only control exact, ASI +1 WIS once, ASI threads popup Casting Ability, Quick Ritual slot-free once/LR checkbox refuse + LR re-arm + ability_use x2 exact; GAPS: PB-growth advisory (save-gated only), extended ritual time record-only)",
       "class": "Feat",
       "triggerConditions": "Passive (Ritual Spells benefit automation type ritual_spells, chosenSpells+quickRitual markers); wizard Spells-step picker; Quick Ritual opt-in checkbox in SpellDetailPopup",
       "expectedBehavior": "Ability Score Increase. Increase your Intelligence, Wisdom, or Charisma score by 1, to a maximum of 20. Ritual Spells. Choose a number of level 1 spells equal to your Proficiency Bonus that have the Ritual tag. You always have those spells prepared, and you can cast them with any spell slots you have. The spells' spellcasting ability is the ability increased by this feat. Whenever your Proficiency Bonus increases thereafter, you can add an additional level 1 spell with the Ritual tag to the spells always prepared with this feature. Quick Ritual. With this benefit, you can cast a Ritual spell that you have prepared using its regular casting time rather than the extended time for a Ritual. Doing so doesn't require a spell slot. Once you cast the spell in this way, you can't use this benefit again until you finish a Long Rest. automation: spell benefit automation ritual_spells{chosenSpells,quickRitual} → passive.js ritual_spells handler → automationRouter ritualSpells bucket; featBuffService threads featAbilityChoices ASI into spellCastingAbility; RitualMasterModal (wizard Spells step) persists ritualMasterSpells to character JSON; spellCalc2024 injects ONLY chosen spells prepared Always stamped _ritualMasterRitual + ASI ability (never full list — pitfall 24); SpellDetailPopup Quick Ritual checkbox once-per-LR slot-free opt-in; prepareSpellCast consumes _Ritual_Master_quickRitualUsed + logs ability_use, refuses when spent (slot payment applies); restRules-longRest re-arms."
@@ -5637,7 +5637,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-cla-300-roving.md",
       "class": "Ranger",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Your Speed increases by 10 feet while you aren't wearing Heavy armor. You also have a Climb Speed and a Swim Speed equal to your Speed."
@@ -5649,7 +5649,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: Devotion lv3 temp_buff -> sacredWeaponHandler; CD 3->2 at picker-open, CHA+5 folds to hit verbatim '+5 Sacred Weapon', Radiant chooser flips damageType live, 10-min clock rounds:100 LIVE (unlike CLA-033 family), 0-CD refusal verbatim, post-END control clean; GAPS: data casting_time '1 action' vs canonical BA (data note), light prose-only, refusal popup-only)",
       "class": "Paladin",
       "triggerConditions": "Action: 1 action; Range: self",
       "expectedBehavior": "CANONICAL (2024, Oath of DEVOTION lv3 major; manifest class/Oath + 1-action casting_time WRONG - data casting_time also says 1 action): Expend one use of Channel Divinity (Bonus Action) to imbue one Melee weapon with positive energy for 10 minutes. Add Charisma modifier to attack rolls (minimum +1). Hit deals normal damage type or Radiant damage. Weapon emits Bright Light in 20-foot radius and Dim Light 20 feet beyond."
@@ -5687,7 +5687,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: te sanctuary saveDc15=8+WIS4+PB3 + badge, lv1 slot spend x2, attacker WIS gate LIVE both faces (fail->attack lost zero-roll, success->proceeds), control non-warded no-prompt, self-break attack+cast legs live, AoE non-protection proven; GAPS: new-target=abandon (no retarget), concentration:false per 2024 data, expiry anchor-only no 1-min clock, damage-ender grep-zero, stale pendingSavePrompts residue)",
       "class": "Spell",
       "triggerConditions": "Action: 1 bonus action; Range: 30 feet; Duration: 1 minute",
       "expectedBehavior": "You ward a creature within range. Until the spell ends, any creature who targets the warded creature with an attack roll or a damaging spell must succeed on a Wisdom saving throw or, either, choose a new target or lose the attack or spell. This spell doesn't protect the warded creature from areas of effect. The spell ends if the warded creature makes an attack roll, casts a spell, or deals damage."
@@ -5699,7 +5699,7 @@
       "handler": "src/services/combat/automation/handlers/weaponMasteryHandler.js",
       "router": "src/services/combat/automation/routers/weaponMasteryRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/weaponMasteryInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: Sap carriers incl Longsword this dataset; kind-bucket chooser armed, hit stamps te disadvantage_next_attack SURVIVING granting hit (WM-008 family clean), target next attack mode:disadvantage rolls-lower machine truth + te consumed, re-arm cycle x2, anchor expiry at holder turn-start exact; GAP: _Sap_appliedTarget single-slot latch zero-reset (same-target re-arm skips until another target latches) WM-004 precedent); manifest handler path stale -> src/services/automation/handlers/combat/weaponMasteryHandler.js",
       "class": "Barbarian",
       "triggerConditions": "",
       "expectedBehavior": "If you hit a creature with this weapon, that creature has Disadvantage on its next attack roll before the start of your next turn."
@@ -5711,7 +5711,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-ft-069-savage-attacker.md",
       "class": "Feat",
       "triggerConditions": "Automation type: reroll_damage_once_per_turn",
       "expectedBehavior": "Once per turn when you hit a target with a weapon, you can roll the weapon's damage dice twice and use either roll against the target."
@@ -5723,7 +5723,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08: lv2 Wizard class_feature choice->expertSkills [Arcana] disk-kept; sheet Expert +17=INT5+2x6 doubled exact, controls +11/+5 exact, off-list + unprof + slot-exhausted refusals verbatim; prior 2026-09-04 six-skill ungated FAIL FIXED (expertise.js+WizardStepSkills gates); advisory: Keen Mind ledger over-count family)",
       "class": "Wizard",
       "triggerConditions": "",
       "expectedBehavior": "By studying magic, you also specialized in another field of study. Choose one of the following skills in which you have proficiency: Arcana, History, Investigation, Medicine, Nature, or Religion. You have Expertise in the chosen skill."
@@ -5748,7 +5748,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08: Cleric base lv5 damage_bonus/turn_undead_fail; auto non-chooser chain SetConditionModal->turn-undead-result->useInitiativeEffects.js:422 shared WIS+4=4d8 pool fresh per use, Radiant totals==hp_change on failed-save undead only, savers+humanoid zero-dmg, CD 3->0 + 0-refusal verbatim, multi-use same round OK; pitfall: searing popups intercept CD row — flush .popup-close-btn)",
       "class": "Cleric",
       "triggerConditions": "Trigger: turn_undead_fail; Once per turn: no",
       "expectedBehavior": "Whenever you use Turn Undead, you can roll a number of d8s equal to your Wisdom modifier (minimum of 1d8) and add the rolls together. Each Undead that fails its saving throw against that use of Turn Undead takes Radiant damage equal to the roll's total."
@@ -5760,7 +5760,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: canonical CELESTIAL lv14 majors[1] not Fiend-lv10 (ticket wrong, HexWarlock already host); manual Reactions press before .dsp-overlay, heal 0->51=floor(103/2) exact + deathSaves reset + pending ended, burst 2d8+CHA3=14 Radiant both targets + blinded rounds:1, pre-combat/0-uses refusals verbatim, LR re-arm restRules-constants.js:248; GAPS: deathSavePrompt key NOT cleared by confirm (reload required), shared single burst roll vs per-creature RAW, gridless range lenient, blinded removal log absent)",
       "class": "Warlock",
       "triggerConditions": "Trigger: death_save_by_ally_or_self; Action: 1 reaction; Range: 30_ft",
       "expectedBehavior": "When you or ally within 60 feet is about to make a Death Saving Throw, unleash radiant energy. Creature regains HP equal to half its Hit Point maximum, ends Pending condition. Each creature within 30 feet takes 2d8 + Charisma modifier Radiant damage and has Blinded condition until end of current turn. Once per Long Rest."
@@ -5772,7 +5772,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: ladder lv1-3=2/lv4-9=3/lv10-20=4 data-exact, lv18=4; press heals 1d10+18 exact +max clamp, zero-uses + full-HP refusals verbatim zero-spend, SR exactly +1/rest cap-4, LR null->4/4 re-arm; GAPS: same-turn BA double-use ungated (grep-zero latch, CLA-006 family), no ability_use named Second Wind, popup-only refusals)",
       "class": "Fighter",
       "triggerConditions": "Action: 1 bonus action; Action: bonus_action",
       "expectedBehavior": "You have a limited well of physical and mental stamina that you can draw on. As a Bonus Action, you can use it to regain Hit Points equal to 1d10 plus your Fighter level. You can use this feature twice at lv1 (uses scale via class_levels.second_wind: 2 lv1-3, 3 lv4-9, 4 lv10-20). You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest."
@@ -5784,7 +5784,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08 re-confirm: Thief lv3 confirmed classes.json[8].majors[3]; Thief swap live -> Speed '30 ft., climb 30 ft.' climb==walk exact + feature row verbatim + fiber climbSpeed=30; dex_jump zero-readers gridless-unmodelled cited; control EF climb-free; subclass RESTORED Soulknife lv20 (CLA-291/293 fixes hosted there))",
       "class": "Rogue",
       "triggerConditions": "Passive",
       "expectedBehavior": "CANONICAL 2024 Thief lv3 (classes.json:10222; manifest name/wording were misattributed UA text): Climb Speed equal to Speed. When you make a Long or High Jump, determine the distance using Dexterity (Acrobatics) instead of Strength (Athletics)."
@@ -5796,7 +5796,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: DATA CORRECTION lv2 concentration:FALSE 1-hour (not lv4/concentration); cast self -> activeBuffs see_invisibility stamp + lv2 slot + Senses-row suffix + ability_use exact; invisible-target targeting zero-delta ON/OFF (no adv producer app-wide, §70 GM-enforced); GAPS: no expiry clock (flight-only clock gate buffHandler.js:302), retract OFF-leg burns slot, comment/code mismatch useInitiativeEffects.js:399, no initiative badge)",
       "class": "Spell",
       "triggerConditions": "Action: action; Range: self",
       "expectedBehavior": "For the duration, you see creatures and objects that have the Invisible condition as if they were visible, and you can see into the Ethereal Plane. Creatures and objects there appear ghostly."
@@ -5808,7 +5808,7 @@
       "handler": "src/services/rules/effects/turnEndConditionRemoval.js (condition removal; exhaustion: src/services/combat/automation/automationImmunities.js hasSelfRestoration → src/hooks/management/useTravelManagement.js)",
       "router": "src/components/initiative/navigationHandlers.js handleNextCreature + src/components/initiative/sseHandlers.js activeCreatureName echo (owner turn-end seam); collector src/services/combat/automation/turnStartEffects.js",
       "infoBuilder": "src/services/combat/automation/automationService.js (turnStartEffects collection)",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: Monk lv10 passive_rule/end_of_turn_condition_removal; Frightened/Poisoned/Charmed held thru others' turns + pre-end, auto-removed at holder turn-end reason:'Self-Restoration' x3 live; Prone survives (list gate); HexWarlock control survives its own turn-end; exhaustion half grep-cited useTravelManagement.js:236 hasSelfRestoration skip (travel lane unoperable in campaign, cited gap))",
       "class": "Monk",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Remove Charmed, Frightened, or Poisoned condition from yourself at end of each turn. Forgoing food and drink doesn't give Exhaustion."
@@ -5820,7 +5820,7 @@
       "handler": "src/services/automation/handlers/combat/sentinelGuardianHandler.js",
       "router": "src/services/automation/index.js (sentinel_guardian :615)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/reaction.js (reaction_damage)",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: row rides GENERIC reaction_damage press-model (sentinelGuardianHandler/router:615/622 DEAD — sentinel_guardian grep-zero in all data); Leg A live-exact: Bandit hits EF-other -> press Guardian OA vs trigger-creature auto-target 20vsAC12 HIT 17dmg, miss-control silent; GAPS: zero reaction economy app-wide (grep-zero reactionUsed, ungated re-press fires stale self-OA — abandon via Escape), Disengage leg grep-ZERO producers (inert), no 5ft check gridless, no OA ability_use log)",
       "class": "Feat",
       "triggerConditions": "Reaction: a creature within 5 ft takes the Disengage action or hits a target other than you",
       "expectedBehavior": "Immediately after a creature within 5 feet of you takes the Disengage action or hits a target other than you with an attack, you can make an Opportunity Attack against that creature."
@@ -5832,7 +5832,7 @@
       "handler": "src/services/automation/handlers/combat/sentinelHaltHandler.js",
       "router": "src/services/automation/index.js (sentinel :616)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/passive.js (passive_rule)",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-ft-101-sentinel-halt.md",
       "class": "Feat",
       "triggerConditions": "Passive: your Opportunity Attack hits a creature",
       "expectedBehavior": "When you hit a creature with an Opportunity Attack, the creature's Speed becomes 0 for the rest of the current turn."
@@ -5844,7 +5844,7 @@
       "handler": "src/services/rules/spells/spellPreparationService.js",
       "router": "src/services/combat/automation/automationRouter.js",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/core-handlers.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08: Warrior of Shadow major lv3 not base; 4 slotless WIS free-casts render unprepared (slots container slotless=zero-delta by design); PWT gated checkbox path te+10+conc dc21=WIS, Darkvision+Silence live, per-spell _Shadow_Arts_<Spell>_freeCastCount null->0 independent, same-day refuse verbatim, LR nulls x4 + recast live; subclass restored Open Hand)",
       "class": "Monk",
       "triggerConditions": "",
       "expectedBehavior": "You can cast the Darkness, Darkvision, Pass Without Trace, and Silence spells without expending spell slots or preparing them, using Wisdom as your spellcasting ability. Each of these spells can be cast in this way once per Long Rest. automation type shadow_arts → passive marker; spellCalc2024 stamps slotless spellAbilities + freeCastSpells as prepared (WIS, CLA-308); isFreeCastAuthorized/prepareSpellCast gate + consume per-spell _Shadow_Arts_<Spell>_freeCastCount (null=fresh); restRules-longRest re-arms; cast flows through generic Spells-table pipeline (Pass Without Trace wired via pendingPassWithoutTrace gate)."
@@ -5856,7 +5856,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: Warrior of Shadow lv6 temp_buff no-uses-economy RAW-honest; TeleportModal live -> ability_use + te next_attack_advantage stamped, attack#1 mode:advantage [16,16] consumed, attack#2 normal (first-melee gate), te replace-on-refire; GAPS: no token position delta gridless (gridX grep-zero CLA-041 family), dim-light precondition unenforced, '150ft Once per Rage' radio leak FT-108 twin, rider perception te stacks :173)",
       "class": "Monk",
       "triggerConditions": "Action: 1 bonus action; Range: self",
       "expectedBehavior": "As a Bonus Action, you can teleport up to 60 feet to an unoccupied space you can see that is in Dim Light or Darkness. You then have Advantage on the first melee attack roll you make before the end of the turn."
@@ -5868,7 +5868,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: 2026-09-04 inert-Invisibility FAIL FIXED; HexWarlock host: chosen False Life + Invisibility always-prepared (addShadowTouchedFreeCasts), free casts live per-spell counters null->0 independent, pact slots untouched, 2nd-cast gating + slot-pay RAW-OK, LR counters->null re-arm live restRules-longRest.js:571, picker audit 8/8 in-spec, ASI +1 once; GAP: casting ability stays CONTAINER CHA (DC17) not ASI WIS — no row-stamp seam, MI-family pattern CLA-221 precedent)",
       "triggerConditions": "Action: 1 action; Spell: Invisibility",
       "expectedBehavior": "Choose one level 1 spell from the Illusion or Necromancy school of magic. You always have that spell and the Invisibility spell prepared. You can cast each of these spells without expending a spell slot. Once you cast either spell in this way, you can't cast that spell in this way again until you finish a Long Rest. You can also cast these spells using spell slots you have of the appropriate level. The spells' spellcasting ability is the ability increased by this feat."
     },
@@ -5879,7 +5879,7 @@
       "handler": "src/services/automation/handlers/class-ranger/shadowyDodgeHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08 RE-TEST on rewritten class-ranger handler: press-model reaction, 2d20 min() adv enforcement EXACT incl hit->miss reversal + damage-negate rollback ledger, miss-face RAW consumes, SAME-ATTACK/SAME-ROUND refusals verbatim (2026-09-04 7-refire defect FIXED), round-latch re-arm x3, ability_use per dodge; GAPS: no auto-prompt (press precedents), te disadvantage_next_attack never produced (in-place enforcement), teleport popup+log advisory only gridless)",
       "class": "Ranger",
       "triggerConditions": "Trigger: after_attack_roll_against_you; Action: 1 reaction; Range: 30_ft",
       "expectedBehavior": "When a creature makes an attack roll against you, take Reaction to impose Disadvantage. Whether hit or miss, teleport up to 30 feet to unoccupied space you can see."
@@ -5891,7 +5891,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "broken — see .opencode/plans/bug-sp-103-shapechange.md",
       "class": "Spell",
       "triggerConditions": "",
       "expectedBehavior": "You shape-shift into another creature for the duration or until you take a Action to shape-shift into a different eligible form. The new form must be of a creature that has a Challenge Rating no higher than your level or Challenge Rating. You must have seen the sort of creature before, and it can't be a Construct or an Undead. When you cast the spell, you gain a number of Temporary Hit Points equal to the Hit Points of the first form into which you shape-shift. These Temporary Hit Points vanish if any remain when the spell ends. Your game statistics are replaced by the stat block of the chosen form, but you retain your creature type; alignment; personality; Intelligence, Wisdom, and Charisma scores; Hit Points; Hit Point Dice; proficiencies; and ability to communicate. If you have the Spellcasting feature, you retain it too. Upon shape-shifting, you determine whether your equipment drops to the ground or changes in size and shape to fit the new form while you're in it."
@@ -5903,7 +5903,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08 RE-TEST: chain rebuilt since 2026-09-05 FAIL — primalCompanionSpellShareService consumed execution/index.js:523+useCustomHandlers.js:167; PWT self-cast caster-only -> companion mirrors te +10 sharedBy:'Share Spells' pure-mirror proof, slot+conc SP-085-fix holds, automation log verbatim, 30ft isWithinRange gate gridless-lenient, 38/38 unit; LEFT Beast Master lv17 PERMANENT)",
       "class": "Ranger",
       "triggerConditions": "Action: passive; Range: 30_ft",
       "expectedBehavior": "When you cast a spell targeting yourself, you can also affect your Primal Companion beast if within 30 feet."
@@ -5915,7 +5915,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08 RE-TEST: total-cover regression FIXED — half/3q ignored verbatim coverReason:'Sharpshooter' targetAc base, TOTAL -> AUTO-MISS refusal hit:false HP frozen (finalizeCover :241), non-holder control half +2 AC applies; typed applySharpshooterCover contextBuilder-map.js:228; HOST CORRECTION: disk host is FeyRanger not EvasiveFighter; 38/38 unit)",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Your ranged attacks with weapons ignore Half Cover and Three-Quarters Cover."
     },
@@ -5926,7 +5926,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08: repress-model cast lv1 4->3, activeBuffs shield anchor expiry, AC cell '14 (+5 from Shield)', 6 attacks targetAc9/effectiveAc14/shieldAcBonus:5 popup reversals both ways, Magic Missile shieldImmune:true totalFinalDamage:0 consumers helpers.js:523, expiry exact own turn-start, control AC9 restrikes; minor: acBonus:0 stamp cosmetic (no ac_bonus in data), metamagic chooser gate-step on sorcerer casts)",
       "class": "Spell",
       "triggerConditions": "Automation type: shield",
       "expectedBehavior": "An imperceptible barrier of magical force protects you. Until the start of your next turn, you have a +5 bonus to AC, including against the triggering attack, and you take no damage from Magic Missile."
@@ -5938,7 +5938,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08: post-hit STR save prompt DC17=8+3+6 verbatim 'Source: Shield Bash', fail->Push/Prone chooser both offered, prone te+meta dc17, push te value:5 marker (gridless), once/turn silent refusal + round-wrap re-arm x2 holder-scoped latch, MISS control zero-affordance, no bash damage per 2024 data, weapon dmg NOT stranded (CLA-326 contrast)); note Skip deliberately doesn't consume latch",
       "triggerConditions": "Trigger: melee_hit_with_shield_equipped; Once per turn: yes",
       "expectedBehavior": "If you attack a creature within 5 feet of you as part of the Attack action and hit with a Melee weapon, you can immediately bash the target with your Shield if it's equipped, forcing the target to make a Strength saving throw (DC 8 plus your Strength modifier and Proficiency Bonus). On a failed save, you either push the target 5 feet from you or cause it to have the Prone condition (your choice). You can use this benefit only once on each of your turns."
     },
@@ -5949,7 +5949,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: lv1 BA cast picker, lv1 slot spend, conc stamp dc15, target activeBuffs acBonus:2 + AC cell '11 (+2 from Shield of Faith)', effectiveAc differential 8/8 exact, concentration-break live replaces+clears buffs, CON maintain prompt DC10=max(10,dmg/2) live, self-cast OK; GAP: expiryRounds:null no 10-min clock (CLA-033 family), log targetName:null bookkeeping)",
       "class": "Spell",
       "triggerConditions": "Action: Bonus Action; Range: 60 feet; Duration: Concentration, up to 10 minutes",
       "expectedBehavior": "A shimmering field surrounds a creature of your choice within range, granting it a +2 bonus to AC for the duration."
@@ -5961,7 +5961,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: lv20 in data; SignatureSpellsModal -> selection runtime + per-spell SignatureSpells_<Spell>_used, free lv3 cast zero-slot + conc stamp + ability_use, same-day refuse pays slot, SHORT-REST re-arm LIVE (distinctive gate, restRules-shortRest.js:222), LR re-arm, upcast pays slot & preserves free counter, independence + non-signature controls exact; GAPS: 'always prepared' unenforced (half-lane: unprepared popup still authorizes free), chooser not spellbook-filtered, path stale class-wizard/)",
       "class": "Wizard",
       "triggerConditions": "Action: passive; Action: action",
       "expectedBehavior": "Choose two level 3 spells in your spellbook as your signature spells. You always have these spells prepared, and you can cast each of them once at level 3 without expending a spell slot. When you do so, you can't cast them in this way again until you finish a Short or Long Rest. To cast either spell at a higher level, you must expend a spell slot."
@@ -5973,7 +5973,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: SilenceModal creature-picker point-model, lv2 slot, conc dc15+badge, te silenced + Deafened machine truth, Thunder immunity LIVE (AE Thunderous Slam 9-negated vs HW; control Bandit 11->0 full), VERBAL-block refusal verbatim execution/index.js:134, concentration-break clears zone full-stack; GAPS: target activeBuffs client-only persistence risk, silenceCenter:null gridless, log targetName:null)",
       "class": "Spell",
       "triggerConditions": "",
       "expectedBehavior": "For the duration, no sound can be created within or pass through a 20-foot-radius Sphere centered on a point you choose within range. Any creature or object entirely inside the Sphere has Immunity to Thunder damage, and creatures have the Deafened condition while entirely inside it. Casting a spell that includes a Verbal component is impossible there."
@@ -5985,7 +5985,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08: feat on disk + featAbilityChoices STR ASI +1 max-20 fold once (stale dup keys never double-fold), expertSkills [Perception,History] -> cells Expert +15 INT3+2x6 / +11 WIS-1+12, proficient +9/+5, non-prof mod-only, live rolls bonus:15/9/3 exact, picker gate disabled 'Select proficient first' DOM-probed, 3-PC control clean)",
       "triggerConditions": "",
       "expectedBehavior": "Ability Score Increase. Increase one ability score of your choice by 1, to a maximum of 20. Skill Proficiency. You gain proficiency in one skill of your choice. Expertise. Choose one skill in which you have proficiency but lack Expertise. You gain Expertise with that skill."
     },
@@ -5996,7 +5996,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08 re-confirm: Skilled 3-choice skills fold proficient +5 cells vs -1 mod-only controls 1:1 live rolls, shared skill/tool pool step-11 catalog '3 of 3', choice lands skillProficiencies, FT-026 tool precedent cited, expertise collision n/a; host disk lv20 registry-corrected)",
       "class": "Feat",
       "triggerConditions": "",
       "expectedBehavior": "You gain proficiency in any combination of three skills or tools of your choice."
@@ -6008,7 +6008,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08: DivinationWizard host — Sleight of Hand = extra-beyond-class/bg Skillful choice, cell +5=DEX-1+PB6 vs -1 peers, live roll bonus:5, wizard 'Race: 1 of 1' pool all 18 any-skill RAW, Orc control mod-only, consumers rules-proficiencies.js:60+proficiencyUtils2024.js:22)",
       "triggerConditions": "Passive",
       "expectedBehavior": "You gain proficiency in one skill of your choice. (Human trait) [2024 races.json Human trait Skillful; retyped classFeature->feat per phantom-row house standard]"
     },
@@ -6019,7 +6019,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08: HeroesFeastBard lane disk-native; Senses row 'Blindsight 10 ft.' first-render + fiber passives+stats.senses exact (senseUtils:64->rules-senses:19); REAL consumers: Blur/Foresight disadvantage bypass contextBuilder-sync:481 + invisible-targeting maze/hold lanes; no-range-enforcement gridless cited; HexWarlock control zero)",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "You have Blindsight with a range of 10 feet."
     },
@@ -6030,7 +6030,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: EvasiveFighter native Slasher 'Hamstring' press-rider -> te speed_reduction value:10 until_start_of_next_turn + clock, miss/piercing/once-per-turn refusals verbatim zero-delta, expiry exact at round-2 EF turn-start, round-2 re-arm; CLA-044 filter NOT shared (separate rider lane); gaps: PC-sheet damage-zero pre-existing seam, refusal ability_use log cosmetic logRiderHandler.js:272, EB speed:null no numeric annotation)",
       "triggerConditions": "Trigger: slashing_damage_hit; Once per turn: yes",
       "expectedBehavior": "Once per turn when you hit a creature with an attack that deals Slashing damage, you can reduce the Speed of that creature by 10 feet until the start of your next turn."
     },
@@ -6041,7 +6041,7 @@
       "handler": "src/services/automation/handlers/spells/sleepHandler.js",
       "router": "src/services/rules/spells/spellCastService/execution/index.js",
       "infoBuilder": "src/services/rules/features/sleepService.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: DivinationWizard native lv1 cast DC19, first-save te sleep_staged+incapacitated, 2-save ladder PC-prompt+NPC-inline save-sleep-repeat exact, Unconscious applied, Undead auto-success verbatim sleepService:46, damage-wake selective applyDamage:1019, conc badge; gaps: shake-awake UI-unreachable (sleep_shake zero producers §70), no elf lanes trance-inert-by-data, 10-round clock not E2E-walked)",
       "class": "Spell",
       "triggerConditions": "Range: 60 feet; Duration: Concentration, up to 1 minute",
       "expectedBehavior": "Each creature of your choice in a 5-foot-radius Sphere centered on a point within range must succeed on a Wisdom saving throw or have the Incapacitated condition until the end of its next turn, at which point it must repeat the save. If the target fails the second save, the target has the Unconscious condition for the duration. The spell ends on a target if it takes damage or someone within 5 feet of it takes an action to shake it out of the spell's effect. Creatures that don't sleep, such as elves, or that have Immunity to the Exhaustion condition automatically succeed on saves against this spell."
@@ -6053,7 +6053,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: 2024 automation sleet_storm+sleet_storm_area_save live (manifest 'undefined' stale, 5e none); _sleetStorm zone state DC17 r20, cast+turn-start recurring Dex saves exact, te sleet_storm+prone, REAL concentration-loss clause AberrantSorcerer concentration_lost verbatim, already-prone skip, caster badge+break; gaps: no difficult_terrain/obscured/douse consumers advisory-only, no expiry clock duration-parser-miss zone persists past conc-break §70-family)",
       "class": "Spell",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Until the spell ends, sleet falls in a 40-foot-tall, 20-foot-radius Cylinder centered on a point you choose within range. The area is Heavily Obscured, and exposed flames in the area are doused. Ground in the Cylinder is Difficult Terrain. When a creature enters the Cylinder for the first time on a turn or starts its turn there, it must succeed on a Dexterity saving throw or have the Prone condition and lose Concentration."
@@ -6065,7 +6065,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08: app-data lv15 WIS+CHA gate exact classes.json lv15-only; AasimarTest cells WIS+7/CHA+9 proficient fold PB+6, live rolls bonus 7/9, fiber saveProficiencies purely Slippery Mind, AberrantSorcerer control mod-only; new pitfall: Stroke of Luck button above Done consumes latch on save popups)",
       "class": "Rogue",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "You gain proficiency in Wisdom and Charisma saving throws. [canonical 2024 = lv10 WIS-only; app data lv15 WIS+CHA; verified against app-data behavior 2026-09-05 per checkpoint-CLA-314.md]"
@@ -6077,7 +6077,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08 vs APP MODEL: per-target WIS saves queued exact, 5x te incl no_reactions/dex_save_disadvantage concentration-duration, AC-2 REAL consumer getSlowAcPenalty loggedDiceRollUtils.js:107 popup 'AC 13 (-2 Slow)', repeat-save badge SUCCESS_CLEANUPS handleSlowSuccess on-self exact, speed-halved flag sheet annotation, conc break bulk clear; DATA FIX: lv3 not lv6 both spells.json, manifest handler paths stale (real slowHandler lane); NEW GAP: no repeatSave te descriptor -> turn-end auto-roll absent (badge-only §70 convention); badge title says Constitution should be WIS)",
       "class": "Spell",
       "triggerConditions": "Range: 120 feet; Duration: Concentration, up to 1 minute",
       "expectedBehavior": "You alter time around up to six creatures of your choice in a 40-foot Cube within range. Each target must succeed on a Wisdom saving throw or be affected by this spell for the duration. An affected target's Speed is halved, it takes a -2 penalty to AC and Dexterity saving throws, and it can't take Reactions. On its turns, it can take either an action or a Bonus action, not both, and it can make only one attack if it takes the Attack action. If it casts a spell with a Somatic component, there is a 25 percent chance the spell fails as a result of the target making the spell's gestures too slowly. An affected target repeats the save at the end of each of its turns, ending the spell on itself on a success. APP MODEL (2026-09-05): DEX penalty modeled as disadvantage; action_limit/single_attack_limit/somatic_failure_chance are display-only (no turn enforcement); monster-side halves of reaction/action gates inert."
@@ -6089,7 +6089,7 @@
       "handler": "src/services/combat/automation/handlers/weaponMasteryHandler.js",
       "router": "src/services/combat/automation/routers/weaponMasteryRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/weaponMasteryInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: mastery weapons Club/Javelin/LightCrossbow/Longbow/Sling/Whip, DraconicDragon Whip auto-fire applyAutoMasteries attackRollPostDamage.js:579 te speed_reduction:10 change-data root + clock, non-stacking cap live (te stays 1x10), miss-gate clean, expiry exact at holder next turn-start; gaps: auto-fire vs RAW 'can', cap refusal popup dropped (silent), no expiry log; registry: DraconicDragon equip permanently restored Warhammer,Whip)",
       "class": "Barbarian",
       "triggerConditions": "",
       "expectedBehavior": "If you hit a creature with this weapon and deal damage to it, you can reduce its Speed by 10 feet until the start of your next turn. If the creature is hit more than once by weapons that have this property, the Speed reduction doesn't exceed 10 feet."
@@ -6101,7 +6101,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "incomplete — needs manual setup — see .opencode/plans/incomplete-cla-315-slow-fall.md",
       "class": "Monk",
       "triggerConditions": "Trigger: falling; Action: 1 reaction",
       "expectedBehavior": "You can take a Reaction when you fall to reduce fall damage by an amount equal to five times your Monk level."
@@ -6113,7 +6113,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: Oath of Devotion lv15 post_cast_smite_cover, free-cast Divine Smite fires flag smiteOfProtectionActive+coverRefresh+pendingExpirations (runtime-flag design not te, no half_cover key by design), in-aura ally cover adjudicated log 'cl:half cb:2 cr:Smite of Protection' + badge, out-of-aura range clause live-gated cb:0 at 56ft, expiry exact round-2; gap: charSummaryCalc.js:332 badge range-blind cosmetic; ElderPaladin restored Vengeance)",
       "class": "Paladin",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "Whenever you cast Divine Smite, you and your allies have Half Cover while in your Aura of Protection until start of next turn."
@@ -6125,7 +6125,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: auto-fire rider computeSneakAttackDice contextBuilder-sync.js:547, lv20=10d6 exact type-match Piercing, advantage path via Steady Aim mode:advantage log, ALLY/normal mode gridless-lenient fire, once-per-turn _SneakAttack_usedRound refusal live (zero sneak dice second hit) + round-2 re-arm; gate gaps (disadv/non-finesse/no-ally/incapacitated-ally) corroborated by green 10/10 CLA-317 unit suite not live-recaptured this run; gridless NEITHER-face unenforceable cited)",
       "class": "Rogue",
       "triggerConditions": "Trigger: on hit; Once per turn: yes",
       "expectedBehavior": "You know how to strike subtly and exploit a foe's distraction. Once per turn, you can deal an extra 1d6 damage to one creature you hit with an attack roll if you have Advantage on the roll and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's type. You don't need Advantage on the attack roll if at least one of your allies is within 5 feet of the target, the ally doesn't have the Incapacitated condition, and you don't have Disadvantage on the attack roll. The extra damage increases as you gain Rogue levels."
@@ -6150,7 +6150,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: AberrantSorcerer lv20, ShortRestModal real lane, regen min(expended,floor(lv/2)) clamp exact both faces (6->20, 17->13 cap+10), latch sorcerousRestorationUses 1->0, second SR section-absent refusal, LONG REST nulls re-arm feature; cosmetic gap: regain log label key-mismatch ShortRestModal.jsx:157 resourceKey sorceryPoints vs sorcerousRestorationUses, no ability_use log for regain)",
       "class": "Sorcerer",
       "triggerConditions": "Trigger: short_rest; Action: passive",
       "expectedBehavior": "When you finish a Short Rest, you can regain expended Sorcery Points, but no more than a number equal to half your Sorcerer level (round down). Once you use this feature, you can't do so again until you finish a Long Rest."
@@ -6162,7 +6162,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: path-a 2SP activation at uses=0 verbatim sorceryHandler.js:89-139 SP-2+buff innate_sorcery_active+log, path-b dual metamagic chooser Quickened+Subtle live cap-2 enforced 3rd-disabled MetamagicPopup.jsx:92 <- metamagicRules.js:88, control cap-1 exact; DATA: app grants lv6 vs canonical lv17; gaps: Quickened downstream inert castingTime:Action, duration label-only no clock, no bonus-action latch)",
       "class": "Sorcerer",
       "triggerConditions": "Action: 1 bonus action",
       "expectedBehavior": "If you have no uses of Innate Sorcery left, you can use it if you spend 2 Sorcery Points when you take the Bonus Action to activate it. In addition, while your Innate Sorcery feature is active, you can use up to two of your Metamagic options on each spell you cast."
@@ -6174,7 +6174,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: Homing Strikes auto-fire hitResolution.js:337 attemptHomingStrike — 3 converts 1-die-exact d12+8+mod recalc vs rig AC25, still-miss zero-spend, press-lane refusals verbatim (attempted-stamp makes press refusal-only); Psychic Teleportation bonus-row expend die x10 ft distance exact pool economy, empty-pool refusal; lv20 d12 formula; gaps: nat-1 leg code-pinned only, teleport advisory no te/token consumer gridless, uses:short_rest label vs die-cost model)",
       "class": "Rogue",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Homing Strikes: If attack with Psychic Blade misses, roll Psionic Energy Die and add to attack roll. If causes hit, die expended. Psychic Teleportation: Bonus Action, manifest Psychic Blade, expend Psionic Energy Die, throw to unoccupied space up to 10x die roll feet. Teleport to that space, blade vanishes."
@@ -6186,7 +6186,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08: Evoker lv6 data classes.json:13492, Fireball chooser 'Choose up to 4'=1+lv exact, soulstitch_auto_success saveResult rolls:[] zero-dmg verbatim popup, control NPC full 8d6, slot lv3 consumed, stamp per-cast clear, consumers savePath:20->postCastRider:152->soulstitchSpellsHandler+handleNpcSaveDamage:626; CLA-244 Cancel-hang now FIXED; HOST NOW EVOKER (permanent))",
       "class": "Wizard",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "When you cast an Evocation spell that affects other creatures you can see, choose a number equal to 1 + spell's level. Chosen creatures automatically succeed on saving throws, and take no damage if they would normally take half damage on a successful save."
@@ -6198,7 +6198,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: War_Cleric gate-armed picker cantrip lane, Stable=deathSaves[T,T,T] runtime-bucket canonical deathSaveRules.isStable verbatim + 0-HP-untouched no-heal, refusals verbatim dead/healthy/undead zero-write, persistence 4-turn walk, ranges cosmetic gridless §42; gaps: monsters never organic-dying (zero cs deathSaves producers, cs POST rig needed), already-stable picker re-arm cs-mirror staleness cosmetic, Skip stamps spell-log leak; War_Cleric +Spare the Dying PERMANENT sole caster lane)",
       "class": "Spell",
       "triggerConditions": "Action: action; Range: 15 feet",
       "expectedBehavior": "Choose a creature within range that has 0 Hit Points and isn't dead. The creature becomes Stable."
@@ -6210,7 +6210,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08: FeyRanger Speed 50=30+Roving10+Speedy10 numeric fold first-render no-reload, fiber buffSpeedBonus:20 two additive sources, HexWarlock control 30/b:0, disk feats+ASI permanent, producer speedUtils.applySpeedIncreasePassives; climb/swim 60-vs-50 = CLA-300 roving fallback double-count NOT FT-084)",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Your Speed increases by 10 feet."
     },
@@ -6221,7 +6221,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: Abjurer lv10 classes.json:13366; all 4 clauses live: always-prepared Counterspell/Dispel (spellCalc2024:329, badge-gap masked by all-prepared default), Dispel BA row spellSectionUtils:101, PB ability-check d20+11 exact resolveDispelCheckBonus + slot-spent-on-success, slot-refund-both-faces LIVE Counterspell lane counterSpellHandler.js:89-109 'spell slot level 3 refunded' Cambion rig; gaps: no BA economy enforcement, dispel-fail face code+test-proven only helpers.js:153, dispel-success popup doesn't purge bless te)",
       "class": "Wizard",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Always have Counterspell and Dispel Magic prepared. Cast Dispel Magic as Bonus Action, add Proficiency Bonus to ability check. When you cast either with spell slot, slot isn't expended if spell fails to stop a spell."
@@ -6233,7 +6233,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: lv18 classes.json:13218 SpellMasteryModal action-time-gated pair choice, at-will free-cast lv1+lv2 slots untouched x2 same-turn unlimited by design no latch, upcast control pays lv2 (CLA-312 popup-leak FIXED effective-level gate useConfirmableFlow:130), non-mastery control pays; G1 REAL DEFECT: first-Confirm double setRuntimeValue concurrent full-store POST last-write-wins clobbers level2 key (campaigns-changedata.js:135 REPLACE, useRuntimeState.js:124) reload-loses lv2 mastery; G3 chooser not spellbook-filtered)",
       "class": "Wizard",
       "triggerConditions": "Action: passive; Action: action",
       "expectedBehavior": "You have achieved such mastery over certain spells that you can cast them at will. Choose a level 1 and a level 2 spell in your spellbook that have a casting time of an action. You always have those spells prepared, and you can cast them at their lowest level without expending a spell slot. To cast either spell at a higher level, you must expend a spell slot."
@@ -6245,7 +6245,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS 2026-10-08: Abjurer lv14 conditional_advantage+passive_immunity Spell, Gazer Frost Ray spell-origin save prompt mode:advantage double-d20 (16,13), damage fold 14->7 halved exact applyDamage.js:82 spellOrigin hp_change -7, controls normal-mode/full-damage exact, unit 32/32 green; cosmetic: pre-roll badge omits against_spell adv, Cambion Fire Ray data unmarked spell-origin not consumer defect)",
       "class": "Wizard",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Advantage on saving throws against spells. Resistance to damage of spells."
@@ -6257,7 +6257,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "not verified",
+      "verified": "verified (PASS-subset 2026-10-08: DivinationWizard native, ASI folded INT+4 feat face; clause-1 cover-bypass vacuous-live: PC spell attacks pay NO cover at all (spellCastService zero cover producers, §84 seam absent); clause-2 gate live-wired rangeValidation.js:113+featRangeService.js:67 but melee-disadv never fires PC chips (forcedMode null CLA-230) control EF identical mode:normal; clause-3 +60 consumer wired+unit-pinned featRangeService:73->damageCalculation:22 live-unobservable: chip lane omits pos/featEffects (useActionSpellMetamagic.js:244), band discarded index.js:692; no bug file (no over-fire, no zero-consumer); tokens/grid byte-restored, map lanes need maps-manager Open not Activate)",
       "triggerConditions": "",
       "expectedBehavior": "Ability Score Increase. Increase your Intelligence, Wisdom, or Charisma score by 1, to a maximum of 20. Bypass Cover. Your attack rolls for spells ignore Half Cover and Three-Quarters Cover. Casting in Melee. Being within 5 feet of an enemy doesn't impose Disadvantage on your attack rolls with spells. Increased Range. When you cast a spell that has a range of at least 10 feet and requires you to make an attack roll, you can increase the spell's range by 60 feet."
     },

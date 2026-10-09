@@ -2558,3 +2558,197 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - `regenerate_target_selection` picker is `.sp-overlay` chrome: rows are `label.secondary-target-row` wrapping hidden `input[type=radio name=secondaryTarget]`; row click toggles `.secondary-target-selected` — checkbox-input queries false-read unselected; confirm button is "Cast Regenerate".
 - Full-store POST `/api/campaigns/:c/<CharName>` REPLACES the whole char change-data object — keys not in the payload (e.g. regenerateActive) vanish; re-stamp via one merged GET→mutate→POST (§39 extends to whole-object replace semantics).
 - Cosmetic residual NOT fixed (off-lane): generic `spell` log entry from spellCastService stamps stale armed target (targetName "Succubus 1" while regenerate lane's own hp_change/ability_use/spell_effect all carry HexWarlock); +1/turn tick lane still log-less by design; regenerate gated lane has NO expiry clock (CLA-033 family) and limb-regrow 2-min grep-zero consumers (§70 advisory).
+
+## SP-098 Remove Curse (2026-10-08 PASS) recipes/pitfalls
+- Real chain (manifest handler paths stale): `spellGates.js:220 gateRemoveCurse` → spell popup → `useSimpleSpellHandlers.js:313 confirmRemoveCurse` → `removeCurseService.js` → `removeCurseHandler.js applyRemoveCurse` (registered `remove_curse`, automation/index.js:561). Clears `cursed` from activeConditions/activeConditionMeta, `type:'cursed'` buffs, and attunement.
+- Curse-on-target recipe: GM Effect Adder → "Cursed" on an EB-joined monster → `activeConditions=['cursed']` + `condition applied` log; cast Remove Curse (touch, creature-only picker) → `condition removed reason:"Remove Curse"` + ability_use + spell_effect logs, lv3 slot spend exact.
+- PITFALL: MI-holding characters' Edit wizard step-14 opens `mi-overlay` intercepting all checkbox clicks — dismiss via `button.mi-skip-btn` (clicking `.mi-skip` container div does NOT close it).
+- Cursed-buff/attunement branches: no live UI producers (picker lists creatures only, no object targets app-wide) — code-verified PASS-subset evidence.
+
+## CLA-293 Rend Mind (2026-10-08 PASS-subset) pitfalls
+- PITFALL: sheet `text="+8"` collides with the Dexterity save cell (both render "+8") — anchor attacks by `.attacks` grid cell index (left clickable name cell), not by bonus text.
+- PITFALL: after a Rogue sneak-hit Done, the Cunning Strike chooser `.sp-overlay` mounts and intercepts clicks — Cancel it or the queued Rend Mind save prompt never surfaces; Cancel can still queue stray CON poison prompts — judge feature firing by `ability_use` + `save_result` log lines only.
+- PITFALL: Long Rest nulls `_RendMind_Used` but NOT `_SneakAttack_usedRound` — sneak re-arms only via initiative round-advance; LR re-arm proof needs a round-walk then attack.
+- PITFALL: target psychic-immunity shows "IMMUNE — 0 damage" popup yet sneak dice and the Rend Mind save rider still ride the hit — immunity does not gate riders.
+- Stale-ref click on Initiative "Next →" can land in a joined monster's name textbox (rename hazard — Escape only, never Enter). cs.round mirror freezes; truth = top-level activeCreatureName + `__initiative__.lastAppliedTurnStartCreature`.
+
+## FT-067 Resilient (2026-10-08 FAIL) pitfalls
+- PITFALL: any feat whose `save_proficiency` automation resolves via featAbilityChoices MUTATES the SPA-cached feats.json (`featBuffService.js:626-627` in-place saveType overwrite + fallbackTypes delete) — save-row order across characters in one session flips which holder is correct; judge feat save grants from a FRESH reload with only the host open, or via `computeAllFeatBuffs(disk, fresh fetch)`.
+- Grant lane recipe (works): wizard step-8 tick `.list-item-checkbox-trigger` + step-9 `.bg-ability-select` for ability choice; disk `featAbilityChoices {Feat-N: {assignment: Ability}}`; forced-save truth `saveResult-<Name>.saveBonus` includes PB.
+- EB Aeromancer registry note was wrong: Gust of Wind forces STR DC13 per live log.
+
+## SP-099 Resistance (2026-10-08 PASS-subset) recipe
+- Recipe: War_Cleric (sole Cleric/Druid cantrip lane, +Resistance permanent) casts on HexWarlock victim via two-stage chooser (target picker cs-all → "Cast Resistance" → stage-2 11-type picker). te `{effect:resistance_damage_reduction, chosenType}` + victim `resistanceChosenDamageType`; reduction truth = `ability_use "reduced damage by N (1d4)"` + `hp_change==final`; once/turn latch `resistanceUsedThisTurn` clears every turn boundary (looser than RAW); type gate shows `resistanceRoll:null` on mismatch; GM badge × clears te.
+- Gaps codified: concentration never stamped (applyResistance un-awaited async getCombatSummary :57 → addConcentration no-op); expiryRounds:null = no 1-min clock.
+
+## CLA-294 Resourceful (2026-10-08 PASS-subset) recipe/pitfalls
+- Recipe: Human lane = DivinationWizard. LR (instant btn) → `hasInspiration=True` change-data + CharSummary "Inspiration:" checkbox (`useTrackedResource storageKey:hasInspiration`); producer restRules-longRest.js:609 gates on trait name 'Resourceful'. SR does NOT grant. Checkbox click flips server key both ways.
+- PITFALL: LR sheet button grants only the ACTIVE character's dict — party-wide expectation invalid. Spend-as-advantage has ZERO consumers app-wide (checkbox is only consumption surface).
+- PITFALL: `run_code_unsafe`/evaluate closures across calls drop captured vars — read server state with separate curl GETs.
+
+## CLA-295 Restore Balance (2026-10-08 PASS) recipe — rewritten armed-flag impl
+- Reactions row click ARMS `restoreBalanceArmed` + spends `<name>Uses` (usesMax=max(1,CHA-mod)) + arm popup "Uses: 0/1"; consumed at logAndShow seam (`useLoggedDiceRollAttack.js:494 maybeCancelForcedMode` BEFORE computeD20Roll) forcing `forcedMode:'normal'` only when mode already adv/dis; third-party rollers reachable; Blinded check + gridless-lenient 60ft. Control: un-armed dis rolls keep `mode:disadvantage`. Once-per-trigger: next dis shot unaffected. Re-arm at LR + fresh row click. Prior 2026-09-04 holder-side passive-cancel defect is GONE (grep-zero producers, automationModifiers.js:130 comment pinned).
+
+## CLA-297 Retaliation (2026-10-08 PASS-subset) recipe/pitfalls
+- Canonical = Path of the BERSERKER lv10 (classes.json majors[0], reaction_damage/5ft) — NOT monster-Retaliation/Ancestral. Lane: Reactions row manual press after taking damage → one melee attack vs lastAttack.attacker (reactionDamageHandler.js:511 handleMeleeReactionAttack); once/round latch `_Retaliation_usedRound` (round-wrap clears navigationHandlers.js:38/123); no-recent-damage refusal verbatim. Host DraconicDragon lv20 Berserker KEEP.
+- PITFALL gridless: EB ranged Light Crossbow stamps `lastAttack.weaponType:'melee'` (§1170) — reaction ranged-refusal branch (:151) only provable on positioned-token maps.
+- PC-initiative-card attacks: PC cards have NO img.avatar-image (button.avatar-initial letter) and NO mc-overlay — sheet weapon rows `.left.clickable`+`.clickable` "+N" Hit / "1dX+N" Damage cells are the PC attack seam; sheet-cast spells auto-derive armed initiative-card cs.targetName (no popup target select needed). Revivify dead-target pickers (pendingRevivify, TargetSpellPopups) AUTO-ARM from cs isCreatureDead and auto-confirm on single dead combatant + "Cast Revivify" (no checkbox tick needed, unlike party-target pickers); refusal `automation_info` popups use `button.popup-close-btn` "Done" and slot paid-then-rolled-back via useSimpleSpellHandlers.rollbackSpellSlot. (SP-100 2026-10-08)
+
+## MN-017 Riposte (2026-10-08 FAIL) pitfalls
+- PITFALL: miss-resolving Riposte LOSES `_Riposte_usedRound` stamp (GET ~11s post: appliedAttack present, usedRound=null) → same-round ungated re-fire+spend; hit-resolving riposte keeps stamp. Own-turn gate reads stale cs.activeCreatureName — verify who's active via tracker DOM, not cs mirror.
+- PITFALL: initiative walk = index order of SORTED cs; stale-ref click can SKIP combatants' turns (full round-wrap needed to re-arm). Init edits commit only via TRUSTED fill on `[data-testid=initiative-input]` (synthetic setter drops; wrong-card anchor hits HP-max spinbutton collateral).
+- PITFALL: unarmed-target monster chip clicks pop without HIT/MISS line; EB Bandit chips = [Scimitar, Light Crossbow].
+
+## CLA-299 Ritual Adept (2026-10-08 FAIL) pitfalls
+- Ritual gate half LIVE: unprepared ritual-tag spells stay clickable (`CharSpells.jsx:113`), casting time "1 minute or Ritual"; but NO "Cast as Ritual" toggle and slot ALWAYS consumed (FREE_CAST_CHECKS spellPreparationService.js:232 lacks spellbook-ritual check; zero-slot popup DISABLES cast — RAW slotless impossible). Feature = base Wizard lv1 passive_rule/ritual_spells (manifest lv6 stale).
+- PITFALL: sheet spell slot pips are TOGGLES — clicking an active pip spends; GET-verify between clicks. Disk spells[] ⊃ sheet rows (preparedSpells filtering) — pick probe spells from live DOM.
+
+## FT-068 Ritual Master (2026-10-08 PASS-subset) recipe/pitfalls
+- Recipe: feat tick via `.list-item.feat-item` exact `.list-item-name` ancestor (generic ancestor-walk overshoots; un-tick needs retry); step-5 `.bg-ability-select` ASI; Spells-step RitualMasterModal enforces EXACTLY PB choices (Save refuses until 6/6 at lv20). Chosen spells inject Prepared="Always" `_ritualMasterRitual` (popup Quick Ritual checkbox = stamp proof, SpellDetailPopup.jsx:249); ASI ability overrides class casting ability in popups (featBuffService.js:614→spellCalc2024.js:482). Quick Ritual: checkbox → zero slot + ability_use + `_Ritual_Master_quickRitualUsed` timestamp; spent → checkbox disabled verbatim; LR nulls, re-fires (restRules-longRest.js:688).
+- PITFALL: feat-less `ritualMasterSpells` persists in char JSON after feat untick+Save (inert, spellCalc-guarded) — clear via PUT. Feat ASI card checkbox double-toggles invisibly; stray tick = phantom ASI feat, reverts on untick+Save.
+
+## CLA-300 Roving (2026-10-08 FAIL) fingerprints/pitfalls
+- CLIMB/SWIM FINGERPRINT: climb/swim render walk+10 too (50/50 vs RAW 40/40) — rules.js:555 folds Roving +10 into stats.speed, then CharSheet.jsx:115/118 adds fallbackSpeed(stats)+10 AGAIN. Supersedes 2026-09-04 "40/40/40 exact" PASS (regression or Speedy-era drift, CharSheet.jsx:208 lineage).
+- PITFALL: Edit wizard targets the ACTIVE character — check document.title before editing (EvasiveFighter was collateral-overwritten mid-cleanup once). Inventory textarea commits on blur only (focus→set→input→blur). Feats toggles = `.list-item-checkbox` inside `.wizard-step-feats-results-list`.
+
+## CLA-301 Sacred Weapon (2026-10-08 PASS-subset) pitfalls
+- temp_buff/effect:sacred_weapon → buffHandler EFFECT_DELEGATES → sacredWeaponHandler; arms `activeBuffs {sacred_weapon, damageTypeChoice}` + `pendingExpirations rounds:100` (rare LIVE 10-min clock); CHA fold prints "+5 Sacred Weapon" in popup + sheet cell title; Radiant radio in picker flips damageType in log.
+- PITFALL: CD burns at picker-open before confirm (refund cancelSacredWeapon code-only); popup replay-cache fakes activation spinners mid-drain — judge by cd/log deltas not overlays; `.npc-remove-btn` lives OUTSIDE `.creature-card` scoping.
+
+## SP-101 Sanctuary (2026-10-08 PASS-subset) recipe/pitfalls
+- Recipe: War_Cleric (Sanctuary KEPT, sole BA-abjuration lane) wards HexWarlock → te `{sanctuary, saveDc=spellDC}`; EB Bandit armed vs warded → `.sp-modal` attacker WIS prompt: fail = "attack is lost" zero roll/hp_change; success = proceeds. Self-break: any attack/cantrip by warded clears te + log. Burning Hands AoE shows only the spell's own save — no sanctuary gate (correct).
+- 2024 Sanctuary is concentration:false (data wins over 5e reading). Expiry anchor-only (expireOnCreatureName, expiryRounds:null; initiative roll scrubs).
+- PITFALL: initiative-card innerText scoping mis-anchors Bandit→AasimarTest (dropdown text) — anchor by avatar alt; PC-card target combobox needs Playwright selectOption (evaluate-set display-only); MI-holders: step-14 auto-opens MI-overlay, dismiss `button.mi-skip-btn` first.
+
+## WM-005 Sap (2026-10-08 PASS-subset) recipe/pitfalls
+- Sap carriers this dataset (equipment.json; weapon-mastery.json defines): Blowgun/Flail/Longsword/Mace/Morningstar/Spear/Trident — Longsword IS Sap; use Warhammer (Push) as control. Handler real path: src/services/automation/handlers/combat/weaponMasteryHandler.js (manifest stale); auto-apply = attackRollPostDamage tacticalMaster step applyAutoMasteries, kind gate automationPassives.js.
+- PITFALL: after Admin Clear Change Data, a loaded tab's Sap auto-apply SILENTLY NO-OPS (client keeps `_Sap_appliedTarget`; server null) — full tab reload required; near-false-FAIL. Kind chooser re-select with pre-checked boxes doesn't commit post-clear ("Weapon kinds set" popup lies) — force real uncheck+recheck. Admin Clear also wipes combatSummary (EB monsters + targets gone).
+- Persisted `combat-ui-viewingMonster` auto-reopens old mc-overlay intercepting other avatars — close × first. 5e attack grid: anchor rows via `.clickable` DOM-order pairing (name→next +N); closest(row) mis-pairs.
+
+## FT-069 Savage Attacker (2026-10-08 FAIL) pitfalls
+- Keep-Reroll delta zeroes when weapon carries mastery riders: DiceRollResult.handlers.js:192 sends rawDamage=adjustedTotal (rider-inflated), CharSheet.handlers.js:305 computes (reroll+flat)-total=0 → applyDamage skipped, log "+0 damage". Non-rider weapon control needed post-fix.
+- PITFALL: Charger + Shield Master attack_riders hijack every sheet melee attack pre-damage-popup (auto-modals, zero weapon damage) — strip riders for damage-popup tests then RESTORE. Damage popup closes only via `button.popup-close-btn`/Escape (backdrop click no-op). PC initiative avatar click = sheet nav (no mc-overlay). EB monster revive = full-store POST `/combatSummary {value:cs}`.
+
+## CLA-303 Searing Undead (2026-10-08 PASS) recipe
+- Turn Undead lane: CD row → SetConditionModal (NPC saves auto-roll inline) → `turn-undead-result{failedTargets}` → useInitiativeEffects.js:422 rolls `${wisMod}d8` shared pool ONCE per use, applies total to each failed undead (damageType Radiant, sequential awaits). Non-undead auto-excluded from picker. Force-fail face: cs full-store POST wis:-2/hp:999; force-save wis:+19.
+- PITFALL: searing damage popups persist and block next CD press — flush `.popup-close-btn` between uses. Auto dialog handler swallows admin confirms (`browser_handle_dialog` errors) — GET is truth.
+
+## CLA-304 Searing Vengeance (2026-10-08 PASS-subset) recipe/pitfalls
+- Canonical host = CELESTIAL Patron lv14 (classes.json majors[1]) — NOT Fiend. Press Reactions row while `.dsp-overlay` up (0-HP self press NOT blocked by cannotAct — row stays clickable). Heal truth runtime currentHitPoints=floor(maxHp/2); deathSaves/deathFailures reset on confirm. Burst = ONE shared 2d8+CHA roll to all pickable combatants minus caster+self-heal; blinded te rounds:1.
+- PITFALL: confirmSearingVengeance never clears `deathSavePrompt-<Target>` — overlay survives heal; DELETE 200 clears disk but loaded-tab overlay needs RELOAD (SSE DELETE ignored). Picker "(100% HP)" labels read cs 1/1 placeholders.
+
+## CLA-305 Second Wind (2026-10-08 PASS-subset) pitfalls
+- Seam: healingHandler.js:391 folds "fighter level" into heal; SR recharge restRules-shortRest.js:95 min(max,cur+1); secondWindUses in LONG_REST_RESOURCES (null=armed).
+- PITFALL: sheet HP display is click-to-reveal spinbutton — fill MUST select-all (Meta+A) first or values concatenate ("11280"); `text=` row locators silently no-op on this sheet — click label span ref.
+
+## CLA-306 Second-Storywork (2026-10-08 PASS-subset) pitfalls
+- PITFALL: wizard step-6 class re-pick CLEARS subclass value (that's the stale-major re-arm) — step-7 must re-pick before Save enables. Thief climb fold (CharSheet.jsx:183-189) has NO heavy-armor gate by RAW-honest design (contrast Roving :101-113) — not a gap.
+
+## SP-102 See Invisibility (2026-10-08 PASS-subset) notes/pitfalls
+- DATA TRUTH: lv2 (both data sets), concentration:false, duration 1h, temp_buff/see_invisibility — manifest lv4/concentration stale. activeBuffs is the channel; NO concentration stamp; NO expiry clock (buffHandler.js:302 gates clocks to flight buffs). Senses row suffix is the only affordance; no initiative badge (te BADGE_SPECS family).
+- PITFALL: EB monster tick via native `input[aria-label="Select <name>"]` click (ref-click intercepted by row); "Join Encounter" appears only after tick. Fire Bolt sheet-route first stamp targetName:null/spellLevel bogus cosmetic — judge by log `mode`/armed 2nd cast.
+
+## CLA-307 Self-Restoration (2026-10-08 PASS-subset) pitfalls
+- Monk lv10 end_of_turn_condition_removal [charmed,frightened,poisoned]: fires at holder's turn-END via navigationHandlers; log `removed reason:"Self-Restoration"`; non-listed conditions survive; non-holders unaffected. Exhaustion immunity at useTravelManagement.js:236 (hex-travel lane unoperable w/o outdoor map — cite gap).
+- PITFALL: EffectAdder "Add" buttons collide (target dropdowns list everyone) — scope `button.effect-add-btn[title*="<Name>"]`; PC avatar alt = initials only.
+
+## FT-100 Sentinel Guardian (2026-10-08 PASS-subset) pitfalls
+- feats.json Guardian = generic `reaction_damage` — sentinelGuardianHandler + router sentinel_guardian are DEAD (grep-zero in data). Press-model OA: auto-target = lastAttack.attackerName; misses don't offer; but ZERO reaction economy app-wide (no reactionUsed key) — stale re-press fires SELF-targeted OA; abandon via Escape (Done self-damages).
+- POST /log {value:[]} APPENDS junk; clears are /admin/clear-change-data + /admin/clear-log. mc chips `.mc-dice-link` shared with ability-mods — anchor by `.mc-action` text; offsetParent fails on fixed overlays, use getBoundingClientRect.
+
+## FT-101 Sentinel Halt (2026-10-08 FAIL flavor-b) fingerprint
+- passive_rule/opportunity_attack_speed_zero (feats.json:584) = grep-ZERO consumer; resolveHandler PASSIVE_RULE_EFFECTS (:289) lacks key; HANDLER_MAP.sentinel key never appears in data; OA-hit seam stamps nothing. Live OA HIT 25vsAC12 → zero speed/te/log delta; "Halt:" row decorative. speed_zero te + clear lanes EXIST (targetEffectDefinitions:1368) but unwired to OA lane. Fix = consumer on OA-hit branch.
+
+## CLA-309 Shadow Step (2026-10-08 PASS-subset) pitfalls
+- Lane: tempTeleportHandler TeleportModal → applyStepTeleportAdvantage: self te next_attack_advantage (replace-gated), consumed attackPostProcessing.js:275; adv folds conditionEffects.js:299. No uses economy in data (RAW-honest unlimited). lv20 auto-fires Improved Shadow Step rider (perception te + WIS DC21 → Blinded — PURGE conditions before advantage legs; rider te STACKS add-only :173).
+- PITFALL: wizard step buttons innerText concatenated ("6Class") — has-text("6 Class") never matches, use startsWith.
+
+## SP-103 Shapechange (2026-10-08 FAIL) fingerprints/pitfalls
+- WORKS: cast->CR<=lvl + construct/undead picker filter machine-exact (518 rows), merged combatant form-block + THP=first-form, Bite chip form-damage, badge-revert clears. DEAD: mid-combat "change form" affordance nowhere (badge x = full revert); recast while live refused by handler anyway but rests strip te first — refusal unreachable; abandon-recast pays 2nd lv9 slot + RE-GRANTS THP (RAW first-form-only violation).
+- PITFALL: shapechange cast pays slot at CHOOSER-OPEN; abandon burns it. Spell-detail popup stacks over chooser — only Close inside .popup-overlay; slot re-click double-pays. Remove buttons empty text — anchor `button[title="Remove effect"]`. `.sp-overlay` fixed: offsetParent null — use computedStyle/getBoundingClientRect.
+
+## FT-071 Sharpshooter (2026-10-08 PASS) cover-rig recipes/pitfalls
+- Cover rig recipe: cover needs ACTIVE map (`__map__.activeMapName` via Maps-manager Activate). Barrel=half, altar=3q (getIgnorableCoverLevels), Paint wall=total. Token drag: synthetic DragEvent+DataTransfer text/plain on `.grid-svg`; cell→screen via getScreenCTM().matrixTransform (43px/cell rendered, viewBox 40). Sharpshooter hits log coverReason:"Sharpshooter" no coverAcBonus; total-cover = "AUTO-MISS (Target has full cover)".
+- PITFALL: map NPC Rename renames ALL npc tokens at once — delete strays first. Monster initiative-card's first input is NOT HP (native-setter wrote into NAME; repair via full-store POST /combatSummary). Two +8 cells collide — anchor `.attacks`. HOST: Sharpshooter on FeyRanger (EF is control).
+
+## FT-074 Shield Master (2026-10-08 PASS) pitfalls
+- Lane: post-hit STR DC(8+STR+PB) prompt -> fail -> Push/Prone chooser -> te (prone_and_push / push value:5 marker gridless); latch `_Shield_Bash_usedRound` holder-scoped, silent 2nd-hit refusal; result panel needs own Done (abandon strands weapon damage); chooser Skip intentionally does NOT stamp latch (free re-offer by design).
+- cs bandit AC key = `ac` (armorClass phantom); Charger chooser re-offers every melee hit un-gated (FT-102 corroborated) Cancel-safe; card target option lists self-exclude — text anchors bleed across cards, walk leaf name nodes.
+
+## SP-105 Shield of Faith (2026-10-08 PASS-subset) pitfalls
+- AC fold pattern reuse (SP-104 twin): target activeBuffs acBonus:2 + cell "+2 from Shield of Faith"; concentration saves route to top-level concentrationPrompt-<Target> + `.cnp-overlay`/`.cnp-roll-btn` (SSE-only, POST-before-load never renders — poll the btn; include .cnp-* in flush selectors). No rounds:100 clock (handler :64 passes none, CLA-033 family).
+
+## CLA-312 Signature Spells (2026-10-08 PASS-subset) pitfalls
+- Keys: SignatureSpells_selection + SignatureSpells_<Spell>_used (true/null, NOT the _Shadow_Arts_* shape). SR re-arm restRules-shortRest.js:222. Modal save uses skipSync — prepared rows don't recompute until reload; unchecked not-castable rows don't reliably re-check (SSE desync) — restore via admin clear. AoE picker stacks under evasion prompt: click `.sp-overlay--evasion` Skip first.
+
+## FT-078 Skilled (2026-10-08 PASS) pitfalls
+- PITFALL: skill cell handler = inner span.clickable (outer span.skills click no-ops). Skill rolls write campaign lastAttack → roll tests need Admin clear change-data too, not just log. Tools rows = owned ∩ proficient only (feat tool grants invisible without inventory). Feat pool attribution audit seam: step-10 "Skilled: 3 of 3".
+
+## SP-106 Silence (2026-10-08 PASS-subset) pitfalls
+- Lane: SilenceModal (handler.handleTargetSelection test-only). Caster silenceCaster/silenceRadius persist; TARGET grants client-only (server activeBuffs null — reload mid-encounter loses gates). Thunder immunity zero-dmg only in automation log (popup bare HIT). Concentration-badge × clears whole zone + logs. picker checkboxes aria-less — anchor wrap-text, verify "Cast Silence (N)". mc-overlay survives Done — press chips directly.
+
+## FT-079 Skulker (2026-10-08 PASS) notes
+- HeroesFeastBard is native Skulker lane (no grant needed). Senses fold: senseUtils.js:64 -> rules-senses.js:19 -> rules.js:566 -> CharSummary.jsx:273 row. Consumers REAL: Blur/Foresight defender-disadv bypass (contextBuilder-sync.js:481/664, conditionEffects.js:278/484/505), invisible-targeting (mazeHandler.js:86, holdMonsterHandler.js:21) — no ft-range enforcement (gridless). Long-standing feats render w/o reload (CLA-15 reload only for fresh grants).
+
+## CLA-315 Slow Fall (2026-10-08 INCOMPLETE) — fall-event lane
+- BLOCKER CONFIRMED x2 runs: zero producers of trigger:'falling' anywhere (maps no elevation, admin no fall tool, flight-expiry no fall, EB no falling chip). Reduction machinery verifiable ONLY via sanctioned API rig POST /campaigns/:c/lastAttack {value:{trigger:'falling',totalDamage:N}} + reload-per-event (heal-model min(reduction,total); full-HP heals 0; judge by hp_change). Refusal logging asymmetric (no-attack branch popup-only). Data: 2024 lv3 / 5e lv4.
+
+## SP-107 Sleep (2026-10-08 PASS-subset) lane notes
+- Real lane: sleepHandler.js + sleepService.js. te key sleep_staged {stage:incapacitated|unconscious}. Repeat-save: PC=prompt, NPC=inline save-sleep-repeat log only (sleepService:155). Undead/construct auto-success exemption live. shake-awake registered (index.js:532) but NO UI producer — §70. Cantrip casts ride runtime-armed target: unarmed cast rolls with targetName:null zero-dmg; arm via initiative-card selectOption. Walk truth = .creature-card.active + __initiative__.lastAppliedTurnStartCreature.
+
+## SP-108 Sleet Storm (2026-10-08 PASS-subset) notes
+- Lane: spellGates.js:585 -> useSimpleSpellHandlers.js:330 -> sleetStormHandler.js; recurring expireStaleEffects.js:29-46; te targetEffectDefinitions.js:1132. Zone key _sleetStorm_<caster>. Save-queue verdict btn "Next Save". popup-overlay fixed→offsetParent null (use getComputedStyle display). Sorcerer casts arm SP-105 metamagic picker first ("Cast Without Metamagic"). EB join drags saved PC party into cs too. Concentration-loss-on-zone-consumers = first real instance (sleet clause).
+
+## CLA-314 (2026-10-08 PASS) pitfalls
+- Save popups show Stroke of Luck ABOVE Done (DiceRollResult.jsx:464) — generic dismiss can silently consume SoL latch; scope Done click precisely.
+- EvasiveFighter invalid as save-proficiency control (Skill Expert feat → all saves); use AberrantSorcerer (saveProficiencies:[]).
+
+## SP-109 Slow (2026-10-08 PASS-subset) notes
+- Real lane: triggerSpells.js:137 handleSlow -> slowService.js -> automation/index.js:607. AC-2 consumer: getSlowAcPenalty loggedDiceRollUtils.js:107. Repeat-save is badge-only (te lacks repeatSave descriptor; MA-0610 applyRepeatSaveTurnEnd navigationHandlers.js:199 needs it — same fix would auto-roll Confusion/Enfeeblement family). NPC condition-save bonus reads campaign-NPC savingThrowBonuses via /npcs/:name PUT (monsterUtils.js:62 campaign-first) — cs stamps inert there. Slot math: trust spells.json level not ticket.
+
+## WM-006 Slow mastery (2026-10-08 PASS-subset) notes
+- Auto-fire mastery lane: attackRollPostDamage.js:579 applyAutoMasteries -> weaponMasteryHandler.js:157 (refusal return DISCARDED — silent cap). te at change-data ROOT targetEffects. Kind-bucket chooser gates weapon kinds; admin-clear wipes bucket — re-arm before mastery runs. /change-data/combatSummary GET 404→HTML; POST /combatSummary {value:cs}. First Next from active:None skips idx0.
+
+## CLA-316 Smite of Protection (2026-10-08 PASS-subset) notes
+- Runtime-FIELD rider (flag smiteOfProtectionActive + pendingExpirations), NOT te — cover adjudicated at monster-attack-time via coverReason/coverAcBonus log fields; grid map lane used (test-map tokens; restore coords after). target-select generic query arms FIRST card — ascend from img[alt=Name]. Free-cast Divine Smite lane: "Paladin's Smite" row + _Paladin's_Smite_freeCastCount. CharSummary cover badge range-blind (cosmetic).
+
+## CLA-317 Sneak Attack (2026-10-08 PASS-subset) notes
+- Auto-fire (no press): gates rogue→d6count→finesse/ranged→disadvantage=0→once-per-turn latch→advantage→flanking-ally (gridless lenient-true). Latch reset = round-walk, NOT admin-clear on loaded tab (full-store resync resurrects it). Stale foreign te (death_strike) re-surfaces save prompts every sheet mount — audit targetEffects before rows. Killing last hostile self-terminates cs — bump HP first (GM fill 999 native-setter trick). Popup Adv/Dis badges cosmetic; Steady Aim = real mode:advantage.
+
+## CLA-318 (2026-10-08 PASS-subset) notes
+- Resource-rest automation: resource_restoration {restore_expression Math.floor(level/2), resourceKey sorceryPoints, recharge long_rest}; header Short Rest button -> ShortRestModal. Latch key sorcerousRestorationUses; LONG_REST_RESOURCES nulls points+latch (constants:116/170). SP tracker spinbutton = point-management commit; Font of Magic modal costs 2-6SP, create-slot gated at max (CLA-146 family).
+
+## CLA-319 (2026-10-08 PASS-subset) notes
+- Innate lane: sorceryHandler.js:89-139 (uses 2 baseline, 2SP over-cap activation); buff innate_sorcery_active raises metamagic cap 1->2 (metamagicRules.js:88). Metamagic cost: waive-max via lv20 Arcane Apotheosis — charges cheapest option. Escape on metamagic chooser does NOT abandon committed cast. Innate uses burn via sheet Initiative roll (§CLA-194).
+
+## CLA-320 Soul Blades (2026-10-08 PASS-subset) notes
+- Psionic lane: auto_reroll homingStrikesAttempted stamped campaign key -> manual press refusals by design (Soul Blades: Reactions row). PE pool key absent=fallback full; d12 lv17+. Soulknife hits spawn Devious Strikes chooser + Rend Mind prompts — sp-overlay intercepts clicks, flush chips between presses. Blind .clickable "+8" doc-order hits save rows — anchor near attack leaf.
+
+## CLA-321 (2026-10-08 PASS) notes
+- DivinationWizard = Evoker NOW (subclass swap step-7-only suffices, CLA-256). Soulstitch chooser precedes AoE picker; saveResult soulstitch_auto_success. +NPC card HP: focus setter+blur commit; Remove-NPC btn may be empty-text title-only. CLA-244 Cancel-hang FIXED. Stale .mi-overlay blocks wizard Save — drain mi-skip-btn.
+
+## SP-110 Spare the Dying (2026-10-08 PASS-subset) notes
+- Stable model = deathSaves:[true,true,true] in RUNTIME bucket (bucket 'Bandit 1'), cs mirror never updates — picker re-arm cosmetic. Dying-model rig: full-store cs POST {currentHp:0,deathSaves:[F,F,F]} + reload + re-select. 0-HP GM-filled join = dead-model gate (refuses). Cantrip grant: wizard step-9 list-item-checkbox-trigger. War_Cleric sole caster lane.
+
+## FT-084 Speedy (2026-10-08 PASS) notes
+- Passive speed fold: SpeedSummary ctx {totalSpeedWithBuff, buffSpeedBonus} fiber channel; additive multi-source stack. CLA-300 fingerprint scales off folded walk (60/60 with Speedy on).
+
+## CLA-322 Spell Breaker (2026-10-08 PASS-subset) notes
+- Abjuration lv10 lane. DivinationWizard round-trips subclass Evoker<->Abjurer via step-7 (currently Evoker). Cambion EB join = Fire Ray hostile-cast rig (lastAttack stamp feeds Counterspell reaction). _Counterspell_usedRound re-arm needs REAL round advance: init input trusted type+Enter only, Next single-click ~15x (batched collapse). DivinationWizard is the sole wizard lane for subclass-gated rows.
+
+## CLA-323 Spell Mastery (2026-10-08 PASS-subset) — CRITICAL race
+- Sequential await setRuntimeValue() = CONCURRENT full-store POSTs, last-write-wins bucket REPLACE (campaigns-changedata.js:135) — multi-key confirm flows MUST re-verify both keys via GET /change-data; confirm popup echoes args not server truth. DivinationWizard mastery now absent (clean). Mastery free-cast banner "Free Cast — no spell slot consumed".
+
+## CLA-324 Spell Resistance (2026-10-09 PASS) notes
+- Abjuration lv14 lane (classes.json[11].majors[0].features[5]; conditional_advantage against_spell + passive_immunity damage_resistance:['Spell']). DivinationWizard step-7 round-trip Evoker<->Abjurer (restored). Sheet fold: "Resistances: Spell" + six save "(Adv)" badges (CharAbilities.jsx:122 spellResistanceSaveSource).
+- Save fold LIVE at SavePromptModal roll time: prompt payload isSpellDamage:true (saveProcessing.processPlayerSave stamps ALL monster save-attack prompts) → computeSaveAdvantage→rollSaveDice double d20, popup "(Advantage)", log rolls:[kept] mode:advantage. Pre-roll badge (promptHasAdvantage :350) does NOT render against_spell adv — roll-time fold only (§CLA-042 badge-vs-seam family).
+- Damage fold: applyDamage.js:82 categorical 'Spell' resist matched via spellOrigin flag (options.isSpellDamage || lastAttack.rollType==='spell-save') — 'Spell' never in damageTypes loop. Logs BOTH "Spell Resistance … halved to" + generic "Damage Resistance" automation pair; hp_change exact-half.
+- cs saving_throws:{dex:{modifier:-19}} full-store rig does NOT fold into SavePromptModal PC roll lane (modal uses PlayerStats real mod; §MA-1739 cs-fold is picker/NPC-seam) — retry-until-fail works (adv fail p=0.36).
+- Cambion Fire Ray data lacks spell_attack_bonus + description says "Ranged Attack Roll" → isSpellOriginAction false → its hits never pay the 'Spell' fold (data-marking gap, consumer proven via Frost Ray lane instead).
+- Phantom caster-side "Gazer 1 DEX mode:normal" save log beside every victim save (§MA-0914 family, cosmetic).
+
+## CLA-324 Spell Resistance (2026-10-08 PASS) notes
+- Spell-origin damage fold: applyDamage.js:82; spell-origin saves prompt isSpellDamage:true -> adv d20 pair. Gazer = spell-origin carrier chip (Frost Ray); monster natural attacks (Cambion Fire Ray) data-UNMARKED spell-origin (no fold — data gap). cs saving_throws rig doesn't fold PC roll lane. mc-overlay intercepts Next — .mc-close first.
+
+## FT-087 Spell Sniper (2026-10-08 PASS-subset) notes
+- PC sheet chips adjudicate NO cover/range/melee-dis (useActionSpellMetamagic omits pos/featEffects; resolveMapMode skips forcedMode-null) — cover/range truth only via monster-card lane or page-evaluate computeCover/computeRange probes. Spell lane drops range 'disadvantage' band. mapName re-arms ONLY via maps-manager Open (App.jsx:181), Activate insufficient. Grid resize 20->60->20 lossless.
