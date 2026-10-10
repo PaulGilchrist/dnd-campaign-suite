@@ -140,7 +140,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 - **Pattern**: ONE shared SSE connection per campaign — use `subscribeToSSE()` from `src/services/ui/sseClient.js`, never `new EventSource` directly
 - **Data flow**: Changes POSTed to server → broadcast via SSE → clients receive and update (e.g. GM map paints appear live on player tabs; `map-activate` auto-opens the map for players)
 - **Player "no active map"**: shows inline `MapUnavailable` placeholder ("Waiting for the GM to open a map…" + Check Again) instead of alerting
-- **GM management views do NOT live-sync (verified 2026-10-10)**: NPCs list in a second tab neither gained a newly created NPC nor lost a deleted one (server truth differed immediately); list refreshes only on re-navigation/mount. Open edit forms also stay stale by design (no squash mid-edit).
+- **NPCs management list live-syncs (fixed 2026-10-10)**: server routes publish `npcs-list-<campaign>` (`{action:'created'|'updated'|'deleted'|'replaced'}`) on NPC mutations; `NPCs.jsx` subscribes via `Subscriber`/`subscribeToSSE` and re-fetches the list — guarded so an open edit form's draft is never squashed (sync resumes after close). Verified live two-tab: create gained row ~0.5s, delete lost row <0.1s.
 
 ### Concurrent GM edits (verified 2026-10-10, two tabs same NPC)
 - Last-write-wins with ZERO conflict detection: Tab A opened edit form, Tab B saved a newer value, Tab A then saved its stale form → Tab B's persisted edit silently lost, no version stamp/E409/warning anywhere.
@@ -224,7 +224,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- (2026-10-10) NPCs management list never live-syncs (create/delete in another GM tab invisible until re-navigation). Wire it to the shared SSE subscription like the map flows.
 - (2026-10-10) `SelectableList` React unique-key console warning fires on the wizard Spells step — assign stable keys in `SelectableList.jsx`.
 
 ## Coverage

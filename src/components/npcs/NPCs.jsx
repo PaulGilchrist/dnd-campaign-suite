@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
 import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 import { loadNPCs, saveNPC, saveNPCs, deleteNPC } from '../../services/npcs/npcsService.js';
 import NPCListItem from './NPCListItem.jsx';
 import NPCFormModal from './NPCFormModal.jsx';
+import Subscriber from '../common/Subscriber.jsx';
 import { getDefaultFormData, cleanNPCData } from '../../services/npcs/npcFormUtils.js';
 import { addNPCToInitiative } from '../../services/npcs/npcCombatService.js';
 import { generateNPC } from '../../services/npcs/npcGenerator.js';
@@ -27,6 +28,15 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       loadNPCsList();
     }
   }, [campaignName, loadNPCsList]);
+
+  // SSE handler — re-fetch NPC list on npcs-list events (another GM tab
+  // created/deleted an NPC). Skipped while the edit modal is open so an
+  // in-progress draft is never squashed mid-edit.
+  const handleSSEEvent = useCallback((event) => {
+    if (!event || event.key !== `npcs-list-${campaignName}`) return;
+    if (modalOpen) return;
+    loadNPCsList();
+  }, [campaignName, modalOpen, loadNPCsList]);
 
   const handleNewNPC = () => {
     setError(null);
@@ -121,6 +131,8 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
 
   return (
     <div className="ct-container">
+      <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
+
       <div className="ct-header">
         <button className="ct-back-btn" onClick={onBack}>
           <i className="fa-solid fa-arrow-left" /> Back

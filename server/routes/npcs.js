@@ -4,11 +4,17 @@ import { processImageUpload, deleteCharacterImage } from '../utils/imageUtils.js
 import asyncHandler from '../utils/asyncHandler.js';
 import { campaignDataFile, campaignImagesDir, ensureDataDir } from '../utils/campaignPaths.js';
 import { createJsonEntityRouter } from '../utils/jsonEntityCrud.js';
+import { publish } from '../utils/changeData.js';
+
+const broadcastNPCsList = (action, campaign, payload = {}) => {
+  publish(`npcs-list-${campaign}`, { action, ...payload }, campaign);
+};
 
 const baseRouter = createJsonEntityRouter('npcs', {
   idField: 'name',
   pluralDisplayName: 'NPCs',
   singularDisplayName: 'NPC',
+  broadcast: broadcastNPCsList,
   onDelete: (npc) => {
     if (npc.imagePath) {
       deleteCharacterImage(npc.imagePath);
@@ -73,6 +79,7 @@ baseRouter.put('/api/campaigns/:campaign/npcs/:npcName', asyncHandler((req, res)
 
     handleImageChange(campaign, updatedNpc, existingNpc, existingNpc?.imagePath);
 
+    const action = existingIndex !== -1 ? 'updated' : 'created';
     if (existingIndex !== -1) {
       npcs[existingIndex] = updatedNpc;
     } else {
@@ -80,6 +87,7 @@ baseRouter.put('/api/campaigns/:campaign/npcs/:npcName', asyncHandler((req, res)
     }
 
     fs.writeFileSync(npcPath, JSON.stringify(npcs, null, 2));
+    broadcastNPCsList(action, campaign, { name: updatedNpc.name });
     res.json({ success: true, npc: updatedNpc });
   } catch (error) {
     console.error('Error updating NPC:', error);

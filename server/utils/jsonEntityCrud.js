@@ -22,6 +22,7 @@ export function createJsonEntityRouter(entityName, options = {}) {
     forbiddenMessage = 'Access denied',
     onDelete = null,
     validateList = null,
+    broadcast = null,
     extraRoutes = () => {},
   } = options;
 
@@ -69,6 +70,7 @@ export function createJsonEntityRouter(entityName, options = {}) {
       const filePath = getFilePath(campaign);
       ensureDataDir(campaign);
       fs.writeFileSync(filePath, JSON.stringify(entities, null, 2));
+      if (broadcast) broadcast('replaced', campaign, {});
       res.json({ success: true });
     } catch (error) {
       console.error(`Error saving ${entityName}:`, error);
@@ -126,6 +128,7 @@ export function createJsonEntityRouter(entityName, options = {}) {
       const filtered = entities.filter(e => e[idField] !== decodedId);
 
       fs.writeFileSync(filePath, JSON.stringify(filtered, null, 2));
+      if (broadcast) broadcast('deleted', campaign, { name: decodedId });
 
       res.json({ success: true });
     } catch (error) {
