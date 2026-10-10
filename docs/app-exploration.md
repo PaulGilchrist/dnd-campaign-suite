@@ -96,6 +96,17 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 - **Dice**: d4, d6, d8, d10, d12, d20, d100
 - **Behavior**: Opens popup overlay for dice rolls
 
+### 16. Sessions (GM planner)
+- **View state**: `sessions`; sidebar button "Sessions"
+- **Features**: session planning — list of plans with status badge (`planned`/`played`), search, checkbox progress, linked-resource chips
+- **Modal** (`.sessions-modal`, heading "New Session" / "Plan Session — <name>"): Name* (whitespace blocked), Date, **Suggest XP Budget** + **Generate Rumors** (copy AI prompts to clipboard — button flips to "Prompt copied"), Linked Resources pickers (maps/encounters/npcs/quests/settlements/notes via `select[aria-label^="Link "]`, linked chip `.sessions-link-row` with quick actions: map→"Activate", npc→"To Initiative"), Contingencies (if/then + branch select), auto+custom Session Checklist, Notes
+- **Row**: `button[aria-label="Edit session: <name>"]`; "Mark as Played" (recap prompt → `session-played` log entry); duplicate-name inline guard (client-only)
+
+### 17. Settlements
+- **View state**: `settlements` (GM/localhost)
+- **Buttons**: New Settlement, Generate Settlement (opens fully pre-filled local draft modal), size filter toggles `.settlements-size-btn` (Village/Town/City/Metropolis), per-card Add Service/Add NPC/Add Rumor repeaters, Preview (aria-label "Switch to preview mode")
+- **Note**: add-row clicks AUTO-FILL all empty textarea fields from the local generator
+
 ## Key UI Patterns
 
 ### Form Validation
@@ -220,7 +231,31 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ### Cleanup performed
 Deleted QA Fog Map, QA Test NPC, QA Rapid Faction, "QA Quest: 50%…" quest, party item "QA Rope x50"; zeroed party currency (pp back to 0); removed stray "NPC 1" and "QA Test NPC" from initiative. Then Admin → Clear Change Data + Clear Campaign Log (verified: change-data keys `[]`, log count 0). Left untouched: pre-existing Battle Arena / Test Map, original NPCs (Zombie, Goblin), The Iron Consortium, The Lost Artifact quest.
 
-## Coverage
+## Session Findings — 2026-10-10 (evening, run 2)
+
+### Explored (depth)
+- **Sessions (deep):** create (whitespace name blocked), duplicate-name inline guard, all 6 link pickers (chips + counts + linked item removed from dropdown), auto-checklist scales 2→8 from linked resources, contingencies if/then+branch, custom checklist, "Suggest XP Budget"/"Generate Rumors" = clipboard AI-prompt copy, "Mark as Played" → recap `prompt` → `session-played` log entry + status badge `played`; GUID-keyed note links; edit re-opens full planner; delete via row → modal Delete → confirm. Full server persistence verified.
+- **Settlements (deep):** create w/ services/NPCs/rumors (sub-docs persist), size-filter toggles, Generate = local pre-filled draft, markdown preview renders h1/ul/blockquote, delete confirm. **Found:** duplicate-name save silently overwrites (no guard) — logged bug; add-row clicks auto-fill all textareas (surprising UX).
+- **Notes (deep):** title optional (content-only saves OK, renders "No location" in list), markdown preview + unbounded in-list render, search, delete confirm ×2, GUID-keyed persistence.
+- **Admin backup/restore (medium):** Create Snapshot → `.snapshots/<c>.zip` (single slot, silent overwrite); Rollback → custom ct-modal → full page reload + campaign deselection → marker note gone, whole folder restored. Download/Upload controls present, not exercised.
+- **Initiative combat (deep):** EB join Goblin (`.encounter-btn-join` only with ≥1 checked) auto-navigates to Initiative, rolls init 13, interleaves PCs by score; armed target via `[data-testid="target-select"]` → `.mc-overlay` avatar modal → Scimitar chip → HIT popup → attack+damage+`hp_change` (AasimarTest −3, 140/143) all logged. Next→/←Prev advance turns by init score + round rollover round 1→2→prev round 1. Goblin removed via card ×+confirm.
+- **Inventory transfers (deep):** From Players "To Party" (item leaves backpack) + party row "Move" → "Move to Player" (item restored to backpack) — both directions persist (~12s debounce); party currency all-zero with −buttons correctly disabled.
+- **Music player (shallow):** lazy-mount verified — 0 iframes idle, mood click mounts YouTube iframe (ad CORS errors = third-party noise).
+
+### Bug files written
+- `.opencode/plans/bug-settlement-duplicate-name-overwrite.md` — creating a settlement with an existing name silently overwrites the original's data (no guard); quests/factions have the server+client fix, settlements missed.
+- `.opencode/plans/bug-session-unlink-tooltip-guid-leak.md` — session planner unlink-button tooltip leaks raw note GUID (`Unlink cb7fa303-…`) instead of the note title (`SessionPlannerModal.jsx` uses raw `name`, not `labelFor`).
+
+### Reliable selectors / identifiers (new this session)
+- Sessions: `.sessions-modal`, `select[aria-label^="Link "]`, `.sessions-link-row`, `.sessions-checklist input[type=checkbox]`, list row `button[aria-label="Edit session: <name>"]`, progressbar `aria-label="Checklist N of M complete"`.
+- Settlements: filter `.settlements-size-btn[.settlements-size-btn-active]`, repeaters `input[placeholder="Business name"]/[placeholder="NPC name"]/[placeholder*="rumor"]`, service type select = first `.ct-modal select`.
+- Notes: `input[placeholder*="Skull Creek"]` (title), `[placeholder="Write your note here…"]` (body), rows `li.ct-list-item`.
+- Admin backup: rollback confirm is custom `.ct-modal-overlay` (buttons "Cancel"/"Confirm") — NOT window.confirm; must click Confirm, then re-select campaign after reload.
+- EB join: `.encounter-btn-join`; qty numeric input must be scoped to the monster row (ancestor walk from `input[aria-label="Select <Name>"]`), not any first numeric input (CR filters collide).
+- Combat: `[data-testid="target-select"]` (arm), `.mc-overlay` (monster card, stays open after attack popup — close via ×), `.mc-action:has-text("<Attack>")`, damage log entries `type:hp_change {targetName, delta, currentHp, maxHp, damageBreakdown[]}`.
+- Inventory transfers: party row `button:has-text("Move")` → modal button `Move to Player`; player-side `button:has-text("To Party")` per `li`.
+
+### Coverage
 
 | Feature | Status | Notes |
 |---|---|---|
@@ -230,24 +265,36 @@ Deleted QA Fog Map, QA Test NPC, QA Rapid Faction, "QA Quest: 50%…" quest, par
 | NPCs | deep | create/edit/delete, whitespace + duplicate name edge cases |
 | Quests | deep | validation, special chars, delete confirm |
 | Factions | shallow | validation + rapid double-save only |
-| Settlements | not explored | |
-| Notes | not explored | (seen in prior sessions) |
-| Initiative | medium | +NPC/remove, round display; attacks/next-prev not exercised |
-| Encounter Builder | shallow | load + search only; join path covered by MA suites |
-| Party Inventory | medium | currency steppers, add/delete item; "From Players" transfer not exercised |
+| Settlements | deep | create w/ services/NPCs/rumors + persistence, size-filter toggles, local Generate, markdown preview, delete; duplicate-name overwrite bug found |
+| Sessions | deep | create/duplicate-guard/link×6/auto-checklist/contingencies/mark-played+recap/edit/delete; full server persistence |
+| Notes | deep | content-only save, markdown preview, search, delete ×2, GUID persistence; unbounded in-list render noted |
+| Initiative | deep | EB join, arm-target, monster attack→hit→damage→hp_change log, Next/Prev turn + round rollover |
+| Encounter Builder | medium | search + checkbox select + Join (auto-navigate + init roll); qty setter collision noted; save/load not this run |
+| Party Inventory | deep | currency steppers, From-Players "To Party" AND party "Move"→player round-trip, both persist |
 | Dice tray | shallow | d20 roll + Escape dismiss |
-| Music player | not explored | iframe + mood buttons render; playback untouched |
+| Music player | medium | lazy-mount verified (0 idle iframes, mood→iframe); playback/track-switch timing not deeply judged |
 | Character wizard | not explored | |
-| Admin | medium | clear change-data + clear log verified; snapshots/rollback not touched |
+| Admin | deep | snapshot create + rollback full-restore verified; rename/delete/clear/Download/Upload UI not this run |
 
 ## Blocked / not verified
 
-- **Full player→GM write path (player mutation):** by design players are read-only off localhost; no player-side mutation to attempt (not a defect).
-- **Concurrent NPC edit from two GM sessions:** single GM browser available this session; not tested.
-- **Rename map UI:** modal appears on Rename click but new-name validation not exercised this run.
-- **Music playback / settlement / wizard / snapshot-rollback:** not attempted this session (time-boxed to maps/fog/SSE + CRUD edge cases).
+- **Character wizard (17-step create):** not attempted this session — time-boxed to Sessions/Settlements/Notes/Admin-restore/combat.
+- **Admin Download / Upload Campaign:** buttons present, not exercised (upload replaces the whole folder — deferred to avoid clobbering).
+- **Map rename modal:** still not exercised (2nd run in a row) — new-name validation untested.
+- **Concurrent write from two GM sessions / SSE conflict:** single GM browser; not tested.
+- **Faction deep edit (services/children):** prior run was validation-only; still shallow.
+- **Concurrent write conflict (two GM tabs editing same entity):** single-tab session this run; not tested.
 
 ## Improvement backlog
+
+### 2026-10-10 (evening, run 2)
+- [2026-10-10] Settlement "Add Service/Add NPC/Add Rumor" row-clicks silently auto-fill every empty textarea (Government/Description/Atmosphere/Threats/Population) from the local generator. A GM adding one service is surprised by unrelated prose appearing. Suggest scoping generation to the clicked row, or an explicit "Auto-fill" button. Likely `src/components/settlements/Settlements.jsx`.
+- [2026-10-10] Settlements lack the duplicate-name guard that NPCs/Quests/Factions/Sessions all have (see bug-settlement-duplicate-name-overwrite.md) — parity gap in the validation family.
+- [2026-10-10] Admin "Create Snapshot" gives zero visible feedback and uses a SINGLE snapshot slot (`.snapshots/<c>.zip`) silently overwritten every time. A GM cannot roll back two steps, and gets no confirmation the backup exists. Suggest a timestamped archive + toast; keep "Rollback to latest". Likely `server/routes/campaigns-admin.js` + Admin component.
+- [2026-10-10] Rollback performs a full `window.location` reload that drops campaign selection, landing the GM on "Select a Campaign" with no "restored" confirmation. Suggest a post-restore toast/banner and returning to the Admin view. Likely the rollback success handler in the Admin component.
+- [2026-10-10] Notes list renders each note's entire markdown inline (`<h1>`, full `<ul>`) with no clamp, so a long note balloons the list. Suggest clamping the row preview to ~2 lines (`-webkit-line-clamp`) with "expand on open". Likely `.notes-list-description` in Notes component CSS.
+- [2026-10-10] Sessions duplicate-name guard is client-only (`Sessions.jsx:114`) while quests/factions added a server `validateList` (`findDuplicateNameError`). Add the same server-side guard to `server/routes/sessions.js` for parity + defense-in-depth.
+- [2026-10-10] EB "Join Encounter" quantity: the per-row qty numeric input is not uniquely addressable — a naive first-numeric-input locator collides with the CR min/max filters, so a GM setting qty may edit the wrong field (observed: set "2" but log recorded "1x"). Suggest a per-row `data-testid="qty-<monsterIndex>"`. Likely `src/components/encounter/EncounterBuilder.jsx`.
 
 ### 2026-10-10
 - DONE: [2026-10-10] — Player tab auto-opens the active map on `map-activate` SSE via the shared app-wide Subscriber (`handleMapActivateEvent` in App.jsx, key+state gated); verified live LAN tab, no new EventSource, 6 new tests.
