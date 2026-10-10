@@ -40,7 +40,7 @@ export const superiorHuntersPrey = {
     if (!atk) return { data: prevData };
 
     const key = '_Superior_Hunters_Prey_UsedRound';
-    const round = getCurrentCombatRound();
+    const round = getCurrentCombatRound(ctx.campaignName);
     if (getRuntimeValue(ctx.playerStats.name, key, ctx.campaignName) === round) return { data: prevData };
 
     const markedTarget = cs.creatures?.find(c => c.name === atk.concentration.target);

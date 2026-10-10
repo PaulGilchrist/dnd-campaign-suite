@@ -75,6 +75,8 @@ const PLAYER_ROUND_LATCH_KEYS = [
     '_Thought_Shield_usedRound',
     // CLA-158: Hand of Harm holder-hit reaction round latch re-arms at round wrap.
     '_Hand_of_Harm_usedRound',
+    // CLA-346: Superior Hunter's Prey once-per-turn spread latch re-arms at round wrap.
+    '_Superior_Hunters_Prey_UsedRound',
     '_Superior_Hunters_Defense_usedRound',
     '_Riposte_usedRound',
     '_Riposte_appliedAttack',

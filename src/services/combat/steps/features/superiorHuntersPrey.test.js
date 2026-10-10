@@ -491,6 +491,88 @@ describe('superiorHuntersPrey', () => {
     });
   });
 
+  describe('handler — once-per-turn round pinning (CLA-346)', () => {
+    function setupOncePerTurnMocks(round) {
+      getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'Ranger1', concentration: { spell: "Hunter's Mark", target: 'Orc1' } },
+          { name: 'Orc1' },
+          { name: 'Goblin1', currentHp: 5, maxHp: 10 },
+        ],
+      });
+      getCurrentCombatRound.mockReturnValue(round);
+      rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0, formula: '1d6' });
+      applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 1 });
+      loadCombatSummary.mockResolvedValue({ creatures: [] });
+      addEntry.mockResolvedValue(undefined);
+    }
+
+    it('threads campaignName into getCurrentCombatRound so the round is not pinned to 1', async () => {
+      setupOncePerTurnMocks(4);
+      getRuntimeValue.mockReturnValue(null);
+
+      const setSecondaryTargetModal = vi.fn();
+      await superiorHuntersPrey.handler(makeCtx({ setSecondaryTargetModal }), {});
+
+      expect(getCurrentCombatRound).toHaveBeenCalledWith('test-campaign');
+    });
+
+    it('stamps the latch with the CURRENT round after dealing spread damage', async () => {
+      setupOncePerTurnMocks(4);
+      getRuntimeValue.mockReturnValue(null);
+
+      const setSecondaryTargetModal = vi.fn();
+      await superiorHuntersPrey.handler(makeCtx({ setSecondaryTargetModal }), {});
+      await setSecondaryTargetModal.mock.calls[0][0].onTargetSelected('Goblin1');
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Ranger1',
+        '_Superior_Hunters_Prey_UsedRound',
+        4,
+        'test-campaign',
+      );
+    });
+
+    it('re-fires the offer on a later-round marked hit after firing once', async () => {
+      // Round 4: rider fires, latch stamps 4.
+      setupOncePerTurnMocks(4);
+      getRuntimeValue.mockReturnValue(null);
+      const setSecondaryTargetModal = vi.fn();
+      await superiorHuntersPrey.handler(makeCtx({ setSecondaryTargetModal }), {});
+      await setSecondaryTargetModal.mock.calls[0][0].onTargetSelected('Goblin1');
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Ranger1',
+        '_Superior_Hunters_Prey_UsedRound',
+        4,
+        'test-campaign',
+      );
+
+      // Round 5 (latch cleared at round wrap): latch is null → offer re-fires.
+      setSecondaryTargetModal.mockClear();
+      setRuntimeValue.mockClear();
+      getCurrentCombatRound.mockReturnValue(5);
+      getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === '_Superior_Hunters_Prey_UsedRound') return null;
+        return null;
+      });
+      await superiorHuntersPrey.handler(makeCtx({ setSecondaryTargetModal }), {});
+      expect(setSecondaryTargetModal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Superior Hunter's Prey — Choose Second Target",
+        }),
+      );
+
+      // Same-round second press with stale latch 4 vs round 5 still blocked.
+      setSecondaryTargetModal.mockClear();
+      getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === '_Superior_Hunters_Prey_UsedRound') return 5;
+        return null;
+      });
+      await superiorHuntersPrey.handler(makeCtx({ setSecondaryTargetModal }), {});
+      expect(setSecondaryTargetModal).not.toHaveBeenCalled();
+    });
+  });
+
   describe('handler — onTargetSelected with damage application', () => {
     function setupDamageModalMocks() {
       getCombatContext.mockResolvedValue({

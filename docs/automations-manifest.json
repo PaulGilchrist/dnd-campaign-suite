@@ -6629,7 +6629,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-cla-346-superior-hunters-prey.md",
+      "verified": "verified",
       "class": "Ranger",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "Once per turn when you deal damage to a creature marked by Hunter's Mark, also deal that spell's extra damage to a different creature within 30 feet of the first creature."

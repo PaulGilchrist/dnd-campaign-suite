@@ -102,10 +102,10 @@ function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, '_Thought_Shield_usedRound', null, campaignName)
     // CLA-158: Hand of Harm holder-hit reaction round latch re-arms at round wrap.
     setRuntimeValue(creatureName, '_Hand_of_Harm_usedRound', null, campaignName)
-    setRuntimeValue(creatureName, '_Superior_Hunters_Defense_usedRound', null, campaignName)
-    setRuntimeValue(creatureName, '_Riposte_usedRound', null, campaignName)
-    setRuntimeValue(creatureName, '_Riposte_appliedAttack', null, campaignName)
-    setRuntimeValue(creatureName, 'pendingRiposteDieValue', null, campaignName)
+    // CLA-346: Superior Hunter's Prey once-per-turn spread latch re-arms on initiative roll / combat reset.
+    for (const latchKey of ['_Superior_Hunters_Prey_UsedRound', '_Superior_Hunters_Defense_usedRound', '_Riposte_usedRound', '_Riposte_appliedAttack', 'pendingRiposteDieValue']) {
+        setRuntimeValue(creatureName, latchKey, null, campaignName)
+    }
     // MN-013: Parry reaction round latch re-arms on initiative roll / combat reset.
     setRuntimeValue(creatureName, '_Parry_usedRound', null, campaignName)
     // MN-003: Commander's Strike once-per-turn grant latch re-arms at round wrap.
