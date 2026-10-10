@@ -278,6 +278,69 @@ describe('PolymorphSelectionModal', () => {
         });
     });
 
+    describe('CLA-391 unstable excludeTypes dep', () => {
+        // Mirrors the wild_shape_select caller (CharSheet.modals.jsx) which omits
+        // excludeTypes and maxCR — the fresh `[]` default in the effect deps used to
+        // refire loadBeasts every render (infinite loop, tab crash).
+        const druidStats = {
+            rules: '2024',
+            level: 20,
+            class: { name: 'Druid', class_levels: [{ level: 20, beast_max_cr: 1, wild_shape: 4 }] },
+        };
+
+        it('loads beasts exactly once when excludeTypes and maxCR are omitted', async () => {
+            const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
+            render(<PolymorphSelectionModal
+                playerStats={druidStats}
+                campaignName="test-campaign"
+                onConfirm={vi.fn()}
+                onCancel={vi.fn()}
+            />);
+            await waitForBeastsLoaded();
+            await new Promise(resolve => setTimeout(resolve, 250));
+            expect(loadMonsters).toHaveBeenCalledTimes(1);
+        });
+
+        it('honors caller-supplied excludeTypes by value without refiring the load effect', async () => {
+            const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
+            const { rerender } = render(<PolymorphSelectionModal
+                playerStats={druidStats}
+                maxCR={1}
+                campaignName="test-campaign"
+                excludeTypes={['undead']}
+                onConfirm={vi.fn()}
+                onCancel={vi.fn()}
+            />);
+            await waitForBeastsLoaded();
+            rerender(<PolymorphSelectionModal
+                playerStats={druidStats}
+                maxCR={1}
+                campaignName="test-campaign"
+                excludeTypes={['undead']}
+                onConfirm={vi.fn()}
+                onCancel={vi.fn()}
+            />);
+            await new Promise(resolve => setTimeout(resolve, 250));
+            expect(loadMonsters).toHaveBeenCalledTimes(1);
+            expect(screen.queryByText('Ghast')).not.toBeInTheDocument();
+        });
+
+        it('calls onConfirm with the chosen beast payload', async () => {
+            const onConfirm = vi.fn();
+            render(<PolymorphSelectionModal
+                playerStats={druidStats}
+                campaignName="test-campaign"
+                onConfirm={onConfirm}
+                onCancel={vi.fn()}
+            />);
+            await waitForBeastsLoaded();
+            fireEvent.click(findBeastItem('Wolf'));
+            fireEvent.click(screen.getByRole('button', { name: 'Wild Shape' }));
+            expect(onConfirm).toHaveBeenCalledTimes(1);
+            expect(onConfirm.mock.calls[0][0]).toMatchObject({ index: 'wolf', name: 'Wolf' });
+        });
+    });
+
     describe('close behavior', () => {
         it('calls onCancel when Cancel button is clicked', async () => {
             render(<PolymorphSelectionModal {...baseProps} />);

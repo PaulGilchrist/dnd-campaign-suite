@@ -23,6 +23,9 @@ const ShieldOfFaithTargetSelectionModal = ({ popupHtml, setPopupHtml, handleShie
     );
 }
 
+// CLA-391: stable array identity — inline literals in props refire the modal's load effect.
+const SHAPECHANGE_EXCLUDE_TYPES = ['construct', 'undead'];
+
 export { ShieldOfFaithTargetSelectionModal };
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -82,7 +85,7 @@ export const renderPopup = ({ popupHtml, setPopupHtml, isLocalhost, playerStats,
                 icon="fa-paw"
                 actionLabel="Shapechange"
                 allowAnyCreature={true}
-                excludeTypes={['construct', 'undead']}
+                excludeTypes={SHAPECHANGE_EXCLUDE_TYPES}
                 onConfirm={(form) => {
                     setPopupHtml(null);
                     popupHandlers.onShapechangeConfirm(form, popupHtml);

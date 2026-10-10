@@ -168,6 +168,9 @@ function PolymorphSelectionModal({ playerStats, maxCR, campaignName, title = 'Wi
 
     const wildShapeLimitations = resolveWildShapeLimitations(playerStats);
     const effectiveMaxCR = resolveEffectiveMaxCR(playerStats, maxCR);
+    // CLA-391: compare excludeTypes by value — callers pass inline arrays, and a
+    // fresh `[]` default per render refired this effect every render (loop -> crash).
+    const excludeTypesKey = excludeTypes.join('|');
 
     React.useEffect(() => {
         async function loadBeasts() {
@@ -182,7 +185,7 @@ function PolymorphSelectionModal({ playerStats, maxCR, campaignName, title = 'Wi
             }
         }
         loadBeasts();
-    }, [playerStats, effectiveMaxCR, wildShapeLimitations, campaignName, allowAnyCreature, mode, excludeTypes]);
+    }, [playerStats, effectiveMaxCR, wildShapeLimitations, campaignName, allowAnyCreature, mode, excludeTypesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const filteredBeasts = React.useMemo(() => {
         if (!searchTerm.trim()) return beasts;
