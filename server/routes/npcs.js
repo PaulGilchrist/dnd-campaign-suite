@@ -58,6 +58,19 @@ baseRouter.put('/api/campaigns/:campaign/npcs/:npcName', asyncHandler((req, res)
     const existingIndex = npcs.findIndex(n => n.name === decodedNpcName);
     const existingNpc = existingIndex !== -1 ? npcs[existingIndex] : null;
 
+    // Duplicate-name guard (mirrors maps.js rename guard): a rename must not
+    // collide case-insensitively with another NPC's name.
+    const newName = (updatedNpc.name || '').trim();
+    if (!newName) {
+      return res.status(400).json({ error: 'NPC name is required' });
+    }
+    const nameCollision = npcs.find(n =>
+      n.name !== decodedNpcName && (n.name || '').toLowerCase() === newName.toLowerCase()
+    );
+    if (nameCollision) {
+      return res.status(400).json({ error: 'An NPC with that name already exists' });
+    }
+
     handleImageChange(campaign, updatedNpc, existingNpc, existingNpc?.imagePath);
 
     if (existingIndex !== -1) {

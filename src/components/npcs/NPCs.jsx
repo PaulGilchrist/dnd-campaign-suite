@@ -20,6 +20,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     openNew, openEdit, closeModal,
   } = useCrudList(npcs, ['name', 'race', 'classRole', 'tags']);
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (campaignName) {
@@ -27,30 +28,46 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     }
   }, [campaignName, loadNPCsList]);
 
-  const handleNewNPC = () => openNew(getDefaultFormData());
+  const handleNewNPC = () => {
+    setError(null);
+    openNew(getDefaultFormData());
+  };
 
   const handleGenerateNPC = async () => {
     const generated = await generateNPC(npcs);
+    setError(null);
     openNew(getDefaultFormData(generated));
   };
 
   const handleEditNPC = (npc) => {
+    setError(null);
     openEdit(npc);
     setFormData(getDefaultFormData(npc));
   };
 
   const handleCloseModal = closeModal;
 
+  // Duplicate-name guard (mirrors MapsManager.handleCreate)
+  const hasDuplicateName = () => npcs.some(n =>
+    n.name !== editingNPC?.name && n.name.toLowerCase() === formData.name.trim().toLowerCase()
+  );
+
   const handleSave = async () => {
     if (!formData || !formData.name.trim()) return;
+    if (hasDuplicateName()) {
+      setError('An NPC with that name already exists');
+      return;
+    }
     setSaving(true);
     try {
       const cleaned = cleanNPCData(formData);
       await saveNPC(campaignName, cleaned, editingNPC?.name);
+      setError(null);
       await loadNPCsList();
       handleCloseModal();
-    } catch (error) {
-      console.error('Failed to save NPC:', error);
+    } catch (err) {
+      console.error('Failed to save NPC:', err);
+      setError(err.message || 'Failed to save NPC');
     } finally {
       setSaving(false);
     }
@@ -76,6 +93,10 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
 
   const handleSaveAndAddToInitiative = async () => {
     if (!formData || !formData.name.trim()) return;
+    if (hasDuplicateName()) {
+      setError('An NPC with that name already exists');
+      return;
+    }
     setSaving(true);
     try {
       const snapshot = { ...formData };
@@ -87,10 +108,12 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
         image: savedNpc.image || snapshot.image,
         imagePath: savedNpc.imagePath || snapshot.image || '',
       };
+      setError(null);
       handleCloseModal();
       await addNPCToInitiative(campaignName, npcForInitiative, onViewInitiative);
-    } catch (error) {
-      console.error('Failed to save NPC:', error);
+    } catch (err) {
+      console.error('Failed to save NPC:', err);
+      setError(err.message || 'Failed to save NPC');
     } finally {
       setSaving(false);
     }
@@ -178,6 +201,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
           campaignName={campaignName}
           saving={saving}
           deleting={deleting}
+          error={error}
           disabled={saving || !formData.name.trim()}
           onClose={handleCloseModal}
           onSave={handleSave}

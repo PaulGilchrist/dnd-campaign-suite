@@ -68,6 +68,7 @@ function NPCFormModal({
   campaignName,
   saving,
   deleting,
+  error,
   disabled,
   onClose,
   onSave,
@@ -163,6 +164,8 @@ function NPCFormModal({
           </div>
 
           <div className="ct-modal-body">
+            {error && <div className="npcs-form-error">{error}</div>}
+
             <label htmlFor="npc-name" className="ct-label">
               Name <span className="ct-required">*</span>
             </label>

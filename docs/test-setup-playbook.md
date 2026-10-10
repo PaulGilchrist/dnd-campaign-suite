@@ -2825,3 +2825,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 - Map toolbar title: `Map.jsx` already spreads server JSON into `mapData`, so `displayName` needs only one prop thread into `MapToolbar` — no `MapsAreaView` change; `useMapLoader` save effect spreads `mapData` so `displayName` survives round-trips. Mirror in `HexMapToolbar`.
 - Vite HMR can blank a mounted map view mid-session — full page reload + campaign re-select is required before verifying.
+
+## §fix-queue (2026-10-10, npc-duplicate-name-silent-overwrite) Recipes & pitfalls
+
+- `npm run dev` runs `node server.js` without nodemon — server-route changes require a manual restart; Vite HMR only reloads the client.
+- NPC route PUT is a name-keyed upsert: same-name creates are indistinguishable from legit edits server-side; duplicate guard must live client-side (mirror MapsManager), server guards rename collisions only.

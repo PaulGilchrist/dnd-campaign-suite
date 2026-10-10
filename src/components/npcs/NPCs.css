@@ -350,6 +350,17 @@
   display: none;
 }
 
+/* Inline error message (mirrors .maps-manager-error) */
+.npcs-form-error {
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-error-border);
+  border-radius: 4px;
+  background-color: var(--background-color-error);
+  color: var(--color-error-light);
+  font-size: 13px;
+}
+
 @media print {
   .npcs-tab-hidden {
     display: block;
