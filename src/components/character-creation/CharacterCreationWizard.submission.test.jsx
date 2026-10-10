@@ -263,6 +263,8 @@ vi.mock('../../config/utils.js', () => ({
   validateStep: vi.fn(() => Promise.resolve({})),
   validateFinalFormData: vi.fn(() => ({})),
   validateAbilityTotals: vi.fn(() => Promise.resolve({})),
+  hasDuplicateCharacterName: vi.fn(() => false),
+  DUPLICATE_CHARACTER_NAME_ERROR: 'A character with that name already exists',
 }));
 
 describe('CharacterCreationWizard - Submission', () => {
@@ -349,7 +351,7 @@ describe('CharacterCreationWizard - Submission', () => {
     });
 
     await waitFor(() => {
-      expect(validateFinalFormData).toHaveBeenCalledWith(mockFormData);
+      expect(validateFinalFormData).toHaveBeenCalledWith(mockFormData, []);
     });
   });
 

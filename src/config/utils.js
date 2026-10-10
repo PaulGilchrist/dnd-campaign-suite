@@ -149,10 +149,28 @@ export async function validateLevel(level, ruleset = '5e') {
   return errors;
 }
 
+export const DUPLICATE_CHARACTER_NAME_ERROR = 'A character with that name already exists';
+
+/**
+ * Case-insensitive duplicate-name lookup over existing character names
+ * (mirrors the NPCs/Quests/Factions duplicate guards).
+ * @param {string} name - Proposed character name
+ * @param {Array<string>} existingNames - Names of characters already in the campaign
+ * @returns {boolean} true when the name collides with an existing character
+ */
+export function hasDuplicateCharacterName(name, existingNames = []) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return false;
+  const lower = trimmed.toLowerCase();
+  return existingNames.some(n => (n || '').trim().toLowerCase() === lower);
+}
+
 const validateBasicsStep = async (formData, context) => {
   const newErrors = {};
   if (!formData.name?.trim()) {
     newErrors.name = 'Character name is required';
+  } else if (hasDuplicateCharacterName(formData.name, context.existingNames)) {
+    newErrors.name = DUPLICATE_CHARACTER_NAME_ERROR;
   }
 
   const levelErrors = await validateLevel(formData.level, context.ruleset);
@@ -228,20 +246,22 @@ const stepValidators = {
  * @param {array} context.racesData - Races data
  * @param {array} context.classSubtypes - Class subtypes data
  * @param {string} context.ruleset - '5e' or '2024'
+ * @param {array} context.existingNames - Names of existing characters (duplicate guard)
  * @returns {Promise<object>} - New errors object
  */
-export async function validateStep(step, formData, { racesData = [], classSubtypes = [], ruleset } = {}) {
+export async function validateStep(step, formData, { racesData = [], classSubtypes = [], ruleset, existingNames = [] } = {}) {
   const validator = stepValidators[step];
   if (!validator) return {};
-  return validator(formData, { racesData, classSubtypes, ruleset });
+  return validator(formData, { racesData, classSubtypes, ruleset, existingNames });
 }
 
 /**
  * Validate final form data
  * @param {object} formData - Form data
+ * @param {array} existingNames - Names of existing characters (duplicate guard)
  * @returns {object} - Final errors object
  */
-export const validateFinalFormData = (formData) => {
+export const validateFinalFormData = (formData, existingNames = []) => {
   const finalErrors = {};
   if (!formData) return finalErrors;
   REQUIRED_FIELDS.forEach(field => {
@@ -252,6 +272,9 @@ export const validateFinalFormData = (formData) => {
       finalErrors[field] = `${field} is required`;
     }
   });
+  if (!finalErrors.name && hasDuplicateCharacterName(formData.name, existingNames)) {
+    finalErrors.name = DUPLICATE_CHARACTER_NAME_ERROR;
+  }
   return finalErrors;
 };
 

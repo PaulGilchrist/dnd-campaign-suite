@@ -730,7 +730,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
 
     it('should create a new character file with sanitized filename', async () => {
         const mfs = getMockFs();
-        mfs.existsSync.mockReturnValue(true);
+        mfs.existsSync.mockImplementation(p => !String(p).endsWith('.json'));
 
         const characterData = { name: 'Thorin', class: 'Fighter', level: 5 };
 
@@ -748,7 +748,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
 
     it('should sanitize special characters in character name for filename', async () => {
         const mfs = getMockFs();
-        mfs.existsSync.mockReturnValue(true);
+        mfs.existsSync.mockImplementation(p => !String(p).endsWith('.json'));
 
         const characterData = { name: 'Thorin Oakenshield!', class: 'Fighter' };
 
@@ -763,7 +763,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
 
     it('should handle image upload during character creation', async () => {
         const mfs = getMockFs();
-        mfs.existsSync.mockReturnValue(true);
+        mfs.existsSync.mockImplementation(p => !String(p).endsWith('.json'));
 
         const characterData = {
             name: 'Thorin',
@@ -782,7 +782,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
 
     it('should return 500 on filesystem write error', async () => {
         const mfs = getMockFs();
-        mfs.existsSync.mockReturnValue(true);
+        mfs.existsSync.mockImplementation(p => !String(p).endsWith('.json'));
         mfs.writeFileSync.mockImplementation(() => {
             throw new Error('EACCES');
         });
@@ -801,7 +801,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
 
     it('should return character data with nested object in response', async () => {
         const mfs = getMockFs();
-        mfs.existsSync.mockReturnValue(true);
+        mfs.existsSync.mockImplementation(p => !String(p).endsWith('.json'));
 
         const characterData = { name: 'Thorin', class: 'Fighter', level: 5 };
 
@@ -817,7 +817,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
 
     it('should sanitize spaces and special chars in character name for filename', async () => {
         const mfs = getMockFs();
-        mfs.existsSync.mockReturnValue(true);
+        mfs.existsSync.mockImplementation(p => !String(p).endsWith('.json'));
 
         const characterData = { name: 'Lady Moonshadow von Lightbringer', class: 'Wizard' };
 
@@ -832,7 +832,7 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
 
     it('should sanitize numeric-only names', async () => {
         const mfs = getMockFs();
-        mfs.existsSync.mockReturnValue(true);
+        mfs.existsSync.mockImplementation(p => !String(p).endsWith('.json'));
 
         const characterData = { name: '123', class: 'Fighter' };
 

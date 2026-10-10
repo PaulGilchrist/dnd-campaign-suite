@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import './CharacterCreationWizard.css';
-import { validateStep, validateFinalFormData, validateAbilityTotals } from '../../config/utils.js';
+import { validateStep, validateFinalFormData, validateAbilityTotals, hasDuplicateCharacterName, DUPLICATE_CHARACTER_NAME_ERROR } from '../../config/utils.js';
 import WizardHeader from './WizardHeader.jsx';
 import WizardProgressBar from './WizardProgressBar.jsx';
 import WizardFooter from './WizardFooter.jsx';
@@ -155,7 +155,7 @@ const WizardStepRenderer = React.memo(({
 });
 WizardStepRenderer.displayName = 'WizardStepRenderer';
 
-function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterData, isEditing = false, campaignName }) {
+function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterData, isEditing = false, campaignName, existingCharacters = [] }) {
   // Core form state
   const {
     formData,
@@ -201,6 +201,27 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     magicItems,
    } = useWizardData(ruleset);
 
+  // Duplicate-name guard (mirrors NPCs/Quests/Factions): existing character
+  // names in this campaign, excluding the character being edited (self-exempt).
+  const existingNames = useMemo(() => {
+    const selfName = (characterData?.name || '').trim().toLowerCase();
+    return (existingCharacters || [])
+      .map(c => (typeof c === 'string' ? c : c?.name) || '')
+      .filter(n => n.trim() && (!isEditing || n.trim().toLowerCase() !== selfName));
+  }, [existingCharacters, characterData, isEditing]);
+
+  // Live inline duplicate-name error on Step 2 (updateField clears errors.name
+  // on each keystroke — this re-arms it while the name still collides). Only
+  // writes when the state actually changes so the happy path stays untouched.
+  useEffect(() => {
+    const dupe = hasDuplicateCharacterName(formData.name, existingNames);
+    if (dupe && errors.name !== DUPLICATE_CHARACTER_NAME_ERROR) {
+      setErrors({ ...errors, name: DUPLICATE_CHARACTER_NAME_ERROR });
+    } else if (!dupe && errors.name === DUPLICATE_CHARACTER_NAME_ERROR) {
+      setErrors({ ...errors, name: null });
+    }
+  }, [formData.name, existingNames, errors, setErrors]);
+
   // Navigation
   const {
     currentStep,
@@ -210,7 +231,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     goToStep,
     getStepEnabled,
     isSaveEnabled,
-   } = useWizardNavigation(isEditing ? 2 : 1, formData, racesData, { classSubtypes, ruleset, allFeats: feats });
+   } = useWizardNavigation(isEditing ? 2 : 1, formData, racesData, { classSubtypes, ruleset, allFeats: feats, existingNames });
 
   // Skills
   const {
@@ -383,7 +404,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
       setErrors(stepErrors);
       return;
         }
-    const finalErrors = validateFinalFormData(formData);
+    const finalErrors = validateFinalFormData(formData, existingNames);
     if (Object.keys(finalErrors).length > 0) {
       setErrors(finalErrors);
       return;
@@ -394,7 +415,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
       return;
         }
     onComplete(formData);
-      }, [currentStep, formData, racesData, classSubtypes, ruleset, feats, onComplete, setErrors]);
+      }, [currentStep, formData, racesData, classSubtypes, ruleset, feats, existingNames, onComplete, setErrors]);
 
   const renderStep = useCallback(() => {
     return (

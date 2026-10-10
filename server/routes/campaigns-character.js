@@ -216,6 +216,12 @@ router.post('/api/campaigns/:campaign', asyncHandler((req, res) => {
     const fileName = `${character.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
     const filePath = path.join(dir, fileName);
 
+    // Duplicate-name guard (mirrors the NPCs/Quests/Settlements 400 guards):
+    // creation must never silently overwrite an existing character file.
+    if (fs.existsSync(filePath)) {
+        return res.status(400).json({ error: 'A character with that name already exists' });
+    }
+
     // Handle image upload
     if (character.image && character.imageName) {
         processImageUpload(campaign, character.name, character, null);

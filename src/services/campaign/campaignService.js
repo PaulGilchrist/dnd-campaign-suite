@@ -70,7 +70,14 @@ export const createCharacter = async (campaignName, characterData) => {
       body: JSON.stringify({ campaignName, character: characterData }),
     });
     if (!response.ok) {
-      throw new Error(`Failed to create character: ${response.statusText}`);
+      let serverError;
+      try {
+        const body = await response.json();
+        serverError = body?.error;
+      } catch {
+        // Error response carried no JSON body — fall back to statusText.
+      }
+      throw new Error(serverError || `Failed to create character: ${response.statusText}`);
     }
     return response.json();
   } catch (error) {

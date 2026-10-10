@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { validateStep } from '../../config/utils.js';
 
-function useWizardNavigation(initialStep, formData, racesData, { classSubtypes = [], ruleset, allFeats = [] } = {}) {
+function useWizardNavigation(initialStep, formData, racesData, { classSubtypes = [], ruleset, allFeats = [], existingNames = [] } = {}) {
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [isNextDisabled, setIsNextDisabled] = useState(false);
   const [step2Valid, setStep2Valid] = useState(false);
@@ -39,13 +39,13 @@ function useWizardNavigation(initialStep, formData, racesData, { classSubtypes =
   }, [formData.class, classSubtypes]);
 
   const navigateNext = useCallback(async () => {
-    const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset, allFeats });
+    const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset, allFeats, existingNames });
     if (Object.keys(stepErrors).length === 0) {
       setCurrentStep(prev => prev + 1);
       return true;
     }
     return false;
-  }, [currentStep, formData, racesData, classSubtypes, ruleset, allFeats]);
+  }, [currentStep, formData, racesData, classSubtypes, ruleset, allFeats, existingNames]);
 
   const navigatePrevious = useCallback(() => {
     setCurrentStep(prev => prev - 1);
@@ -57,19 +57,19 @@ function useWizardNavigation(initialStep, formData, racesData, { classSubtypes =
 
   useEffect(() => {
     const checkValidation = async () => {
-      const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset, allFeats });
+      const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset, allFeats, existingNames });
       setIsNextDisabled(Object.keys(stepErrors).length > 0);
     };
     checkValidation();
-  }, [currentStep, formData, racesData, classSubtypes, ruleset, allFeats]);
+  }, [currentStep, formData, racesData, classSubtypes, ruleset, allFeats, existingNames]);
 
   useEffect(() => {
     const checkStep2 = async () => {
-      const step2Errors = await validateStep(2, formData, { racesData, classSubtypes, ruleset });
+      const step2Errors = await validateStep(2, formData, { racesData, classSubtypes, ruleset, existingNames });
       setStep2Valid(Object.keys(step2Errors).length === 0);
     };
     checkStep2();
-  }, [formData, racesData, classSubtypes, ruleset]);
+  }, [formData, racesData, classSubtypes, ruleset, existingNames]);
 
   const validPrefixes = useMemo(() => {
     const stepValidities = [step1Valid, step2Valid, step3Valid, step4Valid, step5Valid, step6Valid, step7Valid];
