@@ -6413,7 +6413,7 @@
       "handler": "src/services/automation/handlers/class-other/giantAncestryTraits.js (handleStormsThunderDirect; option variant giantAncestryDispatch.js)",
       "router": "src/services/automation/index.js (storms_thunder dispatch; display automationRouter.js)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/elemental-handlers.js (+ trackedResources.js uses-counter, restRules-longRest.js LR refill, CharRaceFeatures.jsx/CharReactions.jsx sheet cells)",
-      "verified": "verified (PASS 2026-10-09 host ElderPaladin temp Stone Giant: storms_thunder reaction 1d8 thunder 60ft uses=PB LR-recharge, 2 live triggers vs Bandit 1 damage ledgers byte-exact + uses spend, stale-trigger + exhausted refusals verbatim zero-spend, LR re-arm 6/6, fresh-swap null-seed, no round latch by design PB-pool economy, gridless 60ft advisory. Subrace disk-restored Hill Giant)",
+      "verified": "verified",
       "class": "Goliath (Storm Giant subrace racial trait, not \"Storm Giant\" class — MISATTRIBUTED row fixed in place 2026-09-06)",
       "triggerConditions": "When you take damage from creature within 60ft; Reaction; Uses: proficiency_bonus, recharges on long rest",
       "expectedBehavior": "When you take damage from a creature within 60 feet of you, you can take a Reaction to deal 1d8 Thunder damage to that creature. (Storm Giant subrace of Goliath)"
