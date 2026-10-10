@@ -264,8 +264,8 @@ describe('WizardStepSpells', () => {
     });
   });
 
-  describe('All spells available regardless of slot level', () => {
-    it('shows all spells regardless of character spell slot level', async () => {
+  describe('Spell level limited to spell slots', () => {
+    it('hides spells above the highest available spell slot level', async () => {
       setSpellLimits({
         cantrip: 3, level1: 4, level2: 3, level3: 0, level4: 0,
         level5: 0, level6: 0, level7: 0, level8: 0, level9: 0,
@@ -282,7 +282,41 @@ describe('WizardStepSpells', () => {
         expect(screen.getByText('Cantrip')).toBeInTheDocument();
         expect(screen.getByText('Level1')).toBeInTheDocument();
         expect(screen.getByText('Level2')).toBeInTheDocument();
-        expect(screen.getByText('Level3')).toBeInTheDocument();
+        expect(screen.queryByText('Level3')).not.toBeInTheDocument();
+      });
+    });
+
+    it('keeps an already-selected spell visible so it can be deselected', async () => {
+      setSpellLimits({
+        cantrip: 3, level1: 4, level2: 0, level3: 0, level4: 0,
+        level5: 0, level6: 0, level7: 0, level8: 0, level9: 0,
+        spellType: 'known', preparedSpells: null,
+      });
+      const allSpells = [
+        { name: 'SlotSpell', level: 1, school: 'Evocation', classes: ['Wizard'], description: [] },
+        { name: 'TooHigh', level: 3, school: 'Evocation', classes: ['Wizard'], description: [] },
+      ];
+      render(<WizardStepSpells {...mockProps} allSpells={allSpells} formData={{ ...mockProps.formData, spells: ['TooHigh'] }} />);
+      await waitFor(() => {
+        expect(screen.getByText('TooHigh')).toBeInTheDocument();
+        expect(screen.getByText('SlotSpell')).toBeInTheDocument();
+      });
+    });
+
+    it('shows cantrips only when the class has no spell slots at this level', async () => {
+      setSpellLimits({
+        cantrip: 2, level1: 0, level2: 0, level3: 0, level4: 0,
+        level5: 0, level6: 0, level7: 0, level8: 0, level9: 0,
+        spellType: 'known', preparedSpells: null,
+      });
+      const allSpells = [
+        { name: 'OnlyCantrip', level: 0, school: 'Evocation', classes: ['Wizard'], description: [] },
+        { name: 'SlotSpell', level: 1, school: 'Evocation', classes: ['Wizard'], description: [] },
+      ];
+      render(<WizardStepSpells {...mockProps} allSpells={allSpells} formData={{ ...mockProps.formData, spells: [] }} />);
+      await waitFor(() => {
+        expect(screen.getByText('OnlyCantrip')).toBeInTheDocument();
+        expect(screen.queryByText('SlotSpell')).not.toBeInTheDocument();
       });
     });
   });

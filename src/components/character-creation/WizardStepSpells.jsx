@@ -177,7 +177,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
   const [spellLimits, setSpellLimits] = useState({ cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 });
   const [spellWarnings, setSpellWarnings] = useState([]);
   const [, setValidationMessage] = useState('');
-  const [, setIsLoadingLimits] = useState(false);
+  const [limitsLoaded, setLimitsLoaded] = useState(false);
   // Fetch spell limits dynamically based on class and level
   useEffect(() => {
     const fetchSpellLimits = async () => {
@@ -194,7 +194,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
         primalOrder: formData.class.primalOrder || null
       };
       
-      setIsLoadingLimits(true);
+      setLimitsLoaded(false);
       try {
       const limits = await getSpellLimits({ className, level: charLevel, version, majorName, extraOptions: classOptions, abilityScores: formData.abilities });
         setSpellLimits(limits);
@@ -202,7 +202,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
         console.error('Error fetching spell limits:', error);
         setSpellLimits({ cantrip: 4, level1: 2, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 });
       } finally {
-        setIsLoadingLimits(false);
+        setLimitsLoaded(true);
        }
       };
     
@@ -281,7 +281,24 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
       setSpellCounts(counts);
       }, [formData.spells, allSpells, preSelected, miSpells, ftSpells, stSpells]);
 
-     const availableSpells = magicalSecrets.availableSpells;
+     // Highest spell slot level available from the class spellcasting table
+    const maxSpellLevel = useMemo(() => {
+      for (let lvl = 9; lvl >= 1; lvl--) {
+        if ((spellLimits[`level${lvl}`] || 0) > 0) return lvl;
+      }
+      return 0;
+    }, [spellLimits]);
+
+    // Only offer cantrips and spells the character has spell slots for;
+    // keep already-selected spells so they can still be deselected
+    const availableSpells = useMemo(() => {
+      if (!limitsLoaded) return magicalSecrets.availableSpells;
+      const selected = new Set(formData.spells || []);
+      return magicalSecrets.availableSpells.filter(spell => {
+        const level = spell.level !== undefined ? spell.level : 0;
+        return level === 0 || level <= maxSpellLevel || selected.has(spell.name) || selected.has(spell.index);
+      });
+    }, [magicalSecrets.availableSpells, limitsLoaded, maxSpellLevel, formData.spells]);
 
       // Calculate total prepared spells (non-cantrip), for classes with spellType === 'prepared'
      const totalPrepared = useMemo(() => {
