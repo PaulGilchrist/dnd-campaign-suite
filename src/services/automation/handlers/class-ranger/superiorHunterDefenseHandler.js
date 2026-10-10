@@ -1,9 +1,10 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
-import { addExpiration } from '../../../rules/effects/expirations.js';
+import { KEY as PENDING_EXPIRATIONS_KEY } from '../../../rules/effects/expirations.js';
+import { getCurrentCombatRound } from '../../../encounters/combatData.js';
 
 function buildMissRefusal(lastAttack, featureName, playerName, campaignName, auto) {
     const primaryDamage = lastAttack.primaryDamage || 0;
@@ -206,16 +207,33 @@ export async function handle(action, playerStats, campaignName) {
     };
 
     const newBuffs = [...existingBuffs, buff];
-    setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
 
-    // CLA-345: Enforce "until end of current turn" — register a
-    // remove_active_buff expiration with a 1-round clock so the resistance
-    // drains via expireStaleEffects at the FIRST turn-start of the next
-    // round (same round-boundary drain family as weapon masteries /
-    // CLA-334 rounds recipe), never persisting indefinitely.
-    addExpiration({ attackerName: playerName, targetName: playerName, effects: [
-        { type: 'remove_active_buff', buffName: featureName },
-    ], campaignName, rounds: 1 });
+    // CLA-345: Enforce "until end of current turn" — the former two un-awaited
+    // writes (setRuntimeValue activeBuffs then addExpiration's own
+    // setRuntimeValue) raced on the same /changes/<Name> replace-route
+    // (§39/MA-0809, addExpiration's BA-001 merge only fixes its OWN writes):
+    // the activeBuffs snapshot POST landing last wiped the expiration entry, so
+    // pendingExpirations stayed [] and expireStaleEffects had nothing to
+    // consume — resistance persisted across rounds (live reproduce 2026-10-10:
+    // buff + latch landed, pendingExpirations absent ~2s after press).
+    // Everything lands in ONE merged setRuntimeObject POST (stonecunningHandler
+    // precedent); entry byte-shape matches expirationQueue.js addExpiration so
+    // expireStaleEffects → clearExpirationEffects 'remove_active_buff' consumes
+    // it unchanged. expiryRounds:1 drains at the FIRST turn-start of the next
+    // round (currentRound >= appliedRound + 1).
+    const storedExpirations = getRuntimeValue(playerName, PENDING_EXPIRATIONS_KEY, campaignName);
+    const expirations = Array.isArray(storedExpirations) ? storedExpirations : [];
+
+    setRuntimeObject(playerName, {
+        activeBuffs: newBuffs,
+        [PENDING_EXPIRATIONS_KEY]: [...expirations, {
+            target: playerName,
+            effects: [{ type: 'remove_active_buff', buffName: featureName }],
+            appliedRound: getCurrentCombatRound(campaignName),
+            expiryRounds: 1,
+            expireOnCreatureName: null,
+        }],
+    }, campaignName);
 
     const healText = actualHeal > 0 ? ` Retroactively healed for ${actualHeal} HP (${Math.floor(resistedAmount / 2)} from ${resistedAmount} ${damageType} damage halved by resistance).` : '';
 

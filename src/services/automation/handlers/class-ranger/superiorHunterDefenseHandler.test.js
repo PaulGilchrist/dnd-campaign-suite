@@ -10,6 +10,7 @@ import * as damageRollback from '../../common/damageRollback.js';
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
+    setRuntimeObject: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -28,14 +29,13 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
     applyHealingToTarget: vi.fn(() => Promise.resolve({ actualHeal: 0, oldHp: 0, newHp: 0 })),
 }));
 
-vi.mock('../../../rules/effects/expirations.js', () => ({
-    addExpiration: vi.fn(),
+vi.mock('../../../encounters/combatData.js', () => ({
+    getCurrentCombatRound: vi.fn(() => 1),
 }));
 
-const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
+const { getRuntimeValue, setRuntimeValue, setRuntimeObject } = await import('../../../../hooks/runtime/useRuntimeState.js');
 const { addEntry } = await import('../../../ui/logService.js');
 const { applyHealingToTarget } = await import('../../../rules/combat/applyHealing.js');
-const { addExpiration } = await import('../../../rules/effects/expirations.js');
 
 function makePlayerStats(overrides = {}) {
     return {
@@ -82,6 +82,7 @@ describe('superiorHunterDefenseHandler', () => {
             expect(result.payload.description).toContain('No recent attack found');
             expect(result.payload.description).toContain('can only be used after taking damage');
             expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(setRuntimeObject).not.toHaveBeenCalled();
             expect(addEntry).not.toHaveBeenCalled();
         });
 
@@ -104,6 +105,7 @@ describe('superiorHunterDefenseHandler', () => {
             expect(result.payload.description).toContain('did not target you');
             expect(result.payload.description).toContain('can only be used shortly after taking damage');
             expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(setRuntimeObject).not.toHaveBeenCalled();
             expect(addEntry).not.toHaveBeenCalled();
         });
 
@@ -126,17 +128,18 @@ describe('superiorHunterDefenseHandler', () => {
             expect(result.payload.description).toContain('Resistance to fire damage');
             expect(result.payload.description).toContain('15 fire');
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeObject).toHaveBeenCalledWith(
                 'Test Ranger',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        name: "Superior Hunter's Defense",
-                        effect: 'damage_resistance',
-                        duration: 'until_end_of_current_turn',
-                        resistanceTypes: ['fire'],
-                    }),
-                ]),
+                expect.objectContaining({
+                    activeBuffs: expect.arrayContaining([
+                        expect.objectContaining({
+                            name: "Superior Hunter's Defense",
+                            effect: 'damage_resistance',
+                            duration: 'until_end_of_current_turn',
+                            resistanceTypes: ['fire'],
+                        }),
+                    ]),
+                }),
                 'test-campaign'
             );
 
@@ -153,7 +156,10 @@ describe('superiorHunterDefenseHandler', () => {
                 { name: 'Shield', effect: 'ac_bonus', resistanceTypes: [] },
                 { name: "Superior Hunter's Defense", effect: 'damage_resistance', resistanceTypes: ['cold'] },
             ];
-            getRuntimeValue.mockReturnValue(existingBuffs);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'activeBuffs') return existingBuffs;
+                return null;
+            });
             damageRollback.findLastAttack.mockResolvedValue({
                 attackEvent: { damageType: 'acid', primaryDamage: 8, targetName: 'Test Ranger' },
                 attackerName: 'Ooze',
@@ -166,7 +172,7 @@ describe('superiorHunterDefenseHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-            const buffsArg = setRuntimeValue.mock.calls.find(c => c[1] === 'activeBuffs')[2];
+            const buffsArg = setRuntimeObject.mock.calls.find(c => c[1]?.activeBuffs)[1].activeBuffs;
 
             // Shield preserved
             expect(buffsArg).toEqual(expect.arrayContaining([
@@ -194,12 +200,13 @@ describe('superiorHunterDefenseHandler', () => {
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
             expect(result.payload.description).toContain('untyped');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeObject).toHaveBeenCalledWith(
                 'Test Ranger',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ resistanceTypes: ['untyped'] }),
-                ]),
+                expect.objectContaining({
+                    activeBuffs: expect.arrayContaining([
+                        expect.objectContaining({ resistanceTypes: ['untyped'] }),
+                    ]),
+                }),
                 'test-campaign'
             );
         });
@@ -239,12 +246,13 @@ describe('superiorHunterDefenseHandler', () => {
 
             expect(result.payload.description).toContain('Resistance to Necrotic damage');
             expect(result.payload.description).toContain('17 Necrotic');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeObject).toHaveBeenCalledWith(
                 'Test Ranger',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ resistanceTypes: ['necrotic'] }),
-                ]),
+                expect.objectContaining({
+                    activeBuffs: expect.arrayContaining([
+                        expect.objectContaining({ resistanceTypes: ['necrotic'] }),
+                    ]),
+                }),
                 'test-campaign'
             );
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
@@ -270,12 +278,13 @@ describe('superiorHunterDefenseHandler', () => {
 
             expect(result.payload.description).toContain('Resistance to Slashing damage');
             expect(result.payload.description).toContain('17 Slashing');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeObject).toHaveBeenCalledWith(
                 'Test Ranger',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ resistanceTypes: ['slashing'] }),
-                ]),
+                expect.objectContaining({
+                    activeBuffs: expect.arrayContaining([
+                        expect.objectContaining({ resistanceTypes: ['slashing'] }),
+                    ]),
+                }),
                 'test-campaign'
             );
         });
@@ -297,12 +306,13 @@ describe('superiorHunterDefenseHandler', () => {
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
             expect(result.payload.description).toContain('Resistance to Cold damage');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeObject).toHaveBeenCalledWith(
                 'Test Ranger',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ resistanceTypes: ['cold'] }),
-                ]),
+                expect.objectContaining({
+                    activeBuffs: expect.arrayContaining([
+                        expect.objectContaining({ resistanceTypes: ['cold'] }),
+                    ]),
+                }),
                 'test-campaign'
             );
         });
@@ -322,12 +332,13 @@ describe('superiorHunterDefenseHandler', () => {
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
             expect(result.type).toBe('popup');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeObject).toHaveBeenCalledWith(
                 'Test Ranger',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ resistanceTypes: ['fire'] }),
-                ]),
+                expect.objectContaining({
+                    activeBuffs: expect.arrayContaining([
+                        expect.objectContaining({ resistanceTypes: ['fire'] }),
+                    ]),
+                }),
                 'test-campaign'
             );
         });
@@ -418,12 +429,13 @@ describe('superiorHunterDefenseHandler', () => {
             const result = await handle(customAction, makePlayerStats(), 'test-campaign');
 
             expect(result.payload.name).toBe('Custom Feature Name');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeObject).toHaveBeenCalledWith(
                 'Test Ranger',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ name: 'Custom Feature Name' }),
-                ]),
+                expect.objectContaining({
+                    activeBuffs: expect.arrayContaining([
+                        expect.objectContaining({ name: 'Custom Feature Name' }),
+                    ]),
+                }),
                 'test-campaign'
             );
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
@@ -545,7 +557,7 @@ describe('superiorHunterDefenseHandler', () => {
                 automationType: 'superior_hunters_defense_refused',
             }));
             expect(applyHealingToTarget).not.toHaveBeenCalled();
-            expect(addExpiration).not.toHaveBeenCalled();
+            expect(setRuntimeObject).not.toHaveBeenCalled();
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 type: 'ability_use',
@@ -586,9 +598,10 @@ describe('superiorHunterDefenseHandler', () => {
         // Simulates the live runtime store so a second same-turn click reads
         // the latch value the first click stamped (the write→read race of CLA-371).
         async function armedRuntime(round) {
-            const store = { _Superior_Hunters_Defense_usedRound: null, activeBuffs: [] };
+            const store = { _Superior_Hunters_Defense_usedRound: null, activeBuffs: [], pendingExpirations: [] };
             getRuntimeValue.mockImplementation((name, key) => store[key] ?? null);
             setRuntimeValue.mockImplementation((name, key, value) => { store[key] = value; });
+            setRuntimeObject.mockImplementation((name, obj) => { Object.assign(store, obj); });
             const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
             getCombatContext.mockResolvedValue({ round, creatures: [{ name: 'Thug 1' }, { name: 'Test Ranger' }], activeCreatureName: 'Thug 1' });
             return store;
@@ -611,7 +624,7 @@ describe('superiorHunterDefenseHandler', () => {
             }));
             expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'ability_use' }));
             expect(applyHealingToTarget).not.toHaveBeenCalled();
-            expect(addExpiration).not.toHaveBeenCalled();
+            expect(setRuntimeObject).not.toHaveBeenCalled();
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(store._Superior_Hunters_Defense_usedRound).toBeNull();
         });
@@ -631,9 +644,9 @@ describe('superiorHunterDefenseHandler', () => {
 
             const latchOrder = setRuntimeValue.mock.invocationCallOrder;
             const latchIdx = setRuntimeValue.mock.calls.findIndex(c => c[1] === '_Superior_Hunters_Defense_usedRound');
-            const buffIdx = setRuntimeValue.mock.calls.findIndex(c => c[1] === 'activeBuffs');
             expect(latchIdx).toBeGreaterThanOrEqual(0);
-            expect(latchIdx).toBeLessThan(buffIdx);
+            expect(setRuntimeObject).toHaveBeenCalledTimes(1);
+            expect(latchOrder[latchIdx]).toBeLessThan(setRuntimeObject.mock.invocationCallOrder[0]);
             expect(latchOrder[latchIdx]).toBeLessThan(applyHealingToTarget.mock.invocationCallOrder[0]);
         });
 
@@ -654,7 +667,7 @@ describe('superiorHunterDefenseHandler', () => {
             const abilityUseLogs = addEntry.mock.calls.filter(c => c[1]?.type === 'ability_use');
             expect(abilityUseLogs).toHaveLength(1);
             expect(applyHealingToTarget).toHaveBeenCalledTimes(1);
-            expect(setRuntimeValue.mock.calls.filter(c => c[1] === 'activeBuffs')).toHaveLength(1);
+            expect(setRuntimeObject.mock.calls.filter(c => c[1]?.activeBuffs)).toHaveLength(1);
         });
 
         it('re-arms next round: hit + cleared latch spends again', async () => {
@@ -722,8 +735,8 @@ describe('superiorHunterDefenseHandler', () => {
                 characterName: 'Test Ranger',
             }));
             expect(applyHealingToTarget).not.toHaveBeenCalled();
-            expect(addExpiration).not.toHaveBeenCalled();
-            const buffWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeBuffs');
+            expect(setRuntimeObject).not.toHaveBeenCalled();
+            const buffWrites = setRuntimeObject.mock.calls.filter(c => c[1]?.activeBuffs);
             expect(buffWrites).toHaveLength(0);
             const latchWrites = setRuntimeValue.mock.calls.filter(c => c[1] === '_Superior_Hunters_Defense_usedRound');
             expect(latchWrites).toHaveLength(0);
@@ -750,11 +763,14 @@ describe('superiorHunterDefenseHandler', () => {
             );
         });
 
-        it('registers a 1-round-clock remove_active_buff expiration so the resistance drains at the next round', async () => {
+        it('merges the buff and a 1-round-clock remove_active_buff expiration into ONE setRuntimeObject write', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'activeBuffs') return [];
+                if (key === 'pendingExpirations') return [{ target: 'Other', effects: [], appliedRound: 1, expiryRounds: 4, expireOnCreatureName: null }];
                 return undefined;
             });
+            const { getCurrentCombatRound } = await import('../../../encounters/combatData.js');
+            getCurrentCombatRound.mockReturnValue(2);
             const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
             getCombatContext.mockResolvedValue({
                 round: 2,
@@ -765,7 +781,34 @@ describe('superiorHunterDefenseHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Test Ranger', targetName: 'Test Ranger', effects: [{ type: 'remove_active_buff', buffName: "Superior Hunter's Defense" }], campaignName: 'test-campaign', rounds: 1 });
+            // §39/MA-0809: buff + expiration must land in ONE merged POST or the
+            // /changes/<Name> replace-route drops pendingExpirations (CLA-345).
+            expect(setRuntimeObject).toHaveBeenCalledTimes(1);
+            const merged = setRuntimeObject.mock.calls[0][1];
+            expect(setRuntimeObject).toHaveBeenCalledWith('Test Ranger', expect.anything(), 'test-campaign');
+            expect(merged.activeBuffs).toEqual([
+                expect.objectContaining({
+                    name: "Superior Hunter's Defense",
+                    effect: 'damage_resistance',
+                    duration: 'until_end_of_current_turn',
+                    resistanceTypes: ['bludgeoning'],
+                }),
+            ]);
+            // byte-shape identical to expirationQueue.js addExpiration entries
+            expect(merged.pendingExpirations).toEqual([
+                { target: 'Other', effects: [], appliedRound: 1, expiryRounds: 4, expireOnCreatureName: null },
+                {
+                    target: 'Test Ranger',
+                    effects: [{ type: 'remove_active_buff', buffName: "Superior Hunter's Defense" }],
+                    appliedRound: 2,
+                    expiryRounds: 1,
+                    expireOnCreatureName: null,
+                },
+            ]);
+            expect(getCurrentCombatRound).toHaveBeenCalledWith('test-campaign');
+            // no separate un-awaited activeBuffs write racing the merged POST
+            expect(setRuntimeValue.mock.calls.filter(c => c[1] === 'activeBuffs')).toHaveLength(0);
+            expect(setRuntimeValue.mock.calls.filter(c => c[1] === 'pendingExpirations')).toHaveLength(0);
         });
     });
 });
