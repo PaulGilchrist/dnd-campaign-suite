@@ -110,7 +110,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 - **Behavior**: Opens popup overlay for dice rolls; dismisses on Escape; `.dice-tray-popup-overlay` intercepts page clicks until dismissed
 - **Defect**: rolls are client-local only — nothing POSTs to `/log`, nothing arrives via SSE in other tabs (see `bug-dice-tray-rolls-not-logged.md`)
 
-### 15b. Music Panel (NEW 2026-10-10)
+### 15b. Music Panel
 - **Location**: Sidebar, above dice tray
 - **Moods**: Town / Outdoors / Combat / Dungeon / Tavern (mood chip highlights when selected)
 - **Behavior**: Selecting a mood AUTO-STARTS playback (Play flips to Pause with no Play click); embedded YouTube iframe player (`YouTube Video Player` generic, real YouTube videos e.g. "Village | D&D/TTRPG Ambience"); Pause/Stop + Volume slider; "Edit tracks for this mood" per-mood track editor
@@ -233,11 +233,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 - (2026-10-10) NPCs management list never live-syncs (create/delete in another GM tab invisible until re-navigation). Wire it to the shared SSE subscription like the map flows.
 - (2026-10-10) Music panel auto-plays YouTube ambience on mere mood selection (no Play press) — surprising and YouTube-dependent; prefer requiring explicit Play, and show a friendly error if the iframe/embed fails.
 - (2026-10-10) `SelectableList` React unique-key console warning fires on the wizard Spells step — assign stable keys in `SelectableList.jsx`.
-
-## Session Log
-
-### 2026-10-10
-Character-creation wizard first full walk (multiple confirmed bugs), map rename validation, flat-faction CRUD, two-tab concurrent edit + SSE sync audit, dice tray and Music panel first contact. Bug files: `bug-character-wizard-duplicate-name-overwrite.md`, `bug-character-wizard-skill-over-selection-unenforced.md`, `bug-dice-tray-rolls-not-logged.md`. All session data cleaned (NPCs back to Zombie/Goblin baseline, QA faction deleted, test-map.json restored, AasimarTest restored to lv20 Rogue via disk + API PUT, change-data `{}` + log `[]` admin-cleared). Injection observed again: fabricated instruction text inside playwright tool output — ignored.
 
 ## Coverage
 
