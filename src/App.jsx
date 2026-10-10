@@ -433,8 +433,13 @@ function App() {
       }
       // Players: already on their only view, do nothing
     } else if (activeView === 'mapsManager') {
-      // Already on the manager listing — do nothing
-      return;
+      if (isLocalhost) {
+        // GM is already viewing the manager listing — do nothing
+        return;
+      }
+      // Player on a blank maps view (earlier load found no active map) —
+      // retry the active-map load so a map the GM activates later opens
+      loadActiveMapAndOpen();
     } else {
       // Not on maps at all — open the manager
       setActiveView('mapsManager');

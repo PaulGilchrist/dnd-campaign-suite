@@ -24,3 +24,21 @@ In `handleMapsClick`, for non-localhost clients check `mapsView.type !== 'map'` 
 
 ### Severity
 Broken feature — players cannot reach the map without knowing an undocumented view-switch workaround, precisely during the most common live-play flow (GM activates a map mid-session).
+
+## Resolution
+FIXED 2026-10-10.
+
+**Root cause** (confirmed, matches the guess): `handleMapsClick` in `src/App.jsx` early-returned whenever `activeView === 'mapsManager'`. For a non-localhost player whose first click had failed with the no-active-map alert, `activeView` was already `'mapsManager'` while `mapsView.type` was `'none'` — and `MapsAreaView` renders `null` for `type: 'none'` — so every subsequent Map click was swallowed with zero network requests, permanently blank.
+
+**Fix** (`src/App.jsx`, `handleMapsClick`): the early-return now applies only on localhost (where being on mapsManager genuinely means the manager listing is visible). For players, if the early-return branch is reached they are provably on a blank maps view, so `loadActiveMapAndOpen()` is re-run — a map the GM activated later now opens on the next click. Minimal click-guard fix; the `map-activate-<campaign>` SSE push remains the separate UX-polish item already tracked in the app-exploration backlog.
+
+**Files changed:**
+- `src/App.jsx` — retry active-map load for players in the `activeView === 'mapsManager'` branch
+- `src/App.map-navigation.test.jsx` — regression test: non-localhost, first click alerts with no active map, second click (after `loadMaps` starts returning `isActive: true`) must render the map
+
+**Verification:**
+- Live repro reproduced pre-fix (player tab via LAN `http://192.168.0.239:5173`): first Map click → alert; GM activated Battle Arena; second click → no `/maps` request, blank content area.
+- Live re-verify post-fix (fresh server, same steps): second click fired `GET /maps` + `GET /maps/battle-arena` and rendered the "Battle Arena" map with tokens. Third click while viewing the map stays inert (player branch unchanged).
+- `npx vitest run src/App.map-navigation.test.jsx` → 6/6 pass; sibling `App.css/runtime-events/state-transitions` suites → 42/42 pass; `npm run lint` → clean (zero warnings).
+- Cleanup: no entities created; GM-activation in-memory flag reset via dev-server restart; Admin → Clear Change Data (`keys: []`) + Clear Campaign Log (0 entries) for `test-campaign`.
+

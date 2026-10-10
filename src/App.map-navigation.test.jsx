@@ -308,6 +308,35 @@ describe('App - Map Navigation & View Management', () => {
       });
     });
 
+    it('re-opens the map on a second maps-btn click after an earlier no-active-map alert (non-localhost)', async () => {
+      setLocalhost('example.com');
+
+      const { loadMaps } = await import('./services/maps/mapsService.js');
+      loadMaps.mockResolvedValue({
+        maps: [{ fileName: 'dungeon-1.json', isActive: false }],
+      });
+
+      await setupWithCharacters();
+      // First click: no active map → alert, blank view
+      fireEvent.click(screen.getByTestId('maps-btn'));
+      await waitFor(() => {
+        expect(window.alert).toHaveBeenCalledWith('No map is currently active. Ask your Game Master to activate one.');
+      });
+      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+
+      // GM activates the map
+      loadMaps.mockResolvedValue({
+        maps: [{ fileName: 'dungeon-1.json', isActive: true }],
+      });
+
+      // Second click must re-run the active-map load and render the map
+      fireEvent.click(screen.getByTestId('maps-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('map-view')).toBeInTheDocument();
+        expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
+      });
+    });
+
     it('alerts when loadMaps fails on non-localhost', async () => {
       setLocalhost('example.com');
 

@@ -2830,3 +2830,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 - `npm run dev` runs `node server.js` without nodemon — server-route changes require a manual restart; Vite HMR only reloads the client.
 - NPC route PUT is a name-keyed upsert: same-name creates are indistinguishable from legit edits server-side; duplicate guard must live client-side (mirror MapsManager), server guards rename collisions only.
+
+## §fix-queue (2026-10-10, player-map-button-dead-state) Pitfalls
+
+- Map activation lives only in server memory (`activeMaps` in `server/routes/maps.js`) — no deactivate UI/endpoint; reset by dev-server restart.
+- Playwright auto-dismisses `window.alert` (handle_dialog reports "already handled"); detect alerts via post-click modal-state checks instead.
