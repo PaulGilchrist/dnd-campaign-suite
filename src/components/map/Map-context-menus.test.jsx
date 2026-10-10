@@ -100,6 +100,7 @@ vi.mock('./hooks/useMapLoader.js', () => ({
             const result = typeof fn === 'function' ? fn(mockState.placedItems) : fn;
             mockState.placedItems = result;
         }),
+        flushSave: vi.fn(),
     })),
 }));
 

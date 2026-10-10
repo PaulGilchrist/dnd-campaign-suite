@@ -80,6 +80,7 @@ vi.mock('./hooks/useMapLoader.js', () => ({
         setMapData: createMockSetMapData,
         placedItems: mockState.placedItems,
         setPlacedItems: createMockSetPlacedItems,
+        flushSave: vi.fn(),
     })),
 }));
 

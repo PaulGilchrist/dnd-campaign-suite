@@ -1,12 +1,37 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import * as mapsService from '../../../services/maps/mapsService';
 import { DEFAULT_GRID_SIZE } from '../../../config/mapConfig';
+
+const AUTOSAVE_DEBOUNCE_MS = 1000;
+
+function buildSavePayload(mapData, gridSize, placedItems) {
+    return {
+        ...mapData,
+        gridSize,
+        walls: Array.from(mapData.walls || []),
+        placedItems,
+    };
+}
 
 function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize }) {
     const [mapData, setMapData] = useState(null);
     const [placedItems, setPlacedItems] = useState([]);
     const svgLoadInProgressRef = useRef(false);
     const loadedMapNameRef = useRef(null);
+    const pendingSaveRef = useRef(null);
+    const saveTimerRef = useRef(null);
+
+    const flushSave = useCallback(() => {
+        if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+        }
+        const pending = pendingSaveRef.current;
+        if (!pending) return;
+        pendingSaveRef.current = null;
+        mapsService.saveMapData(pending.campaignName, pending.mapName, pending.dataToSave)
+            .catch(err => console.error('Failed to save map data:', err));
+    }, []);
 
     useEffect(() => {
         if (loadedMapNameRef.current === mapName) return;
@@ -51,18 +76,24 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
     }, [campaignName, characters, mapName, gridSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
+        const pending = pendingSaveRef.current;
+        if (pending && (pending.mapName !== mapName || pending.campaignName !== campaignName)) {
+            flushSave();
+        }
         if (!mapData) return;
         if (svgLoadInProgressRef.current) return;
-        const dataToSave = {
-            ...mapData,
-            gridSize,
-            walls: Array.from(mapData.walls || []),
-            placedItems: placedItems,
+        pendingSaveRef.current = {
+            campaignName,
+            mapName,
+            dataToSave: buildSavePayload(mapData, gridSize, placedItems),
         };
-        mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save map data:', err));
-    }, [mapData, campaignName, gridSize, placedItems, mapName]);
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(flushSave, AUTOSAVE_DEBOUNCE_MS);
+    }, [mapData, campaignName, gridSize, placedItems, mapName, flushSave]);
 
-    return { mapData, setMapData, placedItems, setPlacedItems, loadInProgressRef: svgLoadInProgressRef };
+    useEffect(() => flushSave, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    return { mapData, setMapData, placedItems, setPlacedItems, loadInProgressRef: svgLoadInProgressRef, flushSave };
 }
 
 export default useMapLoader;

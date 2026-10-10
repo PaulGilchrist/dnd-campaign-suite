@@ -117,7 +117,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const [shapeParams, setShapeParams] = useState(DEFAULTS.sphere);
     const [viewMode, setViewMode] = useState('2d');
 
-    const { mapData, setMapData, placedItems, setPlacedItems } = useMapLoader({
+    const { mapData, setMapData, placedItems, setPlacedItems, flushSave } = useMapLoader({
         campaignName, characters, mapName, gridSize, setGridSize,
     });
 
@@ -319,6 +319,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     }, [handlePointerMove, handleItemPointerMove, handleGridPointerMove, handleSelectPointerMove, handlePanMove, handleSpellPointerMove, handleSpellDragMove, handleRulerPointerMove, setMapData, painting, tool, spellDraft, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlay, rulerMode, rulerStart, rulerEnd]);
 
     const handleToolPointerUp = useCallback((e) => {
+        flushSave();
         handlePointerUp(e);
         handleItemPointerUpHook(e);
         handleGridPointerUp(e);
@@ -327,13 +328,14 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         handleSpellPointerUp(e, spellDraft, spellMode, addOverlay, shapeParams);
         handleSpellDragEnd(e, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlayImmediate, svgRef);
         handleRulerPointerUp(e, rulerMode, svgRef);
-    }, [handlePointerUp, handleItemPointerUpHook, handleGridPointerUp, handleSelectPointerUp, handlePanEnd, handleSpellPointerUp, handleSpellDragEnd, handleRulerPointerUp, placedItems, mapData, setMapData, setPlacedItems, spellDraft, spellMode, addOverlay, shapeParams, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlayImmediate, rulerMode, svgRef]);
+    }, [flushSave, handlePointerUp, handleItemPointerUpHook, handleGridPointerUp, handleSelectPointerUp, handlePanEnd, handleSpellPointerUp, handleSpellDragEnd, handleRulerPointerUp, placedItems, mapData, setMapData, setPlacedItems, spellDraft, spellMode, addOverlay, shapeParams, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlayImmediate, rulerMode, svgRef]);
 
     const handleToolPointerLeave = useCallback((e) => {
+        flushSave();
         handleItemPointerLeave();
         handleGridPointerLeave(e);
         handleSelectPointerUp(e, placedItems, mapData, setMapData, setPlacedItems);
-    }, [handleItemPointerLeave, handleGridPointerLeave, handleSelectPointerUp, placedItems, mapData, setMapData, setPlacedItems]);
+    }, [flushSave, handleItemPointerLeave, handleGridPointerLeave, handleSelectPointerUp, placedItems, mapData, setMapData, setPlacedItems]);
 
     const handleSetRulerMode = useCallback((value) => {
         setRulerMode(value);

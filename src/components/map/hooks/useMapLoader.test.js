@@ -420,4 +420,130 @@ describe('useMapLoader', () => {
       expect(loadMapDataSpy.mock.calls.length).toBe(firstCallCount);
     });
   });
+
+  describe('batched autosave', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      loadMapDataSpy.mockResolvedValue({
+        players: [], walls: [], placedItems: [], gridSize: 40,
+      });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const loadAndClearSaves = async (hook) => {
+      await act(async () => {});
+      act(() => { hook.result.current.flushSave(); });
+      saveMapDataSpy.mockClear();
+    };
+
+    const paintCells = (hook, keys) => {
+      keys.forEach((key, i) => {
+        act(() => hook.result.current.setMapData(prev => ({
+          ...prev, walls: new Set([...prev.walls, ...keys.slice(0, i + 1)]),
+        })));
+      });
+    };
+
+    it('coalesces many mutations in one stroke into a single save on flush', async () => {
+      const { result } = getHook();
+      await loadAndClearSaves({ result });
+
+      const keys = Array.from({ length: 10 }, (_, y) => `5,${y}`);
+      paintCells({ result }, keys);
+      expect(saveMapDataSpy).not.toHaveBeenCalled();
+
+      act(() => { result.current.flushSave(); });
+      expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
+      expect(saveMapDataSpy.mock.calls[0][2].walls.sort()).toEqual([...keys].sort());
+
+      await act(() => { vi.advanceTimersByTime(1500); });
+      expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('debounces to one save when a long stroke pauses, and completes on flush', async () => {
+      const { result } = getHook();
+      await loadAndClearSaves({ result });
+
+      for (let y = 0; y < 20; y++) {
+        act(() => result.current.setMapData(prev => ({
+          ...prev, walls: new Set([...prev.walls, `5,${y}`]),
+        })));
+        await act(() => { vi.advanceTimersByTime(50); });
+      }
+      expect(saveMapDataSpy).not.toHaveBeenCalled();
+
+      await act(() => { vi.advanceTimersByTime(1000); });
+      expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
+
+      act(() => result.current.setMapData(prev => ({
+        ...prev, walls: new Set([...prev.walls, '5,20']),
+      })));
+      act(() => { result.current.flushSave(); });
+      expect(saveMapDataSpy).toHaveBeenCalledTimes(2);
+      expect(saveMapDataSpy.mock.calls.at(-1)[2].walls).toHaveLength(21);
+    });
+
+    it('persists erased cells with the same batching', async () => {
+      loadMapDataSpy.mockResolvedValue({
+        players: [], walls: ['5,0', '5,1', '5,2'], placedItems: [], gridSize: 40,
+      });
+      const { result } = getHook();
+      await loadAndClearSaves({ result });
+
+      ['5,0', '5,1', '5,2'].forEach(key => {
+        act(() => result.current.setMapData(prev => {
+          const walls = new Set(prev.walls);
+          walls.delete(key);
+          return { ...prev, walls };
+        }));
+      });
+      expect(saveMapDataSpy).not.toHaveBeenCalled();
+
+      act(() => { result.current.flushSave(); });
+      expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
+      expect(saveMapDataSpy.mock.calls[0][2].walls).toEqual([]);
+    });
+
+    it('flushes pending stroke data on unmount', async () => {
+      const { result, unmount } = getHook();
+      await loadAndClearSaves({ result });
+
+      act(() => result.current.setMapData(prev => ({
+        ...prev, walls: new Set([...prev.walls, '7,3']),
+      })));
+      expect(saveMapDataSpy).not.toHaveBeenCalled();
+
+      unmount();
+      expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
+      expect(saveMapDataSpy.mock.calls[0][2].walls).toEqual(['7,3']);
+    });
+
+    it('flushes pending data under the previous map name when map switches', async () => {
+      const { result, rerender } = renderHook(
+        ({ mapName }) => useMapLoader({
+          campaignName: defaultCampaignName,
+          characters: defaultCharacters,
+          mapName,
+          gridSize: DEFAULT_GRID_SIZE,
+          setGridSize: setGridSizeMock,
+        }),
+        { initialProps: { mapName: defaultMapName } },
+      );
+      await loadAndClearSaves({ result });
+
+      act(() => result.current.setMapData(prev => ({
+        ...prev, walls: new Set([...prev.walls, '9,9']),
+      })));
+      expect(saveMapDataSpy).not.toHaveBeenCalled();
+
+      rerender({ mapName: 'other-map' });
+      await act(async () => {});
+      expect(saveMapDataSpy).toHaveBeenCalledWith(
+        defaultCampaignName, defaultMapName,
+        expect.objectContaining({ walls: ['9,9'] }),
+      );
+    });
+  });
 });
