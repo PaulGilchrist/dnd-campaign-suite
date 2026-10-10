@@ -115,6 +115,22 @@ describe('ConstellationSelectionModal', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
+
+    // CLA-368: CharActions lane wires the modal with autoApply={false} — the
+    // parent lane owns the single application, so the modal must not apply.
+    it('does not apply when autoApply is false, only confirms once', async () => {
+      const applyOption = vi.fn();
+      const onConfirm = vi.fn();
+      render(<ConstellationSelectionModal {...makeProps({ autoApply: false, applyOption, onConfirm })} />);
+      fireEvent.click(screen.getByRole('button', { name: /Dragon/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Choose' }));
+      await vi.waitFor(() => {
+        expect(onConfirm).toHaveBeenCalledWith('Dragon');
+      });
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(applyOption).not.toHaveBeenCalled();
+      expect(starryFormHandler.applyConstellationOption).not.toHaveBeenCalled();
+    });
   });
 
   describe('result state', () => {

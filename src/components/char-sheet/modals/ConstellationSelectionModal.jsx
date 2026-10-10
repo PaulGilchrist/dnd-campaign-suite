@@ -3,7 +3,7 @@ import { applyConstellationOption } from '../../../services/automation/handlers/
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import '../CharSheet.css';
 
-function ConstellationSelectionModal({ action, playerStats, campaignName, isTwinkled, onConfirm, onClose, applyOption = applyConstellationOption }) {
+function ConstellationSelectionModal({ action, playerStats, campaignName, isTwinkled, onConfirm, onClose, applyOption = applyConstellationOption, autoApply = true }) {
     const [selected, setSelected] = useState(null);
     const [result, setResult] = useState(null);
 
@@ -20,6 +20,12 @@ function ConstellationSelectionModal({ action, playerStats, campaignName, isTwin
 
     const handleApply = async () => {
         if (!selected) return;
+        if (!autoApply) {
+            // CLA-368: parent lane owns the single application (apply + log +
+            // close) — the modal must not apply too or every Choose double-logs.
+            onConfirm(selected);
+            return;
+        }
         const res = await applyOption(action, playerStats, campaignName, selected);
         setResult(res);
         onConfirm(selected);

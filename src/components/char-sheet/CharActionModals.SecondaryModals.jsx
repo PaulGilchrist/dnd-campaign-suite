@@ -534,6 +534,7 @@ function CombatChoiceModals({
                     playerStats={mergedModalState.starryFormConstellationModal.playerStats}
                     campaignName={mergedModalState.starryFormConstellationModal.campaignName}
                     isTwinkled={mergedModalState.starryFormConstellationModal.playerStats?.level >= 10}
+                    autoApply={false}
                     onConfirm={(option) => handleConstellationSelect(mergedModalState.starryFormConstellationModal, option)}
                     onClose={() => setModalState({ starryFormConstellationModal: null })}
                 />
@@ -544,6 +545,7 @@ function CombatChoiceModals({
                     playerStats={mergedModalState.twinklingConstellationModal.playerStats}
                     campaignName={mergedModalState.twinklingConstellationModal.campaignName}
                     isTwinkled={true}
+                    autoApply={false}
                     onConfirm={(option) => handleConstellationSelect(mergedModalState.twinklingConstellationModal, option)}
                     onClose={() => setModalState({ twinklingConstellationModal: null })}
                 />

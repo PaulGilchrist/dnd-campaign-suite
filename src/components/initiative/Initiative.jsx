@@ -106,6 +106,8 @@ function clearPlayerRoundFlags(creatureName, campaignName) {
     for (const latchKey of ['_Superior_Hunters_Prey_UsedRound', '_Superior_Hunters_Defense_usedRound', '_Riposte_usedRound', '_Riposte_appliedAttack', 'pendingRiposteDieValue']) {
         setRuntimeValue(creatureName, latchKey, null, campaignName)
     }
+    // CLA-368: Twinkling Constellations turn-start switch press latch re-arms on initiative roll / combat reset.
+    setRuntimeValue(creatureName, '_Twinkling_Constellations_usedRound', null, campaignName)
     // MN-013: Parry reaction round latch re-arms on initiative roll / combat reset.
     setRuntimeValue(creatureName, '_Parry_usedRound', null, campaignName)
     // MN-003: Commander's Strike once-per-turn grant latch re-arms at round wrap.

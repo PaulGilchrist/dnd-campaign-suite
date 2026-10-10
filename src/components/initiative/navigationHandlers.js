@@ -101,6 +101,8 @@ const PLAYER_ROUND_LATCH_KEYS = [
     '_bonusActionAttackRound',
     // CLA-356: Telekinetic Master bonus-action weapon attack — once per turn latch re-arms at round wrap.
     '_Telekinetic_Master_attack_usedRound',
+    // CLA-368: Twinkling Constellations turn-start constellation switch press latch re-arms at round wrap.
+    '_Twinkling_Constellations_usedRound',
 ]
 
 function clearPlayerRoundLatches(creatureName, campaignName) {
