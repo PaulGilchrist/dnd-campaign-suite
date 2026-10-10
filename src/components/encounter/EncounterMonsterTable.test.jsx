@@ -221,6 +221,46 @@ describe('EncounterMonsterTable', () => {
     });
   });
 
+  describe('per-row qty testids', () => {
+    it('stamps every rendered monster row qty cell with a unique qty-<rowIndex> testid', () => {
+      renderTable();
+      const cells = document.querySelectorAll('[data-testid^="qty-"]');
+      expect(cells).toHaveLength(sampleMonsters.length);
+      sampleMonsters.forEach((_monster, rowIndex) => {
+        const cell = document.querySelectorAll(`[data-testid="qty-${rowIndex}"]`);
+        expect(cell).toHaveLength(1);
+        expect(cell[0]).toHaveClass('col-qty');
+      });
+    });
+
+    it('does not collide with the CR min/max numeric filter inputs', () => {
+      renderTable({ crMin: 1, crMax: 5 });
+      expect(document.querySelectorAll('[data-testid^="qty-"] input[type="number"]')).toHaveLength(0);
+      const crInputs = document.querySelectorAll('input[type="number"]');
+      for (const input of crInputs) {
+        expect(input.closest('[data-testid^="qty-"]')).toBeNull();
+      }
+      expect(document.querySelector('[data-testid="qty-0"]')).toBe(
+        document.querySelectorAll('td.col-qty')[0]
+      );
+    });
+
+    it('exposes the row qty and its controls scoped to the qty-<rowIndex> cell', () => {
+      renderTable();
+      const goblinCell = document.querySelector('[data-testid="qty-0"]');
+      expect(goblinCell).toHaveTextContent('2');
+      fireEvent.click(goblinCell.querySelector('[aria-label="Increase quantity of Goblin"]'));
+      fireEvent.click(goblinCell.querySelector('[aria-label="Decrease quantity of Goblin"]'));
+    });
+
+    it('keeps qty testids unique when the filtered list changes', () => {
+      renderTable({ filteredMonsters: [sampleMonsters[2]] });
+      expect(document.querySelectorAll('[data-testid^="qty-"]')).toHaveLength(1);
+      expect(document.querySelector('[data-testid="qty-0"]')).toHaveTextContent('\u2014');
+      expect(document.querySelector('[data-testid="qty-1"]')).toBeNull();
+    });
+  });
+
   describe('selection toggling', () => {
     it('calls onToggleMonster exactly once when the checkbox is clicked', () => {
       const { props } = renderTable();

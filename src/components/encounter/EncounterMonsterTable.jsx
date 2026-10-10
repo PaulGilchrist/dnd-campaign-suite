@@ -47,6 +47,7 @@ function SortableHeader({ field, label, className, ariaLabel, sortField, sortDir
 
 function MonsterTableRow({
   monster,
+  rowIndex,
   selected,
   qty,
   showEnvironment,
@@ -78,7 +79,7 @@ function MonsterTableRow({
       {showEnvironment && (
         <td className="col-env">{envLabel}</td>
       )}
-      <td className="col-qty">
+      <td className="col-qty" data-testid={`qty-${rowIndex}`}>
         {qty > 0 ? (
           <span className="qty-controls">
             <button
@@ -253,10 +254,11 @@ function EncounterMonsterTable({
               </tr>
             </thead>
             <tbody>
-              {filteredMonsters.map((monster) => (
+              {filteredMonsters.map((monster, rowIndex) => (
                 <MonsterTableRow
                   key={monster.index}
                   monster={monster}
+                  rowIndex={rowIndex}
                   selected={isSelected(monster.index)}
                   qty={getQty(monster.index)}
                   showEnvironment={showEnvironment}
