@@ -1129,3 +1129,16 @@
     color: var(--color-text-muted);
     font-style: italic;
 }
+
+/* Music ambience entries */
+.log-music {
+    border-left: 3px solid #16a085;
+}
+
+.log-music-details {
+    padding-left: 28px;
+    margin-top: 2px;
+    font-size: 0.85rem;
+    color: var(--color-text);
+    line-height: 1.5;
+}

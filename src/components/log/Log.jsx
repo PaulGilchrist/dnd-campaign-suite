@@ -19,6 +19,7 @@ import { PsionicSorceryEntry } from './LogPsionicSorceryEntry.jsx';
 import { SummonsEntry } from './LogSummonsEntry.jsx';
 import { SpellEffectEntry } from './LogSpellEffectEntry.jsx';
 import { BuffEntry } from './LogBuffEntry.jsx';
+import { MusicEntry } from './LogMusicEntry.jsx';
 
 const ENTRY_COMPONENTS = {
   roll: RollEntry,
@@ -42,7 +43,8 @@ const ENTRY_COMPONENTS = {
   psionic_sorcery: PsionicSorceryEntry,
   summons: SummonsEntry,
   spell_effect: SpellEffectEntry,
-  buff: BuffEntry
+  buff: BuffEntry,
+  music: MusicEntry
 };
 
 function LogEntryRenderer({ entry }) {

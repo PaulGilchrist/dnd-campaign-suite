@@ -1,0 +1,137 @@
+/* GM background music mini-player (sidebar footer) */
+
+.music-player {
+  border-top: 1px solid var(--border-color);
+  padding: 6px 12px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.music-player .sidebar-section-header {
+  padding: 4px 0;
+  font-size: 0.95em;
+}
+
+.music-moods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.music-mood-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.8em;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.music-mood-btn:hover {
+  background-color: var(--background-color-card-hover);
+  color: var(--color-hover);
+}
+
+.music-mood-btn.active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.music-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.music-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.music-btn:hover:not(:disabled) {
+  background-color: var(--background-color-card-hover);
+  color: var(--color-hover);
+}
+
+.music-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.music-volume {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.music-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px;
+}
+
+.music-editor label {
+  font-size: 0.8em;
+  color: var(--color-text-secondary);
+}
+
+.music-editor select,
+.music-editor-urls {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--background-color-card);
+  color: var(--color-text);
+  font-size: 0.8em;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.music-editor-urls {
+  resize: vertical;
+  font-family: monospace;
+}
+
+.music-editor-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.music-editor-actions .music-btn {
+  width: auto;
+  padding: 0 8px;
+  font-size: 0.8em;
+}
+
+/* Hidden YouTube iframe — kept tiny but rendered so playback works */
+.yt-music-frame {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0.01;
+  overflow: hidden;
+  pointer-events: none;
+  border: 0;
+}

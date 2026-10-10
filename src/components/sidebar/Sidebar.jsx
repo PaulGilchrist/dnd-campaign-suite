@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { DiceTray, DicePopup } from './DiceTray.jsx';
+import MusicPlayer from './MusicPlayer.jsx';
 import './Sidebar.css';
 
 const VIEW_LABELS = {
@@ -144,6 +145,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                         </button>
                     </div>
                 )}
+                <MusicPlayer campaignName={campaignName} isLocalhost={isLocalhost} />
                 <DiceTray onRoll={setDiceResult} />
             </nav>
             {diceResult && <DicePopup result={diceResult} onClose={() => setDiceResult(null)} />}

@@ -24,6 +24,23 @@ function inertFetch() {
 globalThis.fetch = inertFetch;
 vi.stubGlobal('fetch', inertFetch);
 
+// Inert EventSource so SSE-connecting components render in jsdom (which lacks EventSource)
+class InertEventSource {
+  constructor(url) {
+    this.url = url;
+    this.readyState = 0;
+  }
+  close() {
+    this.readyState = 2;
+  }
+  addEventListener() {}
+  removeEventListener() {}
+}
+InertEventSource.CONNECTING = 0;
+InertEventSource.OPEN = 1;
+InertEventSource.CLOSED = 2;
+vi.stubGlobal('EventSource', InertEventSource);
+
 // Mock localStorage for all tests
 const localStorageMock = (() => {
   let store = {};

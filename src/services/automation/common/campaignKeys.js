@@ -35,6 +35,7 @@ export const CAMPAIGN_KEYS = new Set([
     'travel-eventFrequency',
     'travel-rerollsRemaining',
     'travel-horseback',
+    'music',
 ]);
 
 /**

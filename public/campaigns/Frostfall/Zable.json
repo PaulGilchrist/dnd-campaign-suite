@@ -102,7 +102,5 @@
     "xp": 0,
     "xpMode": "milestone",
     "background": "Wayfarer",
-    "image": "images/Zable.png",
-    "imageName": "390.jpg",
-    "imagePath": ""
+    "imagePath": "images/Zable.png"
 }
