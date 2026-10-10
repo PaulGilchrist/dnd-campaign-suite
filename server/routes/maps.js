@@ -1,7 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import { publish, activeMaps } from '../utils/changeData.js';
+import { publish, activeMaps, characterChangeData, markDirty } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { campaignMapsDir, normalizeMapFile } from '../utils/campaignPaths.js';
 
@@ -10,6 +10,18 @@ const router = express.Router();
 // Helper to sanitize map names to filenames
 const sanitizeMapName = (name) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '.json';
 const toKebabCase = (name) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+// Mirror the authoritative active map into the '__map__' runtime key so range
+// gates (rangeCheck.js) and every client see the same map the /maps list reports.
+function stampActiveMapContext(campaign, mapKey) {
+  if (!characterChangeData.has(campaign)) {
+    characterChangeData.set(campaign, {});
+  }
+  const value = { activeMapName: mapKey };
+  characterChangeData.get(campaign).__map__ = value;
+  markDirty(campaign);
+  publish(`change-${campaign}-__map__`, value, campaign);
+}
 
 // GET /api/campaigns/:campaign/maps - List all maps with active status
 router.get('/api/campaigns/:campaign/maps', asyncHandler((req, res) => {
@@ -175,6 +187,7 @@ router.delete('/api/campaigns/:campaign/maps/:mapname', asyncHandler((req, res) 
   const mapKey = fileName.replace(/\.json$/, '');
   if (activeMaps.get(campaign) === mapKey) {
     activeMaps.delete(campaign);
+    stampActiveMapContext(campaign, null);
   }
 
   // Broadcast maps list change
@@ -223,6 +236,7 @@ router.put('/api/campaigns/:campaign/maps/:mapname/rename', asyncHandler((req, r
   const newKey = newFileName.replace(/\.json$/, '');
   if (activeMaps.get(campaign) === oldKey) {
     activeMaps.set(campaign, newKey);
+    stampActiveMapContext(campaign, newKey);
   }
 
   // Broadcast maps list change
@@ -251,6 +265,7 @@ router.put('/api/campaigns/:campaign/maps/:mapname/activate', asyncHandler((req,
 
   const mapKey = fileName.replace(/\.json$/, '');
   activeMaps.set(campaign, mapKey);
+  stampActiveMapContext(campaign, mapKey);
 
   // Broadcast activation change
   publish(`map-activate-${campaign}`, { activeMap: mapKey }, campaign);

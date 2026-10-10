@@ -76,6 +76,8 @@ vi.mock('../utils/changeData.js', () => ({
             MOCK_ACTIVE_MAPS.delete(campaign);
         }),
     },
+    characterChangeData: new Map(),
+    markDirty: vi.fn(),
 }));
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────

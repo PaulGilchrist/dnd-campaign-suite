@@ -2815,3 +2815,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - `+ NPC` bare NPC = "NPC 1" HP 10; `.npc-remove-btn` swallows evaluate `.click()` — real `mouse.click` at fresh rect fires confirm ("NPC 1 has 10 HP. Remove anyway?"). Accidental re-join happens if you click the NPC list row by name text (row click adds to Initiative? no — sidebar row click opened editor; the stray join came from list-item click after nav — re-verify cs after any NPC nav).
 - Browser tools can drop both tabs to about:blank mid-session (Playwright MCP instability) — re-navigate + campaign re-select recovers cleanly; not an app defect.
 - Admin Clear Change Data + Clear Campaign Log with `window.confirm=()=>true` override: verified change-data keys [] + log 0 in one pass.
+
+## §fix-queue (2026-10-10, map-context-sync-null-stamp) New pitfalls
+
+- Any test mocking `changeData.js` must add every export the route imports — adding a route-side import silently 500s sibling test files until their mock is updated.
+- Judge console-error fixes by the since-navigation count (page-header "Console: N errors"), not `console_messages(all:true)` which returns whole-session history including stale pre-fix errors.
