@@ -5,6 +5,7 @@ import { addCondition } from '../../services/combat/conditions/conditionSaveServ
 import { getAuraConditionImmunities } from '../../services/combat/auras/auraConditionImmunity.js'
 import { addConcentration } from '../../services/combat/concentration/concentrationService.js'
 import { logConditionEvent } from '../../services/encounters/combatLoggingService.js'
+import { produceFallDamage } from '../../services/combat/fallDamage.js'
 import { cloneDeep } from 'lodash'
 
 // CLA-019: aura-granted condition immunities (Aura of Courage) gate the GM add seam —
@@ -36,7 +37,14 @@ function buildEffectEntry(data) {
     return effectEntry
 }
 
-function applyEffectTabEntry(campaignName, data) {
+function applyEffectTabEntry(campaignName, data, ctx) {
+    // CLA-315: one-shot fall-event producer — stamp trigger:'falling' +
+    // roll/applied damage, no persisted te entry (the chip IS the event).
+    if (data.effectKey === 'falling') {
+        // producer logs the fall_damage automation entry itself
+        produceFallDamage({ combatSummary: ctx.combatSummary, targetName: data.target, feet: data.value, campaignName, characters: ctx.characters })
+        return
+    }
     const effectEntry = buildEffectEntry(data)
     const existing = getRuntimeValue('campaign', 'targetEffects') || []
     const filtered = existing.filter(te => !(te.target === data.target && te.effect === data.effectKey))
@@ -77,7 +85,7 @@ export function createEffectAdderHandlers({
             }
             if (!outcome) return
         } else if (tab === 'effects') {
-            applyEffectTabEntry(campaignName, data)
+            applyEffectTabEntry(campaignName, data, { combatSummary, characters })
         } else if (tab === 'concentration') {
             if (isRaging(data.target, campaignName)) {
                 setEffectAdderTarget(null)

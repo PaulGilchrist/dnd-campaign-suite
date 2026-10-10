@@ -185,10 +185,16 @@ function logRelentlessHunterMaintained(creature, campaignName) {
   }).catch((e) => { console.error("[applyDamage] Error:", e); });
 }
 
-function buildLastAttackUpdate(existingAttack, attackerName, targetName, rawDamage, damageTypes) {
+// CLA-315: single hit descriptor object (not positional) — trigger is
+// stamped explicit (null default): the existingAttack spread would otherwise
+// leak a previous trigger:'falling' fall event into the next weapon hit and
+// fail open every matchesTrigger consumer (Slow Fall et al.).
+function buildLastAttackUpdate(existingAttack, hit) {
+  const { attackerName, targetName, rawDamage, damageTypes } = hit;
   const isSecondary = existingAttack?.primaryDamage != null;
-  return {
+  const update = {
     ...existingAttack,
+    trigger: null,
     attackerName: attackerName || existingAttack?.attackerName || null,
     targetName,
     weaponType: existingAttack?.weaponType || 'melee',
@@ -204,6 +210,8 @@ function buildLastAttackUpdate(existingAttack, attackerName, targetName, rawDama
     damageApplied: true,
     timestamp: Date.now(),
   };
+  if (hit.trigger) update.trigger = hit.trigger;
+  return update;
 }
 
 // CLA-336: passive resistances are read LIVE at hit-resolution (name included so
@@ -927,9 +935,9 @@ function isSpellOriginDamage(options, existingAttack) {
 }
 
 // Stamp campaign lastAttack with this hit and return the pre-hit attack (if any).
-function stampLastAttack(attackerName, targetName, rawDamage, damageTypes, campaignName) {
+function stampLastAttack(hit, campaignName) {
   const existingAttack = getRuntimeValue('campaign', 'lastAttack') || null;
-  setRuntimeValue('campaign', 'lastAttack', buildLastAttackUpdate(existingAttack, attackerName, targetName, rawDamage, damageTypes), campaignName);
+  setRuntimeValue('campaign', 'lastAttack', buildLastAttackUpdate(existingAttack, hit), campaignName);
   return existingAttack;
 }
 
@@ -986,7 +994,7 @@ export async function applyDamageToTarget(combatSummary, targetName, rawDamage, 
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
 
-  const existingAttack = stampLastAttack(attackerName, targetName, rawDamage, damageTypes, campaignName);
+  const existingAttack = stampLastAttack({ attackerName, targetName, rawDamage, damageTypes, trigger: options.trigger }, campaignName);
   const isSecondary = existingAttack?.primaryDamage != null;
 
   const isPlayer = creature.type === 'player';

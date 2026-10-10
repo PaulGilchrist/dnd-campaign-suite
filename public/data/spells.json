@@ -3673,7 +3673,12 @@
         ],
         "subclasses": [
             "Lore"
-        ]
+        ],
+        "automation": {
+            "type": "feather_fall",
+            "trigger": "falling",
+            "casting_time": "1 reaction"
+        }
     },
     {
         "index": "feeblemind",

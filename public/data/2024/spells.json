@@ -5068,7 +5068,12 @@
         ],
         "subclasses": [],
         "area_of_effect": null,
-        "status_effects": []
+        "status_effects": [],
+        "automation": {
+            "type": "feather_fall",
+            "trigger": "falling",
+            "casting_time": "1 reaction"
+        }
     },
     {
         "index": "feign-death",

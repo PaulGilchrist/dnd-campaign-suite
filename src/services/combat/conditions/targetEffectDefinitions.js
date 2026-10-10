@@ -1346,6 +1346,24 @@ const TARGET_EFFECT_DEFINITIONS = [
     defaults: { value: 10 },
   },
   {
+    // CLA-315: first in-app producer of trigger:'falling' events app-wide.
+    // One-shot GM stamp: applyEffectTabEntry delegates to fallDamage.js which
+    // rolls 2d10 bludgeoning per 10 feet fallen (max 20d10), applies the
+    // damage via applyDamageToTarget with trigger:'falling' stamped onto the
+    // campaign lastAttack, and logs fall_damage. No persisted te — the chip
+    // IS the fall event, not a state. Reaction consumers (Slow Fall
+    // damageReductionHandler.js, Feather Fall featherFallHandler.js) press
+    // against the stamped lastAttack afterwards.
+    effect: 'falling',
+    label: 'Falling',
+    description: 'The creature falls N feet: 2d10 bludgeoning per 10 feet fallen (max 20d10) is rolled and applied immediately, and the event is stamped as a falling trigger so Slow Fall and Feather Fall Reactions can be pressed against it (RAW: creature also lands Prone — GM-enforced, §70 advisory).',
+    icon: 'fa-person-falling',
+    cls: 'effect-debuff',
+    group: 'Movement',
+    fields: ['value'],
+    defaults: { value: 10 },
+  },
+  {
     effect: 'push',
     label: 'Pushed',
     description: 'The creature was pushed N feet straight away from the source.',

@@ -233,6 +233,7 @@ import { handle as handleLesserRestoration, applyLesserRestoration as applyLesse
 import { handle as handleRemoveCurse, applyRemoveCurse as applyRemoveCurseEffect } from './handlers/spells/removeCurseHandler.js';
 import { handle as handleLongstrider, applyLongstrider as applyLongstriderEffect } from './handlers/buffs/longstriderHandler.js';
 import { handle as handleSpareTheDying, applySpareTheDying as applySpareTheDyingEffect } from './handlers/spells/spareTheDyingHandler.js';
+import { handle as handleFeatherFall } from './handlers/spells/featherFallHandler.js';
 import { handle as handleMageArmor, applyMageArmor as applyMageArmorEffect } from './handlers/buffs/mageArmorHandler.js';
 import { handle as handleHeroesFeast, applyHeroesFeast as applyHeroesFeastEffect } from './handlers/buffs/heroesFeastHandler.js';
 import { handle as handleHypnoticPatternShake, handleConfirm as handleHypnoticPatternShakeConfirm } from './handlers/spells/hypnoticPatternShake.js';
@@ -563,6 +564,7 @@ const HANDLER_MAP = {
         longstrider_apply: applyLongstriderEffect,
         spare_the_dying: handleSpareTheDying,
         spare_the_dying_apply: applySpareTheDyingEffect,
+        feather_fall: handleFeatherFall,
         mage_armor: handleMageArmor,
         mage_armor_apply: applyMageArmorEffect,
         heroes_feast: handleHeroesFeast,
