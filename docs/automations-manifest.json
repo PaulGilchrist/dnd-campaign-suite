@@ -6713,7 +6713,7 @@
       "handler": "src/services/automation/handlers/combat/concentrationBonusAttackHandler.js (two bonus-action attacks per turn while concentrating; arrow/bolt weapons only)",
       "router": "src/services/automation/index.js (concentration_bonus_attack :397)",
       "infoBuilder": "src/services/combat/automation/automationInfoBuilder/attack.js (concentration_bonus_attack)",
-      "verified": "broken — see .opencode/plans/bug-sp-129-swift-quiver.md",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Bonus Action each turn while concentrating: two attacks with an arrow/bolt weapon (spell creates the ammunition)",
       "expectedBehavior": "When you cast the spell and as a Bonus Action until it ends, you can make two attacks with a weapon that fires Arrows or Bolts, such as a Longbow or a Light Crossbow. The spell magically creates the ammunition needed for each attack."

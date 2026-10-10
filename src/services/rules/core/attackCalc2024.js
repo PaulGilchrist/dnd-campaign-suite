@@ -440,7 +440,7 @@ function resolveSwiftQuiverStats(bowWeapon, dexMod, proficiency) {
     const damageDie = weapon?.damage?.damage_dice || '1d8';
     const damageType = weapon?.damage?.damage_type || 'Piercing';
     return {
-        range: rawRange.replace(/_ft$/, '').replace(/_ft/g, ' ft'),
+        range: typeof rawRange === 'number' ? rawRange : rawRange.replace(/_ft$/, '').replace(/_ft/g, ' ft'),
         damageType,
         damage: `${damageDie}+${dexMod}`,
         hitBonusFormula: `To Hit Bonus = Dexterity Modifier (${dexMod}) + Proficiency (${proficiency})`,
@@ -455,11 +455,13 @@ function buildSwiftQuiverAttack(name, toHit, stats) {
         isRanged: true,
         range: stats.range,
         toHit,
+        hitBonus: toHit,
         hitBonusFormula: stats.hitBonusFormula,
         damageFormula: stats.damageFormula,
         damage: stats.damage,
         damageType: stats.damageType,
         abilityName: 'Dexterity',
+        type: 'Bonus Action',
         actionType: 'Bonus Action',
         properties: ['Ammunition'],
         isSwiftQuiver: true,
@@ -474,7 +476,7 @@ function buildSwiftQuiverAttack(name, toHit, stats) {
  * @returns {Object[]}
  */
 function buildSwiftQuiverAttacks(allEquipment, playerStats, proficiency) {
-    const combatSummary = getCombatSummary();
+    const combatSummary = getCombatSummary(playerStats.campaignName);
     const swiftQuiverCreature = combatSummary?.creatures?.find(c => c.name === playerStats.name);
     const hasSwiftQuiverConcentration = swiftQuiverCreature?.concentration?.spell === 'Swift Quiver';
     if (!hasSwiftQuiverConcentration) return [];

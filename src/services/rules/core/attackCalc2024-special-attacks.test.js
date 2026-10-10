@@ -135,6 +135,80 @@ describe('attackCalc2024 - special attacks', () => {
       expect(result[1].name).toBe('Swift Quiver (2nd Attack)');
       expect(result[0].isSwiftQuiver).toBe(true);
       expect(result[0].actionType).toBe('Bonus Action');
+      expect(result[0].type).toBe('Bonus Action');
+      expect(result[1].type).toBe('Bonus Action');
+    });
+
+    it('handles numeric weapon range from live equipment data (SP-129)', async () => {
+      findEquippedWeaponsStub.mockReturnValue([]);
+
+      const combatData = await import('../../encounters/combatData.js');
+      vi.mocked(combatData.getCombatSummary).mockReturnValue({
+        creatures: [{ name: 'Test Character', concentration: { spell: 'Swift Quiver' } }],
+      });
+
+      const allEquipment = [
+        {
+          name: 'Longbow',
+          equipment_category: 'Weapon',
+          weapon_range: 'Ranged',
+          properties: ['Ammunition', 'Heavy', 'Two-Handed'],
+          damage: { damage_dice: '1d8', damage_type: 'Piercing' },
+          range: { normal: 150, long: 600 },
+        },
+      ];
+      const playerStats = defaultPlayerStats({
+        level: 17,
+        name: 'Test Character',
+        abilities: [
+          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+          { name: 'Dexterity', baseScore: 20, abilityImprovements: 0, miscBonus: 0, bonus: 5 },
+        ],
+        inventory: { equipped: ['Longbow'] },
+      });
+
+      const result = getAttacks(allEquipment, [], playerStats);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].range).toBe(600);
+      expect(result[0].type).toBe('Bonus Action');
+      expect(result[0].hitBonus).toBe(11);
+      expect(result[0].damage).toBe('1d8+5');
+    });
+
+    it('threads playerStats.campaignName into getCombatSummary for the concentration gate (SP-129)', async () => {
+      findEquippedWeaponsStub.mockReturnValue([]);
+
+      const combatData = await import('../../encounters/combatData.js');
+      vi.mocked(combatData.getCombatSummary).mockReturnValue({
+        creatures: [{ name: 'Test Character', concentration: { spell: 'Swift Quiver' } }],
+      });
+
+      const allEquipment = [
+        {
+          name: 'Longbow',
+          equipment_category: 'Weapon',
+          weapon_range: 'Ranged',
+          properties: ['Ammunition', 'Heavy', 'Two-Handed'],
+          damage: { damage_dice: '1d8', damage_type: 'Piercing' },
+          range: { normal: 150, long: 600 },
+        },
+      ];
+      const playerStats = defaultPlayerStats({
+        level: 5,
+        name: 'Test Character',
+        campaignName: 'test-campaign',
+        abilities: [
+          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+          { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+        ],
+        inventory: { equipped: ['Longbow'] },
+      });
+
+      const result = getAttacks(allEquipment, [], playerStats);
+
+      expect(result).toHaveLength(2);
+      expect(combatData.getCombatSummary).toHaveBeenCalledWith('test-campaign');
     });
 
     it('does not add Swift Quiver attacks when concentration is not active', async () => {
