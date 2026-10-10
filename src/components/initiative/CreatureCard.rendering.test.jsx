@@ -266,6 +266,44 @@ describe('CreatureCard - rendering', () => {
         });
     });
 
+    describe('statless default NPC hint', () => {
+        const statlessNpc = {
+            name: 'NPC 1',
+            type: 'npc',
+            currentHp: 10,
+            maxHp: 10,
+            ac: 10,
+            initiative: '',
+            targetName: null,
+            conditions: [],
+            concentration: null,
+        };
+
+        it('shows a statless default hint with 10 HP on auto-named NPCs', () => {
+            render(<CreatureCard {...props} creature={statlessNpc} allCreatures={[statlessNpc]} />);
+            const hint = document.querySelector('.npc-statless-hint');
+            expect(hint).toBeInTheDocument();
+            expect(hint.textContent).toMatch(/Statless/i);
+            expect(hint.textContent).toContain('10 HP');
+        });
+
+        it('hides the hint once the NPC HP is no longer the default', () => {
+            render(<CreatureCard {...props} creature={{ ...statlessNpc, currentHp: 7 }} allCreatures={[statlessNpc]} />);
+            expect(document.querySelector('.npc-statless-hint')).not.toBeInTheDocument();
+        });
+
+        it('does not show the hint for renamed (monster-backed) NPCs', () => {
+            const goblin = { ...defaultNpcCreature, currentHp: 7, maxHp: 7 };
+            render(<CreatureCard {...props} creature={goblin} allCreatures={[goblin]} />);
+            expect(document.querySelector('.npc-statless-hint')).not.toBeInTheDocument();
+        });
+
+        it('does not show the hint for player cards', () => {
+            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, name: 'NPC 1' }} allCreatures={[defaultPlayerCreature]} />);
+            expect(document.querySelector('.npc-statless-hint')).not.toBeInTheDocument();
+        });
+    });
+
     describe('edge cases - creature data', () => {
         it('should render the creature card when allCreatures is empty', () => {
             render(<CreatureCard {...props} creature={defaultPlayerCreature} allCreatures={[]} />);

@@ -680,7 +680,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             </div>
               <div className='combat-controls'>
                   <button className='clear-button' onClick={handleClear}>Clear</button>
-                  <button onClick={handleAddNpc}>+ NPC</button>
+                  <button onClick={handleAddNpc} title='Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — rename it to a monster name or drop a monster from the Encounter Builder to set real stats'>+ NPC</button>
                   <button onClick={handlePreviousCreature} disabled={isPrevDisabledValue}>← Prev</button>
                   <button onClick={handleNextCreature}>Next →</button>
               </div>

@@ -136,6 +136,17 @@ describe('Initiative', () => {
                 expect(screen.getByText('Next →')).toBeInTheDocument();
             });
         });
+
+        it('should give the + NPC button a title explaining the auto-naming and 10 HP default', async () => {
+            vi.mocked(combatData.loadCombatSummary).mockResolvedValue({ round: 1, creatures: [] });
+            await act(async () => { render(<Initiative {...props} />); });
+            const npcButton = await screen.findByText('+ NPC');
+            const title = npcButton.getAttribute('title');
+            expect(title).toContain('NPC 1');
+            expect(title).toContain('NPC 2');
+            expect(title).toContain('10 HP');
+            expect(title).toMatch(/statless/i);
+        });
     });
 
     describe('clear combat', () => {

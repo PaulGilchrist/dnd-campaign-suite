@@ -188,6 +188,12 @@
     min-height: 1.2em;
 }
 
+.initiative .npc-statless-hint {
+    font-size: 0.75em;
+    text-align: center;
+    margin-top: 2px;
+}
+
 .initiative .npc-name-input {
     border: none;
     background-color: transparent;

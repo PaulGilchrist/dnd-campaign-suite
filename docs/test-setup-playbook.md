@@ -2865,3 +2865,9 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - YouTube embeds emit their own third-party console errors (googleads doubleclick CORS `ERR_FAILED` from inside the embed document, `@ https://www.youtube.com/embed/...:0`) after playback starts — tracking-prevention noise, not app-origin; attribute console errors by the trailing `@ URL` (app errors point at localhost:5173).
 - change-data GET for whole-store is `/api/campaigns/:c/change-data` (returns object directly, e.g. `.music`); `/change-data/campaign` 404s to index.html HTML → JSON parse SyntaxError.
 - FLAKY (pre-existing, unrelated): `mazeHandler.sp080-escape-concentration.test.js` escape-roll test is unseeded — fails ~1-in-3 standalone; re-run to confirm before attributing to your change.
+
+## + NPC statless-hint tooltip (2026-10-10, QA-backlog IMP)
+- "+NPC" default verified in code (initiativeService.js addNpc): name `NPC N`, ac:10, maxHp/currentHp:10, empty saveBonuses — tooltip/hint copy must match those bytes. Hint gates on `/^NPC \d+$/` + hp===10 so renaming to a monster (applyNpcMonsterData) or editing HP clears it with no extra state.
+- `div.creature-card.npc:has(.monster-autocomplete-input[value="NPC 1"]) .npc-remove-btn` is a clean trusted-click anchor per card (Playwright CSS :has + exact input value; sidesteps §484/§490 name-text cross-match).
+- Harness auto-accepts both remove confirms this session (§485/§1336 re-confirm): browser_handle_dialog errors "already handled" both times — verify removal by cs GET names list, not by dialog tool result.
+- Playwright `browser_navigate` URL arg rewritten to routify-file-proxy aliyuncs 403 again (§90 family); page stayed localhost:5173 — adjudicate by own location.href.

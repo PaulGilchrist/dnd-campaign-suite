@@ -624,6 +624,11 @@ function CreatureCard({
             <NpcRemoveButton creature={creature} isLocalhost={isLocalhost} onRemoveNpc={onRemoveNpc} />
             <CardAvatar creature={creature} isLocalhost={isLocalhost} isPlayerSummoned={isPlayerSummoned} npcImage={npcImage} campaignName={campaignName} characters={characters} onViewCharacter={onViewCharacter} onNpcClick={onNpcClick} />
             <CardName creature={creature} campaignNpcs={campaignNpcs} onNameChange={onNameChange} />
+            {creature.type === 'npc' && /^NPC \d+$/.test(creature.name) && creature.currentHp === 10 && creature.maxHp === 10 && (
+                <div className='npc-statless-hint text-muted'>
+                    <i className='fa-solid fa-circle-info'></i> Statless default · 10 HP (AC 10)
+                </div>
+            )}
             <CreatureHp
                 creature={creature}
                 isLocalhost={isLocalhost}
