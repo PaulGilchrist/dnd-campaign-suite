@@ -62,7 +62,7 @@ describe('WizardStepSpells — FT-068 Ritual Master picker', () => {
 
   it('auto-opens the Ritual Master modal when the feat is held with no chosen spells (pitfall 34 mirror)', () => {
     render(
-      <WizardStepSpells
+      <WizardStepSpells stepNumber={14}
         formData={makeFormData()}
         allSpells={allSpells}
         onArrayFieldChange={vi.fn()}
@@ -74,7 +74,7 @@ describe('WizardStepSpells — FT-068 Ritual Master picker', () => {
 
   it('shows the Edit Ritual Spells banner once spells are chosen and reopens the modal on click', () => {
     render(
-      <WizardStepSpells
+      <WizardStepSpells stepNumber={14}
         formData={makeFormData({ ritualMasterSpells: ['Alarm', 'Identify', 'Comprehend Languages', 'Detect Magic', 'Purify Food and Drink'] })}
         allSpells={allSpells}
         onArrayFieldChange={vi.fn()}
@@ -89,7 +89,7 @@ describe('WizardStepSpells — FT-068 Ritual Master picker', () => {
 
   it('does not render the ritual picker for non-holders', () => {
     render(
-      <WizardStepSpells
+      <WizardStepSpells stepNumber={14}
         formData={makeFormData({ feats: ['Poisoner'] })}
         allSpells={allSpells}
         onArrayFieldChange={vi.fn()}

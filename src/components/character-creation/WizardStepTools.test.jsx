@@ -85,13 +85,13 @@ function getCardByName(name) {
 describe('WizardStepTools', () => {
   describe('rendering', () => {
     it('should render step header', async () => {
-      render(<WizardStepTools {...baseProps} />);
+      render(<WizardStepTools stepNumber={11} {...baseProps} />);
       await waitForTools();
       expect(screen.getByText('Step 11: Tool Proficiencies')).toBeInTheDocument();
     });
 
     it('should render all four tool categories', async () => {
-      render(<WizardStepTools {...baseProps} />);
+      render(<WizardStepTools stepNumber={11} {...baseProps} />);
       await waitForTools();
       expect(screen.getByText("Artisan's Tools")).toBeInTheDocument();
       expect(screen.getByText('Gaming Sets')).toBeInTheDocument();
@@ -100,7 +100,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should render tools within each category', async () => {
-      render(<WizardStepTools {...baseProps} />);
+      render(<WizardStepTools stepNumber={11} {...baseProps} />);
       await waitForTools();
       expect(screen.getByText("Alchemist's Supplies")).toBeInTheDocument();
       expect(screen.getByText("Brewer's Supplies")).toBeInTheDocument();
@@ -109,7 +109,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should render ability badges mapped from full ability names', async () => {
-      render(<WizardStepTools {...baseProps} />);
+      render(<WizardStepTools stepNumber={11} {...baseProps} />);
       await waitForTools();
       // Intelligence -> INT, Dexterity -> DEX, Wisdom -> WIS, Charisma -> CHA
       expect(document.querySelectorAll('.tool-ability-badge').length).toBeGreaterThan(0);
@@ -125,7 +125,7 @@ describe('WizardStepTools', () => {
         return mockToolData[cat] || [];
       });
 
-      render(<WizardStepTools {...baseProps} />);
+      render(<WizardStepTools stepNumber={11} {...baseProps} />);
       await waitForTools();
 
       const card = getCardByName('Simple Hammer');
@@ -134,7 +134,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should render tool details (utilize/craft) when tool is selected', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         formData={{ toolProficiencies: ["Alchemist's Supplies"] }}
       />);
@@ -148,7 +148,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should NOT render tool details for unselected tools', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         formData={{ toolProficiencies: [] }}
       />);
@@ -161,7 +161,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should render warnings when provided', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         toolWarnings={[{ type: 'warning', message: 'Too many tools selected' }]}
       />);
@@ -170,7 +170,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should render error message when provided', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         errors={{ toolProficiencies: 'Tool proficiency error' }}
       />);
@@ -179,17 +179,17 @@ describe('WizardStepTools', () => {
     });
 
     it('should hide rules info when toolLimits is falsy or empty', async () => {
-      render(<WizardStepTools {...baseProps} toolLimits={null} />);
+      render(<WizardStepTools stepNumber={11} {...baseProps} toolLimits={null} />);
       await waitForTools();
       expect(screen.queryByText(/Rules:/)).not.toBeInTheDocument();
 
-      render(<WizardStepTools {...baseProps} toolLimits={{}} />);
+      render(<WizardStepTools stepNumber={11} {...baseProps} toolLimits={{}} />);
       await waitForTools();
       expect(screen.queryByText(/Rules:/)).not.toBeInTheDocument();
     });
 
     it('should show rules info when toolLimits exists but categoryLimits is undefined', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         toolLimits={{ skilledUsesAvailable: 0 }}
       />);
@@ -204,7 +204,7 @@ describe('WizardStepTools', () => {
     it('should render empty tool list when getToolsByCategory returns empty arrays', async () => {
       getToolsByCategory.mockResolvedValue([]);
 
-      render(<WizardStepTools {...baseProps} />);
+      render(<WizardStepTools stepNumber={11} {...baseProps} />);
       await waitFor(() => {
         expect(screen.getByText('Step 11: Tool Proficiencies')).toBeInTheDocument();
       });
@@ -215,7 +215,7 @@ describe('WizardStepTools', () => {
 
   describe('selection state', () => {
     it('should mark selected tools with "selected" class', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         formData={{ toolProficiencies: ["Alchemist's Supplies", 'Dice Set'] }}
       />);
@@ -229,7 +229,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should mark pre-selected tools with "pre-selected" class', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         preSelectedTools={['Brewer\'s Supplies']}
       />);
@@ -240,7 +240,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should mark tools that are both pre-selected and selected with both classes', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         formData={{ toolProficiencies: ['Brewer\'s Supplies'] }}
         preSelectedTools={['Brewer\'s Supplies']}
@@ -253,7 +253,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should render checkboxes with checked state matching formData', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         formData={{ toolProficiencies: ["Alchemist's Supplies"] }}
       />);
@@ -274,7 +274,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should disable checkbox for pre-selected + selected tools', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         formData={{ toolProficiencies: ['Brewer\'s Supplies'] }}
         preSelectedTools={['Brewer\'s Supplies']}
@@ -287,7 +287,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should NOT disable checkbox for pre-selected but NOT selected tools', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         formData={{ toolProficiencies: [] }}
         preSelectedTools={['Brewer\'s Supplies']}
@@ -305,7 +305,7 @@ describe('WizardStepTools', () => {
   describe('tool toggling', () => {
     it('should call onToolToggle when toggling a non-pre-selected tool on', async () => {
       const mockOnToolToggle = vi.fn();
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         onToolToggle={mockOnToolToggle}
       />);
@@ -320,7 +320,7 @@ describe('WizardStepTools', () => {
 
     it('should NOT call onToolToggle when clicking a pre-selected + selected tool', async () => {
       const mockOnToolToggle = vi.fn();
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         formData={{ toolProficiencies: ['Brewer\'s Supplies'] }}
         preSelectedTools={['Brewer\'s Supplies']}
@@ -337,7 +337,7 @@ describe('WizardStepTools', () => {
 
     it('should call onToolToggle when toggling off a non-pre-selected tool', async () => {
       const mockOnToolToggle = vi.fn();
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         formData={{ toolProficiencies: ["Alchemist's Supplies"] }}
         onToolToggle={mockOnToolToggle}
@@ -354,7 +354,7 @@ describe('WizardStepTools', () => {
 
   describe('rules info display', () => {
     it('should display selected tool count including pre-selected', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         formData={{ toolProficiencies: ["Alchemist's Supplies", 'Dice Set'] }}
         preSelectedTools={['Brewer\'s Supplies']}
@@ -368,7 +368,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should display category limits from toolLimits', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         toolLimits={{
           categoryLimits: new Map([["Artisan's Tools", 2], ['Gaming Sets', 1]]),
@@ -382,7 +382,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should filter out zero-count categories from the display', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         toolLimits={{
           categoryLimits: new Map([["Artisan's Tools", 2], ['Gaming Sets', 0]]),
@@ -398,14 +398,14 @@ describe('WizardStepTools', () => {
 
   describe('skilled tool usage display', () => {
     it('should conditionally show skilled info based on skilledUsesAvailable', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         toolLimits={{ categoryLimits: new Map(), skilledUsesAvailable: 0 }}
       />);
       await waitForTools();
       expect(screen.queryByText(/Skilled/)).not.toBeInTheDocument();
 
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         toolLimits={{ categoryLimits: new Map(), skilledUsesAvailable: 3 }}
         skillLimits={{ skilledUsesUsed: 2 }}
@@ -414,7 +414,7 @@ describe('WizardStepTools', () => {
       expect(screen.getByText(/Skilled/)).toBeInTheDocument();
       expect(screen.getByText(/2 of 3 uses used for tools/)).toBeInTheDocument();
 
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         toolLimits={{ categoryLimits: new Map(), skilledUsesAvailable: 3 }}
         skillLimits={{ skilledUsesUsed: 0 }}
@@ -427,7 +427,7 @@ describe('WizardStepTools', () => {
   describe('placeholder tool handling', () => {
     it('should exclude placeholder tools from realToolCount', async () => {
       // Placeholder format: "2 from: SomeTool"
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         formData={{ toolProficiencies: ["Alchemist's Supplies", "2 from: Brewer's Supplies"] }}
       />);
@@ -438,7 +438,7 @@ describe('WizardStepTools', () => {
     });
 
     it('should exclude placeholder tools from skilled tool tracking', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         formData={{ toolProficiencies: ["Alchemist's Supplies", "2 from: Brewer's Supplies"] }}
         toolLimits={{
@@ -457,7 +457,7 @@ describe('WizardStepTools', () => {
 
   describe('empty state', () => {
     it('should render without crashing when formData has no toolProficiencies key', async () => {
-      render(<WizardStepTools
+      render(<WizardStepTools stepNumber={11}
         {...baseProps}
         formData={{}}
       />);
@@ -476,7 +476,7 @@ describe('WizardStepTools', () => {
       };
       const skillLimits = { skilledUsesUsed: 0 };
 
-      const { rerender } = render(<WizardStepTools
+      const { rerender } = render(<WizardStepTools stepNumber={11}
         {...baseProps}
         onToolToggle={mockOnToolToggle}
         toolLimits={limits}
@@ -485,7 +485,7 @@ describe('WizardStepTools', () => {
       await waitForTools();
 
       // Rerender with identical props (same references) should use memo
-      rerender(<WizardStepTools
+      rerender(<WizardStepTools stepNumber={11}
         {...baseProps}
         onToolToggle={mockOnToolToggle}
         toolLimits={limits}
@@ -502,7 +502,7 @@ describe('WizardStepTools', () => {
         skilledUsesAvailable: 0,
       };
 
-      const { rerender } = render(<WizardStepTools
+      const { rerender } = render(<WizardStepTools stepNumber={11}
         {...baseProps}
         onToolToggle={mockOnToolToggle}
         toolLimits={limits}
@@ -510,7 +510,7 @@ describe('WizardStepTools', () => {
       />);
       await waitForTools();
 
-      rerender(<WizardStepTools
+      rerender(<WizardStepTools stepNumber={11}
         {...baseProps}
         onToolToggle={mockOnToolToggle}
         toolLimits={limits}

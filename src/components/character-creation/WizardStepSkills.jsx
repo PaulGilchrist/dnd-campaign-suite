@@ -186,7 +186,7 @@ const SkillLimitsInfo = ({ skillLimits, formData }) => (
 	</div>
 );
 
-const WizardStepSkills = React.memo(function WizardStepSkills({ formData, errors, onSkillToggle, onSkillExpertiseToggle, skillLimits, expertiseLimits, warnings, preSelectedSkills }) {
+const WizardStepSkills = React.memo(function WizardStepSkills({ stepNumber, formData, errors, onSkillToggle, onSkillExpertiseToggle, skillLimits, expertiseLimits, warnings, preSelectedSkills }) {
   const [showExpertiseFeedback, setShowExpertiseFeedback] = useState(null);
   const [skills, setSkills] = useState([]);
 
@@ -308,7 +308,7 @@ const WizardStepSkills = React.memo(function WizardStepSkills({ formData, errors
 
 	return (
 		<div className="wizard-step wizard-step-skills">
-			<h2>Step 6: Skill Proficiencies</h2>
+			<h2>Step {stepNumber}: Skill Proficiencies</h2>
 
 			{/* Display skill limits info with breakdown */}
 			{skillLimits && <SkillLimitsInfo skillLimits={skillLimits} formData={formData} />}

@@ -156,8 +156,8 @@ describe('WizardStepInventory', () => {
 
   describe('rendering', () => {
     it('renders header, gold input, textareas, search buttons, and section labels', () => {
-      render(<WizardStepInventory {...createMockProps()} />);
-      expect(screen.getByText('Step 11: Inventory')).toBeInTheDocument();
+      render(<WizardStepInventory stepNumber={16} {...createMockProps()} />);
+      expect(screen.getByText('Step 16: Inventory')).toBeInTheDocument();
       expect(screen.getByRole('spinbutton', { name: /Gold Pieces/i })).toBeInTheDocument();
       expect(screen.getAllByRole('textbox')).toHaveLength(4);
       expect(
@@ -173,14 +173,14 @@ describe('WizardStepInventory', () => {
       const props = createMockProps({
         formData: { inventory: { gold: 50 } },
       });
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
       expect(screen.getByRole('spinbutton', { name: /Gold Pieces/i })).toHaveValue(50);
     });
 
     it('calls onInventoryChange with parsed integer when gold changes', () => {
       const onInventoryChange = vi.fn();
       const props = createMockProps({ onInventoryChange });
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
       const goldInput = screen.getByRole('spinbutton', { name: /Gold Pieces/i });
       fireEvent.change(goldInput, { target: { value: '100' } });
       expect(onInventoryChange).toHaveBeenCalledWith('gold', 100);
@@ -189,7 +189,7 @@ describe('WizardStepInventory', () => {
     it('calls onInventoryChange with 0 for empty, non-numeric, or decimal input', () => {
       const onInventoryChange = vi.fn();
       const props = createMockProps({ onInventoryChange });
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
       const goldInput = screen.getByRole('spinbutton', { name: /Gold Pieces/i });
 
       fireEvent.change(goldInput, { target: { value: '' } });
@@ -208,7 +208,7 @@ describe('WizardStepInventory', () => {
       const props = createMockProps({
         formData: { inventory: {} },
       });
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
       expect(screen.getByRole('spinbutton', { name: /Gold Pieces/i })).toHaveValue(null);
     });
   });
@@ -222,7 +222,7 @@ describe('WizardStepInventory', () => {
         onInventoryChange,
         onTempInventoryChange,
       });
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
 
       const backpackTextarea = screen.getAllByRole('textbox')[0];
       fireEvent.change(backpackTextarea, { target: { value: 'Drums, Guitar' } });
@@ -246,7 +246,7 @@ describe('WizardStepInventory', () => {
         onInventoryChange,
         onTempInventoryChange,
       });
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
 
       const backpackTextarea = screen.getAllByRole('textbox')[0];
       fireEvent.change(backpackTextarea, {
@@ -272,7 +272,7 @@ describe('WizardStepInventory', () => {
         onInventoryChange,
         onTempInventoryChange,
       });
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
 
       const backpackTextarea = screen.getAllByRole('textbox')[0];
       fireEvent.change(backpackTextarea, { target: { value: '' } });
@@ -289,7 +289,7 @@ describe('WizardStepInventory', () => {
         onInventoryChange,
         onTempInventoryChange,
       });
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
 
       const equippedTextarea = screen.getAllByRole('textbox')[1];
       fireEvent.change(equippedTextarea, {
@@ -315,7 +315,7 @@ describe('WizardStepInventory', () => {
         onInventoryChange,
         onTempInventoryChange,
       });
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
 
       const backpackTextarea = screen.getAllByRole('textbox')[0];
 
@@ -364,7 +364,7 @@ describe('WizardStepInventory', () => {
           equipped: ['Longsword'],
         },
       });
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
 
       expect(screen.getAllByText('Rope').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Torch').length).toBeGreaterThan(0);
@@ -376,13 +376,13 @@ describe('WizardStepInventory', () => {
       const props = createMockProps({
         tempInventory: { backpack: ['Rope'], equipped: [] },
       });
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
       expect(screen.getByText('1 item')).toBeInTheDocument();
     });
 
     it('does not render the preview container when there are no items', () => {
       const { container } = render(
-        <WizardStepInventory
+        <WizardStepInventory stepNumber={16}
           {...createMockProps({
             tempInventory: { backpack: [], equipped: [] },
           })}
@@ -399,13 +399,13 @@ describe('WizardStepInventory', () => {
       const props = createMockProps({
         tempInventory: { backpack: ['Rope'], equipped: [] },
       });
-      const { rerender } = render(<WizardStepInventory {...props} />);
+      const { rerender } = render(<WizardStepInventory stepNumber={16} {...props} />);
 
       const backpackTextarea = screen.getAllByRole('textbox')[0];
       expect(backpackTextarea).toHaveValue('Rope');
 
       rerender(
-        <WizardStepInventory
+        <WizardStepInventory stepNumber={16}
           {...props}
           tempInventory={{ backpack: ['Rope', 'Torch'], equipped: [] }}
         />
@@ -418,7 +418,7 @@ describe('WizardStepInventory', () => {
       const props = createMockProps({
         tempInventory: { backpack: ['Rope'], equipped: [] },
       });
-      const { rerender } = render(<WizardStepInventory {...props} />);
+      const { rerender } = render(<WizardStepInventory stepNumber={16} {...props} />);
 
       const backpackTextarea = screen.getAllByRole('textbox')[0];
       fireEvent.focus(backpackTextarea);
@@ -427,7 +427,7 @@ describe('WizardStepInventory', () => {
       });
 
       rerender(
-        <WizardStepInventory
+        <WizardStepInventory stepNumber={16}
           {...props}
           tempInventory={{ backpack: ['Rope', 'Torch'], equipped: [] }}
         />
@@ -445,7 +445,7 @@ describe('WizardStepInventory', () => {
       );
 
       const props = createMockProps();
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
 
       const buttons = screen.getAllByRole('button', {
         name: /Search Equipment/,
@@ -464,7 +464,7 @@ describe('WizardStepInventory', () => {
         createMockHookReturn({ searchField: 'backpack' })
       );
       const props = createMockProps();
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
       expect(screen.getByTestId('equipment-search-modal')).toBeInTheDocument();
     });
 
@@ -473,7 +473,7 @@ describe('WizardStepInventory', () => {
         createMockHookReturn({ searchField: null })
       );
       const props = createMockProps();
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
       expect(
         screen.queryByTestId('equipment-search-modal')
       ).not.toBeInTheDocument();
@@ -491,7 +491,7 @@ describe('WizardStepInventory', () => {
       );
 
       const props = createMockProps();
-      render(<WizardStepInventory {...props} />);
+      render(<WizardStepInventory stepNumber={16} {...props} />);
 
       // Close via ✕ button
       fireEvent.click(screen.getByText('✕'));
@@ -508,7 +508,7 @@ describe('WizardStepInventory item details', () => {
 
   it('renders editable quantity and description rows for backpack items', () => {
     const props = createMockProps();
-    render(<WizardStepInventory {...props} />);
+    render(<WizardStepInventory stepNumber={16} {...props} />);
     const qty = screen.getByLabelText('Quantity for Rope');
     const desc = screen.getByLabelText('Description for Rope');
     expect(qty).toHaveValue(1);
@@ -518,7 +518,7 @@ describe('WizardStepInventory item details', () => {
   it('writes quantity and description into inventory.itemMeta via onInventoryChange', () => {
     const onInventoryChange = vi.fn();
     const props = createMockProps({ onInventoryChange });
-    render(<WizardStepInventory {...props} />);
+    render(<WizardStepInventory stepNumber={16} {...props} />);
 
     fireEvent.change(screen.getByLabelText('Quantity for Torch'), { target: { value: '4' } });
     expect(onInventoryChange).toHaveBeenCalledWith('itemMeta', {
@@ -533,7 +533,7 @@ describe('WizardStepInventory item details', () => {
 
   it('does not render item details when the backpack is empty', () => {
     const props = createMockProps({ tempInventory: { backpack: [], equipped: [] } });
-    render(<WizardStepInventory {...props} />);
+    render(<WizardStepInventory stepNumber={16} {...props} />);
     expect(screen.queryByText('Item Details (optional)')).toBeNull();
   });
 
@@ -543,7 +543,7 @@ describe('WizardStepInventory item details', () => {
         inventory: { gold: 50, itemMeta: { Rope: { quantity: 2, description: 'hempen' } } },
       },
     });
-    render(<WizardStepInventory {...props} />);
+    render(<WizardStepInventory stepNumber={16} {...props} />);
     expect(screen.getByLabelText('Quantity for Rope')).toHaveValue(2);
     expect(screen.getByLabelText('Description for Rope')).toHaveValue('hempen');
   });

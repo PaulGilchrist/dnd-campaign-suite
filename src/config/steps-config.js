@@ -254,6 +254,29 @@ export const WIZARD_STEPS = [
 export const getTotalSteps = () => WIZARD_STEPS.length;
 
 /**
+ * Get the steps actually walked for a given flow, numbered consecutively.
+ * Single source of truth for both the sidebar indicator and the content
+ * headings: `displayNumber` is 1-based over visible steps only.
+ *  - isEditing: step 1 (Ruleset) is skipped.
+ *  - ruleset !== '2024': step 5 (Background) is skipped (2024-only by design).
+ */
+export const getVisibleSteps = ({ isEditing = false, ruleset } = {}) =>
+  WIZARD_STEPS
+    .filter((step) => {
+      if (isEditing && step.step === 1) return false;
+      if (ruleset !== '2024' && step.step === 5) return false;
+      return true;
+    })
+    .map((step, index) => ({ ...step, displayNumber: index + 1 }));
+
+/**
+ * Get the consecutive display number for a canonical step number in a given flow.
+ * Returns undefined when the step is not part of the flow.
+ */
+export const getDisplayNumber = (stepNumber, { isEditing = false, ruleset } = {}) =>
+  getVisibleSteps({ isEditing, ruleset }).find((step) => step.step === stepNumber)?.displayNumber;
+
+/**
  * Get the step configuration for a given step number.
  */
 export const getStepConfig = (stepNumber) => WIZARD_STEPS.find((step) => step.step === stepNumber);

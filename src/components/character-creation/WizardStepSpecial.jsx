@@ -2,7 +2,7 @@
 
 import PreviewToggle from '../common/PreviewToggle.jsx';
 
-function WizardStepSpecial({ formData, onArrayFieldChange }) {
+function WizardStepSpecial({ stepNumber, formData, onArrayFieldChange }) {
   // Normalize special actions to ensure they're objects with name/description/details
   const normalizedActions = (formData.specialActions || []).map(action => 
     typeof action === 'string' ? { name: action, description: '', details: null } : action
@@ -44,7 +44,7 @@ function WizardStepSpecial({ formData, onArrayFieldChange }) {
 
   return (
     <div className="wizard-step">
-      <h2>Step 12: Special Actions</h2>
+      <h2>Step {stepNumber}: Special Actions</h2>
       
       {/* Add new action form */}
       <div className="form-group">

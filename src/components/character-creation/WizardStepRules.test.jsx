@@ -20,7 +20,7 @@ describe('WizardStepRules', () => {
 
   describe('rendering', () => {
     it('should render the step heading, description, and both ruleset options', () => {
-      render(<WizardStepRules {...createMockProps()} />);
+      render(<WizardStepRules stepNumber={1} {...createMockProps()} />);
       expect(screen.getByRole('heading', { name: 'Select Rules System' })).toBeInTheDocument();
       expect(screen.getByText(/Choose which D&D ruleset your character will follow:/)).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: '5th Edition (5e)' })).toBeInTheDocument();
@@ -28,7 +28,7 @@ describe('WizardStepRules', () => {
     });
 
     it('should render option content for both 5e and 2024', () => {
-      render(<WizardStepRules {...createMockProps()} />);
+      render(<WizardStepRules stepNumber={1} {...createMockProps()} />);
       // 5e content
       expect(screen.getByText(/The classic D&D ruleset from 2014/)).toBeInTheDocument();
       expect(screen.getByText('Traditional spell slots')).toBeInTheDocument();
@@ -46,13 +46,13 @@ describe('WizardStepRules', () => {
 
   describe('selection state', () => {
     it('should mark the matching ruleset option as selected', () => {
-      render(<WizardStepRules {...createMockProps({ ruleset: '5e' })} />);
+      render(<WizardStepRules stepNumber={1} {...createMockProps({ ruleset: '5e' })} />);
       expect(screen.getByTestId('rules-option-5e')).toHaveClass('selected');
       expect(screen.getByTestId('rules-option-2024')).not.toHaveClass('selected');
     });
 
     it('should mark the 2024 option as selected when ruleset is 2024', () => {
-      render(<WizardStepRules {...createMockProps({ ruleset: '2024' })} />);
+      render(<WizardStepRules stepNumber={1} {...createMockProps({ ruleset: '2024' })} />);
       expect(screen.getByTestId('rules-option-5e')).not.toHaveClass('selected');
       expect(screen.getByTestId('rules-option-2024')).toHaveClass('selected');
     });
@@ -61,21 +61,21 @@ describe('WizardStepRules', () => {
   describe('selection switching', () => {
     it('should call onRulesetChange with the clicked ruleset', () => {
       const onRulesetChange = vi.fn();
-      render(<WizardStepRules {...createMockProps({ onRulesetChange })} />);
+      render(<WizardStepRules stepNumber={1} {...createMockProps({ onRulesetChange })} />);
       fireEvent.click(screen.getByTestId('rules-option-5e'));
       expect(onRulesetChange).toHaveBeenCalledWith('5e');
     });
 
     it('should call onRulesetChange with 2024 when the 2024 option is clicked', () => {
       const onRulesetChange = vi.fn();
-      render(<WizardStepRules {...createMockProps({ onRulesetChange })} />);
+      render(<WizardStepRules stepNumber={1} {...createMockProps({ onRulesetChange })} />);
       fireEvent.click(screen.getByTestId('rules-option-2024'));
       expect(onRulesetChange).toHaveBeenCalledWith('2024');
     });
 
     it('should call onRulesetChange independently for each click', () => {
       const onRulesetChange = vi.fn();
-      render(<WizardStepRules {...createMockProps({ onRulesetChange })} />);
+      render(<WizardStepRules stepNumber={1} {...createMockProps({ onRulesetChange })} />);
       fireEvent.click(screen.getByTestId('rules-option-5e'));
       fireEvent.click(screen.getByTestId('rules-option-2024'));
       fireEvent.click(screen.getByTestId('rules-option-5e'));
@@ -92,7 +92,7 @@ describe('WizardStepRules', () => {
       [{}, false],
       [undefined, false],
     ])('should %s an error message when errors is %j', (errors, shouldRender) => {
-      render(<WizardStepRules {...createMockProps({ errors })} />);
+      render(<WizardStepRules stepNumber={1} {...createMockProps({ errors })} />);
       if (shouldRender) {
         const errorEl = screen.getByText('Please select a ruleset');
         expect(errorEl).toBeInTheDocument();

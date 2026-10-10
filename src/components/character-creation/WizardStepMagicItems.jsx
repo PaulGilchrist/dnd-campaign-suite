@@ -45,7 +45,7 @@ function calculateAttunementLimit(formData, classSubtypes) {
     return BASE_ATTUNEMENT_LIMIT + 1;
 }
 
-function WizardStepMagicItems({ formData, allMagicItems, classSubtypes, onArrayFieldChange }) {
+function WizardStepMagicItems({ stepNumber, formData, allMagicItems, classSubtypes, onArrayFieldChange }) {
     const [warnings, setWarnings] = useState([]);
 
     const maxAttunement = useMemo(() => {
@@ -152,7 +152,7 @@ function WizardStepMagicItems({ formData, allMagicItems, classSubtypes, onArrayF
           fieldName="inventory.magicItems"
           formData={formData}
           onArrayFieldChange={onArrayFieldChange}
-          title="Step 10: Magic Items"
+          title={`Step ${stepNumber}: Magic Items`}
           searchPlaceholder="Search magic items..."
           filters={filters}
           renderItem={renderItem}

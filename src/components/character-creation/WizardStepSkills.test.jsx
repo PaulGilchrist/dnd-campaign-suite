@@ -51,9 +51,9 @@ async function waitForSkillsLoaded() {
 describe('WizardStepSkills', () => {
   describe('rendering', () => {
     it('should render step header, rules, and skill list', async () => {
-      render(<WizardStepSkills {...baseProps} />);
+      render(<WizardStepSkills stepNumber={10} {...baseProps} />);
       await waitForSkillsLoaded();
-      expect(screen.getByText('Step 6: Skill Proficiencies')).toBeInTheDocument();
+      expect(screen.getByText('Step 10: Skill Proficiencies')).toBeInTheDocument();
       expect(screen.getByText(/Your class and level grant 3 skills/)).toBeInTheDocument();
       expect(screen.getByText('Acrobatics')).toBeInTheDocument();
       expect(screen.getByText('Stealth')).toBeInTheDocument();
@@ -61,7 +61,7 @@ describe('WizardStepSkills', () => {
     });
 
     it('should display proficiency and expertise counts based on formData', async () => {
-      render(<WizardStepSkills {...baseProps} />);
+      render(<WizardStepSkills stepNumber={10} {...baseProps} />);
       await waitForSkillsLoaded();
       expect(screen.getByText(/You have selected.*of.*allowed/)).toBeInTheDocument();
       expect(screen.getByText(/Expertise:/)).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe('WizardStepSkills', () => {
     });
 
     it('should display expertise count when skill has expertise', async () => {
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics'], expertSkills: ['Acrobatics'] }}
       />);
@@ -78,28 +78,28 @@ describe('WizardStepSkills', () => {
     });
 
     it('should render warnings and errors when provided', async () => {
-      render(<WizardStepSkills {...baseProps} warnings={[{ type: 'warning', message: 'Warning message' }]} />);
+      render(<WizardStepSkills stepNumber={10} {...baseProps} warnings={[{ type: 'warning', message: 'Warning message' }]} />);
       await waitForSkillsLoaded();
       expect(screen.getByText('Warning message')).toBeInTheDocument();
 
-      render(<WizardStepSkills {...baseProps} errors={{ skillProficiencies: 'Too many skills selected.' }} />);
+      render(<WizardStepSkills stepNumber={10} {...baseProps} errors={{ skillProficiencies: 'Too many skills selected.' }} />);
       await waitForSkillsLoaded();
       expect(screen.getByText('Too many skills selected.')).toBeInTheDocument();
     });
 
     it('should hide skill limits when skillLimits is null', async () => {
-      render(<WizardStepSkills {...baseProps} skillLimits={null} />);
+      render(<WizardStepSkills stepNumber={10} {...baseProps} skillLimits={null} />);
       await waitForSkillsLoaded();
       expect(screen.queryByText(/Your class and level grant 3 skills/)).not.toBeInTheDocument();
       expect(screen.queryByText(/You have selected/)).not.toBeInTheDocument();
     });
 
     it('should not show expertise section when expertiseLimits is null or allowed is false', async () => {
-      render(<WizardStepSkills {...baseProps} expertiseLimits={null} />);
+      render(<WizardStepSkills stepNumber={10} {...baseProps} expertiseLimits={null} />);
       await waitForSkillsLoaded();
       expect(screen.queryByText(/Expertise:/)).not.toBeInTheDocument();
 
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         expertiseLimits={{ allowed: false, count: 0, details: 'No expertise available.' }}
       />);
@@ -109,7 +109,7 @@ describe('WizardStepSkills', () => {
 
     it('should mark pre-selected skills correctly based on proficiency state', async () => {
       // Pre-selected but NOT proficient: checkbox enabled, pre-selected class
-      const { container: c1 } = render(<WizardStepSkills {...baseProps} />);
+      const { container: c1 } = render(<WizardStepSkills stepNumber={10} {...baseProps} />);
       await waitForSkillsLoaded();
 
       let labels = c1.querySelectorAll('.multi-select-item');
@@ -120,7 +120,7 @@ describe('WizardStepSkills', () => {
       expect(stealthLabel).not.toHaveClass('selected');
 
       // Pre-selected AND proficient: checkbox disabled, both classes
-      const { container: c2 } = render(<WizardStepSkills
+      const { container: c2 } = render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics', 'Stealth'], expertSkills: [] }}
         preSelectedSkills={['Stealth']}
@@ -136,7 +136,7 @@ describe('WizardStepSkills', () => {
     });
 
     it('should show expert badge on expert skills', async () => {
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics'], expertSkills: ['Acrobatics'] }}
       />);
@@ -153,7 +153,7 @@ describe('WizardStepSkills', () => {
 
     it('should show expertise toggle button with correct state for all proficiency levels', async () => {
       // Expert skill: active button, enabled
-      const { container: c1 } = render(<WizardStepSkills
+      const { container: c1 } = render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics'], expertSkills: ['Acrobatics'] }}
       />);
@@ -168,7 +168,7 @@ describe('WizardStepSkills', () => {
       expect(button).toHaveAttribute('title', 'Click to remove Expert status');
 
       // Non-proficient: disabled button
-      const { container: c2 } = render(<WizardStepSkills
+      const { container: c2 } = render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: [], expertSkills: [] }}
       />);
@@ -183,7 +183,7 @@ describe('WizardStepSkills', () => {
       expect(button).toHaveAttribute('title', 'Select proficient first');
 
       // Proficient non-expert: enabled button
-      const { container: c3 } = render(<WizardStepSkills
+      const { container: c3 } = render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics'], expertSkills: [] }}
       />);
@@ -200,16 +200,16 @@ describe('WizardStepSkills', () => {
 
     it('should render with empty skills list', async () => {
       loadSkills.mockResolvedValue([]);
-      render(<WizardStepSkills {...baseProps} />);
+      render(<WizardStepSkills stepNumber={10} {...baseProps} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Step 6: Skill Proficiencies')).toBeInTheDocument();
+        expect(screen.getByText('Step 10: Skill Proficiencies')).toBeInTheDocument();
       });
       expect(screen.queryByText('Acrobatics')).not.toBeInTheDocument();
     });
 
     it('should handle null/undefined skillProficiencies and expertSkills in formData', async () => {
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         skillLimits={{ allowed: 3, details: 'Your class and level grant 3 skills.' }}
         expertiseLimits={{ allowed: true, count: 2, details: 'Rogues get expertise in 2 skills.' }}
         preSelectedSkills={['Stealth']}
@@ -220,7 +220,7 @@ describe('WizardStepSkills', () => {
         onSkillExpertiseToggle={vi.fn()}
       />);
       await waitForSkillsLoaded();
-      expect(screen.getByText('Step 6: Skill Proficiencies')).toBeInTheDocument();
+      expect(screen.getByText('Step 10: Skill Proficiencies')).toBeInTheDocument();
       // With null proficiencies, count should be 0
       const summaryText = document.querySelector('.skill-count-text');
       expect(summaryText.textContent).toContain('0');
@@ -232,7 +232,7 @@ describe('WizardStepSkills', () => {
     it('should call onSkillToggle when toggling a skill on', async () => {
       const mockOnSkillToggle = vi.fn();
 
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics'], expertSkills: [] }}
         onSkillToggle={mockOnSkillToggle}
@@ -249,7 +249,7 @@ describe('WizardStepSkills', () => {
     it('should call onSkillToggle when toggling a skill off', async () => {
       const mockOnSkillToggle = vi.fn();
 
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics'], expertSkills: [] }}
         onSkillToggle={mockOnSkillToggle}
@@ -267,7 +267,7 @@ describe('WizardStepSkills', () => {
       const mockOnSkillToggle = vi.fn();
       const mockOnSkillExpertiseToggle = vi.fn();
 
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics'], expertSkills: ['Acrobatics'] }}
         onSkillToggle={mockOnSkillToggle}
@@ -288,7 +288,7 @@ describe('WizardStepSkills', () => {
   describe('expertise toggle action', () => {
     it('should call onSkillExpertiseToggle with true when elevating a proficient skill', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics'], expertSkills: [] }}
         onSkillExpertiseToggle={mockOnSkillExpertiseToggle}
@@ -305,7 +305,7 @@ describe('WizardStepSkills', () => {
 
     it('should call onSkillExpertiseToggle with false when deselecting expertise', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics', 'Stealth'], expertSkills: ['Acrobatics'] }}
         onSkillExpertiseToggle={mockOnSkillExpertiseToggle}
@@ -322,7 +322,7 @@ describe('WizardStepSkills', () => {
 
     it('should not call onSkillExpertiseToggle when elevating a non-proficient skill', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: [], expertSkills: [] }}
         onSkillExpertiseToggle={mockOnSkillExpertiseToggle}
@@ -341,7 +341,7 @@ describe('WizardStepSkills', () => {
   describe('expertise feedback messages', () => {
     it('should show error feedback when attempting to elevate a non-proficient skill', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: [], expertSkills: [] }}
         onSkillExpertiseToggle={mockOnSkillExpertiseToggle}
@@ -359,7 +359,7 @@ describe('WizardStepSkills', () => {
 
     it('should show success feedback when elevating to expertise', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics'], expertSkills: [] }}
         onSkillExpertiseToggle={mockOnSkillExpertiseToggle}
@@ -386,7 +386,7 @@ describe('WizardStepSkills', () => {
         const mockOnSkillExpertiseToggle = vi.fn();
         let container;
         await act(async () => {
-          const { container: c } = render(<WizardStepSkills
+          const { container: c } = render(<WizardStepSkills stepNumber={10}
             {...baseProps}
             formData={{ skillProficiencies: ['Acrobatics'], expertSkills: [] }}
             onSkillExpertiseToggle={mockOnSkillExpertiseToggle}
@@ -414,7 +414,7 @@ describe('WizardStepSkills', () => {
 
     it('should show error feedback and dismiss when deselecting expertise', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics'], expertSkills: ['Acrobatics'] }}
         onSkillExpertiseToggle={mockOnSkillExpertiseToggle}
@@ -438,7 +438,7 @@ describe('WizardStepSkills', () => {
   describe('feat-restricted expertise', () => {
     it('should show error when feat count is zero and skill is feat-restricted', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics'], expertSkills: [] }}
         expertiseLimits={{
@@ -465,7 +465,7 @@ describe('WizardStepSkills', () => {
 
     it('should show error when all feat slots are used for feat-restricted skill', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics', 'Stealth', 'Perception'], expertSkills: ['Acrobatics'] }}
         expertiseLimits={{
@@ -494,7 +494,7 @@ describe('WizardStepSkills', () => {
 
     it('should allow feat-restricted skill when feat slots are available', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics'], expertSkills: [] }}
         expertiseLimits={{
@@ -521,7 +521,7 @@ describe('WizardStepSkills', () => {
     it('should show appropriate error when no expertise slots are available', async () => {
       // No class or feat slots for non-restricted skill
       const mockOnSkillExpertiseToggle1 = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics', 'Stealth', 'Perception'], expertSkills: ['Acrobatics', 'Stealth'] }}
         expertiseLimits={{
@@ -547,7 +547,7 @@ describe('WizardStepSkills', () => {
       });
 
       // Class grants 0 slots and feat count is 0
-      const { container: c2 } = render(<WizardStepSkills
+      const { container: c2 } = render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics'], expertSkills: [] }}
         expertiseLimits={{
@@ -574,7 +574,7 @@ describe('WizardStepSkills', () => {
 
     it('should use feat slots when class slots are exhausted', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics', 'Stealth', 'Perception'], expertSkills: ['Acrobatics', 'Stealth'] }}
         expertiseLimits={{
@@ -608,7 +608,7 @@ describe('WizardStepSkills', () => {
 
     it('should keep Elevate clickable but present the class list refusal for non-list skills', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics', 'Perception'], expertSkills: [] }}
         expertiseLimits={scholarLimits}
@@ -633,7 +633,7 @@ describe('WizardStepSkills', () => {
 
     it('should allow elevation of a proficient skill inside the class list', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics', 'Perception'], expertSkills: [] }}
         expertiseLimits={scholarLimits}
@@ -652,7 +652,7 @@ describe('WizardStepSkills', () => {
 
     it('should keep the count gate for in-list skills when class slots are exhausted', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics', 'Stealth'], expertSkills: ['Acrobatics'] }}
         expertiseLimits={scholarLimits}
@@ -675,7 +675,7 @@ describe('WizardStepSkills', () => {
 
     it('should allow a non-list skill when a feat expertise slot is still free', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics', 'Perception'], expertSkills: [] }}
         expertiseLimits={{ ...scholarLimits, count: 2, featCount: 1 }}
@@ -694,7 +694,7 @@ describe('WizardStepSkills', () => {
 
     it('should not gate any skill when classExpertiseSkillLists is absent', async () => {
       const mockOnSkillExpertiseToggle = vi.fn();
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Acrobatics', 'Perception'], expertSkills: [] }}
         expertiseLimits={{ allowed: true, count: 1, classCount: 1, featCount: 0 }}
@@ -724,7 +724,7 @@ describe('WizardStepSkills', () => {
         },
       };
 
-      render(<WizardStepSkills {...propsWithBreakdown} />);
+      render(<WizardStepSkills stepNumber={10} {...propsWithBreakdown} />);
       await waitForSkillsLoaded();
 
       const ruleInfo = document.querySelector('.rule-info');
@@ -746,7 +746,7 @@ describe('WizardStepSkills', () => {
         },
       };
 
-      render(<WizardStepSkills {...propsWithSkilled} />);
+      render(<WizardStepSkills stepNumber={10} {...propsWithSkilled} />);
       await waitForSkillsLoaded();
 
       const skilledSource = document.querySelector('.skilled-source');
@@ -756,7 +756,7 @@ describe('WizardStepSkills', () => {
     });
 
     it('should display details when no skillChoiceSources', async () => {
-      render(<WizardStepSkills
+      render(<WizardStepSkills stepNumber={10}
         {...baseProps}
         skillLimits={{ allowed: 3, details: 'Your class grants 3 skills.' }}
       />);
@@ -782,7 +782,7 @@ describe('WizardStepSkills', () => {
         },
       };
 
-      render(<WizardStepSkills {...propsWithBreakdown} />);
+      render(<WizardStepSkills stepNumber={10} {...propsWithBreakdown} />);
       await waitForSkillsLoaded();
 
       const ruleInfoElements = document.querySelectorAll('.rule-info');

@@ -63,27 +63,27 @@ describe('WizardStepResistances', () => {
 
   describe('Rendering', () => {
     it('should render the step header, resistances and immunities labels', () => {
-      render(<WizardStepResistances {...createMockProps()} />);
-      expect(screen.getByText('Step 8: Resistances & Immunities')).toBeInTheDocument();
+      render(<WizardStepResistances stepNumber={13} {...createMockProps()} />);
+      expect(screen.getByText('Step 13: Resistances & Immunities')).toBeInTheDocument();
       expect(screen.getByText('Resistances')).toBeInTheDocument();
       expect(screen.getByText('Immunities')).toBeInTheDocument();
     });
 
     it('should render no checkboxes when data array is empty', async () => {
       setupFetchMock([]);
-      render(<WizardStepResistances {...createMockProps()} />);
+      render(<WizardStepResistances stepNumber={13} {...createMockProps()} />);
       await waitFor(() => {
         const checkboxes = document.querySelectorAll('input[type="checkbox"]');
         expect(checkboxes.length).toBe(0);
       });
-      expect(screen.getByText('Step 8: Resistances & Immunities')).toBeInTheDocument();
+      expect(screen.getByText('Step 13: Resistances & Immunities')).toBeInTheDocument();
     });
   });
 
   describe('Selected values', () => {
     it('should check the checkbox when a value is in formData resistances', async () => {
       render(
-        <WizardStepResistances
+        <WizardStepResistances stepNumber={13}
           {...createMockProps({
             formData: { resistances: ['Fire'], immunities: [] },
           })}
@@ -97,7 +97,7 @@ describe('WizardStepResistances', () => {
 
     it('should mark selected items with the "selected" CSS class', async () => {
       render(
-        <WizardStepResistances
+        <WizardStepResistances stepNumber={13}
           {...createMockProps({
             formData: { resistances: ['Fire'], immunities: ['Cold'] },
           })}
@@ -113,7 +113,7 @@ describe('WizardStepResistances', () => {
   describe('Pre-selected items', () => {
     it('should show "(Granted)" suffix for pre-selected values', async () => {
       render(
-        <WizardStepResistances
+        <WizardStepResistances stepNumber={13}
           {...createMockProps({
             preSelectedResistances: ['Acid'],
             preSelectedImmunities: ['Cold'],
@@ -128,7 +128,7 @@ describe('WizardStepResistances', () => {
 
     it('should disable the checkbox when pre-selected and already selected, and keep it enabled when pre-selected but not yet selected', async () => {
       render(
-        <WizardStepResistances
+        <WizardStepResistances stepNumber={13}
           {...createMockProps({
             preSelectedResistances: ['Fire'],
             formData: { resistances: ['Fire'] },
@@ -145,7 +145,7 @@ describe('WizardStepResistances', () => {
 
     it('should apply pre-selected CSS class to the label', async () => {
       render(
-        <WizardStepResistances
+        <WizardStepResistances stepNumber={13}
           {...createMockProps({
             preSelectedResistances: ['Acid'],
           })}
@@ -162,8 +162,8 @@ describe('WizardStepResistances', () => {
       const props = createMockProps();
       props.preSelectedResistances = undefined;
       props.preSelectedImmunities = undefined;
-      render(<WizardStepResistances {...props} />);
-      expect(screen.getByText('Step 8: Resistances & Immunities')).toBeInTheDocument();
+      render(<WizardStepResistances stepNumber={13} {...props} />);
+      expect(screen.getByText('Step 13: Resistances & Immunities')).toBeInTheDocument();
     });
   });
 
@@ -171,7 +171,7 @@ describe('WizardStepResistances', () => {
     it('should call onResistanceToggle when a resistance checkbox is clicked', async () => {
       const mockOnResistanceToggle = vi.fn();
       render(
-        <WizardStepResistances
+        <WizardStepResistances stepNumber={13}
           {...createMockProps({
             onResistanceToggle: mockOnResistanceToggle,
             formData: { resistances: [], immunities: [] },
@@ -190,7 +190,7 @@ describe('WizardStepResistances', () => {
 
     it('should keep the checkbox checked when a disabled pre-selected checkbox is clicked', async () => {
       render(
-        <WizardStepResistances
+        <WizardStepResistances stepNumber={13}
           {...createMockProps({
             preSelectedResistances: ['Fire'],
             formData: { resistances: ['Fire'] },
@@ -211,7 +211,7 @@ describe('WizardStepResistances', () => {
   describe('Warnings', () => {
     it('should render warning messages when provided', async () => {
       render(
-        <WizardStepResistances
+        <WizardStepResistances stepNumber={13}
           {...createMockProps({
             warnings: [
               { type: 'error', message: 'Too many resistances selected' },
@@ -226,9 +226,9 @@ describe('WizardStepResistances', () => {
     });
 
     it('should not render warnings container when warnings is null or empty', () => {
-      render(<WizardStepResistances {...createMockProps({ warnings: null })} />);
+      render(<WizardStepResistances stepNumber={13} {...createMockProps({ warnings: null })} />);
       expect(document.querySelector('.warning-container')).not.toBeInTheDocument();
-      render(<WizardStepResistances {...createMockProps({ warnings: [] })} />);
+      render(<WizardStepResistances stepNumber={13} {...createMockProps({ warnings: [] })} />);
       expect(document.querySelector('.warning-container')).not.toBeInTheDocument();
     });
   });
@@ -237,7 +237,7 @@ describe('WizardStepResistances', () => {
     it('should log an error and keep rendering when fetch fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
-      render(<WizardStepResistances {...createMockProps()} />);
+      render(<WizardStepResistances stepNumber={13} {...createMockProps()} />);
 
       await waitFor(() => {
         expect(consoleSpy).toHaveBeenCalledWith(
@@ -246,7 +246,7 @@ describe('WizardStepResistances', () => {
         );
       });
 
-      expect(screen.getByText('Step 8: Resistances & Immunities')).toBeInTheDocument();
+      expect(screen.getByText('Step 13: Resistances & Immunities')).toBeInTheDocument();
       consoleSpy.mockRestore();
     });
   });

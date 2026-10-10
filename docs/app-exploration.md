@@ -224,14 +224,9 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- (2026-08) Settlement "Add Service/Add NPC/Add Rumor" row-clicks silently auto-fill every empty textarea (Government/Description/Atmosphere/Threats/Population) from the local generator. A GM adding one service is surprised by unrelated prose appearing. Suggest scoping generation to the clicked row, or an explicit "Auto-fill" button. Likely `src/components/settlements/Settlements.jsx`.
-- (2026-10-10) Wizard step indicator numbering: indicator omits step 5 (Background) and content headings renumber independently from Feats onward ("Step 4: Feats" under indicator "8"). One shared step-index should drive both. Likely wizard stepper + step-content components in `src/components/wizard/`.
-- (2026-10-10) Background step for 5e characters shows only an "unavailable" notice, yet the skills step promises "2 from your background" — background skills are unobtainable in the 5e create flow. Either offer the skills or fix the copy.
 - (2026-10-10) Point-buy overspend silently resets the input to 8 with no feedback — show a toast/inline "not enough points" message. Ability-score wizard step.
 - (2026-10-10) Faction "already exists" error appears only after Save and persists after the name is fixed — validate while typing and clear the banner on edit.
-- (2026-10-10) Lost-update on concurrent GM edits: two tabs editing the same NPC, stale save silently overwrites newer persisted value. Consider a `lastModified` stamp + conflict warning on save. Server route + client edit forms.
 - (2026-10-10) NPCs management list never live-syncs (create/delete in another GM tab invisible until re-navigation). Wire it to the shared SSE subscription like the map flows.
-- (2026-10-10) Music panel auto-plays YouTube ambience on mere mood selection (no Play press) — surprising and YouTube-dependent; prefer requiring explicit Play, and show a friendly error if the iframe/embed fails.
 - (2026-10-10) `SelectableList` React unique-key console warning fires on the wizard Spells step — assign stable keys in `SelectableList.jsx`.
 
 ## Coverage

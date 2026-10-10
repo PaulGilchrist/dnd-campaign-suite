@@ -61,13 +61,13 @@ describe('WizardStepSubclass', () => {
 
   describe('Rendering', () => {
     it('should display the step heading', () => {
-      render(<WizardStepSubclass {...createMockProps()} />);
+      render(<WizardStepSubclass stepNumber={7} {...createMockProps()} />);
       expect(screen.getByText('Step 7: Subclass / Major')).toBeInTheDocument();
     });
 
     it('should show the default select option', () => {
       render(
-        <WizardStepSubclass
+        <WizardStepSubclass stepNumber={7}
           {...createMockProps({
             formData: { class: { name: 'Fighter', subclass: { name: '' } } },
           })}
@@ -78,7 +78,7 @@ describe('WizardStepSubclass', () => {
 
     it('should show subclass dropdown options when class has subclasses', () => {
       render(
-        <WizardStepSubclass
+        <WizardStepSubclass stepNumber={7}
           {...createMockProps({
             formData: { class: { name: 'Fighter', subclass: { name: '' } } },
           })}
@@ -91,7 +91,7 @@ describe('WizardStepSubclass', () => {
 
     it('should show no-subclass message when class has no subclasses', () => {
       render(
-        <WizardStepSubclass
+        <WizardStepSubclass stepNumber={7}
           {...createMockProps({
             formData: { class: { name: 'Barbarian', subclass: { name: '' } } },
           })}
@@ -102,7 +102,7 @@ describe('WizardStepSubclass', () => {
     });
 
     it('should show no-subclass message when no class is selected', () => {
-      render(<WizardStepSubclass {...createMockProps()} />);
+      render(<WizardStepSubclass stepNumber={7} {...createMockProps()} />);
       expect(screen.getByText(/Your selected class \(\) has no subclasses\/majors/)).toBeInTheDocument();
       expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     });
@@ -111,7 +111,7 @@ describe('WizardStepSubclass', () => {
   describe('Subclass details expand/collapse', () => {
     it('should show subclass details header when a subclass is selected', () => {
       render(
-        <WizardStepSubclass
+        <WizardStepSubclass stepNumber={7}
           {...createMockProps({
             formData: { class: { name: 'Fighter', subclass: { name: 'Battle Master' } } },
           })}
@@ -123,7 +123,7 @@ describe('WizardStepSubclass', () => {
 
     it('should toggle expanded state when the header is clicked', () => {
       render(
-        <WizardStepSubclass
+        <WizardStepSubclass stepNumber={7}
           {...createMockProps({
             formData: { class: { name: 'Fighter', subclass: { name: 'Battle Master' } } },
           })}
@@ -143,7 +143,7 @@ describe('WizardStepSubclass', () => {
 
     it('should render the subclass description, flavor, and features when expanded', () => {
       render(
-        <WizardStepSubclass
+        <WizardStepSubclass stepNumber={7}
           {...createMockProps({
             formData: { class: { name: 'Fighter', subclass: { name: 'Battle Master' } } },
           })}
@@ -165,7 +165,7 @@ describe('WizardStepSubclass', () => {
 
     it('should not render the flavor section when subclass_flavor is absent', () => {
       render(
-        <WizardStepSubclass
+        <WizardStepSubclass stepNumber={7}
           {...createMockProps({
             formData: { class: { name: 'Fighter', subclass: { name: 'Champion' } } },
           })}
@@ -181,7 +181,7 @@ describe('WizardStepSubclass', () => {
     it('should call onInputChange with the correct payload when subclass changes', () => {
       const mockOnChange = vi.fn();
       render(
-        <WizardStepSubclass
+        <WizardStepSubclass stepNumber={7}
           {...createMockProps({
             onInputChange: mockOnChange,
             formData: { class: { name: 'Fighter', subclass: { name: '' } } },
@@ -200,7 +200,7 @@ describe('WizardStepSubclass', () => {
   describe('Error display', () => {
     it('should render error message and error class when subclass error exists', () => {
       render(
-        <WizardStepSubclass
+        <WizardStepSubclass stepNumber={7}
           {...createMockProps({
             formData: { class: { name: 'Fighter', subclass: { name: '' } } },
             errors: { subclass: 'Subclass is required' },
@@ -216,7 +216,7 @@ describe('WizardStepSubclass', () => {
   describe('2024 ruleset', () => {
     it('should show 2024 major features and description', () => {
       render(
-        <WizardStepSubclass
+        <WizardStepSubclass stepNumber={7}
           {...createMockProps({
             formData: { class: { name: 'Fighter', subclass: { name: 'Battle Master' } } },
             ruleset: '2024',

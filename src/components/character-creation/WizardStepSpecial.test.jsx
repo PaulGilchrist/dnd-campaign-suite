@@ -31,8 +31,8 @@ describe('WizardStepSpecial', () => {
 
   describe('rendering', () => {
     it('should render step header and add action form', () => {
-      render(<WizardStepSpecial {...baseProps} />);
-      expect(screen.getByText('Step 12: Special Actions')).toBeInTheDocument();
+      render(<WizardStepSpecial stepNumber={17} {...baseProps} />);
+      expect(screen.getByText('Step 17: Special Actions')).toBeInTheDocument();
       expect(screen.getByText('Add New Action')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('Action name (required)')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('Description')).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe('WizardStepSpecial', () => {
     });
 
     it('should render existing actions with name, description, details, and remove button', () => {
-      render(<WizardStepSpecial {...baseProps} />);
+      render(<WizardStepSpecial stepNumber={17} {...baseProps} />);
       expect(screen.getByText('Action 1')).toBeInTheDocument();
       expect(screen.getByText('Description 1')).toBeInTheDocument();
       expect(screen.getByText('Custom Special Actions')).toBeInTheDocument();
@@ -53,7 +53,7 @@ describe('WizardStepSpecial', () => {
         ...baseProps,
         formData: { specialActions: [] },
       };
-      render(<WizardStepSpecial {...props} />);
+      render(<WizardStepSpecial stepNumber={17} {...props} />);
       expect(screen.queryByText('Custom Special Actions')).not.toBeInTheDocument();
     });
 
@@ -67,7 +67,7 @@ describe('WizardStepSpecial', () => {
           specialActions: ['Plain String Action'],
         },
       };
-      render(<WizardStepSpecial {...props} />);
+      render(<WizardStepSpecial stepNumber={17} {...props} />);
       expect(screen.getByText('Plain String Action')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument();
     });
@@ -85,7 +85,7 @@ describe('WizardStepSpecial', () => {
         },
         onArrayFieldChange: mockOnChange,
       };
-      render(<WizardStepSpecial {...props} />);
+      render(<WizardStepSpecial stepNumber={17} {...props} />);
       fireEvent.click(screen.getByRole('button', { name: 'Add Action' }));
       expect(mockOnChange).toHaveBeenCalledWith(
         'specialActions',
@@ -106,7 +106,7 @@ describe('WizardStepSpecial', () => {
         },
         onArrayFieldChange: mockOnChange,
       };
-      const { container: c1 } = render(<WizardStepSpecial {...propsWhitespace} />);
+      const { container: c1 } = render(<WizardStepSpecial stepNumber={17} {...propsWhitespace} />);
       fireEvent.click(c1.querySelector('button.btn-primary'));
       expect(mockOnChange.mock.calls.filter((c) => c[0] === 'specialActions')).toHaveLength(0);
 
@@ -119,7 +119,7 @@ describe('WizardStepSpecial', () => {
         },
         onArrayFieldChange: mockOnChange,
       };
-      const { container: c2 } = render(<WizardStepSpecial {...propsNoName} />);
+      const { container: c2 } = render(<WizardStepSpecial stepNumber={17} {...propsNoName} />);
       fireEvent.click(c2.querySelector('button.btn-primary'));
       expect(mockOnChange.mock.calls.filter((c) => c[0] === 'specialActions')).toHaveLength(0);
     });
@@ -134,7 +134,7 @@ describe('WizardStepSpecial', () => {
         },
         onArrayFieldChange: mockOnChange,
       };
-      render(<WizardStepSpecial {...props} />);
+      render(<WizardStepSpecial stepNumber={17} {...props} />);
       fireEvent.click(screen.getByRole('button', { name: 'Add Action' }));
       expect(mockOnChange).toHaveBeenCalledWith('specialActions', [
         { name: 'Existing', description: 'Old', details: null },
@@ -159,7 +159,7 @@ describe('WizardStepSpecial', () => {
         },
         onArrayFieldChange: mockOnChange,
       };
-      const { container: c1 } = render(<WizardStepSpecial {...propsMulti} />);
+      const { container: c1 } = render(<WizardStepSpecial stepNumber={17} {...propsMulti} />);
       const removeButtons = c1.querySelectorAll('button.btn-danger');
       fireEvent.click(removeButtons[1]);
       expect(mockOnChange).toHaveBeenCalledWith('specialActions', [
@@ -176,7 +176,7 @@ describe('WizardStepSpecial', () => {
         },
         onArrayFieldChange: mockOnChange,
       };
-      const { container: c2 } = render(<WizardStepSpecial {...propsSingle} />);
+      const { container: c2 } = render(<WizardStepSpecial stepNumber={17} {...propsSingle} />);
       fireEvent.click(c2.querySelector('button.btn-danger'));
       expect(mockOnChange).toHaveBeenCalledWith('specialActions', []);
     });
@@ -190,7 +190,7 @@ describe('WizardStepSpecial', () => {
         },
         onArrayFieldChange: mockOnChange,
       };
-      render(<WizardStepSpecial {...props} />);
+      render(<WizardStepSpecial stepNumber={17} {...props} />);
       const removeButtons = screen.getAllByRole('button', { name: 'Remove' });
       fireEvent.click(removeButtons[0]);
       expect(mockOnChange).toHaveBeenCalledWith('specialActions', [
@@ -202,7 +202,7 @@ describe('WizardStepSpecial', () => {
   describe('form field updates', () => {
     it('should update new action fields on typing', () => {
       const mockOnChange = vi.fn();
-      render(<WizardStepSpecial {...baseProps} onArrayFieldChange={mockOnChange} />);
+      render(<WizardStepSpecial stepNumber={17} {...baseProps} onArrayFieldChange={mockOnChange} />);
 
       const nameInput = screen.getByPlaceholderText('Action name (required)');
       fireEvent.change(nameInput, { target: { value: 'New Action Name' } });
@@ -231,7 +231,7 @@ describe('WizardStepSpecial', () => {
         },
         onArrayFieldChange: mockOnChange,
       };
-      render(<WizardStepSpecial {...props} />);
+      render(<WizardStepSpecial stepNumber={17} {...props} />);
 
       const nameInput = screen.getByPlaceholderText('Action name (required)');
       fireEvent.change(nameInput, { target: { value: 'Updated Name' } });
@@ -252,7 +252,7 @@ describe('WizardStepSpecial', () => {
         },
         onArrayFieldChange: mockOnChange,
       };
-      render(<WizardStepSpecial {...props} />);
+      render(<WizardStepSpecial stepNumber={17} {...props} />);
 
       const nameInput = screen.getByPlaceholderText('Action name (required)');
       expect(nameInput).toHaveValue('');

@@ -71,7 +71,7 @@ describe('WizardStepSkills proficiency cap', () => {
   it('allows toggling on a skill while below the cap', async () => {
     const onSkillToggle = vi.fn();
     const { container } = render(
-      <WizardStepSkills
+      <WizardStepSkills stepNumber={10}
         {...baseProps}
         formData={{ skillProficiencies: ['Arcana'], expertSkills: [] }}
         onSkillToggle={onSkillToggle}
@@ -98,7 +98,7 @@ describe('WizardStepSkills proficiency cap', () => {
   it('does not gate toggle-on when skillLimits is null (still loading)', async () => {
     const onSkillToggle = vi.fn();
     const { container } = render(
-      <WizardStepSkills
+      <WizardStepSkills stepNumber={10}
         {...baseProps}
         skillLimits={null}
         formData={{ skillProficiencies: ['Arcana', 'History'], expertSkills: [] }}
@@ -115,7 +115,7 @@ describe('WizardStepSkills proficiency cap', () => {
   it('does not gate a pre-selected skill at the cap', async () => {
     const onSkillToggle = vi.fn();
     const { container } = render(
-      <WizardStepSkills
+      <WizardStepSkills stepNumber={10}
         {...baseProps}
         preSelectedSkills={['Religion']}
         onSkillToggle={onSkillToggle}

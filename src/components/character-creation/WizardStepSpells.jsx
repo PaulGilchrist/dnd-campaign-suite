@@ -121,7 +121,7 @@ function getEditBannerDescriptors({ formData, modals }) {
 }
 
 // Mystic Arcanum selection component for Warlock
-function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelectedSpells }) {
+function WizardStepSpells({ stepNumber, formData, allSpells, onArrayFieldChange, preSelectedSpells }) {
   const preSelected = useMemo(() => preSelectedSpells || [], [preSelectedSpells]);
   const isWarlock = formData?.class?.name === 'Warlock';
   const charLevel = parseInt(formData?.level) || 1;
@@ -636,7 +636,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
         fieldName="spells"
         formData={formData}
         onArrayFieldChange={onArrayFieldChange}
-        title="Step 9: Spells"
+        title={`Step ${stepNumber}: Spells`}
         searchPlaceholder="Search spells..."
         filters={filters}
         renderItem={renderItem}

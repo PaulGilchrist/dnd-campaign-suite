@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import WarningList from '../common/WarningList.jsx';
 
-function WizardStepResistances({ formData, onResistanceToggle, onImmunityToggle, warnings, preSelectedResistances, preSelectedImmunities }) {
+function WizardStepResistances({ stepNumber, formData, onResistanceToggle, onImmunityToggle, warnings, preSelectedResistances, preSelectedImmunities }) {
   const [resistancesImmunities, setResistancesImmunities] = useState([]);
 
   useEffect(() => {
@@ -12,7 +12,7 @@ function WizardStepResistances({ formData, onResistanceToggle, onImmunityToggle,
     }, []);
   return (
     <div className="wizard-step">
-      <h2>Step 8: Resistances & Immunities</h2>
+      <h2>Step {stepNumber}: Resistances & Immunities</h2>
       
         {/* Display warnings if any */}
         {warnings && warnings.length > 0 && <WarningList warnings={warnings} />}

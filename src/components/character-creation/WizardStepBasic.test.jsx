@@ -56,7 +56,7 @@ describe('WizardStepBasic', () => {
 
   describe('Render', () => {
     it('should display initial form values', async () => {
-      render(<WizardStepBasic {...createMockProps()} />);
+      render(<WizardStepBasic stepNumber={2} {...createMockProps()} />);
 
       expect(screen.getByDisplayValue('Test Character')).toBeInTheDocument();
       await waitFor(() => {
@@ -65,7 +65,7 @@ describe('WizardStepBasic', () => {
     });
 
     it('should show "Click to upload" and no remove button when no image is set', () => {
-      render(<WizardStepBasic {...createMockProps()} />);
+      render(<WizardStepBasic stepNumber={2} {...createMockProps()} />);
 
       expect(screen.getByText('Click to upload')).toBeInTheDocument();
       expect(screen.queryByText('Remove Image')).not.toBeInTheDocument();
@@ -75,7 +75,7 @@ describe('WizardStepBasic', () => {
       { label: 'base64 image data', formData: { image: 'data:image/png;base64,test' } },
       { label: 'image path', formData: { imagePath: '/path/to/portrait.jpg' } },
     ])('should render image preview from %s', ({ formData }) => {
-      render(<WizardStepBasic {...createMockProps({ formData })} />);
+      render(<WizardStepBasic stepNumber={2} {...createMockProps({ formData })} />);
 
       const preview = screen.getByRole('img');
       expect(preview).toBeInTheDocument();
@@ -85,7 +85,7 @@ describe('WizardStepBasic', () => {
 
     it('should use campaignName to construct image path when imagePath is a relative path', async () => {
       render(
-        <WizardStepBasic
+        <WizardStepBasic stepNumber={2}
           {...createMockProps({
             campaignName: 'my-campaign',
             formData: { imagePath: 'portraits/hero.jpg' },
@@ -102,7 +102,7 @@ describe('WizardStepBasic', () => {
 
     it('should not prepend campaigns/ when imagePath is an absolute URL', () => {
       render(
-        <WizardStepBasic
+        <WizardStepBasic stepNumber={2}
           {...createMockProps({
             campaignName: 'my-campaign',
             formData: { imagePath: 'https://example.com/hero.jpg' },
@@ -116,7 +116,7 @@ describe('WizardStepBasic', () => {
 
     it('should render remove button when an image is set', () => {
       render(
-        <WizardStepBasic
+        <WizardStepBasic stepNumber={2}
           {...createMockProps({
             formData: { image: 'data:image/png;base64,test' },
           })}
@@ -130,7 +130,7 @@ describe('WizardStepBasic', () => {
   describe('Input changes', () => {
     it('should call onInputChange with name when the name input changes', () => {
       const mockOnChange = vi.fn();
-      render(<WizardStepBasic {...createMockProps({ onInputChange: mockOnChange })} />);
+      render(<WizardStepBasic stepNumber={2} {...createMockProps({ onInputChange: mockOnChange })} />);
 
       const nameInput = screen.getByDisplayValue('Test Character');
       fireEvent.change(nameInput, { target: { value: 'New Name' } });
@@ -149,7 +149,7 @@ describe('WizardStepBasic', () => {
       ({ input, expected }) => {
         const mockOnChange = vi.fn();
         render(
-          <WizardStepBasic
+          <WizardStepBasic stepNumber={2}
             {...createMockProps({
               formData: { level: 1 },
               onInputChange: mockOnChange,
@@ -166,7 +166,7 @@ describe('WizardStepBasic', () => {
 
     it('should call onInputChange with alignment when the alignment select changes', async () => {
       const mockOnChange = vi.fn();
-      render(<WizardStepBasic {...createMockProps({ onInputChange: mockOnChange })} />);
+      render(<WizardStepBasic stepNumber={2} {...createMockProps({ onInputChange: mockOnChange })} />);
 
       await waitFor(() => {
         const alignmentSelect = screen.getByRole('combobox');
@@ -189,7 +189,7 @@ describe('WizardStepBasic', () => {
       'should render error message and error class for the %s field',
       ({ field, error, getQuery }) => {
         render(
-          <WizardStepBasic
+          <WizardStepBasic stepNumber={2}
             {...createMockProps({
               errors: { [field]: error },
             })}
@@ -207,7 +207,7 @@ describe('WizardStepBasic', () => {
     it('should clear both image and imagePath when Remove Image is clicked', () => {
       const mockOnChange = vi.fn();
       render(
-        <WizardStepBasic
+        <WizardStepBasic stepNumber={2}
           {...createMockProps({
             onInputChange: mockOnChange,
             formData: {
@@ -239,7 +239,7 @@ describe('WizardStepBasic', () => {
         }
       });
 
-      render(<WizardStepBasic {...createMockProps({ onInputChange: mockOnChange })} />);
+      render(<WizardStepBasic stepNumber={2} {...createMockProps({ onInputChange: mockOnChange })} />);
 
       const fileInput = document.querySelector('input[type="file"]');
       const file = new File(['test'], 'test-image.png', { type: 'image/png' });
@@ -258,7 +258,7 @@ describe('WizardStepBasic', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       setupFetchFailure();
-      render(<WizardStepBasic {...createMockProps()} />);
+      render(<WizardStepBasic stepNumber={2} {...createMockProps()} />);
 
       await waitFor(() => {
         expect(consoleSpy).toHaveBeenCalledWith(

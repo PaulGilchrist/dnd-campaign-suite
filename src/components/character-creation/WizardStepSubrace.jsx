@@ -70,7 +70,7 @@ function SubraceDetailCard({ subrace, traits, expanded, onToggle }) {
   );
 }
 
-function WizardStepSubrace({ formData, errors, racesData, onInputChange }) {
+function WizardStepSubrace({ stepNumber, formData, errors, racesData, onInputChange }) {
   const [expanded, setExpanded] = useState(false);
 
   const selectedRaceName = formData.race?.name || '';
@@ -87,7 +87,7 @@ function WizardStepSubrace({ formData, errors, racesData, onInputChange }) {
 
   return (
     <div className="wizard-step wizard-step-subrace">
-      <h2>Step 4: Subrace</h2>
+      <h2>Step {stepNumber}: Subrace</h2>
 
       {!hasSubraces ? (
         <div className="no-subrace-message">

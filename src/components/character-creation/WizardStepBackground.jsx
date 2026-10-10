@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './WizardStepBackground.css';
 
-function WizardStepBackground({ formData, errors, backgrounds, ruleset, onInputChange }) {
+function WizardStepBackground({ stepNumber, formData, errors, backgrounds, ruleset, onInputChange }) {
   const [expanded, setExpanded] = useState(false);
 
   const selectedBackgroundName = formData.background || '';
@@ -10,7 +10,7 @@ function WizardStepBackground({ formData, errors, backgrounds, ruleset, onInputC
   if (ruleset !== '2024') {
     return (
       <div className="wizard-step wizard-step-background">
-        <h2>Step 5: Background</h2>
+        <h2>Step {stepNumber}: Background</h2>
         <div className="background-not-available">
           <i className="fa-solid fa-circle-info" />
           <p>Backgrounds are only available for 2024 (Essentials) ruleset characters. For 5e characters, backgrounds are purely narrative and do not grant mechanical benefits.</p>
@@ -22,7 +22,7 @@ function WizardStepBackground({ formData, errors, backgrounds, ruleset, onInputC
   if (backgrounds.length === 0) {
     return (
       <div className="wizard-step wizard-step-background">
-        <h2>Step 5: Background</h2>
+        <h2>Step {stepNumber}: Background</h2>
         <div className="no-results-found">Background data not yet loaded. Please try again.</div>
       </div>
     );
@@ -30,7 +30,7 @@ function WizardStepBackground({ formData, errors, backgrounds, ruleset, onInputC
 
   return (
     <div className="wizard-step wizard-step-background">
-      <h2>Step 5: Background</h2>
+      <h2>Step {stepNumber}: Background</h2>
 
       <div className="form-group">
         <label>Background *</label>

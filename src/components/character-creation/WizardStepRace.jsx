@@ -2,7 +2,7 @@ import { useState } from 'react';
 import RaceDetailCard from './RaceDetailCard.jsx';
 import './WizardStepRace.css';
 
-function WizardStepRace({ formData, errors, allRacesData, racesData, ruleset, onInputChange }) {
+function WizardStepRace({ stepNumber, formData, errors, allRacesData, racesData, ruleset, onInputChange }) {
   const [expanded, setExpanded] = useState(false);
 
   const selectedRaceName = formData.race?.name || '';
@@ -18,7 +18,7 @@ function WizardStepRace({ formData, errors, allRacesData, racesData, ruleset, on
 
   return (
     <div className="wizard-step wizard-step-race">
-      <h2>Step 3: Race</h2>
+      <h2>Step {stepNumber}: Race</h2>
 
       <div className="form-group">
         <label>Race *</label>

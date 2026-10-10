@@ -5,7 +5,7 @@ import WizardHeader from './WizardHeader.jsx';
 import WizardProgressBar from './WizardProgressBar.jsx';
 import WizardFooter from './WizardFooter.jsx';
 import WizardSidebar from './WizardSidebar.jsx';
-import { WIZARD_STEPS, getTotalSteps } from '../../config/steps-config.js';
+import { WIZARD_STEPS, getVisibleSteps } from '../../config/steps-config.js';
 import useWizardForm from '../../hooks/wizard/useWizardForm.js';
 import useWizardData from '../../hooks/wizard/useWizardData.js';
 import useWizardNavigation from '../../hooks/wizard/useWizardNavigation.js';
@@ -24,6 +24,7 @@ import useWizardFeatAbilityChoices from '../../hooks/wizard/useWizardFeatAbility
 
 const WizardStepRenderer = React.memo(({
   currentStep,
+  stepNumber,
   ruleset,
   errors,
   formData,
@@ -151,7 +152,7 @@ const WizardStepRenderer = React.memo(({
     onFeatAbilityModeChange,
   });
 
-  return <StepComponent {...props} />;
+  return <StepComponent stepNumber={stepNumber} {...props} />;
 });
 WizardStepRenderer.displayName = 'WizardStepRenderer';
 
@@ -417,10 +418,22 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     onComplete(formData);
       }, [currentStep, formData, racesData, classSubtypes, ruleset, feats, existingNames, onComplete, setErrors]);
 
+  const totalSteps = WIZARD_STEPS.length;
+
+  // Shared step index: drives both the sidebar indicator and the content
+  // headings so their numbering can never drift apart.
+  const visibleSteps = useMemo(
+    () => getVisibleSteps({ isEditing, ruleset }),
+    [isEditing, ruleset]
+  );
+  const lastCanonicalStep = visibleSteps[visibleSteps.length - 1]?.step;
+  const stepNumber = visibleSteps.findIndex((step) => step.step === currentStep) + 1;
+
   const renderStep = useCallback(() => {
     return (
       <WizardStepRenderer
         currentStep={currentStep}
+        stepNumber={stepNumber}
         ruleset={ruleset}
         errors={errors}
         formData={formData}
@@ -482,6 +495,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     );
   }, [
     currentStep,
+    stepNumber,
     ruleset,
     errors,
     formData,
@@ -537,8 +551,6 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
     handleFeatAbilityModeChange,
   ]);
 
-  const totalSteps = getTotalSteps();
-
   return (
       <div className="character-creation-wizard-overlay">
         <div className="character-creation-wizard">
@@ -568,7 +580,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allClasses, characterDa
           <WizardFooter
           currentStep={currentStep}
           isFirstStep={isEditing ? currentStep === 2 : currentStep === 1}
-          isLastStep={currentStep === totalSteps}
+          isLastStep={currentStep === lastCanonicalStep}
           onCancel={onCancel}
           onPrevious={navigatePrevious}
           onNext={handleNext}

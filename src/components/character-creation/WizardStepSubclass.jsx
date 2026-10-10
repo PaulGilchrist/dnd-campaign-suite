@@ -60,7 +60,7 @@ function SubclassDetailCard({ selectedSubclass, features, expanded, onToggleExpa
   );
 }
 
-function WizardStepSubclass({ formData, errors, classSubtypes, ruleset, onInputChange, allClassesData }) {
+function WizardStepSubclass({ stepNumber, formData, errors, classSubtypes, ruleset, onInputChange, allClassesData }) {
   const [expanded, setExpanded] = useState(false);
 
   const selectedClassName = formData.class?.name || '';
@@ -130,7 +130,7 @@ function WizardStepSubclass({ formData, errors, classSubtypes, ruleset, onInputC
 
   return (
     <div className="wizard-step wizard-step-subclass">
-      <h2>Step 7: Subclass / Major</h2>
+      <h2>Step {stepNumber}: Subclass / Major</h2>
 
       {!hasSubclasses ? (
         <div className="no-subclass-message">

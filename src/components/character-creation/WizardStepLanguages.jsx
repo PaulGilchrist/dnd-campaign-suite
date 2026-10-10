@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import WarningList from '../common/WarningList.jsx';
 
-function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingStyleToggle, languageLimits, fightingStyleLimits, warnings, preSelectedLanguages, preSelectedFightingStyles }) {
+function WizardStepLanguages({ stepNumber, formData, errors, onLanguageToggle, onFightingStyleToggle, languageLimits, fightingStyleLimits, warnings, preSelectedLanguages, preSelectedFightingStyles }) {
   const [languagesList, setLanguagesList] = useState([]);
   const [fightingStylesList, setFightingStylesList] = useState([]);
   const fightingStyles = useMemo(() => formData.class?.fightingStyles || [], [formData.class]);
@@ -60,7 +60,7 @@ function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingSty
 
   return (
       <div className="wizard-step">
-        <h2>Step 7: Languages & Fighting Styles</h2>
+        <h2>Step {stepNumber}: Languages & Fighting Styles</h2>
 
        {/* Display language limits info */}
         {languageLimits && (

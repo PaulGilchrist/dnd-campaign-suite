@@ -54,7 +54,7 @@ describe('WizardStepMagicItems', () => {
         { name: 'Ring', requiresAttunement: true },
       ];
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             formData: {
               inventory: {
@@ -76,7 +76,7 @@ describe('WizardStepMagicItems', () => {
         { name: 'Cloak', requiresAttunement: true },
       ];
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             formData: {
               inventory: {
@@ -94,7 +94,7 @@ describe('WizardStepMagicItems', () => {
 
     it('does not display a warning when no items are selected', () => {
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             formData: { inventory: { magicItems: [] } },
             allMagicItems: baseMagicItems,
@@ -112,7 +112,7 @@ describe('WizardStepMagicItems', () => {
         { name: 'Potion', requiresAttunement: false },
       ];
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             formData: {
               inventory: {
@@ -152,7 +152,7 @@ describe('WizardStepMagicItems', () => {
       ];
 
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             formData: {
               class: { name: 'Rogue', subclass: { name: 'Thief' } },
@@ -195,7 +195,7 @@ describe('WizardStepMagicItems', () => {
       ];
 
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             formData: {
               class: { name: 'Rogue', subclass: { name: 'Thief' } },
@@ -226,7 +226,7 @@ describe('WizardStepMagicItems', () => {
         { name: 'Ring', requiresAttunement: true },
       ];
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             formData: {
               class: { name: 'Wizard' },
@@ -266,7 +266,7 @@ describe('WizardStepMagicItems', () => {
 
     it('CLA-374: raises the cap to 4 for 2024 Thief lv13+ (flat features[] shape, class.subclass)', () => {
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             formData: {
               class: { name: 'Rogue', subclass: { name: 'Thief' } },
@@ -283,7 +283,7 @@ describe('WizardStepMagicItems', () => {
 
     it('CLA-374: honors class.major naming (2024 wizard normalization)', () => {
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             formData: {
               class: { name: 'Rogue', major: { name: 'Thief' } },
@@ -300,7 +300,7 @@ describe('WizardStepMagicItems', () => {
 
     it('CLA-374: keeps base limit 3 below lv13 for 2024 Thief shape', () => {
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             formData: {
               class: { name: 'Rogue', subclass: { name: 'Thief' } },
@@ -317,7 +317,7 @@ describe('WizardStepMagicItems', () => {
 
     it('CLA-374: keeps base limit 3 without the feature in the major', () => {
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             formData: {
               class: { name: 'Rogue', subclass: { name: 'Assassin' } },
@@ -345,7 +345,7 @@ describe('WizardStepMagicItems', () => {
         { name: 'Ring of Spell Storing', index: 'ring-spell-storing', requiresAttunement: true },
       ];
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             formData: {
               inventory: {
@@ -364,7 +364,7 @@ describe('WizardStepMagicItems', () => {
 
   describe('item display', () => {
     it('shows attunement badge on items that require attunement', () => {
-      render(<WizardStepMagicItems {...createProps()} />);
+      render(<WizardStepMagicItems stepNumber={15} {...createProps()} />);
       expect(screen.getByText('requires attunement')).toBeInTheDocument();
     });
 
@@ -374,7 +374,7 @@ describe('WizardStepMagicItems', () => {
         index: 'odd',
       };
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             allMagicItems: [minimalItem],
           })}
@@ -388,7 +388,7 @@ describe('WizardStepMagicItems', () => {
         { name: 'Ring of Protection', index: 'ring', type: 'Ring', rarity: 'Rare', description: 'AC +1' },
       ];
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             allMagicItems: itemsWithTypeAndRarity,
           })}
@@ -404,7 +404,7 @@ describe('WizardStepMagicItems', () => {
         index: 'artifact',
       };
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             allMagicItems: [minimalItem],
           })}
@@ -419,7 +419,7 @@ describe('WizardStepMagicItems', () => {
     it('calls onArrayFieldChange to add an unselected item when its checkbox is clicked', () => {
       const onArrayFieldChange = vi.fn();
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             onArrayFieldChange,
           })}
@@ -440,7 +440,7 @@ describe('WizardStepMagicItems', () => {
     it('calls onArrayFieldChange to remove a selected item when its checkbox is clicked', () => {
       const onArrayFieldChange = vi.fn();
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             onArrayFieldChange,
             formData: {
@@ -473,7 +473,7 @@ describe('WizardStepMagicItems', () => {
       ];
       // Select by index instead of name
       render(
-        <WizardStepMagicItems
+        <WizardStepMagicItems stepNumber={15}
           {...createProps({
             formData: {
               inventory: {

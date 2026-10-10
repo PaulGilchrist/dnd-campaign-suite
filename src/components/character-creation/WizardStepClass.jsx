@@ -9,7 +9,7 @@ const CLASS_ORDER_CONFIGS = {
   },
 };
 
-function WizardStepClass({ formData, errors, allClassesData, ruleset, onInputChange }) {
+function WizardStepClass({ stepNumber, formData, errors, allClassesData, ruleset, onInputChange }) {
   const selectedClass = formData.class || {};
   const selectedClassName = selectedClass.name || '';
   const fullClassData = allClassesData.find(c => c.name === selectedClassName);
@@ -30,7 +30,7 @@ function WizardStepClass({ formData, errors, allClassesData, ruleset, onInputCha
 
   return (
     <div className="wizard-step wizard-step-class">
-      <h2>Step 6: Class</h2>
+      <h2>Step {stepNumber}: Class</h2>
 
       <div className="form-group">
         <label>Class *</label>

@@ -122,7 +122,7 @@ function setupFetchMock(rules, background = null) {
 }
 
 async function renderWizard(props) {
-  render(<WizardStepAbilities {...props} />);
+  render(<WizardStepAbilities stepNumber={9} {...props} />);
   await waitFor(() => {
     expect(screen.getAllByRole('heading', { level: 4 })).toHaveLength(6);
   });
@@ -139,7 +139,7 @@ describe('WizardStepAbilities', () => {
       const props = createMockProps();
       await renderWizard(props);
 
-      expect(screen.getByText('Step 5: Ability Scores')).toBeInTheDocument();
+      expect(screen.getByText('Step 9: Ability Scores')).toBeInTheDocument();
       expect(screen.getByText(/Total points allowed: 24/)).toBeInTheDocument();
       expect(
         screen.getByText(/Total score \(base \+ feat \+ background \+ racial \+ misc\) cannot exceed 20/)
@@ -535,7 +535,7 @@ describe('WizardStepAbilities', () => {
       });
       await renderWizard(props);
 
-      expect(screen.getByText('Step 5: Ability Scores')).toBeInTheDocument();
+      expect(screen.getByText('Step 9: Ability Scores')).toBeInTheDocument();
     });
   });
 });

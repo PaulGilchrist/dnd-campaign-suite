@@ -74,9 +74,9 @@ describe('WizardStepLanguages', () => {
   describe('rendering', () => {
     it('should render step header, labels, rule info, and selection counts', async () => {
       setupFetchSuccess();
-      render(<WizardStepLanguages {...createMockProps()} />);
+      render(<WizardStepLanguages stepNumber={12} {...createMockProps()} />);
       await waitForListsLoaded();
-      expect(screen.getByText('Step 7: Languages & Fighting Styles')).toBeInTheDocument();
+      expect(screen.getByText('Step 12: Languages & Fighting Styles')).toBeInTheDocument();
       expect(screen.getByText('Languages')).toBeInTheDocument();
       expect(screen.getByText('Fighting Styles')).toBeInTheDocument();
       expect(screen.getByText(/Your race grants 2 languages/)).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe('WizardStepLanguages', () => {
 
     it('should render all languages and fighting styles from fetched data', async () => {
       setupFetchSuccess();
-      render(<WizardStepLanguages {...createMockProps()} />);
+      render(<WizardStepLanguages stepNumber={12} {...createMockProps()} />);
       await waitForListsLoaded();
       expect(screen.getByText('Elvish')).toBeInTheDocument();
       expect(screen.getByText('Dwarfish')).toBeInTheDocument();
@@ -100,7 +100,7 @@ describe('WizardStepLanguages', () => {
       setupFetchSuccess();
       const warningMsg = 'You have exceeded the limit.';
       render(
-        <WizardStepLanguages
+        <WizardStepLanguages stepNumber={12}
           {...createMockProps()}
           warnings={[{ type: 'warning', message: warningMsg }]}
         />
@@ -113,7 +113,7 @@ describe('WizardStepLanguages', () => {
   describe('conditional rendering', () => {
     it('should hide fighting style rule info when fightingStyleLimits is null', async () => {
       setupFetchSuccess();
-      render(<WizardStepLanguages {...createMockProps()} fightingStyleLimits={null} />);
+      render(<WizardStepLanguages stepNumber={12} {...createMockProps()} fightingStyleLimits={null} />);
       await waitForListsLoaded();
       expect(screen.getByText(/allowed language/)).toBeInTheDocument();
       expect(screen.queryByText(/allowed fighting style/)).not.toBeInTheDocument();
@@ -121,7 +121,7 @@ describe('WizardStepLanguages', () => {
 
     it('should hide language rule info when languageLimits is null', async () => {
       setupFetchSuccess();
-      render(<WizardStepLanguages {...createMockProps()} languageLimits={null} />);
+      render(<WizardStepLanguages stepNumber={12} {...createMockProps()} languageLimits={null} />);
       await waitForListsLoaded();
       expect(screen.getByText(/allowed fighting style/)).toBeInTheDocument();
       expect(screen.queryByText(/allowed language/)).not.toBeInTheDocument();
@@ -130,7 +130,7 @@ describe('WizardStepLanguages', () => {
     it('should show validation errors for languages and fighting styles', async () => {
       setupFetchSuccess();
       render(
-        <WizardStepLanguages
+        <WizardStepLanguages stepNumber={12}
           {...createMockProps()}
           errors={{ languages: 'Must select at least one language', fightingStyles: 'Fighting style selection required' }}
         />
@@ -143,7 +143,7 @@ describe('WizardStepLanguages', () => {
     it('should only show the error for the section that has one', async () => {
       setupFetchSuccess();
       render(
-        <WizardStepLanguages
+        <WizardStepLanguages stepNumber={12}
           {...createMockProps()}
           errors={{ languages: 'Must select at least one language' }}
         />
@@ -157,7 +157,7 @@ describe('WizardStepLanguages', () => {
   describe('pre-selected items', () => {
     it('should disable checkboxes for pre-selected items already in formData', async () => {
       setupFetchSuccess();
-      render(<WizardStepLanguages {...createMockProps()} />);
+      render(<WizardStepLanguages stepNumber={12} {...createMockProps()} />);
       await waitForListsLoaded();
       const langCheckbox = screen.getByRole('checkbox', { name: 'Common' });
       expect(langCheckbox).toBeDisabled();
@@ -168,7 +168,7 @@ describe('WizardStepLanguages', () => {
     it('should not disable pre-selected items when not in formData', async () => {
       setupFetchSuccess();
       render(
-        <WizardStepLanguages
+        <WizardStepLanguages stepNumber={12}
           {...createMockProps({
             formData: { languages: [], class: { fightingStyles: [] } },
           })}
@@ -188,7 +188,7 @@ describe('WizardStepLanguages', () => {
       const mockOnLanguageToggle = vi.fn();
       const mockOnFightingStyleToggle = vi.fn();
       render(
-        <WizardStepLanguages
+        <WizardStepLanguages stepNumber={12}
           {...createMockProps({
             formData: { languages: [], class: { fightingStyles: [] } },
           })}
@@ -214,7 +214,7 @@ describe('WizardStepLanguages', () => {
       const mockOnLanguageToggle = vi.fn();
       const mockOnFightingStyleToggle = vi.fn();
       render(
-        <WizardStepLanguages
+        <WizardStepLanguages stepNumber={12}
           {...createMockProps({
             formData: { languages: ['Elvish'], class: { fightingStyles: ['Dueling'] } },
           })}
@@ -240,7 +240,7 @@ describe('WizardStepLanguages', () => {
       const mockOnLanguageToggle = vi.fn();
       const mockOnFightingStyleToggle = vi.fn();
       render(
-        <WizardStepLanguages
+        <WizardStepLanguages stepNumber={12}
           {...createMockProps({ formData: { languages: [], class: { fightingStyles: [] } } })}
           languageLimits={null}
           fightingStyleLimits={null}
@@ -259,7 +259,7 @@ describe('WizardStepLanguages', () => {
       setupFetchSuccess();
       const mockOnLanguageToggle = vi.fn();
       render(
-        <WizardStepLanguages
+        <WizardStepLanguages stepNumber={12}
           {...createMockProps()}
           onLanguageToggle={mockOnLanguageToggle}
         />
@@ -274,7 +274,7 @@ describe('WizardStepLanguages', () => {
       setupFetchSuccess();
       const mockOnFightingStyleToggle = vi.fn();
       render(
-        <WizardStepLanguages
+        <WizardStepLanguages stepNumber={12}
           {...createMockProps({ formData: { languages: [], class: { fightingStyles: [] } } })}
           onFightingStyleToggle={mockOnFightingStyleToggle}
         />
@@ -299,9 +299,9 @@ describe('WizardStepLanguages', () => {
           json: () => Promise.resolve(mockFightingStyles),
         });
       });
-      render(<WizardStepLanguages {...createMockProps()} />);
+      render(<WizardStepLanguages stepNumber={12} {...createMockProps()} />);
       await waitFor(() => {
-        expect(screen.getByText('Step 7: Languages & Fighting Styles')).toBeInTheDocument();
+        expect(screen.getByText('Step 12: Languages & Fighting Styles')).toBeInTheDocument();
         expect(screen.getByText('Fighting Styles')).toBeInTheDocument();
       });
       expect(consoleSpy).toHaveBeenCalledWith('Error loading languages:', expect.any(Error));
@@ -313,9 +313,9 @@ describe('WizardStepLanguages', () => {
       global.fetch = vi.fn(() =>
         Promise.reject(new Error('Network error'))
       );
-      render(<WizardStepLanguages {...createMockProps()} />);
+      render(<WizardStepLanguages stepNumber={12} {...createMockProps()} />);
       await waitFor(() => {
-        expect(screen.getByText('Step 7: Languages & Fighting Styles')).toBeInTheDocument();
+        expect(screen.getByText('Step 12: Languages & Fighting Styles')).toBeInTheDocument();
       });
       expect(consoleSpy).toHaveBeenCalledWith('Error loading languages:', expect.any(Error));
       expect(consoleSpy).toHaveBeenCalledWith('Error loading fighting styles:', expect.any(Error));
@@ -327,7 +327,7 @@ describe('WizardStepLanguages', () => {
     it('should render string items from formData that are not in the fetched list', async () => {
       setupFetchSuccess();
       render(
-        <WizardStepLanguages
+        <WizardStepLanguages stepNumber={12}
           {...createMockProps({
             formData: { languages: ['Undercommon'], class: { fightingStyles: [] } },
           })}
@@ -357,7 +357,7 @@ describe('WizardStepLanguages', () => {
           json: () => Promise.resolve([]),
         });
       });
-      render(<WizardStepLanguages {...createMockProps()} />);
+      render(<WizardStepLanguages stepNumber={12} {...createMockProps()} />);
       await waitFor(() => {
         expect(screen.getByText('Common')).toBeInTheDocument();
         expect(screen.getByText('Elvish')).toBeInTheDocument();

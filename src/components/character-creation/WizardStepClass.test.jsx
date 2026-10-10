@@ -53,12 +53,12 @@ describe('WizardStepClass', () => {
 
   describe('render', () => {
     it('should display the step heading', () => {
-      render(<WizardStepClass {...createMockProps()} />);
+      render(<WizardStepClass stepNumber={6} {...createMockProps()} />);
       expect(screen.getByText('Step 6: Class')).toBeInTheDocument();
     });
 
     it('should render the class dropdown with options', () => {
-      render(<WizardStepClass {...createMockProps()} />);
+      render(<WizardStepClass stepNumber={6} {...createMockProps()} />);
       expect(screen.getByText('Class *')).toBeInTheDocument();
       const select = document.querySelector('select');
       expect(select.querySelector('option[value=""]')).toHaveTextContent('Select a class');
@@ -67,7 +67,7 @@ describe('WizardStepClass', () => {
     });
 
     it('should not render a detail card when no class is selected', () => {
-      render(<WizardStepClass {...createMockProps({ formData: { class: { name: '', subclass: { name: '' }, divineOrder: '', primalOrder: '' } } })} />);
+      render(<WizardStepClass stepNumber={6} {...createMockProps({ formData: { class: { name: '', subclass: { name: '' }, divineOrder: '', primalOrder: '' } } })} />);
       expect(screen.queryByText(/Details$/)).not.toBeInTheDocument();
     });
   });
@@ -75,7 +75,7 @@ describe('WizardStepClass', () => {
   describe('5e ruleset', () => {
     it('should show saving throws and weapon proficiencies for 5e classes', () => {
       render(
-        <WizardStepClass
+        <WizardStepClass stepNumber={6}
           {...createMockProps({
             allClassesData: mockAllClassesData5e,
             formData: { class: { name: 'Barbarian', subclass: { name: '' }, divineOrder: '', primalOrder: '' } },
@@ -91,7 +91,7 @@ describe('WizardStepClass', () => {
     it('should call onInputChange when class changes and reset subclass', () => {
       const mockOnChange = vi.fn();
       render(
-        <WizardStepClass
+        <WizardStepClass stepNumber={6}
           {...createMockProps({
             onInputChange: mockOnChange,
             formData: { class: { name: 'Barbarian', subclass: { name: 'Path of the Berserker' }, divineOrder: '', primalOrder: '' } },
@@ -111,7 +111,7 @@ describe('WizardStepClass', () => {
     it('should select an empty string to reset the class', () => {
       const mockOnChange = vi.fn();
       render(
-        <WizardStepClass
+        <WizardStepClass stepNumber={6}
           {...createMockProps({
             onInputChange: mockOnChange,
             formData: { class: { name: 'Barbarian', subclass: { name: '' }, divineOrder: '', primalOrder: '' } },
@@ -132,7 +132,7 @@ describe('WizardStepClass', () => {
   describe('2024 ruleset', () => {
     it('should show saving throws, weapon proficiencies, and armor training for 2024', () => {
       render(
-        <WizardStepClass
+        <WizardStepClass stepNumber={6}
           {...createMockProps({
             allClassesData: mockAllClassesData2024,
             ruleset: '2024',
@@ -152,7 +152,7 @@ describe('WizardStepClass', () => {
 
     it('should not show tool proficiencies when empty for 2024', () => {
       render(
-        <WizardStepClass
+        <WizardStepClass stepNumber={6}
           {...createMockProps({
             allClassesData: mockAllClassesData2024,
             ruleset: '2024',
@@ -170,7 +170,7 @@ describe('WizardStepClass', () => {
       { className: 'Druid', label: 'Primal Order *', optionValue: 'Magician', optionText: 'Magician' },
     ])('should show %s dropdown for %s 2024', ({ className, label, optionValue, optionText }) => {
       render(
-        <WizardStepClass
+        <WizardStepClass stepNumber={6}
           {...createMockProps({
             allClassesData: mockAllClassesData2024,
             classSubtypes: mockClassSubtypes,
@@ -187,7 +187,7 @@ describe('WizardStepClass', () => {
 
     it('should not show order dropdowns for non-special classes in 2024', () => {
       render(
-        <WizardStepClass
+        <WizardStepClass stepNumber={6}
           {...createMockProps({
             allClassesData: mockAllClassesData2024,
             ruleset: '2024',
@@ -206,7 +206,7 @@ describe('WizardStepClass', () => {
       const mockOnChange = vi.fn();
       const formData = { class: { name: className, subclass: { name: '' }, divineOrder: '', primalOrder: '' } };
       render(
-        <WizardStepClass
+        <WizardStepClass stepNumber={6}
           {...createMockProps({
             allClassesData: mockAllClassesData2024,
             ruleset: '2024',
@@ -225,7 +225,7 @@ describe('WizardStepClass', () => {
   describe('toggle details', () => {
     it('should show "Show Details" button initially and toggle to "Hide Details"', () => {
       render(
-        <WizardStepClass
+        <WizardStepClass stepNumber={6}
           {...createMockProps({
             allClassesData: mockAllClassesData5e,
             formData: { class: { name: 'Barbarian', subclass: { name: '' }, divineOrder: '', primalOrder: '' } },
@@ -250,7 +250,7 @@ describe('WizardStepClass', () => {
   describe('error display', () => {
     it('should render error message and error class when class error exists', () => {
       render(
-        <WizardStepClass
+        <WizardStepClass stepNumber={6}
           {...createMockProps({
             errors: { class: 'Class is required' },
           })}
@@ -266,7 +266,7 @@ describe('WizardStepClass', () => {
       { fieldName: 'primalOrder', className: 'Druid', errorMessage: 'Primal Order is required' },
     ])('should render error message and error class when %s error exists', ({ fieldName, className, errorMessage }) => {
       render(
-        <WizardStepClass
+        <WizardStepClass stepNumber={6}
           {...createMockProps({
             allClassesData: mockAllClassesData2024,
             ruleset: '2024',
@@ -284,7 +284,7 @@ describe('WizardStepClass', () => {
 
   describe('empty state', () => {
     it('should render the class dropdown but no detail card when allClassesData is empty', () => {
-      render(<WizardStepClass {...createMockProps({ allClassesData: [] })} />);
+      render(<WizardStepClass stepNumber={6} {...createMockProps({ allClassesData: [] })} />);
       expect(screen.getByText('Class *')).toBeInTheDocument();
       const select = document.querySelector('select');
       expect(select.querySelector('option[value=""]')).toHaveTextContent('Select a class');

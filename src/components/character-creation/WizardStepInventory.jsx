@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useEquipmentSearch } from '../../hooks/ui/useEquipmentSearch.js';
 import EquipmentSearchModal from './EquipmentSearchModal.jsx';
 
-const WizardStepInventory = React.memo(function WizardStepInventory({ formData, tempInventory, onInventoryChange, onTempInventoryChange }) {
+const WizardStepInventory = React.memo(function WizardStepInventory({ stepNumber, formData, tempInventory, onInventoryChange, onTempInventoryChange }) {
   const {
     searchQuery,
     setSearchQuery,
@@ -173,7 +173,7 @@ const WizardStepInventory = React.memo(function WizardStepInventory({ formData, 
 
   return (
     <div className="wizard-step">
-      <h2>Step 11: Inventory</h2>
+      <h2>Step {stepNumber}: Inventory</h2>
 
       <div className="form-group">
         <label>Gold Pieces *</label>

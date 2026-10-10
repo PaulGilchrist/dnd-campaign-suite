@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-function WizardStepBasic({ formData, errors, campaignName, onInputChange }) {
+function WizardStepBasic({ stepNumber, formData, errors, campaignName, onInputChange }) {
   const [alignments, setAlignments] = useState([]);
 
   useEffect(() => {
@@ -24,7 +24,7 @@ function WizardStepBasic({ formData, errors, campaignName, onInputChange }) {
 
   return (
      <div className="wizard-step">
-       <h2>Step 2: Basic Information</h2>
+       <h2>Step {stepNumber}: Basic Information</h2>
        
        <div className="form-group">
          <label>Character Name *</label>

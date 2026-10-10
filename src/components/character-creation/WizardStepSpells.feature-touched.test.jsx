@@ -409,7 +409,7 @@ describe('WizardStepSpells feat integrations', () => {
         { name: 'ST_Spell', level: 2, school: 'Illusion', classes: ['Wizard'], description: [] },
       ];
       render(
-        <WizardStepSpells
+        <WizardStepSpells stepNumber={14}
           {...mockProps}
           allSpells={allSpells}
           formData={{

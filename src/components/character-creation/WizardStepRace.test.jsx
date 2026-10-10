@@ -30,12 +30,12 @@ function createMockProps(overrides = {}) {
 describe('WizardStepRace', () => {
   describe('Render', () => {
     it('should display the step heading', () => {
-      render(<WizardStepRace {...createMockProps()} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps()} />);
       expect(screen.getByText('Step 3: Race')).toBeInTheDocument();
     });
 
     it('should render the race dropdown with options', () => {
-      render(<WizardStepRace {...createMockProps()} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps()} />);
       expect(screen.getByText('Race *')).toBeInTheDocument();
       const select = screen.getByRole('combobox');
       expect(select).toHaveTextContent('Select a race');
@@ -43,19 +43,19 @@ describe('WizardStepRace', () => {
     });
 
     it('should show the detail card when a race is selected', () => {
-      render(<WizardStepRace {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
       expect(screen.getByText('Human Details')).toBeInTheDocument();
     });
 
     it('should not show the detail card when no race is selected', () => {
-      render(<WizardStepRace {...createMockProps()} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps()} />);
       expect(screen.queryByText('Details')).not.toBeInTheDocument();
     });
   });
 
   describe('Expand/Collapse', () => {
     it('should toggle details when the header is clicked', () => {
-      render(<WizardStepRace {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
       const header = screen.getByRole('heading', { name: /Human Details/i });
       expect(screen.getByRole('button', { name: /Show Details/i })).toBeInTheDocument();
       fireEvent.click(header);
@@ -65,7 +65,7 @@ describe('WizardStepRace', () => {
     });
 
     it('should toggle details when the toggle button is clicked', () => {
-      render(<WizardStepRace {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
       const button = screen.getByRole('button', { name: /Show Details/i });
       expect(button).toHaveTextContent('Show Details');
       fireEvent.click(button);
@@ -78,7 +78,7 @@ describe('WizardStepRace', () => {
   describe('Race selection', () => {
     it('should call onInputChange when race changes', () => {
       const mockOnChange = vi.fn();
-      render(<WizardStepRace {...createMockProps({ onInputChange: mockOnChange })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ onInputChange: mockOnChange })} />);
       const select = screen.getByRole('combobox');
       fireEvent.change(select, { target: { value: 'Elf' } });
       expect(mockOnChange).toHaveBeenCalledWith('race', { name: 'Elf', subrace: { name: '' } });
@@ -87,14 +87,14 @@ describe('WizardStepRace', () => {
 
   describe('Error display', () => {
     it('should render error message when race error exists', () => {
-      render(<WizardStepRace {...createMockProps({ errors: { race: 'Race is required' } })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ errors: { race: 'Race is required' } })} />);
       expect(screen.getByText('Race is required')).toBeInTheDocument();
     });
   });
 
   describe('Detail card content', () => {
     it('should render description when full race data has one', () => {
-      render(<WizardStepRace {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
       const header = screen.getByRole('heading', { name: /Human Details/i });
       fireEvent.click(header);
       expect(screen.getByText('Description')).toBeInTheDocument();
@@ -102,14 +102,14 @@ describe('WizardStepRace', () => {
     });
 
     it('should not render description section when full race data has no description', () => {
-      render(<WizardStepRace {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } }, allRacesData: [{ name: 'Human' }] })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } }, allRacesData: [{ name: 'Human' }] })} />);
       const header = screen.getByRole('heading', { name: /Human Details/i });
       fireEvent.click(header);
       expect(screen.queryByText('Description')).not.toBeInTheDocument();
     });
 
     it('should render core information section with speed and size', () => {
-      render(<WizardStepRace {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
       const header = screen.getByRole('heading', { name: /Human Details/i });
       fireEvent.click(header);
       expect(screen.getByText('Core Information')).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe('WizardStepRace', () => {
     });
 
     it('should render languages', () => {
-      render(<WizardStepRace {...createMockProps({ formData: { race: { name: 'Elf', subrace: { name: '' } } } })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Elf', subrace: { name: '' } } } })} />);
       const header = screen.getByRole('heading', { name: /Elf Details/i });
       fireEvent.click(header);
       expect(screen.getByText('Languages')).toBeInTheDocument();
@@ -126,7 +126,7 @@ describe('WizardStepRace', () => {
     });
 
     it('should render racial traits when they exist', () => {
-      render(<WizardStepRace {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
       const header = screen.getByRole('heading', { name: /Human Details/i });
       fireEvent.click(header);
       expect(screen.getByText('Racial Traits')).toBeInTheDocument();
@@ -135,21 +135,21 @@ describe('WizardStepRace', () => {
     });
 
     it('should not render racial traits section when traits are missing', () => {
-      render(<WizardStepRace {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } }, racesData: [{ name: 'Human', speed: 30, size: 'Medium' }] })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } }, racesData: [{ name: 'Human', speed: 30, size: 'Medium' }] })} />);
       const header = screen.getByRole('heading', { name: /Human Details/i });
       fireEvent.click(header);
       expect(screen.queryByText('Racial Traits')).not.toBeInTheDocument();
     });
 
     it('should render trait descriptions with HTML', () => {
-      render(<WizardStepRace {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } }, racesData: [{ name: 'Human', speed: 30, size: 'Medium', traits: [{ name: 'Trait', description: '<em>Italic trait</em>' }] }] })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } }, racesData: [{ name: 'Human', speed: 30, size: 'Medium', traits: [{ name: 'Trait', description: '<em>Italic trait</em>' }] }] })} />);
       const header = screen.getByRole('heading', { name: /Human Details/i });
       fireEvent.click(header);
       expect(screen.getByText(/Italic trait/)).toBeInTheDocument();
     });
 
     it('should render plain trait descriptions without HTML', () => {
-      render(<WizardStepRace {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
       const header = screen.getByRole('heading', { name: /Human Details/i });
       fireEvent.click(header);
       expect(screen.getByText(/You can speak one extra language/)).toBeInTheDocument();
@@ -158,13 +158,13 @@ describe('WizardStepRace', () => {
 
   describe('Edge cases', () => {
     it('should render gracefully when formData.race is null, undefined, or missing', () => {
-      render(<WizardStepRace {...createMockProps({ formData: { race: null } })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: null } })} />);
       expect(screen.getByText('Step 3: Race')).toBeInTheDocument();
       expect(screen.queryByText('Details')).not.toBeInTheDocument();
     });
 
     it('should render gracefully with empty racesData', () => {
-      render(<WizardStepRace {...createMockProps({ racesData: [] })} />);
+      render(<WizardStepRace stepNumber={3} {...createMockProps({ racesData: [] })} />);
       expect(screen.getByText('Step 3: Race')).toBeInTheDocument();
       const select = screen.getByRole('combobox');
       expect(select.querySelector('option')).toHaveTextContent('Select a race');

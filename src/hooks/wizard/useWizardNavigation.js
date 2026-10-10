@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { validateStep } from '../../config/utils.js';
+import { getVisibleSteps } from '../../config/steps-config.js';
 
 function useWizardNavigation(initialStep, formData, racesData, { classSubtypes = [], ruleset, allFeats = [], existingNames = [] } = {}) {
   const [currentStep, setCurrentStep] = useState(initialStep);
@@ -38,18 +39,28 @@ function useWizardNavigation(initialStep, formData, racesData, { classSubtypes =
     return !!(formData.class.subclass && formData.class.subclass.name);
   }, [formData.class, classSubtypes]);
 
+  // Walk order = the same shared step index the sidebar and content headings
+  // use, so Next/Back never land on a step the indicator omits.
+  const walkSteps = useMemo(() => getVisibleSteps({ ruleset }).map(s => s.step), [ruleset]);
+
   const navigateNext = useCallback(async () => {
     const stepErrors = await validateStep(currentStep, formData, { racesData, classSubtypes, ruleset, allFeats, existingNames });
     if (Object.keys(stepErrors).length === 0) {
-      setCurrentStep(prev => prev + 1);
+      setCurrentStep(prev => {
+        const idx = walkSteps.indexOf(prev);
+        return idx >= 0 && idx < walkSteps.length - 1 ? walkSteps[idx + 1] : prev;
+      });
       return true;
     }
     return false;
-  }, [currentStep, formData, racesData, classSubtypes, ruleset, allFeats, existingNames]);
+  }, [currentStep, formData, racesData, classSubtypes, ruleset, allFeats, existingNames, walkSteps]);
 
   const navigatePrevious = useCallback(() => {
-    setCurrentStep(prev => prev - 1);
-  }, []);
+    setCurrentStep(prev => {
+      const idx = walkSteps.indexOf(prev);
+      return idx > 0 ? walkSteps[idx - 1] : prev;
+    });
+  }, [walkSteps]);
 
   const goToStep = useCallback((step) => {
     setCurrentStep(step);

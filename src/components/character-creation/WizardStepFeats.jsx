@@ -34,7 +34,7 @@ function RepeatableFeatActions({ isRepeatable, isSelected, itemCount, isPreSelec
   );
 }
 
-function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFeats, computedBuffs }) {
+function WizardStepFeats({ stepNumber, formData, allFeats, onArrayFieldChange, preSelectedFeats, computedBuffs }) {
   const [warnings, setWarnings] = React.useState([]);
   const [raceFeatChoices, setRaceFeatChoices] = React.useState([]);
   const [isVersatile, setIsVersatile] = React.useState(false);
@@ -206,7 +206,7 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
          fieldName="feats"
          formData={formData}
          onArrayFieldChange={onArrayFieldChange}
-         title="Step 4: Feats"
+         title={`Step ${stepNumber}: Feats`}
          searchPlaceholder="Search feats..."
          filters={filters}
          renderItem={renderItem}

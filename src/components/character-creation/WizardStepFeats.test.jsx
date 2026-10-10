@@ -43,7 +43,8 @@ const mockFormData = {
 
 function renderComponent(props) {
   return render(
-    <WizardStepFeats
+    <WizardStepFeats stepNumber={8}
+      stepNumber={8}
       formData={mockFormData}
       allFeats={mockFeats}
       onArrayFieldChange={vi.fn()}
@@ -347,11 +348,11 @@ describe('WizardStepFeats', () => {
 
   describe('Edge cases', () => {
     it('should render the wizard step title when allFeats is null or undefined', () => {
-      const { rerender } = render(<WizardStepFeats formData={mockFormData} allFeats={null} onArrayFieldChange={vi.fn()} preSelectedFeats={[]} />);
-      expect(screen.getByText('Step 4: Feats')).toBeInTheDocument();
+      const { rerender } = render(<WizardStepFeats stepNumber={8} formData={mockFormData} allFeats={null} onArrayFieldChange={vi.fn()} preSelectedFeats={[]} />);
+      expect(screen.getByText('Step 8: Feats')).toBeInTheDocument();
 
-      rerender(<WizardStepFeats formData={mockFormData} allFeats={undefined} onArrayFieldChange={vi.fn()} preSelectedFeats={[]} />);
-      expect(screen.getByText('Step 4: Feats')).toBeInTheDocument();
+      rerender(<WizardStepFeats stepNumber={8} formData={mockFormData} allFeats={undefined} onArrayFieldChange={vi.fn()} preSelectedFeats={[]} />);
+      expect(screen.getByText('Step 8: Feats')).toBeInTheDocument();
     });
   });
 });

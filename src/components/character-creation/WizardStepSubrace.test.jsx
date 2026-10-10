@@ -46,13 +46,13 @@ describe('WizardStepSubrace', () => {
 
   describe('Rendering', () => {
     it('should display the step heading', () => {
-      render(<WizardStepSubrace {...createMockProps()} />);
+      render(<WizardStepSubrace stepNumber={4} {...createMockProps()} />);
       expect(screen.getByText('Step 4: Subrace')).toBeInTheDocument();
     });
 
     it('should show a default select option', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Dragonborn', subrace: { name: '' } } },
           })}
@@ -65,7 +65,7 @@ describe('WizardStepSubrace', () => {
 
     it('should show selected subrace value in dropdown', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Dragonborn', subrace: { name: 'Red Dragonborn' } } },
           })}
@@ -77,7 +77,7 @@ describe('WizardStepSubrace', () => {
 
     it('should show no-subrace message when race has no subraces', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Human', subrace: { name: '' } } },
           })}
@@ -88,7 +88,7 @@ describe('WizardStepSubrace', () => {
 
     it('should not show subrace dropdown when no subraces available', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Human', subrace: { name: '' } } },
           })}
@@ -101,7 +101,7 @@ describe('WizardStepSubrace', () => {
   describe('Subrace dropdown options', () => {
     it('should list all subrace names as options', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Dragonborn', subrace: { name: '' } } },
           })}
@@ -116,7 +116,7 @@ describe('WizardStepSubrace', () => {
   describe('Expand/Collapse', () => {
     it('should expand details when header is clicked', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Dragonborn', subrace: { name: 'Red Dragonborn' } } },
           })}
@@ -129,7 +129,7 @@ describe('WizardStepSubrace', () => {
 
     it('should collapse details when header is clicked again', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Dragonborn', subrace: { name: 'Red Dragonborn' } } },
           })}
@@ -143,7 +143,7 @@ describe('WizardStepSubrace', () => {
 
     it('should show subrace details header when expanded', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Dragonborn', subrace: { name: 'Red Dragonborn' } } },
           })}
@@ -156,7 +156,7 @@ describe('WizardStepSubrace', () => {
 
     it('should not show detail card when no subrace is selected', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Dragonborn', subrace: { name: '' } } },
           })}
@@ -167,7 +167,7 @@ describe('WizardStepSubrace', () => {
 
     it('should not show detail card when race has no subraces', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Human', subrace: { name: '' } } },
           })}
@@ -180,7 +180,7 @@ describe('WizardStepSubrace', () => {
   describe('Description rendering', () => {
     it('should render sanitized HTML description when expanded', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Dragonborn', subrace: { name: 'Red Dragonborn' } } },
           })}
@@ -194,7 +194,7 @@ describe('WizardStepSubrace', () => {
 
     it('should not show description section when subrace has no description', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Elf', subrace: { name: 'High Elf' } } },
           })}
@@ -209,7 +209,7 @@ describe('WizardStepSubrace', () => {
   describe('Trait display', () => {
     it('should show damage resistance trait when expanded', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Dragonborn', subrace: { name: 'Red Dragonborn' } } },
           })}
@@ -224,7 +224,7 @@ describe('WizardStepSubrace', () => {
 
     it('should show non-damage-resistance traits when expanded', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Elf', subrace: { name: 'High Elf' } } },
           })}
@@ -249,7 +249,7 @@ describe('WizardStepSubrace', () => {
         },
       ];
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'TestRace', subrace: { name: 'EmptySubrace' } } },
             racesData: racesNoTraits,
@@ -273,7 +273,7 @@ describe('WizardStepSubrace', () => {
         },
       ];
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'TestRace', subrace: { name: 'TestSubrace' } } },
             racesData: racesWithHtmlTrait,
@@ -292,7 +292,7 @@ describe('WizardStepSubrace', () => {
     it('should call onInputChange with correct payload when subrace changes', () => {
       const mockOnChange = vi.fn();
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             onInputChange: mockOnChange,
             formData: { race: { name: 'Dragonborn', subrace: { name: 'Red Dragonborn' } } },
@@ -310,7 +310,7 @@ describe('WizardStepSubrace', () => {
     it('should call onInputChange when clearing subrace selection', () => {
       const mockOnChange = vi.fn();
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             onInputChange: mockOnChange,
             formData: { race: { name: 'Dragonborn', subrace: { name: 'Red Dragonborn' } } },
@@ -329,7 +329,7 @@ describe('WizardStepSubrace', () => {
   describe('Error display', () => {
     it('should render error message when subrace error exists', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Dragonborn', subrace: { name: '' } } },
             errors: { subrace: 'Subrace is required' },
@@ -341,7 +341,7 @@ describe('WizardStepSubrace', () => {
 
     it('should apply error class to select when subrace error exists', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Dragonborn', subrace: { name: '' } } },
             errors: { subrace: 'Subrace is required' },
@@ -354,7 +354,7 @@ describe('WizardStepSubrace', () => {
 
     it('should not apply error class when no subrace error exists', () => {
       render(
-        <WizardStepSubrace
+        <WizardStepSubrace stepNumber={4}
           {...createMockProps({
             formData: { race: { name: 'Dragonborn', subrace: { name: 'Red Dragonborn' } } },
           })}

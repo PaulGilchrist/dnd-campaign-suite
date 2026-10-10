@@ -51,14 +51,14 @@ describe('WizardStepBackground', () => {
 
   describe('heading', () => {
     it('should display the step heading', () => {
-      render(<WizardStepBackground {...createMockProps()} />);
+      render(<WizardStepBackground stepNumber={5} {...createMockProps()} />);
       expect(screen.getByText('Step 5: Background')).toBeInTheDocument();
     });
   });
 
   describe('dropdown', () => {
     it('should render the background label, select element, and options from backgrounds array', () => {
-      render(<WizardStepBackground {...createMockProps()} />);
+      render(<WizardStepBackground stepNumber={5} {...createMockProps()} />);
       expect(screen.getByText('Background *')).toBeInTheDocument();
       expect(screen.getByRole('combobox')).toBeInTheDocument();
       expect(screen.getByText('Select a background')).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe('WizardStepBackground', () => {
 
     it('should pre-select a chosen background', () => {
       render(
-        <WizardStepBackground
+        <WizardStepBackground stepNumber={5}
           {...createMockProps({
             formData: { background: 'Soldier' },
           })}
@@ -81,7 +81,7 @@ describe('WizardStepBackground', () => {
 
     it('should call onInputChange with the selected value when changed', () => {
       const mockOnChange = vi.fn();
-      render(<WizardStepBackground {...createMockProps({ onInputChange: mockOnChange })} />);
+      render(<WizardStepBackground stepNumber={5} {...createMockProps({ onInputChange: mockOnChange })} />);
       const select = screen.getByRole('combobox');
       fireEvent.change(select, { target: { value: 'Soldier' } });
       expect(mockOnChange).toHaveBeenCalledWith('background', 'Soldier');
@@ -90,7 +90,7 @@ describe('WizardStepBackground', () => {
     it('should call onInputChange with empty string when deselecting', () => {
       const mockOnChange = vi.fn();
       render(
-        <WizardStepBackground
+        <WizardStepBackground stepNumber={5}
           {...createMockProps({
             formData: { background: 'Acolyte' },
             onInputChange: mockOnChange,
@@ -106,7 +106,7 @@ describe('WizardStepBackground', () => {
   describe('error display', () => {
     it('should render the error message below the select', () => {
       render(
-        <WizardStepBackground
+        <WizardStepBackground stepNumber={5}
           {...createMockProps({
             errors: { background: 'Background is required' },
           })}
@@ -119,7 +119,7 @@ describe('WizardStepBackground', () => {
   describe('detail card', () => {
     it('should render the detail card header when a background is selected', () => {
       render(
-        <WizardStepBackground
+        <WizardStepBackground stepNumber={5}
           {...createMockProps({
             formData: { background: 'Acolyte' },
           })}
@@ -131,7 +131,7 @@ describe('WizardStepBackground', () => {
 
     it('should toggle expanded state when header or toggle button is clicked', () => {
       render(
-        <WizardStepBackground
+        <WizardStepBackground stepNumber={5}
           {...createMockProps({
             formData: { background: 'Acolyte' },
           })}
@@ -145,7 +145,7 @@ describe('WizardStepBackground', () => {
 
     it('should render all detail sections when expanded with full data', () => {
       render(
-        <WizardStepBackground
+        <WizardStepBackground stepNumber={5}
           {...createMockProps({
             formData: { background: 'Acolyte' },
           })}
@@ -166,7 +166,7 @@ describe('WizardStepBackground', () => {
 
     it('should not render empty sections when fields are falsy', () => {
       render(
-        <WizardStepBackground
+        <WizardStepBackground stepNumber={5}
           {...createMockProps({
             formData: { background: 'Hermit' },
           })}
@@ -184,7 +184,7 @@ describe('WizardStepBackground', () => {
   describe('early return paths', () => {
     it('should display the not-available notice for non-2024 rulesets and not render the dropdown', () => {
       render(
-        <WizardStepBackground
+        <WizardStepBackground stepNumber={5}
           {...createMockProps({
             ruleset: '5e',
             errors: { background: 'Background is required' },
@@ -198,7 +198,7 @@ describe('WizardStepBackground', () => {
 
     it('should show a loading message when no backgrounds are available and not render the dropdown', () => {
       render(
-        <WizardStepBackground
+        <WizardStepBackground stepNumber={5}
           {...createMockProps({
             backgrounds: [],
             errors: { background: 'Background is required' },

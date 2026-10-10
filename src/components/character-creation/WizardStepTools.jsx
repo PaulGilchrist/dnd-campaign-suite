@@ -24,7 +24,7 @@ const areEqual = (prevProps, nextProps) => {
     );
 };
 
-function WizardStepTools({ formData, errors, onToolToggle, toolLimits, toolWarnings, preSelectedTools, skillLimits }) {
+function WizardStepTools({ stepNumber, formData, errors, onToolToggle, toolLimits, toolWarnings, preSelectedTools, skillLimits }) {
     const [allTools, setAllTools] = useState([]);
     const [toolCategories, setToolCategories] = useState([]);
 
@@ -102,7 +102,7 @@ function WizardStepTools({ formData, errors, onToolToggle, toolLimits, toolWarni
 
     return (
         <div className="wizard-step wizard-step-tools">
-            <h2>Step 11: Tool Proficiencies</h2>
+            <h2>Step {stepNumber}: Tool Proficiencies</h2>
 
             {toolLimits && Object.keys(toolLimits).length > 0 && (
                 <div className="rule-info">
