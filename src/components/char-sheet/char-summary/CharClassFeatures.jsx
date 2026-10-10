@@ -608,8 +608,8 @@ const RangerFeatures = function RangerFeatures({ playerStats, campaignName }) {
 };
 
 /* ─── Rogue ─── */
-function SupremeSneakBadge({ level, stealthAttackActive }) {
-    if (level < 9) return null;
+function SupremeSneakBadge({ level, majorName, stealthAttackActive }) {
+    if (level < 9 || majorName !== 'Thief') return null;
     const cls = 'automation-badge' + (stealthAttackActive ? ' automation-badge--active' : '');
     const title = stealthAttackActive
         ? "Supreme Sneak: Stealth Attack active — next attack costs 1d6 Sneak Attack, Invisible preserved with cover"
@@ -642,7 +642,7 @@ const RogueFeatures = function RogueFeatures({ playerStats, campaignName }) {
           <div data-testid="char-class-rogue">
               {rogueFeatures?.expertise?.length > 0 && <div><b>Expertise: </b>{rogueFeatures.expertise.join(', ')}</div>}
               {hasEnergy && <EnergyDiceSection playerStats={playerStats} campaignName={campaignName} classLevel={classLevel} />}
-              <SupremeSneakBadge level={playerStats.level} stealthAttackActive={stealthAttackActive} />
+              <SupremeSneakBadge level={playerStats.level} majorName={majorName} stealthAttackActive={stealthAttackActive} />
               <RogueSneakAttackLine rogueFeatures={rogueFeatures} />
           </div>
     );

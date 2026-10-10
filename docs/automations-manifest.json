@@ -6677,7 +6677,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "verified (PASS-subset PROBE on Thief host 2026-10-09 — prior AT-host FAIL reverted: Thief lv9 'Stealth Attack 1d6' lane LIVE: press modal verbatim cost gate dice-count-only, activate stamps stealthAttackCost=1, Invisibility self-cast then melee HIT 17vs12 consumes cost 1->0 sneak dice +10d6->+9d6 ledger Bandit 11->0, untargeted control no-consume, turn-start clear grep-live. Gaps: no invisibility refuse gate, no once/turn latch, ranged unexecutable post-swap, badge onclick-null on non-major host remains real defect. AT md5 abb54565 byte-restored)",
+      "verified": "verified",
       "class": "Rogue",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Stealth Attack (Cost: 1d6). If you have Hide action's Invisible condition, this attack doesn't end that condition on you if you end turn behind Three-Quarters Cover or Total Cover."

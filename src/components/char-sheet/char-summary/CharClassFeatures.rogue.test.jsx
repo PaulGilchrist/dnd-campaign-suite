@@ -167,9 +167,30 @@ describe('RogueFeatures', () => {
 
   describe('supreme sneak', () => {
     it('does not render supreme sneak when level < 9', () => {
-      const stats = buildPlayerStats({ level: 8 });
+      const stats = buildPlayerStats({ level: 8, class: { name: 'Rogue', major: { name: 'Thief' }, subclass: {}, class_levels: [], fightingStyles: [] } });
       render(<RogueFeatures playerStats={stats} campaignName="test" />);
       expect(screen.queryByTitle(/Supreme Sneak/)).not.toBeInTheDocument();
+    });
+
+    it('does not render supreme sneak badge for non-Thief major', () => {
+      const stats = buildPlayerStats({
+        level: 20,
+        class: { name: 'Rogue', major: {}, subclass: { name: 'Arcane Trickster' }, class_levels: [], fightingStyles: [] },
+      });
+      render(<RogueFeatures playerStats={stats} campaignName="test" />);
+      expect(screen.queryByText('Supreme Sneak')).not.toBeInTheDocument();
+      expect(screen.queryByTitle(/Supreme Sneak/)).not.toBeInTheDocument();
+    });
+
+    it('renders supreme sneak badge for Thief major at level >= 9', () => {
+      const stats = buildPlayerStats({
+        level: 9,
+        class: { name: 'Rogue', major: { name: 'Thief' }, subclass: {}, class_levels: [], fightingStyles: [] },
+      });
+      render(<RogueFeatures playerStats={stats} campaignName="test" />);
+      const badge = screen.getByTitle(/Supreme Sneak/);
+      expect(badge).toHaveTextContent('Supreme Sneak');
+      expect(badge.getAttribute('title')).toContain('Available at Rogue level 9');
     });
 
     it('shows active state tooltip when stealth attack cost is greater than 0', () => {
@@ -177,7 +198,7 @@ describe('RogueFeatures', () => {
         if (key === 'stealthAttackCost') return 1;
         return undefined;
       });
-      const stats = buildPlayerStats({ level: 9 });
+      const stats = buildPlayerStats({ level: 9, class: { name: 'Rogue', major: { name: 'Thief' }, subclass: {}, class_levels: [], fightingStyles: [] } });
       render(<RogueFeatures playerStats={stats} campaignName="test" />);
       const badge = screen.getByTitle(/Supreme Sneak/);
       expect(badge).toHaveTextContent('Supreme Sneak');
@@ -185,7 +206,7 @@ describe('RogueFeatures', () => {
     });
 
     it('shows availability tooltip when stealth attack cost is 0', () => {
-      const stats = buildPlayerStats({ level: 9 });
+      const stats = buildPlayerStats({ level: 9, class: { name: 'Rogue', major: { name: 'Thief' }, subclass: {}, class_levels: [], fightingStyles: [] } });
       render(<RogueFeatures playerStats={stats} campaignName="test" />);
       const badge = screen.getByTitle(/Supreme Sneak/);
       expect(badge).toHaveTextContent('Supreme Sneak');
