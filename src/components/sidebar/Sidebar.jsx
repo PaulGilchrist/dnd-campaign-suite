@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DiceTray, DicePopup } from './DiceTray.jsx';
 import MusicPlayer from './MusicPlayer.jsx';
+import { addEntry } from '../../services/ui/logService.js';
 import './Sidebar.css';
 
 const VIEW_LABELS = {
@@ -100,6 +101,19 @@ function CharacterList({ characters, activeView, activeCharacter, onAddCharacter
 function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onSessionsClick, onInventoryClick, onSettlementsClick, onLogClick, onRepairClick, onRenameCampaign: _onRenameCampaign, onDeleteCampaign: _onDeleteCampaign, isLocalhost, activeView }) {
     const [diceResult, setDiceResult] = useState(null);
 
+    const handleDiceRoll = (result) => {
+        setDiceResult(result);
+        addEntry(campaignName, {
+            type: 'roll',
+            rollType: 'dice',
+            characterName: 'GM',
+            name: `Dice Tray ${result.label}`,
+            rolls: [result.value],
+            total: result.value,
+            formula: result.label,
+        }).catch((e) => { console.error('[Sidebar] Failed to log dice tray roll:', e); });
+      };
+
     const { label: activeLabel, icon: activeIcon } = getActiveInfo(activeView, activeCharacter);
     const navHandlers = { onEncounterClick, onFactionsClick, onInitiativeClick, onLogClick, onMapsClick, onNPCsClick, onNotesClick, onQuestsClick, onSessionsClick, onInventoryClick, onSettlementsClick };
 
@@ -148,7 +162,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                     </div>
                 )}
                 <MusicPlayer campaignName={campaignName} isLocalhost={isLocalhost} />
-                <DiceTray onRoll={setDiceResult} />
+                <DiceTray onRoll={handleDiceRoll} />
             </nav>
             {diceResult && <DicePopup result={diceResult} onClose={() => setDiceResult(null)} />}
         </>
