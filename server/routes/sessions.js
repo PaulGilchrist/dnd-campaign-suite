@@ -2,11 +2,13 @@ import fs from 'fs';
 import { campaignDataFile, ensureDataDir } from '../utils/campaignPaths.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createJsonEntityRouter } from '../utils/jsonEntityCrud.js';
+import { findDuplicateNameError } from '../utils/nameUniqueness.js';
 
 const baseRouter = createJsonEntityRouter('sessions', {
   idField: 'name',
   pluralDisplayName: 'sessions',
   singularDisplayName: 'session',
+  validateList: (sessions) => findDuplicateNameError(sessions, 'session'),
 });
 
 // PUT /api/campaigns/:campaign/sessions/:sessionName — upsert by name

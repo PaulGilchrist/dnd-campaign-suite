@@ -2896,3 +2896,4 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 - Snapshot dir is public/campaigns/.snapshots/ (legacy test-campaign.zip retained as rollback fallback).
 - Post-reload carry-over recipe: pre-reload handler setItem sessionStorage flag; App-boot hook consumes it, autoSelectCampaign prop into CampaignSelection (ref-guarded auto-select), setActiveView lands the target view at the tail of the select callback (last setActiveView wins).
 - TDZ in hooks: consumeRestore-style hook callback listed in an EARLIER useEffect dep array throws Cannot access before initialization — declare the hook call above the effect. App.jsx max-statements 60 is at ceiling; new top-level hook calls tip it over (removed write-only campaignNameRef).
+- Sessions save via BOTH routes: PUT /sessions/:name upsert (already rename-guarded) AND POST collection overwrite — the dup-bypass seam was POST only; add validateList there, mirror quests test file.
