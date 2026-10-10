@@ -233,7 +233,7 @@ describe('settlements - Real PUT route (settlements.js lines 13-42)', () => {
         expect(res.body.settlement.name).toBe('Town & Country');
     });
 
-    it('should handle case-sensitive name matching', async () => {
+    it('should reject case-insensitive name collisions (duplicate-name parity guard)', async () => {
         const campaign = 'real-fs-case';
         const existingData = [
             { name: 'Whiterun', type: 'city', population: 5000, description: 'A large city' },
@@ -253,12 +253,13 @@ describe('settlements - Real PUT route (settlements.js lines 13-42)', () => {
             .put(`/api/campaigns/${campaign}/settlements/whiterun`)
             .send(updatedData);
 
-        expect(res.status).toBe(200);
+        expect(res.status).toBe(400);
+        expect(res.body).toHaveProperty('error', 'A settlement with that name already exists');
 
         const fileData = mockFsData.get(filePath);
-        expect(fileData).toHaveLength(2);
-        expect(fileData.find(s => s.name === 'Whiterun')).toBeDefined();
-        expect(fileData.find(s => s.name === 'whiterun')).toBeDefined();
+        expect(fileData).toHaveLength(1);
+        expect(fileData[0].name).toBe('Whiterun');
+        expect(fileData[0].population).toBe(5000);
     });
 
     it('should handle settlements with complex nested data', async () => {

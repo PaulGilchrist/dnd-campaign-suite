@@ -2,11 +2,13 @@ import fs from 'fs';
 import { campaignDataFile, ensureDataDir } from '../utils/campaignPaths.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createJsonEntityRouter } from '../utils/jsonEntityCrud.js';
+import { findDuplicateNameError } from '../utils/nameUniqueness.js';
 
 const baseRouter = createJsonEntityRouter('settlements', {
   idField: 'name',
   pluralDisplayName: 'settlements',
   singularDisplayName: 'settlement',
+  validateList: (settlements) => findDuplicateNameError(settlements, 'settlement'),
 });
 
 // PUT /api/campaigns/:campaign/settlements/:settlementName — upsert by name
@@ -26,6 +28,19 @@ baseRouter.put('/api/campaigns/:campaign/settlements/:settlementName', asyncHand
     if (!Array.isArray(settlements)) settlements = [];
 
     const existingIndex = settlements.findIndex(s => s.name === decodedName);
+
+    // Duplicate-name guard (mirrors npcs.js PUT guard): a rename must not
+    // collide case-insensitively with another settlement's name.
+    const newName = (updatedSettlement.name || '').trim();
+    if (!newName) {
+      return res.status(400).json({ error: 'Settlement name is required' });
+    }
+    const nameCollision = settlements.find(s =>
+      s.name !== decodedName && (s.name || '').toLowerCase() === newName.toLowerCase()
+    );
+    if (nameCollision) {
+      return res.status(400).json({ error: 'A settlement with that name already exists' });
+    }
 
     if (existingIndex !== -1) {
       settlements[existingIndex] = updatedSettlement;

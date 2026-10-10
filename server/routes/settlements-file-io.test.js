@@ -170,6 +170,19 @@ baseRouter.put('/api/campaigns/:campaign/settlements/:settlementName', (req, res
 
         const existingIndex = settlements.findIndex(s => s.name === decodedName);
 
+        // Duplicate-name guard (mirrors npcs.js PUT guard): a rename must not
+        // collide case-insensitively with another settlement's name.
+        const newName = (updatedSettlement.name || '').trim();
+        if (!newName) {
+            return res.status(400).json({ error: 'Settlement name is required' });
+        }
+        const nameCollision = settlements.find(s =>
+            s.name !== decodedName && (s.name || '').toLowerCase() === newName.toLowerCase()
+        );
+        if (nameCollision) {
+            return res.status(400).json({ error: 'A settlement with that name already exists' });
+        }
+
         if (existingIndex !== -1) {
             settlements[existingIndex] = updatedSettlement;
         } else {
@@ -407,7 +420,7 @@ describe('settlements - File-based PUT route (real fs operations)', () => {
         expect(res.body.settlement).toEqual(settlementData);
     });
 
-    it('should handle case-sensitive name matching in file operations', async () => {
+    it('should reject case-insensitive name collisions in file operations (parity guard)', async () => {
         const campaign = 'file-case-campaign';
         const existingData = [
             { name: 'Whiterun', type: 'city', population: 5000, description: 'A large city' },
@@ -417,7 +430,7 @@ describe('settlements - File-based PUT route (real fs operations)', () => {
         ensureTempDir(campaign);
         mockFsState.set(filePath, JSON.stringify(existingData, null, 2));
 
-        // Try to update with different case - should create a new entry, not replace
+        // Rename with different case onto another existing name - must be rejected
         const updatedData = {
             name: 'whiterun',
             type: 'town',
@@ -430,14 +443,15 @@ describe('settlements - File-based PUT route (real fs operations)', () => {
             .put('/api/campaigns/file-case-campaign/settlements/whiterun')
             .send(updatedData);
 
-        expect(res.status).toBe(200);
+        expect(res.status).toBe(400);
+        expect(res.body).toHaveProperty('error', 'A settlement with that name already exists');
 
-        // Verify both entries exist (case-sensitive matching)
+        // Verify original entry is untouched
         const fileContent = mockFsState.get(filePath, 'utf-8');
         const fileData = JSON.parse(fileContent);
-        expect(fileData).toHaveLength(2);
-        expect(fileData.find(s => s.name === 'Whiterun')).toBeDefined();
-        expect(fileData.find(s => s.name === 'whiterun')).toBeDefined();
+        expect(fileData).toHaveLength(1);
+        expect(fileData[0].name).toBe('Whiterun');
+        expect(fileData[0].population).toBe(5000);
     });
 
     it('should handle multiple upserts to the same settlement', async () => {

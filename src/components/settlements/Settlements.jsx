@@ -113,7 +113,7 @@ function SettlementListItem({ settlement, onEdit }) {
 }
 
 function SettlementModal({
-  formData, editingSettlement, saving, deleting,
+  formData, editingSettlement, saving, deleting, error,
   onClose, onSave, onDelete, onFormChange,
   onAddService, onServiceChange, onRemoveService,
   onAddNPC, onNPCChange, onRemoveNPC,
@@ -134,6 +134,7 @@ function SettlementModal({
         </div>
 
         <div className="ct-modal-body">
+          {error && <div className="settlements-form-error">{error}</div>}
           <label htmlFor="settlement-name" className="ct-label">
             Name <span className="ct-required">*</span>
           </label>
@@ -394,6 +395,7 @@ function Settlements({ campaignName, onBack }) {
   const [sizeFilter, setSizeFilter] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState(null);
   const descDataRef = useRef(null);
 
   useEffect(() => {
@@ -432,7 +434,10 @@ function Settlements({ campaignName, onBack }) {
     ...overrides,
   });
 
-  const handleNewSettlement = () => openNew(getDefaultFormData());
+  const handleNewSettlement = () => {
+    setError(null);
+    openNew(getDefaultFormData());
+  };
 
   const handleGenerateSettlement = async () => {
     setGenerating(true);
@@ -447,11 +452,15 @@ function Settlements({ campaignName, onBack }) {
   };
 
   const handleEditSettlement = (settlement) => {
+    setError(null);
     openEdit(settlement);
     setFormData(getDefaultFormData(settlement));
   };
 
-  const handleCloseModal = closeModal;
+  const handleCloseModal = () => {
+    setError(null);
+    closeModal();
+  };
 
   const handleFormChange = (field, value) => {
     if (field === 'size') {
@@ -542,15 +551,26 @@ function Settlements({ campaignName, onBack }) {
     }));
   };
 
+  // Duplicate-name guard (mirrors NPCs.jsx / MapsManager.handleCreate)
+  const hasDuplicateName = () => settlements.some(s =>
+    s.name !== editingSettlement?.name && (s.name || '').trim().toLowerCase() === formData.name.trim().toLowerCase()
+  );
+
   const handleSave = async () => {
     if (!formData || !formData.name.trim()) return;
+    if (hasDuplicateName()) {
+      setError('A settlement with that name already exists');
+      return;
+    }
     setSaving(true);
     try {
       await saveSettlement(campaignName, formData, editingSettlement?.name);
       await loadItems();
+      setError(null);
       handleCloseModal();
-    } catch (error) {
-      console.error('Failed to save settlement:', error);
+    } catch (err) {
+      console.error('Failed to save settlement:', err);
+      setError(err.message || 'Failed to save settlement');
     } finally {
       setSaving(false);
     }
@@ -660,6 +680,7 @@ function Settlements({ campaignName, onBack }) {
           editingSettlement={editingSettlement}
           saving={saving}
           deleting={deleting}
+          error={error}
           onClose={handleCloseModal}
           onSave={handleSave}
           onDelete={handleDelete}
