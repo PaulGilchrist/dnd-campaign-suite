@@ -247,6 +247,10 @@ function buildBlockedAttackContext(attack, playerName, targetName, playerStats, 
         grazeAbilityName: null,
         grazeAbilityMod: 0,
         weaponType: attack.weaponType,
+        // FT-090: row identity rides the transport — unarmed rows keep
+        // isUnarmedStrike honest through the popup/damage seams so
+        // resolveWeaponTypeFlags preserves weaponType:'unarmed'.
+        isUnarmedStrike: attack.weaponType === 'unarmed',
         weaponName: attack.name,
         sneakAttackDice: 0,
     };
@@ -788,6 +792,9 @@ export async function buildAttackContextSync(attack, playerStats, campaignName, 
             grazeAbilityName,
             grazeAbilityMod,
             weaponType: attack.weaponType,
+            // FT-090: stamp row identity so resolveWeaponTypeFlags preserves
+            // weaponType:'unarmed' and lastAttack carries isUnarmedStrike.
+            isUnarmedStrike: attack.weaponType === 'unarmed',
             weaponName: attack.name,
             sneakAttackDice,
         };

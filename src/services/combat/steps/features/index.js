@@ -23,6 +23,12 @@ export const featureModules = [
   assassinate,
   stealthAttackCost,
   rendMind,
+  // FT-090: tavern riders mount BEFORE shieldBash — shieldBash offers a
+  // chooser modal that PAUSES featureRiders (FT-074) and resumes from its
+  // emit, so every module ordered after it is skipped for that attack.
+  // Unarmed hits on shield-holders stranded tavern push/reroll forever.
+  tavernBrawler,
+  tavernBrawlerPush,
   shieldBash,
   colossusSlayer,
   superiorHuntersPrey,
@@ -31,9 +37,7 @@ export const featureModules = [
   crusher,
   slasher,
   piercer,
-  tavernBrawler,
   cantripBonuses,
-  tavernBrawlerPush,
   sacredWeapon,
   remarkableAthlete,
   huntersMarkDamage,

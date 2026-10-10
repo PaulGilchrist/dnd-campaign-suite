@@ -843,7 +843,7 @@ describe('useAttackDamageResolution - feats', () => {
                 weaponType: 'unarmed',
             });
 
-            await resolveAttackDamage(attack);
+            await resolveAttackDamage(attack, { hit: true });
             await tick();
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -852,9 +852,10 @@ describe('useAttackDamageResolution - feats', () => {
                 expect.arrayContaining([
                     expect.objectContaining({
                         target: 'Goblin',
-                        source: 'Tavern Brawler',
+                        source: 'TestFighter',
                         effect: 'push',
                         value: 5,
+                        duration: 'instant',
                     }),
                 ]),
                 'test-campaign',
@@ -889,7 +890,7 @@ describe('useAttackDamageResolution - feats', () => {
                 const effects = call[2];
                 expect(effects).not.toContainEqual(
                     expect.objectContaining({
-                        source: 'Tavern Brawler',
+                        source: 'TestFighter',
                         effect: 'push',
                     })
                 );

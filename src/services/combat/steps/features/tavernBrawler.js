@@ -1,4 +1,6 @@
 
+import { addEntry } from '../../../ui/logService.js';
+
 export const tavernBrawler = {
   name: 'tavernBrawler',
   condition: (ctx) => {
@@ -33,6 +35,14 @@ export const tavernBrawler = {
 
     if (rerollPairs.length > 0) {
       ctx.tavernBrawlerRerolls = rerollPairs;
+      addEntry(ctx.campaignName, {
+        type: 'ability_use',
+        characterName: ps.name,
+        abilityName: 'Tavern Brawler',
+        description: `Tavern Brawler Damage Reroll: rerolled ${rerollPairs.length} damage die ${rerollPairs.length === 1 ? 'showing' : 'showing'} 1 on ${ctx.attack.name} — new values ${rerollPairs.map(p => p.rerolled).join(', ')}.`,
+        targetName: ctx.targetName || null,
+        timestamp: Date.now(),
+      }).catch((e) => { console.error("[tavernBrawler:log-error]", e); });
     }
 
     return { data: { formula, total, rolls } };
