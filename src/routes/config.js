@@ -82,6 +82,13 @@ export const VIEWS = {
       component: 'Settlements',
       description: 'Settlement management'
     },
+  SESSIONS: {
+    name: 'sessions',
+    stateVar: 'activeView',
+    type: 'string',
+    component: 'Sessions',
+    description: 'GM session planner — link maps, encounters, NPCs, quests and notes for the next session'
+  },
   PARTY_INVENTORY: {
     name: 'partyInventory',
     stateVar: 'activeView',
@@ -141,8 +148,9 @@ export const SIDEBAR_BUTTONS = [
   { label: 'Initiative', icon: 'fa-gavel', view: 'initiative' },
   { label: 'Maps', icon: 'fa-map', view: 'mapsManager' },
   { label: 'Notes', icon: 'fa-sticky-note', view: 'notes' },
-{ label: 'Quests', icon: 'fa-scroll', view: 'quests' },
+  { label: 'Quests', icon: 'fa-scroll', view: 'quests' },
   { label: 'NPCs', icon: 'fa-users', view: 'npcs' },
+  { label: 'Sessions', icon: 'fa-calendar-check', view: 'sessions' },
   { label: 'Inventory', icon: 'fa-boxes-stacked', view: 'partyInventory' },
   { label: 'Settlements', icon: 'fa-city', view: 'settlements' },
   { label: 'Log', icon: 'fa-book-journal-whills', view: 'campaignLog' },
@@ -152,4 +160,4 @@ export const SIDEBAR_BUTTONS = [
 /**
  * All sidebar views — mutually exclusive via single activeView variable.
  */
-export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs', 'settlements', 'partyInventory', 'campaignLog', 'campaignRepair'];
+export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs', 'sessions', 'settlements', 'partyInventory', 'campaignLog', 'campaignRepair'];

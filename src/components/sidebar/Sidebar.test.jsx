@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Sidebar from './Sidebar.jsx';
 
-const LOCALHOST_ONLY_BUTTONS = ['Encounters', 'Factions', 'NPCs', 'Quests', 'Settlements', 'Admin'];
+const LOCALHOST_ONLY_BUTTONS = ['Encounters', 'Factions', 'NPCs', 'Quests', 'Sessions', 'Settlements', 'Admin'];
 const ALWAYS_VISIBLE_BUTTONS = ['Campaigns', 'Add Character', 'Initiative', 'Log', 'Notes', 'Rules'];
 
 const RULES_URL = 'https://paulgilchrist.github.io/dnd-tools/rules/general';
@@ -25,6 +25,7 @@ function createProps(overrides = {}) {
     onNotesClick: vi.fn(),
     onQuestsClick: vi.fn(),
     onNPCsClick: vi.fn(),
+    onSessionsClick: vi.fn(),
     onSettlementsClick: vi.fn(),
     onLogClick: vi.fn(),
     onRepairClick: vi.fn(),
@@ -104,6 +105,7 @@ describe('Sidebar', () => {
       ['onFactionsClick', 'Factions'],
       ['onNPCsClick', 'NPCs'],
       ['onQuestsClick', 'Quests'],
+      ['onSessionsClick', 'Sessions'],
       ['onSettlementsClick', 'Settlements'],
     ])('calls %s when the %s button is clicked on localhost', (handler, label) => {
       const { props } = renderSidebar({ isLocalhost: true });
@@ -155,6 +157,7 @@ describe('Sidebar', () => {
       ['NPCs', 'npcs'],
       ['Notes', 'notes'],
       ['Quests', 'quests'],
+      ['Sessions', 'sessions'],
       ['Settlements', 'settlements'],
       ['Admin', 'campaignRepair'],
     ])('highlights the %s button when activeView is %s', (label, activeView) => {
@@ -201,4 +204,16 @@ describe('Sidebar', () => {
     });
   });
 
+  describe('navigation order', () => {
+    it('renders nav buttons in alphabetical order by label', () => {
+      const { container } = renderSidebar({ isLocalhost: true });
+      const navButtons = [...container.querySelectorAll('nav > button.sidebar-section-header')];
+      const labels = navButtons.map(b => b.textContent.trim().replace(/\s+/g, ' '));
+      expect(labels).toEqual([
+        'Campaigns',
+        'Encounters', 'Factions', 'Initiative', 'Inventory', 'Log', 'Maps', 'Notes',
+        'NPCs', 'Quests', 'Rules', 'Sessions', 'Settlements',
+      ]);
+    });
+  });
 });

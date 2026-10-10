@@ -39,6 +39,7 @@ export default [
         console: 'readonly',
         localStorage: 'readonly',
         sessionStorage: 'readonly',
+        navigator: 'readonly',
         setTimeout: 'readonly',
         setInterval: 'readonly',
         clearTimeout: 'readonly',

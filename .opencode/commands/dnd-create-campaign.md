@@ -46,6 +46,36 @@ For each of Levels 4-20, update the data files with:
 - Terrain and encounter types
 - Status: "outline" (to be expanded later using the flesh-out-levels command)
 
+## Session Planner (`sessions.json`)
+Write `public/campaigns/{{campaign name}}/data/sessions.json` — a JSON array of session plans read by the in-app GM-only **Session Planner**. Each session links content that already exists in the campaign so the DM can pull up the right map, encounter, and NPCs at the table without hunting through each tool.
+
+Create **one session per level** — "Session 1: <episode title>" through "Session 20: <episode title>".
+
+Session schema:
+```json
+{
+  "name": "Session 1: <episode title>",
+  "date": "YYYY-MM-DD or empty",
+  "status": "planned",
+  "playedAt": null,
+  "summary": "<short DM storyline notes / loose threads for this session>",
+  "links": { "maps": [], "encounters": [], "npcs": [], "quests": [], "settlements": [], "notes": [] },
+  "contingencies": [
+    { "id": "ctg-<unique>", "ifText": "<if the players…>", "thenText": "<then…>", "branch": "negotiate | alternate | failure" }
+  ],
+  "checklist": [
+    { "id": "<unique>", "label": "<prep step>", "done": false, "auto": true }
+  ]
+}
+```
+
+Rules:
+- Every value in `links` MUST reference an object that already exists in the corresponding data file in this campaign — maps/encounters/npcs/quests/settlements by their exact `name`, notes by their `id`. Never invent names or re-enter content.
+- Auto-generated checklist: for each linked map add `"{name} set as active map"` and `"Fog of war reset"`; each encounter `"{name} encounter saved and ready"`; each quest `"{name} quest brief ready to share"`; each settlement `"{name} ready to roleplay"`; each NPC `"{name} notes on hand"`; plus always `"Player characters up to date"` and `"Initiative and dice ready"`. Use stable ids `auto-map-<slug>`, `auto-map-<slug>-fog`, `auto-enc-<slug>`, `auto-quest-<slug>`, `auto-settle-<slug>`, `auto-npc-<slug>`, `auto-baseline-chars`, `auto-baseline-init` (slug = name lowercased, non-alphanumeric runs collapsed to `-`). Mark these `auto: true`; DM-added custom items use `auto: false` with a `custom-<unique>` id. (The app regenerates `auto` items from `links` whenever a session opens, preserving `done` state — write them so the file is complete on first load.)
+- Contingencies use the structured If → then format, one row per branch, color-coded by `branch`: green = `negotiate`, blue = `alternate`, amber = `failure`.
+- All new sessions start `status: "planned"`, `playedAt: null`.
+- For Levels 1-3 (fully detailed): populate every link that exists for that level, 2-3 contingencies, and the full auto + a few custom checklist items. For Levels 4-20 (outlines): create the session with a theme summary and link only the objects that actually exist so far; expand it via the update-campaign command when the level is fleshed out.
+
 ## NPCs, Locations, Artifacts
 - Create individual notes for each key NPC, location, and artifact
 - NPCs should include: name, race/class, role, relationship to antagonist, combat stats, personality traits
@@ -65,6 +95,7 @@ For each of Levels 4-20, update the data files with:
 - Maps are the hardest part to design so that the room layout makes sense.  Take your time to put a good floorplan together before writing the map's json.
 - Write compelling D&D story arcs, quests, encounters, factions, and worldbuilding indoor and outdoor maps.
 - Relavent content that does not fit the above categories can go in notes.
+- After creating each level's content, populate that level's session in `sessions.json` (see Session Planner section) — link the maps, encounters, NPCs, quests, and settlements you created for that level, add branch contingencies, and let the auto-checklist capture the prep steps.
 - If there is already any content in the campaign folder, tie it into the story you are building, or build upon what has already transpired.
 - Create NPCs with depth and long-term relevance.
 - Seed foreshadowing and narrative hooks.

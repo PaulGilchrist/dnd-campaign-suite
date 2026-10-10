@@ -30,6 +30,7 @@ import Notes from './components/notes/Notes.jsx';
 import Quests from './components/quests/Quests.jsx';
 import NPCs from './components/npcs/NPCs.jsx';
 import Settlements from './components/settlements/Settlements.jsx';
+import Sessions from './components/sessions/Sessions.jsx';
 import Factions from './components/factions/Factions.jsx';
 import PartyInventory from './components/party-inventory/PartyInventory.jsx';
 import Log from './components/log/Log.jsx';
@@ -226,6 +227,7 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
     quests: <Quests campaignName={campaignName} isLocalhost={isLocalhost} onBack={() => setActiveView(null)} />,
     npcs: <NPCs campaignName={campaignName} characters={characters} onBack={() => setActiveView(null)} onViewInitiative={() => setActiveView('initiative')} />,
     settlements: <Settlements campaignName={campaignName} onBack={() => setActiveView(null)} />,
+    sessions: <Sessions campaignName={campaignName} characters={characters} onBack={() => setActiveView(null)} onViewInitiative={() => setActiveView('initiative')} />,
     factions: <Factions campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} onBack={() => setActiveView(null)} />,
     partyInventory: <PartyInventory campaignName={campaignName} characters={characters} onBack={() => setActiveView(null)} />,
     campaignLog: <Log campaignName={campaignName} characters={characters} />,
@@ -616,6 +618,7 @@ function App() {
           isLocalhost={isLocalhost}
            onNPCsClick={handleNPCsClick}
            onInventoryClick={handleInventoryClick}
+           onSessionsClick={() => setActiveView('sessions')}
            onSettlementsClick={handleSettlementsClick}
            onFactionsClick={handleFactionsClick}
           onLogClick={handleLogClick}
