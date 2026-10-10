@@ -26,15 +26,16 @@ function MusicPlayer({ campaignName, isLocalhost }) {
 
   const [volume, setVolume] = useState(music.volume ?? DEFAULT_VOLUME);
   const [editing, setEditing] = useState(false);
+  const [playerMounted, setPlayerMounted] = useState(false);
   const [editMood, setEditMood] = useState(MOODS[0].key);
   const [trackText, setTrackText] = useState('');
   const { addEntry } = useLog(campaignName);
 
   useEffect(() => {
-    if (!isLocalhost) return;
+    if (!isLocalhost || !playerMounted) return;
     youtubePlayer.ensurePlayer(YT_FRAME_ID);
     return () => youtubePlayer.dispose();
-  }, [isLocalhost]);
+  }, [isLocalhost, playerMounted]);
 
   useEffect(() => {
     youtubePlayer.setVolume(volume);
@@ -46,6 +47,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
       console.error(`No tracks configured for mood "${moodKey}"`);
       return;
     }
+    setPlayerMounted(true);
     youtubePlayer.playTracks(tracks.map(t => t.videoId));
     setMusic({ ...music, mood: moodKey, playing: true });
     const mood = getMood(moodKey);
@@ -63,10 +65,20 @@ function MusicPlayer({ campaignName, isLocalhost }) {
       youtubePlayer.pause();
       setMusic({ ...music, playing: false });
     } else {
-      youtubePlayer.resume();
+      if (!playerMounted) {
+        setPlayerMounted(true);
+        const tracks = getTracksForMood(music.mood, music.overrides);
+        if (tracks.length === 0) {
+          console.error(`No tracks configured for mood "${music.mood}"`);
+          return;
+        }
+        youtubePlayer.playTracks(tracks.map(t => t.videoId));
+      } else {
+        youtubePlayer.resume();
+      }
       setMusic({ ...music, playing: true });
     }
-  }, [music, setMusic]);
+  }, [music, setMusic, playerMounted]);
 
   const stopMusic = useCallback(() => {
     youtubePlayer.stop();
@@ -102,6 +114,7 @@ function MusicPlayer({ campaignName, isLocalhost }) {
     const overrides = { ...music.overrides, [editMood]: tracks };
     setMusic({ ...music, overrides });
     if (music.mood === editMood && music.playing) {
+      setPlayerMounted(true);
       youtubePlayer.playTracks(tracks.map(t => t.videoId));
     }
     setEditing(false);
@@ -179,7 +192,9 @@ function MusicPlayer({ campaignName, isLocalhost }) {
           </div>
         </div>
       )}
-      <div className="yt-music-frame"><div id={YT_FRAME_ID}></div></div>
+      {playerMounted && (
+        <div className="yt-music-frame"><div id={YT_FRAME_ID}></div></div>
+      )}
     </div>
   );
 }

@@ -54,7 +54,48 @@ describe('MusicPlayer', () => {
       expect(screen.getByTitle(`Play ${mood.label} ambience`)).toBeInTheDocument();
     }
     expect(screen.getByTitle('Volume')).toBeInTheDocument();
+  });
+
+  it('does not mount the YouTube iframe while idle', () => {
+    const { container } = renderPlayer();
+    expect(container.querySelector('.yt-music-frame')).toBeNull();
+    expect(container.querySelector('#yt-music-frame')).toBeNull();
+    expect(youtubePlayer.ensurePlayer).not.toHaveBeenCalled();
+  });
+
+  it('lazy-mounts the YouTube iframe on first mood play', () => {
+    const { container } = renderPlayer();
+    fireEvent.click(screen.getByTitle('Play Town ambience'));
     expect(youtubePlayer.ensurePlayer).toHaveBeenCalledWith('yt-music-frame');
+    expect(container.querySelector('#yt-music-frame')).not.toBeNull();
+  });
+
+  it('lazy-mounts the iframe and queues tracks when resuming after reload', () => {
+    getStore('campaign').set('music', { mood: 'town', playing: false, volume: 0.7, overrides: {} });
+    const { container } = renderPlayer();
+    expect(container.querySelector('.yt-music-frame')).toBeNull();
+    expect(youtubePlayer.ensurePlayer).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTitle('Play'));
+    expect(youtubePlayer.ensurePlayer).toHaveBeenCalledWith('yt-music-frame');
+    expect(container.querySelector('#yt-music-frame')).not.toBeNull();
+    const town = MOODS.find(m => m.key === 'town');
+    expect(youtubePlayer.playTracks).toHaveBeenCalledWith(town.tracks.map(t => t.videoId));
+    expect(youtubePlayer.resume).not.toHaveBeenCalled();
+  });
+
+  it('keeps the same iframe node across pause/play and mood switches', () => {
+    const { container } = renderPlayer();
+    fireEvent.click(screen.getByTitle('Play Town ambience'));
+    const frame = container.querySelector('.yt-music-frame');
+    fireEvent.click(screen.getByTitle('Pause'));
+    fireEvent.click(screen.getByTitle('Play'));
+    expect(container.querySelector('.yt-music-frame')).toBe(frame);
+    expect(youtubePlayer.resume).toHaveBeenCalled();
+    fireEvent.click(screen.getByTitle('Play Combat ambience'));
+    expect(container.querySelector('.yt-music-frame')).toBe(frame);
+    expect(youtubePlayer.ensurePlayer).toHaveBeenCalledTimes(1);
+    const combat = MOODS.find(m => m.key === 'combat');
+    expect(youtubePlayer.playTracks).toHaveBeenLastCalledWith(combat.tracks.map(t => t.videoId));
   });
 
   it('plays a mood, stores state, and logs the ambience change', () => {
