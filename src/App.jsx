@@ -10,6 +10,7 @@ import CampaignSelection from './components/campaign-selection/CampaignSelection
 import CharacterCreationWizard from './components/character-creation/CharacterCreationWizard.jsx';
 import Sidebar from './components/sidebar/Sidebar.jsx';
 import Map from './components/map/Map.jsx';
+import MapUnavailable from './components/map/MapUnavailable.jsx';
 import MapsManager from './components/maps-manager/MapsManager.jsx';
 import { loadCombatSummary, setCombatSummaryCache } from './services/encounters/combatData.js';
 import storage from './services/ui/storage.js';
@@ -186,7 +187,7 @@ function seedCampaignRuntimeData(serverData) {
   }
 }
 
-function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, onBackFromMap, onEncounterCreated, setMapsView, setActiveMapName }) {
+function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, onBackFromMap, onEncounterCreated, setMapsView, setActiveMapName, onRetryActiveMap }) {
   if (mapsView.type === 'manager') {
     return (
       <MapsManager
@@ -209,6 +210,11 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, o
         onPoiEntered={onEncounterCreated}
       />
     );
+  }
+  // Player with no active map — friendly waiting state until the GM
+  // activates one (the map-activate SSE auto-open swaps this out).
+  if (!isLocalhost) {
+    return <MapUnavailable onRetry={onRetryActiveMap} />;
   }
   return null;
 }
@@ -472,12 +478,11 @@ function App() {
         const mapName = activeMap.fileName.replace(/\.json$/, '');
         setMapsView({ type: 'map', mapName });
         setActiveMapName(mapName);
-      } else {
-        alert('No map is currently active. Ask your Game Master to activate one.');
       }
+      // No active map: the MapsAreaView waiting placeholder stays visible —
+      // no blocking alert. A later map-activate SSE (or "Check Again") opens it.
     } catch (err) {
       console.error('Error loading maps:', err);
-      alert('Failed to load map data.');
     }
   };
 
@@ -651,6 +656,7 @@ function App() {
             onEncounterCreated={handleEnterMap}
             setMapsView={setMapsView}
             setActiveMapName={setActiveMapName}
+            onRetryActiveMap={loadActiveMapAndOpen}
           />
         )}
         <OverlayViews

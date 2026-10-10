@@ -1,0 +1,6 @@
+/* Player-facing "no active map" placeholder (scoped to .map-unavailable) */
+
+.map-unavailable .map-unavailable-retry-btn {
+  font-style: normal;
+  margin-top: 8px;
+}

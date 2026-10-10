@@ -292,7 +292,7 @@ describe('App - Map Navigation & View Management', () => {
       });
     });
 
-    it('alerts when non-localhost and no active map found', async () => {
+    it('shows the waiting placeholder (no alert) when non-localhost and no active map found', async () => {
       setLocalhost('example.com');
 
       const { loadMaps } = await import('./services/maps/mapsService.js');
@@ -304,11 +304,14 @@ describe('App - Map Navigation & View Management', () => {
       fireEvent.click(screen.getByTestId('maps-btn'));
 
       await waitFor(() => {
-        expect(window.alert).toHaveBeenCalledWith('No map is currently active. Ask your Game Master to activate one.');
+        expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
       });
+      expect(screen.getByText('Check Again')).toBeInTheDocument();
+      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+      expect(window.alert).not.toHaveBeenCalled();
     });
 
-    it('re-opens the map on a second maps-btn click after an earlier no-active-map alert (non-localhost)', async () => {
+    it('re-opens the map on a second maps-btn click after an earlier waiting placeholder (non-localhost)', async () => {
       setLocalhost('example.com');
 
       const { loadMaps } = await import('./services/maps/mapsService.js');
@@ -317,11 +320,12 @@ describe('App - Map Navigation & View Management', () => {
       });
 
       await setupWithCharacters();
-      // First click: no active map → alert, blank view
+      // First click: no active map → waiting placeholder, no alert
       fireEvent.click(screen.getByTestId('maps-btn'));
       await waitFor(() => {
-        expect(window.alert).toHaveBeenCalledWith('No map is currently active. Ask your Game Master to activate one.');
+        expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
       });
+      expect(window.alert).not.toHaveBeenCalled();
       expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
 
       // GM activates the map
@@ -337,18 +341,21 @@ describe('App - Map Navigation & View Management', () => {
       });
     });
 
-    it('alerts when loadMaps fails on non-localhost', async () => {
+    it('keeps the waiting placeholder when loadMaps fails on non-localhost', async () => {
       setLocalhost('example.com');
 
       const { loadMaps } = await import('./services/maps/mapsService.js');
       loadMaps.mockRejectedValue(new Error('Network error'));
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await setupWithCharacters();
       fireEvent.click(screen.getByTestId('maps-btn'));
 
       await waitFor(() => {
-        expect(window.alert).toHaveBeenCalledWith('Failed to load map data.');
+        expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
       });
+      expect(window.alert).not.toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalled();
     });
   });
 });
