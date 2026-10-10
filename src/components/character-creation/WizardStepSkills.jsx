@@ -274,11 +274,28 @@ const WizardStepSkills = React.memo(function WizardStepSkills({ formData, errors
 		if (!isSkillProficient(skill)) return 'Select proficient first';
 		return 'Click to elevate to Expert';
 	};
+	// Proficiency cap refusal (FT-002): refuse over-cap selections at the checkbox,
+	// mirroring the expertise blockReason refusal flow in this component.
+	const getProficiencyCapBlockReason = (skill) => {
+		const selected = formData.skillProficiencies || [];
+		if ((preSelectedSkills || []).includes(skill)) return null;
+		if (skillLimits?.allowed == null) return null;
+		if (selected.length >= skillLimits.allowed) {
+			return `You can only select ${skillLimits.allowed} allowed skill proficiency/ies. Deselect one first.`;
+		}
+		return null;
+	};
+
 	const handleProficiencyToggle = (skill) => {
 		const isCurrentlyProficient = (formData.skillProficiencies || []).includes(skill);
 		const isCurrentlyExpert = (formData.expertSkills || []).includes(skill);
 
 		if (!isCurrentlyProficient) {
+			const blockReason = getProficiencyCapBlockReason(skill);
+			if (blockReason) {
+				showExpertiseFeedbackFor(blockReason);
+				return;
+			}
 			onSkillToggle(skill);
 		} else {
 			onSkillToggle(skill);

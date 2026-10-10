@@ -2,6 +2,7 @@ import { get } from 'lodash';
 import { REQUIRED_FIELDS } from './constants.js';
 import { loadValidationRules, getCachedPointBuyCosts } from '../services/ui/dataLoader.js';
 import { computeRaceBuffs } from '../services/character/raceBuffService.js';
+import { getSkillLimits } from '../services/character/skillValidation/index.js';
 
 /**
  * Get point buy costs synchronously from the cached JSON data.
@@ -228,6 +229,18 @@ const validateSubclassStep = (formData, context) => {
 
 const validateAbilitiesStep = (formData, context) => validateAbilityTotals(formData, context);
 
+// Skill proficiencies step (FT-002): block Next/Save while the selection
+// exceeds the class/race/background/feat allowance for the active ruleset.
+const validateSkillsStep = async (formData, context) => {
+  const newErrors = {};
+  const selected = formData.skillProficiencies || [];
+  const limits = await getSkillLimits(formData, context.allFeats || []);
+  if (selected.length > limits.allowed) {
+    newErrors.skillProficiencies = `Rules allow ${limits.allowed} skill proficiency/ies. You have selected ${selected.length}. Deselect ${selected.length - limits.allowed} to continue.`;
+  }
+  return newErrors;
+};
+
 const stepValidators = {
   2: validateBasicsStep,
   3: validateRaceStep,
@@ -236,6 +249,7 @@ const stepValidators = {
   6: validateClassStep,
   7: validateSubclassStep,
   9: validateAbilitiesStep,
+  10: validateSkillsStep,
 };
 
 /**
@@ -247,12 +261,13 @@ const stepValidators = {
  * @param {array} context.classSubtypes - Class subtypes data
  * @param {string} context.ruleset - '5e' or '2024'
  * @param {array} context.existingNames - Names of existing characters (duplicate guard)
+ * @param {array} context.allFeats - All feats data (for feat-granted skill allowances)
  * @returns {Promise<object>} - New errors object
  */
-export async function validateStep(step, formData, { racesData = [], classSubtypes = [], ruleset, existingNames = [] } = {}) {
+export async function validateStep(step, formData, { racesData = [], classSubtypes = [], ruleset, existingNames = [], allFeats = [] } = {}) {
   const validator = stepValidators[step];
   if (!validator) return {};
-  return validator(formData, { racesData, classSubtypes, ruleset, existingNames });
+  return validator(formData, { racesData, classSubtypes, ruleset, existingNames, allFeats });
 }
 
 /**
