@@ -61,7 +61,7 @@ function LinkPicker({ linkType, options, linked, otherSessions, onAdd, onRemove,
               className="ct-select sessions-move-select"
               value=""
               onChange={(e) => e.target.value && onMove(linkType.key, name, e.target.value)}
-              aria-label={`Move ${name} to another session`}
+              aria-label={`Move ${labelFor(name)} to another session`}
               title="Move to another session"
             >
               <option value="">Move to…</option>
@@ -73,7 +73,7 @@ function LinkPicker({ linkType, options, linked, otherSessions, onAdd, onRemove,
           <button
             className="ct-btn ct-btn-sm ct-btn-danger"
             onClick={() => onRemove(linkType.key, name)}
-            title={`Unlink ${name}`}
+            title={`Unlink ${labelFor(name)}`}
           >
             <i className="fa-solid fa-link-slash" />
           </button>
