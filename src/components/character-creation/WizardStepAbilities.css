@@ -96,6 +96,25 @@
   }
 }
 
+/* Point buy overspend inline feedback (mirrors .expertise-feedback.error) */
+.wizard-step-abilities .points-feedback {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background-color: var(--background-color-error);
+  border: 1px solid var(--border-color-error);
+  border-radius: 4px;
+  color: var(--color-error-light);
+  font-size: 0.9rem;
+}
+
+.wizard-step-abilities .points-feedback i {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
 /* Misc increase warning */
 .wizard-step-abilities .misc-warning {
   display: flex;

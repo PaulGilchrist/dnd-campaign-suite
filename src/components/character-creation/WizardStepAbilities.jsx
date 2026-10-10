@@ -398,6 +398,31 @@ function WizardStepAbilities({
 
   const pointsRemaining = pointsAllowed - totalPointsSpent;
 
+  const [pointsFeedback, setPointsFeedback] = useState(null);
+
+  const showPointsFeedback = (message) => {
+    setPointsFeedback(message);
+    setTimeout(() => setPointsFeedback(null), 3000);
+  };
+
+  const handleBaseScoreChange = (index, value) => {
+    const parsedScore = parseInt(value);
+    if (Number.isNaN(parsedScore)) {
+      return;
+    }
+    if (parsedScore >= 8 && parsedScore <= 15) {
+      const currentBaseScore = parseInt(formData.abilities?.[index]?.baseScore) || 8;
+      const newPointsSpent = totalPointsSpent - (pointBuyCosts[currentBaseScore] || 0) + (pointBuyCosts[parsedScore] || 0);
+      if (newPointsSpent > pointsAllowed) {
+        const abilityName = abilityNames[index] || 'that ability';
+        showPointsFeedback(`Not enough points: only ${Math.max(0, pointsRemaining)} point${pointsRemaining === 1 ? '' : 's'} remaining, but raising ${abilityName} to ${parsedScore} needs ${(pointBuyCosts[parsedScore] || 0) - (pointBuyCosts[currentBaseScore] || 0)} more.`);
+        return;
+      }
+    }
+    setPointsFeedback(null);
+    onAbilityBaseScoreChange(index, value);
+  };
+
   const isBackgroundAbility = (abilityName) => {
     return effectiveBackgroundAbilityChoices.includes(abilityName);
   };
@@ -498,6 +523,12 @@ function WizardStepAbilities({
         Use point buy: Each ability base score minimum is 8 and maximum is 15. You have <span className="points-remaining">{Math.max(0, pointsRemaining)} points</span> remaining to spend.
         (Total points allowed: {pointsAllowed})
       </div>
+      {pointsFeedback && (
+        <div className="step-description points-feedback">
+          <i className="fa-solid fa-triangle-exclamation"></i>
+          <span>{pointsFeedback}</span>
+        </div>
+      )}
       <div className="step-description">
         Total score (base + feat + background + racial + misc) cannot exceed {effectiveAbilityScoreCap} for any ability.
       </div>
@@ -558,7 +589,7 @@ function WizardStepAbilities({
               totalScore={totalScore}
               scoreCap={effectiveAbilityScoreCap}
               errors={errors}
-              onBaseScoreChange={onAbilityBaseScoreChange}
+              onBaseScoreChange={handleBaseScoreChange}
               onMiscIncreaseChange={onAbilityMiscIncreaseChange}
             />
           );
