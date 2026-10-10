@@ -41,6 +41,10 @@
 
 .notes-list-description .markdown-preview {
   font-size: inherit;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .notes-list-description .markdown-preview h1 {
