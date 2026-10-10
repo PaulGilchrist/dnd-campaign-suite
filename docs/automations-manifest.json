@@ -6773,7 +6773,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "broken — see .opencode/plans/bug-cla-354-tamed-surge.md",
+      "verified": "verified",
       "class": "Sorcerer",
       "triggerConditions": "Trigger: after_sorcerer_spell_slot",
       "expectedBehavior": "Immediately after casting Sorcerer spell with spell slot, create effect of your choice from Wild Magic Surge table instead of rolling. Can choose any effect except final row. Once per Long Rest."

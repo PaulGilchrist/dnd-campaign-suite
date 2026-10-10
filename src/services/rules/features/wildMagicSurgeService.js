@@ -76,10 +76,33 @@ async function executeWildMagicSurgeAction(surgeFeature, playerStats, campaignNa
     }
 }
 
+function hasTamedSurgeUses(playerStats, campaignName) {
+    const currentUses = getRuntimeValue(playerStats.name, 'tamedSurgeUses', campaignName);
+    const normalizedUses = currentUses === null || currentUses === undefined ? 1 : Number(currentUses);
+    return normalizedUses > 0;
+}
+
+// CLA-354: the chooser lists surgeTable rows minus the final wish row
+// (WildMagicSurgeModal.slice(0, -1)) — no selectable rows = nothing to offer.
+function hasTamedSurgeChoices(playerStats) {
+    const surgeTable = playerStats.wildMagicSurgeTable || [];
+    return surgeTable.slice(0, -1).length > 0;
+}
+
+// CLA-354: Tamed Surge (Wild Magic lv18) — "Immediately after casting Sorcerer spell
+// with spell slot, create effect of your choice ... instead of rolling." The post-cast
+// seam must offer the tamed chooser INSTEAD of the random d100 roll lane. Rides the
+// same modal/result pipeline as the roll lane (executeHandler → wild_magic_tamed →
+// handleTamedSurge → WildMagicSurgeModal → onTamedSurgeSelected spends uses + logs).
 export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaignName, mapName) {
     if (!playerStats) return null;
     if (!isSorcererSpell(spell, playerStats)) return null;
     if (!usesSpellSlot(spell, metaCtx)) return null;
+
+    const tamedFeature = getTamedSurgeFeature(playerStats);
+    if (tamedFeature && hasTamedSurgeUses(playerStats, campaignName) && hasTamedSurgeChoices(playerStats)) {
+        return await executeHandler({ name: tamedFeature.name, automation: { ...tamedFeature } }, playerStats, campaignName, mapName);
+    }
 
     const surgeFeatures = getWildMagicSurgeFeatures(playerStats);
     if (surgeFeatures.length === 0) return null;

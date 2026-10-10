@@ -576,6 +576,159 @@ describe('wildMagicSurgeService', () => {
             expect(lastRestCalls).toHaveLength(0);
         });
 
+        it('CLA-354: routes slot cast to the tamed chooser lane (no d100 roll) when tamed feature has uses', async () => {
+            const playerStats = {
+                ...BASE_PLAYER_STATS,
+                automation: {
+                    passives: [
+                        { type: 'wild_magic_surge', name: 'Wild Surge' },
+                        { type: 'wild_magic_tamed', name: 'Tamed Surge', trigger: 'after_sorcerer_spell_slot', recharge: 'long_rest', uses: 1 },
+                    ],
+                },
+            };
+            const spell = { ...SPELL, level: 1 };
+
+            getRuntimeValue.mockImplementation((_charKey, prop) => {
+                if (prop === 'tamedSurgeUses') return 1;
+                return null;
+            });
+            executeHandler.mockResolvedValue({
+                type: 'modal',
+                modalName: 'wildMagicSurge',
+                payload: { featureName: 'Tamed Surge', mode: 'tamedSurge', surgeTable: BASE_SURGE_TABLE },
+            });
+
+            const result = await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
+
+            expect(executeHandler).toHaveBeenCalledTimes(1);
+            const action = executeHandler.mock.calls[0][0];
+            expect(action.name).toBe('Tamed Surge');
+            expect(action.automation.type).toBe('wild_magic_tamed');
+            expect(result.type).toBe('modal');
+            expect(result.payload.mode).toBe('tamedSurge');
+            expect(result.payload.roll).toBeUndefined();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                playerStats.name, 'surgeUsedRound', expect.anything(), CAMPAIGN_NAME,
+            );
+        });
+
+        it('CLA-354: falls through to the wild_magic_surge roll lane when tamed has no uses', async () => {
+            const playerStats = {
+                ...BASE_PLAYER_STATS,
+                automation: {
+                    passives: [
+                        { type: 'wild_magic_surge', name: 'Wild Surge' },
+                        { type: 'wild_magic_tamed', name: 'Tamed Surge' },
+                    ],
+                },
+            };
+            const spell = { ...SPELL, level: 1 };
+
+            getRuntimeValue.mockImplementation((_charKey, prop) => {
+                if (prop === 'tamedSurgeUses') return 0;
+                return null;
+            });
+            executeHandler.mockResolvedValue({ type: 'modal', modalName: 'wildMagicSurge', payload: { mode: 'roll', roll: 13 } });
+
+            const result = await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
+
+            expect(executeHandler).toHaveBeenCalledTimes(1);
+            expect(executeHandler.mock.calls[0][0].automation.type).toBe('wild_magic_surge');
+            expect(result.payload.mode).toBe('roll');
+        });
+
+        it('CLA-354: treats null tamedSurgeUses as unspent and dispatches the chooser', async () => {
+            const playerStats = {
+                ...BASE_PLAYER_STATS,
+                automation: {
+                    passives: [
+                        { type: 'wild_magic_surge', name: 'Wild Surge' },
+                        { type: 'wild_magic_tamed', name: 'Tamed Surge' },
+                    ],
+                },
+            };
+            const spell = { ...SPELL, level: 1 };
+
+            getRuntimeValue.mockReturnValue(null);
+            executeHandler.mockResolvedValue({ type: 'modal', modalName: 'wildMagicSurge', payload: { mode: 'tamedSurge' } });
+
+            const result = await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
+
+            expect(executeHandler).toHaveBeenCalledTimes(1);
+            expect(executeHandler.mock.calls[0][0].automation.type).toBe('wild_magic_tamed');
+            expect(result.payload.mode).toBe('tamedSurge');
+        });
+
+        it('CLA-354: cantrip cast never dispatches even when tamed feature has uses', async () => {
+            const playerStats = {
+                ...BASE_PLAYER_STATS,
+                automation: {
+                    passives: [
+                        { type: 'wild_magic_surge', name: 'Wild Surge' },
+                        { type: 'wild_magic_tamed', name: 'Tamed Surge' },
+                    ],
+                },
+            };
+            const spell = { name: 'Fire Bolt', level: 0 };
+
+            getRuntimeValue.mockImplementation((_charKey, prop) => {
+                if (prop === 'tamedSurgeUses') return 1;
+                return null;
+            });
+
+            const result = await triggerWildMagicSurge(spell, { slotLevel: 0 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
+
+            expect(result).toBeNull();
+            expect(executeHandler).not.toHaveBeenCalled();
+        });
+
+        it('CLA-354: tamed-only caster (no wild_magic_surge passive) still gets the chooser', async () => {
+            const playerStats = {
+                ...BASE_PLAYER_STATS,
+                automation: {
+                    passives: [
+                        { type: 'wild_magic_tamed', name: 'Tamed Surge' },
+                    ],
+                },
+            };
+            const spell = { ...SPELL, level: 1 };
+
+            getRuntimeValue.mockReturnValue(null);
+            executeHandler.mockResolvedValue({ type: 'modal', modalName: 'wildMagicSurge', payload: { mode: 'tamedSurge' } });
+
+            const result = await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
+
+            expect(executeHandler).toHaveBeenCalledTimes(1);
+            expect(executeHandler.mock.calls[0][0].automation.type).toBe('wild_magic_tamed');
+            expect(result.payload.mode).toBe('tamedSurge');
+        });
+
+        it('CLA-354: empty selectable table (final row only) falls through to the roll lane', async () => {
+            const playerStats = {
+                ...BASE_PLAYER_STATS,
+                automation: {
+                    passives: [
+                        { type: 'wild_magic_surge', name: 'Wild Surge' },
+                        { type: 'wild_magic_tamed', name: 'Tamed Surge' },
+                    ],
+                },
+                wildMagicSurgeTable: [{ min: 1, max: 100, effect: 'Wish (final row)' }],
+            };
+            const spell = { ...SPELL, level: 1 };
+
+            getRuntimeValue.mockImplementation((_charKey, prop) => {
+                if (prop === 'tamedSurgeUses') return 1;
+                return null;
+            });
+            executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
+
+            const result = await triggerWildMagicSurge(spell, { slotLevel: 1 }, playerStats, CAMPAIGN_NAME, MAP_NAME);
+
+            expect(executeHandler).toHaveBeenCalledTimes(1);
+            expect(executeHandler.mock.calls[0][0].automation.type).toBe('wild_magic_surge');
+            expect(result).toEqual({ type: 'popup', payload: {} });
+        });
+
         it('falls through to executeHandler when feats of chaos uses are 0 within rest period', async () => {
             const now = Date.now();
             const playerStats = {
