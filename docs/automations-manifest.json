@@ -6497,7 +6497,7 @@
       "handler": "src/services/combat/automation/handlers/spellHandler.js",
       "router": "src/services/combat/automation/routers/spellRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/spellInfoBuilder.js",
-      "verified": "verified (PASS-subset CAST-path 2026-10-09 host AberrantSorcerer lv20: lv4 radio slot 2->1, variant chooser Beholderkin, spawn 'Aberrant Spirit (Beholderkin) 1' init caster-0.1 AC11 HP40 summonedBy stamp + summoned/concentration te, caster-fold attack_bonus 5 CHA+prof + damage 1d8+3+4 no token residue (§86 fold holds), HIT 16 vs AC12 fd10 hp_change exact zero MA-0465 block, rounds:600 expiry clock, badge-remove purges te. Gaps: Cancel-after-Cast slot leak accepted family §84, CR-by-slot unmodeled. Spellbook PUT-restored)",
+      "verified": "verified",
       "class": "Spell",
       "triggerConditions": "Automation type: summon_spirit",
       "expectedBehavior": "You call forth an aberrant spirit. It manifests in an unoccupied space that you can see within range and uses the Aberrant Spirit stat block. When you cast the spell, choose Beholderkin, Mind Flayer, or Slaad. The creature resembles an Aberration of that kind, which determines certain details in its stat block. The creature disappears when it drops to 0 Hit Points or when the spell ends. The creature is an ally to you and your allies. In combat, it shares your Initiative count, but it takes its turn immediately after yours. It obeys your verbal commands (no action required from you). If you don't issue any, it takes the Dodge action and uses its movement to avoid danger."
