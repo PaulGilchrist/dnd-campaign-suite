@@ -90,6 +90,7 @@ export function useSpellMetamagicFlow({ playerStats, campaignName, onExecute, se
     handlePassWithoutTraceConfirm, handlePassWithoutTraceSkip,
     handleProtectionFromPoisonConfirm, handleProtectionFromPoisonSkip,
     handleStoneSkinConfirm, handleStoneSkinSkip,
+    handleWardingBondConfirm, handleWardingBondSkip,
   } = customHandlers
 
   const {
@@ -133,6 +134,7 @@ export function useSpellMetamagicFlow({ playerStats, campaignName, onExecute, se
     pendingSanctuary, pendingSleetStorm, pendingHoldMonster, pendingHoldPerson, pendingPolymorph,
     pendingShapechange, pendingAnimalShapes, pendingTruePolymorph, pendingCharmPerson,
     pendingCharmMonster, pendingBanishment, pendingHeroism, pendingHex, pendingDeathWard,
+    pendingWardingBond,
   } = buildPendingStates(getPending)
 
   return {
@@ -164,6 +166,7 @@ export function useSpellMetamagicFlow({ playerStats, campaignName, onExecute, se
     pendingHeroism, handleHeroismConfirm, handleHeroismSkip,
     pendingHex, handleHexConfirm, handleHexSkip,
     handleAnimalFriendshipConfirm, handleAnimalFriendshipSkip,
+    pendingWardingBond, handleWardingBondConfirm, handleWardingBondSkip,
     resistanceStage, enhanceAbilityStage, protectionFromEnergyStage,
     handleResistanceTargetSelect, handleResistanceTypeSelect, handleResistanceSkip,
     handleProtectionFromEnergyTargetSelect, handleProtectionFromEnergyTypeSelect, handleProtectionFromEnergySkip,

@@ -5,6 +5,7 @@ import { applyBarkskinEffect } from '../../../services/automation/index.js'
 import { applyPassWithoutTraceEffect } from '../../../services/automation/index.js'
 import { applyProtectionFromPoisonHandler } from '../../../services/automation/index.js'
 import { applyStoneSkinHandler } from '../../../services/automation/index.js'
+import { executeHandler } from '../../../services/automation/index.js'
 import { consumeMaterial } from '../../../services/rules/spells/materialComponents.js'
 import { isFreeCastAuthorized, prepareSpellCast } from '../../../services/rules/spells/spellPreparationService.js'
 import { triggerPrimalCompanionSpellShare } from '../../../services/rules/features/primalCompanionSpellShareService.js'
@@ -291,10 +292,82 @@ export function useCustomHandlers({ playerStats, campaignName, cfClearPending, g
     cfClearPending('stoneSkin')
   }, [playerStats, campaignName, cfClearPending, getPending])
 
+  // SP-125: Warding Bond pay-at-confirm chooser lane (SP-013 barkskin template).
+  // The gate opens UNPAID; confirm consumes the slot via prepareSpellCast then
+  // dispatches wardingBondHandler with the CHOSEN target name on metaCtx —
+  // the production producer for metaCtx.wardingBondTargetName (previously set
+  // only in tests, so the link target was never threaded outside combat).
+  const consumeWardingBondSlot = React.useCallback(async (pending) => {
+    const isCantrip = (pending.spell?.level === 0)
+    if (isCantrip || !pending.spell) return
+    const upcastLevel = pending.spell.upcastLevel
+    const isUpcast = upcastLevel != null && upcastLevel !== pending.spell.level
+    const gateLevel = isUpcast ? upcastLevel : (pending.spell.level ?? pending.spellLevel ?? 0)
+    const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, pending.spellName, gateLevel, playerStats, campaignName)
+    const slotResult = await prepareSpellCast(pending.spell, {}, {
+      playerName: playerStats.name,
+      playerStats,
+      campaignName,
+      isUpcast,
+      upcastLevel,
+      freeCastAuthorized,
+    })
+    if (slotResult && slotResult.slotConsumed) {
+      addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: pending.spellName,
+        spellName: pending.spellName,
+        description: `${pending.spellName}: Expended a level ${(slotResult.modifiedSpell && slotResult.modifiedSpell.level) || pending.spellLevel || 0} spell slot.`,
+        timestamp: Date.now(),
+      }).catch((e) => { console.error("[useCustomHandlers:log-error]", e); })
+    }
+  }, [playerStats, campaignName])
+
+  const handleWardingBondConfirm = React.useCallback(async (result) => {
+    const pending = getPending('wardingBond')
+    if (!pending) return
+
+    cfClearPending('wardingBond')
+    const targetName = Array.isArray(result) ? result[0] : result
+    if (!targetName) return
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      targetName: targetName,
+      targets: [targetName],
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error("[useCustomHandlers:log-error]", e); })
+
+    await consumeWardingBondSlot(pending)
+
+    const popup = await executeHandler({
+      name: pending.spellName,
+      spell: pending.spell,
+      automation: pending.spell?.automation || { type: 'warding_bond', duration: '1 hour', target: 'willing_creature', casting_time: pending.castingTime },
+      metaCtx: { wardingBondTargetName: targetName },
+    }, playerStats, campaignName, null, characters)
+
+    if (popup && setPopupHtml) {
+      setPopupHtml(popup.payload)
+    }
+  }, [playerStats, campaignName, cfClearPending, getPending, setPopupHtml, characters, consumeWardingBondSlot])
+
+  const handleWardingBondSkip = React.useCallback(() => {
+    // SP-095 shape: the gate never spent the slot (payment is at confirm), so
+    // skip clears pending with no rollback and no cast log.
+    cfClearPending('wardingBond')
+  }, [cfClearPending])
+
   return {
     handleBarkskinConfirm, handleBarkskinSkip,
     handlePassWithoutTraceConfirm, handlePassWithoutTraceSkip,
     handleProtectionFromPoisonConfirm, handleProtectionFromPoisonSkip,
     handleStoneSkinConfirm, handleStoneSkinSkip,
+    handleWardingBondConfirm, handleWardingBondSkip,
   }
 }

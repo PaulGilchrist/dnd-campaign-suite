@@ -181,6 +181,48 @@ function refuseUnarmedMazeCast(spell, playerStats, campaignName, setPopupHtml, h
   }).catch((e) => { console.error("[useSpellMetamagicGates:maze_refused]", e); });
 }
 
+// SP-125: Warding Bond refuses untargeted casts UNPAID (SP-080 maze-refused
+// family). The chooser gate (spellGates.gateWardingBond) opens the picker when
+// candidates exist and an armed initiative target keeps the paid lane verbatim;
+// this gate catches the zero-candidate case (no combat, no party roster) that
+// previously fell through to prepareSpellCast and burned the lv2 slot on the
+// handler's "No target selected" popup with zero effect (§CLA-208 pay-no-effect).
+function isWardingBondSpell(spell) {
+  const lower = (spell?.name || '').toLowerCase();
+  return lower === 'warding bond' || spell?.automation?.type === 'warding_bond';
+}
+
+// Returns true when the cast was refused (unpaid). Mirrors wardingBondHandler's
+// exact target resolution: metaCtx name → armed initiative target → picker
+// candidates (cs creatures, campaign roster fallback outside combat).
+function refuseUntargetedWardingBondGate(spell, metaCtx, { playerStats, campaignName, characters, setPopupHtml }) {
+  if (!isWardingBondSpell(spell)) return false;
+  if (metaCtx?.wardingBondTargetName) return false;
+  // Same candidate list as gateWardingBond — RAW targets ANOTHER creature, so
+  // a solo roster (caster only) must still refuse unpaid.
+  const candidates = getCreatureTargets(playerStats.name, campaignName, characters || [])
+    .filter(name => name !== playerStats.name);
+  if (candidates.length > 0) return false;
+  if (setPopupHtml) {
+    setPopupHtml({
+      type: 'automation_info',
+      name: spell.name,
+      automationType: 'warding_bond_refused',
+      description: 'No target selected. Warding Bond has no effect. Nothing spent.',
+    });
+  }
+  addEntry(campaignName, {
+    type: 'automation',
+    automationType: 'warding_bond_refused',
+    reason: 'no_target',
+    characterName: playerStats.name,
+    abilityName: spell.name,
+    description: `${spell.name} refused: no willing creature available to bond with. Nothing spent.`,
+    timestamp: Date.now(),
+  }).catch((e) => { console.error("[useSpellMetamagicGates:warding_bond_refused]", e); });
+  return true;
+}
+
 // SP-103: recasting Shapechange while already transformed is RAW "an action to
 // shape-shift into a different eligible form" — a free form change, not a new
 // casting. cs.shapechangeOriginal is the transform-state source of truth; when it
@@ -355,6 +397,13 @@ export async function gateMetamagic(spell, metaCtx, {
   // concentration). Short-circuit on spell identity so non-Maze lanes keep their
   // exact sync timing (other-paths tests assert onExecute inside a sync act()).
   if (isMazeSpell(spell) && await refuseUnarmedMazeCastGate(spell, playerStats, campaignName, setPopupHtml)) return;
+
+  // SP-125: refuse an untargeted Warding Bond cast BEFORE any payment lane.
+  // The chooser above (tryGateSpell → gateWardingBond) already collected a
+  // target when candidates existed; reaching here with zero candidates means
+  // wardingBondHandler would refuse anyway — refuse honestly unpaid instead
+  // of paying the lv2 slot for a popup.
+  if (refuseUntargetedWardingBondGate(spell, metaCtx, { playerStats, campaignName, characters, setPopupHtml })) return;
 
   if (!isSorcerer) {
     await handleNonSorcererCast(spell, metaCtx, { campaignName, consumedMaterial, freeCastAuthorized, materialsWaived, onExecute, playerStats });

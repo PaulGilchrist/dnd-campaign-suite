@@ -63,5 +63,6 @@ export function buildPendingStates(getPending) {
     pendingHeroism: getPending('heroism'),
     pendingHex: getPending('hex'),
     pendingDeathWard: getPending('deathWard'),
+    pendingWardingBond: getPending('wardingBond'),
   }
 }

@@ -1,6 +1,8 @@
 import { getCombatSummary, loadCombatSummary } from '../../services/encounters/combatData.js';
 import { getAllyList } from '../useAllySelection.js';
 import { getCsAndTargets, extractMaxTargets, resolveHumanoids, resolveBeasts, makePending, isSpareTheDyingTarget } from './spellGateHelpers.js';
+import { getCreatureTargets } from './useSpellMetamagicHelpers.js';
+import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { isCreatureDead } from '../../services/shared/hpModifier.js';
 import { resolveAuraOfLifeParty } from '../../services/automation/handlers/buffs/auraOfLifeHandler.js';
 import { checkAnyArmor } from '../../services/rules/core/speedUtils.js';
@@ -24,6 +26,29 @@ function gateSanctuary({ spell, campaignName, cfSetPending, playerStats }) {
   const { creatureTargets } = getCsAndTargets(campaignName, { includeCaster: true, casterName: playerStats.name });
   if (creatureTargets.length > 0) {
     cfSetPending('sanctuary', makePending('sanctuary', spell, { range: spell.range || '30 feet', creatureTargets }));
+    return true;
+  }
+  return false;
+}
+
+// SP-125: Warding Bond (2024) targets ANOTHER willing creature and is not
+// concentrated. The sheet lane previously fell through to the generic paid lane
+// (gateMetamagic → prepareSpellCast) so an unarmed cast burned the lv2 slot on
+// the handler's no-target refusal popup, and metaCtx.wardingBondTargetName was
+// never set outside combat (no SecondaryTargetModal path). This gate opens the
+// SecondaryTarget chooser UNPAID — confirm consumes the slot (pay-at-confirm,
+// SP-079/SP-080 family) and the runner threads the chosen name onto the handler
+// metaCtx. An armed initiative target keeps the verified paid lane byte-identical
+// (wardingBondHandler resolves the armed target via its documented fallback).
+// No candidates at all → the unpaid refusal gate in gateMetamagic catches it.
+function gateWardingBond({ spell, campaignName, cfSetPending, playerStats, characters }) {
+  const cs = getCombatSummary(campaignName);
+  const armed = cs?.creatures ? getTargetFromAttacker(cs, playerStats.name)?.name : null;
+  if (armed) return false;
+  const creatureTargets = getCreatureTargets(playerStats.name, campaignName, characters || [])
+    .filter(name => name !== playerStats.name);
+  if (creatureTargets.length > 0) {
+    cfSetPending('wardingBond', makePending('wardingBond', spell, { range: spell.range || 'Touch', creatureTargets }));
     return true;
   }
   return false;
@@ -758,6 +783,7 @@ function gateHex({ spell, campaignName, cfSetPending, playerStats, metaCtx }) {
 const spellGateMap = {
   'foresight': gateForesight,
   'sanctuary': gateSanctuary,
+  'warding bond': gateWardingBond,
   'protection from evil and good': gateProtectionFromEvilAndGood,
   'protection from poison': gateProtectionFromPoison,
   'stone skin': gateStoneSkin,

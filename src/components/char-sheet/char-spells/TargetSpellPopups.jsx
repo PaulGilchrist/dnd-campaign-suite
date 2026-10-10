@@ -497,6 +497,17 @@ const TARGET_SPELL_POPUP_RENDERERS = [
             confirmIcon="fa-crown"
         />
     ),
+    (p) => p.pendingWardingBond && (
+        <SecondaryTargetModal
+            title="Warding Bond"
+            targets={p.pendingWardingBond.creatureTargets.map(name => ({ name, type: 'creature' }))}
+            onTargetSelected={(targetName) => p.handleWardingBondConfirm(targetName)}
+            onSkip={p.handleWardingBondSkip}
+            description="Choose a willing creature to bond with. While within 60 feet, the target gains +1 AC, +1 to saving throws, and Resistance to all damage; you take the same damage they take."
+            confirmLabel="Cast Warding Bond"
+            confirmIcon="fa-hand-holding-heart"
+        />
+    ),
 ];
 
 const TargetSpellPopups = function TargetSpellPopups(props) {
