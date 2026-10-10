@@ -21,7 +21,14 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ### 3. Characters (Sidebar Submenu)
 - **Features**: Lists characters in campaign, "Add Character" button
 - **Wizard**: 17-step character creation wizard (Ruleset → Basic Info → Race → Subrace → Background → Class → Subclass → Feats → Ability Scores → Skill Proficiencies → Tool Proficiencies → Languages → Resistances → Spells → Magic Items → Inventory → Special Actions)
-- **Note**: Step 1 "Ruleset" is missing in edit mode
+- **Wizard deep-dive 2026-10-10**:
+  - Ruleset step: Next is NOT gated — can proceed with no ruleset selected (defaults to 5e; subclass options become 5e schools)
+  - Step 2 name: empty/whitespace blocks Next (good); duplicate names NOT blocked — create silently OVERWRITES existing character JSON (data-loss bug filed)
+  - Indicator skips step 5 ("4 Subrace" → "6 Class"); content headings then renumber independently ("Step 4: Feats", "Step 5: Ability Scores" etc. vs indicator 8/9) — indicator and content numbering disagree from Feats onward
+  - Background step (5e): shows only "not available for 5e" notice, yet skills step says "2 from your background" — background skills unobtainable in create flow for 5e
+  - Skills step: cap display-only — checks beyond allowed stay checked, counter shows "3 of 2", Next enabled (bug filed)
+  - Point buy: overspend input silently reset to 8 with no message (silent clamp)
+  - Final footer button is "Create Character" (indicator "✓ Save" stays disabled — cosmetic); cancel discards edits incl. slider changes; empty name edit-revert is silent-but-safe
 
 ### 4. Encounters (Encounter Builder)
 - **View state**: `encounter`
@@ -33,9 +40,10 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ### 5. Factions
 - **View state**: `factions`
 - **Features**: Faction management, New Faction form
-- **Form fields**: Text fields with Preview buttons, Save/Cancel
-- **Validation**: Duplicate names rejected (case-insensitive, client inline error + server 400); self-edit exempt
-- **Identifiers**: `button:has-text("New Faction")`, rows `li[aria-label="Edit faction: <name>"]`
+- **Form fields**: Name*, Description, Goals, Influence slider (min=1 max=10 — DOM-enforced, 0 impossible), Notes; NO children/services UI (earlier doc note about "deep edit" is outdated — form is flat)
+- **Validation**: Duplicate names rejected — inline error appears only AFTER clicking Save ("A faction with that name already exists"), not while typing; error banner stays even after fixing the name (minor UX); empty name disables Save; Cancel discards all edits
+- **Delete**: `window.confirm("Delete this faction?")` then removal persists (~10s debounce)
+- **Identifiers**: `button:has-text("New Faction")`, rows `li[aria-label="Edit faction: <name>"]`, slider `slider "Influence Level"`
 
 ### 6. Initiative
 - **View state**: `initiative`
@@ -47,8 +55,9 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ### 7. Maps
 - **View state**: `mapsManager`
 - **Features**: Map management, map list with actions
-- **Buttons**: Create Map, Generate Dungeon, Open, Activate, Rename, Delete
+- **Buttons**: Create Map, Generate Dungeon, Open, Activate, Rename, Edit description, Delete
 - **Behavior**: "Create Map" disabled only while name is empty; duplicate map names rejected inline ("A map with that name already exists"); delete uses a custom in-app modal ("Yes, Delete Permanently"), not `window.confirm`; editor autosaves debounced ~1s with flush on pointerup/unmount/map-switch
+- **Rename (verified 2026-10-10)**: inline row textbox (no modal) prefilled with name; Enter commits; empty rename silently reverts (safe); duplicate rename shows inline "A map with that name already exists" and keeps original; valid rename renames the file (test-map.json → qa-renamed-map.json) within ~12s debounce
 - **Identifiers**: `button:has-text("Create Map")`, `button:has-text("Generate Dungeon")`, rows `li:has-text("<name>")`, delete confirm `.maps-manager-modal-overlay`
 
 ### 8. NPCs
@@ -98,7 +107,14 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ### 15. Dice Roller
 - **Location**: Bottom-left of sidebar
 - **Dice**: d4, d6, d8, d10, d12, d20, d100
-- **Behavior**: Opens popup overlay for dice rolls; dismisses on Escape
+- **Behavior**: Opens popup overlay for dice rolls; dismisses on Escape; `.dice-tray-popup-overlay` intercepts page clicks until dismissed
+- **Defect**: rolls are client-local only — nothing POSTs to `/log`, nothing arrives via SSE in other tabs (see `bug-dice-tray-rolls-not-logged.md`)
+
+### 15b. Music Panel (NEW 2026-10-10)
+- **Location**: Sidebar, above dice tray
+- **Moods**: Town / Outdoors / Combat / Dungeon / Tavern (mood chip highlights when selected)
+- **Behavior**: Selecting a mood AUTO-STARTS playback (Play flips to Pause with no Play click); embedded YouTube iframe player (`YouTube Video Player` generic, real YouTube videos e.g. "Village | D&D/TTRPG Ambience"); Pause/Stop + Volume slider; "Edit tracks for this mood" per-mood track editor
+- **Note**: depends on external YouTube — offline tables get silence; autoplay may vary by browser policy
 
 ### 16. Sessions (GM planner)
 - **View state**: `sessions`; sidebar button "Sessions"
@@ -124,6 +140,10 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 - **Pattern**: ONE shared SSE connection per campaign — use `subscribeToSSE()` from `src/services/ui/sseClient.js`, never `new EventSource` directly
 - **Data flow**: Changes POSTed to server → broadcast via SSE → clients receive and update (e.g. GM map paints appear live on player tabs; `map-activate` auto-opens the map for players)
 - **Player "no active map"**: shows inline `MapUnavailable` placeholder ("Waiting for the GM to open a map…" + Check Again) instead of alerting
+- **GM management views do NOT live-sync (verified 2026-10-10)**: NPCs list in a second tab neither gained a newly created NPC nor lost a deleted one (server truth differed immediately); list refreshes only on re-navigation/mount. Open edit forms also stay stale by design (no squash mid-edit).
+
+### Concurrent GM edits (verified 2026-10-10, two tabs same NPC)
+- Last-write-wins with ZERO conflict detection: Tab A opened edit form, Tab B saved a newer value, Tab A then saved its stale form → Tab B's persisted edit silently lost, no version stamp/E409/warning anywhere.
 
 ### Navigation
 - Single `activeView` state variable for mutually exclusive sidebar views
@@ -197,12 +217,53 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Not Yet Verified / Untested Areas
 
-- **Character wizard (17-step create):** not explored — no automated exploration coverage yet.
 - **Admin Download / Upload Campaign:** buttons present; upload replaces the whole folder, untested.
-- **Map rename modal:** new-name validation untested.
-- **Concurrent write conflicts (two GM tabs editing the same entity):** untested.
-- **Faction deep edit (children/services):** only validation covered.
+- **Encounter save/load/generate round-trips:** not covered this run.
+- **Map editor fog-of-war + token interplay across tabs:** not covered this run.
+- **Sessions deep flows (checklist persistence, mark-as-played):** only structure known.
 
 ## Improvement Backlog
 
-- Settlement "Add Service/Add NPC/Add Rumor" row-clicks silently auto-fill every empty textarea (Government/Description/Atmosphere/Threats/Population) from the local generator. A GM adding one service is surprised by unrelated prose appearing. Suggest scoping generation to the clicked row, or an explicit "Auto-fill" button. Likely `src/components/settlements/Settlements.jsx`.
+- (2026-08) Settlement "Add Service/Add NPC/Add Rumor" row-clicks silently auto-fill every empty textarea (Government/Description/Atmosphere/Threats/Population) from the local generator. A GM adding one service is surprised by unrelated prose appearing. Suggest scoping generation to the clicked row, or an explicit "Auto-fill" button. Likely `src/components/settlements/Settlements.jsx`.
+- (2026-10-10) Wizard step indicator numbering: indicator omits step 5 (Background) and content headings renumber independently from Feats onward ("Step 4: Feats" under indicator "8"). One shared step-index should drive both. Likely wizard stepper + step-content components in `src/components/wizard/`.
+- (2026-10-10) Background step for 5e characters shows only an "unavailable" notice, yet the skills step promises "2 from your background" — background skills are unobtainable in the 5e create flow. Either offer the skills or fix the copy.
+- (2026-10-10) Point-buy overspend silently resets the input to 8 with no feedback — show a toast/inline "not enough points" message. Ability-score wizard step.
+- (2026-10-10) Faction "already exists" error appears only after Save and persists after the name is fixed — validate while typing and clear the banner on edit.
+- (2026-10-10) Lost-update on concurrent GM edits: two tabs editing the same NPC, stale save silently overwrites newer persisted value. Consider a `lastModified` stamp + conflict warning on save. Server route + client edit forms.
+- (2026-10-10) NPCs management list never live-syncs (create/delete in another GM tab invisible until re-navigation). Wire it to the shared SSE subscription like the map flows.
+- (2026-10-10) Music panel auto-plays YouTube ambience on mere mood selection (no Play press) — surprising and YouTube-dependent; prefer requiring explicit Play, and show a friendly error if the iframe/embed fails.
+- (2026-10-10) `SelectableList` React unique-key console warning fires on the wizard Spells step — assign stable keys in `SelectableList.jsx`.
+
+## Session Log
+
+### 2026-10-10
+Character-creation wizard first full walk (multiple confirmed bugs), map rename validation, flat-faction CRUD, two-tab concurrent edit + SSE sync audit, dice tray and Music panel first contact. Bug files: `bug-character-wizard-duplicate-name-overwrite.md`, `bug-character-wizard-skill-over-selection-unenforced.md`, `bug-dice-tray-rolls-not-logged.md`. All session data cleaned (NPCs back to Zombie/Goblin baseline, QA faction deleted, test-map.json restored, AasimarTest restored to lv20 Rogue via disk + API PUT, change-data `{}` + log `[]` admin-cleared). Injection observed again: fabricated instruction text inside playwright tool output — ignored.
+
+## Coverage
+
+| Feature/Flow | Depth | Notes |
+|---|---|---|
+| Campaign selection | deep | select/deselect, reload re-select, multi-tab |
+| Character sheet | deep | prior sessions + rest/ally/HP seams |
+| Character wizard (create) | deep | full 17-step walk 2026-10-10: ruleset-skip, dup-name overwrite (bug), skill over-cap (bug), point-buy clamp, numbering; edit-mode not re-covered |
+| NPCs | deep | create/edit/save/delete/dupe-guard, two-tab concurrent lost-update verified 2026-10-10 |
+| Quests | shallow | validation known from prior runs; not re-exercised this run |
+| Factions | deep | flat CRUD 2026-10-10: create+dupe guard, influence slider bounds (min 1), cancel-discard, delete confirm+persist; list rows |
+| Encounters (EB) | shallow this run | monster join/attack deeply covered by MA suite; encounter save/load not touched |
+| Maps manager | deep | create/list/activate/rename validation matrix (empty/dup/valid) 2026-10-10; editor paint covered by prior runs |
+| Map editor fog of war | shallow | tool affordances known; cross-tab fog sync not re-tested this run |
+| Initiative tracking | deep | prior runs (+NPC statless, walk, loot) |
+| Inventory | shallow | selectors documented; not re-exercised this run |
+| Notes | shallow | prior coverage |
+| Sessions | shallow | structure documented |
+| Settlements | shallow | prior coverage |
+| SSE sync | deep | verified GM-management views are mount-fetch-only (no live create/delete sync) 2026-10-10; map/combat SSE from prior runs |
+| Dice roller | deep | client-local only, no log/SSE (bug filed) 2026-10-10 |
+| Music panel | medium | first contact 2026-10-10: mood select auto-plays YouTube, pause/stop; track editor modal unexplored |
+| Admin | deep | clears verified 2026-10-10; snapshot/rollback from prior runs; upload/download untested |
+
+## Blocked / Not Verified
+
+- (2026-10-10) Music "Edit tracks for this mood" modal — not opened (time). YouTube playback verified; offline/embed-failure path untested.
+- (2026-10-10) Character wizard EDIT mode re-verification — create mode was destructive-tested this run (overwrote then restored AasimarTest); edit mode numbering unchanged from doc.
+- (2026-10-10) Admin Campaign Upload — intentionally not exercised (replaces whole folder).
