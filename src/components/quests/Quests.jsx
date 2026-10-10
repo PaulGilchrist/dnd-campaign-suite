@@ -31,7 +31,7 @@ function QuestEmptyState({ searchQuery }) {
   );
 }
 
-function QuestFormModal({ editingQuest, formData, saving, deleting, onChange, onClose, onSave, onDelete }) {
+function QuestFormModal({ editingQuest, formData, saving, deleting, error, onChange, onClose, onSave, onDelete }) {
   return (
     <div className="ct-modal-overlay">
       <div className="ct-modal quests-modal">
@@ -47,6 +47,7 @@ function QuestFormModal({ editingQuest, formData, saving, deleting, onChange, on
         </div>
 
         <div className="ct-modal-body">
+          {error && <div className="quests-form-error">{error}</div>}
           <label htmlFor="quest-name" className="ct-label">
             Name <span className="ct-required">*</span>
           </label>
@@ -144,35 +145,50 @@ function Quests({ campaignName, isLocalhost, onBack }) {
     openNew, openEdit, closeModal, updateFormField,
   } = useCrudList(quests, ['name']);
   const [deleting, setDeleting] = useState(null);
+  const [error, setError] = useState(null);
 
   if (!isLocalhost) return null;
 
   const handleNewQuest = () => {
+    setError(null);
     openNew({ name: '', status: 'active', description: '', rewards: '', notes: '' });
   };
 
   const handleEditQuest = (quest) => {
+    setError(null);
     openEdit(quest);
   };
 
   const handleCloseModal = () => {
+    setError(null);
     closeModal();
     setFormData({ name: '', status: 'active', description: '', rewards: '', notes: '' });
   };
 
   const handleFormChange = updateFormField;
 
+  // Duplicate-name guard (mirrors NPCs.jsx / MapsManager.handleCreate)
+  const hasDuplicateName = () => quests.some(q =>
+    q.id !== editingQuest?.id && (q.name || '').trim().toLowerCase() === formData.name.trim().toLowerCase()
+  );
+
   const handleSave = async () => {
     if (!formData.name?.trim()) return;
+    if (hasDuplicateName()) {
+      setError('A quest with that name already exists');
+      return;
+    }
     setSaving(true);
     try {
       const questsArray = editingQuest
         ? quests.map(q => q.id === editingQuest.id ? { ...formData } : q)
         : [...quests, { id: crypto.randomUUID(), ...formData }];
       await saveQuestsList(questsArray);
+      setError(null);
       handleCloseModal();
-    } catch (error) {
-      console.error('Failed to save quest:', error);
+    } catch (err) {
+      console.error('Failed to save quest:', err);
+      setError(err.message || 'Failed to save quests');
     } finally {
       setSaving(false);
     }
@@ -284,6 +300,7 @@ function Quests({ campaignName, isLocalhost, onBack }) {
           formData={formData}
           saving={saving}
           deleting={deleting}
+          error={error}
           onChange={handleFormChange}
           onClose={handleCloseModal}
           onSave={handleSave}

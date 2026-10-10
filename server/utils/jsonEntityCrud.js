@@ -21,6 +21,7 @@ export function createJsonEntityRouter(entityName, options = {}) {
     authorizeRead = null,
     forbiddenMessage = 'Access denied',
     onDelete = null,
+    validateList = null,
     extraRoutes = () => {},
   } = options;
 
@@ -58,6 +59,12 @@ export function createJsonEntityRouter(entityName, options = {}) {
       const entities = req.body[entityName];
       if (!Array.isArray(entities)) {
         return res.status(400).json({ error: `Expected an array for ${entityName}` });
+      }
+      if (validateList) {
+        const validationError = validateList(entities);
+        if (validationError) {
+          return res.status(400).json({ error: validationError });
+        }
       }
       const filePath = getFilePath(campaign);
       ensureDataDir(campaign);

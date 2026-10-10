@@ -152,6 +152,66 @@ describe('Factions', () => {
     });
   });
 
+  describe('duplicate-name guard', () => {
+    it('shows an inline error and does not save when a new faction name collides case-insensitively', async () => {
+      factionsState.factions = [{ id: 'f1', name: 'The Iron Consortium', description: '', goals: '', influence: 5, notes: '' }];
+      render(<Factions {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
+      fireEvent.change(screen.getByRole('textbox', { name: 'Faction Name *' }), { target: { value: 'the iron CONSORTIUM' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect(screen.getByText('A faction with that name already exists')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'New Faction' })).toBeInTheDocument();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(factionsState.saveFactionsList).not.toHaveBeenCalled();
+    });
+
+    it('shows an inline error when renaming onto another existing faction name', async () => {
+      factionsState.factions = [
+        { id: 'f1', name: 'The Iron Consortium', description: '', goals: '', influence: 5, notes: '' },
+        { id: 'f2', name: 'QA Parity Faction', description: '', goals: '', influence: 5, notes: '' },
+      ];
+      render(<Factions {...defaultProps} />);
+      await waitFor(() => expect(screen.getByText('QA Parity Faction')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('QA Parity Faction'));
+      fireEvent.change(screen.getByRole('textbox', { name: 'Faction Name *' }), { target: { value: 'THE IRON CONSORTIUM' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect(screen.getByText('A faction with that name already exists')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Edit Faction' })).toBeInTheDocument();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(factionsState.saveFactionsList).not.toHaveBeenCalled();
+    });
+
+    it('saves normally when editing without renaming (self-match excluded)', async () => {
+      factionsState.factions = [{ id: 'f1', name: 'The Iron Consortium', description: 'old', goals: '', influence: 5, notes: '' }];
+      render(<Factions {...defaultProps} />);
+      await waitFor(() => expect(screen.getByText('The Iron Consortium')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('The Iron Consortium'));
+      fireEvent.change(screen.getByTestId('faction-field-faction-description'), { target: { value: 'updated' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => expect(factionsState.saveFactionsList).toHaveBeenCalled());
+      expect(screen.queryByText('A faction with that name already exists')).not.toBeInTheDocument();
+      expect(factionsState.saveFactionsList.mock.calls[0][0][0].description).toBe('updated');
+    });
+
+    it('surfaces the server error message when a save is rejected', async () => {
+      factionsState.saveFactionsList = vi.fn().mockRejectedValue(new Error('A faction with that name already exists'));
+      render(<Factions {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
+      fireEvent.change(screen.getByRole('textbox', { name: 'Faction Name *' }), { target: { value: 'Some Faction' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => expect(screen.getByText('A faction with that name already exists')).toBeInTheDocument());
+      expect(screen.getByRole('heading', { name: 'New Faction' })).toBeInTheDocument();
+    });
+  });
+
   describe('delete', () => {
     it('deletes when confirmed', async () => {
       factionsState.deleteFactionAction = vi.fn().mockResolvedValue(undefined);

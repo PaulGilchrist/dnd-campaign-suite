@@ -13,6 +13,29 @@ const INFLUENCE_COLORS = {
   extreme: { bg: '#7f1d1d', color: '#fecaca', border: '#b91c1c' },
 };
 
+function FactionsEmptyState({ searchQuery }) {
+  return (
+    <div className="ct-empty-state">
+      {searchQuery ? (
+        <>
+          <i className="fa-solid fa-search" />
+          No factions found matching &ldquo;{searchQuery}&rdquo;
+        </>
+      ) : (
+        <>
+          <i className="fa-solid fa-handshake" />
+          No factions yet. Click &ldquo;New Faction&rdquo; to create one.
+        </>
+      )}
+    </div>
+  );
+}
+
+// Duplicate-name guard (mirrors NPCs.jsx / MapsManager.handleCreate)
+const hasDuplicateName = (factions, editingId, name) => factions.some(f =>
+  f.id !== editingId && (f.name || '').trim().toLowerCase() === name.trim().toLowerCase()
+);
+
 function Factions({ campaignName, onBack }) {
   const { items: factions, loading, loadItems: loadFactionsList, saveItems: saveFactionsList, deleteItem: deleteFactionAction } =
     useEntityManagement(campaignName, { load: loadFactions, save: saveFactions, delete: deleteFaction }, { responseKey: 'factions', loadOnMount: false });
@@ -24,6 +47,7 @@ function Factions({ campaignName, onBack }) {
     openNew, openEdit, closeModal, updateFormField,
   } = useCrudList(factions, ['name']);
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState(null);
 
   // Load factions on mount
   useEffect(() => {
@@ -34,6 +58,7 @@ function Factions({ campaignName, onBack }) {
 
   // Open modal for new faction
   const handleNewFaction = () => {
+    setError(null);
     openNew({
       id: crypto.randomUUID(),
       name: '',
@@ -46,18 +71,26 @@ function Factions({ campaignName, onBack }) {
 
   // Open modal for editing a faction
   const handleEditFaction = (faction) => {
+    setError(null);
     openEdit(faction);
   };
 
   // Close modal and reset
-  const handleCloseModal = closeModal;
+  const handleCloseModal = () => {
+    setError(null);
+    closeModal();
+  };
 
   // Handle form field changes
   const handleFormChange = updateFormField;
 
-  // Save faction (create or update)
+  // Save faction (create or update); duplicate-name guard mirrors NPCs.jsx
   const handleSave = async () => {
     if (!formData || !formData.name.trim()) return;
+    if (hasDuplicateName(factions, editingFaction?.id, formData.name)) {
+      setError('A faction with that name already exists');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -67,9 +100,11 @@ function Factions({ campaignName, onBack }) {
         : [...factions, updated];
 
       await saveFactionsList(updatedFactions);
+      setError(null);
       flushSync(handleCloseModal);
-    } catch (error) {
-      console.error('Failed to save faction:', error);
+    } catch (err) {
+      console.error('Failed to save faction:', err);
+      setError(err.message || 'Failed to save factions');
     } finally {
       setSaving(false);
     }
@@ -161,19 +196,7 @@ function Factions({ campaignName, onBack }) {
 
       {/* Factions list */}
       {!loading && filteredFactions.length === 0 && (
-        <div className="ct-empty-state">
-          {searchQuery ? (
-            <>
-              <i className="fa-solid fa-search" />
-              No factions found matching &ldquo;{searchQuery}&rdquo;
-            </>
-          ) : (
-            <>
-              <i className="fa-solid fa-handshake" />
-              No factions yet. Click &ldquo;New Faction&rdquo; to create one.
-            </>
-          )}
-        </div>
+        <FactionsEmptyState searchQuery={searchQuery} />
       )}
 
       {!loading && filteredFactions.length > 0 && (
@@ -234,6 +257,7 @@ function Factions({ campaignName, onBack }) {
             </div>
 
             <div className="ct-modal-body">
+              {error && <div className="factions-form-error">{error}</div>}
               {/* Name (required) */}
               <label htmlFor="faction-name" className="ct-label">
                 Faction Name <span className="ct-required">*</span>

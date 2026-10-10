@@ -266,6 +266,66 @@ describe('Quests', () => {
     });
   });
 
+  describe('duplicate-name guard', () => {
+    it('shows an inline error and does not save when a new quest name collides case-insensitively', async () => {
+      const { mockSave } = renderWithQuests([
+        quest({ id: 'quest-1', name: 'The Lost Artifact' }),
+      ]);
+
+      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
+      fireEvent.change(screen.getByRole('textbox', { name: /Name/ }), { target: { value: 'the lost artifact' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect(screen.getByText('A quest with that name already exists')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mockSave).not.toHaveBeenCalled();
+    });
+
+    it('shows an inline error when renaming onto another existing quest name', async () => {
+      const { mockSave } = renderWithQuests([
+        quest({ id: 'quest-1', name: 'The Lost Artifact' }),
+        quest({ id: 'quest-2', name: 'QA Parity Quest' }),
+      ]);
+
+      fireEvent.click(screen.getByRole('button', { name: /Edit quest: QA Parity Quest/ }));
+      fireEvent.change(screen.getByRole('textbox', { name: /Name/ }), { target: { value: 'THE LOST ARTIFACT' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect(screen.getByText('A quest with that name already exists')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mockSave).not.toHaveBeenCalled();
+    });
+
+    it('saves normally when editing without renaming (self-match excluded)', async () => {
+      const { mockSave } = renderWithQuests([
+        quest({ id: 'quest-1', name: 'The Lost Artifact' }),
+      ]);
+
+      fireEvent.click(screen.getByRole('button', { name: /Edit quest: The Lost Artifact/ }));
+      fireEvent.change(screen.getByTestId('field-quest-description'), { target: { value: 'updated' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => expect(mockSave).toHaveBeenCalled());
+      expect(screen.queryByText('A quest with that name already exists')).not.toBeInTheDocument();
+      expect(mockSave.mock.calls[0][0][0].description).toBe('updated');
+    });
+
+    it('clears the error when the modal is closed and reopened', async () => {
+      renderWithQuests([quest({ id: 'quest-1', name: 'The Lost Artifact' })]);
+
+      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
+      fireEvent.change(screen.getByRole('textbox', { name: /Name/ }), { target: { value: 'the lost artifact' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      expect(screen.getByText('A quest with that name already exists')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
+      expect(screen.queryByText('A quest with that name already exists')).not.toBeInTheDocument();
+    });
+  });
+
   describe('quest list rendering', () => {
     it('renders each quest with its name and status', () => {
       renderWithQuests([
