@@ -303,6 +303,21 @@
   color: var(--color-text-muted);
 }
 
+.mc-combat-strategy {
+  border-left: 3px solid var(--color-header);
+  padding-left: 10px;
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+.mc-combat-strategy .mc-section-title {
+  font-style: normal;
+}
+
+.mc-combat-strategy .mc-section-title i {
+  margin-right: 6px;
+}
+
 .mc-dice-link {
   display: inline-block;
   font-size: 0.75rem;

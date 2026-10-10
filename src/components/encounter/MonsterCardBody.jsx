@@ -79,6 +79,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
             <MonsterNamedEffectSection title="Regional Effects" items={regionalEffects} renderItem={(re, i) => <MonsterRegionalEffect key={i} re={re} />} />
           )}
           <MonsterCardDescription monster={monster} />
+          <MonsterCombatStrategy monster={monster} />
         </div>
         <div className="mc-footer no-print">
           <span className="mc-ally-badge clickable" onClick={(e) => { e.stopPropagation(); handleAllyModalOpen(); }} title="Manage allies">
@@ -278,6 +279,20 @@ function MonsterCardDescription({ monster }) {
         {monster.book && (
           <div className="mc-source"><em>{monster.book}{monster.page ? ` (page ${monster.page})` : ''}</em></div>
         )}
+      </div>
+    </>
+  );
+}
+
+function MonsterCombatStrategy({ monster }) {
+  const strategy = monster['combat-strategy'];
+  if (!strategy) return null;
+  return (
+    <>
+      <hr />
+      <div className="mc-section mc-combat-strategy">
+        <h5 className="mc-section-title"><i className="fa-solid fa-chess"></i> Combat Strategy</h5>
+        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(strategy) }} />
       </div>
     </>
   );
