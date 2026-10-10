@@ -81,7 +81,6 @@ Do not attempt to fix the bug yourself during this session — just document it.
 - Key UI patterns (e.g. how forms validate, how the SSE party sync behaves, how fog of war interactions work)
 - Selectors or stable identifiers you found reliable for each major element (role, label, testid) — useful for writing tests later
 - Known quirks or gotchas you ran into
-- A dated entry (today's date) briefly summarizing this session's findings, with links to the corresponding files in `.opencode/plans/`
 - A "Coverage" section: a checklist of every major feature/flow (NPCs, quests, encounters, maps, party members, initiative tracking, fog of war, SSE sync, and any others you find), each marked "not explored" / "shallow" / "deep", with a one-line note on what "deep" testing has covered so far (e.g. "edited existing NPC, deleted NPC, tried empty name field — not yet tried concurrent edit from two sessions"). Update this checklist every run so the next run knows exactly where to push further.
 - A "Blocked / not verified" section: anything you could not test or confirm, with the concrete blocker named (replaced each run).
 - The `## Improvement backlog` section in `docs/app-exploration.md` updated with this session's improvement opportunities (create the section if missing; append dated entries, never delete prior ones).
