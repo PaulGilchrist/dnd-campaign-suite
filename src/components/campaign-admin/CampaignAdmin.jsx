@@ -152,7 +152,7 @@ function SnapshotList({ snapshots }) {
     );
 }
 
-function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampaign }) {
+function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampaign, restoredSnapshot }) {
     const [status, setStatus] = useState(null);
     const [renameModal, setRenameModal] = useState(false);
     const [newName, setNewName] = useState('');
@@ -299,6 +299,11 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                         setStatus({ error: data.error });
                     } else {
                         setStatus({ success: data.message });
+                        try {
+                            sessionStorage.setItem('postRestoreNotice', JSON.stringify({ campaign: campaignName, restored: data.restored }));
+                        } catch (err) {
+                            console.error('Failed to store post-restore notice:', err);
+                        }
                         window.location.reload();
                     }
                 } catch (err) {
@@ -370,6 +375,12 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
     return (
         <div className="ct-container campaign-admin">
             <AdminHeader campaignName={campaignName} onBack={onBack} />
+
+            {restoredSnapshot && (
+                <div className="admin-status admin-status--success" role="status">
+                    <i className="fas fa-check-circle"></i> Campaign restored from {restoredSnapshot}
+                </div>
+            )}
 
             <AppearanceSection theme={theme} toggleTheme={toggleTheme} />
 

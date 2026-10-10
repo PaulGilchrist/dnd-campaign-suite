@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign/campaignService.js';
 import './CampaignSelection.css';
 
-function CampaignSelection({ onCampaignSelect }) {
+function CampaignSelection({ onCampaignSelect, autoSelectCampaign }) {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -42,6 +42,17 @@ function CampaignSelection({ onCampaignSelect }) {
           setLoading(false);
           }
         };
+
+  // Post-rollback carry-over: auto-open the campaign named by the restore notice.
+  const autoSelectedRef = useRef(false);
+  useEffect(() => {
+    if (autoSelectCampaign && !autoSelectedRef.current) {
+      autoSelectedRef.current = true;
+      handleCampaignSelect(autoSelectCampaign);
+    }
+    // handleCampaignSelect intentionally omitted: autoSelectedRef guards re-run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSelectCampaign]);
 
   const handleCreateCampaign = async () => {
     if (!newCampaignName.trim()) {

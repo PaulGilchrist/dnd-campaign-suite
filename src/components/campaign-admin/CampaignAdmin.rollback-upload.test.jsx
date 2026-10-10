@@ -143,6 +143,48 @@ describe('CampaignAdmin - Rollback & Upload', () => {
             });
         });
 
+        it('stores post-restore notice with restored snapshot filename before reloading', async () => {
+            sessionStorage.clear();
+            global.fetch = vi.fn(() =>
+                Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        message: 'Rollback complete',
+                        restored: 'test-campaign-2026-10-10T12-34-56-789.zip',
+                    }),
+                })
+            );
+
+            render(<CampaignAdmin {...defaultProps} />);
+            fireEvent.click(getActionButton('Rollback to Snapshot'));
+            fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
+
+            await waitFor(() => {
+                expect(window.location.reload).toHaveBeenCalledTimes(1);
+            });
+            expect(JSON.parse(sessionStorage.getItem('postRestoreNotice'))).toEqual({
+                campaign: 'test-campaign',
+                restored: 'test-campaign-2026-10-10T12-34-56-789.zip',
+            });
+        });
+
+        it('does not store post-restore notice when rollback fails', async () => {
+            sessionStorage.clear();
+            global.fetch = vi.fn(() =>
+                Promise.resolve({ ok: false, json: () => Promise.resolve({ error: 'Rollback failed' }) })
+            );
+
+            render(<CampaignAdmin {...defaultProps} />);
+            fireEvent.click(getActionButton('Rollback to Snapshot'));
+            fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
+
+            await waitFor(() => {
+                expect(screen.getByText('Rollback failed')).toBeInTheDocument();
+            });
+            expect(sessionStorage.getItem('postRestoreNotice')).toBeNull();
+            expect(window.location.reload).not.toHaveBeenCalled();
+        });
+
         it('shows error status on failed rollback', async () => {
             global.fetch = vi.fn(() =>
                 Promise.resolve({ ok: false, json: () => Promise.resolve({ error: 'Rollback failed' }) })
@@ -199,6 +241,27 @@ describe('CampaignAdmin - Rollback & Upload', () => {
                     expect.objectContaining({ method: 'POST' })
                 );
             });
+        });
+    });
+
+    describe('Restored snapshot banner', () => {
+        beforeEach(() => {
+            global.fetch = vi.fn(() =>
+                Promise.resolve({ ok: true, json: () => Promise.resolve({ snapshots: [] }) })
+            );
+        });
+
+        it('renders a success banner naming the restored snapshot file', () => {
+            render(<CampaignAdmin {...createDefaultProps({ restoredSnapshot: 'test-campaign-2026-10-10T12-34-56-789.zip' })} />);
+
+            const banner = screen.getByText(/Campaign restored from test-campaign-2026-10-10T12-34-56-789\.zip/);
+            expect(banner.closest('.admin-status')).toHaveClass('admin-status--success');
+        });
+
+        it('renders no restored banner when restoredSnapshot prop is absent', () => {
+            render(<CampaignAdmin {...defaultProps} />);
+
+            expect(screen.queryByText(/Campaign restored from/)).not.toBeInTheDocument();
         });
     });
 

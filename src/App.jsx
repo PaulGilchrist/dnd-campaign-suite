@@ -25,6 +25,7 @@ import Subscriber from './components/common/Subscriber.jsx';
 import MapContextSync from './components/common/MapContextSync.jsx';
 import { setRuntimeObject, seedTrackedResources, getStore, notify } from './hooks/runtime/useRuntimeState.js';
 import { applyServerOverride, trackedResourcesToStoreEntries } from './services/rules/trackedResources.js';
+import { usePostRestoreNotice } from './hooks/ui/usePostRestoreNotice.js';
 import { useBattleMasterSelectionVersion, battleMasterSelectionSerial } from './hooks/combat/battleMaster.js';
 import Notes from './components/notes/Notes.jsx';
 import Quests from './components/quests/Quests.jsx';
@@ -220,7 +221,7 @@ function MapsAreaView({ campaignName, characters, npcs, isLocalhost, mapsView, o
   return null;
 }
 
-function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme, toggleTheme, onRenameCampaign, onDeleteCampaign, setActiveView }) {
+function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme, toggleTheme, onRenameCampaign, onDeleteCampaign, setActiveView, restoredSnapshot }) {
   const views = {
     encounter: <EncounterBuilder characters={characters} campaignName={campaignName} onJoinEncounter={() => setActiveView('initiative')} />,
     notes: <Notes campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} onBack={() => setActiveView(null)} />,
@@ -239,6 +240,7 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
         toggleTheme={toggleTheme}
         onRenameCampaign={onRenameCampaign}
         onDeleteCampaign={onDeleteCampaign}
+        restoredSnapshot={restoredSnapshot}
       />
     ),
   };
@@ -255,9 +257,18 @@ function App() {
   const charMgmtRef = useRef();
   const campaignRef = useRef();
   const wizardRef = useRef();
-  const campaignNameRef = useRef(null);
   useEffect(() => { charMgmtRef.current = charMgmt; campaignRef.current = campaignMgmt; wizardRef.current = wizard; }, [charMgmt, campaignMgmt, wizard]);
-  useEffect(() => { campaignNameRef.current = campaignMgmt.campaignName; }, [campaignMgmt.campaignName]);
+
+  const [activeView, setActiveView] = useState(null);
+   // activeView: null | 'charSheet' | 'mapsManager' | 'encounter' | 'notes' | 'npcs' | 'settlements' | 'initiative'
+  // type: 'none' | 'manager' | 'map'
+  // When type is 'map', mapName holds the sanitized map filename (e.g. 'dungeon-level-1')
+  // Navigation stack for indoor map entry (POI, encounter) — push on enter, pop on back
+  const mapHistoryRef = useRef([]);
+
+  // Post-rollback carry-over: re-select the campaign, land on the Admin view,
+  // and show the "restored" banner after the rollback's full page reload.
+  const { autoSelectCampaign, restoredSnapshot, consumeRestore } = usePostRestoreNotice(activeView);
 
   useEffect(() => {
     wizardRef.current.setCharacterCallbacks({ setCharacters: charMgmtRef.current.setCharacters, setActiveCharacter: charMgmtRef.current.setActiveCharacter });
@@ -289,9 +300,14 @@ function App() {
       } else {
         wizardRef.current.handleAddCharacter();
       }
+      // Post-rollback auto-selection: land the GM back on the Admin view
+      // instead of the character sheet after the full page reload.
+      if (consumeRestore(name)) {
+        setActiveView('campaignRepair');
+      }
     });
     campaignRef.current.setDeleteCampaignCallback(() => { charMgmtRef.current.setCharacters([]); charMgmtRef.current.setActiveCharacter(null); });
-  }, []);
+  }, [consumeRestore]);
 
   const { showCampaignSelection, campaignName, isLocalhost, handleRenameCampaign: handleRenameCampaignRaw, handleDeleteCampaign: handleDeleteCampaignRaw, handleBackToCampaigns } = campaignMgmt;
   const { characters, activeCharacter, setCharacters, setActiveCharacter, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
@@ -362,12 +378,6 @@ function App() {
   const [mapsView, setMapsView] = useState({ type: 'none' });
   const [activeMapName, setActiveMapName] = useState(null);
   const [npcs, setNpcs] = useState([]);
-  const [activeView, setActiveView] = useState(null);
-   // activeView: null | 'charSheet' | 'mapsManager' | 'encounter' | 'notes' | 'npcs' | 'settlements' | 'initiative'
-  // type: 'none' | 'manager' | 'map'
-  // When type is 'map', mapName holds the sanitized map filename (e.g. 'dungeon-level-1')
-  // Navigation stack for indoor map entry (POI, encounter) — push on enter, pop on back
-  const mapHistoryRef = useRef([]);
 
   const handleEnterMap = useCallback((mapName) => {
     if (mapsView.type === 'map' && mapsView.mapName) {
@@ -593,7 +603,7 @@ function App() {
     }
   };
 
-  if (showCampaignSelection) return <CampaignSelection onCampaignSelect={handleCampaignSelect} />;
+  if (showCampaignSelection) return <CampaignSelection onCampaignSelect={handleCampaignSelect} autoSelectCampaign={autoSelectCampaign} />;
   if (appData.isLoading) return <div className="loading-overlay"><div className="loading-spinner">Loading rules data...</div></div>;
   if (!combatSummaryLoaded) return <div className="loading-overlay"><div className="loading-spinner">Loading campaign...</div></div>;
 
@@ -672,6 +682,7 @@ function App() {
           onRenameCampaign={handleRenameCampaign}
           onDeleteCampaign={handleDeleteCampaign}
           setActiveView={setActiveView}
+          restoredSnapshot={restoredSnapshot}
         />
         <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allClasses={classes} campaignName={campaignName} />}

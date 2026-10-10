@@ -257,6 +257,32 @@ describe('CampaignSelection', () => {
   });
 
   describe('campaign selection', () => {
+    it('auto-selects the campaign named by autoSelectCampaign without a click', async () => {
+      const onSelect = vi.fn();
+      getCharacterFolders.mockResolvedValue(['Campaign1', 'Campaign2']);
+      getCharacterFiles.mockResolvedValue(['char1.json']);
+      loadCharacters.mockResolvedValue([{ name: 'Character1' }]);
+
+      render(<CampaignSelection onCampaignSelect={onSelect} autoSelectCampaign="Campaign1" />);
+
+      await waitFor(() => {
+        expect(onSelect).toHaveBeenCalledWith('Campaign1', [{ name: 'Character1' }]);
+      });
+      expect(getCharacterFiles).toHaveBeenCalledWith('Campaign1');
+    });
+
+    it('does not auto-select when autoSelectCampaign is absent', async () => {
+      const onSelect = vi.fn();
+      getCharacterFolders.mockResolvedValue(['Campaign1']);
+
+      render(<CampaignSelection onCampaignSelect={onSelect} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Campaign1')).toBeInTheDocument();
+      });
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
     it('should call onCampaignSelect with campaign and characters', async () => {
       const onSelect = vi.fn();
       getCharacterFolders.mockResolvedValue(['Campaign1']);
