@@ -250,7 +250,7 @@ Deleted QA Fog Map, QA Test NPC, QA Rapid Faction, "QA Quest: 50%…" quest, par
 ## Improvement backlog
 
 ### 2026-10-10
-- Player Map button should auto-open the active map on the `map-activate` SSE event instead of dead-stucking blank (related: bug-player-map-button-dead-state.md — that fix covers the click guard; this is the push-UX polish remainder).
+- DONE: [2026-10-10] — Player tab auto-opens the active map on `map-activate` SSE via the shared app-wide Subscriber (`handleMapActivateEvent` in App.jsx, key+state gated); verified live LAN tab, no new EventSource, 6 new tests.
 - Thread the map's `displayName` (not the filename slug) into the editor toolbar title (related: bug-map-editor-title-slug-capitalization.md).
 - Give players a friendlier map-unavailable state than a bare alert + blank view (e.g. an inline "Waiting for the GM to open a map…" placeholder with auto-retry).
 - Duplicate-name validation parity: NPCs/Quests/Factions lack the inline duplicate guard the Maps manager has — add the same case-insensitive check and error text.

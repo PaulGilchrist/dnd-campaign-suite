@@ -115,6 +115,19 @@ function handleChangeKeyEvent(event, campaignName, pendingPromptIdRef) {
   applyStoreUpdate(storeKey, event.data, campaignName);
 }
 
+function handleMapActivateEvent(event, { isLocalhost, activeView, mapsView, setMapsView, setActiveMapName }) {
+  // GM (localhost) manages maps through the manager listing — behavior unchanged there.
+  if (isLocalhost) return;
+  const { activeMap } = event.data || {};
+  if (!activeMap) return;
+  // Player stranded on the blank maps view (no active map when they clicked
+  // "Map") — open the map the GM just activated with zero further clicks.
+  if (activeView === 'mapsManager' && mapsView.type !== 'map') {
+    setMapsView({ type: 'map', mapName: activeMap });
+    setActiveMapName(activeMap);
+  }
+}
+
 async function fetchCampaignChangeData(campaignName) {
   try {
     const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/change-data`);
@@ -557,8 +570,12 @@ function App() {
       handlePipelineKeyEvent(event, campaignName);
       return;
     }
+    if (event.key === `map-activate-${campaignName}`) {
+      handleMapActivateEvent(event, { isLocalhost, activeView, mapsView, setMapsView, setActiveMapName });
+      return;
+    }
     handleChangeKeyEvent(event, campaignName, pendingPromptIdRef);
-  }, [campaignName, setCharacters, activeCharacter, setActiveCharacter]);
+  }, [campaignName, isLocalhost, activeView, mapsView, setCharacters, activeCharacter, setActiveCharacter]);
 
   const handleDeleteCharacter = async (characterName) => {
     try {

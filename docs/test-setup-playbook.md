@@ -2835,3 +2835,5 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 - Map activation lives only in server memory (`activeMaps` in `server/routes/maps.js`) — no deactivate UI/endpoint; reset by dev-server restart.
 - Playwright auto-dismisses `window.alert` (handle_dialog reports "already handled"); detect alerts via post-click modal-state checks instead.
+- App-level auto-open on `map-activate-<campaign>` SSE fires through the existing app-wide `Subscriber`/`handleRuntimeEvent` (App.jsx) — no new EventSource; SSE fan-out delivers the same event to every mounted Subscriber, so per-view handlers must key-gate (`event.key === \`map-activate-${campaign}\``) and state-gate (player + blank maps view) themselves.
+- LAN-IP player tabs hit `/subscribe` on port 80 directly (`http://${hostname}/subscribe`, sseClient.js omits Vite's :5173) — fine in dev (Express serves it), don't mistake it for a proxy misconfig.
