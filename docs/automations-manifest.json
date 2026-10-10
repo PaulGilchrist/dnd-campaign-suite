@@ -6831,7 +6831,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "verified (PASS-subset 2026-10-09 host EasiveFighter temp Psi Warrior md5-restored: lv18 3 automations — auto-prepare lv5 Telekinesis via _telekineticMasterFreeCast keepSpellRow exemption disk-unchanged, FREE cast popup no-slot lv5=0 both sides conc dc17 stamp, BA attack lane target-refusal-no-spend then HIT 19vs12 11slashing roll/damage/hp/ability_use + usedRound latch 2nd-refuse, LR clears conc then press 'not concentrating' refuse, 9/9 unit. By-design unlimited free-cast no latch; STR-row duplicate feat cosmetic)",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Automation type: undefined",
       "expectedBehavior": "Always have Telekinesis spell prepared. Cast without spell slot. On each turn while maintaining Concentration, make one weapon attack as Bonus Action."
