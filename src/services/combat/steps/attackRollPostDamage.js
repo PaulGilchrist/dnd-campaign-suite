@@ -600,11 +600,7 @@ export function buildTacticalMasterStep() {
       const available = collectWeaponMastery(lastAttack.attackName, ctx.playerStats);
       if (!available) return { data: {} };
 
-      const { choiceMasteries, modalOptions, autoApplyMasteries, allMasteries } = collectTacticalMasteries(available);
-
-      console.log('[WM-004 debug] tacticalMaster step', { attackName: lastAttack.attackName, allMasteries, autoApplyMasteries, targetName: lastAttack.targetName });
-      const wh = (ctx.playerStats.equipment || []).find(e => e.name === 'Warhammer');
-      console.log('[WM-004 debug] equipment probe', 'mastery=' + (wh ? String(wh.mastery) : 'no-equip'), 'equipKeys=' + (wh ? Object.keys(wh).join(',') : '-'), 'lastAttack=', JSON.stringify(lastAttack).slice(0, 200));
+      const { choiceMasteries, modalOptions, autoApplyMasteries } = collectTacticalMasteries(available);
 
       const targetName = lastAttack.targetName;
 

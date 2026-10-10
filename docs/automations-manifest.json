@@ -6737,7 +6737,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "verified (PASS-subset 2026-10-09 host EvasiveFighter BM lv18 lv9 class_feature no-swap: post-hit chooser 'Tactical Master — <weapon>' single-radio Keep+Push/Sap/Slow badged, Scimitar Nick->Push te push:10 instant, Shortbow Vex->Sap te disadvantage_next_attack until_start_of_next_turn, Nick->Slow speed_reduction:-10, replaces-per-hit single. Gates honest: kind-bucket-empty/Glaive-out-of-bucket/miss = no chooser (CLA-029 misattribution NOT reproduced). Delta: replacement advisory — base Vex te pre-applied not rolled back; chosenWeapons gate needs runtime-store POST; stale WM-004 debug console probes at attackRollPostDamage.js:692 owe removal)",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "When you attack with a weapon whose mastery property you can use, you can replace that property with the Push, Sap, or Slow property for that attack."
