@@ -36,6 +36,42 @@ const hasDuplicateName = (factions, editingId, name) => factions.some(f =>
   f.id !== editingId && (f.name || '').trim().toLowerCase() === name.trim().toLowerCase()
 );
 
+const DUPLICATE_NAME_ERROR = 'A faction with that name already exists';
+
+function getDuplicateState({ modalOpen, formData, factions, editingFaction, saving, error }) {
+  if (!formData) return { visibleError: error, saveDisabled: true };
+  const duplicateNameError = modalOpen && hasDuplicateName(factions, editingFaction?.id, formData.name)
+    ? DUPLICATE_NAME_ERROR
+    : null;
+  return {
+    visibleError: duplicateNameError || error,
+    saveDisabled: saving || !formData.name.trim() || !!duplicateNameError,
+  };
+}
+
+// Truncate text for preview
+function truncateText(text, maxLength) {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '…';
+}
+
+// Get influence badge styles
+function getInfluenceStyle(influence) {
+  let level;
+  if (influence <= 3) level = 'low';
+  else if (influence <= 6) level = 'medium';
+  else if (influence <= 8) level = 'high';
+  else level = 'extreme';
+
+  const colors = INFLUENCE_COLORS[level] || INFLUENCE_COLORS.medium;
+  return {
+    backgroundColor: colors.bg,
+    color: colors.color,
+    borderColor: colors.border,
+  };
+}
+
 function Factions({ campaignName, onBack }) {
   const { items: factions, loading, loadItems: loadFactionsList, saveItems: saveFactionsList, deleteItem: deleteFactionAction } =
     useEntityManagement(campaignName, { load: loadFactions, save: saveFactions, delete: deleteFaction }, { responseKey: 'factions', loadOnMount: false });
@@ -84,6 +120,11 @@ function Factions({ campaignName, onBack }) {
   // Handle form field changes
   const handleFormChange = updateFormField;
 
+  // Derived duplicate-name error: shown while typing, cleared as soon as the name changes
+  const { visibleError, saveDisabled } = getDuplicateState({
+    modalOpen, formData, factions, editingFaction, saving, error,
+  });
+
   // Save faction (create or update); duplicate-name guard mirrors NPCs.jsx
   const handleSave = async () => {
     if (!formData || !formData.name.trim()) return;
@@ -125,29 +166,6 @@ function Factions({ campaignName, onBack }) {
     } finally {
       setDeleting(false);
     }
-  };
-
-  // Truncate text for preview
-  const truncateText = (text, maxLength) => {
-    if (!text) return '';
-    if (text.length <= maxLength) return text;
-    return text.slice(0, maxLength) + '…';
-  };
-
-  // Get influence badge styles
-  const getInfluenceStyle = (influence) => {
-    let level;
-    if (influence <= 3) level = 'low';
-    else if (influence <= 6) level = 'medium';
-    else if (influence <= 8) level = 'high';
-    else level = 'extreme';
-
-    const colors = INFLUENCE_COLORS[level] || INFLUENCE_COLORS.medium;
-    return {
-      backgroundColor: colors.bg,
-      color: colors.color,
-      borderColor: colors.border,
-    };
   };
 
   return (
@@ -257,7 +275,7 @@ function Factions({ campaignName, onBack }) {
             </div>
 
             <div className="ct-modal-body">
-              {error && <div className="factions-form-error">{error}</div>}
+              {visibleError && <div className="factions-form-error">{visibleError}</div>}
               {/* Name (required) */}
               <label htmlFor="faction-name" className="ct-label">
                 Faction Name <span className="ct-required">*</span>
@@ -345,7 +363,7 @@ function Factions({ campaignName, onBack }) {
                 <button
                   className="ct-btn ct-btn-primary"
                   onClick={handleSave}
-                  disabled={saving || !formData.name.trim()}
+                  disabled={saveDisabled}
                 >
                   <i className="fa-solid fa-floppy-disk" />{' '}
                   {saving ? 'Saving…' : 'Save'}
