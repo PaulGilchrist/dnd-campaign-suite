@@ -6437,7 +6437,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "verified (PASS 2026-10-09 host AasimarTest AT lv20 — BASE Rogue lv20 not Thief, no swap: fail-only gate fixed DiceRollResult.jsx:465, .dice-roll-reroll-btn offered on fail checks/miss attacks only (HIT never offers), spend converts to 20 + strokeOfLuckUsed latch + exact ability_use log, post-spend refusal, Short Rest re-arm null+re-offer, boon latch split clean. Recipes: SR 2-step char-btn+Complete, ref-click intercept DOM el.click, backdrop never closes result overlays)",
+      "verified": "verified",
       "class": "Rogue",
       "triggerConditions": "Action: passive",
       "expectedBehavior": "If you fail a D20 Test, you can turn the roll into a 20. Once per Short or Long Rest."
