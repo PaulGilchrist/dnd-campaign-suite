@@ -7178,7 +7178,7 @@
       "handler": "src/services/combat/automation/handlers/weaponMasteryHandler.js",
       "router": "src/services/combat/automation/routers/weaponMasteryRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/weaponMasteryInfoBuilder.js",
-      "verified": "verified (PASS retry 2026-10-09 host DraconicDragon Handaxe mastery-bucket: HIT auto-Vex no-chooser te {next_attack_advantage,vexTarget,until_start_of_next_turn} appliedRound:1 + 'applied Vex' log, 2nd-attack popup 'Adv (conditions)' rolls [10,12] mode:advantage CONSUMED attackPostProcessing:330, once-per-target latch _Vex_appliedTarget miss-gate :598, prior blocker=stranded sp-overlay ghost §29. sha-ceccba4e restored)",
+      "verified": "verified",
       "class": "Barbarian",
       "triggerConditions": "",
       "expectedBehavior": "If you hit a creature with this weapon and deal damage to it, you have Advantage on your next attack roll against that creature before the end of your next turn."
