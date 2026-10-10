@@ -25,36 +25,39 @@ function basePlayerStats(extra = {}) {
 }
 
 // ── tranceOfOrderUses ──
+// CLA-364 BUG-A: no longer seeded — the tranceOfOrderHandler owns the
+// null-as-available once-per-Long-Rest latch (warpingimplosionUses pattern).
+// A grant-time 0-seed killed the free first use (charged 5 SP).
 
 describe('tranceOfOrderUses', () => {
-  it('sets to 1 when automation.bonusActions includes trance_of_order', () => {
+  it('is never seeded — null-as-available handler latch (CLA-364)', () => {
     const stats = basePlayerStats({
       automation: { bonusActions: [{ type: 'trance_of_order' }] },
     });
     const result = computeTrackedResources(stats);
-    expect(result.tranceOfOrderUses).toEqual({ current: 1, max: 1 });
+    expect(result.tranceOfOrderUses).toBeUndefined();
   });
 
-  it('defaults to 0 when no trance_of_order bonus action', () => {
+  it('is absent when no trance_of_order bonus action', () => {
     const stats = basePlayerStats({
       automation: { bonusActions: [{ type: 'other_type' }] },
     });
     const result = computeTrackedResources(stats);
-    expect(result.tranceOfOrderUses).toEqual({ current: 0, max: 0 });
+    expect(result.tranceOfOrderUses).toBeUndefined();
   });
 
-  it('defaults to 0 when automation.bonusActions is missing', () => {
+  it('is absent when automation.bonusActions is missing', () => {
     const stats = basePlayerStats({
       automation: {},
     });
     const result = computeTrackedResources(stats);
-    expect(result.tranceOfOrderUses).toEqual({ current: 0, max: 0 });
+    expect(result.tranceOfOrderUses).toBeUndefined();
   });
 
-  it('defaults to 0 when automation is missing entirely', () => {
+  it('is absent when automation is missing entirely', () => {
     const stats = basePlayerStats();
     const result = computeTrackedResources(stats);
-    expect(result.tranceOfOrderUses).toEqual({ current: 0, max: 0 });
+    expect(result.tranceOfOrderUses).toBeUndefined();
   });
 });
 

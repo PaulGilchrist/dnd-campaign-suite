@@ -15,10 +15,40 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const activeKey = 'tranceOfOrderActive';
     const usesMax = 1;
 
-    const stored = getRuntimeValue(playerName, usesKey, campaignName);
-    const active = (stored != null ? Number(stored) : usesMax) > 0;
+    // CLA-364 BUG-B: re-click while the trance is still active refuses with
+    // zero spend and zero state writes (mirrors sorceryHandler
+    // innate_sorcery_refused already_active / stonecunning re-click gate).
+    if (getRuntimeValue(playerName, activeKey, campaignName) === true) {
+        const durationLabel = String(auto.duration || '1 minute').replaceAll('_', ' ');
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerName,
+            abilityName: featureName,
+            automationType: auto.type,
+            description: `${featureName} refused: trance_of_order_refused already_active. It lasts ${durationLabel}. Nothing spent.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[tranceOfOrder] Error:", e); });
 
-    if (!active) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                automationType: auto.type,
+                description: `${featureName} is already active. It lasts ${durationLabel}.`,
+                automation: auto,
+            },
+        };
+    }
+
+    // CLA-364 BUG-A: null/unset means the once-per-Long-Rest free use is
+    // still available (warpingimplosionUses null-as-available pattern —
+    // trackedResources no longer seeds 0 at feature grant; Long Rest
+    // null-re-arm via restRules-constants LONG_REST_RESOURCES).
+    const stored = getRuntimeValue(playerName, usesKey, campaignName);
+    const usesRemaining = stored != null ? Number(stored) : usesMax;
+
+    if (usesRemaining <= 0) {
         if (currentSP >= 5) {
             spendSorceryPoints(playerName, 5, campaignName, maxSP);
 
@@ -44,11 +74,21 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             };
         }
 
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerName,
+            abilityName: featureName,
+            automationType: auto.type,
+            description: `${featureName} refused: trance_of_order_refused no_uses — not enough Sorcery Points to restore (needs 5). Nothing spent.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[tranceOfOrder] Error:", e); });
+
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: featureName,
+                automationType: auto.type,
                 description: `${featureName} has no uses remaining. Recharges on a Long Rest, or you can spend 5 Sorcery Points to restore.`,
                 automation: auto,
             },

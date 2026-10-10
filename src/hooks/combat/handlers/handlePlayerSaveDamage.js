@@ -215,7 +215,11 @@ function resolveTargetSaveContext({ charactersRef, campaignName, target, attacke
         isElderChampionAttackerActive,
         holyAuraTargets,
         isProtectionFromPoisonActive,
-        isTranceOfOrderActive: false,
+        // CLA-364: was hardcoded false — holder save-prompt rolls never got
+        // the Trance of Order d20-floor-10 leg. Read the real runtime flag
+        // (mirrors CharSheet.conditionEffects.js:93 / automationModifiers
+        // trance_of_order_active gate; consumed via d20Floor10 downstream).
+        isTranceOfOrderActive: getRuntimeValue(target.name, 'tranceOfOrderActive', campaignName) === true,
     });
     const fanaticalFocusUsed = getRuntimeValue(target.name, 'fanaticalFocusUsed', campaignName);
     const indomitableUses = Number(getRuntimeValue(target.name, 'indomitableUses', campaignName) ?? 0);

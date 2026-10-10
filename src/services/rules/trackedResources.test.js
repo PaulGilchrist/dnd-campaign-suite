@@ -339,11 +339,12 @@ describe('computeTrackedResources', () => {
   });
 
   describe('tranceOfOrderUses', () => {
-    it('sets to 1 when bonusActions includes trance_of_order; 0 otherwise', () => {
+    // CLA-364 BUG-A: no longer seeded — handler-owned null-as-available latch.
+    it('is never seeded (CLA-364: null-as-available handler latch)', () => {
       let result = computeTrackedResources(basePlayerStats({ automation: { bonusActions: [{ type: 'trance_of_order' }] } })).tranceOfOrderUses;
-      expect(result).toEqual({ current: 1, max: 1 });
+      expect(result).toBeUndefined();
       result = computeTrackedResources(basePlayerStats({ automation: { bonusActions: [{ type: 'other_type' }] } })).tranceOfOrderUses;
-      expect(result).toEqual({ current: 0, max: 0 });
+      expect(result).toBeUndefined();
     });
   });
 

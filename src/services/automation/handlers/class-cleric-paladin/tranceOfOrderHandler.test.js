@@ -215,6 +215,120 @@ describe('Trance of Order Handler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('activated');
+            expect(result.payload.description).not.toContain('5 SP');
+            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                playerName,
+                usesKey,
+                0,
+                campaignName,
+            );
+        });
+
+        // CLA-364 BUG-A: first use each Long Rest is free. The key is never
+        // seeded at feature grant (trackedResources no longer writes 0 — the
+        // warpingimplosionUses null-as-available pattern), so a first press
+        // (uses unset) must not reach the 5 SP restore lane.
+        it('should activate free on first press when uses were never seeded (CLA-364 BUG-A)', async () => {
+            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === activeKey) return null;
+                if (key === usesKey) return null;
+                return null;
+            });
+            metamagic.getCurrentSorceryPoints.mockReturnValue(20);
+            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 20 });
+
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('activated');
+            expect(result.payload.description).not.toContain('5 SP');
+            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                playerName,
+                usesKey,
+                0,
+                campaignName,
+            );
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                playerName,
+                activeKey,
+                true,
+                campaignName,
+            );
+            expect(logService.addEntry).toHaveBeenCalledWith(
+                campaignName,
+                expect.objectContaining({ type: 'ability_use' }),
+            );
+        });
+
+        // CLA-364 BUG-B: re-click while tranceOfOrderActive refuses with zero
+        // spend and zero state writes (mirrors sorceryHandler already_active /
+        // stonecunning re-click refusal phrasing).
+        it('should refuse re-press while already active with zero spend (CLA-364 BUG-B)', async () => {
+            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === activeKey) return true;
+                if (key === usesKey) return 0;
+                return null;
+            });
+            metamagic.getCurrentSorceryPoints.mockReturnValue(20);
+            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 20 });
+
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('already active');
+            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(logService.addEntry).toHaveBeenCalledWith(
+                campaignName,
+                expect.objectContaining({
+                    type: 'automation',
+                    characterName: playerName,
+                    description: expect.stringContaining('trance_of_order_refused already_active'),
+                }),
+            );
+        });
+
+        it('should log a refusal when no uses remain and SP is insufficient', async () => {
+            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === activeKey) return false;
+                if (key === usesKey) return 0;
+                return null;
+            });
+            metamagic.getCurrentSorceryPoints.mockReturnValue(2);
+            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 10 });
+
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            expect(result.payload.description).toContain('no uses remaining');
+            expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(logService.addEntry).toHaveBeenCalledWith(
+                campaignName,
+                expect.objectContaining({
+                    type: 'automation',
+                    description: expect.stringContaining('trance_of_order_refused no_uses'),
+                }),
+            );
+        });
+
+        // CLA-364: Long Rest null-re-arm (restRules-constants LONG_REST_RESOURCES)
+        // restores the free use — a press with uses re-armed to null is free even
+        // when the player could afford the 5 SP restore.
+        it('should spend the free use (not 5 SP) after a Long Rest re-arm (CLA-364)', async () => {
+            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === activeKey) return null;
+                if (key === usesKey) return null;
+                return null;
+            });
+            metamagic.getCurrentSorceryPoints.mockReturnValue(20);
+            classFeatures.getClassFeatures.mockReturnValue({ maxSorceryPoints: 20 });
+
+            const result = await handle(makeAction(), makePlayerStats({ level: 20 }), campaignName, null);
+
+            expect(result.payload.description).toContain('activated');
+            expect(result.payload.description).not.toContain('5 SP');
             expect(metamagic.spendSorceryPoints).not.toHaveBeenCalled();
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
