@@ -10,6 +10,7 @@ const TOGGLE_TOOLS = [
 
 const MapToolbar = ({
     mapName,
+    displayName,
     isLocalhost,
     tool,
     setTool,
@@ -60,7 +61,7 @@ const MapToolbar = ({
                         <i className="fa-solid fa-arrow-left"></i>
                     </button>
                 )}
-                <h4>{mapsService.formatMapName(mapName) || 'Map'}</h4>
+                <h4>{displayName || mapsService.formatMapName(mapName) || 'Map'}</h4>
                 {isLocalhost && (
                     <label className="grid-size-label no-print">
                         Grid Size&nbsp;&nbsp;

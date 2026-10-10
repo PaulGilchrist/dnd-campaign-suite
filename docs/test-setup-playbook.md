@@ -2820,3 +2820,8 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 
 - Any test mocking `changeData.js` must add every export the route imports — adding a route-side import silently 500s sibling test files until their mock is updated.
 - Judge console-error fixes by the since-navigation count (page-header "Console: N errors"), not `console_messages(all:true)` which returns whole-session history including stale pre-fix errors.
+
+## §fix-queue (2026-10-10, map-editor-title-slug-capitalization) Recipes & pitfalls
+
+- Map toolbar title: `Map.jsx` already spreads server JSON into `mapData`, so `displayName` needs only one prop thread into `MapToolbar` — no `MapsAreaView` change; `useMapLoader` save effect spreads `mapData` so `displayName` survives round-trips. Mirror in `HexMapToolbar`.
+- Vite HMR can blank a mounted map view mid-session — full page reload + campaign re-select is required before verifying.

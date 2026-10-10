@@ -3,6 +3,7 @@ import { TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_TRAVEL, TOOL_ROAD }
 function HexMapToolbar({
     onBack,
     mapName,
+    displayName,
     tool,
     setTool,
     selectedTerrain,
@@ -23,7 +24,7 @@ function HexMapToolbar({
             <button onClick={onBack} title="Back to maps" className="no-print">
                 <i className="fa-solid fa-arrow-left"></i>
             </button>
-            <span className="hex-map-title">{mapName}</span>
+            <span className="hex-map-title">{displayName || mapName}</span>
 
             {/* Terrain tools */}
             <button

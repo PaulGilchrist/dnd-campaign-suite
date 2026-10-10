@@ -352,6 +352,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             <HexMapToolbar
                 onBack={onBack}
                 mapName={mapsService.formatMapName(mapName)}
+                displayName={mapLoader.mapData?.displayName}
                 tool={tool} setTool={setTool}
                 selectedTerrain={selectedTerrain} setSelectedTerrain={setSelectedTerrain}
                 terrainTypes={TERRAIN_TYPES}

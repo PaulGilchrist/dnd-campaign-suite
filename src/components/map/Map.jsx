@@ -371,6 +371,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 <>
             <MapToolbar
                 mapName={mapName}
+                displayName={mapData.displayName}
                 isLocalhost={isLocalhost}
                 tool={tool}
                 setTool={setTool}
