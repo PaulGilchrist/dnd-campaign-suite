@@ -6593,7 +6593,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "verified (PASS 2026-10-09 host EvasiveFighter temp Champion lv18 (Champion lv15 critical_range passive_rule 18-20 in 2024 data; Improved lv3 19-20): nat18/19/20 CRIT dice-doubled flat-undoubled ledgers exact, nat17 normal boundary, passive zero-spend, consumers computeCriticalRange/hitResolution. Subclass + Charger/ShieldMaster feats stripped+byte-restored sha)",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "Critical Hit on 18-20."
