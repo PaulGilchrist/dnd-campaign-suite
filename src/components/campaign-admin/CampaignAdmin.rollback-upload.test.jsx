@@ -185,7 +185,7 @@ describe('CampaignAdmin - Rollback & Upload', () => {
             });
         });
 
-        it('does not call onConfirm when modal is canceled', async () => {
+        it('does not call rollback fetch when modal is canceled', async () => {
             const fetchMock = vi.fn();
             global.fetch = fetchMock;
 
@@ -194,7 +194,10 @@ describe('CampaignAdmin - Rollback & Upload', () => {
             fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
             await waitFor(() => {
-                expect(fetchMock).not.toHaveBeenCalled();
+                expect(fetchMock).not.toHaveBeenCalledWith(
+                    '/api/campaigns/test-campaign/admin/rollback',
+                    expect.objectContaining({ method: 'POST' })
+                );
             });
         });
     });
@@ -495,7 +498,7 @@ describe('CampaignAdmin - Rollback & Upload', () => {
             });
         });
 
-        it('does not call fetch when upload modal is canceled', async () => {
+        it('does not call upload fetch when upload modal is canceled', async () => {
             const fetchMock = vi.fn();
             global.fetch = fetchMock;
 
@@ -506,7 +509,10 @@ describe('CampaignAdmin - Rollback & Upload', () => {
             fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
             await waitFor(() => {
-                expect(fetchMock).not.toHaveBeenCalled();
+                expect(fetchMock).not.toHaveBeenCalledWith(
+                    '/api/campaigns/test-campaign/admin/upload',
+                    expect.anything()
+                );
             });
         });
     });

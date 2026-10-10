@@ -2891,3 +2891,6 @@ Condensed for monster-action fix/verify subagents. All PC feat/class/spell/summo
 ## QA-improve run 2026-10-10
 - Dup-name repro names must preserve whitespace when case-flipping: "QA DupA" vs "qadupa" (space dropped) is legitimately unique and passes the guard; use "qa dupa".
 - Playwright sidebar/row clicks often return empty output yet still register — verify state via browser_evaluate before re-clicking; double-clicking an already-open row hits modal-interception timeout.
+- No nodemon in dev: server-route edits need the npm run api child restarted (kill trio + nohup npm run dev); Vite only hot-reloads UI.
+- Admin component tests: CampaignAdmin now GETs /admin/snapshots on mount — not.toHaveBeenCalled() fetch assertions must be scoped to method+URL.
+- Snapshot dir is public/campaigns/.snapshots/ (legacy test-campaign.zip retained as rollback fallback).

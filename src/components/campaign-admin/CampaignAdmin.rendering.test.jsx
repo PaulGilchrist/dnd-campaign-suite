@@ -1,6 +1,6 @@
 // @improved-by-ai
 // @cleaned-by-ai
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CampaignAdmin from './CampaignAdmin.jsx';
 
@@ -74,7 +74,7 @@ describe('CampaignAdmin - Rendering', () => {
             expect(screen.getByText('Removes all runtime state (HP, conditions, spell slots, death saves, target effects, active buffs, and position data).')).toBeInTheDocument();
             expect(screen.getByText('Deletes all entries from the campaign log. Roll history, combat events, and ability use records will be permanently lost.')).toBeInTheDocument();
             expect(screen.getByText('Clears both the campaign log and change data in one action. Use to fix corrupted campaign state.')).toBeInTheDocument();
-            expect(screen.getByText('Creates a zip backup of the entire campaign folder on the server. This snapshot can be used to rollback if something goes wrong.')).toBeInTheDocument();
+            expect(screen.getByText('Creates a timestamped zip backup of the entire campaign folder on the server. Snapshots are kept (newest 10) and never overwrite each other, so you can roll back more than one step.')).toBeInTheDocument();
             expect(screen.getByText('Downloads the entire campaign folder as a .zip file to your computer.')).toBeInTheDocument();
             expect(screen.getByText('Restores the campaign to the last snapshot. All changes since the snapshot will be lost.')).toBeInTheDocument();
             expect(screen.getByText('Replaces the current campaign with an uploaded .zip file. A safety snapshot is saved first and used if upload fails.')).toBeInTheDocument();
@@ -143,6 +143,20 @@ describe('CampaignAdmin - Rendering', () => {
             expect(uploadLabel).toBeInTheDocument();
             expect(uploadLabel.querySelector('input[type="file"]')).toBeInTheDocument();
             expect(uploadLabel.querySelector('input[type="file"]')).toHaveAttribute('accept', '.zip');
+        });
+
+        it('renders the available snapshots section', async () => {
+            global.fetch = vi.fn(() =>
+                Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ snapshots: [{ filename: 'test-campaign-2026-10-10T12-00-00-000.zip', size: 4096, timestamp: '2026-10-10T12:00:00.000Z' }] }),
+                })
+            );
+            render(<CampaignAdmin {...defaultProps} />);
+            expect(screen.getByRole('heading', { name: 'Available Snapshots' })).toBeInTheDocument();
+            await waitFor(() => {
+                expect(document.querySelector('.admin-snapshot-name')).toHaveTextContent('test-campaign-2026-10-10T12-00-00-000.zip');
+            });
         });
     });
 

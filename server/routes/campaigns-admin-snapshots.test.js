@@ -2,7 +2,24 @@ import { request } from '../test-utils/localhostSupertest.js';
 import express from 'express';
 import campaignsAdmin from './campaigns-admin.js';
 
-const mockFsState = { exists: new Set(), files: new Map(), mkdir: new Map(), readdir: new Map() };
+const mockFsState = { exists: new Set(), files: new Map(), mkdir: new Map(), readdir: new Map(), stats: new Map() };
+
+function mockCreateWriteStream(p) {
+    mockFsState.exists.add(p);
+    const dir = p.slice(0, p.lastIndexOf('/'));
+    const names = mockFsState.readdir.get(dir) || [];
+    const name = p.slice(p.lastIndexOf('/') + 1);
+    if (!names.includes(name)) {
+        mockFsState.readdir.set(dir, [...names, name]);
+        mockFsState.stats.set(p, { size: 1024, mtime: new Date() });
+    }
+    return { on: vi.fn(), write: () => {}, end: () => {}, bytesWritten: 1024 };
+}
+
+function mockStat(p) {
+    const s = mockFsState.stats.get(p) || {};
+    return { isDirectory: () => true, size: s.size ?? 1024, mtime: s.mtime ?? new Date('2026-01-01T00:00:00.000Z') };
+}
 
 vi.mock('fs', () => ({
     default: {
@@ -14,8 +31,8 @@ vi.mock('fs', () => ({
         readdirSync: vi.fn((p) => { const entries = mockFsState.readdir.get(p); if (entries === undefined) throw new Error('ENOENT'); return entries; }),
         readFileSync: vi.fn((p) => { if (mockFsState.files.has(p)) return mockFsState.files.get(p); throw new Error('ENOENT'); }),
         unlinkSync: vi.fn((p) => { mockFsState.files.delete(p); mockFsState.exists.delete(p); }),
-        createWriteStream: vi.fn(() => ({ on: vi.fn((event, cb) => { if (event === 'error') return { on: () => {} }; if (event === 'close') setTimeout(cb, 0); return {}; }), write: () => {}, end: () => {}, bytesWritten: 1024 })),
-        statSync: vi.fn(() => ({ isDirectory: () => true })),
+        createWriteStream: vi.fn((p) => mockCreateWriteStream(p)),
+        statSync: vi.fn((p) => mockStat(p)),
     },
     existsSync: vi.fn((p) => mockFsState.exists.has(p)),
     mkdirSync: vi.fn((p) => { mockFsState.exists.add(p); mockFsState.mkdir.set(p, true); }),
@@ -25,19 +42,27 @@ vi.mock('fs', () => ({
     readdirSync: vi.fn((p) => { const entries = mockFsState.readdir.get(p); if (entries === undefined) throw new Error('ENOENT'); return entries; }),
     readFileSync: vi.fn((p) => { if (mockFsState.files.has(p)) return mockFsState.files.get(p); throw new Error('ENOENT'); }),
     unlinkSync: vi.fn((p) => { mockFsState.files.delete(p); mockFsState.exists.delete(p); }),
-    createWriteStream: vi.fn(() => ({ on: vi.fn((event, cb) => { if (event === 'error') return { on: () => {} }; if (event === 'close') setTimeout(cb, 0); return {}; }), write: () => {}, end: () => {}, bytesWritten: 1024 })),
-    statSync: vi.fn(() => ({ isDirectory: () => true })),
+    createWriteStream: vi.fn((p) => mockCreateWriteStream(p)),
+    statSync: vi.fn((p) => mockStat(p)),
 }));
 
-vi.mock('../utils/campaignPaths.js', () => ({
-    campaignDir: (name) => `/mock/campaigns/${name}`,
-    campaignMapsDir: (name) => `/mock/campaigns/${name}/maps`,
-    campaignImagesDir: (name) => `/mock/campaigns/${name}/images`,
-    campaignDataDir: (name) => `/mock/campaigns/${name}/data`,
-    campaignDataFile: (campaign, fileName) => `/mock/campaigns/${campaign}/data/${fileName}`,
-    campaignSnapshotDir: () => '/mock/campaigns/.snapshots',
-    campaignSnapshotFile: (campaign) => `/mock/campaigns/.snapshots/${campaign}.zip`,
-}));
+vi.mock('../utils/campaignPaths.js', () => {
+    let seq = 0;
+    return {
+        campaignDir: (name) => `/mock/campaigns/${name}`,
+        campaignMapsDir: (name) => `/mock/campaigns/${name}/maps`,
+        campaignImagesDir: (name) => `/mock/campaigns/${name}/images`,
+        campaignDataDir: (name) => `/mock/campaigns/${name}/data`,
+        campaignDataFile: (campaign, fileName) => `/mock/campaigns/${campaign}/data/${fileName}`,
+        campaignSnapshotDir: () => '/mock/campaigns/.snapshots',
+        campaignSnapshotFile: (campaign) => `/mock/campaigns/.snapshots/${campaign}.zip`,
+        snapshotTimestamp: () => {
+            seq += 1000;
+            return new Date(1760000000000 + seq).toISOString().slice(0, 23).replace(/[:.]/g, '-');
+        },
+        campaignTimestampedSnapshotFile: (campaign, timestamp) => `/mock/campaigns/.snapshots/${campaign}-${timestamp}.zip`,
+    };
+});
 
 vi.mock('../utils/changeData.js', () => ({
     characterChangeData: new Map(),
@@ -93,11 +118,14 @@ vi.mock('multer', () => {
 function createTestApp() { const app = express(); app.use(express.json()); app.use(campaignsAdmin); return app; }
 function ensureCampaign(name) { mockFsState.exists.add(`/mock/campaigns/${name}`); }
 function removeCampaign(name) { mockFsState.exists.delete(`/mock/campaigns/${name}`); }
-function ensureSnapshot(campaign) { mockFsState.exists.add(`/mock/campaigns/.snapshots/${campaign}.zip`); }
+function ensureSnapshot(campaign) { mockFsState.exists.add(`/mock/campaigns/.snapshots/${campaign}.zip`); setSnapshotDir([...snapshotDir(), `${campaign}.zip`]); }
 function removeSnapshot(campaign) { mockFsState.exists.delete(`/mock/campaigns/.snapshots/${campaign}.zip`); }
+function snapshotDir() { return mockFsState.readdir.get('/mock/campaigns/.snapshots') || []; }
+function setSnapshotDir(names) { mockFsState.readdir.set('/mock/campaigns/.snapshots', names); }
 
 describe('campaignsAdmin - POST /api/campaigns/:campaign/admin/snapshot', () => {
-    afterEach(() => { removeCampaign('test-campaign'); removeSnapshot('test-campaign'); vi.clearAllMocks(); });
+    beforeEach(() => { setSnapshotDir([]); });
+    afterEach(() => { removeCampaign('test-campaign'); removeSnapshot('test-campaign'); setSnapshotDir([]); vi.clearAllMocks(); });
 
     it('should reject non-localhost requests', async () => {
         const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/snapshot').set('Host', 'example.com');
@@ -113,22 +141,96 @@ describe('campaignsAdmin - POST /api/campaigns/:campaign/admin/snapshot', () => 
         ensureCampaign('test-campaign');
         const { saveFile } = await import('../utils/changeData.js');
         saveFile.mockImplementation(() => {});
-        const app = express();
-        app.use(express.json());
-        app.use(campaignsAdmin);
-        app.use((err, req, res, _next) => {
-            console.error('Global error handler:', err, err.message, err.stack);
-            res.status(500).json({ error: err.message || 'Unknown error' });
-        });
-        const res = await request(app).post('/api/campaigns/test-campaign/admin/snapshot').set('Host', 'localhost');
-        console.log('snapshot status:', res.status, 'body:', JSON.stringify(res.body));
+        const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/snapshot').set('Host', 'localhost');
         expect(res.status).toBe(200); expect(res.body.message).toBe('Snapshot created');
         expect(typeof res.body.size).toBe('number');
+    });
+
+    it('should return a timestamped filename', async () => {
+        ensureCampaign('test-campaign');
+        const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/snapshot').set('Host', 'localhost');
+        expect(res.status).toBe(200);
+        expect(res.body.filename).toMatch(/^test-campaign-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}\.zip$/);
+    });
+
+    it('should never overwrite existing snapshots — repeated snapshots get unique names', async () => {
+        ensureCampaign('test-campaign');
+        const first = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/snapshot').set('Host', 'localhost');
+        const second = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/snapshot').set('Host', 'localhost');
+        expect(first.status).toBe(200); expect(second.status).toBe(200);
+        expect(second.body.filename).not.toBe(first.body.filename);
+    });
+
+    it('should prune snapshots beyond the 10 newest after creating one', async () => {
+        ensureCampaign('test-campaign');
+        // Mock fs defaults statSync mtime to 2026-01-01 (the newly created snapshot);
+        // existing snapshots are all older (Dec 2025), oldest two must be pruned.
+        const existing = [];
+        for (let i = 1; i <= 11; i += 1) {
+            const name = `test-campaign-2025-12-${String(i).padStart(2, '0')}T00-00-00-000.zip`;
+            existing.push(name);
+            mockFsState.stats.set(`/mock/campaigns/.snapshots/${name}`, { size: 100, mtime: new Date(Date.UTC(2025, 11, i)) });
+        }
+        setSnapshotDir(existing);
+        const { default: fsMock } = await import('fs');
+
+        const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/snapshot').set('Host', 'localhost');
+        expect(res.status).toBe(200);
+
+        const pruned = fsMock.rmSync.mock.calls.map(([p]) => p).filter((p) => p.includes('.snapshots'));
+        expect(pruned).toContain('/mock/campaigns/.snapshots/test-campaign-2025-12-01T00-00-00-000.zip');
+        expect(pruned).toContain('/mock/campaigns/.snapshots/test-campaign-2025-12-02T00-00-00-000.zip');
+        expect(pruned).not.toContain('/mock/campaigns/.snapshots/test-campaign-2025-12-11T00-00-00-000.zip');
+        expect(pruned).toHaveLength(2);
+    });
+});
+
+describe('campaignsAdmin - GET /api/campaigns/:campaign/admin/snapshots', () => {
+    beforeEach(() => { setSnapshotDir([]); });
+    afterEach(() => { removeCampaign('test-campaign'); setSnapshotDir([]); mockFsState.stats.clear(); vi.clearAllMocks(); });
+
+    it('should reject non-localhost requests', async () => {
+        const res = await request(createTestApp()).get('/api/campaigns/test-campaign/admin/snapshots').set('Host', 'example.com');
+        expect(res.status).toBe(403); expect(res.body.error).toBe('Only available on localhost');
+    });
+
+    it('should return 404 when campaign does not exist', async () => {
+        const res = await request(createTestApp()).get('/api/campaigns/test-campaign/admin/snapshots').set('Host', 'localhost');
+        expect(res.status).toBe(404); expect(res.body.error).toBe('Campaign not found');
+    });
+
+    it('should return an empty list when no snapshots exist', async () => {
+        ensureCampaign('test-campaign');
+        const res = await request(createTestApp()).get('/api/campaigns/test-campaign/admin/snapshots').set('Host', 'localhost');
+        expect(res.status).toBe(200); expect(res.body.snapshots).toEqual([]);
+    });
+
+    it('should list snapshots newest-first with filename, size and timestamp', async () => {
+        ensureCampaign('test-campaign');
+        const names = ['test-campaign-2026-10-09T00-00-00-000.zip', 'test-campaign-2026-10-10T00-00-00-000.zip'];
+        setSnapshotDir(names);
+        mockFsState.stats.set('/mock/campaigns/.snapshots/test-campaign-2026-10-09T00-00-00-000.zip', { size: 111, mtime: new Date('2026-10-09T00:00:00.000Z') });
+        mockFsState.stats.set('/mock/campaigns/.snapshots/test-campaign-2026-10-10T00-00-00-000.zip', { size: 222, mtime: new Date('2026-10-10T00:00:00.000Z') });
+
+        const res = await request(createTestApp()).get('/api/campaigns/test-campaign/admin/snapshots').set('Host', 'localhost');
+        expect(res.status).toBe(200);
+        expect(res.body.snapshots).toEqual([
+            { filename: 'test-campaign-2026-10-10T00-00-00-000.zip', size: 222, timestamp: '2026-10-10T00:00:00.000Z' },
+            { filename: 'test-campaign-2026-10-09T00-00-00-000.zip', size: 111, timestamp: '2026-10-09T00:00:00.000Z' },
+        ]);
+    });
+
+    it('should ignore other campaigns zips', async () => {
+        ensureCampaign('test-campaign');
+        setSnapshotDir(['other-campaign-2026-10-10T00-00-00-000.zip', 'unrelated.txt']);
+        const res = await request(createTestApp()).get('/api/campaigns/test-campaign/admin/snapshots').set('Host', 'localhost');
+        expect(res.status).toBe(200); expect(res.body.snapshots).toEqual([]);
     });
 });
 
 describe('campaignsAdmin - POST /api/campaigns/:campaign/admin/rollback', () => {
-    afterEach(() => { removeCampaign('test-campaign'); removeSnapshot('test-campaign'); vi.clearAllMocks(); });
+    beforeEach(() => { setSnapshotDir([]); });
+    afterEach(() => { removeCampaign('test-campaign'); removeSnapshot('test-campaign'); setSnapshotDir([]); mockFsState.stats.clear(); vi.clearAllMocks(); });
 
     it('should reject non-localhost requests', async () => {
         const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/rollback').set('Host', 'example.com');
@@ -151,6 +253,43 @@ describe('campaignsAdmin - POST /api/campaigns/:campaign/admin/rollback', () => 
         ensureSnapshot('test-campaign');
         const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/rollback').set('Host', 'localhost');
         expect(res.status).toBe(200); expect(res.body.message).toBe('Rollback complete');
+        expect(res.body.restored).toBe('test-campaign.zip');
+    });
+
+    it('should restore from the NEWEST timestamped snapshot', async () => {
+        ensureCampaign('test-campaign');
+        const extractZip = (await import('extract-zip')).default;
+        setSnapshotDir(['test-campaign-2026-10-09T00-00-00-000.zip', 'test-campaign-2026-10-10T00-00-00-000.zip']);
+        mockFsState.stats.set('/mock/campaigns/.snapshots/test-campaign-2026-10-09T00-00-00-000.zip', { size: 100, mtime: new Date('2026-10-09T00:00:00.000Z') });
+        mockFsState.stats.set('/mock/campaigns/.snapshots/test-campaign-2026-10-10T00-00-00-000.zip', { size: 200, mtime: new Date('2026-10-10T00:00:00.000Z') });
+
+        const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/rollback').set('Host', 'localhost');
+        expect(res.status).toBe(200);
+        expect(res.body.restored).toBe('test-campaign-2026-10-10T00-00-00-000.zip');
+        expect(extractZip).toHaveBeenCalledWith('/mock/campaigns/.snapshots/test-campaign-2026-10-10T00-00-00-000.zip', { dir: '/mock/campaigns/test-campaign' });
+    });
+
+    it('should fall back to legacy <campaign>.zip when no timestamped snapshots exist', async () => {
+        ensureCampaign('test-campaign');
+        const extractZip = (await import('extract-zip')).default;
+        ensureSnapshot('test-campaign');
+        mockFsState.stats.set('/mock/campaigns/.snapshots/test-campaign.zip', { size: 300, mtime: new Date('2026-10-01T00:00:00.000Z') });
+
+        const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/rollback').set('Host', 'localhost');
+        expect(res.status).toBe(200);
+        expect(res.body.restored).toBe('test-campaign.zip');
+        expect(extractZip).toHaveBeenCalledWith('/mock/campaigns/.snapshots/test-campaign.zip', { dir: '/mock/campaigns/test-campaign' });
+    });
+
+    it('should prefer newer timestamped snapshot over legacy zip', async () => {
+        ensureCampaign('test-campaign');
+        setSnapshotDir(['test-campaign.zip', 'test-campaign-2026-10-10T00-00-00-000.zip']);
+        mockFsState.stats.set('/mock/campaigns/.snapshots/test-campaign.zip', { size: 300, mtime: new Date('2026-10-01T00:00:00.000Z') });
+        mockFsState.stats.set('/mock/campaigns/.snapshots/test-campaign-2026-10-10T00-00-00-000.zip', { size: 400, mtime: new Date('2026-10-10T00:00:00.000Z') });
+
+        const res = await request(createTestApp()).post('/api/campaigns/test-campaign/admin/rollback').set('Host', 'localhost');
+        expect(res.status).toBe(200);
+        expect(res.body.restored).toBe('test-campaign-2026-10-10T00-00-00-000.zip');
     });
 
     it('should call saveFile before rollback', async () => {

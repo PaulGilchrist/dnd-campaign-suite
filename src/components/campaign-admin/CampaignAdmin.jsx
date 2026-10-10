@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './CampaignAdmin.css';
 
 const BUSY_STATUS_TEXT = {
@@ -10,6 +10,19 @@ const BUSY_STATUS_TEXT = {
     'clearing-log': 'Clearing log...',
     'resetting': 'Performing full reset...'
 };
+
+function formatBytes(bytes) {
+    if (typeof bytes !== 'number' || Number.isNaN(bytes)) return '';
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+function formatSnapshotDate(timestamp) {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString();
+}
 
 function AdminHeader({ campaignName, onBack }) {
     return (
@@ -117,13 +130,56 @@ function ConfirmModal({ modal, onClose }) {
     );
 }
 
+function SnapshotList({ snapshots }) {
+    return (
+        <div className="admin-snapshots">
+            <h3>Available Snapshots</h3>
+            {snapshots.length === 0 ? (
+                <p className="admin-snapshots-empty">No snapshots on the server yet.</p>
+            ) : (
+                <ul className="admin-snapshots-list">
+                    {snapshots.map((snapshot) => (
+                        <li key={snapshot.filename} className="admin-snapshot-row">
+                            <span className="admin-snapshot-name">{snapshot.filename}</span>
+                            <span className="admin-snapshot-meta">
+                                {formatSnapshotDate(snapshot.timestamp)} · {formatBytes(snapshot.size)}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
 function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampaign }) {
     const [status, setStatus] = useState(null);
     const [renameModal, setRenameModal] = useState(false);
     const [newName, setNewName] = useState('');
     const [confirmModal, setConfirmModal] = useState(null);
+    const [snapshots, setSnapshots] = useState([]);
 
     const isBusy = status && typeof status === 'string';
+
+    const loadSnapshots = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/admin/snapshots`);
+            const data = await res.json();
+            if (!res.ok) {
+                console.error('Failed to load snapshots:', data.error || res.status);
+                return;
+            }
+            if (Array.isArray(data.snapshots)) {
+                setSnapshots(data.snapshots);
+            }
+        } catch (err) {
+            console.error('Failed to load snapshots:', err.message);
+        }
+    }, [campaignName]);
+
+    useEffect(() => {
+        loadSnapshots();
+    }, [loadSnapshots]);
 
     const handleClearChangeData = async () => {
         if (!window.confirm(`This will clear all runtime state for "${campaignName}" including HP, conditions, spell slots, death saves, and target effects. You will need to re-establish combat state. Continue?`)) {
@@ -222,7 +278,8 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
             if (!res.ok) {
                 setStatus({ error: data.error });
             } else {
-                setStatus({ success: `Snapshot created (${(data.size / 1024).toFixed(1)} KB)` });
+                setStatus({ success: `Snapshot created: ${data.filename} (${formatBytes(data.size)})` });
+                await loadSnapshots();
             }
         } catch (err) {
             setStatus({ error: err.message });
@@ -368,7 +425,7 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                 <div className="admin-actions-grid">
                     <div className="admin-action">
                         <h3>Snapshot</h3>
-                        <p>Creates a zip backup of the entire campaign folder on the server. This snapshot can be used to rollback if something goes wrong.</p>
+                        <p>Creates a timestamped zip backup of the entire campaign folder on the server. Snapshots are kept (newest 10) and never overwrite each other, so you can roll back more than one step.</p>
                         <button className="ct-btn ct-btn-primary" onClick={handleSnapshot} disabled={isBusy}>
                             <i className="fas fa-camera"></i> Create Snapshot
                         </button>
@@ -396,6 +453,8 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
                         </label>
                     </div>
                 </div>
+
+                <SnapshotList snapshots={snapshots} />
             </div>
 
             <StatusDisplay status={status} />

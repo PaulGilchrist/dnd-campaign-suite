@@ -110,14 +110,17 @@ describe('CampaignAdmin - Delete Campaign', () => {
             expect(window.alert).not.toHaveBeenCalled();
         });
 
-        it('does not call fetch when confirmations are denied', () => {
+        it('does not call delete fetch when confirmations are denied', () => {
             const fetchSpy = vi.spyOn(global, 'fetch');
             window.prompt.mockReturnValueOnce('test-campaign');
             window.confirm.mockReturnValueOnce(false);
             renderCampaignAdmin();
             clickDeleteButton();
 
-            expect(fetchSpy).not.toHaveBeenCalled();
+            expect(fetchSpy).not.toHaveBeenCalledWith(
+                '/api/campaigns/test-campaign',
+                expect.objectContaining({ method: 'DELETE' })
+            );
             fetchSpy.mockRestore();
         });
 

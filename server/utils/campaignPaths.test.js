@@ -403,3 +403,31 @@ describe('campaignPaths - path consistency', () => {
         expect(dir).toContain(root);
     });
 });
+
+// ---------------------------------------------------------------------------
+// snapshotTimestamp / campaignTimestampedSnapshotFile
+// ---------------------------------------------------------------------------
+describe('campaignPaths - snapshotTimestamp', () => {
+    it('should format a deterministic lexicographically sortable timestamp', () => {
+        const ts = campaignPaths.snapshotTimestamp(new Date('2026-10-10T12:34:56.789Z'));
+        expect(ts).toBe('2026-10-10T12-34-56-789');
+    });
+
+    it('should sort chronologically as strings', () => {
+        const a = campaignPaths.snapshotTimestamp(new Date('2026-10-10T00:00:00.000Z'));
+        const b = campaignPaths.snapshotTimestamp(new Date('2026-10-10T23:59:59.999Z'));
+        expect(a < b).toBe(true);
+    });
+
+    it('should contain no colons, dots, or slashes (filename safe)', () => {
+        const ts = campaignPaths.snapshotTimestamp();
+        expect(ts).not.toMatch(/[:./]/);
+    });
+});
+
+describe('campaignPaths - campaignTimestampedSnapshotFile', () => {
+    it('should build a timestamped archive path', () => {
+        const result = campaignPaths.campaignTimestampedSnapshotFile('test-campaign', '2026-10-10T12-34-56-789');
+        expect(result).toBe(path.resolve(process.cwd(), 'public', 'campaigns', '.snapshots', 'test-campaign-2026-10-10T12-34-56-789.zip'));
+    });
+});

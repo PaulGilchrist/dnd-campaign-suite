@@ -48,3 +48,12 @@ export function campaignSnapshotDir() {
 export function campaignSnapshotFile(campaign) {
   return path.join(campaignSnapshotDir(), `${campaign}.zip`);
 }
+
+// Timestamp format is lexicographically sortable: YYYY-MM-DDTHH-mm-ss-mmm
+export function snapshotTimestamp(date = new Date()) {
+  return date.toISOString().slice(0, 23).replace(/[:.]/g, '-');
+}
+
+export function campaignTimestampedSnapshotFile(campaign, timestamp) {
+  return path.join(campaignSnapshotDir(), `${campaign}-${timestamp}.zip`);
+}
