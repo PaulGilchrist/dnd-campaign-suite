@@ -152,9 +152,9 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Known Quirks & Gotchas
 
-1. **Dice tray overlay blocks clicks** — The dice tray popup overlay (`dice-tray-popup-overlay`) intercepts pointer events and blocks clicks on elements behind it. Must press Escape or click the tray to dismiss.
+1. **Dice tray overlay blocks clicks** — CORRECTED 2026-10-10: `dice-tray-popup-overlay` now dismisses cleanly on Escape (verified live). Older note about it sticking appears fixed.
 
-2. **Create Map always disabled** — The "Create Map" button has `disabled=true` even when maps exist and the user should be able to create new ones.
+2. **Create Map disabled until name typed** — CORRECTED 2026-10-10: "Create Map" is only disabled while the name field is empty; typing a name enables it. Duplicate map names are rejected inline ("A map with that name already exists"). The old "always disabled" note was wrong.
 
 3. **Duplicate accessible names** — Multiple "Add to Initiative" buttons (one per NPC) and ~101 "Add" buttons (one per effect slot per creature) share identical accessible names, causing ambiguity.
 
@@ -186,3 +186,74 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 - Dice roller (functional, though overlay issue)
 - SSE real-time sync (connections established, change-data polling active)
 - No console errors or failed network requests observed
+
+## Session Findings — 2026-10-10
+
+### Explored (depth)
+- **Maps + fog of war (deep):** created "QA Fog Map" (indoor, grid 20), painted walls (vertical x=14 y=4–16, horizontal y=3 x=4–12) via Paint tool; verified wall persistence to `public/campaigns/test-campaign/maps/qa-fog-map.json`; dragged AasimarTest character chip from Items panel onto grid (token at 10,10); confirmed persistent exploration memory (`revealed` = 400 all-visible when wall-less, 303 after Reset Fog — occlusion works); Reset Fog re-reveals to current LoS only. Delete Map uses a custom in-app modal ("Yes, Delete Permanently"), NOT window.confirm.
+- **SSE two-tab sync (deep):** GM paint strokes appeared on the player tab (LAN IP) live with no reload (22 wall elements = 13+9). One shared `/subscribe?campaign=test-campaign` per tab confirmed.
+- **NPCs (deep):** create, whitespace-only-name blocked (Save stays disabled), duplicate name silently overwrites (no warning) — logged bug; delete via row → in-form Delete → confirm.
+- **Quests (deep):** empty-name Save disabled; special-character names (`/ % " & <b>`) stored fine (GUID-keyed, not slug); delete = confirm dialog.
+- **Factions (medium):** empty-name Save disabled; rapid double-Save did not duplicate; delete via in-form Delete button.
+- **Inventory (medium):** party currency steppers work (+10 Platinum → pp:10, −10 back to 0); −buttons disabled at 0; Add Item with free-text name persists; item delete confirm works; "From Players" transfer picker present.
+- **Initiative (medium):** "+ NPC" adds statless "NPC 1" (HP 10); Remove NPC confirm says "NPC 1 has 10 HP. Remove anyway?"; synthetic `.click()` on `.npc-remove-btn` is silently absorbed — real mouse click needed (rig note).
+- **Encounter Builder (shallow):** loads, search "goblin" narrows rows, difficulty/type/size selects present; join path not exercised this session (covered by MA suites).
+- **Dice tray (shallow):** d20 roll popup renders and dismisses on Escape.
+
+### Bug files written
+- `.opencode/plans/bug-featfinder-debug-console-error.md` — leftover hardcoded console.error for "Boon Of Fortitude" fires every session.
+- `.opencode/plans/bug-player-map-button-dead-state.md` — player "Map" click with no active map dead-stucks the view; re-click after GM activation is ignored (early-return guard).
+- `.opencode/plans/bug-map-context-sync-null-stamp.md` — MapContextSync force-stamps `__map__:null` on tab mount, clobbering server active-map state read by range gates.
+- `.opencode/plans/bug-npc-duplicate-name-silent-overwrite.md` — duplicate NPC names silently overwrite; Maps has the guard, NPCs don't.
+- `.opencode/plans/bug-map-editor-title-slug-capitalization.md` — editor title re-derives from slug ("Qa Fog Map") ignoring stored displayName ("QA Fog Map").
+
+### Reliable selectors / identifiers (new this session)
+- Map editor canvas: `svg.grid-svg` (viewBox 800×800 at CELL_SIZE 40); convert grid→client via `getScreenCTM()` + `DOMPoint(gx*40+20, gy*40+20)`.
+- Map tools: `button:has-text("Paint"|"Erase"|"Select"|"Spell"|"Ruler"|"3D"|"Items")`, fog reset `button[title="Reset fog of war and view"]` (GM) / `"Reset view"` (player).
+- Items panel: `button.items-panel-close`; draggable char chips live in panel "Characters" section (`character:<name>` drag payload).
+- Maps list rows: `li:has-text("<name>")` with `button:has-text("Open"|"Activate"|"Rename"|"Delete")`; delete confirm = `.maps-manager-modal-overlay` button "Yes, Delete Permanently".
+- NPC rows: `li[aria-label="Edit NPC: <Name>"]` (the `li` itself is role=button); inner init button `.npcs-init-btn`.
+- Initiative NPC remove: `button.npc-remove-btn` (icon-only — use real mouse click + [role="dialog"] handle, NOT evaluate .click()).
+- Inventory: currency rows label text "Platinum|Gold|Silver|Copper"; items table `.pi-items-table` with `button[title="Edit item"]` / delete in `.pi-actions-cell`.
+- Faction rows: `li[aria-label="Edit faction: <name>"]`.
+
+### Cleanup performed
+Deleted QA Fog Map, QA Test NPC, QA Rapid Faction, "QA Quest: 50%…" quest, party item "QA Rope x50"; zeroed party currency (pp back to 0); removed stray "NPC 1" and "QA Test NPC" from initiative. Then Admin → Clear Change Data + Clear Campaign Log (verified: change-data keys `[]`, log count 0). Left untouched: pre-existing Battle Arena / Test Map, original NPCs (Zombie, Goblin), The Iron Consortium, The Lost Artifact quest.
+
+## Coverage
+
+| Feature | Status | Notes |
+|---|---|---|
+| Maps (create/rename/delete/activate) | deep | create w/ validation, duplicate reject, activate, custom delete modal; rename UI not exercised this session |
+| Fog of war | deep | LoS occlusion w/ walls, persistent revealed, Reset Fog, player-view rendering |
+| SSE sync | deep | GM wall paints → player live; player tab null-stamp bug found here |
+| NPCs | deep | create/edit/delete, whitespace + duplicate name edge cases |
+| Quests | deep | validation, special chars, delete confirm |
+| Factions | shallow | validation + rapid double-save only |
+| Settlements | not explored | |
+| Notes | not explored | (seen in prior sessions) |
+| Initiative | medium | +NPC/remove, round display; attacks/next-prev not exercised |
+| Encounter Builder | shallow | load + search only; join path covered by MA suites |
+| Party Inventory | medium | currency steppers, add/delete item; "From Players" transfer not exercised |
+| Dice tray | shallow | d20 roll + Escape dismiss |
+| Music player | not explored | iframe + mood buttons render; playback untouched |
+| Character wizard | not explored | |
+| Admin | medium | clear change-data + clear log verified; snapshots/rollback not touched |
+
+## Blocked / not verified
+
+- **Full player→GM write path (player mutation):** by design players are read-only off localhost; no player-side mutation to attempt (not a defect).
+- **Concurrent NPC edit from two GM sessions:** single GM browser available this session; not tested.
+- **Rename map UI:** modal appears on Rename click but new-name validation not exercised this run.
+- **Music playback / settlement / wizard / snapshot-rollback:** not attempted this session (time-boxed to maps/fog/SSE + CRUD edge cases).
+
+## Improvement backlog
+
+### 2026-10-10
+- Player Map button should auto-open the active map on the `map-activate` SSE event instead of dead-stucking blank (related: bug-player-map-button-dead-state.md — that fix covers the click guard; this is the push-UX polish remainder).
+- Thread the map's `displayName` (not the filename slug) into the editor toolbar title (related: bug-map-editor-title-slug-capitalization.md).
+- Give players a friendlier map-unavailable state than a bare alert + blank view (e.g. an inline "Waiting for the GM to open a map…" placeholder with auto-retry).
+- Duplicate-name validation parity: NPCs/Quests/Factions lack the inline duplicate guard the Maps manager has — add the same case-insensitive check and error text.
+- Map editor save is chatty: every wall-paint stroke PUTs the whole map JSON (~20 writes/stroke) — batch on pointerup or debounce ~1s.
+- Music player loads the YouTube iframe eagerly on campaign load even when idle — lazy-load on first Play.
+- "+ NPC" adds a statless "NPC 1" at HP 10 with no UI hint — surface a tooltip/label explaining defaults, or let the GM set starting HP in a small dialog.

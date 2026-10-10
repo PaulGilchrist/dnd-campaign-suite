@@ -32,6 +32,7 @@ yet (unusual input combinations, concurrent SSE updates, boundary conditions) ra
 2. Inside "test-campaign", exercise each major feature end-to-end: create/edit/delete NPCs, quests, encounters, maps, party members, initiative tracking, fog of war, and anything using the real-time SSE party sync — try it from a couple of angles (e.g. rapid edits, empty/invalid inputs, refreshing mid-action) since sync and stateful features are the most likely to break.
 3. Pay attention to: console errors, failed network requests, broken navigation, UI states that don't match what you did (stale data, elements that don't update), and anything that silently fails instead of showing feedback.
 4. Note anything confusing or inconsistent from a UX standpoint too, not just outright breakage.
+5. Record improvement opportunities — things that could be better or more complete (missing affordances, inconsistent validation between similar screens, chatty network/save patterns, UX friction) — in an `## Improvement backlog` section of `docs/app-exploration.md`, dated per entry. These are NOT bug files; only write a `bug-*.md` file for confirmed breakage. An improvement may still name likely files and suggested approaches, but keep it non-blocking — never spend session time turning an improvement into a deep investigation.
 
 ## Testing pitfalls (from the automations/monster verify suites — check these before concluding "broken" or "can't test")
 
@@ -83,11 +84,12 @@ Do not attempt to fix the bug yourself during this session — just document it.
 - A dated entry (today's date) briefly summarizing this session's findings, with links to the corresponding files in `.opencode/plans/`
 - A "Coverage" section: a checklist of every major feature/flow (NPCs, quests, encounters, maps, party members, initiative tracking, fog of war, SSE sync, and any others you find), each marked "not explored" / "shallow" / "deep", with a one-line note on what "deep" testing has covered so far (e.g. "edited existing NPC, deleted NPC, tried empty name field — not yet tried concurrent edit from two sessions"). Update this checklist every run so the next run knows exactly where to push further.
 - A "Blocked / not verified" section: anything you could not test or confirm, with the concrete blocker named (replaced each run).
+- The `## Improvement backlog` section in `docs/app-exploration.md` updated with this session's improvement opportunities (create the section if missing; append dated entries, never delete prior ones).
 
 Then clean up: clear the change-data cache and campaign log for "test-campaign" via the Admin panel, append any new setup recipes or pitfalls you hit to `docs/test-setup-playbook.md`, and record any characters/NPCs/monsters you left in the campaign in the two registry files.
 
 ## What to report back
 
-Give me a short summary of the session: what you explored, and a list of the bug files you wrote to `.opencode/plans/` (filename + one-line summary of each). Don't restate full bug details here — that's what the files are for.
+Give me a short summary of the session: what you explored, and a list of the bug files you wrote to `.opencode/plans/` (filename + one-line summary of each). Don't restate full bug details here — that's what the files are for. Also give a brief list of the top improvement opportunities added to the improvement backlog.
 
 Don't write any Playwright test code yet — just explore, learn the app's real behavior, and report findings. We'll turn confirmed flows into actual test specs afterward.
