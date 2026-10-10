@@ -543,12 +543,13 @@ describe('executeSpellCast — post-cast', () => {
       expect(triggerInspiringSmite).toHaveBeenCalled();
     });
 
-    it('skips post-cast triggers when a dc save path returns a handled result (dc spells unchanged)', async () => {
+    it('runs post-cast triggers even when a dc save path returns a handled result (CLA-389 inversion: the slot is paid, the gate must roll)', async () => {
       resolveSpellDamageWithTypes.mockReturnValue({ formula: '8d6', primaryType: 'Fire' });
       computeRange.mockReturnValue({});
-      mockHandleSavePath.mockResolvedValue({ automationPopup: { type: 'popup' } });
+      const handledSaveResult = { automationPopup: { type: 'popup' } };
+      mockHandleSavePath.mockResolvedValue(handledSaveResult);
 
-      await executeSpellCast(
+      const result = await executeSpellCast(
         makeSpell(),
         makeMetaCtx(),
         {
@@ -562,7 +563,10 @@ describe('executeSpellCast — post-cast', () => {
 
       expect(mockHandleSavePath).toHaveBeenCalled();
       expect(mockHandleNoSavePath).not.toHaveBeenCalled();
-      expect(triggerInspiringSmite).not.toHaveBeenCalled();
+      // CLA-389: the save-path early return no longer skips the post-cast block —
+      // the lane keeps its own visible popup (picker/payload precedence).
+      expect(triggerInspiringSmite).toHaveBeenCalled();
+      expect(result).toBe(handledSaveResult);
     });
   });
 

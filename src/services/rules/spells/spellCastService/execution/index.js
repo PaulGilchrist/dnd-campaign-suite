@@ -508,7 +508,12 @@ async function runPostCastTriggers({ spell, metaCtx, playerStats, campaignName, 
     });
 
     const hexTarget = metaCtx?.targetName || (await getTargetInfo())?.name;
-    applyHexEffects(spell, playerStats, campaignName, hexTarget, metaCtx?.hexAbility);
+    // CLA-389: Hex/Hunter's Mark are resolved by runMarkedTargetSpell (castHex owns
+    // the hex write + cast log) before this block can run — skip the duplicate
+    // applyHexEffects here so the marked-target lane never double-writes targetEffects.
+    if (spell.name !== 'Hex' && spell.name !== "Hunter's Mark") {
+        applyHexEffects(spell, playerStats, campaignName, hexTarget, metaCtx?.hexAbility);
+    }
 
     const triggerTargetCtx = { ...(metaCtx || {}), targetNames: metaCtx?.targetNames || (hexTarget ? [hexTarget] : undefined) };
     triggerPostCastSelfHeals(spell, triggerTargetCtx, playerStats, campaignName, mapName).catch(e => {
@@ -546,6 +551,13 @@ async function runPostCastTriggers({ spell, metaCtx, playerStats, campaignName, 
         console.error('[spellCast] Arcane Ward trigger failed:', e);
     });
 
+    endSanctuaryOnCast(playerStats, characters, campaignName);
+
+    return triggerResult;
+}
+
+// Sanctuary: casting any spell ends Sanctuary on the caster.
+function endSanctuaryOnCast(playerStats, characters, campaignName) {
     const sanctuaryEffects = (function () {
         try {
             return (getRuntimeValue('campaign', 'targetEffects') || []).filter(
@@ -555,18 +567,37 @@ async function runPostCastTriggers({ spell, metaCtx, playerStats, campaignName, 
             return [];
         }
     })();
-    if (sanctuaryEffects.length > 0) {
-        for (const se of sanctuaryEffects) {
-            const casterName = se.source;
-            const caster = characters?.find(c => c.name === casterName);
-            if (caster) {
-                endSanctuary(casterName, playerStats.name, campaignName,
-                    `${playerStats.name} cast a spell, ending Sanctuary.`);
-            }
+    if (sanctuaryEffects.length === 0) return;
+    for (const se of sanctuaryEffects) {
+        const casterName = se.source;
+        const caster = characters?.find(c => c.name === casterName);
+        if (caster) {
+            endSanctuary(casterName, playerStats.name, campaignName,
+                `${playerStats.name} cast a spell, ending Sanctuary.`);
         }
     }
+}
 
-    return triggerResult;
+// CLA-389: whether a lane return carries its own visible payload (picker modal,
+// automation popup, or heal popup) — those keep precedence over the surge popup.
+function hasVisibleCastPayload(value) {
+    if (!value) return false;
+    if (value.automationPopup) return true;
+    if (value.type === 'modal' || value.type === 'popup' || value.modalName) return true;
+    if (value.targetName != null) return true;
+    return false;
+}
+
+// CLA-389: early-return lanes (no-damage handled, auto-miss, save-path modal)
+// paid the spell slot but never reached runPostCastTriggers — Wild Magic Surge
+// and the other post-cast gates were structurally unreachable on those casts.
+// Run the post-cast block post-payment on every such lane; the lane keeps its
+// own visible picker/popup when it has one (the surge outcome is still logged
+// and stamped by the handlers), otherwise the surge popup/modal wins.
+async function runPostCastTriggersMerged(ctx, laneValue) {
+    const triggerResult = await runPostCastTriggers(ctx);
+    if (triggerResult && !hasVisibleCastPayload(laneValue)) return triggerResult;
+    return laneValue;
 }
 
 // Auto-miss (out of range) — roll a zero-damage result and optionally run the save path.
@@ -683,11 +714,18 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     // --- NO DAMAGE PATH ---
     if (!formula) {
         const noDamage = await runNoDamagePath(spell, { fullSpell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellSaveDc, innateSorceryActive, hasInvisible, spellCastingMod, rollDamage });
-        if (noDamage.handled) return noDamage.value;
+        if (noDamage.handled) {
+            // CLA-389: handled no-damage lanes (e.g. Expeditious Retreat) paid the
+            // slot but previously swallowed the post-cast triggers entirely.
+            return await runPostCastTriggersMerged({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo }, noDamage.value);
+        }
     }
 
     // --- Hunter's Mark / Hex ---
-    if (await runMarkedTargetSpell(spell, metaCtx, playerStats, campaignName, getTargetInfo)) return;
+    if (await runMarkedTargetSpell(spell, metaCtx, playerStats, campaignName, getTargetInfo)) {
+        // CLA-389: marked-target spells pay their slot too — run post-cast triggers.
+        return await runPostCastTriggersMerged({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo }, undefined);
+    }
 
     // --- Damage path ---
     await expireCompelledDuelOnHarmfulCast(formula, getTargetInfo, playerStats, campaignName);
@@ -708,12 +746,18 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         overchannelFormula, overchannelActive, overchannelUseCount, rollAttack, rollDamage, formula, hasInvisible };
 
     if (rangeResult.isAutoMiss) {
-        return await runAutoMissPath({ ...savePathOpts, rangeResult });
+        // CLA-389: an out-of-range cast still pays the slot — run post-cast triggers.
+        const autoMissResult = await runAutoMissPath({ ...savePathOpts, rangeResult });
+        return await runPostCastTriggersMerged({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo }, autoMissResult);
     }
 
     if (spell.dc || fullSpell.dc) {
         const savePathResult = await handleSavePath(savePathOpts);
-        if (savePathResult) return savePathResult;
+        if (savePathResult) {
+            // CLA-389: the save-path early return previously skipped the post-cast
+            // trigger block — the slot was paid and no gate ever rolled.
+            return await runPostCastTriggersMerged({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo }, savePathResult);
+        }
     } else {
         // CLA-200: no-save spells (e.g. Divine Smite — no `dc` in spells.json) must fall
         // through to the post-cast trigger block below instead of early-returning.

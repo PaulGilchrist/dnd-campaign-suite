@@ -67,9 +67,9 @@ vi.mock('../features/friendsService.js', () => ({
 }))
 
 vi.mock('./postCastRiderService.js', () => ({
-  triggerPostCastRiderSaves: vi.fn(),
-  triggerSpellThief: vi.fn(),
-  triggerBewitchingMagic: vi.fn(),
+  triggerPostCastRiderSaves: vi.fn(async () => null),
+  triggerSpellThief: vi.fn(async () => null),
+  triggerBewitchingMagic: vi.fn(async () => null),
   triggerSoulstitchSpells: vi.fn(),
   getEmpoweredEvocationFeatures: vi.fn(() => []),
   getEmpoweredEvocationIntModifier: vi.fn(() => 0),
@@ -81,19 +81,19 @@ vi.mock('./postCastHealService.js', () => ({
 }))
 
 vi.mock('../features/smiteOfProtectionService.js', () => ({
-  triggerSmiteOfProtection: vi.fn(),
+  triggerSmiteOfProtection: vi.fn(async () => null),
 }))
 
 vi.mock('../features/inspiringSmiteService.js', () => ({
-  triggerInspiringSmite: vi.fn(),
+  triggerInspiringSmite: vi.fn(async () => null),
 }))
 
 vi.mock('../features/primalCompanionSpellShareService.js', () => ({
-  triggerPrimalCompanionSpellShare: vi.fn(),
+  triggerPrimalCompanionSpellShare: vi.fn(async () => null),
 }))
 
 vi.mock('../features/wildMagicSurgeService.js', () => ({
-  triggerWildMagicSurge: vi.fn(),
+  triggerWildMagicSurge: vi.fn(async () => null),
 }))
 
 vi.mock('../features/falseLifeService.js', () => ({

@@ -51,6 +51,35 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const hasRollOnTableEffect = activeEffects.some(e => e && e.effect && e.effect.includes('Roll on the surge table at the start of each turn'));
 
     const d20Roll = Math.floor(Math.random() * 20) + 1;
+
+    // CLA-389: the d20 nat-20 gate precedes the Controlled Chaos branch —
+    // previously the armed double-roll short-circuited BEFORE the gate, so
+    // every slot cast opened the chooser. The chooser now opens only when a
+    // surge-table roll actually occurs (nat 20, auto-surge, or the
+    // roll-on-table rider); an armed double-roll stamp never survives a
+    // gate miss.
+    if (!isAutoSurge && !hasRollOnTableEffect && d20Roll !== 20) {
+        if (getRuntimeValue(playerName, 'wildMagicDoubleRoll', campaignName) === true) {
+            await setRuntimeValue(playerName, 'wildMagicDoubleRoll', false, campaignName, true);
+        }
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${action.name}: Rolled ${d20Roll} on d20 (not a 20). No surge occurs.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[wildMagicSurge] Error logging roll:", e); });
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name}: Rolled ${d20Roll} (not a 20). No surge occurs.`,
+                automation: auto,
+            },
+        };
+    }
+
     const doubleRoll = hasDoubleRoll(playerName, playerStats, campaignName);
 
     if (doubleRoll) {
@@ -69,25 +98,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 mode: 'controlledChaos',
                 roll1: Math.floor(Math.random() * 100) + 1,
                 roll2: Math.floor(Math.random() * 100) + 1,
-            },
-        };
-    }
-
-    if (!isAutoSurge && !hasRollOnTableEffect && d20Roll !== 20) {
-        await addEntry(campaignName, {
-            type: 'ability_use',
-            characterName: playerName,
-            abilityName: action.name,
-            description: `${action.name}: Rolled ${d20Roll} on d20 (not a 20). No surge occurs.`,
-            timestamp: Date.now(),
-        }).catch((e) => { console.error("[wildMagicSurge] Error logging roll:", e); });
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name}: Rolled ${d20Roll} (not a 20). No surge occurs.`,
-                automation: auto,
             },
         };
     }

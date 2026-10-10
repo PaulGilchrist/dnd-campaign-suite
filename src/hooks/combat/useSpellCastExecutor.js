@@ -104,3 +104,10 @@ function handleModalResult(popup, setModalState) {
     }
     setModalState({ [MODAL_STATE_KEYS[modalName]]: popup.payload });
 }
+
+// CLA-389: shared modal router for cast-lane consumers outside this executor
+// (e.g. useActionSpellMetamagic) — a modal-type cast result must reach sheet
+// modal state through the SAME key map, never be discarded.
+export function routeCastModal(popup, setModalState) {
+    handleModalResult(popup, setModalState);
+}

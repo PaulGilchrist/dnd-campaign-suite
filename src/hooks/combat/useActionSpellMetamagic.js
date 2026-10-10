@@ -4,6 +4,7 @@ import { addEntry } from '../../services/ui/logService.js'
 import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/metamagicRules.js'
 import { prepareSpellCast, isFreeCastAuthorized } from '../../services/rules/spells/spellPreparationService.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
+import { routeCastModal } from './useSpellCastExecutor.js'
 
 const AREA_SHAPES = ['emanation', 'cone', 'line', 'sphere', 'cube', 'cylinder', 'square', 'circle', 'wall', 'cage', 'floor', 'area'];
 
@@ -119,11 +120,18 @@ export function useActionSpellMetamagic({
         pending.action({});
     }, [pendingActionMetamagic, playerStats.name, campaignName]);
 
+    // CLA-389: modal-type cast results (Wild Magic Surge chooser etc.) were
+    // silently discarded here — the claimed "useSpellCastExecutor pattern" never
+    // covered this lane. Route them into sheet modal state via the SAME key map
+    // the verified executor lane uses; post-cast triggers also return their
+    // result at the TOP level of castResult (runPostCastTriggers passthrough),
+    // so unwrap automationPopup and top-level modal/popup alike.
     const showCastPopup = (castResult) => {
-        if (!castResult?.automationPopup) return
-        const popup = castResult.automationPopup
-        if (popup.type === 'modal' && setModalState) {
-            // handled by useSpellCastExecutor pattern
+        const popup = castResult?.automationPopup
+            || ((castResult?.type === 'modal' || castResult?.type === 'popup' || castResult?.modalName) ? castResult : null)
+        if (!popup) return
+        if ((popup.type === 'modal' || popup.modalName) && setModalState) {
+            routeCastModal(popup, setModalState)
         } else {
             setPopupHtml(popup.payload)
         }
@@ -229,14 +237,7 @@ export function useActionSpellMetamagic({
                     mapName,
                     characters,
                 });
-                if (castResult?.automationPopup) {
-                    const popup = castResult.automationPopup;
-                    if (popup.type === 'modal' && setModalState) {
-                        // handled by useSpellCastExecutor pattern
-                    } else {
-                        setPopupHtml(popup.payload);
-                    }
-                }
+                showCastPopup(castResult)
             },
         });
     };
