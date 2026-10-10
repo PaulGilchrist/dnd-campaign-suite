@@ -6461,7 +6461,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "verified (PASS-subset 2026-10-09 host EvasiveFighter BM lv18 lv13 auto_effect miss trigger: miss grants te next_attack_advantage+vexTarget per studied target + ability_use, attacks vs studied target mode:advantage 2d20 consumed/re-arm per miss, cross-target miss strict mode:normal own-vex arm, HIT zero-grant miss-only gate frozen-grant-count proof. Gap: no addExpiration clock unspent te survives EONT lenient)",
+      "verified": "verified",
       "class": "Fighter",
       "triggerConditions": "Trigger: miss; Action: passive; Duration: until_start_of_next_turn",
       "expectedBehavior": "You study your opponents and learn from each attack you make. If you make an attack roll against a creature and miss, you have Advantage on your next attack roll against that creature before the end of your next turn."
