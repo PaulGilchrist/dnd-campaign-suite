@@ -435,3 +435,13 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - Music panel: mood-chip click AUTO-PLAYS embedded YouTube iframe (Play flips to Pause unbidden); audio depends on network YouTube — expect failures in offline/sandboxed runs, don't chase as app defect; Stop halts.
 - `.dice-tray-popup-overlay` survives tab switches and intercepts all page clicks — press Escape before clicking page elements after any dice roll.
 - Admin Clear Change Data / Clear Campaign Log fire native confirms; post-clear verified `change-data {}` + `log []` even while two tabs open (quiet-state worked this session; still clear last).
+
+## 12. Character wizard / character-file routes (added by wizard-dup-name fix)
+- Character create is `POST /api/campaigns/:campaign` (filename derived from name) — PUT `/:Name.json` is edit-only; overwrite bugs on create live in the POST handler (`campaigns-character.js` writeFileSync upsert).
+- `campaigns-character.test.js` mocks `fs.existsSync` blanket-true; any file-existence guard must switch those mocks to path-aware impls (`p => !p.endsWith('.json')`).
+- `vi.mock('fs')` factory may not reference a top-level const (hoisting) — inline the functions like `npcs-duplicate-name.test.js`.
+- Adding exports to `src/config/utils.js` breaks `CharacterCreationWizard.submission.test.jsx` partial mock — extend `vi.mock` + exact-args assertions same pass.
+- Residual (ticket owed): edit-mode rename onto an existing character name still overwrites via PUT — needs maps-rename-guard twin.
+- Wizard UI content headings ("Step 6: Skill Proficiencies") differ from internal `steps-config` numbers (skills = step 10) — `stepValidators` must key on the internal number. Skill-cap enforcement: `validateSkillsStep` (config/utils.js stepValidators[10]) + checkbox refusal guard in WizardStepSkills via `getProficiencyCapBlockReason`; pre-selected skills and null limits must stay ungated.
+- `.dice-tray-popup-overlay` dismisses ONLY via Escape or its × — `el.click()` on the overlay does NOT close it (unlike `.mc-overlay`/`.popup-overlay` flush pattern); it intercepts Admin clicks until Escape.
+- Client→log seam for GM tools: `addEntry(campaignName, entry)` (logService.js, same path as Log add-note) — server stamps id/timestamp and broadcasts via shared SSE; GM dice-tray rolls now log `{type:'roll', rollType:'dice', characterName:'GM', name:'Dice Tray <die>', rolls, total, formula}` from Sidebar.jsx.
