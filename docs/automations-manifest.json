@@ -6808,7 +6808,7 @@
       "handler": "src/services/combat/automation/handlers/featHandler.js",
       "router": "src/services/combat/automation/routers/featRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/featInfoBuilder.js",
-      "verified": "verified (PASS-subset 2026-10-09 host EvasiveFighter KEPT feat: BA 'Telekinetic Shove' row live, STR save DC17=INT3+PB6 featAbilityChoices-derived (not opposed, canonical-correct), fail 1+9=10 -> telekinetic_movement te value/movedDistanceFt5 instant CLA-357 mirror no-prone-per-text, same-turn latch refuse, logs+save_result x2. Lenient gridless 30ft advisory self-fallback not refusal. No CLA-0687 axis)",
+      "verified": "verified",
       "triggerConditions": "Action: 1 bonus action; Action: bonus_action; Range: 30",
       "expectedBehavior": "As a Bonus Action, you can telekinetically shove one creature you can see within 30 feet of yourself. When you do so, the target must succeed on a Strength saving throw (DC 8 plus the ability modifier of the score increased by this feat and your Proficiency Bonus) or be moved 5 feet toward or away from you."
     },
