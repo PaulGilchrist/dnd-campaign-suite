@@ -251,7 +251,7 @@ Deleted QA Fog Map, QA Test NPC, QA Rapid Faction, "QA Quest: 50%…" quest, par
 
 ### 2026-10-10
 - DONE: [2026-10-10] — Player tab auto-opens the active map on `map-activate` SSE via the shared app-wide Subscriber (`handleMapActivateEvent` in App.jsx, key+state gated); verified live LAN tab, no new EventSource, 6 new tests.
-- Thread the map's `displayName` (not the filename slug) into the editor toolbar title (related: bug-map-editor-title-slug-capitalization.md).
+- DONE: [2026-10-10] — displayName threading already shipped in bug-fix 65b9849a9 (`MapToolbar.jsx` renders `displayName || formatMapName(slug)`); verified live "QA Acronym Map" verbatim + rename stays in sync; pinned by existing `MapToolbar.display-name.test.jsx`, no code changes.
 - Give players a friendlier map-unavailable state than a bare alert + blank view (e.g. an inline "Waiting for the GM to open a map…" placeholder with auto-retry).
 - Duplicate-name validation parity: NPCs/Quests/Factions lack the inline duplicate guard the Maps manager has — add the same case-insensitive check and error text.
 - Map editor save is chatty: every wall-paint stroke PUTs the whole map JSON (~20 writes/stroke) — batch on pointerup or debounce ~1s.
