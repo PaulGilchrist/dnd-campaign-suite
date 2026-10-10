@@ -6665,7 +6665,7 @@
       "handler": "src/services/combat/automation/handlers/classFeatureHandler.js",
       "router": "src/services/combat/automation/routers/classFeatureRouter.js",
       "infoBuilder": "src/services/combat/automation/infoBuilders/classFeatureInfoBuilder.js",
-      "verified": "verified (PASS-subset 2026-10-09 host War_Cleric temp lv20 Life Domain — Supreme Healing is LIFE lv17 exclusive in app data not base: lv1 Cure Wounds auto-upcast lv2 = popup 2d8+4 [8,8]=20 deterministic maximized no-roll + DoL +3 ledger no rollInfo, maximize lane live, CD legs grep-documented. Gap: applied-delta 0 victim-cs-injection artifact, upcast radio leg unrecast (budget). Host RESTORED lv8 Light md5 def6854 byte-exact; tab closed to stop in-memory lv20/Life re-PUSH clobber)",
+      "verified": "verified",
       "class": "Cleric",
       "triggerConditions": "Passive: Always active",
       "expectedBehavior": "When you would normally roll one or more dice to restore Hit Points to a creature with a spell or Channel Divinity, don't roll those dice; instead use the highest number possible for each die."
