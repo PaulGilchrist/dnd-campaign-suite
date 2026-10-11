@@ -714,7 +714,33 @@ function getDamageTypeChoices(action) {
 // routes to the same handlers the numeric chips already use (MA-0014 intact).
 // MA-0022: a non-numeric row that names another action via `delegates_to`
 // resolves using THAT row's attack_bonus/damage through the identical attack
-// seam (Lash → Tentacle +9 / 2d6+5), logs "Lash (Tentacle attack)".
+// seam (Lash → Tentacle +9 / 2d6+5), logs "Lash (Tentacle attack)").
+// MA-1853 inherit-BEFORE-collapse precedent, save-branch twin (MA-1881
+// Demogorgon legendary Gaze → parent Gaze): the delegate's chooser fields
+// are copied onto the child BEFORE the first-clause/inline-save shortcut,
+// so a master carrying a live variants[] chooser travels with it (below).
+// eslint-disable-next-line react-refresh/only-export-components
+export function legendaryDelegateChooserAction(action, { monster, parseSaveVariantChooser }) {
+  if (!action?.delegates_to) return action;
+  const delegate = legendaryDelegateAction(monster, action);
+  if (!delegate) return action;
+  // Child authors its OWN chooser → self-resolves byte-identical (never
+  // overwritten by the master's arms).
+  if (parseSaveVariantChooser(action)) return action;
+  // MA-1881: inherit-when-empty must NOT drop the master's chooser. When
+  // the delegate master arms parseSaveVariantChooser and the child authors
+  // no chooser of its own, the master's variants/save fields ride the
+  // child so handleSaveRoll's shared chooser seam (tryOpenVariantChoosers)
+  // opens the SAME chip-arm + roll-d6 picker on the legendary panel as on
+  // the parent row — never a first-clause collapse with zero choice and
+  // zero d6. Child keeps its own name (spend log + chooser header stay
+  // honest); byte-inert passthrough when the master has no chooser.
+  if (delegate.variants) {
+    return { ...action, variants: delegate.variants, save_dc: delegate.save_dc, save_type: delegate.save_type, range: delegate.range };
+  }
+  return delegate;
+}
+
 function legendaryRowHasNumericMechanic(action) {
   // MA-1071 twin: a DC0 decoy is not a numeric mechanic (MA-0551 >0 convention).
   if (action.attack_bonus != null || Number(action.save_dc) > 0) return true;
@@ -808,20 +834,31 @@ async function legendaryPrerequisiteRefusal({ action, monsterName, campaignName,
   return true;
 }
 
+// MA-1881: delegate arm hoisted out of resolveLegendaryRow (§45 complexity
+// ceiling) — resolves the mechanic row for a non-numeric delegating legendary
+// child: chooser-inherited child (parent variants ride the child, child name
+// stays), plain MA-0022 master delegate, or null = no-delegate refusal.
+function legendaryDelegateMechanic(action, monster) {
+  const resolved = legendaryDelegateChooserAction(action, { monster, parseSaveVariantChooser });
+  if (resolved === action && !parseSaveVariantChooser(action)) return null;
+  const chooserInherited = resolved !== action && Boolean(resolved.variants) && !parseSaveVariantChooser(action);
+  return { mechanicAction: resolved, actionName: chooserInherited ? action.name : legendaryDelegateAttackName(action, resolved) };
+}
+
 async function resolveLegendaryRow({ action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage, handleCheck, getTarget }) {
   if (await legendaryPrerequisiteRefusal({ action, monsterName, campaignName, setPopupHtml, getTarget })) return;
   let mechanicAction = action;
   let actionName = action.name;
   if (!legendaryRowHasNumericMechanic(action) && action.delegates_to) {
-    const delegate = legendaryDelegateAction(monster, action);
-    if (!delegate) {
+    const delegateMechanic = legendaryDelegateMechanic(action, monster);
+    if (!delegateMechanic) {
       setPopupHtml(buildLegendaryRefusalPopup({ monsterName, actionName: action.name, reason: 'no-delegate' }));
       addEntry(campaignName, buildLegendaryRefusalLog({ monsterName, actionName: action.name, reason: 'no-delegate' }))
         .catch((e) => { console.error('[MonsterCardModal] Error logging legendary delegate refusal:', e); });
       return;
     }
-    mechanicAction = delegate;
-    actionName = legendaryDelegateAttackName(action, delegate);
+    mechanicAction = delegateMechanic.mechanicAction;
+    actionName = delegateMechanic.actionName;
   }
   // MA-0051: authored ability-check rows (Dracolich "Detect" → Wisdom
   // (Perception)) resolve the stat-block bonus BEFORE the spend — an
