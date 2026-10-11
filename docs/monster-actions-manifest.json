@@ -6081,7 +6081,7 @@
       "damageDicePrimary": "10d10",
       "damageTypePrimary": "Bludgeoning",
       "description": "Strength Saving Throw: DC 25, each creature within 60 ft. on the ground. Failure: 55 (10d10) Bludgeoning damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1859-behemoth-earthshaker.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1860",

@@ -9095,7 +9095,8 @@
         "save_dc": 25,
         "description": "Strength Saving Throw: DC 25, each creature within 60 ft. on the ground. Failure: 55 (10d10) Bludgeoning damage. Success: Half damage.",
         "damage_dice_primary": "10d10",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "recharge": "5-6"
       }
     ],
     "bonus_actions": [],
