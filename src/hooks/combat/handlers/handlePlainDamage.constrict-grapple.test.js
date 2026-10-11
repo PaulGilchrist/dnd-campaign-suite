@@ -1,0 +1,242 @@
+// MA-1842: Apep Constrict ongoing grapple-damage producer — the hit-clause
+// leg registers the registered constrict_grapple te + ONE rounds:100 backstop
+// clock ONLY while Grappled stands on the victim, and logs every grant and
+// refusal. Rows without the structured grapple_ongoing_damage key (all other
+// grapple rows) stay byte-inert.
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('../../../services/dice/diceRoller.js', () => ({
+    rollExpression: vi.fn(),
+    rollExpressionDoubled: vi.fn(),
+    formatDamageFormula: vi.fn((formula) => formula),
+}));
+
+vi.mock('../../../services/ui/utils.js', () => ({
+    default: {
+        getName: vi.fn((n) => n || 'Unknown'),
+        guid: vi.fn(() => 'test-guid-1234'),
+    },
+}));
+
+vi.mock('../../runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('../../../services/encounters/combatData.js', () => ({
+    loadCombatSummary: vi.fn(),
+    getCombatSummary: vi.fn(),
+    getCurrentCombatRound: vi.fn(() => 1),
+}));
+
+vi.mock('../../../services/combat/automation/automationService.js', () => ({
+    hasIgnoreResistance: vi.fn(),
+    playerIsImmuneToCondition: vi.fn(),
+    hasGreatWeaponFighting: vi.fn(),
+    applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
+}));
+
+vi.mock('../../../services/rules/features/invisibilityService.js', () => ({
+    endInvisibilityOnHostileAction: vi.fn(),
+}));
+
+vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({
+    sendSavePrompt: vi.fn(),
+}));
+
+vi.mock('../../../services/combat/aoeService.js', () => ({
+    getAffectedCreatures: vi.fn(),
+    processAoeNpcs: vi.fn(),
+    sendAoePlayerSaves: vi.fn(),
+}));
+
+vi.mock('../loggedDiceRollUtils.js', () => ({
+    getGuardianProtectionAcBonus: vi.fn(() => 0),
+    readAoeContext: vi.fn(),
+    hasPotentCantrip: vi.fn(),
+    isMagicMissileImmune: vi.fn(),
+    hasSoulstitchProtection: vi.fn(),
+    applyMinDamageAdjustment: vi.fn((d) => d),
+}));
+
+vi.mock('../../../services/ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
+    computeDamageAfterSave: vi.fn((total, success, _dcSuccess) => success ? Math.floor(total / 2) : total),
+    rollSaveForCreature: vi.fn(),
+    applyDamageToTarget: vi.fn(),
+    clearReTriggeredSequence: vi.fn(),
+}));
+
+vi.mock('../../../services/combat/conditions/targetEffectDefinitions.js', () => ({
+    registerTargetEffect: vi.fn(),
+    getActiveTargetEffect: vi.fn(() => null),
+    getEffectDefinition: vi.fn((key) => ({ effect: key, label: 'Constrict', group: 'Defensive' })),
+}));
+
+vi.mock('../../../services/rules/effects/expirationQueue.js', () => ({
+    addExpiration: vi.fn(),
+}));
+
+vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
+    hasBardicInspirationOffense: vi.fn(),
+    getBardicInspirationDieSize: vi.fn(),
+    getBardicInspirationDieSizeFromClass: vi.fn(),
+}));
+
+vi.mock('../../rules/spells/empoweredSpellService.js', () => ({
+    hasEmpoweredSpell: vi.fn(),
+}));
+
+vi.mock('../../rules/spells/metamagicRules.js', () => ({
+    getChaModifier: vi.fn(),
+}));
+
+import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
+import { loadCombatSummary, getCombatSummary } from '../../../services/encounters/combatData.js';
+import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
+import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
+import { buildHitConditionClause } from '../../../components/encounter/MonsterCardHelpers.js';
+import { registerTargetEffect } from '../../../services/combat/conditions/targetEffectDefinitions.js';
+import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
+
+const APEP_CONSTRICT_ACTION = {
+    name: 'Constrict',
+    attack_bonus: 18,
+    reach: '15 ft.',
+    damage_dice_primary: '4d8 + 9',
+    damage_type_primary: 'Bludgeoning',
+    hit_conditions: ['grappled'],
+    escape_dc: 26,
+    grapple_ongoing_damage: { dice: '4d8', damage_type: 'Bludgeoning' },
+};
+
+const deps = {
+    characterName: 'Apep 1',
+    campaignName: 'test-campaign',
+    characters: [
+        { name: 'Apep 1', computedStats: { armorClass: 23 } },
+        { name: 'ElderPaladin', computedStats: { armorClass: 19 } },
+    ],
+    setPopupHtml: vi.fn(),
+    logEntry: vi.fn(),
+    pendingSaves: {},
+};
+
+function hitContext(extra = {}) {
+    return {
+        targetName: 'ElderPaladin',
+        damageType: 'Bludgeoning',
+        attackerName: 'Apep 1',
+        hitClause: buildHitConditionClause(APEP_CONSTRICT_ACTION),
+        ...extra,
+    };
+}
+
+beforeEach(() => {
+    vi.clearAllMocks();
+    getRuntimeValue.mockReturnValue(null);
+    applyDamageToTarget.mockReturnValue({ finalDamage: 25, newHp: 175, damageReduced: false });
+    loadCombatSummary.mockResolvedValue({
+        creatures: [
+            { name: 'ElderPaladin', type: 'player', ac: 19, currentHp: 200, maxHp: 224 },
+            { name: 'Apep 1', type: 'npc', size: 'Gargantuan', ac: 23, currentHp: 624, maxHp: 624 },
+        ],
+    });
+    getCombatSummary.mockReturnValue(loadCombatSummary._result);
+});
+
+describe('MA-1842 ongoing grapple-damage producer', () => {
+    it('registers constrict_grapple te (inflictor + die + escape_dc) + ONE rounds:100 clock when Grappled stands', async () => {
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (key === 'ElderPaladin' && prop === 'activeConditions') return ['grappled'];
+            return null;
+        });
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Constrict', formula: '4d8 + 9', total: 25, rolls: [4, 4, 4, 8], modifier: 9, context: hitContext() });
+
+        expect(registerTargetEffect).toHaveBeenCalledWith('test-campaign', 'ElderPaladin', 'constrict_grapple', 'Apep 1', {
+            duration: 'until_released',
+            die: '4d8',
+            damageType: 'Bludgeoning',
+            escapeDc: 26,
+            actionName: 'Constrict',
+        });
+        expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
+            attackerName: 'Apep 1',
+            targetName: 'ElderPaladin',
+            campaignName: 'test-campaign',
+            rounds: 100,
+            effects: [{ type: 'remove_target_effect', effectKey: 'constrict_grapple', source: 'Apep 1', target: 'ElderPaladin' }],
+        }));
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'automation',
+            automationType: 'constrict_grapple_granted',
+            characterName: 'ElderPaladin',
+            sourceName: 'Apep 1',
+        }));
+    });
+
+    it('stamps escape DC 26 (STR) into activeConditionMeta — the MA-0010 badge escape seam arms', async () => {
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (key === 'ElderPaladin' && prop === 'activeConditions') return [];
+            return null;
+        });
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Constrict', formula: '4d8 + 9', total: 25, rolls: [4, 4, 4, 8], modifier: 9, context: hitContext() });
+
+        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
+        expect(metaCall).toBeTruthy();
+        expect(metaCall[2].grappled).toMatchObject({ dc: 26, ability: 'str', source: 'Apep 1' });
+    });
+
+    it('logs the condition reason as "Constrict (escape DC 26)" — never "escape DC —"', async () => {
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (key === 'ElderPaladin' && prop === 'activeConditions') return ['grappled'];
+            return null;
+        });
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Constrict', formula: '4d8 + 9', total: 25, rolls: [4, 4, 4, 8], modifier: 9, context: hitContext() });
+
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'condition',
+            reason: 'Constrict (escape DC 26)',
+        }));
+    });
+
+    it('refuses with zero te / zero clock when the grapple did not stand (immunity split)', async () => {
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (key === 'ElderPaladin' && prop === 'activeConditions') return [];
+            return null;
+        });
+        const fn = createLogDamageAndShow(deps);
+        await fn({ name: 'Constrict', formula: '4d8 + 9', total: 25, rolls: [4, 4, 4, 8], modifier: 9, context: hitContext() });
+
+        expect(registerTargetEffect).not.toHaveBeenCalledWith('test-campaign', 'ElderPaladin', 'constrict_grapple', expect.anything(), expect.anything());
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'automation',
+            automationType: 'constrict_grapple_refused',
+        }));
+    });
+
+    it('is byte-inert for sibling grapple rows without the structured key (Vine Blight)', async () => {
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (key === 'ElderPaladin' && prop === 'activeConditions') return ['grappled'];
+            return null;
+        });
+        const clause = buildHitConditionClause({ name: 'Constricting Vine', attack_bonus: 4, hit_conditions: ['grappled'], escape_dc: 12 });
+        const fn = createLogDamageAndShow(deps);
+        await fn({
+            name: 'Constricting Vine', formula: '1d6 + 2', total: 5, rolls: [3], modifier: 2,
+            context: { targetName: 'ElderPaladin', damageType: 'Bludgeoning', attackerName: 'Apep 1', hitClause: clause },
+        });
+
+        expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ automationType: 'constrict_grapple_granted' }));
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ automationType: 'constrict_grapple_refused' }));
+    });
+});

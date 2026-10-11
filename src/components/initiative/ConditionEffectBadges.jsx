@@ -223,6 +223,14 @@ const BADGE_SPECS = [
         find: ctx => findDirect(ctx, 'infernal_wound'),
         build: ctx => ({ label: 'Infernal Wound', cls: 'effect-debuff', icon: 'fa-droplet', removable: true, removeAction: 'target_effect', effectType: 'infernal_wound', tooltip: `Infernal Wound from ${ctx.te.source || 'unknown'} — loses ${ctx.te.bleedDie || '1d10'} Hit Points at the start of each of its turns; closes after 1 minute, on any healing, or after a DC 12 Wisdom (Medicine) action (GM-enforced)` }),
     },
+    // MA-1842: Apep Constrict ongoing grapple-damage te badge — removable ×
+    // early release; the tick also stops with the Grappled condition (escape
+    // badge save vs the stamped escape_dc, rest, or GM removal) or a dead
+    // grappler (constrictGrappleService turn-start choke points).
+    {
+        find: ctx => findDirect(ctx, 'constrict_grapple'),
+        build: ctx => ({ label: 'Constrict', cls: 'effect-debuff', icon: 'fa-hand-fist', removable: true, removeAction: 'target_effect', effectType: 'constrict_grapple', tooltip: `Constricted by ${ctx.te.source || 'unknown'} — takes ${ctx.te.damageType || 'Bludgeoning'} damage (${ctx.te.die || '4d8'}) at the start of each of its turns until released${ctx.te.escapeDc != null ? ` (escape DC ${ctx.te.escapeDc})` : ''}` }),
+    },
     {
         guard: ctx => ctx.effects.noAdvantageAgainst,
         build: () => ({ label: 'No Adv vs', cls: 'effect-buff', icon: 'fa-arrow-down', removable: true, removeAction: 'remove_derived', effectTypes: ['blur', 'foresight', 'escape_the_horde', 'protection', 'multiattack_defense'] }),

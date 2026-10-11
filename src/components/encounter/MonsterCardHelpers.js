@@ -726,6 +726,26 @@ export function parseHitTargetEffectAbility(action) {
   return HIT_EFFECT_ABILITIES.includes(ability) ? ability : null;
 }
 
+// MA-1842: Apep Constrict ongoing grapple-damage rider — "the target has
+// the Grappled condition (escape DC 26) and takes 18 (4d8) Bludgeoning
+// damage at the start of every turn until released". Recurring ticks need an
+// explicit te + consumer (MA-0367/MA-0610 precedent, playbook §87) —
+// hit_conditions alone never tick. STRUCTURED-KEY-ONLY
+// grapple_ongoing_damage:{dice,damage_type} rides the MA-0010 hit-clause
+// seam to the resolved-hit producer in handlePlainDamage (which registers the
+// registered constrict_grapple te carrying inflictor + die + escape_dc and
+// ONE rounds:100 backstop clock), ticked at the victim's turn-start by
+// constrictGrappleService via the turnStartEffects pre-playerStats guard.
+// Byte-inert null for every row without the key — sibling grapple rows
+// (Vine Blight, Constrictor Snake) stay byte-identical.
+export function parseGrappleOngoingDamage(action) {
+  const rider = action?.grapple_ongoing_damage;
+  if (!rider || typeof rider !== 'object') return null;
+  const dice = String(rider.dice || '').trim().toLowerCase();
+  if (!dice) return null;
+  return { dice, damageType: String(rider.damage_type || 'Bludgeoning').trim() || 'Bludgeoning' };
+}
+
 // MA-1451: Shadow "Draining Swipe" numeric ability-score drain rider —
 // "Hit: ... the target's Strength score decreases by 1d4. The target dies if
 // this reduces that score to 0." Not a canonical condition, so
@@ -886,6 +906,7 @@ function hitClauseRiderPayload(action) {
   const pull = parseHitPull(action);
   const hpMaxReduce = parseHitHpMaxReduce(action);
   const attackerRecover = parseHitAttackerRecover(action);
+  const grappleOngoingDamage = parseGrappleOngoingDamage(action);
   return {
     targetEffect,
     ...(targetEffectAbility ? { targetEffectAbility } : {}),
@@ -894,13 +915,14 @@ function hitClauseRiderPayload(action) {
     ...(pull ? { pull } : {}),
     ...(hpMaxReduce ? { hpMaxReduce } : {}),
     ...(attackerRecover ? { attackerRecover } : {}),
+    ...(grappleOngoingDamage ? { grappleOngoingDamage } : {}),
   };
 }
 
 export function buildHitConditionClause(action) {
   const conditions = hitClauseAutoGrantConditions(action);
   const riders = hitClauseRiderPayload(action);
-  if (conditions.length === 0 && !riders.targetEffect && !riders.conditionRoll && !riders.abilityDrain && !riders.pull && !riders.hpMaxReduce && !riders.attackerRecover) return null;
+  if (conditions.length === 0 && !riders.targetEffect && !riders.conditionRoll && !riders.abilityDrain && !riders.pull && !riders.hpMaxReduce && !riders.attackerRecover && !riders.grappleOngoingDamage) return null;
   return {
     conditions,
     escapeDc: action.escape_dc != null ? Number(action.escape_dc) : null,

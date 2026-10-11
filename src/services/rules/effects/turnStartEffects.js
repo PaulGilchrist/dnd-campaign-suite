@@ -9,6 +9,7 @@ import { cleanUpToppleConditions } from './toppleCleanup.js';
 import { regainLegendaryUses } from '../../encounters/monsterLegendaryUses.js';
 import { rollMonsterRecharges } from '../../encounters/monsterRecharge.js';
 import { applyInfernalWoundBleedTurnStart } from '../../rules/features/infernalWoundService.js';
+import { applyConstrictGrappleTurnStart } from '../features/constrictGrappleService.js';
 import { applyWhirlwindTurnStart } from '../features/whirlwindService.js';
 import utils from '../../ui/utils.js';
 import storage from '../../ui/storage.js';
@@ -213,6 +214,12 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
         // (whirlwindService; same pre-playerStats seam as MA-0367 — PC AND
         // monster victims tick alike; untyped direct-HP loss shape).
         await applyWhirlwindTurnStart(activeName, campaignName);
+        // MA-1842: Apep Constrict ongoing grapple-damage tick — te-keyed +
+        // Grappled-gated recurring start-of-turn HP loss for creatures held
+        // by a row that authors grapple_ongoing_damage (constrictGrappleService;
+        // same pre-playerStats seam as MA-0367/MA-0610 — PC AND monster
+        // victims tick alike; release stops with the Grappled condition).
+        await applyConstrictGrappleTurnStart(activeName, campaignName);
     }
 
     if (!activeName || !playerStats) {

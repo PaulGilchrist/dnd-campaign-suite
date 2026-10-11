@@ -4697,7 +4697,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +18, reach 15 ft., one Huge or smaller creature. Hit: 25 (4d8+9) Bludgeoning damage and the target has the Grappled condition (escape DC 26) and takes 18 (4d8) Bludgeoning damage at the start of every turn until released.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1842-apep-constrict.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1843",

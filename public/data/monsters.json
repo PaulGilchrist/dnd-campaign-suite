@@ -6189,6 +6189,11 @@
         "hit_conditions": [
           "grappled"
         ],
+        "escape_dc": 26,
+        "grapple_ongoing_damage": {
+          "dice": "4d8",
+          "damage_type": "Bludgeoning"
+        },
         "save_effect": "The target has the Grappled condition (escape DC 26) and takes 18 (4d8) Bludgeoning damage at the start of every turn until released."
       },
       {

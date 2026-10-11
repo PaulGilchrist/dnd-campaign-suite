@@ -678,7 +678,59 @@ function applyHitClauseConditions({ hitClause, target, campaignName, logEntry, a
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
-// MA-0575: random-condition rider (Death Slaad Chaos Blade — "a condition
+// MA-1842: Apep Constrict ongoing grapple-damage grant — the row authors
+// structured grapple_ongoing_damage:{dice,damage_type} (parseGrappleOngoingDamage,
+// byte-inert for every sibling grapple row — Vine Blight/Constrictor Snake
+// stay byte-identical). Rides the MA-0010 hit-clause AFTER the condition leg,
+// so the rider arms only once Grappled actually stands on the victim
+// (immunity-split victims get a refusal log, zero state). Registers the
+// registered constrict_grapple te carrying inflictor + die + escape_dc
+// (MA-0367 infernal-wound grant shape — registerTargetEffect REPLACE per
+// (target,effect,source) means a re-constrict never duplicates the bleed),
+// ONE rounds:100 backstop clock (§343; RAW "until released" is bounded by
+// the Grappled-condition gate in the tick consumer — escape badge save, rest
+// or GM removal stop the tick; the clock only prunes the marker), and every
+// grant/refusal logs.
+function applyGrappleOngoingDamageClause({ hitClause, target, attackerName, campaignName, logEntry }) {
+    if (!hitClause.grappleOngoingDamage) return;
+    const conds = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
+    if (!conds.some(c => String(c).toLowerCase() === 'grappled')) {
+        logEntry({
+            type: 'automation',
+            automationType: 'constrict_grapple_refused',
+            characterName: target.name,
+            sourceName: attackerName,
+            abilityName: hitClause.attackName,
+            description: `${target.name} was hit by ${attackerName}'s ${hitClause.attackName} but the Grappled condition did not stand — the ongoing ${hitClause.grappleOngoingDamage.damageType.toLowerCase()} (${hitClause.grappleOngoingDamage.dice}) rider is not armed.`,
+            timestamp: Date.now(),
+        });
+        return;
+    }
+    const rider = hitClause.grappleOngoingDamage;
+    registerTargetEffect(campaignName, target.name, 'constrict_grapple', attackerName, {
+        duration: 'until_released',
+        die: rider.dice,
+        damageType: rider.damageType,
+        escapeDc: hitClause.escapeDc ?? null,
+        actionName: hitClause.attackName,
+    });
+    addExpiration({
+        attackerName,
+        targetName: target.name,
+        effects: [{ type: 'remove_target_effect', effectKey: 'constrict_grapple', source: attackerName, target: target.name }],
+        campaignName,
+        rounds: 100,
+    });
+    logEntry({
+        type: 'automation',
+        automationType: 'constrict_grapple_granted',
+        characterName: target.name,
+        sourceName: attackerName,
+        abilityName: hitClause.attackName,
+        description: `${target.name} is constricted by ${attackerName}'s ${hitClause.attackName} — takes ${rider.damageType} damage (${rider.dice}) at the start of each of its turns until released${hitClause.escapeDc != null ? ` (escape DC ${hitClause.escapeDc} via the Grappled badge save)` : ''}. Tick consumer: constrict_grapple te (100-round backstop clock; stops with the Grappled condition or a dead grappler).`,
+        timestamp: Date.now(),
+    });
+}
 // determined by rolling 1d4: 1 Charmed; 2 Frightened; 3 Poisoned; 4
 // Incapacitated" until the slaad's next turn). Rolls the authored die via
 // the existing rollExpression seam on the resolved hit, logs the die value
@@ -1012,6 +1064,11 @@ async function maybeApplyHitClause({ context, target, applyResult, secondaryFina
     if (hasConditions) {
         applyHitClauseConditions({ hitClause: effectiveClause, target, campaignName, logEntry, attackerName: characterName, characters, combatSummary });
     }
+    // MA-1842: the ongoing grapple-damage rider rides AFTER the condition
+    // leg (guard hoisted into the consumer — byte-inert for every row
+    // without the structured grapple_ongoing_damage key) and arms only while
+    // Grappled stands on the victim.
+    applyGrappleOngoingDamageClause({ hitClause: effectiveClause, target, attackerName: characterName, campaignName, logEntry });
     if (riderChoice) {
         addExpiration({
             attackerName: characterName,

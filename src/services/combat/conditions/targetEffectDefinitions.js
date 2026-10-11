@@ -187,6 +187,24 @@ const TARGET_EFFECT_DEFINITIONS = [
     fields: ['source'],
   },
   {
+    // MA-1842: Apep Constrict ongoing grapple-damage rider te (granted by
+    // the MA-0010 hit-clause producer in handlePlainDamage when the row
+    // authors grapple_ongoing_damage + grappled lands). Recurring tick
+    // consumer: constrictGrappleService via the turnStartEffects
+    // pre-playerStats guard (MA-0367 infernal-wound / MA-0610 whirlwind
+    // lineage) — PC AND monster victims tick alike. The tick stops with the
+    // Grappled condition (badge escape save vs the stamped escape_dc, rest,
+    // or GM removal) and when the grappler dies; ONE rounds:100 backstop
+    // clock anchors the marker (§343) — removable badge × for early release.
+    effect: 'constrict_grapple',
+    label: 'Constrict',
+    description: 'Constricted and Grappled: takes ongoing damage (dice and type indicated) at the start of each of its turns until released (escape via the Grappled badge save, DC indicated).',
+    icon: 'fa-hand-fist',
+    cls: 'effect-debuff',
+    group: 'Defensive',
+    fields: ['source', 'dc'],
+  },
+  {
     effect: 'dodge',
     label: 'Disadvantage on attacks',
     description: 'Attacks against the target have Disadvantage. The target has Advantage on Dexterity saving throws.',
