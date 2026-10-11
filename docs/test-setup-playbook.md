@@ -498,3 +498,6 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 ## MA-1843 additions (Apep Venomous Darkness FIXED 2026-10-11)
 - Advisory key on a row that ALREADY carries a save chip arms a SECOND chip (AdvisoryLink MonsterAction.jsx:336/413 beside SpellOrSaveLinks) — duplicate affordance; do NOT author flat `advisory` on save-chip rows to record zone clauses (MA-1843 adjudication: darkness clause stays documented zero-consumer advisory §70).
 - PC-prompt lane (ElderPaladin etc.): save-result renders INSIDE the .sp-modal (no stage-2 popup); save-damage `total` is post-halve while `rolls` carry the raw sum (§316 twin).
+
+## MA-1846 additions (Apep Venomous Sting FIXED 2026-10-11)
+- Numeric legendary CHILD renders NO "Expend Legendary" chip (MonsterAction.jsx:192 self-suppress on numeric rows) — the +N chip IS the gated press surface (section wraps onAttack→legendaryGate); expend-chip absence ≠ dead economy (§204 twin confirmed on Apep). Structuring a prose legendary attack child = Orochi Crushing Coil byte-shape: attack_bonus/reach/dice/type/hit_conditions trailing keys, NO delegates_to (row self-resolves).

@@ -6221,7 +6221,14 @@
       },
       {
         "name": "Venomous Sting",
-        "description": "Melee Attack Roll: +18, reach 25 ft., one target. Hit: 24 (4d6+9) Poison damage and the target has the Poisoned condition until the end of its next turn."
+        "description": "Melee Attack Roll: +18, reach 25 ft., one target. Hit: 23 (4d6+9) Poison damage and the target has the Poisoned condition until the end of its next turn.",
+        "attack_bonus": 18,
+        "reach": "25 ft.",
+        "damage_dice_primary": "4d6 + 9",
+        "damage_type_primary": "Poison",
+        "hit_conditions": [
+          "poisoned"
+        ]
       },
       {
         "name": "Devour the Boat (Costs 2 Actions)",
