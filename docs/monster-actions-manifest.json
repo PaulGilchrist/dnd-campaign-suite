@@ -5085,7 +5085,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The archlich makes one Cantrip spell attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1853-archlich-cast-cantrip.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1854",
