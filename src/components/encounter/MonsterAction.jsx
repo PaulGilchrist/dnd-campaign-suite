@@ -148,6 +148,27 @@ function ActionSaveRoll({ action, attackerCannotAct, onSaveRoll, spellUsesUsed, 
   );
 }
 
+// MA-1883: legendary spell-cast delegate chip row (Demogorgon "Cast a Spell
+// (Costs 2 Actions)" → Spellcasting) — the master's MA-1879 spell chips
+// render ON the legendary row with their live "(N/Day · X left)" counters
+// (uses extracted from the MASTER description; MA-1879 markup lane). The
+// press rides the legendary gate: spend the row's RAW parsed cost (2), then
+// cast the NAMED spell through handleSpellCast — real DC, spells.json
+// payload, charge tracking (MA-1853 inherit-BEFORE-collapse precedent;
+// MA-1488 sole-press mandate). Byte-inert on every unstamped row.
+function LegendarySpellCastLinks({ action, attackerCannotAct, legendaryGate, spellUsesUsed }) {
+  const spellRow = action?.legendarySpellRow;
+  if (!legendaryGate || !spellRow) return null;
+  return (
+    <SpellCastLinks
+      action={spellRow}
+      spellUsesUsed={spellUsesUsed}
+      attackerCannotAct={attackerCannotAct}
+      onSpellCast={(_spellRow, spellName) => legendaryGate(action, spellName)}
+    />
+  );
+}
+
 function GatedReactionLink({ def, remaining, attackerCannotAct, onClick }) {
   const clickable = !attackerCannotAct;
   return (
@@ -189,7 +210,11 @@ function LegendarySpendLink({ action, attackerCannotAct, legendaryGate }) {
   if (!legendaryGate) return null;
   const formula = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
   // MA-1071 twin: a DC0 decoy is not a numeric affordance (MA-0551 >0 convention).
-  const numericAffordance = action.attack_bonus != null || Number(action.save_dc) > 0 || canRollExpression(formula);
+  // MA-1883: a spell-delegate row armed with gated spell chips (MA-1488
+  // sole-press mandate) suppresses the generic expend — the spell chips ARE
+  // the press surface, each spending the row's RAW cost then casting the
+  // named spell (never the payload-less save shell the bare chip rolled).
+  const numericAffordance = action.attack_bonus != null || Number(action.save_dc) > 0 || canRollExpression(formula) || Boolean(action.legendarySpellRow);
   if (numericAffordance) return null;
   if (legendaryCheckRow(action)) return <LegendaryCheckLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />;
   return (
@@ -404,6 +429,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
     <div key={index} className={`mc-action ${attackerCannotAct ? 'mc-action-disabled' : ''}`}>
       <strong>{action.name}.</strong>{' '}
       <LegendarySpendLink action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} />
+      <LegendarySpellCastLinks action={action} attackerCannotAct={attackerCannotAct} legendaryGate={legendaryGate} spellUsesUsed={spellUsesUsed} />
       <ZoneAuraLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onZoneAuraRow={onZoneAuraRow} />
       <ZonePickerLink action={action} attackerCannotAct={attackerCannotAct} onZonePickerRow={onZonePickerRow} />
       <SummonLink action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSummonRow={onSummonRow} rechargeOut={rechargeOut} />

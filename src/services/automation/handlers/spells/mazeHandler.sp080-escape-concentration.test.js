@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { handleEscape } from './mazeHandler.js';
 import * as combatData from '../../../encounters/combatData.js';
@@ -93,13 +93,18 @@ describe('SP-080 maze escape lane — caster concentration breaks when the spell
     storage.set.mockReturnValue(undefined);
     logService.addEntry.mockReturnValue(Promise.resolve());
   });
+  afterEach(() => { vi.restoreAllMocks(); });
 
   it('escape success clears caster Maze concentration, persists combatSummary, logs release', async () => {
     const cs = makeCs({ spell: 'Maze', dc: 19 });
     combatData.getCombatSummary.mockReturnValue(cs);
     armMaze([{ effect: 'maze', target: 'Goblin', source: 'TestCaster', dc: 20 }]);
+    // mazeHandler.js:305 rolls a live Math.random d20 — rig a natural 20 so
+    // the success-lane assertions are deterministic (~35% flake at +12 vs DC 20).
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.95);
 
     const result = await handleEscape(makeEscapeAction(), {}, campaignName, null);
+    randomSpy.mockRestore();
 
     expect(result.payload.description).toContain('escaped the Maze');
     expect(concentrationService.breakConcentration).toHaveBeenCalledWith(cs, 'TestCaster');

@@ -19,7 +19,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, parseSpeedReduceClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseSaveVariantChooser, parseBothOutcomesClause, parseTempHpGrantClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseSaveHpMaxReduce, parseSaveAttackerRecover, parseSaveTargetEffect, parseSaveDamageFields, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog, isUtilitySpellCastRow } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, extractSpellNamesFromSpellcasting, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, parseSpeedReduceClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseSaveVariantChooser, parseBothOutcomesClause, parseTempHpGrantClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseSaveHpMaxReduce, parseSaveAttackerRecover, parseSaveTargetEffect, parseSaveDamageFields, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog, isUtilitySpellCastRow } from './MonsterCardHelpers.js';
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { SaveVariantChooserModal } from './SaveVariantChooserModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
@@ -845,8 +845,51 @@ function legendaryDelegateMechanic(action, monster) {
   return { mechanicAction: resolved, actionName: chooserInherited ? action.name : legendaryDelegateAttackName(action, resolved) };
 }
 
-async function resolveLegendaryRow({ action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage, handleCheck, getTarget }) {
+// MA-1883: live spell-delegate lane (inherit-BEFORE-collapse, the MA-1853/
+// MA-1881 precedent taken to its lane) — a stamped spell-delegate child
+// (Demogorgon "Cast a Spell (Costs 2 Actions)") NEVER reaches the save leg:
+// a spell-named press spends the row's RAW legendary cost (cost-parsed by
+// expendLegendaryUse, MA-1847/MA-1872 residual closed) then casts through the
+// SAME live handleSpellCast lane MA-1879 armed on the master (spells.json
+// lookup, the spell's own dc_type + row DC 23, N/Day charge tracking, real
+// damage/condition payload). Check-BEFORE-spend (MA-1150): an exhausted
+// spell, an unarmed save-lane cast (MA-0049), and a press with no spell
+// chosen all refuse honestly with ZERO legendary spend — never again the
+// MA-1874 zero-payload CAN-route that rolled a victim save into empty air.
+// Returns true when the press is consumed. Hoisted for the §45 complexity
+// ceiling (MA-0501 sibling-helper pattern).
+async function legendarySpellCastFlow({ action, monsterName, monster, campaignName, setPopupHtml, handleSpellCast, getTarget, spellName }) {
+  const spellRow = action.legendarySpellRow;
+  if (!spellRow) return false;
+  const spellNames = extractSpellNamesFromSpellcasting(spellRow.description);
+  if (!spellName || !spellNames.includes(spellName)) {
+    setPopupHtml(buildLegendaryRefusalPopup({ monsterName, actionName: action.name, reason: 'no-spell-chosen' }));
+    addEntry(campaignName, buildLegendaryRefusalLog({ monsterName, actionName: action.name, reason: 'no-spell-chosen' }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging legendary no-spell refusal:', e); });
+    return true;
+  }
+  const spellGate = spellUsesGate(monsterName, spellRow, spellName);
+  if (spellGate.exhausted) {
+    await addEntry(campaignName, buildMonsterSpellRefusalEntry({ monsterName, spellName, usesMax: spellGate.usesMax }))
+      .catch((e) => { console.error('[MonsterCardModal] Error logging legendary spell refusal:', e); });
+    return true;
+  }
+  const castSpell = await findMonsterSpell(spellName);
+  const routesToSave = castSpell ? (spellHasDamage(castSpell) || Boolean(spellDamagelessSaveCondition(castSpell))) : false;
+  if (refuseUnarmedMonsterSaveCast({ routesToSave, target: getTarget(), monsterName, spellName, campaignName, setPopupHtml })) return true;
+  const result = await expendLegendaryUse({ monsterName, monster, actionName: `${action.name} (${spellName})`, campaignName, action });
+  if (!result.spent) {
+    setPopupHtml(result.popupHtml);
+    return true;
+  }
+  handleSpellCast(spellRow, spellName)
+    .catch((e) => { console.error(`[MonsterCardModal] legendary spell cast "${spellName}" failed:`, e); });
+  return true;
+}
+
+async function resolveLegendaryRow({ action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage, handleCheck, handleSpellCast, getTarget, spellName = null }) {
   if (await legendaryPrerequisiteRefusal({ action, monsterName, campaignName, setPopupHtml, getTarget })) return;
+  if (await legendarySpellCastFlow({ action, monsterName, monster, campaignName, setPopupHtml, handleSpellCast, getTarget, spellName })) return;
   let mechanicAction = action;
   let actionName = action.name;
   if (!legendaryRowHasNumericMechanic(action) && action.delegates_to) {
@@ -2586,8 +2629,11 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   // refusal popup + legendary_use_refused zero-spend log) then resolve the
   // row's own mechanic as today (numeric chips roll via the existing
   // handlers, MA-0014 chip gate intact; non-numeric rows log the advisory).
-  const handleLegendaryRow = (action) => resolveLegendaryRow({
+  // MA-1883: spell-delegate chips press with their spellName — the gated
+  // press spends the row's RAW cost (2) then casts the named spell live.
+  const handleLegendaryRow = (action, spellName = null) => resolveLegendaryRow({
     action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage,
+    handleSpellCast, spellName,
     handleCheck: handleSkillCheck,
     // MA-1847: armed-target eligibility refused BEFORE the spend.
     getTarget,

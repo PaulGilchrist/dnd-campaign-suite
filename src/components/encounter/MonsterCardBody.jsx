@@ -7,8 +7,20 @@ import { EFFECT_DESCRIPTIONS } from '../../services/combat/conditions/effectDesc
 import { MonsterAction } from './MonsterAction.jsx';
 import { legendaryHeaderAction, legendaryUsesRemaining, legendaryCheckRow, legendaryCheckBonus } from '../../services/encounters/monsterLegendaryUses.js';
 import { isLairRowClickable, lairRowAffordance } from '../../services/encounters/monsterLairActions.js';
-import { hasEntries, hasSenseEntries, saveAbilityAbbr, parseInitiativeBonus, formatSenses } from './MonsterCardHelpers.js';
+import { hasEntries, hasSenseEntries, saveAbilityAbbr, parseInitiativeBonus, formatSenses, legendarySpellCastMaster } from './MonsterCardHelpers.js';
 import { useSpellNameIndex } from '../../hooks/ui/useSpellNameIndex.js';
+
+// MA-1883: legendary child render-stamp (mirrors the MA-0051 checkBonus
+// stamp at the same seam) — a child delegating to a live Spellcasting master
+// carries `legendarySpellRow` so MonsterAction arms gated spell chips
+// (press = spend the row's RAW cost, then cast the named spell through the
+// MA-1879 live lane) instead of collapsing into a zero-payload save. Stamp
+// lives on the render copy only — monsters.json is never mirrored (MA-1881).
+function stampLegendaryChildRow(monster, action) {
+  const row = legendaryCheckRow(action) ? { ...action, checkBonus: legendaryCheckBonus(monster, action) } : action;
+  const spellRow = legendarySpellCastMaster(monster, row);
+  return spellRow ? { ...row, legendarySpellRow: spellRow } : row;
+}
 
 export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp, shieldOfFaithBonus, handleInitiative, handleAbilityCheck, handleSaveThrow, handleSkillCheck, attackerCannotAct, attackerActionBlocked = attackerCannotAct, handleAttack, handleDamage, handleSaveRoll, handleSpellCast, handleAllyModalOpen, currentAllies, monsterTargetEffects, inspiringMoveNoOA, remarkableNoOA, speedyOpportunityDisadvantage, speedyDifficultTerrainIgnore, getAttackerCreature, campaignName, monsterSpellUses = {}, monsterReactionUses = {}, monsterLegendaryUses = {}, handleGatedReaction, handleLegendaryRow, handleLairRow, handleZoneAuraRow, handleSummonRow, handleSelfBuffRow, handleGrantReactionRow, handleShapeShiftRow, handleZonePickerRow, handleAdvisoryRow, monsterRecharge = {} }) {
   // MA-1014: spells.json name index for the spell_save_dc-only utility-row
@@ -67,7 +79,7 @@ export function MonsterCardBody({ monster, monsterName, onClose, creatureTempHp,
           <MonsterCardDefenses monster={monster} monsterName={monsterName} campaignName={campaignName} handleSaveThrow={handleSaveThrow} handleSkillCheck={handleSkillCheck} />
           {actionSections.map(s => (
             s.key === 'legendary_actions' && legendaryHeader ? (
-              <MonsterActionSection key={s.key} title={s.title} actions={s.actions.slice(1).map(a => legendaryCheckRow(a) ? { ...a, checkBonus: legendaryCheckBonus(monster, a) } : a)} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} legendaryGate={handleLegendaryRow} rechargeState={monsterRecharge} handleZoneAuraRow={handleZoneAuraRow} handleSummonRow={handleSummonRow} handleSelfBuffRow={handleSelfBuffRow} handleGrantReactionRow={handleGrantReactionRow} handleShapeShiftRow={handleShapeShiftRow} handleZonePickerRow={handleZonePickerRow} handleAdvisoryRow={handleAdvisoryRow} spellNameIndex={spellNameIndex} headerRow={<MonsterLegendaryHeaderRow header={legendaryHeader} remaining={legendaryRemaining} />} />
+              <MonsterActionSection key={s.key} title={s.title} actions={s.actions.slice(1).map(a => stampLegendaryChildRow(monster, a))} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} legendaryGate={handleLegendaryRow} rechargeState={monsterRecharge} handleZoneAuraRow={handleZoneAuraRow} handleSummonRow={handleSummonRow} handleSelfBuffRow={handleSelfBuffRow} handleGrantReactionRow={handleGrantReactionRow} handleShapeShiftRow={handleShapeShiftRow} handleZonePickerRow={handleZonePickerRow} handleAdvisoryRow={handleAdvisoryRow} spellNameIndex={spellNameIndex} headerRow={<MonsterLegendaryHeaderRow header={legendaryHeader} remaining={legendaryRemaining} />} />
             ) : (
               <MonsterActionSection key={s.key} title={s.title} actions={s.actions} attackerCannotAct={s.blocked} handleAttack={handleAttack} handleDamage={handleDamage} handleSaveRoll={handleSaveRoll} handleSpellCast={handleSpellCast} spellUsesUsed={monsterSpellUses} reactionUsesUsed={monsterReactionUses} onGatedReaction={handleGatedReaction} rechargeState={monsterRecharge} handleZoneAuraRow={handleZoneAuraRow} handleSummonRow={handleSummonRow} handleSelfBuffRow={handleSelfBuffRow} handleGrantReactionRow={handleGrantReactionRow} handleShapeShiftRow={handleShapeShiftRow} handleZonePickerRow={handleZonePickerRow} handleAdvisoryRow={handleAdvisoryRow} spellNameIndex={spellNameIndex} />
             )

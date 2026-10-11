@@ -169,17 +169,35 @@ export function legendaryUsesRemaining(header, storedUses) {
   return Math.max(0, max - (Number(storedUses?.used) || 0));
 }
 
-// Gate for a legendary-row click. Refusal reasons: exhausted / own-turn /
-// turn (one expend per other-creature-turn latch).
-export function legendaryExpendGate({ header, storedUses, round, activeCreatureName, monsterName, latch }) {
+// MA-1883: RAW "Cast a Spell (Costs 2 Actions)"-family rows carry their
+// legendary-uses cost in the ROW NAME ("Costs N Actions") — the disk-canonical
+// source, since monsters.json authors no structured cost field anywhere
+// (grep-proven; MA-1847/MA-1872 family, whose fixes documented the spends-1
+// residual this closes). Parsed once here; gate + expend consume N with an
+// honest insufficient-cost refusal when N > remaining. Unmarked rows cost 1,
+// byte-identical for every existing single-use press.
+export function legendaryActionCost(action) {
+  const m = /\bCosts\s+(\d+)\s+Actions?\b/i.exec(String(action?.name || ''));
+  const n = m ? Number(m[1]) : 1;
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+// Gate for a legendary-row click. Refusal reasons: exhausted / insufficient-cost
+// (MA-1883 cost > remaining) / own-turn / turn (one expend per other-creature-turn latch).
+export function legendaryExpendGate({ header, storedUses, round, activeCreatureName, monsterName, latch, cost = 1 }) {
   const max = legendaryMaxUses(header, storedUses);
   if (max == null) return { allowed: false, reason: 'no-uses' };
-  if (legendaryUsesRemaining(header, storedUses) === 0) return { allowed: false, reason: 'exhausted', max };
+  const remaining = legendaryUsesRemaining(header, storedUses);
+  if (remaining === 0) return { allowed: false, reason: 'exhausted', max };
   if (activeCreatureName === monsterName) return { allowed: false, reason: 'own-turn', max };
   if (latch && Number(latch.round) === Number(round) && latch.activeCreature === activeCreatureName) {
     return { allowed: false, reason: 'turn', max };
   }
-  return { allowed: true, remaining: legendaryUsesRemaining(header, storedUses), max };
+  // MA-1883: economy-floor refusal checked AFTER the boundary gates so a
+  // turn-latch press keeps its honest 'turn' vocabulary (MA-1847 byte-inert);
+  // this only arms on a LEGAL boundary press whose RAW cost exceeds the pool.
+  if (remaining < cost) return { allowed: false, reason: 'insufficient-cost', max, remaining, cost };
+  return { allowed: true, remaining, max };
 }
 
 // MA-0051: authored skill-check legendary rows (Adult Blue Dracolich
@@ -215,7 +233,7 @@ export function legendaryCheckLabel(action) {
   return ac.skill ? `${titleCase(ac.ability)} (${titleCase(ac.skill)})` : `${titleCase(ac.ability)} check`;
 }
 
-export function buildLegendaryRefusalPopup({ monsterName, actionName, reason }) {
+export function buildLegendaryRefusalPopup({ monsterName, actionName, reason, cost = null, remaining = null }) {
   const why = reason === 'exhausted'
     ? `${monsterName} has no legendary uses left — they regain at the start of ${monsterName}'s turn.`
     : reason === 'turn'
@@ -226,17 +244,22 @@ export function buildLegendaryRefusalPopup({ monsterName, actionName, reason }) 
           ? `${actionName} delegates to an attack that could not be found on ${monsterName}. Check the stat block.`
           : reason === 'no-check-bonus'
             ? `${actionName} declares an ability check but no skill or ability modifier could be resolved on ${monsterName}. Check the stat block.`
-            : `${monsterName} has no legendary uses to expend.`;
+            : reason === 'insufficient-cost'
+              ? `${actionName} costs ${cost} legendary uses but ${monsterName} has only ${remaining} left — they regain at the start of ${monsterName}'s turn.`
+              : reason === 'no-spell-chosen'
+                ? `${actionName} casts one of ${monsterName}'s Spellcasting spells — press one of this row's spell chips to choose.`
+                : `${monsterName} has no legendary uses to expend.`;
   return `<div class="mc-prerequisite-refusal"><h3>Legendary Action Refused</h3><p>${actionName}: ${why} Nothing spent, no roll.</p></div>`;
 }
 
-export function buildLegendaryRefusalLog({ monsterName, actionName, reason }) {
+export function buildLegendaryRefusalLog({ monsterName, actionName, reason, cost = null, remaining = null }) {
+  const why = reason === 'insufficient-cost' ? `insufficient-cost: costs ${cost}, ${remaining} left` : reason;
   return {
     type: 'automation',
     automationType: 'legendary_use_refused',
     characterName: monsterName,
     abilityName: actionName,
-    description: `${monsterName} ${actionName} legendary action refused (${reason}) — zero spend, no roll.`,
+    description: `${monsterName} ${actionName} legendary action refused (${why}) — zero spend, no roll.`,
     timestamp: Date.now(),
   };
 }
@@ -276,19 +299,22 @@ export function buildLegendaryAdvisoryLog({ monsterName, action }) {
 function combatRound(cs) { return Number(cs?.round ?? 1) || 0; }
 function combatActive(cs) { return cs?.activeCreatureName || ''; }
 
-function buildLegendarySpendLog({ monsterName, actionName, activeCreature, remaining, max }) {
+function buildLegendarySpendLog({ monsterName, actionName, activeCreature, remaining, max, cost = 1 }) {
+  // MA-1883: "Costs N Actions" rows print the honest multi-spend —
+  // "spends 2 legendary uses … — 0 of 2 left". Cost-1 rows stay byte-identical.
+  const verb = cost > 1 ? `spends ${cost} legendary uses` : 'expends a legendary use';
   return {
     type: 'ability_use',
     characterName: monsterName,
     abilityName: actionName,
-    description: `${monsterName} expends a legendary use for ${actionName} after ${activeCreature || 'another creature'}'s turn — ${remaining} of ${max} left (regain at the start of ${monsterName}'s turn; 4 in lair advisory).`,
+    description: `${monsterName} ${verb} for ${actionName} after ${activeCreature || 'another creature'}'s turn — ${remaining} of ${max} left (regain at the start of ${monsterName}'s turn; 4 in lair advisory).`,
     timestamp: Date.now(),
   };
 }
 
-function refuseLegendary({ log, campaignName, monsterName, actionName, reason }) {
-  return Promise.resolve(log(campaignName, buildLegendaryRefusalLog({ monsterName, actionName, reason })))
-    .then(() => ({ spent: false, remaining: null, reason, popupHtml: buildLegendaryRefusalPopup({ monsterName, actionName, reason }) }));
+function refuseLegendary({ log, campaignName, monsterName, actionName, reason, cost = null, remaining = null }) {
+  return Promise.resolve(log(campaignName, buildLegendaryRefusalLog({ monsterName, actionName, reason, cost, remaining })))
+    .then(() => ({ spent: false, remaining: null, reason, popupHtml: buildLegendaryRefusalPopup({ monsterName, actionName, reason, cost, remaining }) }));
 }
 
 // Row-click expend: gate → spend 1 (awaited, new-object spread, MA-0005
@@ -304,11 +330,11 @@ async function legendaryCooldownRefusal({ action, actionName, monsterName, campa
   return { spent: false, remaining: null, reason: 'cooldown', popupHtml: buildLegendaryCooldownRefusalPopup({ monsterName, actionName: action.name || actionName }) };
 }
 
-async function stampLegendaryCooldown({ action, actionName, monsterName, campaignName, round, used, getRV, setRV }) {
+async function stampLegendaryCooldown({ action, actionName, monsterName, campaignName, round, used, cost = 1, getRV, setRV }) {
   if (!action || !hasLegendaryCooldownClause(action)) return;
   const slug = legendaryActionSlug(action.name || actionName);
   const cooldowns = getRV(monsterName, MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY) || {};
-  await setRV(monsterName, MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY, { ...cooldowns, [slug]: { round, usedBefore: used - 1 } }, campaignName);
+  await setRV(monsterName, MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY, { ...cooldowns, [slug]: { round, usedBefore: used - cost } }, campaignName);
 }
 
 // MA-1868: REGULAR (non-legendary) action rows that declare a structured
@@ -359,6 +385,8 @@ export async function expendLegendaryUse({ monsterName, monster, actionName, cam
   const round = combatRound(cs);
   const activeCreature = combatActive(cs);
 
+  // MA-1883: the row's RAW cost — "(Costs N Actions)" name-text now spends N.
+  const cost = legendaryActionCost(action);
   const gate = legendaryExpendGate({
     header: legendaryHeaderAction(monster),
     storedUses: getRV(monsterName, MONSTER_LEGENDARY_USES_KEY) || {},
@@ -366,8 +394,9 @@ export async function expendLegendaryUse({ monsterName, monster, actionName, cam
     activeCreatureName: activeCreature,
     monsterName,
     latch: getRV(monsterName, MONSTER_LEGENDARY_LATCH_KEY) || null,
+    cost,
   });
-  if (!gate.allowed) return refuseLegendary({ log, campaignName, monsterName, actionName, reason: gate.reason });
+  if (!gate.allowed) return refuseLegendary({ log, campaignName, monsterName, actionName, reason: gate.reason, cost, remaining: gate.remaining });
 
   // MA-0073: per-action once-per-turn gate (after the uses/boundary economy
   // gates so the MA-0021 refusal vocabulary stays intact) — a row whose own
@@ -378,12 +407,14 @@ export async function expendLegendaryUse({ monsterName, monster, actionName, cam
   if (cooldownRefusal) return cooldownRefusal;
 
   const stored = getRV(monsterName, MONSTER_LEGENDARY_USES_KEY) || {};
-  const used = (Number(stored.used) || 0) + 1;
+  const used = (Number(stored.used) || 0) + cost;
   await setRV(monsterName, MONSTER_LEGENDARY_USES_KEY, { max: gate.max, used }, campaignName);
   await setRV(monsterName, MONSTER_LEGENDARY_LATCH_KEY, { round, activeCreature }, campaignName);
-  await stampLegendaryCooldown({ action, actionName, monsterName, campaignName, round, used, getRV, setRV });
+  await stampLegendaryCooldown({ action, actionName, monsterName, campaignName, round, used, cost, getRV, setRV });
   const remaining = Math.max(0, gate.max - used);
-  await log(campaignName, buildLegendarySpendLog({ monsterName, actionName, activeCreature, remaining, max: gate.max }));
+  await log(campaignName, buildLegendarySpendLog({ monsterName, actionName, activeCreature, remaining, max: gate.max, cost }));
+  // Return shape byte-identical to MA-0021 (spent/remaining/max) — the cost
+  // rides the spend log, never a new key (§165 pin stability).
   return { spent: true, remaining, max: gate.max };
 }
 

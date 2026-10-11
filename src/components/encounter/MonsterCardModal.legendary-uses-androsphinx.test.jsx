@@ -175,11 +175,12 @@ describe('MA-0269 monsters.json data: Claw Attack delegates to Claw', () => {
 
 // MA-0270/0271: the header-armed children must not silent-burn (MA-0164).
 // Both route through the MA-0058 advisory seam with row-authored honest copy
-// (`advisory_message`): spend 1 + advisory popup + ability_use record, zero
+// (`advisory_message`): spend + advisory popup + ability_use record, zero
 // rolls. CLA-320: no position consumer app-wide — teleport relocation stays
 // GM-enforced; no spell list is authored for androsphinx, so cast choice
-// stays GM-adjudicated. Canonical costs 2/3 exceed the 1-per-click engine
-// spend — the row copy records that honestly.
+// stays GM-adjudicated. MA-1883: canonical costs 2/3 are now PAID —
+// legendaryActionCost parses "(Costs N Actions)" and expendLegendaryUse
+// spends N per press (pre-fix spends-1 residual closed, MA-1847 family).
 describe('MA-0270/0271 monsters.json data: advisory children, honest cost copy', () => {
   it('Teleport is an advisory row, no numeric mechanic, honest CLA-320 copy', () => {
     const t = row('Teleport (Costs 2 Actions)');
@@ -188,7 +189,7 @@ describe('MA-0270/0271 monsters.json data: advisory children, honest cost copy',
     expect(t.save_dc).toBeUndefined();
     expect(t.delegates_to).toBeUndefined();
     expect(t.advisory_message).toMatch(/GM moves the token, no position consumer \(CLA-320\)/);
-    expect(t.advisory_message).toMatch(/Canonical cost is 2 legendary uses — the engine spends 1 per click/);
+    expect(t.advisory_message).toMatch(/Canonical cost is 2 legendary uses — MA-1883 per-row cost parsing spends 2 per press/);
     expect(t.description).toBe('The sphinx magically teleports, along with any equipment it is wearing or carrying, up to 120 feet to an unoccupied space it can see.');
   });
 
@@ -199,7 +200,7 @@ describe('MA-0270/0271 monsters.json data: advisory children, honest cost copy',
     expect(c.save_dc).toBeUndefined();
     expect(c.delegates_to).toBeUndefined();
     expect(c.advisory_message).toMatch(/GM adjudicates spell choice, no spell list authored/);
-    expect(c.advisory_message).toMatch(/Canonical cost is 3 legendary uses — the engine spends 1 per click/);
+    expect(c.advisory_message).toMatch(/Canonical cost is 3 legendary uses — MA-1883 per-row cost parsing spends 3 per press/);
     expect(c.description).toBe('The sphinx casts a spell from its list of prepared spells, using a spell slot as normal.');
   });
 
@@ -280,16 +281,17 @@ describe('MA-0269 MonsterCardModal androsphinx gated legendary economy', () => {
     expect(spends.length).toBe(1);
   });
 
-  it('Teleport gated click spends 1 and lands the advisory record (popup + ability_use log), zero rolls, zero console dead-end', async () => {
+  it('Teleport gated click spends its RAW cost 2 and lands the advisory record (popup + ability_use log), zero rolls, zero console dead-end', async () => {
     renderASphinx({ max: 3, used: 0 });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     fireEvent.click(sphinxRow('Teleport (Costs 2 Actions)').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 3, used: 1 }));
+    // MA-1883: "(Costs 2 Actions)" spends 2 — the pre-fix spends-1 residual closed.
+    await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 3, used: 2 }));
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
     const html = String(setPopupHtml.mock.calls.map(c => String(c[0])).find(h => /Teleport/.test(h)));
     expect(html).toMatch(/Legendary Action — Teleport \(Costs 2 Actions\)/);
     expect(html).toMatch(/GM moves the token, no position consumer \(CLA-320\)/);
-    expect(html).toMatch(/Canonical cost is 2 legendary uses — the engine spends 1 per click/);
+    expect(html).toMatch(/Canonical cost is 2 legendary uses — MA-1883 per-row cost parsing spends 2 per press/);
     await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e =>
       e.type === 'ability_use' && e.abilityName === 'Teleport (Costs 2 Actions)' && /advisory record/.test(e.description))).toBe(true));
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
@@ -299,16 +301,17 @@ describe('MA-0269 MonsterCardModal androsphinx gated legendary economy', () => {
     errSpy.mockRestore();
   });
 
-  it('Cast a Spell gated click spends 1 and lands the advisory record (popup + ability_use log), zero rolls, zero console dead-end', async () => {
-    renderASphinx({ max: 3, used: 1 });
+  it('Cast a Spell gated click spends its RAW cost 3 and lands the advisory record (popup + ability_use log), zero rolls, zero console dead-end', async () => {
+    renderASphinx({ max: 3, used: 0 });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     fireEvent.click(sphinxRow('Cast a Spell (Costs 3 Actions)').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 3, used: 2 }));
+    // MA-1883: "(Costs 3 Actions)" spends the full 3-use RAW cost.
+    await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 3, used: 3 }));
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
     const html = String(setPopupHtml.mock.calls.map(c => String(c[0])).find(h => /Cast a Spell/.test(h)));
     expect(html).toMatch(/Legendary Action — Cast a Spell \(Costs 3 Actions\)/);
     expect(html).toMatch(/GM adjudicates spell choice, no spell list authored/);
-    expect(html).toMatch(/Canonical cost is 3 legendary uses — the engine spends 1 per click/);
+    expect(html).toMatch(/Canonical cost is 3 legendary uses — MA-1883 per-row cost parsing spends 3 per press/);
     await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e =>
       e.type === 'ability_use' && e.abilityName === 'Cast a Spell (Costs 3 Actions)' && /advisory record/.test(e.description))).toBe(true));
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();

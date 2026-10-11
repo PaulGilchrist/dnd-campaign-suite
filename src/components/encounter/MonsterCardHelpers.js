@@ -18,6 +18,7 @@ import { resolveMonsterJinxRow } from '../../services/encounters/monsterJinx.js'
 import { resolveMonsterGuardianProtectionRow } from '../../services/encounters/monsterGuardianProtection.js';
 import { resolveMonsterSpellReflectionRow } from '../../services/encounters/monsterSpellReflection.js';
 import { resolveMonsterBurstOfIngenuityRow } from '../../services/encounters/monsterBurstOfIngenuity.js';
+import { legendaryDelegateAction } from '../../services/encounters/monsterLegendaryUses.js';
 
 export function hasEntries(obj) {
   return obj && Object.keys(obj).length > 0;
@@ -448,6 +449,23 @@ export function extractSpellcastingSpellUses(description) {
     if (limit != null) uses[text] = limit;
   }
   return uses;
+}
+
+// MA-1883: legendary spell-delegate fingerprint — a legendary row that
+// delegates to its monster's Spellcasting master (Demogorgon "Cast a Spell
+// (Costs 2 Actions)") resolves to the LIVE cast lane MA-1879 armed on the
+// master (markup spell chips, per-spell N/Day uses, row DC). Returns the
+// master row when it exists AND carries extractable spell names; the master
+// is NOT mirrored onto the child in monsters.json (MA-1881 code-side inherit
+// is the single source of truth) — MonsterCardBody stamps `legendarySpellRow`
+// on the render copy so the row arms gated spell chips instead of collapsing
+// into the save leg (MA-1874 zero-payload CAN-route). Null = no spell
+// delegate; every non-delegating row byte-inert.
+export function legendarySpellCastMaster(monster, action) {
+  if (!action?.delegates_to) return null;
+  const master = legendaryDelegateAction(monster, action);
+  if (!master || !/^spellcasting$/i.test(master.name || '')) return null;
+  return extractSpellNamesFromSpellcasting(master.description).length > 0 ? master : null;
 }
 
 // MA-0348: damageless save spells (Bandit Deceiver Hold Person) live on the

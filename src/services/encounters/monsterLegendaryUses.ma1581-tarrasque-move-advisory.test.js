@@ -153,7 +153,9 @@ describe('MA-1581 block siblings intact', () => {
     expect(Object.keys(tp)).toEqual(['name', 'advisory', 'advisory_message', 'description']);
     expect(tp.advisory).toBe('sphinx_teleport');
     expect(tp.advisory_message).toContain('no position consumer (CLA-320)');
-    expect(tp.advisory_message).toContain('the engine spends 1 per click');
+    // MA-1883: cost parsed from "(Costs 2 Actions)" and spent per press —
+    // the pre-fix "engine spends 1 per click" copy would now be false.
+    expect(tp.advisory_message).toContain('MA-1883 per-row cost parsing spends 2 per press');
   });
 
   it('arch-hag advisory twin byte-locked: Malicious Magic advisory + advisory_message (spellcast-choice copy)', () => {

@@ -111,17 +111,18 @@ describe('MA-1582 delegated Chomp rides the shared spend gate honestly (cost-2 r
     };
   });
 
-  it('end-of-other-turn press spends 3→2 with the Chomp name in the spend log', async () => {
+  it('end-of-other-turn press spends 3→1 with the Chomp name in the spend log (MA-1883 closes the cost-2 residual)', async () => {
     const delegate = legendaryDelegateAction(tarrasque, chomp);
     const actionName = legendaryDelegateAttackName(chomp, delegate);
     const r = await expendLegendaryUse({ monsterName: 'Tarrasque 1', monster: tarrasque, actionName, action: chomp, campaignName: 'test-campaign', deps });
-    expect(r).toEqual({ spent: true, remaining: 2, max: 3 });
-    expect(store['Tarrasque 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    expect(r).toEqual({ spent: true, remaining: 1, max: 3 });
+    expect(store['Tarrasque 1.monsterLegendaryUses']).toEqual({ max: 3, used: 2 });
     const spend = logs.filter(e => e.type === 'ability_use');
-    expect(spend[0].description).toMatch(/expends a legendary use for Chomp \(Costs 2 Actions\) \(Bite attack\) .* 2 of 3 left/);
-    // RESIDUAL (documented, honest): RAW cost is 2 — engine spends 1 per
-    // click (no cost-2 consumer app-wide); the deduction of the second use
-    // stays GM-adjudicated. One spend is asserted AS OBSERVED, not fudged.
+    expect(spend[0].description).toMatch(/spends 2 legendary uses for Chomp \(Costs 2 Actions\) \(Bite attack\) .* 1 of 3 left/);
+    // RESIDUAL CLOSED (MA-1883): the MA-1582-era engine spent 1 per click
+    // ("Costs 2 Actions" was name-text, no cost consumer). Legendary
+    // expendLegendaryUse now parses "(Costs N Actions)" from the row name
+    // (legendaryActionCost) and spends N — RAW-exact.
   });
 
   it('own-turn press refuses own-turn with ZERO spend (gate turn-latch honest)', async () => {

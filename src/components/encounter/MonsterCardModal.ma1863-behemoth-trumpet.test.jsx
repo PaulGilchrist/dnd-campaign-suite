@@ -12,9 +12,9 @@
 // resolveInlineSlowedDuration /next turn/ fork → rounds:2, MA-0073 clock shape).
 // dc_success:"none" — condition-only row, half-default would leak fake
 // "takes half damage" copy (MV-20/§335). NO costs/cost-token authored:
-// "Costs 2 Actions" stays name-text — the engine spends 1 per press, the
-// 2-cost multiplier is the documented MA-1847/MA-1839 ADVISORY floor
-// (grep-zero cost-token parse, engine-side). NO delegates_to (row self-resolves),
+// "Costs 2 Actions" rides the row name — MA-1883 per-row cost parsing
+// (legendaryActionCost) spends 2 per press, closing the MA-1847/MA-1839
+// spends-1 ADVISORY floor. NO delegates_to (row self-resolves),
 // NO advisory, NO structured range (multi-enemy roar "within 60 ft." carries no
 // shape token → breathAoeShape null → inline single-target-vs-armed degradation,
 // accepted per orchestrator adjudication §162/§1843).
@@ -197,11 +197,11 @@ describe('MA-1863 MonsterCardModal Behemoth Trumpet resolves as a DC 23 Wisdom s
     expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
   });
 
-  it('chip press spends ONE legendary use then rolls DC 23 Wisdom with no_reactions transport — zero silent burn', async () => {
+  it('chip press spends its RAW cost 2 (MA-1883) then rolls DC 23 Wisdom with no_reactions transport — zero silent burn', async () => {
     renderBehemoth({ max: 3, used: 0 });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     fireEvent.click(trumpChip());
-    await waitFor(() => expect(runtime.store['Behemoth 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(runtime.store['Behemoth 1.monsterLegendaryUses']).toEqual({ max: 3, used: 2 }));
     await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
     const [abbr, , options] = ROLLERS.rollSavingThrow.mock.calls[0];
     expect(abbr).toBe('WIS');
@@ -214,7 +214,8 @@ describe('MA-1863 MonsterCardModal Behemoth Trumpet resolves as a DC 23 Wisdom s
     expect(options.slowedClauses).toEqual({ effects: ['no_reactions'] });
     expect(options.conditionDurationNote).toMatch(/until the end of its next turn/);
     const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Trumpet/.test(String(e.description)));
-    expect(spend.description).toMatch(/expends a legendary use/i);
+    // MA-1883: "(Costs 2 Actions)" pays its RAW cost — spends 2 of 3.
+    expect(spend.description).toMatch(/spends 2 legendary uses for Trumpet \(Costs 2 Actions\).*1 of 3 left/);
     expect(errSpy.mock.calls.flat().some(a => /no resolvable mechanic/.test(String(a)))).toBe(false);
     errSpy.mockRestore();
   });

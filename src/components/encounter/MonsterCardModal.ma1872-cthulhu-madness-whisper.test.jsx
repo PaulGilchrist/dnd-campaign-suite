@@ -15,9 +15,9 @@
 // The fail-face reaction-block rides the MA-0711/MA-1863 victim-anchored prose
 // te lane: save_effect "can't take Reactions" → parseSlowedClauses arms the
 // registered te no_reactions (targetEffectDefinitions), /next turn/ →
-// rounds:2 clock (§216 consumer fork). "Costs 2 Actions" stays name-text —
-// engine spends 1 per press (MA-1847/MA-1839 ADVISORY floor, grep-zero
-// cost-token parse). NO once_per_turn authored — that is Psychic Shatter's
+// rounds:2 clock (§216 consumer fork). "Costs 2 Actions" rides the row name —
+// MA-1883 per-row cost parsing spends 2 per press, closing the
+// MA-1847/MA-1839 spends-1 ADVISORY floor. NO once_per_turn authored — that is Psychic Shatter's
 // MA-1868 field; madness_whisper must stay byte-inert on the cooldown lane.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -206,11 +206,11 @@ describe('MA-1872 MonsterCardModal Madness Whisper resolves as its own DC 24 Wis
     expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
   });
 
-  it('chip press spends ONE legendary use then rolls DC 24 WISDOM with no_reactions transport + 4d6 fail pool — zero mis-route, zero silent burn', async () => {
+  it('chip press spends its RAW cost 2 (MA-1883) then rolls DC 24 WISDOM with no_reactions transport + 4d6 fail pool — zero mis-route, zero silent burn', async () => {
     renderCthulhu({ max: 3, used: 0 });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     fireEvent.click(whisperChip());
-    await waitFor(() => expect(runtime.store['Cthulhu 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    await waitFor(() => expect(runtime.store['Cthulhu 1.monsterLegendaryUses']).toEqual({ max: 3, used: 2 }));
     await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
     const [abbr, , options] = ROLLERS.rollSavingThrow.mock.calls[0];
     expect(abbr).toBe('WIS');
@@ -225,7 +225,7 @@ describe('MA-1872 MonsterCardModal Madness Whisper resolves as its own DC 24 Wis
     const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Madness Whisper/.test(String(e.description)));
     expect(spend).toBeTruthy();
     expect(spend.abilityName).toBe('Madness Whisper (Costs 2 Actions)');
-    expect(spend.description).toMatch(/expends a legendary use/i);
+    expect(spend.description).toMatch(/spends 2 legendary uses for Madness Whisper \(Costs 2 Actions\).*1 of 3 left/);
     // never routes into Psychic Shatter's pool (no delegate label, no INT axis, no stun conditions)
     expect(String(spend.abilityName)).not.toMatch(/Psychic Shatter/);
     expect(addEntry.mock.calls.map(c => c[1]).some(e => /Psychic Shatter/.test(String(e.abilityName)) && e.type === 'ability_use')).toBe(false);

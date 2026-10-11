@@ -187,9 +187,14 @@ describe('MA-1879 monsters.json data lock: Demogorgon Spellcasting row', () => {
     });
   });
 
-  it('row-level numeric save_dc 23 + save_type Wisdom pair untouched (§89 requirement)', () => {
+  it('row-level numeric save_dc 23 + save_type Charisma (§89 pair; MA-1883 fixed the ability)', () => {
     expect(demogorgonRow.save_dc).toBe(23);
-    expect(demogorgonRow.save_type).toBe('Wisdom');
+    // MA-1883: save_type "Wisdom" contradicted the row's OWN prose ("using
+    // Charisma as the spellcasting ability (spell save DC 23)") and the app-
+    // wide Spellcasting convention (save_type === prose ability, grep-proven
+    // across ~90 monsters). Charisma: DC 23 = 8 + PB 8 + CHA mod +7 (CHA 25);
+    // Wisdom would give 8 + 8 + 3 = 19 ≠ 23. DC byte-untouched.
+    expect(demogorgonRow.save_type).toBe('Charisma');
     expect(demogorgonRow.description).toMatch(/spell save DC 23/);
   });
 

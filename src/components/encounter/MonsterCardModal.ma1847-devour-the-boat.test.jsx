@@ -133,13 +133,14 @@ describe('MA-1847 Devour chip rides the legendary gate with its own save', () =>
     expect(addEntry.mock.calls.map((c) => c[1]).some((e) => e.type === 'ability_use')).toBe(false);
   });
 
-  it('grappled armed target: spends 1 (cost-2 advisory floor), DC 26 CON save fires with 6d10 Piercing + no_healing rider armed', async () => {
+  it('grappled armed target: spends 2 (MA-1883 cost-parsed RAW cost), DC 26 CON save fires with 6d10 Piercing + no_healing rider armed', async () => {
     runtime.store['ElderPaladin.activeConditions'] = ['grappled'];
     runtime.store['ElderPaladin.activeConditionMeta'] = { grappled: { dc: 26, source: 'Apep 1' } };
     renderApep({ max: 3, used: 0 });
     fireEvent.click(devourChip());
 
-    await waitFor(() => expect(runtime.store['Apep 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
+    // MA-1883: "(Costs 2 Actions)" now pays its RAW cost (was spends-1 floor).
+    await waitFor(() => expect(runtime.store['Apep 1.monsterLegendaryUses']).toEqual({ max: 3, used: 2 }));
     await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
     const call = ROLLERS.rollSavingThrow.mock.calls[0];
     expect(String(call[0]).toUpperCase()).toContain('CON');
@@ -157,15 +158,17 @@ describe('MA-1847 Devour chip rides the legendary gate with its own save', () =>
     expect(addEntry.mock.calls.map((c) => c[1]).some((e) => e.automationType === 'devour_the_boat_costs_2_actions_refused')).toBe(false);
   });
 
-  it('same-boundary refire after spend: honest latch refusal, no second save', async () => {
+  it('same-boundary refire after spend: honest turn-latch refusal, no second save', async () => {
     runtime.store['ElderPaladin.activeConditions'] = ['grappled'];
     runtime.store['ElderPaladin.activeConditionMeta'] = { grappled: { dc: 26, source: 'Apep 1' } };
     renderApep({ max: 3, used: 0 });
     fireEvent.click(devourChip());
     await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1));
     fireEvent.click(devourChip());
-    await waitFor(() => expect(addEntry.mock.calls.map((c) => c[1]).some((e) => e.automationType === 'legendary_use_refused' && /turn/.test(e.description))).toBe(true));
-    expect(runtime.store['Apep 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    // MA-1883: RAW cost 2 paid on the first press (used 2, 1 left); the
+    // same-boundary refire refuses on the turn latch (MA-1847 vocabulary).
+    await waitFor(() => expect(addEntry.mock.calls.map((c) => c[1]).some((e) => e.automationType === 'legendary_use_refused' && /refused \(turn\)/.test(e.description))).toBe(true));
+    expect(runtime.store['Apep 1.monsterLegendaryUses']).toEqual({ max: 3, used: 2 });
     expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1);
   });
 });
