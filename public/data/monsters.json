@@ -18290,7 +18290,41 @@
         "name": "Gaze",
         "save_type": "Wisdom",
         "save_dc": 23,
-        "description": "Wisdom Saving Throw: DC 23, one creature it can see within 120 ft. The target suffers one of the following effects (choose one or roll a d6): 1-2 Beguiling Gaze, the target has the Stunned condition until the start of the demogorgon's next turn or until the demogorgon is no longer within line of sight; 3-4 Confusing Gaze, the target suffers the effect of the Confusion spell until the start of the demogorgon's next turn without concentrating; 5-6 Hypnotic Gaze, the target is Charmed by the demogorgon until the start of its next turn and the demogorgon chooses how the Charmed target uses its Action, Reaction, and movement. No damage."
+        "description": "Wisdom Saving Throw: DC 23, one creature it can see within 120 ft. The target suffers one of the following effects (choose one or roll a d6): 1-2 Beguiling Gaze, the target has the Stunned condition until the start of the demogorgon's next turn or until the demogorgon is no longer within line of sight; 3-4 Confusing Gaze, the target suffers the effect of the Confusion spell until the start of the demogorgon's next turn without concentrating; 5-6 Hypnotic Gaze, the target is Charmed by the demogorgon until the start of its next turn and the demogorgon chooses how the Charmed target uses its Action, Reaction, and movement. No damage.",
+        "range": "120 feet",
+        "variants": [
+          {
+            "key": "beguiling",
+            "label": "Beguiling Gaze (1-2)",
+            "description": "The target has the Stunned condition until the start of the demogorgon's next turn or until the demogorgon is no longer within line of sight. No damage.",
+            "conditions": [
+              "stunned"
+            ],
+            "rounds": 2,
+            "dc_success": "none",
+            "duration_note": "until start of demogorgon's next turn or until out of line of sight (line-of-sight clause GM-enforced)"
+          },
+          {
+            "key": "confusing",
+            "label": "Confusing Gaze (3-4)",
+            "description": "The target suffers the effect of the Confusion spell until the start of the demogorgon's next turn without concentrating. No damage.",
+            "te": "confusion",
+            "rounds": 2,
+            "dc_success": "none",
+            "duration_note": "until start of demogorgon's next turn"
+          },
+          {
+            "key": "hypnotic",
+            "label": "Hypnotic Gaze (5-6)",
+            "description": "The target is Charmed by the demogorgon until the start of its next turn and the demogorgon chooses how the Charmed target uses its Action, Reaction, and movement. No damage.",
+            "conditions": [
+              "charmed"
+            ],
+            "rounds": 2,
+            "dc_success": "none",
+            "duration_note": "until start of demogorgon's next turn; GM directs Action/Reaction/movement (GM-enforced)"
+          }
+        ]
       },
       {
         "name": "Spellcasting",

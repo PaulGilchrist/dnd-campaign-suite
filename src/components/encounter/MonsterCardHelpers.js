@@ -307,9 +307,14 @@ export function parseAnimalSpiritVariants(action) {
 // conditions / damage / dc_success / duration_note; the chip press opens the
 // chooser before any roll, and the picked variant replaces the row-level
 // saveDamageFormula + saveConditions threading into the block-save seam.
+// MA-1878: a variant may declare a registered te instead of canonical
+// conditions (Demogorgon Confusing Gaze → confusion te — "Confused" rides
+// the MA-1863 non-canonical te channel, the §346 word-scan can never see
+// it). Entries need key/label PLUS conditions[] or te; malformed entries
+// (no conditions, no te) stay filtered, so every existing byte-pin holds.
 export function parseSaveVariantChooser(action) {
   const variants = Array.isArray(action?.variants)
-    ? action.variants.filter(v => v?.key && v?.label && Array.isArray(v.conditions) && v.conditions.length > 0)
+    ? action.variants.filter(v => v?.key && v?.label && ((Array.isArray(v.conditions) && v.conditions.length > 0) || (typeof v.te === 'string' && v.te.length > 0)))
     : [];
   if (variants.length < 2) return null;
   return { variants };

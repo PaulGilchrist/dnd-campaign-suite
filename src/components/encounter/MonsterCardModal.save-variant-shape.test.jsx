@@ -28,4 +28,33 @@ describe('MA-1436 breathAoeShape — authored emanation beats prose shape tokens
   it('byte-inertia: no DC, no shape — DC0 decoy stays picker-inert', () => {
     expect(breathAoeShape({ save_dc: 0, range: '60-foot Emanation', description: 'Spores.' }, null)).toBeNull();
   });
+
+  // MA-1878: "line of sight" is a targeting condition, not an area shape,
+  // once the row authors a NUMERIC origin range — pre-fix the prose /\bline\b/
+  // scrape opened a fake "60-ft Line" picker on the Demogorgon Gaze
+  // (§412/MA-1436 fingerprint re-confirmed: prose "120 ft." carries no full
+  // word "foot|feet" token, so the Line leg defaulted to 60).
+  it('MA-1878: numeric-range row whose only shape word is "line of sight" parses NULL (inline single-target, no fake Line)', () => {
+    const gaze = monstersData.find(m => m.index === 'demogorgon').actions.find(a => a.name === 'Gaze');
+    expect(/line of sight/i.test(gaze.description)).toBe(true);
+    expect(gaze.range).toBe('120 feet');
+    expect(breathAoeShape(gaze, null)).toBeNull();
+  });
+
+  it('MA-1878 byte-inertia: range:null prose-Line row keeps its adjudicated Line picker (Tarrasque Frightful Presence)', () => {
+    const fp = monstersData.find(m => m.index === 'tarrasque').actions.find(a => a.name === 'Frightful Presence');
+    expect(fp.range ?? null).toBeNull();
+    expect(breathAoeShape(fp, null)).toMatchObject({ shape: 'Line' });
+  });
+
+  it('MA-1878 byte-inertia: numeric-range prose-Line rows WITHOUT variants keep their adjudicated Line picker (Young Green Dragon Wall of Thorns, MA-1785 pin)', () => {
+    const wall = monstersData.find(m => m.index === 'young-green-dragon').lair_actions.find(a => a.name === 'Wall of Thorns');
+    expect(wall.variants ?? null).toBeNull();
+    expect(/line of sight/i.test(wall.description)).toBe(true);
+    expect(breathAoeShape(wall, null)).toMatchObject({ shape: 'Line' });
+  });
+
+  it('MA-1878 byte-inertia: real prose Line with numeric range survives LOS sanitize', () => {
+    expect(breathAoeShape({ save_dc: 15, range: '120 feet', description: 'A 90-foot line of lightning; the target cannot break line of sight.' }, null)).toMatchObject({ shape: 'Line', feet: 90 });
+  });
 });

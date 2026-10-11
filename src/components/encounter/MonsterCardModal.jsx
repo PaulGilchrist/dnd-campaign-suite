@@ -121,6 +121,20 @@ function hasRealSaveDc(action) {
   return action?.save_dc != null && Number(action.save_dc) > 0;
 }
 
+// MA-1878: prose shape scrape runs over LOS-sanitized text for VARIANT
+// CHOOSER rows that author a NUMERIC origin range — "line of sight" on the
+// Demogorgon Gaze single-target sighted save ("one creature it can see
+// within 120 ft." + range:"120 feet") is a targeting condition, NOT an area
+// shape; the MA-1436 §412 fingerprint (prose /\bline\b/ fabricating a fake
+// 60-ft Line picker, feet-token list empty because the prose says "120 ft.")
+// dies here. The guard is double-gated on row.variants so every adjudicated
+// prose-shape row stays byte-identical: Young Green Dragon Wall of Thorns
+// (MA-1785 pins its Line picker — "blocks line of sight" there IS the wall
+// area) and Tarrasque Frightful Presence (range:null) never sanitize.
+function proseShapeText(action, description) {
+  return action?.variants && rangeToFeet(action?.range) != null ? description.replace(/\bline of sight\b/gi, ' ') : description;
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
 export function breathAoeShape(action, spellInfo) {
   if (spellInfo) return null;
@@ -147,7 +161,8 @@ export function breathAoeShape(action, spellInfo) {
   if (emanationFt != null) {
     return { shape: 'Radius', feet: emanationFt, rangeGateFt: emanationFt };
   }
-  const shape = /\bcone\b/i.test(description) ? 'Cone' : (/\bline\b/i.test(description) ? 'Line' : null);
+  const shapeText = proseShapeText(action, description);
+  const shape = /\bcone\b/i.test(shapeText) ? 'Cone' : (/\bline\b/i.test(shapeText) ? 'Line' : null);
   // MA-0084: a sphere/radius save row is an area too — route it through the
   // same area picker as the MA-0031 cones / MA-0042 zones. The GM positions
   // the center, so the attacker-origin gate does NOT apply (zone shape).
@@ -430,7 +445,7 @@ function executeBlockSaveRoll({ action, spellInfo, saveDamageFormula, saveCondit
     const saveMod = getSaveModifierForSaveType(saveType, target, characters, creatures);
     rollSavingThrow(saveAbilityAbbr(saveType), saveMod, buildAbilitySaveRollContext({
       monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType: spellInfo?.damageType, animalSpiritVariant, animalSpiritFortifyHp,
-      conditionDurationNote: blockSaveConditionDurationNote(action, spellInfo, saveVariant), characters,
+      conditionDurationNote: blockSaveConditionDurationNote(action, spellInfo, saveVariant), characters, saveVariant,
     }));
   };
   const sleepStaging = sleepStagingForAction(spellInfo, action);
@@ -1681,8 +1696,22 @@ function saveRiderAttackDamageSnapshot(action, monsterName, targetName) {
   return Number(la.actualDamage || la.primaryDamage || la.rawDamage) || 0;
 }
 
+// MA-1878: pruned saveVariant transport stamp (§45 hoist out of
+// buildAbilitySaveRollContext, complexity cap) — the GM-picked save-variant
+// (MA-1436 chooser lane) rides the INLINE block-save context when the row
+// has no area shape (Demogorgon Gaze — fake-Line picker killed by the
+// MA-1878 LOS guard, single-target inline is the Bone Naga Serpentine Gaze
+// canonical twin). The picker's applySaveVariantClockGrant never sees this
+// row (picker never opens), so its te + clock legs ride this pruned stamp
+// to the fail-face consumer saveProcessing.grantSaveVariantClause (§511
+// fail-face te-grant precedent, MA-0595 zoneTe twin). Byte-inert null for
+// every chooserless row (§384 pin).
+function saveVariantTransportStamp(saveVariant) {
+  return saveVariant ? { key: saveVariant.key, label: saveVariant.label, te: saveVariant.te ?? null, conditions: saveVariant.conditions ?? [], rounds: saveVariant.rounds ?? null } : null;
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
-export function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType, animalSpiritVariant = null, animalSpiritFortifyHp = null, conditionDurationNote = null, characters = [] }) {
+export function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType, animalSpiritVariant = null, animalSpiritFortifyHp = null, conditionDurationNote = null, characters = [], saveVariant }) {
   const primaryDamageType = savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction);
   const actionName = spellName || action.name;
   const saveEffect = action?.save_effect ?? null;
@@ -1703,6 +1732,10 @@ export function buildAbilitySaveRollContext({ monsterName, target, spellName, ac
     ...resolveSaveLegDamageFields(action, saveDamageFormula, primaryDamageType, actionName),
     autoDamageName: actionName,
     saveConditions,
+    // MA-1878: MA-1436 chooser-lane variant folded onto the inline save
+    // context for the fail-face te+clock consumer (stamp + rationale hoisted
+    // to saveVariantTransportStamp, §45 ceiling).
+    saveVariant: saveVariantTransportStamp(saveVariant),
     // SP-094: carry the full character list (with computedStats) so the save
     // lane's condition-immunity checks (PFEG ward, aura, static, feature) have
     // a real targetStats to consult. Threaded from executeBlockSaveRoll's

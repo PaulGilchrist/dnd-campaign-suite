@@ -68,3 +68,26 @@ describe('MA-1436 parseSaveVariantChooser — structured arm only, byte-inert el
     expect(parseSaveVariantChooser(spiritRow)).toBeNull();
   });
 });
+
+// MA-1878: te-bearing variants (Demogorgon Confusing Gaze → confusion te —
+// "Confused" is non-canonical §346, so its variant payload carries te
+// instead of conditions[]). The parser counts a key/label entry with a
+// non-empty string te as complete; entries with NEITHER conditions nor te
+// stay filtered, so every pre-existing byte-pin above still holds.
+describe('MA-1878 parseSaveVariantChooser — te-bearing variants arm (Demogorgon Gaze)', () => {
+  const DEMOGORGON = monstersData.find(m => m.index === 'demogorgon');
+  const GAZE = DEMOGORGON.actions.find(a => a.name === 'Gaze');
+
+  it('arms on the authored Gaze row and keeps the te variant in the chooser', () => {
+    const chooser = parseSaveVariantChooser(GAZE);
+    expect(chooser).not.toBeNull();
+    expect(chooser.variants.map(v => v.key)).toEqual(['beguiling', 'confusing', 'hypnotic']);
+    expect(chooser.variants.find(v => v.key === 'confusing').te).toBe('confusion');
+    expect(GAZE.range).toBe('120 feet');
+  });
+
+  it('te-only entries with missing label still filtered — malformed pairs stay inert', () => {
+    expect(parseSaveVariantChooser({ variants: [{ key: 'a', te: 'confusion' }, { key: 'b', label: 'B', conditions: ['prone'] }] })).toBeNull();
+    expect(parseSaveVariantChooser({ variants: [{ key: 'a', label: 'A', te: '' }, { key: 'b', label: 'B', conditions: [] }] })).toBeNull();
+  });
+});

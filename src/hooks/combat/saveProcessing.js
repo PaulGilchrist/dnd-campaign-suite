@@ -450,6 +450,23 @@ async function applyFailedSaveClauseGrants({ context, campaignName, attackerName
     // the gate requires the structured key AND a formula-less save leg
     // (every damage-bearing save row stays on the MA-1547 both-faces lane).
     await grantFailedSaveHpMaxReduce({ context, campaignName, attackerName, applyTarget });
+    // MA-1878: Demogorgon Gaze choose-one save-variant te transport — the
+    // MA-1436 chooser lane granted conditions + clock on the PICKER seam
+    // (applySaveVariantClockGrant) only; the shapeless single-target Gaze
+    // row rides the INLINE save (fake-Line picker killed by the MA-1878
+    // LOS guard), where NO lane mapped variant.te → targetEffects (§388
+    // code-gap). This leg consumes the pruned context.saveVariant stamp
+    // (buildAbilitySaveRollContext), registers the declared te fail-only
+    // (MA-0595 zoneTe / MA-1847 save_target_effect byte-shape) and arms
+    // ONE merged §80 clock (rounds from the variant payload: "until start
+    // of the demogorgon's next turn" → rounds:2, MA-1872 twin) covering
+    // the declared conditions AND the te removal. Canonical conditions
+    // themselves ride applyDamagelessSaveConditions' saveConditions lane
+    // (§159); the te channel (confusion — "Confused" is MA-1863 non-
+    // canonical, word-scan-blind) lives HERE. Byte-inert: rows without the
+    // chooser stamp never reach the helper (§384 pin); success face never
+    // runs this dispatcher (fail-only, §511).
+    await grantSaveVariantClause({ context, campaignName, attackerName, applyTarget });
 }
 
 // MA-1877: failed-save HP-max-reduce grant (Demogorgon Tentacle "…or its
@@ -517,6 +534,61 @@ async function grantSaveTargetEffectClause({ context, campaignName, attackerName
         note: `${effectKey} applied to ${applyTarget} — healing blocked (healingBlock choke points applyHealingToTarget/healingRoll refuse with healing_blocked; anchored clock expires it at ${attackerName}'s next turn start).${granted ? '' : ' (te write unconfirmed)'}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[saveProcessing:save-target-effect-granted]', e); });
+}
+
+// MA-1878: GM-chosen save-variant grant on the INLINE save lane (Demogorgon
+// Gaze — variants[] chooser, MA-1436 template). Fail-only: this runs solely
+// from applyFailedSaveClauseGrants (saveSuccess===false), so a successful
+// save grants nothing (§511). Registers the variant's declared registered te
+// on the campaign ROOT targetEffects (MA-1847/MA-0595 byte-shape, source =
+// attacker) and arms ONE merged §80 clock (MA-1436 applySaveVariantClockGrant
+// picker twin folded with the MA-1872 te-removal twin) covering BOTH the
+// declared conditions (type:'condition' — clearExpirationEffects strips them
+// via removeConditionEverywhere) AND the te removal
+// (type:'remove_target_effect') — never two racing clocks (§5/§38). rounds
+// come from the variant payload ("until start of the demogorgon's next
+// turn" → rounds:2, §80 fork); default 10 mirrors the picker twin. The
+// Confusion 1d10 behavior-roll leg is §410 dead for EB-NPC victims
+// (TURN_START_HANDLERS sit behind the !playerStats guard) — logged
+// GM-enforced residual, not silently claimed. Byte-inert: rows without the
+// chooser-stamped context.saveVariant return untouched (§384 pin — every
+// other inline save row never allocates this key).
+async function grantSaveVariantClause({ context, campaignName, attackerName, applyTarget }) {
+    const variant = context?.saveVariant;
+    if (!variant) return;
+    const teKey = typeof variant.te === 'string' && variant.te.length > 0 ? variant.te : null;
+    if (teKey) await registerSaveVariantTeGrant({ context, variant, teKey, campaignName, attackerName, applyTarget });
+    const clockEffects = (variant.conditions || []).map(condition => ({ type: 'condition', condition }));
+    if (teKey) clockEffects.push({ type: 'remove_target_effect', effectKey: teKey, source: attackerName, target: applyTarget });
+    if (clockEffects.length === 0) return;
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        effects: clockEffects,
+        campaignName,
+        rounds: variant.rounds ?? 10,
+    });
+}
+
+// MA-1878 te-registration sibling (§45 ceiling split of the dispatcher leg
+// above) — MA-1847 byte-shape: registered te on campaign ROOT targetEffects
+// (source = attacker, duration until_start_of_next_turn) + `condition
+// applied` grant log naming the te label and the §410 residual.
+async function registerSaveVariantTeGrant({ context, variant, teKey, campaignName, attackerName, applyTarget }) {
+    const def = getEffectDefinition(teKey);
+    registerTargetEffect(campaignName, applyTarget, teKey, attackerName, { duration: 'until_start_of_next_turn' });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, teKey);
+    const actionName = context?.actionName || context?.name || 'the action';
+    await addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        condition: `${def?.label || teKey}`,
+        reason: `${actionName} — ${variant.label} variant failed save, until the start of ${attackerName}'s next turn`,
+        note: `${teKey} applied to ${applyTarget} — ONE rounds:${variant.rounds ?? 10} clock expires te + declared conditions at expiry; the Confusion 1d10 behavior roll and end-of-turn repeat save are GM-enforced on EB victims (§410 turn-start guard).${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:save-variant-te-granted]', e); });
 }
 
 // MA-0875: failed-save temporary-hit-point grant (Gnoll Demoniac Hunger of
