@@ -24320,6 +24320,7 @@
         "name": "Whirlwind Flight (Recharge 5-6)",
         "save_type": "Strength",
         "save_dc": 23,
+        "recharge": "5-6",
         "description": "Strength Saving Throw: DC 23, each creature within a 60-ft. radius in the air. Failure: 55 (10d10) Bludgeoning damage. Success: Half damage.",
         "damage_dice_primary": "10d10",
         "damage_type_primary": "Bludgeoning"
@@ -24340,6 +24341,10 @@
       },
       {
         "name": "Detection",
+        "ability_check": {
+          "ability": "wisdom",
+          "skill": "perception"
+        },
         "description": "Garuda makes one Perception check."
       },
       {

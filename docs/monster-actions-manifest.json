@@ -12469,7 +12469,8 @@
       "damageDicePrimary": "10d10",
       "damageTypePrimary": "Bludgeoning",
       "description": "Strength Saving Throw: DC 23, each creature within a 60-ft. radius in the air. Failure: 55 (10d10) Bludgeoning damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1907-garuda-whirlwind-flight.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-11"
     },
     {
       "id": "MA-1908",
@@ -12506,7 +12507,8 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Garuda makes one Perception check.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1910-garuda-detection.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-11"
     },
     {
       "id": "MA-1911",
