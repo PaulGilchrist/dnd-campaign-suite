@@ -12099,7 +12099,8 @@
         "grappled"
       ],
       "description": "Strength Saving Throw: DC 26, one Huge or smaller creature Fenrir has Grappled. Failure: 43 (6d10 + 10) Piercing damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1890-fenrir-devour.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-11"
     },
     {
       "id": "MA-1891",
