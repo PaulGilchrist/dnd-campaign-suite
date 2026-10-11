@@ -6849,7 +6849,9 @@
       {
         "name": "Spell Absorption",
         "trigger": "When the archlich is targeted by a spell requiring concentration.",
-        "description": "The archlich can use its Reaction to attempt to absorb the spell. If it succeeds on a DC 20 Intelligence (Arcana) check, the spell fails and the archlich regains 10 Hit Points."
+        "description": "The archlich can use its Reaction to attempt to absorb the spell. If it succeeds on a DC 20 Intelligence (Arcana) check, the spell fails and the archlich regains 10 Hit Points.",
+        "advisory": "spell_absorption",
+        "advisory_message": "attempts to absorb the spell with a DC 20 Intelligence (Arcana) check — GM-enforced: on success, the targeting concentration spell fails and the archlich regains 10 Hit Points (no engine consumer for this spell-negation reaction)."
       }
     ],
     "legendary_actions": [
