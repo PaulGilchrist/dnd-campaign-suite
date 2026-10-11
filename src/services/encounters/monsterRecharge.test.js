@@ -207,3 +207,42 @@ describe('MA-0663 dust-mephit blinding-breath recharge data', () => {
     expect(monsterRechargeGate(blindingBreath, { 'Blinding Breath': { recharged: false, threshold: 6 } }).available).toBe(false);
   });
 });
+
+// MA-1843: Apep "Venomous Darkness (Recharge 5-6)" authored recharge:"5-6"
+// (MA-0663 twin one-field DATA fix) — name-text "(Recharge 5-6)" is parsed
+// by NO recharge parser, so the flat field arms the live economy
+// (spend/refusal/recovery via monsterRechargeGate consumers). Byte-inertness
+// pinned: no top-level advisory key (AdvisoryLink would duplicate the live
+// DC 26 save chip) and no dc_success override (app default "half" is
+// RAW-correct for this row).
+describe('MA-1843 apep venomous-darkness recharge data', () => {
+  const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+  const apep = monsters.find((m) => m.name === 'Apep');
+  const venomousDarkness = apep.actions.find((a) => a.name.startsWith('Venomous Darkness'));
+
+  it('row authors recharge "5-6" (string, twin byte-shape) on the DC 26 CON save row', () => {
+    expect(venomousDarkness.name).toBe('Venomous Darkness (Recharge 5-6)');
+    expect(venomousDarkness.recharge).toBe('5-6');
+    expect(venomousDarkness.save_dc).toBe(26);
+    expect(venomousDarkness.save_type).toBe('Constitution');
+    expect(venomousDarkness.damage_dice_primary).toBe('14d10');
+  });
+
+  it('rechargeUsageOf + gate arm: threshold 5, fresh available, spent refused', () => {
+    expect(rechargeUsageOf(venomousDarkness)).toEqual({ threshold: 5 });
+    const fresh = monsterRechargeGate(venomousDarkness, null);
+    expect(fresh).toEqual({ key: 'Venomous Darkness', threshold: 5, available: true });
+    expect(monsterRechargeGate(venomousDarkness, { 'Venomous Darkness': { recharged: false, threshold: 5 } }).available).toBe(false);
+    expect(monsterRechargeGate(venomousDarkness, { 'Venomous Darkness': { recharged: true, threshold: 5 } }).available).toBe(true);
+  });
+
+  it('darkness clause stays advisory/te-free: no advisory key, no dc_success, no new fields', () => {
+    expect(venomousDarkness.advisory).toBeUndefined();
+    expect(venomousDarkness.advisory_message).toBeUndefined();
+    expect(venomousDarkness.dc_success).toBeUndefined();
+    expect(venomousDarkness.save_effect).toBeUndefined();
+    expect(Object.keys(venomousDarkness).sort()).toEqual(
+      ['damage_dice_primary', 'damage_type_primary', 'description', 'name', 'recharge', 'save_dc', 'save_type']
+    );
+  });
+});

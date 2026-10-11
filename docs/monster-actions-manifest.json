@@ -4713,7 +4713,7 @@
       "damageDicePrimary": "14d10",
       "damageTypePrimary": "Necrotic",
       "description": "Constitution Saving Throw: DC 26, each creature within 60 ft. Failure: 77 (14d10) Necrotic damage. Success: Half damage. The area is also filled with magical darkness until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1843-apep-venomous-darkness.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1844",

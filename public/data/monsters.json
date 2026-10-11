@@ -6202,7 +6202,8 @@
         "save_dc": 26,
         "description": "Constitution Saving Throw: DC 26, each creature within 60 ft. Failure: 77 (14d10) Necrotic damage. Success: Half damage. The area is also filled with magical darkness until the end of its next turn.",
         "damage_dice_primary": "14d10",
-        "damage_type_primary": "Necrotic"
+        "damage_type_primary": "Necrotic",
+        "recharge": "5-6"
       }
     ],
     "bonus_actions": [],
