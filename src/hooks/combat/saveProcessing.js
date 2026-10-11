@@ -422,6 +422,54 @@ async function applyFailedSaveClauseGrants({ context, campaignName, attackerName
     // MA-0875: failed-save THP grant clause (Gnoll Demoniac Hunger of
     // Yeenoghu) on the INLINE seam — fail-only, byte-inert null elsewhere.
     await grantFailedSaveTempHp({ context, campaignName, attackerName });
+    // MA-1847: failed-save TARGET-effect rider (Apep Devour the Boat —
+    // "unable to regain Hit Points until the start of Apep's next turn") —
+    // the structured save_target_effect key rides the save context
+    // (§233 save-rider grammar, MA-0016 hit-lane twin); the registered te
+    // + anchored clock grant lands HERE (MA-0556 heal choke points were
+    // already live — only the save-lane producer was missing). Self-guarded
+    // unguarded-call pattern (MA-0501 split); rows without the key return
+    // untouched, dispatcher byte-inert.
+    await grantSaveTargetEffectClause({ context, campaignName, attackerName, applyTarget });
+}
+
+// MA-1847: failed-save target-effect grant — registers the te sourced from
+// the attacker (MA-0016 byte-shape: duration until_start_of_next_turn) and
+// arms ONE anchored clock (rounds:undefined → expiryRounds:null; the
+// expireOnCreatureName leg fires at the ATTACKER's next turn-start,
+// §38/currentRound>appliedRound — RAW exact "until the start of Apep's
+// next turn"), then logs the `condition applied` grant naming the te key.
+// Consumers: applyHealingToTarget/healingRoll via healingBlock.js. Zero
+// grant on the success face (fail-only dispatcher); rows without the
+// structured key never reach this helper (dispatcher gate byte-inert).
+async function grantSaveTargetEffectClause({ context, campaignName, attackerName, applyTarget }) {
+    const clause = context?.saveTargetEffect;
+    if (!clause) return;
+    const effectKey = clause.effect;
+    const def = getEffectDefinition(effectKey);
+    const actionName = context?.actionName || context?.name || 'the action';
+    registerTargetEffect(campaignName, applyTarget, effectKey, attackerName, {
+        duration: 'until_start_of_next_turn',
+    });
+    addExpiration({
+        attackerName,
+        targetName: applyTarget,
+        effects: [{ type: 'remove_target_effect', effectKey, source: attackerName, target: applyTarget }],
+        campaignName,
+        rounds: undefined,
+        expireOnCreatureName: attackerName,
+    });
+    const granted = getActiveTargetEffect(campaignName, applyTarget, effectKey);
+    await addEntry(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: applyTarget,
+        sourceName: attackerName,
+        condition: `${def?.label || effectKey}`,
+        reason: `${actionName} — until the start of ${attackerName}'s next turn`,
+        note: `${effectKey} applied to ${applyTarget} — healing blocked (healingBlock choke points applyHealingToTarget/healingRoll refuse with healing_blocked; anchored clock expires it at ${attackerName}'s next turn start).${granted ? '' : ' (te write unconfirmed)'}`,
+        timestamp: Date.now(),
+    }).catch((e) => { console.error('[saveProcessing:save-target-effect-granted]', e); });
 }
 
 // MA-0875: failed-save temporary-hit-point grant (Gnoll Demoniac Hunger of

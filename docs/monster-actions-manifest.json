@@ -4768,7 +4768,7 @@
         "grappled"
       ],
       "description": "Apep's coils lunge for one Grappled creature. The target must succeed on a DC 26 Constitution saving throw or take 33 (6d10) Piercing damage and be unable to regain Hit Points until the start of Apep's next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1847-apep-devour-the-boat.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0295",

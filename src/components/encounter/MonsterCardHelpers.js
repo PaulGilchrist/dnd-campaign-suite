@@ -878,6 +878,23 @@ export function parseSaveAttackerRecover(action) {
   return String(rider.equal_to || '').toLowerCase() === 'damage' ? { equalTo: 'damage' } : null;
 }
 
+// MA-1847: Apep "Devour the Boat" save-path TARGET-effect rider — the
+// save-lane twin of MA-0016's hit_target_effect (raw registered te key
+// string, never prose — MA-1547/MA-1489 structured-key-only precedent),
+// keyed on the structured save_target_effect key ONLY, so every clauseless
+// save row stays byte-identical. RAW: failed DC 26 CON save — "unable to
+// regain Hit Points until the start of Apep's next turn". The consumer
+// (saveProcessing.applyFailedSaveClauseGrants → grantSaveTargetEffectClause)
+// registers the te sourced from the attacker with ONE anchored clock
+// (expireOnCreatureName=attacker fires at the attacker's NEXT turn-start,
+// §38 exact) and consumes at the canonical healingBlock choke points
+// (applyHealingToTarget/healingRoll, MA-0016/MA-0556 heal lane live).
+export function parseSaveTargetEffect(action) {
+  const key = action?.save_target_effect;
+  if (!key || typeof key !== 'string' || key.trim() === '') return null;
+  return { effect: String(key) };
+}
+
 // MA-1563: save-leg-specific damage pool (Swarm of Poisonous Snakes Bites
 // "save_damage_dice":"4d6"/"save_damage_type":"Poison") — structured keys
 // only, never prose. Byte-inert null for every row without the keys, so all

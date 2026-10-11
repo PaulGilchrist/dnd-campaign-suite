@@ -19,7 +19,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { MonsterCardBody } from './MonsterCardBody.jsx';
 import { MonsterEvasionModal } from './MonsterEvasionModal.jsx';
-import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, parseSpeedReduceClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseSaveVariantChooser, parseBothOutcomesClause, parseTempHpGrantClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseSaveHpMaxReduce, parseSaveAttackerRecover, parseSaveDamageFields, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog, isUtilitySpellCastRow } from './MonsterCardHelpers.js';
+import { saveAbilityAbbr, abilityNameMap, extractConditionsFromSaveEffect, getSaveModifierForSaveType, toAbbr, spellHasDamage, spellDamageFormulaAtBaseLevel, extractSpellcastingSpellUses, getGatedMonsterReaction, resolveMonsterGatedReaction, MONSTER_REACTION_USES_KEY, buildChargeBonusOffer, buildChargeBonusGrantLog, buildChargeBonusDeclineLog, buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog, buildRangedVariantOffer, buildRangedVariantSelectLog, buildRangedBandAdvisory, buildHitConditionClause, buildHitChoiceOffer, buildHitChoiceSelectedLog, buildHitChoiceAppliedLog, buildHitChoiceAdvisoryLog, evaluateTargetPrerequisiteGate, gazeImmunityActive, buildGazeImmunityRefusalLog, isSpellAttackSpell, spellDamageFormulaAtLevel, spellCastLevelFromSpellcasting, monsterSpellAttackBonus, parseConcentrationDisadvantageClause, parseSpeedHalfClause, parseSubtractDieClause, parsePushFeetClause, parseSlowedClauses, parseExhaustionLevelClause, parseWeakeningBreathClause, parseBanishTransportClause, parseSoulTomeTrapClause, parseDreamPlaneBanishClause, parseAcPenaltyClause, parseSpeedZeroClause, parseSpeedReduceClause, buildNoTargetRefusalPopup, buildNoTargetRefusalLog, parseAnimalSpiritVariants, parseSaveVariantChooser, parseBothOutcomesClause, parseTempHpGrantClause, extractFlatHitDamage, spellDamagelessSaveCondition, spellSaveLegOutcome, parseHpThresholdKillClause, parseInfernalWoundClause, parseSaveMarginClause, parseSaveHpMaxReduce, parseSaveAttackerRecover, parseSaveTargetEffect, parseSaveDamageFields, parseEyeRayGrant, parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog, eyeRaySaveSpellInfo, buildEyeRayAdvisoryLog, isUtilitySpellCastRow } from './MonsterCardHelpers.js';
 import { AnimalSpiritVariantModal } from './AnimalSpiritVariantModal.jsx';
 import { SaveVariantChooserModal } from './SaveVariantChooserModal.jsx';
 import { loadSpells } from '../../services/ui/dataLoader.js';
@@ -741,18 +741,40 @@ async function legendarySelfBuffActiveRefusal({ action, monsterName, campaignNam
   return true;
 }
 
-async function resolveLegendaryRow({ action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage, handleCheck }) {
+// MA-1847: pre-spend prerequisite refusals, split out of resolveLegendaryRow
+// to hold the §45 complexity ceiling (MA-0501 sibling-helper pattern).
+// (a) MA-0023 any-ally roster-scan gate — Psychic Drain byte-shape moves here
+// UNCHANGED. (b) MA-0019 armed-target gate: rows whose target_prerequisite is
+// NOT the any-ally form (Apep Devour — "one Grappled creature") evaluate the
+// MA-0019 gate BEFORE the spend — refuse with popup + `<slug>_refused` log,
+// ZERO legendary spend, no save, no roll ("Costs 2 Actions" advisory floor:
+// the refusal never burns even 1). The downstream handleSaveRoll gate at
+// :2273 stays byte-identical for the satisfied press. Rows without
+// target_prerequisite return false untouched.
+async function legendaryAllyGateRefusal({ allyPrerequisite, monsterName, actionName, campaignName, setPopupHtml }) {
+  const gateCs = await getCombatContext(campaignName);
+  const sat = legendaryAllyPrerequisiteSatisfied({ prerequisite: allyPrerequisite, creatures: gateCs?.creatures || [], monsterName, getRuntimeValue });
+  if (sat.satisfied) return false;
+  setPopupHtml(buildLegendaryPrerequisiteRefusalPopup({ monsterName, actionName, prerequisite: allyPrerequisite }));
+  addEntry(campaignName, buildLegendaryPrerequisiteRefusalLog({ monsterName, actionName, prerequisite: allyPrerequisite }))
+    .catch((e) => { console.error('[MonsterCardModal] Error logging ally-prerequisite refusal:', e); });
+  return true;
+}
+
+async function legendaryPrerequisiteRefusal({ action, monsterName, campaignName, setPopupHtml, getTarget }) {
   const allyPrerequisite = parseLegendaryAllyPrerequisite(action);
-  if (allyPrerequisite) {
-    const gateCs = await getCombatContext(campaignName);
-    const sat = legendaryAllyPrerequisiteSatisfied({ prerequisite: allyPrerequisite, creatures: gateCs?.creatures || [], monsterName, getRuntimeValue });
-    if (!sat.satisfied) {
-      setPopupHtml(buildLegendaryPrerequisiteRefusalPopup({ monsterName, actionName: action.name, prerequisite: allyPrerequisite }));
-      addEntry(campaignName, buildLegendaryPrerequisiteRefusalLog({ monsterName, actionName: action.name, prerequisite: allyPrerequisite }))
-        .catch((e) => { console.error('[MonsterCardModal] Error logging ally-prerequisite refusal:', e); });
-      return;
-    }
-  }
+  if (allyPrerequisite) return legendaryAllyGateRefusal({ allyPrerequisite, monsterName, actionName: action.name, campaignName, setPopupHtml });
+  if (!action?.target_prerequisite || action.target_prerequisite.any_ally_of_attacker === true) return false;
+  const gate = evaluateTargetPrerequisiteGate({ action, target: getTarget ? getTarget() : null, monsterName, campaignName, getRuntimeValue });
+  if (gate.satisfied) return false;
+  setPopupHtml(gate.popupHtml);
+  addEntry(campaignName, gate.refusalLog)
+    .catch((e) => { console.error('[MonsterCardModal] Error logging legendary target-prerequisite refusal:', e); });
+  return true;
+}
+
+async function resolveLegendaryRow({ action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage, handleCheck, getTarget }) {
+  if (await legendaryPrerequisiteRefusal({ action, monsterName, campaignName, setPopupHtml, getTarget })) return;
   let mechanicAction = action;
   let actionName = action.name;
   if (!legendaryRowHasNumericMechanic(action) && action.delegates_to) {
@@ -1743,6 +1765,16 @@ export function buildAbilitySaveRollContext({ monsterName, target, spellName, ac
     // save_hp_max_reduce drain rider consumed ("equal to that amount" —
     // disk RAW). Byte-inert null for every save row without the key.
     saveAttackerRecover: parseSaveAttackerRecover(action),
+    // MA-1847: Apep Devour the Boat save-path no-heal rider — the structured
+    // save_target_effect:"no_healing" key rides the INLINE block-save context
+    // (MA-1547/MA-1639 §233 save-rider grammar, MA-0016 hit-lane twin) to
+    // saveProcessing.applyFailedSaveClauseGrants, which registers the te
+    // sourced from the attacker with ONE anchored clock (§38 — fires at the
+    // attacker's NEXT turn-start = RAW exact) and logs the grant. Healing
+    // refuses downstream at the canonical healingBlock choke points (MA-0556
+    // heal lane live — only the save-lane GRANT was missing). Byte-inert
+    // null for every save row without the key; success face grants nothing.
+    saveTargetEffect: parseSaveTargetEffect(action),
     // MA-0374: Beholder Eye Rays — the picked ray's structured grant spec
     // (te_grants/clock_rounds/ladder/zero_hp_clause) rides the save context
     // for the saveProcessing failed-save dispatcher + zero-HP advisory.
@@ -2422,6 +2454,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const handleLegendaryRow = (action) => resolveLegendaryRow({
     action, monsterName, monster, campaignName, setPopupHtml, handleAttack, handleSaveRoll, handleDamage,
     handleCheck: handleSkillCheck,
+    // MA-1847: armed-target eligibility refused BEFORE the spend.
+    getTarget,
   });
 
   // MA-0024: lair-row gated click — mirrors the legendary gated-row model.

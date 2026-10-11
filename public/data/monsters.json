@@ -6232,8 +6232,18 @@
       },
       {
         "name": "Devour the Boat (Costs 2 Actions)",
-        "delegates_to": "Constrict",
-        "description": "Apep's coils lunge for one Grappled creature. The target must succeed on a DC 26 Constitution saving throw or take 33 (6d10) Piercing damage and be unable to regain Hit Points until the start of Apep's next turn."
+        "description": "Apep's coils lunge for one Grappled creature. The target must succeed on a DC 26 Constitution saving throw or take 33 (6d10) Piercing damage and be unable to regain Hit Points until the start of Apep's next turn.",
+        "save_dc": 26,
+        "save_type": "Constitution",
+        "damage_dice_primary": "6d10",
+        "damage_type_primary": "Piercing",
+        "dc_success": "half",
+        "target_prerequisite": {
+          "conditions": [
+            "grappled"
+          ]
+        },
+        "save_target_effect": "no_healing"
       }
     ],
     "lair_actions": [],

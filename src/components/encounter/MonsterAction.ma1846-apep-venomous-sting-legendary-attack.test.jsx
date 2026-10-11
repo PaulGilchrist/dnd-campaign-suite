@@ -104,14 +104,17 @@ describe('MA-1846 disk fingerprint: Apep Venomous Sting structured legendary att
     expect(legendaryGate).not.toHaveBeenCalled();
   });
 
-  it('header economy and siblings untouched: uses:3 header, Coils + Devour keep delegates_to', () => {
+  it('header economy and siblings untouched: uses:3 header, Coils keeps delegates_to; MA-1847 Devour is its own save resolver', () => {
     expect(HEADER.name).toBe('Legendary Action Uses: 3');
     expect(HEADER.uses).toBe(3);
     expect(LEGENDARY.length).toBe(4);
     expect(COILS.delegates_to).toBe('Constrict');
     expect(COILS.attack_bonus).toBeUndefined();
-    expect(BOAT.delegates_to).toBe('Constrict');
+    // MA-1847 stale-pin inversion: Devour stopped delegating — it authors
+    // its own DC 26 CON save mechanic (delegates_to removed at the fix).
+    expect(BOAT.delegates_to).toBeUndefined();
     expect(BOAT.attack_bonus).toBeUndefined();
+    expect(BOAT.save_dc).toBe(26);
     const stingActions = APEP.actions.filter((a) => a.name === 'Venomous Sting');
     expect(stingActions).toEqual([]);
   });
