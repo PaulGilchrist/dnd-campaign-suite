@@ -6839,7 +6839,7 @@
       },
       {
         "name": "Spellcasting",
-        "description": "The archlich is a 20th-level spellcaster. Its spellcasting ability is Intelligence (spell save DC 22, +14 to hit with spell attacks). It has the following Wizard spells prepared: Cantrips (at will): Blade Ward, Fire Bolt, Mage Hand,Mage Armor. 1st-7th level (at will): Counterspell, Dispel Magic, Fly, Hold Monster, Lightning Bolt, Phantasmagoria, Shield. 8th-9th level (3 slots total per spell level): Mind Blank, Power Word Stun, Dominate Monster, Meteor Swarm, Time Stop, Wish.",
+        "description": "The archlich is a 20th-level spellcaster. Its spellcasting ability is Intelligence (spell save DC 22, +14 to hit with spell attacks). It has the following Wizard spells prepared: <strong>Cantrips (at will):</strong> <em>Blade Ward</em>, <em>Fire Bolt</em>, <em>Mage Hand</em>, <em>Mage Armor</em>. <strong>1st-7th level (at will):</strong> <em>Counterspell</em>, <em>Dispel Magic</em>, <em>Fly</em>, <em>Hold Monster</em>, <em>Lightning Bolt</em>, Phantasmagoria, <em>Shield</em>. <strong>8th-9th level (3 slots total per spell level):</strong> <em>Mind Blank</em>, <em>Power Word Stun</em>, <em>Dominate Monster</em>, <em>Meteor Swarm</em>, <em>Time Stop</em>, <em>Wish</em>.",
         "save_dc": 22,
         "save_type": "Intelligence"
       }
