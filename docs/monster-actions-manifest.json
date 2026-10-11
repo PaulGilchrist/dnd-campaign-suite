@@ -47,7 +47,8 @@
       "damageTypePrimary": "slashing",
       "reach": "5 ft.",
       "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 4 (1d4 + 2) slashing damage.",
-      "verified": "verified"
+      "verified": "verified",
+      "lastTouched": "stop-2026-10-11"
     },
     {
       "id": "MA-0002",
@@ -4255,7 +4256,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, the sphinx can expend a use to take one of the following actions. The sphinx regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0269",
@@ -4658,7 +4659,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Apep makes two Bite attacks and one Constrict attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1841",
@@ -4676,7 +4677,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "20 ft.",
       "description": "Melee Attack Roll: +18, reach 20 ft. Hit: 31 (4d10 + 9) Piercing damage. Plus 27 (6d8) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1842",
@@ -4696,7 +4697,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +18, reach 15 ft., one Huge or smaller creature. Hit: 25 (4d8+9) Bludgeoning damage and the target has the Grappled condition (escape DC 26) and takes 18 (4d8) Bludgeoning damage at the start of every turn until released.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1842-apep-constrict.md"
     },
     {
       "id": "MA-1843",
@@ -4712,7 +4713,7 @@
       "damageDicePrimary": "14d10",
       "damageTypePrimary": "Necrotic",
       "description": "Constitution Saving Throw: DC 26, each creature within 60 ft. Failure: 77 (14d10) Necrotic damage. Success: Half damage. The area is also filled with magical darkness until the end of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1843-apep-venomous-darkness.md"
     },
     {
       "id": "MA-1844",
@@ -4725,7 +4726,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1845",
@@ -4737,7 +4738,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The coils make one Constrict attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1846",
@@ -4752,7 +4753,7 @@
         "poisoned"
       ],
       "description": "Melee Attack Roll: +18, reach 25 ft., one target. Hit: 24 (4d6+9) Poison damage and the target has the Poisoned condition until the end of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1846-apep-venomous-sting.md"
     },
     {
       "id": "MA-1847",
@@ -4767,7 +4768,7 @@
         "grappled"
       ],
       "description": "Apep's coils lunge for one Grappled creature. The target must succeed on a DC 26 Constitution saving throw or take 33 (6d10) Piercing damage and be unable to regain Hit Points until the start of Apep's next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1847-apep-devour-the-boat.md"
     },
     {
       "id": "MA-0295",
@@ -5016,7 +5017,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The archlich makes three Disintegrate Ray attacks. It can replace any number of attacks with a use of Spellcasting.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1849",
@@ -5032,7 +5033,7 @@
       "damageTypePrimary": "Radiant",
       "range": "120 ft.",
       "description": "Ranged Attack Roll: +19, range 120 ft. Hit: 45 (10d6 + 10) Radiant damage. If this damage reduces a creature to 0 Hit Points, its body crumbles to dust.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1850",
@@ -5046,7 +5047,7 @@
       "saveDc": 22,
       "saveType": "Intelligence",
       "description": "The archlich is a 20th-level spellcaster. Its spellcasting ability is Intelligence (spell save DC 22, +14 to hit with spell attacks). It has the following Wizard spells prepared: Cantrips (at will): Blade Ward, Fire Bolt, Mage Hand,Mage Armor. 1st-7th level (at will): Counterspell, Dispel Magic, Fly, Hold Monster, Lightning Bolt, Phantasmagoria, Shield. 8th-9th level (3 slots total per spell level): Mind Blank, Power Word Stun, Dominate Monster, Meteor Swarm, Time Stop, Wish.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1850-archlich-spellcasting.md"
     },
     {
       "id": "MA-1851",
@@ -5059,7 +5060,7 @@
       "actionType": "other",
       "trigger": "When the archlich is targeted by a spell requiring concentration.",
       "description": "The archlich can use its Reaction to attempt to absorb the spell. If it succeeds on a DC 20 Intelligence (Arcana) check, the spell fails and the archlich regains 10 Hit Points.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1851-archlich-spell-absorption.md"
     },
     {
       "id": "MA-1852",
@@ -5072,7 +5073,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1853",
@@ -5084,7 +5085,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The archlich makes one Cantrip spell attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1853-archlich-cast-cantrip.md"
     },
     {
       "id": "MA-1854",
@@ -5100,7 +5101,7 @@
       "damageTypePrimary": "Necrotic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +19, reach 5 ft. Hit: 41 (8d8 + 5) Necrotic damage. If the target is a living creature, it cannot regain Hit Points until the start of the archlich's next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1855",
@@ -5117,7 +5118,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 22, each creature within 30 ft. A creature that can hear the word has the Frightened condition until the end of its next turn and takes 22 (5d8) Psychic damage. No damage other than Psychic. The target has the Frightened condition on a failed save.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1855-archlich-dread-word.md"
     },
     {
       "id": "MA-0311",
@@ -6029,7 +6030,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Behemoth makes two Gore attacks and one Stomp attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1857",
@@ -6045,7 +6046,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +18, reach 10 ft. Hit: 26 (3d10 + 10) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1858",
@@ -6064,7 +6065,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +18, reach 10 ft. Hit: 32 (4d10 + 10) Bludgeoning damage. The target has the Prone condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1859",
@@ -6080,7 +6081,7 @@
       "damageDicePrimary": "10d10",
       "damageTypePrimary": "Bludgeoning",
       "description": "Strength Saving Throw: DC 25, each creature within 60 ft. on the ground. Failure: 55 (10d10) Bludgeoning damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1859-behemoth-earthshaker.md"
     },
     {
       "id": "MA-1860",
@@ -6093,7 +6094,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1861",
@@ -6105,7 +6106,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Gore attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1862",
@@ -6117,7 +6118,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Stomp attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1863",
@@ -6129,7 +6130,7 @@
       "category": "legendary_actions",
       "actionType": "save",
       "description": "Behemoth bellows. Each enemy within 60 ft. that can hear it must succeed on a DC 23 Wisdom saving throw or be unable to use Reactions until the end of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1863-behemoth-trumpet.md"
     },
     {
       "id": "MA-0368",
@@ -8464,7 +8465,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The colossus moves up to half its Speed without provoking Opportunity Attacks, and it can make one Slam attack at any point during that move.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0512",
@@ -8748,7 +8749,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Cthulhu makes three attacks: two with its claws and one with its tentacles. It can replace one Claw attack with a use of Psychic Shatter.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1866",
@@ -8764,7 +8765,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +18, reach 15 ft. Hit: 32 (4d10 + 10) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1867",
@@ -8783,7 +8784,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +18, reach 20 ft. Hit: 28 (4d8 + 10) Bludgeoning damage. If the target is a Huge or smaller creature, it must succeed on a DC 26 Strength saving throw or be pulled 20 ft. toward Cthulhu and have the Grappled condition (escape DC 26). While Grappled this way, the target automatically takes 18 (4d8) Bludgeoning damage at the start of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1867-cthulhu-tentacles.md"
     },
     {
       "id": "MA-1868",
@@ -8803,7 +8804,7 @@
         "stunned"
       ],
       "description": "Intelligence Saving Throw: DC 24, each creature within 60 ft. that can see Cthulhu. Failure: 33 (6d10) Psychic damage and the target has the Stunned condition until the end of its next turn. Success: Half damage and no Stun. Cthulhu can't use this action again until its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1868-cthulhu-psychic-shatter.md"
     },
     {
       "id": "MA-1869",
@@ -8816,7 +8817,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1870",
@@ -8828,7 +8829,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Claw attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1871",
@@ -8840,7 +8841,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Tentacles attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1872",
@@ -8852,7 +8853,7 @@
       "category": "legendary_actions",
       "actionType": "save",
       "description": "Cthulhu projects a maddening whisper at one creature within 120 ft. The target must succeed on a DC 24 Wisdom saving throw or take 14 (4d6) Psychic damage and be unable to take Reactions until the end of its next turn. No damage on a success.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1872-cthulhu-madness-whisper.md"
     },
     {
       "id": "MA-0528",
@@ -9499,7 +9500,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The death knight moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Dread Blade attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0569",
@@ -9717,7 +9718,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The death tyrant uses Eye Rays.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0582",
@@ -9910,7 +9911,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The demilich makes one Necrotic Burst attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0594",
@@ -9964,7 +9965,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The demogorgon makes two Tentacle attacks. It can replace one attack with a use of Gaze.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1877",
@@ -9980,7 +9981,7 @@
       "damageTypePrimary": "Force",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 28 (3d12 + 9) Force damage. If the target is a creature, it must succeed on a DC 23 Constitution saving throw or its Hit Point maximum is reduced by an amount equal to the damage taken. This reduction lasts until the target finishes a Long Rest. The target dies if its Hit Point maximum is reduced to 0.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1877-demogorgon-tentacle.md"
     },
     {
       "id": "MA-1878",
@@ -9998,7 +9999,7 @@
         "stunned"
       ],
       "description": "Wisdom Saving Throw: DC 23, one creature it can see within 120 ft. The target suffers one of the following effects (choose one or roll a d6): 1-2 Beguiling Gaze, the target has the Stunned condition until the start of the demogorgon's next turn or until the demogorgon is no longer within line of sight; 3-4 Confusing Gaze, the target suffers the effect of the Confusion spell until the start of the demogorgon's next turn without concentrating; 5-6 Hypnotic Gaze, the target is Charmed by the demogorgon until the start of its next turn and the demogorgon chooses how the Charmed target uses its Action, Reaction, and movement. No damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1878-demogorgon-gaze.md"
     },
     {
       "id": "MA-1879",
@@ -10012,7 +10013,7 @@
       "saveDc": 23,
       "saveType": "Wisdom",
       "description": "The demogorgon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23): At Will: Detect Magic, Major Image. 3/Day: Dispel Magic, Fear, Telekinesis. 1/Day: Feeblemind, Project Image.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1879-demogorgon-spellcasting.md"
     },
     {
       "id": "MA-1880",
@@ -10025,7 +10026,7 @@
       "actionType": "other",
       "uses": 2,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1881",
@@ -10037,7 +10038,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The demogorgon uses Gaze, choosing Beguiling Gaze or Confusing Gaze.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1881-demogorgon-legendary-gaze.md"
     },
     {
       "id": "MA-1882",
@@ -10055,7 +10056,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +17, reach 15 ft. Hit: 20 (2d10 + 9) Bludgeoning damage. Plus 11 (2d10) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1883",
@@ -10067,7 +10068,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The demogorgon uses Spellcasting.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1883-demogorgon-cast-a-spell.md"
     },
     {
       "id": "MA-0597",
@@ -10506,7 +10507,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 19, each creature in a 30-foot Emanation originating from the dracolich. Failure: 11 (2d10) Psychic damage, and the target has the Frightened condition until the end of its next turn. Failure or Success: The dracolich can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0623",
@@ -11365,7 +11366,7 @@
         "prone"
       ],
       "description": "The cataclysm moves up to its Speed, Fly Speed, or Swim Speed without provoking Opportunity Attacks. Each creature within 5 feet of the cataclysm as it moves is targeted once by the following effect. Constitution Saving Throw: DC 23. Failure: The target has the Prone condition. Failure or Success: The cataclysm can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0677",
@@ -11685,7 +11686,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The empyrean makes one Divine Ray attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0697",
@@ -12042,7 +12043,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Fenrir makes two Bite attacks and one Claw attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1888",
@@ -12060,7 +12061,7 @@
       "damageTypeSecondary": "Cold",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +18, reach 10 ft. Hit: 32 (4d10 + 10) Piercing damage. Plus 7 (2d6) Cold damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1889",
@@ -12076,7 +12077,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +18, reach 10 ft. Hit: 29 (3d12 + 10) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1890",
@@ -12095,7 +12096,7 @@
         "grappled"
       ],
       "description": "Strength Saving Throw: DC 26, one Huge or smaller creature Fenrir has Grappled. Failure: 43 (6d10 + 10) Piercing damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1890-fenrir-devour.md"
     },
     {
       "id": "MA-1891",
@@ -12108,7 +12109,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1892",
@@ -12120,7 +12121,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Bite attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1893",
@@ -12132,7 +12133,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Claw attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1894",
@@ -12149,7 +12150,7 @@
         "frightened"
       ],
       "description": "Constitution Saving Throw: DC 24, each creature within 60 ft. The target also has the Frightened condition until the end of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1894-fenrir-winters-howl.md"
     },
     {
       "id": "MA-0718",
@@ -12279,7 +12280,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Garmr makes two Bite attacks and one Claw attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1896",
@@ -12297,7 +12298,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 25 (3d10 + 9) Piercing damage. Plus 9 (2d8) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1897",
@@ -12313,7 +12314,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 22 (3d8 + 9) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1898",
@@ -12329,7 +12330,7 @@
       "damageDicePrimary": "12d10",
       "damageTypePrimary": "Necrotic",
       "description": "Dexterity Saving Throw: DC 24, each creature in a 60-foot Cone. Failure: 66 (12d10) Necrotic damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1898-garmr-corpse-fire-breath.md"
     },
     {
       "id": "MA-1899",
@@ -12342,7 +12343,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1900",
@@ -12354,7 +12355,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Bite attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1901",
@@ -12373,7 +12374,7 @@
         "prone"
       ],
       "description": "Strength Saving Throw: DC 23, each creature within 30 ft. Failure: knocked Prone and takes 9 (2d8) Thunder damage. Success: half damage and not Prone.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1901-garmr-knockdown-howl.md"
     },
     {
       "id": "MA-1902",
@@ -12385,7 +12386,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Garmr lunges, making one Claw attack against a target up to 20 ft. away without provoking Opportunity Attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1903",
@@ -12397,7 +12398,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Garuda makes two Talon attacks and one Beak attack. They can replace one attack with a Sunfire Ray.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1904",
@@ -12413,7 +12414,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 26 (4d8 + 8) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1905",
@@ -12429,7 +12430,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 24 (3d10 + 8) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1906",
@@ -12445,7 +12446,7 @@
       "damageTypePrimary": "Radiant",
       "range": "120 ft.",
       "description": "Ranged Attack Roll: +15, range 120 ft. Hit: 27 (6d8) Radiant damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1907",
@@ -12461,7 +12462,7 @@
       "damageDicePrimary": "10d10",
       "damageTypePrimary": "Bludgeoning",
       "description": "Strength Saving Throw: DC 23, each creature within a 60-ft. radius in the air. Failure: 55 (10d10) Bludgeoning damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1907-garuda-whirlwind-flight.md"
     },
     {
       "id": "MA-1908",
@@ -12474,7 +12475,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1909",
@@ -12486,7 +12487,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Talon attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1910",
@@ -12498,7 +12499,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Garuda makes one Perception check.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1910-garuda-detection.md"
     },
     {
       "id": "MA-1911",
@@ -12510,7 +12511,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Garuda flies up to double their Speed, then makes one Talon attack without provoking Opportunity Attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1912",
@@ -12522,7 +12523,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Godzilla makes three attacks: one with its Bite and two with its Claws. It can replace one Claw attack with a Tail attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1913",
@@ -12541,7 +12542,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 32 (4d10 + 10) Piercing damage. The target has the Prone condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1914",
@@ -12557,7 +12558,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +19, reach 15 ft. Hit: 26 (3d10 + 10) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1915",
@@ -12576,7 +12577,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +19, reach 25 ft. Hit: 36 (5d12 + 4) Bludgeoning damage. The target has the Prone condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1916",
@@ -12592,7 +12593,7 @@
       "damageDicePrimary": "26d6",
       "damageTypePrimary": "Radiant",
       "description": "Dexterity Saving Throw: DC 27, each creature in a 120-foot-long, 10-foot-wide Line. Failure: 91 (26d6) Radiant damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1916-godzilla-atomic-breath.md"
     },
     {
       "id": "MA-1917",
