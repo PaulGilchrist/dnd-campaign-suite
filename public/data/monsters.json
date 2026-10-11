@@ -23520,6 +23520,7 @@
         "name": "Winter's Howl (Costs 2 Actions)",
         "save_type": "Constitution",
         "save_dc": 24,
+        "save_effect": "The target has the Frightened condition until the end of its next turn.",
         "description": "Constitution Saving Throw: DC 24, each creature within 60 ft. The target also has the Frightened condition until the end of its next turn."
       }
     ],

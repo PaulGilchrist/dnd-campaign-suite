@@ -12154,7 +12154,8 @@
         "frightened"
       ],
       "description": "Constitution Saving Throw: DC 24, each creature within 60 ft. The target also has the Frightened condition until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1894-fenrir-winters-howl.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-11"
     },
     {
       "id": "MA-0718",
