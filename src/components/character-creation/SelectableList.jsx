@@ -1,7 +1,24 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 
 function getNestedValue(obj, path) {
   return path.split('.').reduce((current, key) => current?.[key], obj);
+}
+
+// Stable unique keys per item: prefer id (index), then name, with a
+// collision-free suffix when the same identity repeats across groups.
+function buildUniqueKeys(items) {
+  const used = new Set();
+  return items.map((item, position) => {
+    const base = String(item.index || item.name || `item-${position}`);
+    let key = base;
+    let suffix = 2;
+    while (used.has(key)) {
+      key = `${base}-${suffix}`;
+      suffix += 1;
+    }
+    used.add(key);
+    return key;
+  });
 }
 
 function FilterControls({
@@ -166,6 +183,8 @@ function SelectableList({
     return results.sort((a, b) => a.name.localeCompare(b.name));
   }, [items, searchQuery, filterStates, showOnlySelected, formData, fieldName, filters]);
 
+  const itemKeys = useMemo(() => buildUniqueKeys(filteredItems), [filteredItems]);
+
   // Handle item toggle
   const handleItemToggle = (itemName) => {
     const currentItems = getNestedValue(formData, fieldName) || [];
@@ -307,17 +326,19 @@ function SelectableList({
                 {resultsMessage(searchQuery, filters, filterStates, resultLabel)}
               </div>
             ) : (
-              filteredItems.map((item, index) =>
-                renderItem(item, index, {
-                  isSelected: itemIsSelected(item.name),
-                  isPreSelected: itemIsPreSelected(item.name),
-                  isExpanded: showFullDetails[index],
-                  onToggle: () => handleItemToggle(item.name),
-                  onRemove: () => handleRemoveItem(item.name),
-                  onToggleExpand: () => toggleFullDetails(index),
-                  itemCount: getItemCount(item.name),
-                 })
-               )
+              filteredItems.map((item, index) => (
+                <Fragment key={itemKeys[index]}>
+                  {renderItem(item, index, {
+                    isSelected: itemIsSelected(item.name),
+                    isPreSelected: itemIsPreSelected(item.name),
+                    isExpanded: showFullDetails[index],
+                    onToggle: () => handleItemToggle(item.name),
+                    onRemove: () => handleRemoveItem(item.name),
+                    onToggleExpand: () => toggleFullDetails(index),
+                    itemCount: getItemCount(item.name),
+                  })}
+                </Fragment>
+              ))
            )}
          </div>
        </div>

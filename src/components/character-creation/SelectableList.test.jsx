@@ -720,8 +720,7 @@ describe('SelectableList', () => {
     });
   });
 
-  describe('nested field access', () => {
-    it('should read from and write to a nested field path', () => {
+  describe('nested field access', () => {    it('should read from and write to a nested field path', () => {
       const nestedFormData = { character: { skills: [] } };
       const mockOnChange = vi.fn();
       const renderItem = createRenderItem((item, index, opts) => (
@@ -747,6 +746,78 @@ describe('SelectableList', () => {
 
       fireEvent.click(screen.getByTestId('item-0'));
       expect(mockOnChange).toHaveBeenCalledWith('character.skills', ['Item A']);
+    });
+  });
+
+  describe('unique keys (spells-step key warning lock)', () => {
+    const KeylessSpellRow = ({ spell }) => <div className="spell-item">{spell.name}</div>;
+
+    function spyOnConsoleErrors() {
+      return vi.spyOn(console, 'error').mockImplementation(() => {});
+    }
+
+    function keyWarningCalls(spy) {
+      return spy.mock.calls.filter((args) => String(args[0]).includes('unique "key"'));
+    }
+
+    it('should render component-returning renderItem without React key warnings', () => {
+      const errorSpy = spyOnConsoleErrors();
+      renderComponent({ renderItem: (item) => <KeylessSpellRow spell={item} /> });
+      expect(keyWarningCalls(errorSpy)).toHaveLength(0);
+      errorSpy.mockRestore();
+    });
+
+    it('should render without key collisions when identity values repeat across items', () => {
+      const errorSpy = spyOnConsoleErrors();
+      const dupItems = [
+        { name: 'Bless', index: 'bless' },
+        { name: 'Bless', index: 'bless' },
+        { name: 'Cure Wounds', index: 'cure-wounds' },
+      ];
+      renderComponent({ items: dupItems, renderItem: (item) => <KeylessSpellRow spell={item} /> });
+      expect(keyWarningCalls(errorSpy)).toHaveLength(0);
+      expect(screen.getAllByText('Bless')).toHaveLength(2);
+      errorSpy.mockRestore();
+    });
+
+    it('should render without key collisions when items lack index and names repeat', () => {
+      const errorSpy = spyOnConsoleErrors();
+      const items = [
+        { name: 'Fire Bolt' },
+        { name: 'Fire Bolt' },
+        { name: 'Fire Bolt' },
+      ];
+      renderComponent({ items, renderItem: (item) => <KeylessSpellRow spell={item} /> });
+      expect(keyWarningCalls(errorSpy)).toHaveLength(0);
+      expect(screen.getAllByText('Fire Bolt')).toHaveLength(3);
+      errorSpy.mockRestore();
+    });
+
+    it('should keep selection behavior stable across filtered re-renders', () => {
+      const errorSpy = spyOnConsoleErrors();
+      const mockOnChange = vi.fn();
+      const renderItem = (item, index, opts) => (
+        <div data-testid={`row-${item.name}`} onClick={opts.onToggle} className={opts.isSelected ? 'selected' : ''}>
+          {item.name}
+        </div>
+      );
+      renderComponent({
+        items: [
+          { name: 'Acid Splash', index: 'acid-splash' },
+          { name: 'Bless', index: 'bless' },
+        ],
+        formData: { skills: [] },
+        onArrayFieldChange: mockOnChange,
+        renderItem,
+      });
+      fireEvent.click(screen.getByTestId('row-Bless'));
+      expect(mockOnChange).toHaveBeenCalledWith('skills', ['Bless']);
+      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'acid' } });
+      expect(screen.queryByTestId('row-Bless')).not.toBeInTheDocument();
+      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: '' } });
+      expect(screen.getByTestId('row-Bless')).toBeInTheDocument();
+      expect(keyWarningCalls(errorSpy)).toHaveLength(0);
+      errorSpy.mockRestore();
     });
   });
 });

@@ -224,7 +224,6 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ## Improvement Backlog
 
-- (2026-10-10) `SelectableList` React unique-key console warning fires on the wizard Spells step — assign stable keys in `SelectableList.jsx`.
 
 ## Coverage
 
