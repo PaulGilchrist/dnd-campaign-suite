@@ -8804,7 +8804,8 @@
         "stunned"
       ],
       "description": "Intelligence Saving Throw: DC 24, each creature within 60 ft. that can see Cthulhu. Failure: 33 (6d10) Psychic damage and the target has the Stunned condition until the end of its next turn. Success: Half damage and no Stun. Cthulhu can't use this action again until its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1868-cthulhu-psychic-shatter.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-11"
     },
     {
       "id": "MA-1869",
@@ -10038,7 +10039,8 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The demogorgon uses Gaze, choosing Beguiling Gaze or Confusing Gaze.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1881-demogorgon-legendary-gaze.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-11"
     },
     {
       "id": "MA-1882",
