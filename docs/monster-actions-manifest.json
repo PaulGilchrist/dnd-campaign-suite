@@ -10013,7 +10013,7 @@
       "saveDc": 23,
       "saveType": "Wisdom",
       "description": "The demogorgon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23): At Will: Detect Magic, Major Image. 3/Day: Dispel Magic, Fear, Telekinesis. 1/Day: Feeblemind, Project Image.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1879-demogorgon-spellcasting.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1880",
