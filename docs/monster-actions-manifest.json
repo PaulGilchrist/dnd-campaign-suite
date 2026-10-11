@@ -12335,7 +12335,8 @@
       "damageDicePrimary": "12d10",
       "damageTypePrimary": "Necrotic",
       "description": "Dexterity Saving Throw: DC 24, each creature in a 60-foot Cone. Failure: 66 (12d10) Necrotic damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1898-garmr-corpse-fire-breath.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-11"
     },
     {
       "id": "MA-1899",
@@ -12379,7 +12380,8 @@
         "prone"
       ],
       "description": "Strength Saving Throw: DC 23, each creature within 30 ft. Failure: knocked Prone and takes 9 (2d8) Thunder damage. Success: half damage and not Prone.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1901-garmr-knockdown-howl.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-11"
     },
     {
       "id": "MA-1902",

@@ -24158,6 +24158,7 @@
         "name": "Corpse-Fire Breath (Recharge 5-6)",
         "save_type": "Dexterity",
         "save_dc": 24,
+        "recharge": "5-6",
         "description": "Dexterity Saving Throw: DC 24, each creature in a 60-foot Cone. Failure: 66 (12d10) Necrotic damage. Success: Half damage.",
         "damage_dice_primary": "12d10",
         "damage_type_primary": "Necrotic"
@@ -24181,6 +24182,7 @@
         "description": "Strength Saving Throw: DC 23, each creature within 30 ft. Failure: knocked Prone and takes 9 (2d8) Thunder damage. Success: half damage and not Prone.",
         "save_dc": 23,
         "save_type": "Strength",
+        "save_effect": "Failure: The target is knocked Prone and takes 9 (2d8) Thunder damage. Success: half damage and not Prone.",
         "damage_dice_primary": "2d8",
         "damage_type_primary": "Thunder",
         "hit_conditions": [
