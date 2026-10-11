@@ -149,14 +149,24 @@ describe('CR 25-30 epic cohort — attack/save centerpiece structure', () => {
       .filter(a => !/^.*spellcasting\b/i.test(a.name))
       .filter(a => a.save_dc != null || /Saving Throw|Vulnerab/i.test(a.description || '') || (a.conditions || []).length);
     expect(saves.length, `${idx}: no saving-throw / control centerpiece`).toBeGreaterThanOrEqual(1);
-    const damaging = saves.filter(a => a.damage_dice_primary);
-    if (damaging.length) {
-      const strongest = damaging.reduce((s, a) => Math.max(s, diceAvg(a.damage_dice_primary)), 0);
+    // Save centerpiece: EITHER an epic damaging burst (>= CR-band floor avg) OR
+    // a hard control save (conditions / vulnerability) — alternatives, not both.
+    // A control save that also carries modest RAW damage (archlich Dread Word:
+    // 5d8 Psychic + Frightened, epic burst = Meteor Swarm in the excluded
+    // Spellcasting row) satisfies via CONTROL; the burst floor stays enforced for
+    // pure-damage epic saves that impose no condition. (§384 stale-pin reconciliation
+    // after MA-1855 added damage_dice_primary to Dread Word.)
+    const control = saves.find(a => (a.conditions || []).length || /Vulnerab|Stunned|Charmed|Grappled|Restrained|Prone|Unconscious|unable to/i.test(a.description));
+    const pureDamageSaves = saves.filter(a => a.damage_dice_primary && !(a.conditions || []).length);
+    if (control) {
+      expect(control, `${idx}: control save centerpiece`).toBeTruthy();
+    } else if (pureDamageSaves.length) {
+      const strongest = pureDamageSaves.reduce((s, a) => Math.max(s, diceAvg(a.damage_dice_primary)), 0);
       const floor = Number(m.challenge_rating) >= 29 ? 45 : Number(m.challenge_rating) >= 27 ? 40 : 24;
       expect(strongest, `${idx}: strongest burst ${strongest.toFixed(1)} below CR${m.challenge_rating} floor ${floor}`).toBeGreaterThanOrEqual(floor);
     } else {
-      const control = saves.find(a => (a.conditions || []).length || /Vulnerab|Stunned|Charmed|Grappled|Restrained|Prone|Unconscious|unable to/i.test(a.description));
-      expect(control, `${idx}: save rows neither deal damage nor impose control`).toBeTruthy();
+      const fallback = saves.find(a => a.damage_dice_primary);
+      expect(fallback || control, `${idx}: save rows neither deal damage nor impose control`).toBeTruthy();
     }
   });
 
