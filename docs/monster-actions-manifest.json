@@ -12602,7 +12602,8 @@
       "damageDicePrimary": "26d6",
       "damageTypePrimary": "Radiant",
       "description": "Dexterity Saving Throw: DC 27, each creature in a 120-foot-long, 10-foot-wide Line. Failure: 91 (26d6) Radiant damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1916-godzilla-atomic-breath.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-11"
     },
     {
       "id": "MA-1917",

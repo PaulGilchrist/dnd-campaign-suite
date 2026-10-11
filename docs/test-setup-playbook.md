@@ -567,3 +567,6 @@ Durable mechanics, rigs, seams and pitfalls for validation/exploration runs in t
 - **Save rows only word-scan `save_effect`** (§346); a save row authoring `hit_conditions:[...]` is bait — buildHitConditionClause runs attack-lane only (§153/handlePlainDamage). Pin inertness in the spec (clause built but never consumed on save rows) so a future save-lane mis-wire can't double-grant.
 - Recharge ungated fingerprint: name-text "(Recharge 5-6)" parsed by NO parser — one-field `recharge:"5-6"` fix rides MA-0031 spend/refusal/recovery lane; verify via rechargeUsageOf/monsterRechargeGate pure functions (no runtime store needed).
 - HeroesFeastBard Leading Evasion chooser auto-opens before every PC save in AoE runs — Skip (decline) per target mandatory before the prompt; budget one extra click per target.
+
+## MA-1916 (Final queue note — recharge breath-twin family complete)
+- Breath-twin one-field fix now landed for MA-1843/1859/1898/1907/1916: name-text "(Recharge 5-6)" never gates; always author `recharge:"5-6"` in data; consumer rechargeUsageOf/monsterRechargeGate is pure — fingerprint spec needs no mocks.
