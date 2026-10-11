@@ -18279,7 +18279,12 @@
         "reach": "10 ft.",
         "attack_bonus": 17,
         "damage_dice_primary": "3d12 + 9",
-        "damage_type_primary": "Force"
+        "damage_type_primary": "Force",
+        "save_dc": 23,
+        "save_type": "Constitution",
+        "dc_success": "full",
+        "save_effect": "If the target is a creature, it must succeed on a DC 23 Constitution saving throw or its Hit Point maximum is reduced by an amount equal to the damage taken. This reduction lasts until the target finishes a Long Rest. The target dies if its Hit Point maximum is reduced to 0.",
+        "save_hp_max_reduce": { "equal_to": "damage" }
       },
       {
         "name": "Gaze",

@@ -1653,6 +1653,34 @@ function resolveSaveLegDamageFields(action, saveDamageFormula, primaryDamageType
   };
 }
 
+// MA-1877: same-attack identity gate — campaign lastAttack belongs to THIS
+// attacker+target (and, when named, this very action), so a Claw hit or a
+// foreign monster's stale hit never arms the rider magnitude.
+function riderSnapshotAttackMatches(la, monsterName, targetName, actionName) {
+  if (la.attackerName !== monsterName || la.targetName !== targetName) return false;
+  const lastAttackName = String(la.attackName || la.actionName || '');
+  return !lastAttackName || lastAttackName === String(actionName || '');
+}
+
+// MA-1877: click-time damage snapshot for the composite rider-only save chip
+// (Demogorgon Tentacle). Armed ONLY when the row carries BOTH attack_bonus
+// and the structured save_hp_max_reduce key — a rider-only fork whose damage
+// was ALREADY paid (in full, dc_success:"full") by the attack chip resolved
+// just before this DC chip was pressed. Identity-gated to the SAME
+// attacker + target + action on campaign lastAttack, and requires
+// damageApplied:true so a miss (or an unpressed attack) snapshots an honest
+// 0 → the consumer logs "No change" via hpMaxReduceService, never a
+// fabricated reduction. magnitude = actualDamage (post-resistance applied,
+// == finalDamage on clean-AC rigs) → primaryDamage → rawDamage.
+function saveRiderAttackDamageSnapshot(action, monsterName, targetName) {
+  if (!parseSaveHpMaxReduce(action)) return null;
+  if (!isCompositeAttackSaveRow(action)) return null;
+  const la = getRuntimeValue('campaign', 'lastAttack');
+  if (!la || la.damageApplied !== true) return 0;
+  if (!riderSnapshotAttackMatches(la, monsterName, targetName, action.name)) return 0;
+  return Number(la.actualDamage || la.primaryDamage || la.rawDamage) || 0;
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
 export function buildAbilitySaveRollContext({ monsterName, target, spellName, action, saveType, dcSuccess, saveDamageFormula, saveConditions, usesGate, prerequisite, getDamageTypesForAction, spellDamageType, animalSpiritVariant = null, animalSpiritFortifyHp = null, conditionDurationNote = null, characters = [] }) {
   const primaryDamageType = savePrimaryDamageType(spellDamageType, action, getDamageTypesForAction);
@@ -1795,6 +1823,18 @@ export function buildAbilitySaveRollContext({ monsterName, target, spellName, ac
     // heal lane live — only the save-lane GRANT was missing). Byte-inert
     // null for every save row without the key; success face grants nothing.
     saveTargetEffect: parseSaveTargetEffect(action),
+    // MA-1877: Demogorgon Tentacle — click-time snapshot of the damage the
+    // SAME-action attack chip just paid (lastAttack.actualDamage/primaryDamage),
+    // the magnitude the fail-only max-HP-reduce rider consumes on the save-FAIL
+    // face (RAW "reduced by an amount equal to the damage taken" + §87
+    // dc_success:"full" = damage always paid, rider gated). Required because
+    // stampNpcSaveLastAttack/stampPlayerSaveLastAttack REPLACE campaign
+    // lastAttack with a save descriptor BEFORE applySaveOutcome runs — by
+    // grant time the attack damage is gone from lastAttack. Armed ONLY on
+    // composite rows carrying the structured save_hp_max_reduce key
+    // (MA-1547/MA-1489 structured-key-only precedent, identity-gated to the
+    // same attacker+target+action); byte-inert null for every other row.
+    saveRiderAttackDamage: saveRiderAttackDamageSnapshot(action, monsterName, target?.name),
     // MA-0374: Beholder Eye Rays — the picked ray's structured grant spec
     // (te_grants/clock_rounds/ladder/zero_hp_clause) rides the save context
     // for the saveProcessing failed-save dispatcher + zero-HP advisory.

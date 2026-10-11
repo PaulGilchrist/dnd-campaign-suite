@@ -9981,7 +9981,7 @@
       "damageTypePrimary": "Force",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 28 (3d12 + 9) Force damage. If the target is a creature, it must succeed on a DC 23 Constitution saving throw or its Hit Point maximum is reduced by an amount equal to the damage taken. This reduction lasts until the target finishes a Long Rest. The target dies if its Hit Point maximum is reduced to 0.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1877-demogorgon-tentacle.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1878",

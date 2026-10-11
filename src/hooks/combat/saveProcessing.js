@@ -431,6 +431,53 @@ async function applyFailedSaveClauseGrants({ context, campaignName, attackerName
     // unguarded-call pattern (MA-0501 split); rows without the key return
     // untouched, dispatcher byte-inert.
     await grantSaveTargetEffectClause({ context, campaignName, attackerName, applyTarget });
+    // MA-1877: Demogorgon Tentacle — failed-save max-HP-reduce rider on a
+    // COMPOSITE attack+save row (dc_success:"full": the attack chip pays FULL
+    // damage on both faces, the DC chip gates ONLY the rider). The
+    // hit_hp_max_reduce attack lane is save-blind (fires on every resolved
+    // hit, live-proven MA-1877 round 1) and the MA-1547 applySaveHpMaxReduceLeg
+    // lives inside applySaveDamage (requires a save-leg damage pool — it
+    // would double-pay the verified-exact attack chip), so NO existing lane
+    // could express the save-gated rider (§388 code-gap, MA-1847 §511
+    // fail-face grant seam precedent). This leg consumes the structured
+    // save_hp_max_reduce:{equal_to:"damage"} armed on the rider-only save
+    // context, magnitude = the same-action damage TAKEN snapshotted at
+    // chip-click (context.saveRiderAttackDamage — stampNpcSaveLastAttack/
+    // stampPlayerSaveLastAttack replace lastAttack with a save descriptor
+    // BEFORE applySaveOutcome, so the click-time snapshot is the truth).
+    // cs maxHp drop + currentHp clamp + te ledger {baseMax,reduced,max} +
+    // LR clear + lethal clamp all LIVE in hpMaxReduceService. Byte-inert:
+    // the gate requires the structured key AND a formula-less save leg
+    // (every damage-bearing save row stays on the MA-1547 both-faces lane).
+    await grantFailedSaveHpMaxReduce({ context, campaignName, attackerName, applyTarget });
+}
+
+// MA-1877: failed-save HP-max-reduce grant (Demogorgon Tentacle "…or its
+// Hit Point maximum is reduced by an amount equal to the damage taken. This
+// reduction lasts until the target finishes a Long Rest."). Fail-only — this
+// dispatcher never runs on a successful save (§87 dc_success:"full" = the
+// rider is the ONLY gated clause). Rows whose save leg carries its own
+// damage pool (MA-1547/MA-1639 context.autoDamageFormula set) return here
+// because applySaveHpMaxReduceLeg already pays the rider on BOTH faces for
+// them — consuming here too would double-reduce. A zero/no same-action hit
+// rides hpMaxReduceService's honest zero-log ("No change"), never a
+// fabricated reduction. No addExpiration clock — RAW ends at Long Rest,
+// cleared via LONG_REST_TARGET_EFFECT_CLEAR_KEYS reading the te ledger
+// (MA-1489/MA-1547 convention).
+function resolveFailedSaveRiderDamage({ context, campaignName }) {
+    const taken = context.saveRiderAttackDamage ?? (getRuntimeValue('campaign', 'lastAttack', campaignName) || {}).finalDamage;
+    return Number(taken) || 0;
+}
+
+async function grantFailedSaveHpMaxReduce({ context, campaignName, attackerName, applyTarget }) {
+    const rider = context && context.saveHpMaxReduce;
+    if (!rider || rider.equalTo !== 'damage') return;
+    if (context.autoDamageFormula != null) return;
+    const combatSummary = await loadCombatSummary(campaignName);
+    const csCreature = ((combatSummary && combatSummary.creatures) || []).find(c => c.name === applyTarget);
+    const drainTarget = context._target || { name: applyTarget, type: (csCreature && csCreature.type) || 'npc' };
+    const logEntry = (entry) => { addEntry(campaignName, entry).catch((e) => { console.error('[saveProcessing:save-hp-max-reduce-rider]', e); }); };
+    await applyHpMaxReduce({ attackName: context.actionName || 'the action', target: drainTarget, damage: resolveFailedSaveRiderDamage({ context, campaignName }), combatSummary, characters: context._characters || [], campaignName, attackerName, logEntry, saveOutcome: 'failure' });
 }
 
 // MA-1847: failed-save target-effect grant — registers the te sourced from
