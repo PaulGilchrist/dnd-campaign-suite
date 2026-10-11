@@ -5118,7 +5118,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 22, each creature within 30 ft. A creature that can hear the word has the Frightened condition until the end of its next turn and takes 22 (5d8) Psychic damage. No damage other than Psychic. The target has the Frightened condition on a failed save.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1855-archlich-dread-word.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0311",

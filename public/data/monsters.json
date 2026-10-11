@@ -6884,7 +6884,10 @@
         "conditions": [
           "frightened"
         ],
-        "description": "Wisdom Saving Throw: DC 22, each creature within 30 ft. A creature that can hear the word has the Frightened condition until the end of its next turn and takes 22 (5d8) Psychic damage. No damage other than Psychic. The target has the Frightened condition on a failed save."
+        "description": "Wisdom Saving Throw: DC 22, each creature within 30 ft. A creature that can hear the word has the Frightened condition until the end of its next turn and takes 22 (5d8) Psychic damage. No damage other than Psychic. The target has the Frightened condition on a failed save.",
+        "damage_dice_primary": "5d8",
+        "damage_type_primary": "Psychic",
+        "save_effect": "The target has the Frightened condition until the end of its next turn."
       }
     ],
     "lair_actions": [],
