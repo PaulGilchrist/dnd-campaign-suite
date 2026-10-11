@@ -6130,7 +6130,7 @@
       "category": "legendary_actions",
       "actionType": "save",
       "description": "Behemoth bellows. Each enemy within 60 ft. that can hear it must succeed on a DC 23 Wisdom saving throw or be unable to use Reactions until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1863-behemoth-trumpet.md"
+      "verified": "verified"
     },
     {
       "id": "MA-0368",

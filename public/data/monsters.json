@@ -9119,7 +9119,11 @@
       },
       {
         "name": "Trumpet (Costs 2 Actions)",
-        "description": "Behemoth bellows. Each enemy within 60 ft. that can hear it must succeed on a DC 23 Wisdom saving throw or be unable to use Reactions until the end of its next turn."
+        "save_dc": 23,
+        "save_type": "Wisdom",
+        "dc_success": "none",
+        "description": "Behemoth bellows. Each enemy within 60 ft. that can hear it must succeed on a DC 23 Wisdom saving throw or be unable to use Reactions until the end of its next turn.",
+        "save_effect": "The target can't take Reactions until the end of its next turn."
       }
     ],
     "lair_actions": [],
