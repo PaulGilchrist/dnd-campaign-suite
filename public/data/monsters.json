@@ -15839,8 +15839,13 @@
       },
       {
         "name": "Madness Whisper (Costs 2 Actions)",
-        "delegates_to": "Psychic Shatter",
-        "description": "Cthulhu projects a maddening whisper at one creature within 120 ft. The target must succeed on a DC 24 Wisdom saving throw or take 14 (4d6) Psychic damage and be unable to take Reactions until the end of its next turn. No damage on a success."
+        "description": "Cthulhu projects a maddening whisper at one creature within 120 ft. The target must succeed on a DC 24 Wisdom saving throw or take 14 (4d6) Psychic damage and be unable to take Reactions until the end of its next turn. No damage on a success.",
+        "save_dc": 24,
+        "save_type": "Wisdom",
+        "damage_dice_primary": "4d6",
+        "damage_type_primary": "Psychic",
+        "dc_success": "none",
+        "save_effect": "The target can't take Reactions until the end of its next turn."
       }
     ],
     "lair_actions": [],
