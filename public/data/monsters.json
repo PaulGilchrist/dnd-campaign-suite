@@ -6071,6 +6071,166 @@
     "combat-strategy": "Aggressive pack fighter: charge with Multiattack Fist against the nearest target, then Rock (recharge 6, +5 ranged) any enemy that retreats beyond reach. In forest or cliff terrain, climb above the party and pelt them with rocks before dropping into a flank. Apes fight as a mob — coordinate several on one isolated target, repositioning with their 30-ft climb speed between attacks. Bold but not stupid: individuals flee up trees when the pack breaks or an ape drops to a few HP, especially against fire or loud weapons."
   },
   {
+    "index": "apep",
+    "name": "Apep",
+    "size": "Gargantuan",
+    "type": "Aberration",
+    "subtype": "Chaos Serpent",
+    "alignment": "Chaotic Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 23,
+    "armor_class_details": "23 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 624,
+    "hit_dice": "32d20 + 288",
+    "speed": {
+      "walk": "40 ft.",
+      "swim": "40 ft."
+    },
+    "ability_scores": {
+      "str": 29,
+      "dex": 12,
+      "con": 28,
+      "int": 14,
+      "wis": 18,
+      "cha": 22
+    },
+    "ability_score_modifiers": {
+      "str": 9,
+      "dex": 1,
+      "con": 9,
+      "int": 2,
+      "wis": 4,
+      "cha": 6
+    },
+    "saving_throws": {
+      "Dex": 9,
+      "Con": 17,
+      "Wis": 12
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 14
+    },
+    "immunities": [
+      "Poison"
+    ],
+    "damage_immunities": [
+      "Poison"
+    ],
+    "damage_resistances": [
+      "Acid",
+      "Cold",
+      "Lightning"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "frightened",
+      "poisoned"
+    ],
+    "languages": "All; telepathy 120 ft.",
+    "environments": [
+      "planar",
+      "underdark"
+    ],
+    "allies": [
+      "crocodile"
+    ],
+    "enemies": [
+      "solar"
+    ],
+    "challenge_rating": "28",
+    "xp": 120000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Apep fails a saving throw, he can choose to succeed instead."
+      },
+      {
+        "name": "Magic Resistance",
+        "description": "Apep has Advantage on saving throws against spells and other magical effects."
+      },
+      {
+        "name": "Swallower of Light",
+        "description": "Apep radiates supernatural darkness in a 120 ft. radius that spreads around corners; magical light of 3rd level or lower is extinguished in it."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Apep makes two Bite attacks and one Constrict attack."
+      },
+      {
+        "name": "Bite",
+        "description": "Melee Attack Roll: +18, reach 20 ft. Hit: 31 (4d10 + 9) Piercing damage. Plus 27 (6d8) Necrotic damage.",
+        "reach": "20 ft.",
+        "attack_bonus": 18,
+        "damage_dice_primary": "4d10 + 9",
+        "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "6d8",
+        "damage_type_secondary": "Necrotic"
+      },
+      {
+        "name": "Constrict",
+        "description": "Melee Attack Roll: +18, reach 15 ft., one Huge or smaller creature. Hit: 25 (4d8+9) Bludgeoning damage and the target has the Grappled condition (escape DC 26) and takes 18 (4d8) Bludgeoning damage at the start of every turn until released.",
+        "attack_bonus": 18,
+        "reach": "15 ft.",
+        "damage_dice_primary": "4d8 + 9",
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": [
+          "grappled"
+        ],
+        "save_effect": "The target has the Grappled condition (escape DC 26) and takes 18 (4d8) Bludgeoning damage at the start of every turn until released."
+      },
+      {
+        "name": "Venomous Darkness (Recharge 5-6)",
+        "save_type": "Constitution",
+        "save_dc": 26,
+        "description": "Constitution Saving Throw: DC 26, each creature within 60 ft. Failure: 77 (14d10) Necrotic damage. Success: Half damage. The area is also filled with magical darkness until the end of its next turn.",
+        "damage_dice_primary": "14d10",
+        "damage_type_primary": "Necrotic"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Coils",
+        "description": "The coils make one Constrict attack.",
+        "delegates_to": "Constrict"
+      },
+      {
+        "name": "Venomous Sting",
+        "description": "Melee Attack Roll: +18, reach 25 ft., one target. Hit: 24 (4d6+9) Poison damage and the target has the Poisoned condition until the end of its next turn."
+      },
+      {
+        "name": "Devour the Boat (Costs 2 Actions)",
+        "delegates_to": "Constrict",
+        "description": "Apep's coils lunge for one Grappled creature. The target must succeed on a DC 26 Constitution saving throw or take 33 (6d10) Piercing damage and be unable to regain Hit Points until the start of Apep's next turn."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The World Serpent of the desert's nightmare, the Uncreator who coils beneath the sun's daily barque and strives every dawn to drag the light down into the waters of oblivion.",
+    "combat-strategy": "He fights where the light fails, swallowing the front rank whole, keeping coils on the biggest threat, and letting his recharge darkness blind archers so his venom bites the blinded ones."
+  },
+  {
     "index": "apprentice-wizard",
     "name": "Apprentice Wizard",
     "size": "Medium",
@@ -6529,6 +6689,180 @@
       "underwater"
     ],
     "combat-strategy": "An 80-ft swim blitz: in water it outmoves everyone, so enter the sea or lake and Bite (two attacks, 14 piercing each) whatever paddles near, circling away from boats and harpoons. On land it is slow and vulnerable — 20-ft walk — so only chase across open sand or shallows where fleeing humanoids can't outrun its sprint into the surf. Use its Huge shell as living cover in shallow water for allies or minions. Stealth +5 in coastal reeds makes for a submerged ambush: wait at the bottom, rise beside a wading target, maul, submerge. If beached or badly hurt, it drags itself back to deep water and flees; it has no reason to fight outside its element."
+  },
+  {
+    "index": "archlich",
+    "name": "Archlich",
+    "size": "Medium",
+    "type": "Undead",
+    "subtype": "Lich",
+    "alignment": "Neutral Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 15,
+    "armor_class_details": "15",
+    "armor_class_options": [],
+    "hit_points": 475,
+    "hit_dice": "50d8 + 250",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "ability_scores": {
+      "str": 8,
+      "dex": 14,
+      "con": 20,
+      "int": 30,
+      "wis": 18,
+      "cha": 20
+    },
+    "ability_score_modifiers": {
+      "str": -1,
+      "dex": 2,
+      "con": 5,
+      "int": 10,
+      "wis": 4,
+      "cha": 5
+    },
+    "saving_throws": {
+      "Dex": 11,
+      "Con": 14,
+      "Int": 19,
+      "Wis": 13
+    },
+    "skills": {
+      "Arcana": 19,
+      "History": 19,
+      "Insight": 13,
+      "Perception": 13,
+      "Religion": 19
+    },
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 14
+    },
+    "immunities": [
+      "Cold",
+      "Lightning",
+      "Necrotic",
+      "Poison"
+    ],
+    "damage_immunities": [
+      "Cold",
+      "Lightning",
+      "Necrotic",
+      "Poison"
+    ],
+    "damage_resistances": [],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "exhaustion",
+      "frightened",
+      "paralyzed",
+      "poisoned",
+      "stunned"
+    ],
+    "languages": "All languages it knew in life plus three others; telepathy 120 ft.",
+    "environments": [
+      "underdark",
+      "urban"
+    ],
+    "allies": [
+      "lich"
+    ],
+    "enemies": [],
+    "challenge_rating": "30",
+    "xp": 155000,
+    "proficiency_bonus": 9,
+    "legendary_resistance": 5,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (5/Day)",
+        "description": "If the archlich fails a saving throw, it can choose to succeed instead."
+      },
+      {
+        "name": "Magic Resistance",
+        "description": "The archlich has Advantage on saving throws against spells and other magical effects."
+      },
+      {
+        "name": "Rejuvenation",
+        "description": "If its Phylactery is destroyed, the archlich reforms in 1d10 days at a place it has prepared. Destroying the body alone does not end it."
+      },
+      {
+        "name": "Undead Fortitude",
+        "description": "If damage reduces the archlich to 0 Hit Points, it must succeed on a DC 20 Constitution saving throw or take 1 Hit Point instead. This trait doesn't work if the damage is Radiant or comes from a Divine Strike."
+      },
+      {
+        "name": "Turn Resistance",
+        "description": "The archlich has Advantage on saving throws against the Channel Divinity of any Divine caster."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "The archlich makes three Disintegrate Ray attacks. It can replace any number of attacks with a use of Spellcasting."
+      },
+      {
+        "name": "Disintegrate Ray",
+        "description": "Ranged Attack Roll: +19, range 120 ft. Hit: 45 (10d6 + 10) Radiant damage. If this damage reduces a creature to 0 Hit Points, its body crumbles to dust.",
+        "range": "120 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "10d6 + 10",
+        "damage_type_primary": "Radiant"
+      },
+      {
+        "name": "Spellcasting",
+        "description": "The archlich is a 20th-level spellcaster. Its spellcasting ability is Intelligence (spell save DC 22, +14 to hit with spell attacks). It has the following Wizard spells prepared: Cantrips (at will): Blade Ward, Fire Bolt, Mage Hand,Mage Armor. 1st-7th level (at will): Counterspell, Dispel Magic, Fly, Hold Monster, Lightning Bolt, Phantasmagoria, Shield. 8th-9th level (3 slots total per spell level): Mind Blank, Power Word Stun, Dominate Monster, Meteor Swarm, Time Stop, Wish.",
+        "save_dc": 22,
+        "save_type": "Intelligence"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [
+      {
+        "name": "Spell Absorption",
+        "trigger": "When the archlich is targeted by a spell requiring concentration.",
+        "description": "The archlich can use its Reaction to attempt to absorb the spell. If it succeeds on a DC 20 Intelligence (Arcana) check, the spell fails and the archlich regains 10 Hit Points."
+      }
+    ],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Cast Cantrip",
+        "description": "The archlich makes one Cantrip spell attack."
+      },
+      {
+        "name": "Grave Touch",
+        "description": "Melee Attack Roll: +19, reach 5 ft. Hit: 41 (8d8 + 5) Necrotic damage. If the target is a living creature, it cannot regain Hit Points until the start of the archlich's next turn.",
+        "reach": "5 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "8d8 + 5",
+        "damage_type_primary": "Necrotic"
+      },
+      {
+        "name": "Dread Word",
+        "save_type": "Wisdom",
+        "save_dc": 22,
+        "conditions": [
+          "frightened"
+        ],
+        "description": "Wisdom Saving Throw: DC 22, each creature within 30 ft. A creature that can hear the word has the Frightened condition until the end of its next turn and takes 22 (5d8) Psychic damage. No damage other than Psychic. The target has the Frightened condition on a failed save."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Homebrew",
+    "page": null,
+    "description": "A lich that has mastered the final threshold between undeath and apotheosis, the archlich is a walking graveyard of stolen centuries, its eye sockets burning with cold, patient malice.",
+    "combat-strategy": "It commands the fight from behind wards of spell control, saving Time Stop and Meteor Swarm for the moment the party clumps, and using Spell Absorption to punish any attempt to Focus a spell against it."
   },
   {
     "index": "archmage",
@@ -8619,6 +8953,147 @@
     "page": 70,
     "description": "Bearded devils serve archdevils as shock troops, fighting shoulder-to-shoulder and reveling in the glory of battle. They respond with violence to any slight, real or imagined, gorging themselves on violence as their infernal saw-toothed glaives carve a path through their foes.<br/>A bearded devil is humanoid in form, with pointed ears, scaly skin, a long tail, and claws that clearly show its fiendish nature. These devils take their names from the snakelike growths that adorn their chins, which they use to lash and poison enemies, weakening them with their virulent venom.",
     "combat-strategy": "Lock onto the party's healer-reliant frontline: Beard hits leave the target Poisoned and unable to regain hit points, while Infernal Glaive stacks an infernal wound bleeding 1d10 each of their turns. That one-two stalls entire healing economies, so keep both effects stacked on the same victim instead of spreading them. Magic Resistance blunts control spells, so the party cannot safely shut it down with saves. At 58 hit points with a 10-foot reach glaive, it grinds willingly — stay in the clinch and let the wounds do the killing."
+  },
+  {
+    "index": "behemoth",
+    "name": "Behemoth",
+    "size": "Gargantuan",
+    "type": "Beast",
+    "subtype": "Primordial Beast",
+    "alignment": "Unaligned",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 22,
+    "armor_class_details": "22 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 594,
+    "hit_dice": "34d20 + 238",
+    "speed": {
+      "walk": "60 ft."
+    },
+    "ability_scores": {
+      "str": 30,
+      "dex": 8,
+      "con": 24,
+      "int": 3,
+      "wis": 12,
+      "cha": 10
+    },
+    "ability_score_modifiers": {
+      "str": 10,
+      "dex": -1,
+      "con": 7,
+      "int": -4,
+      "wis": 1,
+      "cha": 0
+    },
+    "saving_throws": {
+      "Str": 18,
+      "Con": 15
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 60,
+      "passive_perception": 11
+    },
+    "immunities": [],
+    "damage_immunities": [],
+    "damage_resistances": [
+      "Bludgeoning, Piercing, and Slashing from Nonmagical Attacks"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [],
+    "languages": "—",
+    "environments": [
+      "desert",
+      "grassland",
+      "mountain"
+    ],
+    "allies": [
+      "elephant",
+      "hippopotamus"
+    ],
+    "enemies": [],
+    "challenge_rating": "27",
+    "xp": 105000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": null,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Thick Hide",
+        "description": "Behemoth has Resistance to nonmagical Bludgeoning, Piercing, and Slashing damage."
+      },
+      {
+        "name": "Unstoppable Charge",
+        "description": "If Behemoth moves at least 30 ft. straight toward a target and hits it with a Gore on the same turn, the target takes an extra 14 (4d6) Bludgeoning damage and must succeed on a DC 25 Strength saving throw or be knocked Prone."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Behemoth makes two Gore attacks and one Stomp attack."
+      },
+      {
+        "name": "Gore",
+        "description": "Melee Attack Roll: +18, reach 10 ft. Hit: 26 (3d10 + 10) Piercing damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 18,
+        "damage_dice_primary": "3d10 + 10",
+        "damage_type_primary": "Piercing"
+      },
+      {
+        "name": "Stomp",
+        "description": "Melee Attack Roll: +18, reach 10 ft. Hit: 32 (4d10 + 10) Bludgeoning damage. The target has the Prone condition.",
+        "reach": "10 ft.",
+        "attack_bonus": 18,
+        "damage_dice_primary": "4d10 + 10",
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": [
+          "prone"
+        ]
+      },
+      {
+        "name": "Earthshaker (Recharge 5-6)",
+        "save_type": "Strength",
+        "save_dc": 25,
+        "description": "Strength Saving Throw: DC 25, each creature within 60 ft. on the ground. Failure: 55 (10d10) Bludgeoning damage. Success: Half damage.",
+        "damage_dice_primary": "10d10",
+        "damage_type_primary": "Bludgeoning"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Gore",
+        "delegates_to": "Gore",
+        "description": "It makes one Gore attack."
+      },
+      {
+        "name": "Stomp",
+        "delegates_to": "Stomp",
+        "description": "It makes one Stomp attack."
+      },
+      {
+        "name": "Trumpet (Costs 2 Actions)",
+        "description": "Behemoth bellows. Each enemy within 60 ft. that can hear it must succeed on a DC 23 Wisdom saving throw or be unable to use Reactions until the end of its next turn."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The land-walker of the old scriptures — a river-horse of impossible bulk whose grazing reshapes valleys and whose tread makes the plain tremble.",
+    "combat-strategy": "He charges the densest line; a Gore on the run topples, and Earthshaker turns formations into rubble."
   },
   {
     "index": "behir",
@@ -15177,6 +15652,161 @@
     "combat-strategy": "Ambush from submerged cover: crocodiles have Stealth +2, Hold Breath for an hour, and can float motionless just below the surface of swamp or river terrain. Wait for a target to wade within 5 ft., then Bite (attack +4) — on a hit against Medium or smaller, the victim is Grappled and Restrained (escape DC 12) and the croc drags them into deep water using its 30-ft. swim speed, where allies may need to swim to help. On land it's slow (20 ft.) and clumsy with only 13 HP, so pick fights exclusively at the water's edge; once it has a grappled victim, swim away from the party rather than standing and trading. If the victim escapes the grapple and the crocodile has taken meaningful damage, submerge and vanish — it holds its breath and waits for the next meal to come to it."
   },
   {
+    "index": "cthulhu",
+    "name": "Cthulhu",
+    "size": "Gargantuan",
+    "type": "Aberration",
+    "subtype": "Great Old One",
+    "alignment": "Chaotic Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 21,
+    "armor_class_details": "21 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 540,
+    "hit_dice": "40d20 + 320",
+    "speed": {
+      "walk": "40 ft.",
+      "fly": "20 ft.",
+      "swim": "60 ft."
+    },
+    "ability_scores": {
+      "str": 30,
+      "dex": 12,
+      "con": 26,
+      "int": 26,
+      "wis": 19,
+      "cha": 26
+    },
+    "ability_score_modifiers": {
+      "str": 10,
+      "dex": 1,
+      "con": 8,
+      "int": 8,
+      "wis": 4,
+      "cha": 8
+    },
+    "saving_throws": {
+      "Dex": 9,
+      "Con": 16,
+      "Wis": 12,
+      "Cha": 16
+    },
+    "skills": {
+      "Arcana": 16,
+      "Perception": 12,
+      "Persuasion": 16
+    },
+    "senses": {
+      "darkvision": 120,
+      "truesight": 60,
+      "passive_perception": 25
+    },
+    "immunities": [],
+    "damage_immunities": [],
+    "damage_resistances": [
+      "Cold"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "frightened",
+      "poisoned"
+    ],
+    "languages": "Telepathy 1 mile.",
+    "environments": [
+      "coastal"
+    ],
+    "allies": [],
+    "enemies": [],
+    "challenge_rating": "26",
+    "xp": 90000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": null,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Insane Geometry",
+        "description": "The demigod's form defies mortal understanding. Creatures that start their turns within 30 ft. of it must succeed on a DC 24 Wisdom saving throw or take 11 (2d10) Psychic damage and have the Frightened condition until the start of their next turn."
+      },
+      {
+        "name": "Star-Spawn Immortal",
+        "description": "When reduced to 0 Hit Points, Cthulhu's body dissolves and reforms elsewhere unless the killing blow was dealt by a blessed weapon or Radiant damage. A Disintegrate spell or a wish unmakes it truly."
+      },
+      {
+        "name": "Amphibious",
+        "description": "Cthulhu can breathe air and water and faces no penalty for fighting submerged."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Cthulhu makes three attacks: two with its claws and one with its tentacles. It can replace one Claw attack with a use of Psychic Shatter."
+      },
+      {
+        "name": "Claw",
+        "description": "Melee Attack Roll: +18, reach 15 ft. Hit: 32 (4d10 + 10) Slashing damage.",
+        "reach": "15 ft.",
+        "attack_bonus": 18,
+        "damage_dice_primary": "4d10 + 10",
+        "damage_type_primary": "Slashing"
+      },
+      {
+        "name": "Tentacles",
+        "description": "Melee Attack Roll: +18, reach 20 ft. Hit: 28 (4d8 + 10) Bludgeoning damage. If the target is a Huge or smaller creature, it must succeed on a DC 26 Strength saving throw or be pulled 20 ft. toward Cthulhu and have the Grappled condition (escape DC 26). While Grappled this way, the target automatically takes 18 (4d8) Bludgeoning damage at the start of its next turn.",
+        "reach": "20 ft.",
+        "attack_bonus": 18,
+        "damage_dice_primary": "4d8 + 10",
+        "damage_type_primary": "Bludgeoning"
+      },
+      {
+        "name": "Psychic Shatter",
+        "description": "Intelligence Saving Throw: DC 24, each creature within 60 ft. that can see Cthulhu. Failure: 33 (6d10) Psychic damage and the target has the Stunned condition until the end of its next turn. Success: Half damage and no Stun. Cthulhu can't use this action again until its next turn.",
+        "save_dc": 24,
+        "save_type": "Intelligence",
+        "damage_dice_primary": "6d10",
+        "damage_type_primary": "Psychic",
+        "save_effect": "Failure: Stunned until the end of its next turn. Success: Half damage and no Stun.",
+        "conditions": [
+          "stunned"
+        ]
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Claw",
+        "delegates_to": "Claw",
+        "description": "It makes one Claw attack."
+      },
+      {
+        "name": "Tentacles",
+        "delegates_to": "Tentacles",
+        "description": "It makes one Tentacles attack."
+      },
+      {
+        "name": "Madness Whisper (Costs 2 Actions)",
+        "delegates_to": "Psychic Shatter",
+        "description": "Cthulhu projects a maddening whisper at one creature within 120 ft. The target must succeed on a DC 24 Wisdom saving throw or take 14 (4d6) Psychic damage and be unable to take Reactions until the end of its next turn. No damage on a success."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Homebrew",
+    "page": null,
+    "description": "The high priest of the Old Ones sleeps and dreams beneath a drowned city, and when the stars align its vast, many-tentacled form rises to warp the minds of civilizations. Its mere geometry hurts to look upon.",
+    "combat-strategy": "It wades through the front line letting Insane Geometry grind the edges, reeling enemies in with Tentacles to feed, and saving Psychic Shatter for when half the party crowds together in its line of sight."
+  },
+  {
     "index": "cult-fanatic",
     "name": "Cult Fanatic",
     "size": "Medium",
@@ -17491,6 +18121,165 @@
       "summary": "A demilich's tomb might have any or all of the following effects in place:"
     },
     "combat-strategy": "Open at maximum range: hover with its 30-ft. flight and unleash Multiattack Necrotic Bursts from 120 ft., kiting anyone without reach or ranged options since it only walks 5 ft. Unleash Howl the moment the party clusters, trading its burst damage for 70 psychic plus mass Frightened, then resume ranged volleys on the fleeing victims. Spend legendary Energy Drain on the healer or the tank whose HP maximum matters most, and use Grave-Dust Flight whenever melee closing in would reach it — the free Blind on pursuers pairs perfectly with its ranged attacks against sighted targets. Save its three Legendary Resistances for banishment, hold monster, and finger of death, never for ordinary damage, and if the party commits to destroying it without a Wish available, retreat behind cover or reform via Undead Restoration rather than die in a corner."
+  },
+  {
+    "index": "demogorgon",
+    "name": "Demogorgon",
+    "size": "Huge",
+    "type": "Fiend",
+    "subtype": "Demon",
+    "alignment": "Chaotic Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 22,
+    "armor_class_details": "22 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 464,
+    "hit_dice": "32d12 + 256",
+    "speed": {
+      "walk": "50 ft.",
+      "swim": "50 ft."
+    },
+    "ability_scores": {
+      "str": 29,
+      "dex": 14,
+      "con": 26,
+      "int": 20,
+      "wis": 17,
+      "cha": 25
+    },
+    "ability_score_modifiers": {
+      "str": 9,
+      "dex": 2,
+      "con": 8,
+      "int": 5,
+      "wis": 3,
+      "cha": 7
+    },
+    "saving_throws": {
+      "Dex": 10,
+      "Con": 16,
+      "Wis": 11,
+      "Cha": 15
+    },
+    "skills": {
+      "Insight": 11,
+      "Perception": 11
+    },
+    "senses": {
+      "truesight": 120,
+      "passive_perception": 29
+    },
+    "immunities": [
+      "Poison",
+      "Bludgeoning, Piercing, and Slashing from Nonmagical Attacks"
+    ],
+    "damage_immunities": [
+      "Poison",
+      "Bludgeoning, Piercing, and Slashing from Nonmagical Attacks"
+    ],
+    "damage_resistances": [
+      "Cold",
+      "Fire",
+      "Lightning"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "exhaustion",
+      "frightened",
+      "poisoned"
+    ],
+    "languages": "All; telepathy 120 ft.",
+    "environments": [
+      "planar",
+      "underdark"
+    ],
+    "allies": [],
+    "enemies": [],
+    "challenge_rating": "26",
+    "xp": 90000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If the demogorgon fails a saving throw, it can choose to succeed instead."
+      },
+      {
+        "name": "Magic Resistance",
+        "description": "The demogorgon has Advantage on saving throws against spells and other magical effects."
+      },
+      {
+        "name": "Two Heads",
+        "description": "The demogorgon has Advantage on saving throws against being Blinded, Deafened, Stunned, or knocked Unconscious."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "The demogorgon makes two Tentacle attacks. It can replace one attack with a use of Gaze."
+      },
+      {
+        "name": "Tentacle",
+        "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 28 (3d12 + 9) Force damage. If the target is a creature, it must succeed on a DC 23 Constitution saving throw or its Hit Point maximum is reduced by an amount equal to the damage taken. This reduction lasts until the target finishes a Long Rest. The target dies if its Hit Point maximum is reduced to 0.",
+        "reach": "10 ft.",
+        "attack_bonus": 17,
+        "damage_dice_primary": "3d12 + 9",
+        "damage_type_primary": "Force"
+      },
+      {
+        "name": "Gaze",
+        "save_type": "Wisdom",
+        "save_dc": 23,
+        "description": "Wisdom Saving Throw: DC 23, one creature it can see within 120 ft. The target suffers one of the following effects (choose one or roll a d6): 1-2 Beguiling Gaze, the target has the Stunned condition until the start of the demogorgon's next turn or until the demogorgon is no longer within line of sight; 3-4 Confusing Gaze, the target suffers the effect of the Confusion spell until the start of the demogorgon's next turn without concentrating; 5-6 Hypnotic Gaze, the target is Charmed by the demogorgon until the start of its next turn and the demogorgon chooses how the Charmed target uses its Action, Reaction, and movement. No damage."
+      },
+      {
+        "name": "Spellcasting",
+        "description": "The demogorgon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23): At Will: Detect Magic, Major Image. 3/Day: Dispel Magic, Fear, Telekinesis. 1/Day: Feeblemind, Project Image.",
+        "save_dc": 23,
+        "save_type": "Wisdom"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 2",
+        "uses": 2,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Gaze",
+        "delegates_to": "Gaze",
+        "description": "The demogorgon uses Gaze, choosing Beguiling Gaze or Confusing Gaze."
+      },
+      {
+        "name": "Tail",
+        "description": "Melee Attack Roll: +17, reach 15 ft. Hit: 20 (2d10 + 9) Bludgeoning damage. Plus 11 (2d10) Necrotic damage.",
+        "reach": "15 ft.",
+        "attack_bonus": 17,
+        "damage_dice_primary": "2d10 + 9",
+        "damage_type_primary": "Bludgeoning",
+        "damage_dice_secondary": "2d10",
+        "damage_type_secondary": "Necrotic"
+      },
+      {
+        "name": "Cast a Spell (Costs 2 Actions)",
+        "delegates_to": "Spellcasting",
+        "description": "The demogorgon uses Spellcasting."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Monsters of the Multiverse",
+    "page": null,
+    "description": "A bloated toad-headed demon prince crowned with writhing serpent-tentacles, Demogorgon is the raw embodiment of chaos, madness, and destruction. He rules endless layers of abyssal salt water and slime, and his twin heads each fix their gaze on a different doomed horizon.",
+    "combat-strategy": "He wades into melee where both Tentacle attacks and Gaze reach the most foes, rotating his Gaze effects to spread Stun, Confusion, and Charm across the party, and saving his Spellcasting for Feeblemind against the leading caster."
   },
   {
     "index": "deva",
@@ -22495,6 +23284,158 @@
     "combat-strategy": "A smaller, scrappier version: open by going invisible (bonus action) and closing to 15 feet of a clustered pair or trio for Euphoria Breath (DC 12 WIS), which Incapacitates one target through its next turn and sends it wandering randomly — enough to break a formation. Minor Illusion and Dancing Lights are your control theater: fake voices down side tunnels, light torches to lure pursuers, and cover your approach. Bite (5 plus 2 psychic) only from invisibility against stragglers, then fly out at 60 feet; its AC 13 and 21 HP cannot survive a focused round, so never be visible and stationary on the same turn. Fight as a pack using telepathy to coordinate swoop-and-vanish passes, and flee to the Feywild-tinged depths of its warren when hurt or when its spells are spent."
   },
   {
+    "index": "fenrir",
+    "name": "Fenrir",
+    "size": "Huge",
+    "type": "Beast",
+    "subtype": "Winter Wolf",
+    "alignment": "Chaotic Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 23,
+    "armor_class_details": "23 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 629,
+    "hit_dice": "37d20 + 259",
+    "speed": {
+      "walk": "60 ft."
+    },
+    "ability_scores": {
+      "str": 30,
+      "dex": 18,
+      "con": 24,
+      "int": 6,
+      "wis": 16,
+      "cha": 12
+    },
+    "ability_score_modifiers": {
+      "str": 10,
+      "dex": 4,
+      "con": 7,
+      "int": -2,
+      "wis": 3,
+      "cha": 1
+    },
+    "saving_throws": {
+      "Dex": 12,
+      "Con": 15,
+      "Wis": 11
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 13
+    },
+    "immunities": [
+      "Cold"
+    ],
+    "damage_immunities": [
+      "Cold"
+    ],
+    "damage_resistances": [
+      "Cold"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "frightened"
+    ],
+    "languages": "",
+    "environments": [
+      "arctic",
+      "mountain"
+    ],
+    "allies": [
+      "wolf",
+      "giant-wolf-spider"
+    ],
+    "enemies": [],
+    "challenge_rating": "28",
+    "xp": 120000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Fenrir fails a saving throw, he can choose to succeed instead."
+      },
+      {
+        "name": "Unbound",
+        "description": "When the bonds that bound him break, Fenrir's jaws can swallow the sun itself. He can't be magically restrained, and spellcasting DCs against him are lowered by 2."
+      },
+      {
+        "name": "Iceborn Fangs",
+        "description": "Fenrir's Bite deals an extra 7 (2d6) Cold damage."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Fenrir makes two Bite attacks and one Claw attack."
+      },
+      {
+        "name": "Bite",
+        "description": "Melee Attack Roll: +18, reach 10 ft. Hit: 32 (4d10 + 10) Piercing damage. Plus 7 (2d6) Cold damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 18,
+        "damage_dice_primary": "4d10 + 10",
+        "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "2d6",
+        "damage_type_secondary": "Cold"
+      },
+      {
+        "name": "Claw",
+        "description": "Melee Attack Roll: +18, reach 10 ft. Hit: 29 (3d12 + 10) Slashing damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 18,
+        "damage_dice_primary": "3d12 + 10",
+        "damage_type_primary": "Slashing"
+      },
+      {
+        "name": "Devour (Recharge 5-6)",
+        "save_type": "Strength",
+        "save_dc": 26,
+        "description": "Strength Saving Throw: DC 26, one Huge or smaller creature Fenrir has Grappled. Failure: 43 (6d10 + 10) Piercing damage. Success: Half damage.",
+        "damage_dice_primary": "6d10 + 10",
+        "damage_type_primary": "Piercing"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Bite",
+        "delegates_to": "Bite",
+        "description": "It makes one Bite attack."
+      },
+      {
+        "name": "Claw",
+        "delegates_to": "Claw",
+        "description": "It makes one Claw attack."
+      },
+      {
+        "name": "Winter's Howl (Costs 2 Actions)",
+        "save_type": "Constitution",
+        "save_dc": 24,
+        "description": "Constitution Saving Throw: DC 24, each creature within 60 ft. The target also has the Frightened condition until the end of its next turn."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The monstrous wolf of Ragnarok, a cold famine with fur and fangs whose growl shakes the nine worlds and whose destined meal is the light of the sun.",
+    "combat-strategy": "He hammers the biggest warrior first; Bite, Claw, then Devour a pinned foe before the healers can reach them."
+  },
+  {
     "index": "fey-spirit",
     "name": "Fey Spirit",
     "size": "Small",
@@ -23004,6 +23945,1403 @@
       "underdark"
     ],
     "combat-strategy": "Open with Fireball (6th level, 42 average fire damage, DC 15 DEX) on the tightest cluster the party presents — nine 6d8 dice into a doorway is the whole thesis of this monster — then let 5th-level Scorching Ray (six beams, 2d6+3 each, +7 to hit) finish scattered survivors at range. Its Pact Axe Multiattack is three swings of 23 fire-slashe damage each, so once it closes on a cornered target it grinds them in three round; save the melee phase for when the party is spread or out of spell slots. Hellish Rebuke (as a reaction, using full caster power) punishes anyone who trades blows, so bait a rogue's sneak attack or a wizard's cantrip into the reaction rather than standing in melee unclaimed. Its fire focus means parties with Fire Shield, fire resistance, or water-heavy terrain hard-counter it — in those fights, kite backwards at 30 feet, ray-focused, never axe-focused. Below half health it should fallback behind the fiend it summoned, casting Scorching Ray from cover and praying for the beast to tank."
+  },
+  {
+    "index": "garmr",
+    "name": "Garmr",
+    "size": "Huge",
+    "type": "Fiend",
+    "subtype": "Hellhound",
+    "alignment": "Neutral Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 22,
+    "armor_class_details": "22 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 460,
+    "hit_dice": "40d12 + 200",
+    "speed": {
+      "walk": "50 ft."
+    },
+    "ability_scores": {
+      "str": 28,
+      "dex": 16,
+      "con": 26,
+      "int": 6,
+      "wis": 16,
+      "cha": 14
+    },
+    "ability_score_modifiers": {
+      "str": 9,
+      "dex": 3,
+      "con": 8,
+      "int": -2,
+      "wis": 3,
+      "cha": 2
+    },
+    "saving_throws": {
+      "Dex": 11,
+      "Con": 16,
+      "Wis": 11
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 13
+    },
+    "immunities": [],
+    "damage_immunities": [],
+    "damage_resistances": [
+      "Cold",
+      "Fire",
+      "Necrotic"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "frightened",
+      "poisoned"
+    ],
+    "languages": "",
+    "environments": [
+      "underdark",
+      "arctic",
+      "planar"
+    ],
+    "allies": [
+      "bone-devil",
+      "werewolf"
+    ],
+    "enemies": [],
+    "challenge_rating": "26",
+    "xp": 90000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Garmr fails a saving throw, he can choose to succeed instead."
+      },
+      {
+        "name": "Bound at the Gate",
+        "description": "Garmr can't be lured more than 30 ft. from a corpse or grave; he is immune to effects that force movement while near the dead."
+      },
+      {
+        "name": "Grave-Tied",
+        "description": "If a creature dies within 60 ft. of Garmr, Garmr regains 15 Hit Points."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Garmr makes two Bite attacks and one Claw attack."
+      },
+      {
+        "name": "Bite",
+        "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 25 (3d10 + 9) Piercing damage. Plus 9 (2d8) Necrotic damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 17,
+        "damage_dice_primary": "3d10 + 9",
+        "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "2d8",
+        "damage_type_secondary": "Necrotic"
+      },
+      {
+        "name": "Claw",
+        "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 22 (3d8 + 9) Slashing damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 17,
+        "damage_dice_primary": "3d8 + 9",
+        "damage_type_primary": "Slashing"
+      },
+      {
+        "name": "Corpse-Fire Breath (Recharge 5-6)",
+        "save_type": "Dexterity",
+        "save_dc": 24,
+        "description": "Dexterity Saving Throw: DC 24, each creature in a 60-foot Cone. Failure: 66 (12d10) Necrotic damage. Success: Half damage.",
+        "damage_dice_primary": "12d10",
+        "damage_type_primary": "Necrotic"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Bite",
+        "delegates_to": "Bite",
+        "description": "It makes one Bite attack."
+      },
+      {
+        "name": "Knockdown Howl",
+        "description": "Strength Saving Throw: DC 23, each creature within 30 ft. Failure: knocked Prone and takes 9 (2d8) Thunder damage. Success: half damage and not Prone.",
+        "save_dc": 23,
+        "save_type": "Strength",
+        "damage_dice_primary": "2d8",
+        "damage_type_primary": "Thunder",
+        "hit_conditions": [
+          "prone"
+        ]
+      },
+      {
+        "name": "Chain Snap (Costs 2 Actions)",
+        "delegates_to": "Claw",
+        "description": "Garmr lunges, making one Claw attack against a target up to 20 ft. away without provoking Opportunity Attacks."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The howling hound of the death-goddess, chained at the mouth of the underworld with blood dripping from his jaws, destined to break free and run last.",
+    "combat-strategy": "He anchors defensive fights around the dead, healing as his victims fall, then uses the Corpse-Fire breath to punish the clusters that dare cluster."
+  },
+  {
+    "index": "garuda",
+    "name": "Garuda",
+    "size": "Huge",
+    "type": "Celestial",
+    "subtype": "Sun Bird",
+    "alignment": "Neutral Good",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 21,
+    "armor_class_details": "21 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 540,
+    "hit_dice": "40d12 + 280",
+    "speed": {
+      "walk": "30 ft.",
+      "fly": "90 ft."
+    },
+    "ability_scores": {
+      "str": 26,
+      "dex": 20,
+      "con": 24,
+      "int": 14,
+      "wis": 18,
+      "cha": 22
+    },
+    "ability_score_modifiers": {
+      "str": 8,
+      "dex": 5,
+      "con": 7,
+      "int": 2,
+      "wis": 4,
+      "cha": 6
+    },
+    "saving_throws": {
+      "Dex": 13,
+      "Con": 15,
+      "Wis": 12
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 14
+    },
+    "immunities": [],
+    "damage_immunities": [],
+    "damage_resistances": [
+      "Radiant"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "poisoned"
+    ],
+    "languages": "",
+    "environments": [
+      "mountain",
+      "planar"
+    ],
+    "allies": [
+      "deva"
+    ],
+    "enemies": [],
+    "challenge_rating": "25",
+    "xp": 75000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Garuda fails a saving throw, they can choose to succeed instead."
+      },
+      {
+        "name": "Solar Majesty",
+        "description": "Undead, Fiends, and Serpents that start their turn within 30 ft. of Garuda have Disadvantage on attack rolls."
+      },
+      {
+        "name": "Sky Sovereign",
+        "description": "Garuda can hover and doesn't need to move to stay aloft."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Garuda makes two Talon attacks and one Beak attack. They can replace one attack with a Sunfire Ray."
+      },
+      {
+        "name": "Talon",
+        "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 26 (4d8 + 8) Slashing damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 15,
+        "damage_dice_primary": "4d8 + 8",
+        "damage_type_primary": "Slashing"
+      },
+      {
+        "name": "Beak",
+        "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 24 (3d10 + 8) Piercing damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 15,
+        "damage_dice_primary": "3d10 + 8",
+        "damage_type_primary": "Piercing"
+      },
+      {
+        "name": "Sunfire Ray",
+        "description": "Ranged Attack Roll: +15, range 120 ft. Hit: 27 (6d8) Radiant damage.",
+        "range": "120 ft.",
+        "attack_bonus": 15,
+        "damage_dice_primary": "6d8",
+        "damage_type_primary": "Radiant"
+      },
+      {
+        "name": "Whirlwind Flight (Recharge 5-6)",
+        "save_type": "Strength",
+        "save_dc": 23,
+        "description": "Strength Saving Throw: DC 23, each creature within a 60-ft. radius in the air. Failure: 55 (10d10) Bludgeoning damage. Success: Half damage.",
+        "damage_dice_primary": "10d10",
+        "damage_type_primary": "Bludgeoning"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Talon",
+        "delegates_to": "Talon",
+        "description": "It makes one Talon attack."
+      },
+      {
+        "name": "Detection",
+        "description": "Garuda makes one Perception check."
+      },
+      {
+        "name": "Swoop (Costs 2 Actions)",
+        "description": "Garuda flies up to double their Speed, then makes one Talon attack without provoking Opportunity Attacks.",
+        "delegates_to": "Talon"
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "A radiant half-man, half-eagle sovereign of the skies and ancient enemy of the serpents, said to be the size of a palace and swifter than any arrow.",
+    "combat-strategy": "They keep the fight vertical, diving to Talon, climbing back above the party, and unleashing Whirlwind Flight to scatter climbers and flyers alike."
+  },
+  {
+    "index": "godzilla",
+    "name": "Godzilla",
+    "size": "Gargantuan",
+    "type": "Monstrosity",
+    "subtype": "Kaiju",
+    "alignment": "Neutral",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 24,
+    "armor_class_details": "24 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 656,
+    "hit_dice": "32d20 + 320",
+    "speed": {
+      "walk": "60 ft.",
+      "swim": "80 ft."
+    },
+    "ability_scores": {
+      "str": 30,
+      "dex": 10,
+      "con": 30,
+      "int": 3,
+      "wis": 12,
+      "cha": 10
+    },
+    "ability_score_modifiers": {
+      "str": 10,
+      "dex": 0,
+      "con": 10,
+      "int": -4,
+      "wis": 1,
+      "cha": 0
+    },
+    "saving_throws": {
+      "Str": 19,
+      "Con": 19
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 11
+    },
+    "immunities": [
+      "Poison"
+    ],
+    "damage_immunities": [
+      "Poison"
+    ],
+    "damage_resistances": [
+      "Fire",
+      "Radiant"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "poisoned",
+      "paralyzed"
+    ],
+    "languages": "—",
+    "environments": [
+      "coastal",
+      "urban"
+    ],
+    "allies": [],
+    "enemies": [],
+    "challenge_rating": "30",
+    "xp": 155000,
+    "proficiency_bonus": 9,
+    "legendary_resistance": 5,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (5/Day)",
+        "description": "If Godzilla fails a saving throw, it can choose to succeed instead."
+      },
+      {
+        "name": "Regeneration",
+        "description": "Godzilla regains 30 Hit Points at the start of its turn if it took any Fire, Radiant, or energy damage since its last turn."
+      },
+      {
+        "name": "Siege Monster",
+        "description": "Godzilla deals double damage to objects and structures."
+      },
+      {
+        "name": "Thermic Nucleus",
+        "description": "When Godzilla takes 50 or more damage of a single damage type in one turn, its Atomic Breath recharges immediately."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Godzilla makes three attacks: one with its Bite and two with its Claws. It can replace one Claw attack with a Tail attack."
+      },
+      {
+        "name": "Bite",
+        "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 32 (4d10 + 10) Piercing damage. The target has the Prone condition.",
+        "reach": "20 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "4d10 + 10",
+        "damage_type_primary": "Piercing",
+        "hit_conditions": [
+          "prone"
+        ]
+      },
+      {
+        "name": "Claw",
+        "description": "Melee Attack Roll: +19, reach 15 ft. Hit: 26 (3d10 + 10) Slashing damage.",
+        "reach": "15 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "3d10 + 10",
+        "damage_type_primary": "Slashing"
+      },
+      {
+        "name": "Tail",
+        "description": "Melee Attack Roll: +19, reach 25 ft. Hit: 36 (5d12 + 4) Bludgeoning damage. The target has the Prone condition.",
+        "reach": "25 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "5d12 + 4",
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": [
+          "prone"
+        ]
+      },
+      {
+        "name": "Atomic Breath (Recharge 5-6)",
+        "save_type": "Dexterity",
+        "save_dc": 27,
+        "description": "Dexterity Saving Throw: DC 27, each creature in a 120-foot-long, 10-foot-wide Line. Failure: 91 (26d6) Radiant damage. Success: Half damage.",
+        "damage_dice_primary": "26d6",
+        "damage_type_primary": "Radiant"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Bite",
+        "delegates_to": "Bite",
+        "description": "It makes one Bite attack."
+      },
+      {
+        "name": "Tail",
+        "delegates_to": "Tail",
+        "description": "It makes one Tail attack."
+      },
+      {
+        "name": "Nuclear Pulse (Costs 2 Actions)",
+        "save_type": "Constitution",
+        "save_dc": 25,
+        "description": "Constitution Saving Throw: DC 25, each creature within 30 ft. Failure: 56 (16d6) Radiant damage. Success: Half damage. Failure: the target also has the Poisoned condition for 1 minute.",
+        "damage_dice_primary": "16d6",
+        "damage_type_primary": "Radiant"
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Homebrew",
+    "page": null,
+    "description": "A primordial titan awakened by the world's folly, Godzilla is a walking catastrophe — a mountain of scale and fury whose footsteps flatten skylines and whose roar is a warning shot fired across all of history.",
+    "combat-strategy": "It simply walks toward the largest concentration of weapons, trading blows it can absorb, and times Atomic Breath for the moment its foes bunch up or when Thermic Nucleus lets it fire early."
+  },
+  {
+    "index": "jormungandr",
+    "name": "Jormungandr",
+    "size": "Gargantuan",
+    "type": "Monstrosity",
+    "subtype": "World Serpent",
+    "alignment": "Chaotic Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 24,
+    "armor_class_details": "24 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 697,
+    "hit_dice": "34d20 + 340",
+    "speed": {
+      "walk": "40 ft.",
+      "swim": "80 ft."
+    },
+    "ability_scores": {
+      "str": 30,
+      "dex": 12,
+      "con": 32,
+      "int": 2,
+      "wis": 14,
+      "cha": 10
+    },
+    "ability_score_modifiers": {
+      "str": 10,
+      "dex": 1,
+      "con": 11,
+      "int": -4,
+      "wis": 2,
+      "cha": 0
+    },
+    "saving_throws": {
+      "Str": 19,
+      "Con": 20
+    },
+    "skills": {},
+    "senses": {
+      "blindsight": 120,
+      "darkvision": 120,
+      "passive_perception": 12
+    },
+    "immunities": [
+      "Poison"
+    ],
+    "damage_immunities": [
+      "Poison"
+    ],
+    "damage_resistances": [],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "poisoned",
+      "blinded"
+    ],
+    "languages": "",
+    "environments": [
+      "coastal",
+      "planar"
+    ],
+    "allies": [],
+    "enemies": [],
+    "challenge_rating": "30",
+    "xp": 155000,
+    "proficiency_bonus": 9,
+    "legendary_resistance": 4,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (4/Day)",
+        "description": "If Jormungandr fails a saving throw, they can choose to succeed instead."
+      },
+      {
+        "name": "Encircling the World",
+        "description": "Attacks against Jormungandr from beyond 100 ft. have their range ignored; the serpent's body looms everywhere."
+      },
+      {
+        "name": "Tidal Tail",
+        "description": "When Jormungandr leaves the water, they make one free Tail attack against every creature within 30 ft."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Jormungandr makes two Bite attacks and one Tail attack."
+      },
+      {
+        "name": "Bite",
+        "description": "Melee Attack Roll: +19, reach 25 ft. Hit: 37 (5d10 + 10) Piercing damage. Plus 27 (6d8) Poison damage.",
+        "reach": "25 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "5d10 + 10",
+        "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "6d8",
+        "damage_type_secondary": "Poison"
+      },
+      {
+        "name": "Tail",
+        "description": "Melee Attack Roll: +19, reach 30 ft. Hit: 34 (4d12 + 9) Bludgeoning damage. The target has the Prone condition.",
+        "reach": "30 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "4d12 + 9",
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": [
+          "prone"
+        ]
+      },
+      {
+        "name": "Venomous Surge (Recharge 5-6)",
+        "save_type": "Constitution",
+        "save_dc": 27,
+        "description": "Constitution Saving Throw: DC 27, each creature within 90 ft. of the water's surface. Failure: 91 (26d6) Poison damage. Success: Half damage.",
+        "damage_dice_primary": "26d6",
+        "damage_type_primary": "Poison"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Bite",
+        "delegates_to": "Bite",
+        "description": "It makes one Bite attack."
+      },
+      {
+        "name": "Venom Drip",
+        "description": "Ranged Attack Roll: +17, range 60 ft., one target. Hit: 18 (4d8+1) Poison damage and the target has the Poisoned condition until the end of its next turn.",
+        "attack_bonus": 17,
+        "range": "60 ft.",
+        "damage_dice_primary": "4d8 + 1",
+        "damage_type_primary": "Poison",
+        "conditions": [
+          "poisoned"
+        ]
+      },
+      {
+        "name": "Capsize (Costs 2 Actions)",
+        "delegates_to": "Tail",
+        "description": "Jormungandr thrashes the water beneath a vehicle or structure. Each creature within 30 ft. of it must succeed on a DC 25 Strength saving throw or fall Prone and take 18 (4d8) Bludgeoning damage."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The Midgard Serpent, so vast it encircles the earth and bites its own tail; when it releases that grip, the oceans will boil and the world will drown.",
+    "combat-strategy": "It commands the water itself, flooding positions, toppling ships and towers, and saving Venomous Surge for when enemies pile onto the shallows to hunt it."
+  },
+  {
+    "index": "king-kong",
+    "name": "King Kong",
+    "size": "Huge",
+    "type": "Beast",
+    "subtype": "Giant Ape",
+    "alignment": "Neutral",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 21,
+    "armor_class_details": "21 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 505,
+    "hit_dice": "24d20 + 264",
+    "speed": {
+      "walk": "50 ft.",
+      "climb": "50 ft."
+    },
+    "ability_scores": {
+      "str": 30,
+      "dex": 12,
+      "con": 32,
+      "int": 8,
+      "wis": 14,
+      "cha": 12
+    },
+    "ability_score_modifiers": {
+      "str": 10,
+      "dex": 1,
+      "con": 11,
+      "int": -1,
+      "wis": 2,
+      "cha": 1
+    },
+    "saving_throws": {
+      "Str": 18,
+      "Dex": 9,
+      "Con": 19
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 60,
+      "passive_perception": 12
+    },
+    "immunities": [],
+    "damage_immunities": [],
+    "damage_resistances": [
+      "Cold"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "frightened"
+    ],
+    "languages": "—",
+    "environments": [
+      "forest",
+      "mountain",
+      "urban"
+    ],
+    "allies": [
+      "ape",
+      "giant-ape"
+    ],
+    "enemies": [],
+    "challenge_rating": "25",
+    "xp": 75000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Kong fails a saving throw, he can choose to succeed instead."
+      },
+      {
+        "name": "Reckless",
+        "description": "At his option, Kong gains Advantage on all attack rolls with all of his melee attacks until the start of his next turn, and attack rolls made against him have Advantage while he is Reckless."
+      },
+      {
+        "name": "Thick Fur",
+        "description": "Cold and Wind damage against Kong is reduced by 5."
+      },
+      {
+        "name": "Tree-Swimmer",
+        "description": "Kong's climbing speed equals his walking speed and he can move through difficult terrain of trees and rubble without penalty."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Kong makes three Slam attacks. If a Slam hits a creature, he can replace one of his remaining attacks with a Grab."
+      },
+      {
+        "name": "Slam",
+        "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 26 (3d10 + 10) Bludgeoning damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 17,
+        "damage_dice_primary": "3d10 + 10",
+        "damage_type_primary": "Bludgeoning"
+      },
+      {
+        "name": "Grab",
+        "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 26 (3d10 + 10) Bludgeoning damage. If the target is a Huge or smaller creature, it must succeed on a DC 25 Strength saving throw or have the Grappled condition (escape DC 25) and be Restrained until Kong's next turn.",
+        "reach": "10 ft.",
+        "attack_bonus": 17,
+        "damage_dice_primary": "3d10 + 10",
+        "damage_type_primary": "Bludgeoning"
+      },
+      {
+        "name": "Thunder Roar (Recharge 5-6)",
+        "save_type": "Wisdom",
+        "save_dc": 23,
+        "description": "Wisdom Saving Throw: DC 23, each creature within 60 ft. that can hear Kong. Failure: the target has the Frightened condition until the end of its next turn. Success: no effect. No damage.",
+        "conditions": [
+          "frightened"
+        ],
+        "save_effect": "Failure: the target has the Frightened condition until the end of its next turn. Success: half damage and not Frightened."
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Slam",
+        "delegates_to": "Slam",
+        "description": "It makes one Slam attack."
+      },
+      {
+        "name": "Rock Throw",
+        "description": "Ranged Attack Roll: +17, range 90 ft. Hit: 26 (3d10 + 10) Bludgeoning damage.",
+        "range": "90 ft.",
+        "attack_bonus": 17,
+        "damage_dice_primary": "3d10 + 10",
+        "damage_type_primary": "Bludgeoning"
+      },
+      {
+        "name": "Climbing Dash (Costs 2 Actions)",
+        "delegates_to": null,
+        "description": "Kong moves up to his Speed without provoking Opportunity Attacks, climbing or swinging, and can make one Slam attack at any point along the path."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Homebrew",
+    "page": null,
+    "description": "The Eighth Wonder of the World — a colossal great ape of startling gentleness and earth-shaking wrath. He guards the forgotten isle's jungle as jealously as he shields the small, curious things he befriends within it.",
+    "combat-strategy": "He closes instantly, Reckless and hugging the group so ranged attackers have to trade with his hides and grabs, then Roars when foes pile in, ending fights with Rock Throw on fleeing targets."
+  },
+  {
+    "index": "ladon",
+    "name": "Ladon",
+    "size": "Huge",
+    "type": "Dragon",
+    "subtype": "Guardian Dragon",
+    "alignment": "Lawful Neutral",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 21,
+    "armor_class_details": "21 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 513,
+    "hit_dice": "38d12 + 266",
+    "speed": {
+      "walk": "40 ft."
+    },
+    "ability_scores": {
+      "str": 26,
+      "dex": 12,
+      "con": 24,
+      "int": 10,
+      "wis": 16,
+      "cha": 18
+    },
+    "ability_score_modifiers": {
+      "str": 8,
+      "dex": 1,
+      "con": 7,
+      "int": 0,
+      "wis": 3,
+      "cha": 4
+    },
+    "saving_throws": {
+      "Dex": 9,
+      "Con": 15,
+      "Wis": 11
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 13
+    },
+    "immunities": [
+      "Poison"
+    ],
+    "damage_immunities": [
+      "Poison"
+    ],
+    "damage_resistances": [],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "frightened",
+      "poisoned"
+    ],
+    "languages": "",
+    "environments": [
+      "forest",
+      "urban",
+      "planar"
+    ],
+    "allies": [],
+    "enemies": [],
+    "challenge_rating": "25",
+    "xp": 75000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Never Sleeps",
+        "description": "Ladon can't be put to sleep by magic and always sees attackers coming."
+      },
+      {
+        "name": "Sworn Guardian",
+        "description": "Ladon gains Advantage on opportunity attacks against any creature that moves within reach of his tree."
+      },
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Ladon fails a saving throw, he can choose to succeed instead."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Ladon makes two Bite attacks and one Constrict attack."
+      },
+      {
+        "name": "Bite",
+        "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 26 (4d8 + 8) Piercing damage. Plus 14 (4d6) Poison damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 15,
+        "damage_dice_primary": "4d8 + 8",
+        "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "4d6",
+        "damage_type_secondary": "Poison"
+      },
+      {
+        "name": "Constrict",
+        "description": "Melee Attack Roll: +15, reach 10 ft., one Huge or smaller creature. Hit: 25 (4d8 + 8) Bludgeoning damage and the target has the Grappled condition (escape DC 22). Ladon has five coils; each Grappled target is held by a separate coil. While Grappled this way, a target takes 18 (4d8) Bludgeoning damage at the start of its turn.",
+        "attack_bonus": 15,
+        "reach": "10 ft.",
+        "damage_dice_primary": "4d8 + 8",
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": [
+          "grappled"
+        ]
+      },
+      {
+        "name": "Sleeping Mist (Recharge 5-6)",
+        "save_type": "Constitution",
+        "save_dc": 23,
+        "description": "Constitution Saving Throw: DC 23, each creature in a 60-foot Cone. Failure: the target has the Unconscious condition until the end of its next turn, repeating the saving throw at the end of each of its turns to end the effect early. Success: no effect. No damage.",
+        "save_effect": "Failure: the target has the Unconscious condition until the end of its next turn, repeating the save at the end of each of its turns. Success: it isn't affected. No damage.",
+        "conditions": [
+          "unconscious"
+        ]
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Bite",
+        "delegates_to": "Bite",
+        "description": "It makes one Bite attack."
+      },
+      {
+        "name": "Coil",
+        "description": "One of Ladon's coils makes a Constrict attack.",
+        "delegates_to": "Constrict"
+      },
+      {
+        "name": "Vigilant Watch (Costs 2 Actions)",
+        "delegates_to": null,
+        "description": "Ladon fixes one target. Until the start of his next turn, his next Opportunity Attack against that target has +5 to hit."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The hundred-headed dragon who coiled around the tree of golden apples, vigilance incarnate and the last monster of the old world to be beaten by a trick.",
+    "combat-strategy": "He fights stationary at the tree, Constrict on the biggest intruder and Sleeping Mist down the climbers."
+  },
+  {
+    "index": "monkey-clone",
+    "name": "Monkey Clone",
+    "size": "Medium",
+    "type": "Beast",
+    "subtype": "Conjured Duplicate",
+    "alignment": "Unaligned",
+    "initiative": 3,
+    "initiative_details": "+3",
+    "armor_class": 18,
+    "armor_class_details": "18 (agile duplicate)",
+    "armor_class_options": [],
+    "hit_points": 30,
+    "hit_dice": "4d8 + 12",
+    "speed": {
+      "walk": "30 ft.",
+      "climb": "30 ft."
+    },
+    "ability_scores": {
+      "str": 14,
+      "dex": 16,
+      "con": 16,
+      "int": 2,
+      "wis": 12,
+      "cha": 8
+    },
+    "ability_score_modifiers": {
+      "str": 2,
+      "dex": 3,
+      "con": 3,
+      "int": -4,
+      "wis": 1,
+      "cha": -1
+    },
+    "saving_throws": {},
+    "skills": {
+      "Acrobatics": 5,
+      "Stealth": 5
+    },
+    "senses": {
+      "darkvision": 60,
+      "passive_perception": 11
+    },
+    "immunities": [],
+    "damage_immunities": [],
+    "damage_resistances": [],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [],
+    "languages": "—",
+    "environments": [],
+    "allies": [
+      "sun-wukong"
+    ],
+    "enemies": [],
+    "challenge_rating": "0",
+    "xp": 0,
+    "proficiency_bonus": 2,
+    "legendary_resistance": null,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Hair Trick",
+        "description": "A monkey clone is a conjured duplicate of Sun Wukong spun from one of his magical hairs. It dies instantly when it takes any damage, and it vanishes when the summon ends."
+      },
+      {
+        "name": "Mimic Strike",
+        "description": "The clone swings a hair-forked copy of the Ruyi Jingu Bang."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Slam",
+        "description": "Melee Attack Roll: +14, reach 5 ft. Hit: 11 (2d8 + 2) Bludgeoning damage.",
+        "attack_bonus": 14,
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 2",
+        "damage_type_primary": "Bludgeoning"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Homebrew (conjured token)",
+    "page": null,
+    "description": "A monkey-shaped duplicate born from one of Sun Wukong's eight thousand four hundred hairs — fierce, fragile, and gone in a heartbeat.",
+    "combat-strategy": "It exists to swing once and vanish; swarm, harass, and never tank."
+  },
+  {
+    "index": "nidhogg",
+    "name": "Nidhogg",
+    "size": "Huge",
+    "type": "Dragon",
+    "subtype": "Corpse Dragon",
+    "alignment": "Chaotic Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 22,
+    "armor_class_details": "22 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 540,
+    "hit_dice": "40d12 + 280",
+    "speed": {
+      "walk": "40 ft.",
+      "fly": "70 ft."
+    },
+    "ability_scores": {
+      "str": 28,
+      "dex": 14,
+      "con": 24,
+      "int": 12,
+      "wis": 16,
+      "cha": 20
+    },
+    "ability_score_modifiers": {
+      "str": 9,
+      "dex": 2,
+      "con": 7,
+      "int": 1,
+      "wis": 3,
+      "cha": 5
+    },
+    "saving_throws": {
+      "Dex": 10,
+      "Con": 15,
+      "Wis": 11
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 13
+    },
+    "immunities": [
+      "Poison",
+      "Necrotic"
+    ],
+    "damage_immunities": [
+      "Poison",
+      "Necrotic"
+    ],
+    "damage_resistances": [
+      "Acid"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "frightened",
+      "poisoned"
+    ],
+    "languages": "",
+    "environments": [
+      "mountain",
+      "planar",
+      "underdark"
+    ],
+    "allies": [
+      "wyvern"
+    ],
+    "enemies": [
+      "eagle"
+    ],
+    "challenge_rating": "26",
+    "xp": 90000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Nidhogg fails a saving throw, he can choose to succeed instead."
+      },
+      {
+        "name": "Rot Wing",
+        "description": "Creatures that start their turn within 20 ft. of Nidhogg take 7 (2d6) Necrotic damage."
+      },
+      {
+        "name": "Root Gnawer",
+        "description": "Whenever Nidhogg deals Necrotic damage to a structure or a rooted plant creature, he regains Hit Points equal to half the damage dealt."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Nidhogg makes two Bite attacks and one Claw attack."
+      },
+      {
+        "name": "Bite",
+        "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 25 (3d10 + 9) Piercing damage. Plus 7 (2d6) Necrotic damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 17,
+        "damage_dice_primary": "3d10 + 9",
+        "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "2d6",
+        "damage_type_secondary": "Necrotic"
+      },
+      {
+        "name": "Claw",
+        "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 22 (3d8 + 9) Slashing damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 17,
+        "damage_dice_primary": "3d8 + 9",
+        "damage_type_primary": "Slashing"
+      },
+      {
+        "name": "Corpse Wind (Recharge 5-6)",
+        "save_type": "Constitution",
+        "save_dc": 24,
+        "description": "Constitution Saving Throw: DC 24, each creature within 60 ft. Failure: 66 (12d10) Necrotic damage. Success: Half damage.",
+        "damage_dice_primary": "12d10",
+        "damage_type_primary": "Necrotic"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Bite",
+        "delegates_to": "Bite",
+        "description": "It makes one Bite attack."
+      },
+      {
+        "name": "Claw",
+        "delegates_to": "Claw",
+        "description": "It makes one Claw attack."
+      },
+      {
+        "name": "Grave Gale (Costs 2 Actions)",
+        "delegates_to": "Corpse Wind (Recharge 5-6)",
+        "description": "Nidhogg beats his wings, exhaling a blast of corpse-light wind: one creature within 60 ft. must succeed on a DC 24 Strength saving throw or take 18 (4d8) Necrotic damage and be pushed 30 ft."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The dread dragon who gnaws the roots of the world tree, feeding on the corpses of oath-breakers and carrying their stolen memories in his scales.",
+    "combat-strategy": "He strafes from above with Bite and Corpse Wind, then dives to root-graze on anything that falls, healing himself with the carrion he leaves behind."
+  },
+  {
+    "index": "orcus",
+    "name": "Orcus",
+    "size": "Huge",
+    "type": "Fiend",
+    "subtype": "Demon",
+    "alignment": "Chaotic Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 17,
+    "armor_class_details": "17 (natural armor), 20 with the Wand of Orcus",
+    "armor_class_options": [],
+    "hit_points": 405,
+    "hit_dice": "30d12 + 210",
+    "speed": {
+      "walk": "40 ft.",
+      "fly": "40 ft."
+    },
+    "ability_scores": {
+      "str": 27,
+      "dex": 14,
+      "con": 25,
+      "int": 20,
+      "wis": 20,
+      "cha": 25
+    },
+    "ability_score_modifiers": {
+      "str": 8,
+      "dex": 2,
+      "con": 7,
+      "int": 5,
+      "wis": 5,
+      "cha": 7
+    },
+    "saving_throws": {
+      "Dex": 10,
+      "Con": 15,
+      "Wis": 13
+    },
+    "skills": {
+      "Arcana": 13,
+      "Perception": 13
+    },
+    "senses": {
+      "truesight": 120,
+      "passive_perception": 22
+    },
+    "immunities": [
+      "Necrotic",
+      "Poison",
+      "Bludgeoning, Piercing, and Slashing from Nonmagical Attacks"
+    ],
+    "damage_immunities": [
+      "Necrotic",
+      "Poison",
+      "Bludgeoning, Piercing, and Slashing from Nonmagical Attacks"
+    ],
+    "damage_resistances": [
+      "Cold",
+      "Fire",
+      "Lightning"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "exhaustion",
+      "frightened",
+      "poisoned"
+    ],
+    "languages": "All; telepathy 120 ft.",
+    "environments": [
+      "planar",
+      "underdark"
+    ],
+    "allies": [],
+    "enemies": [],
+    "challenge_rating": "26",
+    "xp": 90000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [
+      "Wand of Orcus"
+    ],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If the orcus fails a saving throw, it can choose to succeed instead."
+      },
+      {
+        "name": "Magic Resistance",
+        "description": "Orcus has Advantage on saving throws against spells and other magical effects."
+      },
+      {
+        "name": "Master of Undeath",
+        "description": "Orcus can cast Animate Dead (at will) and Create Undead (3/Day), choosing the level at which the spells are cast. Creatures created by them remain under his control indefinitely, and he can cast Create Undead even when it isn't night."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Orcus makes three Wand of Orcus, Tail, or Necrotic Bolt attacks."
+      },
+      {
+        "name": "Wand of Orcus",
+        "description": "Melee Attack Roll: +19, reach 10 ft. Hit: 24 (3d8 + 11) Bludgeoning damage. Plus 13 (2d12) Necrotic damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "3d8 + 11",
+        "damage_type_primary": "Bludgeoning",
+        "damage_dice_secondary": "2d12",
+        "damage_type_secondary": "Necrotic"
+      },
+      {
+        "name": "Tail",
+        "description": "Melee Attack Roll: +16, reach 10 ft. Hit: 21 (3d8 + 8) Force damage. Plus 9 (2d8) Poison damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 16,
+        "damage_dice_primary": "3d8 + 8",
+        "damage_type_primary": "Force",
+        "damage_dice_secondary": "2d8",
+        "damage_type_secondary": "Poison"
+      },
+      {
+        "name": "Necrotic Bolt",
+        "description": "Ranged Attack Roll: +15, range 120 ft. Hit: 29 (5d8 + 7) Necrotic damage.",
+        "range": "120 ft.",
+        "attack_bonus": 15,
+        "damage_dice_primary": "5d8 + 7",
+        "damage_type_primary": "Necrotic"
+      },
+      {
+        "name": "Conjure Undead (1/Day)",
+        "uses": 1,
+        "description": "While holding the Wand of Orcus, Orcus conjures Undead creatures whose combined average Hit Points don't exceed 500. The creatures rise from the ground or form in unoccupied spaces within 300 ft. of him and obey his commands until destroyed or dismissed.",
+        "range": "300 ft.",
+        "automation": {
+          "type": "monster_summon",
+          "options": [
+            {
+              "monster": "wight",
+              "chance": 0.25
+            },
+            {
+              "monster": "skeleton"
+            },
+            {
+              "monster": "zombie"
+            }
+          ],
+          "count": "1d4+1",
+          "range_ft": 300,
+          "advisory": "Combined average Hit Points of the conjured undead never exceed 500 (§70 GM-enforced cap). They obey Orcus until destroyed or dismissed as an action."
+        },
+        "maxUses": 1,
+        "usage": {
+          "type": "per day",
+          "times": 1
+        }
+      },
+      {
+        "name": "Spellcasting",
+        "description": "Orcus casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23): At Will: Detect Magic. 3/Day: Dispel Magic. 1/Day: Time Stop.",
+        "save_dc": 23,
+        "save_type": "Wisdom"
+      },
+      {
+        "name": "Wand Spellcasting",
+        "description": "While holding the Wand of Orcus, Orcus casts one of the following spells (spell save DC 18). The wand has 7 charges: At Will (no charge): Animate Dead, Blight, Speak with Dead. 1 Charge: Circle of Death. 2 Charges: Power Word Kill. It regains 1d4 + 3 charges daily at dawn.",
+        "save_dc": 18,
+        "save_type": "Wisdom"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Attack",
+        "delegates_to": "Necrotic Bolt",
+        "description": "Orcus makes one Tail or Necrotic Bolt attack."
+      },
+      {
+        "name": "Creeping Death (Costs 2 Actions)",
+        "description": "Area Effect: a 60-foot-tall, 10-foot-radius Cylinder of swirling necrotic energy rises from a point it can see within 100 ft. and lasts until the end of Orcus's next turn. Creatures in the area have Vulnerability to Necrotic damage. No saving throw, no damage."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Monsters of the Multiverse",
+    "page": null,
+    "description": "The Demon Prince of Undeath, the Blood Lord, Orcus stalks the multiverse as a towering, bull-skulled butcher wreathed in creeping death, wielding the bone-white Wand that bears his name.",
+    "combat-strategy": "He unleases Conjure Undead early to flood the field, then hovers at range behind his horde, alternating Wand swings up close with Necrotic Bolts, and drops Creeping Death on clusters to make Necrotic damage a death sentence."
   },
   {
     "index": "otherworldly-steed",
@@ -51735,6 +54073,167 @@
     "combat-strategy": "Radiant juggernaut: open by standing beside allies inside Aura of Bravery (immunity to Charmed and Frightened in 30 ft.), daring the party's controllers to waste spells on immune targets. Fight defensively patient at range with Longbow first (each arrow carries 22 radiant on top of 12 piercing, so three ranged attacks per round shred), then close with Greatsword Multiattack (~34 damage per swing) once the party's buffs and crowd control are spent. Dispel Evil and Good on turn one if fiends, undead, or summons are present; Greater Restoration on cursed or dominated allies; Daylight to strip darkvision advantage from the knight's own foes. Its 202 HP and 18 AC let it tank the entire party's focused fire, so its only real weakness is being separated from its aura-protected companions by forced movement or terrain — if the fight turns against honor or its quest, it withdraws on Phantom Steed to fight another day on its own terms."
   },
   {
+    "index": "quetzalcoatl",
+    "name": "Quetzalcoatl",
+    "size": "Huge",
+    "type": "Dragon",
+    "subtype": "Feathered Serpent",
+    "alignment": "Chaotic Good",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 22,
+    "armor_class_details": "22 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 594,
+    "hit_dice": "44d12 + 308",
+    "speed": {
+      "walk": "40 ft.",
+      "fly": "90 ft."
+    },
+    "ability_scores": {
+      "str": 26,
+      "dex": 16,
+      "con": 24,
+      "int": 20,
+      "wis": 18,
+      "cha": 24
+    },
+    "ability_score_modifiers": {
+      "str": 8,
+      "dex": 3,
+      "con": 7,
+      "int": 5,
+      "wis": 4,
+      "cha": 7
+    },
+    "saving_throws": {
+      "Dex": 11,
+      "Con": 15,
+      "Wis": 12,
+      "Cha": 15
+    },
+    "skills": {
+      "Arcana": 13,
+      "Persuasion": 15,
+      "Religion": 13
+    },
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 14
+    },
+    "immunities": [],
+    "damage_immunities": [],
+    "damage_resistances": [
+      "Lightning",
+      "Thunder"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "frightened",
+      "poisoned"
+    ],
+    "languages": "All; telepathy 120 ft.",
+    "environments": [
+      "grassland",
+      "planar"
+    ],
+    "allies": [],
+    "enemies": [
+      "bat"
+    ],
+    "challenge_rating": "27",
+    "xp": 105000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Quetzalcoatl fails a saving throw, he can choose to succeed instead."
+      },
+      {
+        "name": "Magic Resistance",
+        "description": "Quetzalcoatl has Advantage on saving throws against spells and other magical effects."
+      },
+      {
+        "name": "Plumage of the Dawn",
+        "description": "Creatures that attack him in bright light have Disadvantage on the attack roll."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Quetzalcoatl makes one Bite attack and two Talon attacks."
+      },
+      {
+        "name": "Bite",
+        "description": "Melee Attack Roll: +16, reach 15 ft. Hit: 24 (3d10 + 8) Piercing damage.",
+        "reach": "15 ft.",
+        "attack_bonus": 16,
+        "damage_dice_primary": "3d10 + 8",
+        "damage_type_primary": "Piercing"
+      },
+      {
+        "name": "Talon",
+        "description": "Melee Attack Roll: +16, reach 10 ft. Hit: 26 (4d8 + 8) Slashing damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 16,
+        "damage_dice_primary": "4d8 + 8",
+        "damage_type_primary": "Slashing"
+      },
+      {
+        "name": "Hurricane Breath (Recharge 5-6)",
+        "save_type": "Dexterity",
+        "save_dc": 25,
+        "description": "Dexterity Saving Throw: DC 25, each creature in a 90-foot Cone. Failure: 70 (20d6) Thunder damage. Success: Half damage. The target is also knocked Prone and Deafened for 1 minute on a failed save.",
+        "damage_dice_primary": "20d6",
+        "damage_type_primary": "Thunder"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [
+      {
+        "name": "Wing Defense",
+        "trigger": "When it is targeted by a ranged weapon attack.",
+        "description": "It flares its feathered wings and gains +5 to AC against the attack, and the attacker must succeed on a DC 25 Dexterity saving throw or take 7 (2d6) Thunder damage.",
+        "save_dc": 25,
+        "save_type": "Dexterity",
+        "damage_dice_primary": "2d6",
+        "damage_type_primary": "Thunder"
+      }
+    ],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Talon",
+        "delegates_to": "Talon",
+        "description": "It makes one Talon attack."
+      },
+      {
+        "name": "Detection",
+        "description": "Quetzalcoatl makes one Perception check."
+      },
+      {
+        "name": "Wind Step (Costs 2 Actions)",
+        "description": "Quetzalcoatl rides a sudden gale, teleporting 60 ft. to an unoccupied space he can see, then making one Talon attack."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The Feathered Serpent, bringer of wind, learning, and maize — a jeweled serpent of emerald plumes who would rather out-think a tyrant than eat him, but does both when required.",
+    "combat-strategy": "He stays on the wing, using Hurricane Breath to break formations before they close, and saves Wing Defense to punish the archers who try to punish him."
+  },
+  {
     "index": "quipper",
     "name": "Quipper",
     "size": "Tiny",
@@ -55314,6 +57813,154 @@
     "combat-strategy": "Open with a Longbow at long range, using Aim as a bonus action so the shot lands with Advantage and triggers the +10 (3d6) piercing bonus damage — the bonus damage makes Advantage the single biggest lever on this stat block. Kite constantly: 30-ft movement against most foes' 30-ft speed means shooting from maximum distance, retreating, and only closing with Multiattack (mixed shortsword/longbow) when a target is already engaged by allies or has no reaction left. Save Uncanny Dodge for the biggest hits you can see coming (crits, rogue sneak attacks, smites), and save it, don't waste it on routine swings. Retreat to cover or climb (30-ft climb speed) when reduced below roughly half HP or when both its ranged advantage opportunities dry up, since 66 HP won't survive a sustained flurry at AC 15."
   },
   {
+    "index": "scylla",
+    "name": "Scylla",
+    "size": "Huge",
+    "type": "Monstrosity",
+    "subtype": "Six-Headed Horror",
+    "alignment": "Chaotic Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 22,
+    "armor_class_details": "22 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 594,
+    "hit_dice": "44d12 + 308",
+    "speed": {
+      "walk": "20 ft.",
+      "climb": "40 ft."
+    },
+    "ability_scores": {
+      "str": 27,
+      "dex": 14,
+      "con": 24,
+      "int": 6,
+      "wis": 16,
+      "cha": 14
+    },
+    "ability_score_modifiers": {
+      "str": 8,
+      "dex": 2,
+      "con": 7,
+      "int": -2,
+      "wis": 3,
+      "cha": 2
+    },
+    "saving_throws": {
+      "Dex": 10,
+      "Con": 15,
+      "Wis": 11
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "blindsight": 30,
+      "passive_perception": 13
+    },
+    "immunities": [],
+    "damage_immunities": [],
+    "damage_resistances": [
+      "Cold",
+      "Lightning"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "blinded",
+      "charmed",
+      "frightened"
+    ],
+    "languages": "",
+    "environments": [
+      "coastal",
+      "underdark"
+    ],
+    "allies": [
+      "sea-hag",
+      "pirate"
+    ],
+    "enemies": [],
+    "challenge_rating": "27",
+    "xp": 105000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Six Heads",
+        "description": "Scylla has Advantage on Perception checks and on saving throws against being Blinded, Deafened, or knocked Unconscious."
+      },
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Scylla fails a saving throw, she can choose to succeed instead."
+      },
+      {
+        "name": "Blood Tide",
+        "description": "When Scylla hits a creature with a Bite, she can immediately pull it 10 ft. toward her if it is Huge or smaller."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Scylla makes three Bite attacks, each against a different target."
+      },
+      {
+        "name": "Bite",
+        "description": "Melee Attack Roll: +16, reach 15 ft. Hit: 30 (4d10 + 8) Piercing damage.",
+        "reach": "15 ft.",
+        "attack_bonus": 16,
+        "damage_dice_primary": "4d10 + 8",
+        "damage_type_primary": "Piercing"
+      },
+      {
+        "name": "Blood Tide (Recharge 5-6)",
+        "save_type": "Dexterity",
+        "save_dc": 25,
+        "description": "Dexterity Saving Throw: DC 25, each creature within 30 ft. of her lair mouth. Failure: 55 (10d10) Piercing damage. Success: Half damage. A creature reduced to 0 Hit Points by this tide is dragged into the depths and consumed.",
+        "damage_dice_primary": "10d10",
+        "damage_type_primary": "Piercing"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Bite",
+        "delegates_to": "Bite",
+        "description": "It makes one Bite attack."
+      },
+      {
+        "name": "Snatch",
+        "description": "One head lunges at a Grappled or Restrained creature. Melee Attack Roll: +16, reach 15 ft. Hit: 30 (4d10 + 8) Piercing damage.",
+        "attack_bonus": 16,
+        "reach": "15 ft.",
+        "damage_dice_primary": "4d10 + 8",
+        "damage_type_primary": "Piercing"
+      },
+      {
+        "name": "Shriek (Costs 2 Actions)",
+        "description": "Wisdom Saving Throw: DC 23, each enemy within 60 ft. Failure: 11 (2d10) Thunder damage and the target is Deafened for 1 minute. Success: half damage and not Deafened.",
+        "save_dc": 23,
+        "save_type": "Wisdom",
+        "damage_dice_primary": "2d10",
+        "damage_type_primary": "Thunder"
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "A cliff-hugging horror of six snapping heads and coiled serpentine coils, once a naiad, now the toll-taker of the narrow strait who plucks sailors from the deck.",
+    "combat-strategy": "She stands her ground at the strait, six heads on six targets, pulling one aboard each round with Blood Tide and shrieking to silence crossbow fire."
+  },
+  {
     "index": "sea-hag",
     "name": "Sea Hag",
     "size": "Medium",
@@ -56587,6 +59234,159 @@
     "combat-strategy": "A good-aligned wyrmling rarely starts a fight, but when forced, it should use flight (60 ft) to control altitude: stay just above melee reach, dive in for Multiattack Rend, and climb back out. Choose Paralyzing Breath over Cold Breath when outnumbered or facing armored fighters — DC 13 Con paralysis on a 15-ft cone neutralizes one or two martial types for a round or more, letting the young dragon fight on its terms; save Cold Breath for clustered groups where 18 avg damage lands cheaply. Its 45 HP can't trade blows, so hit-and-run over rooftops, water, or cliffs where ground-based pursuers slow down. Bully weaker foes and disengage from big ones: the Paralyzed victims repeat saves, so never waste a full melee round standing next to someone who will wake up mid-fight."
   },
   {
+    "index": "simurgh",
+    "name": "Simurgh",
+    "size": "Huge",
+    "type": "Celestial",
+    "subtype": "Roc Sovereign",
+    "alignment": "Neutral Good",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 21,
+    "armor_class_details": "21 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 486,
+    "hit_dice": "36d12 + 252",
+    "speed": {
+      "walk": "30 ft.",
+      "fly": "120 ft."
+    },
+    "ability_scores": {
+      "str": 24,
+      "dex": 20,
+      "con": 24,
+      "int": 18,
+      "wis": 20,
+      "cha": 22
+    },
+    "ability_score_modifiers": {
+      "str": 7,
+      "dex": 5,
+      "con": 7,
+      "int": 4,
+      "wis": 5,
+      "cha": 6
+    },
+    "saving_throws": {
+      "Dex": 13,
+      "Con": 15,
+      "Wis": 13,
+      "Cha": 14
+    },
+    "skills": {
+      "Arcana": 12,
+      "Healer": 13,
+      "Insight": 13,
+      "Perception": 13,
+      "Persuasion": 14
+    },
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 15
+    },
+    "immunities": [],
+    "damage_immunities": [],
+    "damage_resistances": [
+      "Radiant",
+      "Fire"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "poisoned"
+    ],
+    "languages": "All; speaks to beasts and good-aligned humanoids; telepathy 120 ft.",
+    "environments": [
+      "mountain",
+      "planar"
+    ],
+    "allies": [
+      "roc"
+    ],
+    "enemies": [],
+    "challenge_rating": "25",
+    "xp": 75000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If the Simurgh fails a saving throw, it can choose to succeed instead."
+      },
+      {
+        "name": "Purifying Aura",
+        "description": "At the start of its turn, the Simurgh removes one Curse, Disease, or Poison effect from each ally within 30 ft."
+      },
+      {
+        "name": "Wings of Blessing",
+        "description": "An ally that starts its turn within 30 ft. of the Simurgh gains 10 (3d6) Temporary Hit Points."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "The Simurgh makes two Talon attacks and one Beak attack."
+      },
+      {
+        "name": "Talon",
+        "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 26 (4d8 + 8) Slashing damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 15,
+        "damage_dice_primary": "4d8 + 8",
+        "damage_type_primary": "Slashing"
+      },
+      {
+        "name": "Beak",
+        "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 24 (3d10 + 8) Piercing damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 15,
+        "damage_dice_primary": "3d10 + 8",
+        "damage_type_primary": "Piercing"
+      },
+      {
+        "name": "Purifying Blaze (Recharge 5-6)",
+        "save_type": "Dexterity",
+        "save_dc": 24,
+        "description": "Dexterity Saving Throw: DC 24, each creature in a 60-foot Cone the Simurgh chooses to burn. Failure: 66 (12d10) Radiant damage. Success: Half damage.",
+        "damage_dice_primary": "12d10",
+        "damage_type_primary": "Radiant"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Talon",
+        "delegates_to": "Talon",
+        "description": "It makes one Talon attack."
+      },
+      {
+        "name": "Healing Breath (Costs 2 Actions)",
+        "description": "The Simurgh exhales warm wind over one creature within 30 ft. The target regains 22 (4d10) Hit Points and the Simurgh regains 5 Hit Points."
+      },
+      {
+        "name": "Soothing Cry (Costs 2 Actions)",
+        "delegates_to": null,
+        "description": "Each ally within 60 ft. is calmed, ending one effect causing them to be Charmed, Frightened, or Confused."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The benevolent great bird of the high peaks, a healer and a counselor, who has nested in the mountain's heart since before the age of humankind and asks only courtesy in return for her aid.",
+    "combat-strategy": "She fights defensively around her wounded, weaving purifying auras; when the fiends crowd, Purifying Blaze scatters them while she lifts the wounded to safety."
+  },
+  {
     "index": "skeleton",
     "name": "Skeleton",
     "size": "Medium",
@@ -56764,6 +59564,202 @@
       "underdark"
     ],
     "combat-strategy": "These are vermin, not warriors: 7 HP and a +4 bite mean a slaad tadpole should never win a fair fight. Open by burrowing 10 ft into earth or under debris to Hide (Stealth +4, Tiny size), then swarm from concealment at the weakest straggler — target the lone scout, the bound captive, or a sleeping camp — bite once, and burrow away before the target turns. Fight in packs of six or more so that even missing half the attacks drains reactions and chip damage adds up, and use Magic Resistance to shrug off the cantrips and command spells that would otherwise control or kill them instantly. Never let a single tadpole get cornered: its entire survival model is hit, vanish underground, and repeat until the prey is bleeding or the swarm moves on. If exposed more than one round, burrow and flee."
+  },
+  {
+    "index": "smaug-the-golden",
+    "name": "Smaug the Golden",
+    "size": "Huge",
+    "type": "Dragon",
+    "subtype": "Fire Dragon",
+    "alignment": "Lawful Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 22,
+    "armor_class_details": "22 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 513,
+    "hit_dice": "38d12 + 266",
+    "speed": {
+      "walk": "40 ft.",
+      "fly": "80 ft."
+    },
+    "ability_scores": {
+      "str": 28,
+      "dex": 14,
+      "con": 24,
+      "int": 22,
+      "wis": 16,
+      "cha": 24
+    },
+    "ability_score_modifiers": {
+      "str": 9,
+      "dex": 2,
+      "con": 7,
+      "int": 6,
+      "wis": 3,
+      "cha": 7
+    },
+    "saving_throws": {
+      "Dex": 10,
+      "Con": 15,
+      "Wis": 11,
+      "Cha": 15
+    },
+    "skills": {
+      "Arcana": 14,
+      "Deception": 15,
+      "Insight": 11,
+      "Intimidation": 15,
+      "Perception": 11,
+      "Persuasion": 15
+    },
+    "senses": {
+      "darkvision": 120,
+      "blindsight": 60,
+      "passive_perception": 24
+    },
+    "immunities": [
+      "Fire"
+    ],
+    "damage_immunities": [
+      "Fire"
+    ],
+    "damage_resistances": [],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "frightened",
+      "paralyzed",
+      "poisoned"
+    ],
+    "languages": "",
+    "environments": [
+      "mountain",
+      "underdark",
+      "urban"
+    ],
+    "allies": [
+      "fire-snake",
+      "bat"
+    ],
+    "enemies": [],
+    "challenge_rating": "25",
+    "xp": 75000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Smaug fails a saving throw, he can choose to succeed instead."
+      },
+      {
+        "name": "Magic Resistance",
+        "description": "Smaug has Advantage on saving throws against spells and other magical effects."
+      },
+      {
+        "name": "Hoard Guardian",
+        "description": "While on or within 30 ft. of his hoard, Smaug gains +2 to Armor Class and Advantage on saving throws."
+      },
+      {
+        "name": "Impenetrable Scales (Vulnerability)",
+        "description": "A shot from a Black Arrow, or any attack where the attacker knows the bare patch on his left breast and calls it out, ignores his natural armor bonus."
+      },
+      {
+        "name": "Ageless Malice",
+        "description": "Smaug can't be surprised while he is on his hoard."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Smaug uses his Frightful Presence. He then makes three attacks: one with his Bite, two with his Claws or Tail."
+      },
+      {
+        "name": "Bite",
+        "description": "Melee Attack Roll: +17, reach 15 ft. Hit: 27 (4d8 + 9) Piercing damage.",
+        "reach": "15 ft.",
+        "attack_bonus": 17,
+        "damage_dice_primary": "4d8 + 9",
+        "damage_type_primary": "Piercing"
+      },
+      {
+        "name": "Claw",
+        "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 22 (3d8 + 9) Slashing damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 17,
+        "damage_dice_primary": "3d8 + 9",
+        "damage_type_primary": "Slashing"
+      },
+      {
+        "name": "Tail",
+        "description": "Melee Attack Roll: +17, reach 20 ft. Hit: 25 (3d10 + 9) Bludgeoning damage. The target has the Prone condition.",
+        "reach": "20 ft.",
+        "attack_bonus": 17,
+        "damage_dice_primary": "3d10 + 9",
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": [
+          "prone"
+        ]
+      },
+      {
+        "name": "Fire Breath (Recharge 5-6)",
+        "save_type": "Dexterity",
+        "save_dc": 24,
+        "description": "Dexterity Saving Throw: DC 24, each creature in a 90-foot Cone. Failure: 77 (22d6) Fire damage. Success: Half damage.",
+        "damage_dice_primary": "22d6",
+        "damage_type_primary": "Fire"
+      },
+      {
+        "name": "Frightful Presence",
+        "description": "Each creature of Smaug's choice within 120 ft. of him and aware of him must succeed on a DC 22 Wisdom saving throw or have the Frightened condition for 1 minute. A creature can repeat the saving throw at the end of each of its turns. On a success or when the effect ends, the creature is immune to his Frightful Presence for 24 hours. No damage.",
+        "save_dc": 22,
+        "save_type": "Wisdom",
+        "conditions": [
+          "frightened"
+        ]
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Claw",
+        "delegates_to": "Claw",
+        "description": "It makes one Claw attack."
+      },
+      {
+        "name": "Tail",
+        "delegates_to": "Tail",
+        "description": "It makes one Tail attack."
+      },
+      {
+        "name": "Flame Lash (Costs 2 Actions)",
+        "description": "Ranged Attack Roll: +15, range 90 ft. Hit: 33 (6d10) Fire damage.",
+        "range": "90 ft.",
+        "attack_bonus": 15,
+        "damage_dice_primary": "6d10",
+        "damage_type_primary": "Fire"
+      },
+      {
+        "name": "Detection",
+        "description": "Smaug makes one Perception check."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Homebrew",
+    "page": null,
+    "description": "The last great wyrm of the mountain, a golden-scaled tyrant who laid waste to an ancient city and slept upon its gold for a century. vain, eloquent, and utterly without mercy, he considers himself more wise than any elf or man.",
+    "combat-strategy": "His favorite trick is talking — learning his enemy's fears and plans while circling overhead — then dropping Fire Breath onto the cluster he has just learned is important, and diving to Bite the single survivors."
   },
   {
     "index": "smoke-mephit",
@@ -59413,6 +62409,191 @@
     "combat-strategy": "This classic fiend is an infiltrator who win combat before it starts: shapechange into a trusted humanoid, Charm a lonely or lonely-hearted target (DC 15 Wis, 1 day, telepathically commanded across planes), and use them as an agent or shield before ever rolling initiative. In a fight, Charm first, then Draining Kiss the charmed target for 32 psychic plus max-HP drain each round—harm lets them reroll, so command the thrall to interpose itself and take attacks instead. Etherealness is the escape hatch and the sneak-in tool: slip through walls to strike, then fade out when the party focuses fire. Claw only as a last resort (6 damage is trivial). When the charmed thrall falls, its save immunity timer, or dispel magic appears, retreat to the Ethereal Plane and resurface elsewhere—dead drops and hostages are worth more than a fight."
   },
   {
+    "index": "sun-wukong",
+    "name": "Sun Wukong",
+    "size": "Medium",
+    "type": "Celestial",
+    "subtype": "Monkey Sage",
+    "alignment": "Chaotic Good",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 23,
+    "armor_class_details": "23 (armor of heaven)",
+    "armor_class_options": [],
+    "hit_points": 520,
+    "hit_dice": "48d8 + 240",
+    "speed": {
+      "walk": "30 ft.",
+      "fly": "300 ft."
+    },
+    "ability_scores": {
+      "str": 28,
+      "dex": 22,
+      "con": 20,
+      "int": 18,
+      "wis": 19,
+      "cha": 22
+    },
+    "ability_score_modifiers": {
+      "str": 9,
+      "dex": 6,
+      "con": 5,
+      "int": 4,
+      "wis": 4,
+      "cha": 6
+    },
+    "saving_throws": {
+      "Dex": 14,
+      "Con": 13,
+      "Wis": 12
+    },
+    "skills": {
+      "Acrobatics": 14,
+      "Arcana": 12,
+      "Athletics": 17,
+      "Deception": 14,
+      "Perception": 12,
+      "Stealth": 14
+    },
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 14
+    },
+    "immunities": [
+      "Lightning",
+      "Poison"
+    ],
+    "damage_immunities": [
+      "Lightning",
+      "Poison"
+    ],
+    "damage_resistances": [
+      "Bludgeoning"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "frightened",
+      "paralyzed",
+      "petrified",
+      "poisoned",
+      "stunned"
+    ],
+    "languages": "All; speaks to animals and spirits; telepathy 60 ft.",
+    "environments": [
+      "planar",
+      "mountain"
+    ],
+    "allies": [],
+    "enemies": [],
+    "challenge_rating": "26",
+    "xp": 90000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Sun Wukong fails a saving throw, he can choose to succeed instead."
+      },
+      {
+        "name": "Magic Resistance",
+        "description": "Sun Wukong has Advantage on saving throws against spells and other magical effects."
+      },
+      {
+        "name": "72 Transformations",
+        "description": "Sun Wukong can cast Shapechange at will, limited to beasts, humanoids, and monstrosities of his size or smaller; he can also turn invisible as a Bonus Action."
+      },
+      {
+        "name": "Fiery Golden Eyes",
+        "description": "Sun Wukong sees through Illusions and shapeshifts, and he has Advantage on saving throws against being Blinded."
+      },
+      {
+        "name": "Immortal Body",
+        "description": "Sun Wukong doesn't age and cannot die of disease; a wish or divine decree is required to unmake him permanently."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Sun Wukong makes three attacks with the Ruyi Jingu Bang (the golden-club) or one attack with the club and two hair-clone strikes."
+      },
+      {
+        "name": "Ruyi Jingu Bang",
+        "description": "Melee Attack Roll: +19, reach 10 ft. Hit: 25 (3d10 + 9) Bludgeoning damage. The target has the Prone condition.",
+        "reach": "10 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "3d10 + 9",
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": [
+          "prone"
+        ]
+      },
+      {
+        "name": "Hair Clone Strike",
+        "description": "Melee Attack Roll: +19, reach 5 ft. Hit: 20 (2d10 + 9) Necrotic damage.",
+        "reach": "5 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "2d10 + 9",
+        "damage_type_primary": "Necrotic"
+      },
+      {
+        "name": "Pluck a Hair (1/Day)",
+        "uses": 1,
+        "description": "Sun Wukong plucks a handful of hairs and breathes on them. Four monkey clones spring forth in unoccupied spaces within 60 ft. Each clone is a monkey-clone token: AC 18, 30 Hit Points, +14 to hit for 11 (2d8 + 2) Bludgeoning damage, acting on Wukong's initiative. A clone dies when it takes damage and a wish can't duplicate this trick.",
+        "automation": {
+          "type": "monster_summon",
+          "options": [
+            {
+              "monster": "monkey-clone"
+            }
+          ],
+          "count": 4,
+          "range_ft": 60,
+          "duration_minutes": 10
+        },
+        "maxUses": 1,
+        "usage": {
+          "type": "per day",
+          "times": 1
+        }
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Club",
+        "delegates_to": "Ruyi Jingu Bang",
+        "description": "It makes one Ruyi Jingu Bang attack."
+      },
+      {
+        "name": "Somersault Leap",
+        "description": "Sun Wukong flies up to his full fly Speed without provoking Opportunity Attacks."
+      },
+      {
+        "name": "Locking Word (Costs 2 Actions)",
+        "description": "Wisdom Saving Throw: DC 24, one creature within 60 ft. Failure: the target is unable to move, take Reactions, or speak until the start of Wukong's next turn. Success: no effect. No damage.",
+        "save_dc": 24,
+        "save_type": "Wisdom"
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The Great Sage Equaling Heaven, a stone-born monkey trickster and immortal warrior, who waged war on heaven itself, and learned only to laugh while doing it.",
+    "combat-strategy": "He fights airborne and invisible, splitting into hair-clones to multiply his golden club, and uses Locking Word on the biggest caster at the worst possible moment."
+  },
+  {
     "index": "swarm-of-bats",
     "name": "Swarm of Bats",
     "size": "Large",
@@ -61819,6 +65000,416 @@
     "combat-strategy": "Open by charging with Pack Tactics—swarm so at least two thugs flank each target and swing with advantage on the +4 mace Multiattack (10 damage per target when both hit). Focus the softest visible target the pack can surround, since advantage evaporates the moment their buddy falls; keep allies within 5 ft. of every engaged foe to keep the advantage flowing. Thugs with crossbows stand off at 100 ft. to avoid triggering opportunity attacks, firing into melees their friends are already in. With AC 11 and 32 HP they lose extended duels: once half the pack is down or a foe is clearly one-shotted-able output, break off through the nearest exit and scatter—loyalty ends where a good sword swing begins."
   },
   {
+    "index": "thunderbird",
+    "name": "Thunderbird",
+    "size": "Gargantuan",
+    "type": "Beast",
+    "subtype": "Storm Bird",
+    "alignment": "Chaotic Neutral",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 21,
+    "armor_class_details": "21 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 490,
+    "hit_dice": "28d20 + 196",
+    "speed": {
+      "walk": "20 ft.",
+      "fly": "120 ft."
+    },
+    "ability_scores": {
+      "str": 26,
+      "dex": 16,
+      "con": 24,
+      "int": 6,
+      "wis": 16,
+      "cha": 14
+    },
+    "ability_score_modifiers": {
+      "str": 8,
+      "dex": 3,
+      "con": 7,
+      "int": -2,
+      "wis": 3,
+      "cha": 2
+    },
+    "saving_throws": {
+      "Dex": 11,
+      "Con": 15,
+      "Wis": 11
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 13
+    },
+    "immunities": [],
+    "damage_immunities": [],
+    "damage_resistances": [
+      "Lightning"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "frightened"
+    ],
+    "languages": "",
+    "environments": [
+      "mountain",
+      "coastal"
+    ],
+    "allies": [
+      "eagle",
+      "roc"
+    ],
+    "enemies": [],
+    "challenge_rating": "25",
+    "xp": 75000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": null,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Wings of Thunder",
+        "description": "When the Thunderbird flies at least 30 ft. in a straight line, the air around it crackles; each creature within 5 ft. of its path must succeed on a DC 23 Dexterity saving throw or take 7 (2d6) Lightning damage."
+      },
+      {
+        "name": "Sky Caller",
+        "description": "Once per day, the Thunderbird can summon a rainstorm covering 1 square mile, lasting up to 1 hour."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "The Thunderbird makes one Beak attack and two Wing attacks."
+      },
+      {
+        "name": "Beak",
+        "description": "Melee Attack Roll: +15, reach 15 ft. Hit: 24 (3d10 + 8) Piercing damage.",
+        "reach": "15 ft.",
+        "attack_bonus": 15,
+        "damage_dice_primary": "3d10 + 8",
+        "damage_type_primary": "Piercing"
+      },
+      {
+        "name": "Wing",
+        "description": "Melee Attack Roll: +15, reach 15 ft. Hit: 26 (4d8 + 8) Bludgeoning damage.",
+        "reach": "15 ft.",
+        "attack_bonus": 15,
+        "damage_dice_primary": "4d8 + 8",
+        "damage_type_primary": "Bludgeoning"
+      },
+      {
+        "name": "Thunderstrike (Recharge 5-6)",
+        "save_type": "Dexterity",
+        "save_dc": 24,
+        "description": "Dexterity Saving Throw: DC 24, each creature within 60 ft. Failure: 66 (12d10) Lightning damage. Success: Half damage.",
+        "damage_dice_primary": "12d10",
+        "damage_type_primary": "Lightning"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [
+      {
+        "name": "Updraft",
+        "trigger": "When the Thunderbird is forced to stop flying.",
+        "description": "The Thunderbird immediately rises 60 ft. vertically without provoking Opportunity Attacks."
+      }
+    ],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Wing",
+        "delegates_to": "Wing",
+        "description": "It makes one Wing attack."
+      },
+      {
+        "name": "Wing Clap",
+        "description": "Strength Saving Throw: DC 23, each creature within 30 ft. Failure: pushed 20 ft. and knocked Prone; takes 7 (2d6) Thunder damage.",
+        "save_dc": 23,
+        "save_type": "Strength",
+        "damage_dice_primary": "2d6",
+        "damage_type_primary": "Thunder",
+        "hit_conditions": [
+          "prone"
+        ]
+      },
+      {
+        "name": "Storm Call (Costs 2 Actions)",
+        "delegates_to": "Thunderstrike (Recharge 5-6)",
+        "description": "The Thunderbird calls down a single bolt of lightning on one creature within 120 ft. The target must succeed on a DC 24 Dexterity saving throw or take 27 (6d8) Lightning damage."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The great storm-bird whose wingbeats are thunder, whose eyes flash lightning, and whose shadow over the plains is the beginning of a tempest.",
+    "combat-strategy": "It stays high, calling Thunderstrike into the thick of the fight and diving through the enemy to scatter them with its wings before any reach it."
+  },
+  {
+    "index": "tiamat",
+    "name": "Tiamat",
+    "size": "Gargantuan",
+    "type": "Dragon",
+    "subtype": "Chromatic Dragon Quintessence",
+    "alignment": "Chaotic Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 25,
+    "armor_class_details": "25 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 615,
+    "hit_dice": "30d20 + 300",
+    "speed": {
+      "walk": "60 ft.",
+      "fly": "120 ft."
+    },
+    "ability_scores": {
+      "str": 30,
+      "dex": 10,
+      "con": 30,
+      "int": 26,
+      "wis": 26,
+      "cha": 28
+    },
+    "ability_score_modifiers": {
+      "str": 10,
+      "dex": 0,
+      "con": 10,
+      "int": 8,
+      "wis": 8,
+      "cha": 9
+    },
+    "saving_throws": {
+      "Str": 19,
+      "Dex": 9,
+      "Wis": 17
+    },
+    "skills": {
+      "Arcana": 17,
+      "Perception": 17,
+      "Religion": 17
+    },
+    "senses": {
+      "darkvision": 240,
+      "truesight": 120,
+      "passive_perception": 36
+    },
+    "immunities": [
+      "Acid",
+      "Cold",
+      "Fire",
+      "Lightning",
+      "Poison",
+      "Bludgeoning, Piercing, and Slashing from Nonmagical Attacks"
+    ],
+    "damage_immunities": [
+      "Acid",
+      "Cold",
+      "Fire",
+      "Lightning",
+      "Poison",
+      "Bludgeoning, Piercing, and Slashing from Nonmagical Attacks"
+    ],
+    "damage_resistances": [],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "blinded",
+      "charmed",
+      "deafened",
+      "frightened",
+      "poisoned",
+      "stunned"
+    ],
+    "languages": "Common, Draconic, Infernal",
+    "environments": [
+      "planar"
+    ],
+    "allies": [],
+    "enemies": [],
+    "challenge_rating": "30",
+    "xp": 155000,
+    "proficiency_bonus": 9,
+    "legendary_resistance": 5,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Discorporation",
+        "description": "When Tiamat drops to 0 Hit Points or dies, her body is destroyed but her essence travels back to her domain in the Nine Hells, and she is unable to take physical form for a time."
+      },
+      {
+        "name": "Innate Spellcasting (3/Day)",
+        "description": "Tiamat can innately cast Divine Word (spell save DC 26). Her spellcasting ability is Charisma."
+      },
+      {
+        "name": "Legendary Resistance (5/Day)",
+        "description": "If Tiamat fails a saving throw, she can choose to succeed instead."
+      },
+      {
+        "name": "Limited Magic Immunity",
+        "description": "Unless she wishes to be affected, Tiamat is immune to spells of 6th level or lower. She has Advantage on saving throws against all other spells and magical effects."
+      },
+      {
+        "name": "Magic Weapons",
+        "description": "Tiamat's weapon attacks are magical."
+      },
+      {
+        "name": "Multiple Heads",
+        "description": "Tiamat can take one Reaction per turn, rather than only one per round. She has Advantage on saving throws against being knocked Unconscious. If she fails a saving throw against an effect that would stun her, one of her unspent Legendary Actions is spent instead."
+      },
+      {
+        "name": "Regeneration",
+        "description": "Tiamat regains 30 Hit Points at the start of her turn."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Tiamat can use her Frightful Presence. She then makes two Claw attacks and one Tail attack."
+      },
+      {
+        "name": "Claw",
+        "description": "Melee Attack Roll: +19, reach 15 ft. Hit: 24 (4d6 + 10) Slashing damage.",
+        "reach": "15 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "4d6 + 10",
+        "damage_type_primary": "Slashing"
+      },
+      {
+        "name": "Tail",
+        "description": "Melee Attack Roll: +19, reach 25 ft. Hit: 28 (4d8 + 10) Piercing damage.",
+        "reach": "25 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "4d8 + 10",
+        "damage_type_primary": "Piercing"
+      },
+      {
+        "name": "Frightful Presence",
+        "save_type": "Wisdom",
+        "save_dc": 26,
+        "conditions": [
+          "frightened"
+        ],
+        "description": "Wisdom Saving Throw: DC 26, each creature of her choice within 240 ft. of her and aware of her. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. If a creature's saving throw is successful or the effect ends for it, the creature is immune to Tiamat's Frightful Presence for 24 hours. No damage. The target has the Frightened condition on a failed save. No damage."
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 5",
+        "uses": 5,
+        "description": "Immediately after another creature's turn, Tiamat can expend a use to take one of the following actions. Her options are tied to her five heads; once she picks an option for one head, she can't choose another option for that head until the start of her next turn. She regains all expended uses at the start of each of her turns."
+      },
+      {
+        "name": "Black Dragon Head Bite",
+        "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 32 (4d10 + 10) Slashing damage. Plus 14 (4d6) Acid damage.",
+        "reach": "20 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "4d10 + 10",
+        "damage_type_primary": "Slashing",
+        "damage_dice_secondary": "4d6",
+        "damage_type_secondary": "Acid"
+      },
+      {
+        "name": "Blue Dragon Head Bite",
+        "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 32 (4d10 + 10) Slashing damage. Plus 14 (4d6) Lightning damage.",
+        "reach": "20 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "4d10 + 10",
+        "damage_type_primary": "Slashing",
+        "damage_dice_secondary": "4d6",
+        "damage_type_secondary": "Lightning"
+      },
+      {
+        "name": "Green Dragon Head Bite",
+        "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 32 (4d10 + 10) Slashing damage. Plus 14 (4d6) Poison damage.",
+        "reach": "20 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "4d10 + 10",
+        "damage_type_primary": "Slashing",
+        "damage_dice_secondary": "4d6",
+        "damage_type_secondary": "Poison"
+      },
+      {
+        "name": "Red Dragon Head Bite",
+        "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 32 (4d10 + 10) Slashing damage. Plus 14 (4d6) Fire damage.",
+        "reach": "20 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "4d10 + 10",
+        "damage_type_primary": "Slashing",
+        "damage_dice_secondary": "4d6",
+        "damage_type_secondary": "Fire"
+      },
+      {
+        "name": "White Dragon Head Bite",
+        "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 32 (4d10 + 10) Slashing damage. Plus 14 (4d6) Cold damage.",
+        "reach": "20 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "4d10 + 10",
+        "damage_type_primary": "Slashing",
+        "damage_dice_secondary": "4d6",
+        "damage_type_secondary": "Cold"
+      },
+      {
+        "name": "Black Dragon Head Acid Breath (Costs 2 Actions)",
+        "save_type": "Dexterity",
+        "save_dc": 27,
+        "description": "Dexterity Saving Throw: DC 27, each creature in a 120-foot-long, 10-foot-wide Line. Failure: 67 (15d8) Acid damage. Success: Half damage.",
+        "damage_dice_primary": "15d8",
+        "damage_type_primary": "Acid"
+      },
+      {
+        "name": "Blue Dragon Head Lightning Breath (Costs 2 Actions)",
+        "save_type": "Dexterity",
+        "save_dc": 27,
+        "description": "Dexterity Saving Throw: DC 27, each creature in a 120-foot-long, 10-foot-wide Line. Failure: 88 (16d10) Lightning damage. Success: Half damage.",
+        "damage_dice_primary": "16d10",
+        "damage_type_primary": "Lightning"
+      },
+      {
+        "name": "Green Dragon Head Poison Breath (Costs 2 Actions)",
+        "save_type": "Constitution",
+        "save_dc": 27,
+        "description": "Constitution Saving Throw: DC 27, each creature in a 90-foot Cone. Failure: 77 (22d6) Poison damage. Success: Half damage.",
+        "damage_dice_primary": "22d6",
+        "damage_type_primary": "Poison"
+      },
+      {
+        "name": "Red Dragon Head Fire Breath (Costs 2 Actions)",
+        "save_type": "Dexterity",
+        "save_dc": 27,
+        "description": "Dexterity Saving Throw: DC 27, each creature in a 90-foot Cone. Failure: 91 (26d6) Fire damage. Success: Half damage.",
+        "damage_dice_primary": "26d6",
+        "damage_type_primary": "Fire"
+      },
+      {
+        "name": "White Dragon Head Cold Breath (Costs 2 Actions)",
+        "save_type": "Dexterity",
+        "save_dc": 27,
+        "description": "Dexterity Saving Throw: DC 27, each creature in a 90-foot Cone. Failure: 72 (16d8) Cold damage. Success: Half damage.",
+        "damage_dice_primary": "16d8",
+        "damage_type_primary": "Cold"
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Monster Manual (2024)",
+    "page": null,
+    "description": "The five-headed dragon goddess of evil, progenitor of chromatic dragons, Tiamat hoards gods' weapons and the spite of every scale she has ever shed. Each of her heads speaks, schemes, and breathes destruction in a different element.",
+    "combat-strategy": "She opens with Frightful Presence, then chains one Claw, one Bite, and her Tail each turn while spending Legendary Actions to rotate her five heads' Breath Weapons down the densest ranks, never wasting two options on the same head in one round."
+  },
+  {
     "index": "tiger",
     "name": "Tiger",
     "size": "Large",
@@ -62934,6 +66525,170 @@
     ],
     "description": "Twig blights can root in soil, which they do when living prey are scarce. While rooted, they resemble woody shrubs. When it pulls its roots free of the ground to move, a twig blight's branches twist together to form a humanoid-looking body with a head and limbs.<br/>Twig blights seek out campsites and watering holes, rooting there to set up ambushes for potential victims coming to drink or rest. Huddled together in groups, twig blights blend in with an area's natural vegetation or with piles of debris or firewood.<br/>Given how dry they are, twig blights are particularly susceptible to fire.",
     "combat-strategy": "Ambush in a swarm-sizable pack from within its own woods—+4 Stealth and 60 ft. blindsight mean the party walks past dozens of 'twigs' before they move. Trigger Pack Tactics en masse surrounding the same target, so a dozen +4 claw attacks (usually +6 with advantage) hit in one wave at 4 damage per claw—attrition death by paper cuts on AC 14 armor. Focus the closest single target rather than splitting attacks, dropping a victim in three rounds of concentrated swarm attacks. At 7 HP one area spell wipes the pack, so spread out when spellcasters are visible and swarm physical fighters, using thick brush and trees as hard cover against ranged shots. The swarm doesn't rout—it is a disposable trap; its only 'retreat' is the pack failing to make contact before the party retreats out of range."
+  },
+  {
+    "index": "typhon",
+    "name": "Typhon",
+    "size": "Gargantuan",
+    "type": "Monstrosity",
+    "subtype": "Storm Father",
+    "alignment": "Chaotic Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 24,
+    "armor_class_details": "24 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 731,
+    "hit_dice": "34d20 + 374",
+    "speed": {
+      "walk": "50 ft."
+    },
+    "ability_scores": {
+      "str": 30,
+      "dex": 16,
+      "con": 32,
+      "int": 8,
+      "wis": 14,
+      "cha": 20
+    },
+    "ability_score_modifiers": {
+      "str": 10,
+      "dex": 3,
+      "con": 11,
+      "int": -1,
+      "wis": 2,
+      "cha": 5
+    },
+    "saving_throws": {
+      "Str": 19,
+      "Dex": 12,
+      "Con": 20
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "blindsight": 60,
+      "passive_perception": 12
+    },
+    "immunities": [
+      "Lightning",
+      "Poison"
+    ],
+    "damage_immunities": [
+      "Lightning",
+      "Poison"
+    ],
+    "damage_resistances": [
+      "Fire",
+      "Bludgeoning"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "frightened",
+      "poisoned"
+    ],
+    "languages": "Speaks to gods in their own tongues.",
+    "environments": [
+      "mountain",
+      "planar"
+    ],
+    "allies": [],
+    "enemies": [],
+    "challenge_rating": "30",
+    "xp": 155000,
+    "proficiency_bonus": 9,
+    "legendary_resistance": 5,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (5/Day)",
+        "description": "If Typhon fails a saving throw, he can choose to succeed instead."
+      },
+      {
+        "name": "Hundred Serpent Heads",
+        "description": "Typhon has Advantage on saving throws against being knocked Unconscious and can't be surprised."
+      },
+      {
+        "name": "Earthshaker",
+        "description": "When Typhon hits an object, structure, or unsecured ground target, it deals an extra 10 (3d6) Thunder damage."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Typhon makes four attacks: two with his serpent heads and two with his claws."
+      },
+      {
+        "name": "Serpent Head",
+        "description": "Melee Attack Roll: +19, reach 15 ft. Hit: 26 (3d10 + 10) Piercing damage. Plus 7 (2d6) Poison damage.",
+        "reach": "15 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "3d10 + 10",
+        "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "2d6",
+        "damage_type_secondary": "Poison"
+      },
+      {
+        "name": "Claw",
+        "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 28 (4d8 + 10) Slashing damage.",
+        "reach": "20 ft.",
+        "attack_bonus": 19,
+        "damage_dice_primary": "4d8 + 10",
+        "damage_type_primary": "Slashing"
+      },
+      {
+        "name": "Storm Breach (Recharge 5-6)",
+        "save_type": "Strength",
+        "save_dc": 27,
+        "description": "Strength Saving Throw: DC 27, each creature within 120 ft. Failure: 91 (26d6) Bludgeoning damage. Success: Half damage. The area becomes difficult terrain as boulders and debris fly.",
+        "damage_dice_primary": "26d6",
+        "damage_type_primary": "Bludgeoning"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Serpent Head",
+        "delegates_to": "Serpent Head",
+        "description": "It makes one Serpent Head attack."
+      },
+      {
+        "name": "Firebolt Volley",
+        "description": "Ranged Attack Roll: +17, range 90 ft., two targets. Hit: 18 (4d8+1) Fire damage each.",
+        "attack_bonus": 17,
+        "range": "90 ft.",
+        "damage_dice_primary": "4d8 + 1",
+        "damage_type_primary": "Fire"
+      },
+      {
+        "name": "Earthquake (Costs 2 Actions)",
+        "delegates_to": "Storm Breach (Recharge 5-6)",
+        "description": "Dexterity Saving Throw: DC 25, each creature within 60 ft. Failure: 27 (6d8) Bludgeoning damage and the target is knocked Prone. Success: half damage and not Prone.",
+        "save_dc": 25,
+        "save_type": "Dexterity",
+        "hit_conditions": [
+          "prone"
+        ],
+        "damage_dice_primary": "6d8",
+        "damage_type_primary": "Bludgeoning"
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The father of monsters, a mountain-striding serpent giant whose hundred heads each speak a different doom and whose rage once unmade the gods.",
+    "combat-strategy": "He advances relentlessly; a Storm Breach every two rounds breaks any army, while his heads and claws mop up those still standing."
   },
   {
     "index": "tyrannosaurus-rex",
@@ -67595,6 +71350,157 @@
     "combat-strategy": "Ambush from stone: it burrows silently via Earth Glide (leaving no trace) and uses tremorsense plus Treasure Sense to home in on whoever is shiny, so let the party walk over it before erupting beneath the wealthiest-looking member. Open with Charge as a bonus action straight up through the floor into melee, then Multiattack — one Bite and three Claws, roughly 41 average damage — on a target caught adjacent. AC 19 and 84 HP make it a brawler that gladly trades blows in tight tunnels where the party can't flank and its 20-ft. burrow beats their movement on rough ground. Target spellcasters and anyone carrying magical items, since it's covetous by nature. Retreat into unworked stone when reduced by half — it can't be chased underground, and it lingers just beneath the surface waiting to burst out again."
   },
   {
+    "index": "yamata-no-orochi",
+    "name": "Yamata no Orochi",
+    "size": "Gargantuan",
+    "type": "Monstrosity",
+    "subtype": "Eight-Headed Serpent",
+    "alignment": "Chaotic Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 21,
+    "armor_class_details": "21 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 511,
+    "hit_dice": "26d20 + 234",
+    "speed": {
+      "walk": "40 ft.",
+      "swim": "40 ft."
+    },
+    "ability_scores": {
+      "str": 28,
+      "dex": 12,
+      "con": 28,
+      "int": 4,
+      "wis": 14,
+      "cha": 14
+    },
+    "ability_score_modifiers": {
+      "str": 9,
+      "dex": 1,
+      "con": 9,
+      "int": -3,
+      "wis": 2,
+      "cha": 2
+    },
+    "saving_throws": {
+      "Con": 17,
+      "Dex": 9
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "blindsight": 30,
+      "passive_perception": 12
+    },
+    "immunities": [
+      "Poison"
+    ],
+    "damage_immunities": [
+      "Poison"
+    ],
+    "damage_resistances": [
+      "Acid",
+      "Fire",
+      "Lightning"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "poisoned",
+      "charmed",
+      "frightened"
+    ],
+    "languages": "—",
+    "environments": [
+      "swamp",
+      "coastal",
+      "planar"
+    ],
+    "allies": [],
+    "enemies": [],
+    "challenge_rating": "25",
+    "xp": 75000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Regenerative Heads",
+        "description": "When a head is severed, two more take its place at the start of its next turn unless the wound is burned with Fire or frozen with Cold."
+      },
+      {
+        "name": "Eight Heads",
+        "description": "Orochi has Advantage on Perception checks and can't be flanked."
+      },
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Orochi fails a saving throw, it can choose to succeed instead."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Orochi makes four Bite attacks, each against a different target."
+      },
+      {
+        "name": "Bite",
+        "description": "Melee Attack Roll: +18, reach 15 ft. Hit: 25 (3d10 + 9) Piercing damage. Plus 7 (2d6) Poison damage.",
+        "reach": "15 ft.",
+        "attack_bonus": 18,
+        "damage_dice_primary": "3d10 + 9",
+        "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "2d6",
+        "damage_type_secondary": "Poison"
+      },
+      {
+        "name": "Venom Mist (Recharge 5-6)",
+        "save_type": "Constitution",
+        "save_dc": 26,
+        "description": "Constitution Saving Throw: DC 26, each creature within 90 ft. Failure: 77 (22d6) Poison damage. Success: Half damage.",
+        "damage_dice_primary": "22d6",
+        "damage_type_primary": "Poison"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Bite",
+        "delegates_to": "Bite",
+        "description": "It makes one Bite attack."
+      },
+      {
+        "name": "Head's Vigil",
+        "description": "Orochi makes one Perception check."
+      },
+      {
+        "name": "Crushing Coil (Costs 2 Actions)",
+        "description": "Melee Attack Roll: +18, reach 10 ft., one Huge or smaller creature. Hit: 27 (4d10+9) Bludgeoning damage and the target is Grappled (escape DC 26); while Grappled it takes 18 (4d8) Bludgeoning at the start of its next turn.",
+        "attack_bonus": 18,
+        "reach": "10 ft.",
+        "damage_dice_primary": "4d10 + 9",
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": [
+          "grappled"
+        ]
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The eight-forked serpent of the old river-tale, whose bodies braid like eight rivers, whose belly glows like eight lanterns, and who is fed an annual maiden.",
+    "combat-strategy": "He floods the field with venom mist, biting at four targets at once, and regenerating severed heads unless his necks are burned."
+  },
+  {
     "index": "yeti",
     "name": "Yeti",
     "size": "Large",
@@ -67713,6 +71619,162 @@
     ],
     "description": "A yeti's windborne howl sounds out across remote mountains, striking fear into the hearts of the scattered miners and herders that dwell there. These hulking creatures stalk alpine peaks in a ceaseless hunt for food. Their snow-white fur lets them move like ghosts against the frozen landscape. A yeti's icy simian eyes can freeze its prey in place.<br/><br/><b>Keen Hunters.</b> Folk of the high peaks travel in groups and go armed, knowing that yetis can smell living flesh from miles away. When it finds prey, a yeti moves quickly over ice and stone to claim its meal, howling to the thrill of the hunt. Even in a blizzard, the scent of its quarry draws the yeti through the cold and snow.<br/>Yetis hunt in solitude or in small family groups. When creatures flee from a yeti or engage it in battle, other yetis might catch the scent of blood and close in. The territorial yetis fight one another for the spoils of such battles, and yetis slain in the fight are also eaten, amid euphoric howls.<br/><br/><b>Terrifying Howlers.</b> Before an avalanche, a blizzard, or a deadly frost, the yetis' howls sweep down the mountain slopes on the icy wind. Some people of the alpine peaks believe that the voices of loved ones killed in avalanches and blizzards sound out in the wails of the yetis, crying warnings of ill omen. More pragmatic folk attest that the yeti's howl is a reminder that, despite the great accomplishments of civilization, the civilized become the hunted in nature's untamed domain.<br/><br/><b>Brutal Rampagers.</b> When mountain herds are abundant, yetis stay clear of humanoid realms. Driven by hunger, they attack humanoid settlements in waves, breaking down gates and stockade walls that once might have daunted them, then devouring the creatures within.<br/>Devious mountain folk sometimes use the yetis as unwitting weapons. A warlord might lay down slaughtered sheep or goats to draw yetis into an enemy's camp, sowing chaos and thinning the ranks before battle. Mountain clan chiefs, wanting to expand their territory, overhunt local game to diminish the yetis' food supplies, inspiring attacks on humanoid settlements that are swiftly annexed in the aftermath.",
     "combat-strategy": "Fight on cliffs and icy slopes where its 40-ft. climb and Stealth +5 set up an ambush from above. Open with Chilling Gaze on a mid-rank hero — DC 13 Con or they're Paralyzed and an easy kill — then Multiattack with Claw and Ice Throw, mixing ranges so melee types waste turns closing while it throws ice. Target the weakest-looking Constitution saves first with the Gaze; paralyzed victims auto-fail Strength saves, so set up prone-and-rend combos on the cliff edge where falling is the real kill. Stay high: enemies must climb while it throws, and it can drop icestones down slopes. Fire gives it Disadvantage, so retreat into snow and blizzards when a mage starts burning, using the storm's concealment to re-hide and re-ambush."
+  },
+  {
+    "index": "ymir",
+    "name": "Ymir",
+    "size": "Gargantuan",
+    "type": "Giant",
+    "subtype": "Frost Giant Progenitor",
+    "alignment": "Chaotic Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 22,
+    "armor_class_details": "22 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 615,
+    "hit_dice": "30d20 + 300",
+    "speed": {
+      "walk": "50 ft."
+    },
+    "ability_scores": {
+      "str": 30,
+      "dex": 8,
+      "con": 30,
+      "int": 6,
+      "wis": 12,
+      "cha": 16
+    },
+    "ability_score_modifiers": {
+      "str": 10,
+      "dex": -1,
+      "con": 10,
+      "int": -2,
+      "wis": 1,
+      "cha": 3
+    },
+    "saving_throws": {
+      "Str": 18,
+      "Con": 18
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 11
+    },
+    "immunities": [
+      "Cold"
+    ],
+    "damage_immunities": [
+      "Cold"
+    ],
+    "damage_resistances": [
+      "Bludgeoning"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "poisoned"
+    ],
+    "languages": "Speaks to giants in their own tongues.",
+    "environments": [
+      "arctic",
+      "mountain",
+      "planar"
+    ],
+    "allies": [
+      "frost-giant",
+      "winter-wolf"
+    ],
+    "enemies": [
+      "fire-giant"
+    ],
+    "challenge_rating": "27",
+    "xp": 105000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Ymir fails a saving throw, he can choose to succeed instead."
+      },
+      {
+        "name": "Primordial Flesh",
+        "description": "Ymir can't be affected by Cold, and every weapon that hits him is numbed (Disadvantage on the attacker's next attack with that weapon)."
+      },
+      {
+        "name": "World-Flesh",
+        "description": "When Ymir takes Radiant damage, his body doesn't melt but bleeds into glaciers; he regains 15 Hit Points."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Ymir makes two Glacier Club attacks and one Stomp attack."
+      },
+      {
+        "name": "Glacier Club",
+        "description": "Melee Attack Roll: +18, reach 20 ft. Hit: 26 (3d10 + 10) Bludgeoning damage. Plus 7 (2d6) Cold damage.",
+        "reach": "20 ft.",
+        "attack_bonus": 18,
+        "damage_dice_primary": "3d10 + 10",
+        "damage_type_primary": "Bludgeoning",
+        "damage_dice_secondary": "2d6",
+        "damage_type_secondary": "Cold"
+      },
+      {
+        "name": "Stomp",
+        "description": "Melee Attack Roll: +18, reach 10 ft. Hit: 32 (4d10 + 10) Bludgeoning damage. The target has the Prone condition.",
+        "reach": "10 ft.",
+        "attack_bonus": 18,
+        "damage_dice_primary": "4d10 + 10",
+        "damage_type_primary": "Bludgeoning",
+        "hit_conditions": [
+          "prone"
+        ]
+      },
+      {
+        "name": "Glacier Wave (Recharge 5-6)",
+        "save_type": "Strength",
+        "save_dc": 26,
+        "description": "Strength Saving Throw: DC 26, each creature in a 120-foot-long, 10-foot-wide Line. Failure: 77 (14d10) Bludgeoning damage. Success: Half damage. The target is also Restrained until the end of its next turn.",
+        "damage_dice_primary": "14d10",
+        "damage_type_primary": "Bludgeoning"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Glacier Club",
+        "delegates_to": "Glacier Club",
+        "description": "It makes one Glacier Club attack."
+      },
+      {
+        "name": "Stomp",
+        "delegates_to": "Stomp",
+        "description": "It makes one Stomp attack."
+      },
+      {
+        "name": "Frost Geyser (Costs 2 Actions)",
+        "delegates_to": null,
+        "description": "A pillar of ice erupts at a point within 90 ft. Each creature in a 20 ft. radius must succeed on a DC 24 Dexterity saving throw or take 18 (4d8) Cold damage and be Restrained."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The first frost giant, the ancestor of all giants, whose body was the raw material of the world; when the glaciers groan, it is Ymir turning in his sleep.",
+    "combat-strategy": "He advances like weather itself; a Glacier Wave carves a lane through the army, leaving the Restrained for clubs."
   },
   {
     "index": "yochlol",
@@ -70333,6 +74395,314 @@
     "page": 310,
     "description": "Purebloods form the lowest caste ofyuan-ti society. They closely resemble humans, yet a pureblood can't pass for human under close scrutiny because there's always some hint of its true nature, such as scaly patches of skin, serpentine eyes, pointed teeth, or a forked tongue. Wearing cloaks and cowls, they masquerade as humans and infiltrate civilized lands to gather information, kidnap prisoners for interrogation and sacrifice, and trade with anyone who has something that can further their myriad plots.",
     "combat-strategy": "The face of the cell: fight like a spy caught with a knife. Open with innate poison spray (DC 12 Con) on a front-line defender, then kite with Shortbow shots (+3 to hit, 7 poison per hit) from cover. Its AC 11 and 40 HP mean it should almost never Multiattack in melee against competent martial adversaries — reserve the two-attack scimitar option for already-restrained or prone targets. Suggestion (DC 12 Wis) is the real opener: make the party split up, sheath weapons, or hand over keys before initiative ever rolls. Its poison immunity lets it fight inside its own gas traps and noxious ruins; retreat at half HP with its intelligence rather than dying on the rooftop."
+  },
+  {
+    "index": "ziz",
+    "name": "Ziz",
+    "size": "Gargantuan",
+    "type": "Beast",
+    "subtype": "Sky Guardian",
+    "alignment": "Neutral Good",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 21,
+    "armor_class_details": "21 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 490,
+    "hit_dice": "28d20 + 196",
+    "speed": {
+      "walk": "20 ft.",
+      "fly": "100 ft."
+    },
+    "ability_scores": {
+      "str": 26,
+      "dex": 16,
+      "con": 24,
+      "int": 6,
+      "wis": 16,
+      "cha": 14
+    },
+    "ability_score_modifiers": {
+      "str": 8,
+      "dex": 3,
+      "con": 7,
+      "int": -2,
+      "wis": 3,
+      "cha": 2
+    },
+    "saving_throws": {
+      "Dex": 11,
+      "Con": 15,
+      "Wis": 11
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 13
+    },
+    "immunities": [],
+    "damage_immunities": [],
+    "damage_resistances": [
+      "Radiant",
+      "Lightning"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "frightened"
+    ],
+    "languages": "",
+    "environments": [
+      "mountain"
+    ],
+    "allies": [
+      "eagle",
+      "roc"
+    ],
+    "enemies": [],
+    "challenge_rating": "25",
+    "xp": 75000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": null,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Sun Shield",
+        "description": "While flying high above the land, Ziz's radiance blinds evil creatures that look at him, imposing Disadvantage on their attacks against him."
+      },
+      {
+        "name": "Protector of the Land",
+        "description": "Ziz won't attack a creature that isn't threatening the land, but he is implacable once the threat is engaged."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Ziz makes one Beak attack and two Wing attacks."
+      },
+      {
+        "name": "Beak",
+        "description": "Melee Attack Roll: +15, reach 15 ft. Hit: 24 (3d10 + 8) Piercing damage.",
+        "reach": "15 ft.",
+        "attack_bonus": 15,
+        "damage_dice_primary": "3d10 + 8",
+        "damage_type_primary": "Piercing"
+      },
+      {
+        "name": "Wing",
+        "description": "Melee Attack Roll: +15, reach 15 ft. Hit: 26 (4d8 + 8) Bludgeoning damage.",
+        "reach": "15 ft.",
+        "attack_bonus": 15,
+        "damage_dice_primary": "4d8 + 8",
+        "damage_type_primary": "Bludgeoning"
+      },
+      {
+        "name": "Solar Flare (Recharge 5-6)",
+        "save_type": "Constitution",
+        "save_dc": 24,
+        "description": "Constitution Saving Throw: DC 24, each creature within 60 ft. Failure: 49 (9d10) Radiant damage. Success: Half damage.",
+        "damage_dice_primary": "9d10",
+        "damage_type_primary": "Radiant"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [
+      {
+        "name": "Wing Shield",
+        "trigger": "When the Ziz is targeted by a ranged attack.",
+        "description": "Ziz folds its wings for armor, adding +5 to AC against the triggering attack."
+      }
+    ],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Wing",
+        "delegates_to": "Wing",
+        "description": "It makes one Wing attack."
+      },
+      {
+        "name": "Blinding Ascent",
+        "description": "Ziz rises into the sun, becoming invisible until the start of his next turn."
+      },
+      {
+        "name": "Sky Screech (Costs 2 Actions)",
+        "delegates_to": null,
+        "description": "Enemies within 60 ft. must succeed on a DC 23 Wisdom saving throw or take 7 (2d6) Thunder damage and be knocked Prone."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The giant bird of the old sky, said to blot out the sun when it spreads its wings, a guardian whose tears once held back the flood.",
+    "combat-strategy": "He fights above his charges, using Solar Flare to punish the evil while his wing-shield deflects what reaches him."
+  },
+  {
+    "index": "zmey-gorynych",
+    "name": "Zmey Gorynych",
+    "size": "Huge",
+    "type": "Dragon",
+    "subtype": "Three-Headed Dragon",
+    "alignment": "Chaotic Evil",
+    "initiative": null,
+    "initiative_details": null,
+    "armor_class": 21,
+    "armor_class_details": "21 (natural armor)",
+    "armor_class_options": [],
+    "hit_points": 486,
+    "hit_dice": "36d12 + 252",
+    "speed": {
+      "walk": "40 ft.",
+      "fly": "80 ft."
+    },
+    "ability_scores": {
+      "str": 26,
+      "dex": 14,
+      "con": 24,
+      "int": 12,
+      "wis": 14,
+      "cha": 18
+    },
+    "ability_score_modifiers": {
+      "str": 8,
+      "dex": 2,
+      "con": 7,
+      "int": 1,
+      "wis": 2,
+      "cha": 4
+    },
+    "saving_throws": {
+      "Dex": 10,
+      "Con": 15,
+      "Wis": 10
+    },
+    "skills": {},
+    "senses": {
+      "darkvision": 120,
+      "passive_perception": 12
+    },
+    "immunities": [
+      "Fire"
+    ],
+    "damage_immunities": [
+      "Fire"
+    ],
+    "damage_resistances": [
+      "Cold",
+      "Bludgeoning"
+    ],
+    "damage_vulnerabilities": [],
+    "condition_immunities": [
+      "charmed",
+      "frightened",
+      "poisoned"
+    ],
+    "languages": "All; telepathy 60 ft.",
+    "environments": [
+      "forest",
+      "mountain",
+      "planar"
+    ],
+    "allies": [
+      "wyvern"
+    ],
+    "enemies": [],
+    "challenge_rating": "25",
+    "xp": 75000,
+    "proficiency_bonus": 8,
+    "legendary_resistance": 3,
+    "equipment": [],
+    "habitat": "",
+    "treasure": "",
+    "artist": null,
+    "traits": [
+      {
+        "name": "Three Heads",
+        "description": "Zmey Gorynych has Advantage on saving throws against being Blinded, Deafened, or knocked Unconscious."
+      },
+      {
+        "name": "Regenerative Heads",
+        "description": "When one head is severed, it regrows at the start of his next turn unless the stump is cauterized with Fire or ice-closed with Cold."
+      },
+      {
+        "name": "Legendary Resistance (3/Day)",
+        "description": "If Zmey Gorynych fails a saving throw, he can choose to succeed instead."
+      }
+    ],
+    "actions": [
+      {
+        "name": "Multiattack",
+        "description": "Zmey Gorynych makes three Bite or Claw attacks."
+      },
+      {
+        "name": "Bite",
+        "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 26 (4d8 + 8) Piercing damage. Plus 7 (2d6) Fire damage.",
+        "reach": "10 ft.",
+        "attack_bonus": 15,
+        "damage_dice_primary": "4d8 + 8",
+        "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "2d6",
+        "damage_type_secondary": "Fire"
+      },
+      {
+        "name": "Claw",
+        "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 22 (4d8 + 8) Slashing damage.",
+        "attack_bonus": 15,
+        "reach": "10 ft.",
+        "damage_dice_primary": "4d8 + 8",
+        "damage_type_primary": "Slashing"
+      },
+      {
+        "name": "Triple Fire Breath (Recharge 5-6)",
+        "save_type": "Dexterity",
+        "save_dc": 23,
+        "description": "Dexterity Saving Throw: DC 23, each creature in a 90-foot Cone. Failure: 49 (11d8) Fire damage. Success: Half damage.",
+        "damage_dice_primary": "11d8",
+        "damage_type_primary": "Fire"
+      }
+    ],
+    "bonus_actions": [],
+    "reactions": [],
+    "legendary_actions": [
+      {
+        "name": "Legendary Action Uses: 3",
+        "uses": 3,
+        "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns."
+      },
+      {
+        "name": "Bite",
+        "delegates_to": "Bite",
+        "description": "It makes one Bite attack."
+      },
+      {
+        "name": "Dust Storm",
+        "description": "Strength Saving Throw: DC 23, each creature within 40 ft. Failure: Blinded until the end of its next turn; takes 7 (2d6) Bludgeoning damage.",
+        "save_dc": 23,
+        "save_type": "Strength",
+        "damage_dice_primary": "2d6",
+        "damage_type_primary": "Bludgeoning",
+        "conditions": [
+          "blinded"
+        ]
+      },
+      {
+        "name": "Wing Buffet (Costs 2 Actions)",
+        "delegates_to": "Triple Fire Breath (Recharge 5-6)",
+        "description": "Zmey Gorynych beats his wings in a wide arc, exhaling fire in a 60-foot Cone. Each creature in the area must succeed on a DC 23 Dexterity saving throw or take 11 (2d8) Fire damage."
+      }
+    ],
+    "lair_actions": [],
+    "regional_effects": {},
+    "book": "Legends & Lore",
+    "page": null,
+    "description": "The three-headed dragon of the eastern tales, a brigand wyrm who demands tribute of cattle, gold, and brides, and who can hold an entire kingdom to ransom between breakfast and supper.",
+    "combat-strategy": "He strafes with Triple Fire Breath, lands among the survivors to bite and to argue, and grows only three heads back if you're foolish enough to sever one and not burn the stump."
   },
   {
     "index": "zombie",
