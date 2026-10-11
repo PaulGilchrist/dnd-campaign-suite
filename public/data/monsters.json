@@ -15808,6 +15808,7 @@
       {
         "name": "Psychic Shatter",
         "description": "Intelligence Saving Throw: DC 24, each creature within 60 ft. that can see Cthulhu. Failure: 33 (6d10) Psychic damage and the target has the Stunned condition until the end of its next turn. Success: Half damage and no Stun. Cthulhu can't use this action again until its next turn.",
+        "once_per_turn": true,
         "save_dc": 24,
         "save_type": "Intelligence",
         "damage_dice_primary": "6d10",

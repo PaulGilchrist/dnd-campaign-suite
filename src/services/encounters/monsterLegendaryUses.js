@@ -311,6 +311,46 @@ async function stampLegendaryCooldown({ action, actionName, monsterName, campaig
   await setRV(monsterName, MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY, { ...cooldowns, [slug]: { round, usedBefore: used - 1 } }, campaignName);
 }
 
+// MA-1868: REGULAR (non-legendary) action rows that declare a structured
+// `once_per_turn: true` field ("Cthulhu can't use this action again until
+// its next turn") ride the SAME MA-0073 latch: the map
+// (`monsterLegendaryActionCooldowns`), slug, refusal popup/log vocabulary
+// (`<slug>_refused (once per turn)`, zero save rolled) and the turn-start
+// clear — regainLegendaryUses already wipes the key on EVERY monster's own
+// turn-start (MA-0073 :361 clear is legendary-state-independent), so no
+// new store, key or seam is needed. The regular save-chip lane
+// (MonsterCardModal handleSaveRoll) never reaches expendLegendaryUse, so
+// it consults/stamps through these helpers instead. `hasLegendaryCooldownClause`
+// stays byte-identical — the existing legendary wording tests stay green;
+// this lane arms ONLY on the structured field (precision — no prose match,
+// so no other row silently changes behavior).
+export function isOncePerTurnActionRow(action) {
+  return action?.once_per_turn === true;
+}
+
+export function regularActionCooldownRefusal({ action, monsterName, deps = {} }) {
+  if (!isOncePerTurnActionRow(action)) return null;
+  const getRV = deps.getRuntimeValue || getRuntimeValue;
+  const cooldowns = getRV(monsterName, MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY) || {};
+  if (!cooldowns[legendaryActionSlug(action.name)]) return null;
+  const actionName = action.name;
+  return {
+    popupHtml: buildLegendaryCooldownRefusalPopup({ monsterName, actionName }),
+    refusalLog: buildLegendaryCooldownRefusalLog({ monsterName, actionName }),
+  };
+}
+
+export async function stampRegularActionCooldown({ action, monsterName, campaignName, deps = {} }) {
+  if (!isOncePerTurnActionRow(action)) return;
+  const getRV = deps.getRuntimeValue || getRuntimeValue;
+  const setRV = deps.setRuntimeValue || setRuntimeValue;
+  const slug = legendaryActionSlug(action.name);
+  const cooldowns = getRV(monsterName, MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY) || {};
+  if (cooldowns[slug]) return;
+  const cs = await (deps.getCombatContext || getCombatContext)(campaignName);
+  await setRV(monsterName, MONSTER_LEGENDARY_ACTION_COOLDOWNS_KEY, { ...cooldowns, [slug]: { round: combatRound(cs), usedBefore: 0 } }, campaignName);
+}
+
 export async function expendLegendaryUse({ monsterName, monster, actionName, campaignName, action = null, deps = {} }) {
   const getRV = deps.getRuntimeValue || getRuntimeValue;
   const setRV = deps.setRuntimeValue || setRuntimeValue;

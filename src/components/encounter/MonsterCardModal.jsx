@@ -35,7 +35,7 @@ import { resolveShapeShiftSelection, declineShapeShiftSelection } from '../../se
 import { ShapeShiftModal } from './ShapeShiftModal.jsx';
 import { resolveUtilitySpellCastRow } from '../../services/encounters/monsterUtilitySpellCast.js';
 import { getActiveTargetEffect } from '../../services/combat/conditions/targetEffectDefinitions.js';
-import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog } from '../../services/encounters/monsterLegendaryUses.js';
+import { expendLegendaryUse, legendaryDelegateAction, legendaryDelegateAttackName, buildLegendaryRefusalPopup, buildLegendaryRefusalLog, parseLegendaryAllyPrerequisite, legendaryAllyPrerequisiteSatisfied, buildLegendaryPrerequisiteRefusalPopup, buildLegendaryPrerequisiteRefusalLog, applyLegendarySelfHeal, legendaryCheckRow, legendaryCheckBonus, legendaryCheckLabel, buildLegendaryAdvisoryPopup, buildLegendaryAdvisoryLog, regularActionCooldownRefusal, stampRegularActionCooldown } from '../../services/encounters/monsterLegendaryUses.js';
 import { resolveLairRow } from '../../services/encounters/monsterLairActions.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from '../../services/encounters/monsterRecharge.js';
 import { resolveRoarStageAction } from '../../services/rules/features/roarService.js';
@@ -616,6 +616,26 @@ function resolveStageSaveFields({ action, usesGate, saveDamageFormula, saveCondi
     stageFormula: roarAction ? extractDamageDiceFromDescription(stageAction.description, stageAction.damage_dice_primary) : saveDamageFormula,
     stageConditions: roarAction ? extractConditionsFromSaveEffect(stageAction.save_effect) : saveConditions,
   };
+}
+
+// MA-1868: once-per-turn cooldown gate for REGULAR monster action rows
+// (Cthulhu "Psychic Shatter") — rides the MA-0073 latch vocabulary: consults
+// `monsterLegendaryActionCooldowns` keyed by the row slug BEFORE any roll
+// (refusal popup + `<slug>_refused (once per turn)` log, zero save/damage/
+// condition) and stamps the slug once the press passes every gate. Clears at
+// the monster's own turn-start via the existing regainLegendaryUses seam.
+// Byte-inert on rows without the structured `once_per_turn: true` field.
+function oncePerTurnActionGate({ action, monsterName, campaignName, setPopupHtml }) {
+  const refusal = regularActionCooldownRefusal({ action, monsterName });
+  if (refusal) {
+    setPopupHtml(refusal.popupHtml);
+    addEntry(campaignName, refusal.refusalLog)
+      .catch((e) => { console.error('[MonsterCardModal] Error logging once-per-turn refusal:', e); });
+    return true;
+  }
+  stampRegularActionCooldown({ action, monsterName, campaignName })
+    .catch((e) => { console.error('[MonsterCardModal] Error stamping once-per-turn cooldown:', e); });
+  return false;
 }
 
 // MA-0275 chooser arm hoisted alongside the MA-1436 twin (§45 ceiling) —
@@ -2312,6 +2332,11 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const prerequisite = gate.prerequisite;
     const { refused, usesGate } = resolveAbilityUsesGate({ action, spellInfo, monsterName, campaignName, setPopupHtml });
     if (refused) return;
+    // MA-1868: regular-row once-per-turn cooldown (MA-0073 latch reuse) —
+    // refuses the SECOND press in the same turn window BEFORE any save is
+    // rolled; the stamp rides the successful press and clears at the
+    // monster's own turn-start (regainLegendaryUses).
+    if (oncePerTurnActionGate({ action, monsterName, campaignName, setPopupHtml })) return;
     // MA-0268: staged_roar row (Androsphinx Roar) — the Nth click resolves
     // ONLY the Nth roar's canonical legs, swapped by the persisted MA-0020
     // spend counter; byte-inert passthrough for every other row (legs hoisted
