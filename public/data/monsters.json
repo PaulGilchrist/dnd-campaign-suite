@@ -15798,7 +15798,12 @@
         "reach": "20 ft.",
         "attack_bonus": 18,
         "damage_dice_primary": "4d8 + 10",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "save_dc": 26,
+        "save_type": "Strength",
+        "dc_success": "none",
+        "save_effect": "The target is pulled 20 ft. toward Cthulhu and has the Grappled condition (escape DC 26).",
+        "escape_dc": 26
       },
       {
         "name": "Psychic Shatter",

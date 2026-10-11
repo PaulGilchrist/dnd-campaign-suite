@@ -8784,7 +8784,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +18, reach 20 ft. Hit: 28 (4d8 + 10) Bludgeoning damage. If the target is a Huge or smaller creature, it must succeed on a DC 26 Strength saving throw or be pulled 20 ft. toward Cthulhu and have the Grappled condition (escape DC 26). While Grappled this way, the target automatically takes 18 (4d8) Bludgeoning damage at the start of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1867-cthulhu-tentacles.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1868",
