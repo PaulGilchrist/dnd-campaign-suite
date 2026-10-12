@@ -13045,7 +13045,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Ladon fixes one target. Until the start of his next turn, his next Opportunity Attack against that target has +5 to hit.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1944-vigilant-watch-fix-target-plus5-oa-rider-inert.md"
     },
     {
       "id": "MA-2080",
@@ -13061,7 +13061,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +14, reach 5 ft. Hit: 11 (2d8 + 2) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1945",
@@ -13073,7 +13073,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Nidhogg makes two Bite attacks and one Claw attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1946",
@@ -13091,7 +13091,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 25 (3d10 + 9) Piercing damage. Plus 7 (2d6) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1947",
@@ -13107,7 +13107,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 22 (3d8 + 9) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1948",
@@ -13123,7 +13123,7 @@
       "damageDicePrimary": "12d10",
       "damageTypePrimary": "Necrotic",
       "description": "Constitution Saving Throw: DC 24, each creature within 60 ft. Failure: 66 (12d10) Necrotic damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1948-corpse-wind-recharge-name-text.md"
     },
     {
       "id": "MA-1949",
@@ -13136,7 +13136,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1950",
@@ -13148,7 +13148,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Bite attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1951",
@@ -13160,7 +13160,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Claw attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1952",
@@ -13172,7 +13172,7 @@
       "category": "legendary_actions",
       "actionType": "save",
       "description": "Nidhogg beats his wings, exhaling a blast of corpse-light wind: one creature within 60 ft. must succeed on a DC 24 Strength saving throw or take 18 (4d8) Necrotic damage and be pushed 30 ft.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1952-grave-gale-delegate-con12d10-drift.md"
     },
     {
       "id": "MA-1953",
@@ -13184,7 +13184,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Orcus makes three Wand of Orcus, Tail, or Necrotic Bolt attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1954",
@@ -13202,7 +13202,7 @@
       "damageTypeSecondary": "Necrotic",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +19, reach 10 ft. Hit: 24 (3d8 + 11) Bludgeoning damage. Plus 13 (2d12) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1955",
@@ -13220,7 +13220,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +16, reach 10 ft. Hit: 21 (3d8 + 8) Force damage. Plus 9 (2d8) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1956",
@@ -13236,7 +13236,7 @@
       "damageTypePrimary": "Necrotic",
       "range": "120 ft.",
       "description": "Ranged Attack Roll: +15, range 120 ft. Hit: 29 (5d8 + 7) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1957",
@@ -13250,7 +13250,7 @@
       "range": "300 ft.",
       "uses": 1,
       "description": "While holding the Wand of Orcus, Orcus conjures Undead creatures whose combined average Hit Points don't exceed 500. The creatures rise from the ground or form in unoccupied spaces within 300 ft. of him and obey his commands until destroyed or dismissed.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1958",
@@ -13264,7 +13264,7 @@
       "saveDc": 23,
       "saveType": "Wisdom",
       "description": "Orcus casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23): At Will: Detect Magic. 3/Day: Dispel Magic. 1/Day: Time Stop.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1958-orcus-spellcasting-plain-text-zero-chips.md"
     },
     {
       "id": "MA-1959",
@@ -13278,7 +13278,7 @@
       "saveDc": 18,
       "saveType": "Wisdom",
       "description": "While holding the Wand of Orcus, Orcus casts one of the following spells (spell save DC 18). The wand has 7 charges: At Will (no charge): Animate Dead, Blight, Speak with Dead. 1 Charge: Circle of Death. 2 Charges: Power Word Kill. It regains 1d4 + 3 charges daily at dawn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1959-wand-spellcasting-shell-live-charges-inert.md"
     },
     {
       "id": "MA-1960",
@@ -13291,7 +13291,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1961",
@@ -13303,7 +13303,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Orcus makes one Tail or Necrotic Bolt attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1962",
@@ -13315,7 +13315,7 @@
       "category": "legendary_actions",
       "actionType": "aoe-save",
       "description": "Area Effect: a 60-foot-tall, 10-foot-radius Cylinder of swirling necrotic energy rises from a point it can see within 100 ft. and lasts until the end of Orcus's next turn. Creatures in the area have Vulnerability to Necrotic damage. No saving throw, no damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1962-creeping-death-cost2-legendary-zone-inert.md"
     },
     {
       "id": "MA-1963",
@@ -13330,7 +13330,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "5 ft.",
       "description": "Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d8+4 Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0726",
@@ -17149,7 +17149,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The sphinx casts a spell from its list of prepared spells, using a spell slot as normal.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-0959",
@@ -18990,7 +18990,7 @@
         "poisoned"
       ],
       "description": "Constitution Saving Throw: DC 23, each creature in a 15-foot Emanation originating from the kraken while it is underwater. Failure: The target has the Blinded and Poisoned conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1059",
@@ -21914,7 +21914,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The mummy makes one Rotting Fist or Channel Negative Energy attack. Delegates to Rotting Fist (the primary damage attack it mirrors; the Channel Negative Energy alternative is GM-enforced at the delegate seam, MA-1057 twin).",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1207",
@@ -25232,7 +25232,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Quetzalcoatl makes one Bite attack and two Talon attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1968",
@@ -25248,7 +25248,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +16, reach 15 ft. Hit: 24 (3d10 + 8) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1969",
@@ -25264,7 +25264,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +16, reach 10 ft. Hit: 26 (4d8 + 8) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1970",
@@ -25284,7 +25284,7 @@
         "prone"
       ],
       "description": "Dexterity Saving Throw: DC 25, each creature in a 90-foot Cone. Failure: 70 (20d6) Thunder damage. Success: Half damage. The target is also knocked Prone and Deafened for 1 minute on a failed save.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1970-quetzalcoatl-hurricane-breath-recharge-rider-inert.md"
     },
     {
       "id": "MA-1971",
@@ -25301,7 +25301,7 @@
       "damageTypePrimary": "Thunder",
       "trigger": "When it is targeted by a ranged weapon attack.",
       "description": "It flares its feathered wings and gains +5 to AC against the attack, and the attacker must succeed on a DC 25 Dexterity saving throw or take 7 (2d6) Thunder damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1971-wing-defense-ac-rider-inert-half-success-leak.md"
     },
     {
       "id": "MA-1972",
@@ -25314,7 +25314,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1973",
@@ -25326,7 +25326,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Talon attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1974",
@@ -25338,7 +25338,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Quetzalcoatl makes one Perception check.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1974-detection-inert-ability-check-no-consumer.md"
     },
     {
       "id": "MA-1975",
@@ -25350,7 +25350,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Quetzalcoatl rides a sudden gale, teleporting 60 ft. to an unoccupied space he can see, then making one Talon attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1975-wind-step-spend2-teleport-talon-inert.md"
     },
     {
       "id": "MA-1376",
@@ -26791,7 +26791,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Scylla makes three Bite attacks, each against a different target.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1977",
@@ -26807,7 +26807,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +16, reach 15 ft. Hit: 30 (4d10 + 8) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1978",
@@ -26823,7 +26823,7 @@
       "damageDicePrimary": "10d10",
       "damageTypePrimary": "Piercing",
       "description": "Dexterity Saving Throw: DC 25, each creature within 30 ft. of her lair mouth. Failure: 55 (10d10) Piercing damage. Success: Half damage. A creature reduced to 0 Hit Points by this tide is dragged into the depths and consumed.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1978-blood-tide-recharge-name-text.md"
     },
     {
       "id": "MA-1979",
@@ -26836,7 +26836,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1980",
@@ -26848,7 +26848,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Bite attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1981",
@@ -26868,7 +26868,7 @@
         "restrained"
       ],
       "description": "One head lunges at a Grappled or Restrained creature. Melee Attack Roll: +16, reach 15 ft. Hit: 30 (4d10 + 8) Piercing damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1981-snatch-grapple-prerequisite-ungated.md"
     },
     {
       "id": "MA-1982",
@@ -26887,7 +26887,7 @@
         "deafened"
       ],
       "description": "Wisdom Saving Throw: DC 23, each enemy within 60 ft. Failure: 11 (2d10) Thunder damage and the target is Deafened for 1 minute. Success: half damage and not Deafened.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1982-shriek-deafened-rider-no-save-effect-field.md"
     },
     {
       "id": "MA-1447",
@@ -27110,7 +27110,7 @@
       "damageDicePrimary": "3d6",
       "damageTypePrimary": "Necrotic",
       "description": "The dragon uses Shadow Stealth (stealth advisory — GM moves the token into hiding; no stealth-consumer), and one creature of its choice that it can see within 10 feet of it takes 10 (3d6) Necrotic damage. The dragon can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1458",
@@ -27338,7 +27338,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The Simurgh makes two Talon attacks and one Beak attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1985",
@@ -27354,7 +27354,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 26 (4d8 + 8) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1986",
@@ -27370,7 +27370,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 24 (3d10 + 8) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1987",
@@ -27386,7 +27386,7 @@
       "damageDicePrimary": "12d10",
       "damageTypePrimary": "Radiant",
       "description": "Dexterity Saving Throw: DC 24, each creature in a 60-foot Cone the Simurgh chooses to burn. Failure: 66 (12d10) Radiant damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-MA-1987-purifying-blaze-recharge-name-text.md"
     },
     {
       "id": "MA-1988",
