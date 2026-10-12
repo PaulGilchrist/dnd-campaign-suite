@@ -26879,7 +26879,8 @@
         "restrained"
       ],
       "description": "One head lunges at a Grappled or Restrained creature. Melee Attack Roll: +16, reach 15 ft. Hit: 30 (4d10 + 8) Piercing damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1981-snatch-grapple-prerequisite-ungated.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1982",

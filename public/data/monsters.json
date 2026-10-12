@@ -58088,7 +58088,13 @@
         "attack_bonus": 16,
         "reach": "15 ft.",
         "damage_dice_primary": "4d10 + 8",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "target_prerequisite": {
+          "conditions": [
+            "grappled",
+            "restrained"
+          ]
+        }
       },
       {
         "name": "Shriek (Costs 2 Actions)",
