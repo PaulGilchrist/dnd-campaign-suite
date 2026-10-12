@@ -13124,7 +13124,8 @@
       "damageDicePrimary": "12d10",
       "damageTypePrimary": "Necrotic",
       "description": "Constitution Saving Throw: DC 24, each creature within 60 ft. Failure: 66 (12d10) Necrotic damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1948-corpse-wind-recharge-name-text.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1949",
