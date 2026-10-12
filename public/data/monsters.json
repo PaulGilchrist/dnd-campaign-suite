@@ -54359,6 +54359,10 @@
       },
       {
         "name": "Detection",
+        "ability_check": {
+          "ability": "wisdom",
+          "skill": "perception"
+        },
         "description": "Quetzalcoatl makes one Perception check."
       },
       {

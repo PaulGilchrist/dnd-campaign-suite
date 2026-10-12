@@ -25346,7 +25346,8 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Quetzalcoatl makes one Perception check.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1974-detection-inert-ability-check-no-consumer.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1975",
