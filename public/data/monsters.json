@@ -24847,6 +24847,8 @@
       {
         "name": "Climbing Dash (Costs 2 Actions)",
         "delegates_to": null,
+        "advisory": "climbing_dash",
+        "advisory_message": "Kong moves up to his Speed without provoking Opportunity Attacks, climbing or swinging, and can make one Slam attack at any point along the path — GM-enforced movement; resolve any optional mid-path Slam as a separate Slam action (GM-enforced).",
         "description": "Kong moves up to his Speed without provoking Opportunity Attacks, climbing or swinging, and can make one Slam attack at any point along the path."
       }
     ],

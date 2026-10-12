@@ -12921,8 +12921,8 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Kong moves up to his Speed without provoking Opportunity Attacks, climbing or swinging, and can make one Slam attack at any point along the path.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1936-climbing-dash-silent-burn.md",
-      "lastTouched": "verify-2026-10-11"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1937",
