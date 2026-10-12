@@ -26899,7 +26899,8 @@
         "deafened"
       ],
       "description": "Wisdom Saving Throw: DC 23, each enemy within 60 ft. Failure: 11 (2d10) Thunder damage and the target is Deafened for 1 minute. Success: half damage and not Deafened.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1982-shriek-deafened-rider-no-save-effect-field.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1447",

@@ -58102,7 +58102,8 @@
         "save_dc": 23,
         "save_type": "Wisdom",
         "damage_dice_primary": "2d10",
-        "damage_type_primary": "Thunder"
+        "damage_type_primary": "Thunder",
+        "save_effect": "The target is Deafened for 1 minute."
       }
     ],
     "lair_actions": [],
