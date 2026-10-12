@@ -24678,8 +24678,13 @@
       },
       {
         "name": "Capsize (Costs 2 Actions)",
-        "delegates_to": "Tail",
-        "description": "Jormungandr thrashes the water beneath a vehicle or structure. Each creature within 30 ft. of it must succeed on a DC 25 Strength saving throw or fall Prone and take 18 (4d8) Bludgeoning damage."
+        "description": "Jormungandr thrashes the water beneath a vehicle or structure. Each creature within 30 ft. of it must succeed on a DC 25 Strength saving throw or fall Prone and take 18 (4d8) Bludgeoning damage.",
+        "save_dc": 25,
+        "save_type": "Strength",
+        "damage_dice_primary": "4d8",
+        "damage_type_primary": "Bludgeoning",
+        "dc_success": "none",
+        "save_effect": "The target falls Prone and takes 18 (4d8) Bludgeoning damage."
       }
     ],
     "lair_actions": [],

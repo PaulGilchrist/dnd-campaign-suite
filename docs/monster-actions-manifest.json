@@ -12794,8 +12794,8 @@
         "prone"
       ],
       "description": "Jormungandr thrashes the water beneath a vehicle or structure. Each creature within 30 ft. of it must succeed on a DC 25 Strength saving throw or fall Prone and take 18 (4d8) Bludgeoning damage.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1928-capsize-delegates-attack-pool.md",
-      "lastTouched": "verify-2026-10-11"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1929",
