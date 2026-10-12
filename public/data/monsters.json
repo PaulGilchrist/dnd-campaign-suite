@@ -24803,7 +24803,12 @@
         "reach": "10 ft.",
         "attack_bonus": 17,
         "damage_dice_primary": "3d10 + 10",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "save_dc": 25,
+        "save_type": "Strength",
+        "dc_success": "none",
+        "save_effect": "On a failed save the target has the Grappled condition (escape DC 25) and is Restrained until Kong's next turn.",
+        "escape_dc": 25
       },
       {
         "name": "Thunder Roar (Recharge 5-6)",

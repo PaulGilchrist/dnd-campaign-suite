@@ -12845,8 +12845,8 @@
         "restrained"
       ],
       "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 26 (3d10 + 10) Bludgeoning damage. If the target is a Huge or smaller creature, it must succeed on a DC 25 Strength saving throw or have the Grappled condition (escape DC 25) and be Restrained until Kong's next turn.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1931-grab-save-rider-absent.md",
-      "lastTouched": "verify-2026-10-11"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1932",
