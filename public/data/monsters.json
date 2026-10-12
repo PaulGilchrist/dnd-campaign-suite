@@ -24520,7 +24520,8 @@
         "save_dc": 25,
         "description": "Constitution Saving Throw: DC 25, each creature within 30 ft. Failure: 56 (16d6) Radiant damage. Success: Half damage. Failure: the target also has the Poisoned condition for 1 minute.",
         "damage_dice_primary": "16d6",
-        "damage_type_primary": "Radiant"
+        "damage_type_primary": "Radiant",
+        "save_effect": "Failure: the target also has the Poisoned condition for 1 minute."
       }
     ],
     "lair_actions": [],

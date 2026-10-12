@@ -12662,8 +12662,8 @@
         "poisoned"
       ],
       "description": "Constitution Saving Throw: DC 25, each creature within 30 ft. Failure: 56 (16d6) Radiant damage. Success: Half damage. Failure: the target also has the Poisoned condition for 1 minute.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1920-godzilla-nuclear-pulse-poison-not-granted.md",
-      "lastTouched": "verify-2026-10-11"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1921",
