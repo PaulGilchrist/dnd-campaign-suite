@@ -59504,6 +59504,7 @@
         "name": "Purifying Blaze (Recharge 5-6)",
         "save_type": "Dexterity",
         "save_dc": 24,
+        "recharge": "5-6",
         "description": "Dexterity Saving Throw: DC 24, each creature in a 60-foot Cone the Simurgh chooses to burn. Failure: 66 (12d10) Radiant damage. Success: Half damage.",
         "damage_dice_primary": "12d10",
         "damage_type_primary": "Radiant"

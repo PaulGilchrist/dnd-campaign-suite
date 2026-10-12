@@ -27399,7 +27399,8 @@
       "damageDicePrimary": "12d10",
       "damageTypePrimary": "Radiant",
       "description": "Dexterity Saving Throw: DC 24, each creature in a 60-foot Cone the Simurgh chooses to burn. Failure: 66 (12d10) Radiant damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1987-purifying-blaze-recharge-name-text.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1988",
