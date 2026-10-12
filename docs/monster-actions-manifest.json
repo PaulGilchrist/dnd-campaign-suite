@@ -13045,7 +13045,8 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Ladon fixes one target. Until the start of his next turn, his next Opportunity Attack against that target has +5 to hit.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1944-vigilant-watch-fix-target-plus5-oa-rider-inert.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-2080",

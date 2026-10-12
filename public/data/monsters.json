@@ -25009,6 +25009,8 @@
       {
         "name": "Vigilant Watch (Costs 2 Actions)",
         "delegates_to": null,
+        "advisory": "vigilant_watch",
+        "advisory_message": "Ladon fixes one target. Until the start of his next turn, his next Opportunity Attack against that target has +5 to hit — GM-enforced; no fixed-target or monster Opportunity Attack consumer exists in the app.",
         "description": "Ladon fixes one target. Until the start of his next turn, his next Opportunity Attack against that target has +5 to hit."
       }
     ],
