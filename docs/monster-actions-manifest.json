@@ -12731,8 +12731,8 @@
       "damageDicePrimary": "26d6",
       "damageTypePrimary": "Poison",
       "description": "Constitution Saving Throw: DC 27, each creature within 90 ft. of the water's surface. Failure: 91 (26d6) Poison damage. Success: Half damage.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1924-recharge-name-text.md",
-      "lastTouched": "verify-2026-10-11"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1925",

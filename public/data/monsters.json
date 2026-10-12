@@ -24646,6 +24646,7 @@
         "name": "Venomous Surge (Recharge 5-6)",
         "save_type": "Constitution",
         "save_dc": 27,
+        "recharge": "5-6",
         "description": "Constitution Saving Throw: DC 27, each creature within 90 ft. of the water's surface. Failure: 91 (26d6) Poison damage. Success: Half damage.",
         "damage_dice_primary": "26d6",
         "damage_type_primary": "Poison"
