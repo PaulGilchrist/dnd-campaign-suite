@@ -12778,8 +12778,8 @@
         "poisoned"
       ],
       "description": "Ranged Attack Roll: +17, range 60 ft., one target. Hit: 18 (4d8+1) Poison damage and the target has the Poisoned condition until the end of its next turn.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1927-poisoned-conditions-key.md",
-      "lastTouched": "verify-2026-10-11"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1928",

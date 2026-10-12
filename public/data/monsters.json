@@ -24672,7 +24672,7 @@
         "range": "60 ft.",
         "damage_dice_primary": "4d8 + 1",
         "damage_type_primary": "Poison",
-        "conditions": [
+        "hit_conditions": [
           "poisoned"
         ]
       },
