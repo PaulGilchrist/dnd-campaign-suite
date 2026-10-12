@@ -54367,6 +54367,7 @@
       },
       {
         "name": "Wind Step (Costs 2 Actions)",
+        "delegates_to": "Talon",
         "description": "Quetzalcoatl rides a sudden gale, teleporting 60 ft. to an unoccupied space he can see, then making one Talon attack."
       }
     ],

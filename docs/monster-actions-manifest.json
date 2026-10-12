@@ -25359,7 +25359,8 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Quetzalcoatl rides a sudden gale, teleporting 60 ft. to an unoccupied space he can see, then making one Talon attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1975-wind-step-spend2-teleport-talon-inert.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1376",

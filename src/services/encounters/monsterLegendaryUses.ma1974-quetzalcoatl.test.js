@@ -49,7 +49,8 @@ describe('MA-1974 disk fingerprint: Detection ability_check authored', () => {
     expect(TALON.delegates_to).toBe('Talon');
     expect(TALON.ability_check).toBeUndefined();
     expect(WIND_STEP.ability_check).toBeUndefined();
-    expect(WIND_STEP.delegates_to).toBeUndefined();
+    // MA-1975 same-pass pin flip: Wind Step now delegates its Talon leg.
+    expect(WIND_STEP.delegates_to).toBe('Talon');
     expect(LEGENDARY.length).toBe(4);
   });
 
