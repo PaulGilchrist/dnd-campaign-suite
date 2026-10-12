@@ -25468,6 +25468,8 @@
       },
       {
         "name": "Creeping Death (Costs 2 Actions)",
+        "advisory": "creeping_death",
+        "advisory_message": "Area Effect: a 60-foot-tall, 10-foot-radius Cylinder of swirling necrotic energy rises from a point Orcus can see within 100 ft. and lasts until the end of his next turn. Creatures in the area have Vulnerability to Necrotic damage — GM-enforced; no cylinder-zone or vulnerability consumer exists in the app. No saving throw, no damage.",
         "description": "Area Effect: a 60-foot-tall, 10-foot-radius Cylinder of swirling necrotic energy rises from a point it can see within 100 ft. and lasts until the end of Orcus's next turn. Creatures in the area have Vulnerability to Necrotic damage. No saving throw, no damage."
       }
     ],

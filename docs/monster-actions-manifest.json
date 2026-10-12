@@ -13320,7 +13320,8 @@
       "category": "legendary_actions",
       "actionType": "aoe-save",
       "description": "Area Effect: a 60-foot-tall, 10-foot-radius Cylinder of swirling necrotic energy rises from a point it can see within 100 ft. and lasts until the end of Orcus's next turn. Creatures in the area have Vulnerability to Necrotic damage. No saving throw, no damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1962-creeping-death-cost2-legendary-zone-inert.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1963",
