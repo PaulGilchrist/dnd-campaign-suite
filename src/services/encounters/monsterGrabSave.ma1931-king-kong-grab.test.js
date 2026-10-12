@@ -104,6 +104,6 @@ describe('MA-1931 disk fingerprint: King Kong Grab save half armed (DATA fix)', 
     expect(roar.name).toBe('Thunder Roar (Recharge 5-6)');
     expect(roar.save_dc).toBe(23);
     expect(roar.save_type).toBe('Wisdom');
-    expect(roar.recharge).toBeUndefined(); // MA-1932 stays this row's neighbor, untouched
+    expect(roar.recharge).toBe('5-6'); // MA-1932 fixed same-family pass: recharge lane armed (fingerprint spec: monsterRecharge.ma1932-king-kong-thunder-roar.test.js)
   });
 });

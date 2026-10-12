@@ -24814,11 +24814,13 @@
         "name": "Thunder Roar (Recharge 5-6)",
         "save_type": "Wisdom",
         "save_dc": 23,
+        "recharge": "5-6",
+        "dc_success": "none",
         "description": "Wisdom Saving Throw: DC 23, each creature within 60 ft. that can hear Kong. Failure: the target has the Frightened condition until the end of its next turn. Success: no effect. No damage.",
         "conditions": [
           "frightened"
         ],
-        "save_effect": "Failure: the target has the Frightened condition until the end of its next turn. Success: half damage and not Frightened."
+        "save_effect": "Failure: the target has the Frightened condition until the end of its next turn. Success: no effect."
       }
     ],
     "bonus_actions": [],

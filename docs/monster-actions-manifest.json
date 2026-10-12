@@ -12864,8 +12864,8 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 23, each creature within 60 ft. that can hear Kong. Failure: the target has the Frightened condition until the end of its next turn. Success: no effect. No damage.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1932-thunder-roar-recharge-name-text.md",
-      "lastTouched": "verify-2026-10-11"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1933",
