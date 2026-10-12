@@ -13174,7 +13174,8 @@
       "category": "legendary_actions",
       "actionType": "save",
       "description": "Nidhogg beats his wings, exhaling a blast of corpse-light wind: one creature within 60 ft. must succeed on a DC 24 Strength saving throw or take 18 (4d8) Necrotic damage and be pushed 30 ft.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1952-grave-gale-delegate-con12d10-drift.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1953",

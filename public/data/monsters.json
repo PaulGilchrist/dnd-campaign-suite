@@ -25262,7 +25262,12 @@
       {
         "name": "Grave Gale (Costs 2 Actions)",
         "delegates_to": "Corpse Wind (Recharge 5-6)",
-        "description": "Nidhogg beats his wings, exhaling a blast of corpse-light wind: one creature within 60 ft. must succeed on a DC 24 Strength saving throw or take 18 (4d8) Necrotic damage and be pushed 30 ft."
+        "description": "Nidhogg beats his wings, exhaling a blast of corpse-light wind: one creature within 60 ft. must succeed on a DC 24 Strength saving throw or take 18 (4d8) Necrotic damage and be pushed 30 ft.",
+        "save_dc": 24,
+        "save_type": "Strength",
+        "damage_dice_primary": "4d8",
+        "damage_type_primary": "Necrotic",
+        "dc_success": "none"
       }
     ],
     "lair_actions": [],
