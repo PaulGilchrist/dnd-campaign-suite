@@ -12992,8 +12992,8 @@
         "unconscious"
       ],
       "description": "Constitution Saving Throw: DC 23, each creature in a 60-foot Cone. Failure: the target has the Unconscious condition until the end of its next turn, repeating the saving throw at the end of each of its turns to end the effect early. Success: no effect. No damage.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1940-sleeping-mist-recharge-name-text.md",
-      "lastTouched": "verify-2026-10-11"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1941",

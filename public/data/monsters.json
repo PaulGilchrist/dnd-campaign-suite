@@ -24980,6 +24980,7 @@
         "name": "Sleeping Mist (Recharge 5-6)",
         "save_type": "Constitution",
         "save_dc": 23,
+        "recharge": "5-6",
         "description": "Constitution Saving Throw: DC 23, each creature in a 60-foot Cone. Failure: the target has the Unconscious condition until the end of its next turn, repeating the saving throw at the end of each of its turns to end the effect early. Success: no effect. No damage.",
         "save_effect": "Failure: the target has the Unconscious condition until the end of its next turn, repeating the save at the end of each of its turns. Success: it isn't affected. No damage.",
         "conditions": [
