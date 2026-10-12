@@ -371,7 +371,26 @@ function AdvisoryLink({ action, attackerCannotAct, onAdvisoryRow, legendaryGate 
 // Wall"). Hoisted out of MonsterAction to hold the complexity ceiling — the
 // three-way choice (Spellcasting markup → spells.json-resolved utility names
 // → generic save-shell) lives here, byte-inert for every non-utility row.
-function SpellOrSaveLinks({ action, isSpellcastingRow, utilityNames, attackerCannotAct, onSpellCast, onSaveRoll, spellUsesUsed, rechargeOut }) {
+// MA-1959: non-"Spellcasting"-named spell-LIST row with numeric save_dc
+// (Orcus "Wand Spellcasting") — the row-name XOR at :422 left the marked
+// spell names inert plain text while the generic ActionSaveRoll shell was
+// LIVE, silently substituting a bare no-effect save for a spell cast. The
+// canonical spell-selection idiom "casts one of the following spells" arms
+// SpellCastLinks ALONGSIDE the shell (chip+shell coexist): chips feed the
+// MA-1879 cast lane (spells.json payload; the row's numeric save_dc rides
+// every cast per the MA-0576 pair; charge tiers "1 Charge/2 Charges/7
+// charges/regains 1d4+3" stay ADVISORY text — §70 codified: no charge-pool
+// producer/consumer exists, so chips are ungated fire-by-design like the
+// At-Will family). Rows without the idiom extract [] → SpellCastLinks null
+// → the shell fragment is DOM-byte-identical (whole-DB census: Wand
+// Spellcasting is the ONLY non-"Spellcasting"-named row carrying the
+// idiom + <strong>/<em>-marked spell names + numeric save_dc).
+function spellListNamesForSaveRow(action) {
+  if (!/one of the following spells/i.test(action.description || '')) return [];
+  return extractSpellNamesFromSpellcasting(action.description);
+}
+
+function SpellOrSaveLinks({ action, isSpellcastingRow, utilityNames, spellListNames, attackerCannotAct, onSpellCast, onSaveRoll, spellUsesUsed, rechargeOut }) {
   if (isSpellcastingRow) {
     return <SpellCastLinks action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} />;
   }
@@ -397,7 +416,16 @@ function SpellOrSaveLinks({ action, isSpellcastingRow, utilityNames, attackerCan
   if (getGatedMonsterReaction(action)) return null;
   // MA-1071: DC0 decoy never arms the save shell (MA-0551 >0 convention twin).
   if (Number(action.save_dc) > 0) {
-    return <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} rechargeOut={rechargeOut} />;
+    // MA-1959 chip+shell coexistence (see spellListNamesForSaveRow): the
+    // five marked spell names render spell chips BEFORE the untouched
+    // DC shell; non-idiom rows pass spellNames=[] → SpellCastLinks null →
+    // byte-identical single-shell output.
+    return (
+      <>
+        <SpellCastLinks action={action} spellUsesUsed={spellUsesUsed} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} spellNames={spellListNames} />
+        <ActionSaveRoll action={action} attackerCannotAct={attackerCannotAct} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} rechargeOut={rechargeOut} />
+      </>
+    );
   }
   return null;
 }
@@ -411,6 +439,14 @@ function utilitySpellNamesFor(action, spellNameIndex) {
   return extractSpellNamesFromSpellcasting(action.description).filter(name => spellNameIndex.has(name));
 }
 
+// MA-1959 (complexity hoist, §45): the legendary-existence of BOTH spell-name
+// arms — gated rows stay byte-identical on their sole press surface (MA-0694
+// utility-lane precedent byte-shape, extended to the spell-list fork).
+function gatedSpellNamesFor(action, legendaryGate, spellNameIndex) {
+  if (legendaryGate) return { utilityNames: [], spellListNames: [] };
+  return { utilityNames: utilitySpellNamesFor(action, spellNameIndex), spellListNames: spellListNamesForSaveRow(action) };
+}
+
 export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDamage, onSaveRoll, onSpellCast, spellUsesUsed = {}, reactionUsesUsed, onGatedReaction, legendaryGate, rechargeState = {}, onZoneAuraRow, onSummonRow, onSelfBuffRow, onGrantReactionRow, onShapeShiftRow, onZonePickerRow, onAdvisoryRow, spellNameIndex = null }) {
   const actionHasAttack = action.attack_bonus != null;
   // MA-0031: recharge rows track spend/recharge state in the monsterRecharge
@@ -420,9 +456,11 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
   const actionDamageType = action?.damage_type_primary ? [action.damage_type_primary] : [];
   const actionDamageTypeLabel = formatDamageTypeList(actionDamageType);
   const isSpellcastingRow = /^spellcasting$/i.test(action.name || '');
-  // MA-1014: the utility-spell arm excludes legendary-gated rows — those
-  // ride the single "Expend Legendary" chip economy (MA-0694 precedent).
-  const utilityNames = legendaryGate ? [] : utilitySpellNamesFor(action, spellNameIndex);
+  // MA-1014/MA-1959: both spell-name arms exclude legendary-gated rows —
+  // those ride the single "Expend Legendary" chip economy (MA-0694 precedent).
+  // Hoisted to hold the §45 complexity ceiling (the two inline ternaries
+  // pushed MonsterAction to 16); every row byte-identical.
+  const { utilityNames, spellListNames } = gatedSpellNamesFor(action, legendaryGate, spellNameIndex);
   const usageText = formatActionUsage(action.usage);
 
   return (
@@ -444,7 +482,7 @@ export function MonsterAction({ action, index, attackerCannotAct, onAttack, onDa
         </span>
       )}
       <ActionDamageLinks action={action} actionDamageFormula={actionDamageFormula} actionDamageTypeLabel={actionDamageTypeLabel} onDamage={onDamage} />
-      <SpellOrSaveLinks action={action} isSpellcastingRow={isSpellcastingRow} utilityNames={utilityNames} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} rechargeOut={rechargeOut} />
+      <SpellOrSaveLinks action={action} isSpellcastingRow={isSpellcastingRow} utilityNames={utilityNames} spellListNames={spellListNames} attackerCannotAct={attackerCannotAct} onSpellCast={onSpellCast} onSaveRoll={onSaveRoll} spellUsesUsed={spellUsesUsed} rechargeOut={rechargeOut} />
       <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }} />
       <GatedReactionSlot action={action} attackerCannotAct={attackerCannotAct} reactionUsesUsed={reactionUsesUsed} onGatedReaction={onGatedReaction} />
       {usageText && <em> ({usageText})</em>}

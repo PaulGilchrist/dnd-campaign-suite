@@ -13282,7 +13282,8 @@
       "saveDc": 18,
       "saveType": "Wisdom",
       "description": "While holding the Wand of Orcus, Orcus casts one of the following spells (spell save DC 18). The wand has 7 charges: At Will (no charge): Animate Dead, Blight, Speak with Dead. 1 Charge: Circle of Death. 2 Charges: Power Word Kill. It regains 1d4 + 3 charges daily at dawn.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1959-wand-spellcasting-shell-live-charges-inert.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1960",
