@@ -54341,6 +54341,7 @@
         "description": "It flares its feathered wings and gains +5 to AC against the attack, and the attacker must succeed on a DC 25 Dexterity saving throw or take 7 (2d6) Thunder damage.",
         "save_dc": 25,
         "save_type": "Dexterity",
+        "dc_success": "none",
         "damage_dice_primary": "2d6",
         "damage_type_primary": "Thunder"
       }

@@ -25308,7 +25308,8 @@
       "damageTypePrimary": "Thunder",
       "trigger": "When it is targeted by a ranged weapon attack.",
       "description": "It flares its feathered wings and gains +5 to AC against the attack, and the attacker must succeed on a DC 25 Dexterity saving throw or take 7 (2d6) Thunder damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1971-wing-defense-ac-rider-inert-half-success-leak.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1972",
