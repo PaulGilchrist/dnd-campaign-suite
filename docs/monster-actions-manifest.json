@@ -13267,7 +13267,8 @@
       "saveDc": 23,
       "saveType": "Wisdom",
       "description": "Orcus casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23): At Will: Detect Magic. 3/Day: Dispel Magic. 1/Day: Time Stop.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1958-orcus-spellcasting-plain-text-zero-chips.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1959",
