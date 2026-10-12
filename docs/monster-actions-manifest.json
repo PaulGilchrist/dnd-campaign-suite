@@ -25290,7 +25290,8 @@
         "prone"
       ],
       "description": "Dexterity Saving Throw: DC 25, each creature in a 90-foot Cone. Failure: 70 (20d6) Thunder damage. Success: Half damage. The target is also knocked Prone and Deafened for 1 minute on a failed save.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1970-quetzalcoatl-hurricane-breath-recharge-rider-inert.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1971",

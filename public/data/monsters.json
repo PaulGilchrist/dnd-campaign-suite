@@ -54326,9 +54326,11 @@
         "name": "Hurricane Breath (Recharge 5-6)",
         "save_type": "Dexterity",
         "save_dc": 25,
+        "recharge": "5-6",
         "description": "Dexterity Saving Throw: DC 25, each creature in a 90-foot Cone. Failure: 70 (20d6) Thunder damage. Success: Half damage. The target is also knocked Prone and Deafened for 1 minute on a failed save.",
         "damage_dice_primary": "20d6",
-        "damage_type_primary": "Thunder"
+        "damage_type_primary": "Thunder",
+        "save_effect": "The target is also knocked Prone and Deafened for 1 minute on a failed save."
       }
     ],
     "bonus_actions": [],
