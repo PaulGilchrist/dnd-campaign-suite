@@ -24969,7 +24969,12 @@
         "damage_type_primary": "Bludgeoning",
         "hit_conditions": [
           "grappled"
-        ]
+        ],
+        "escape_dc": 22,
+        "grapple_ongoing_damage": {
+          "dice": "4d8",
+          "damage_type": "Bludgeoning"
+        }
       },
       {
         "name": "Sleeping Mist (Recharge 5-6)",

@@ -12973,8 +12973,8 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +15, reach 10 ft., one Huge or smaller creature. Hit: 25 (4d8 + 8) Bludgeoning damage and the target has the Grappled condition (escape DC 22). Ladon has five coils; each Grappled target is held by a separate coil. While Grappled this way, a target takes 18 (4d8) Bludgeoning damage at the start of its turn.",
-      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1939-constrict-escape-dc-and-coil-tick-absent.md",
-      "lastTouched": "verify-2026-10-11"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1940",
