@@ -12616,7 +12616,8 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1918",
@@ -12628,7 +12629,8 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Bite attack.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1919",
@@ -12640,7 +12642,8 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Tail attack.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1920",
@@ -12659,7 +12662,8 @@
         "poisoned"
       ],
       "description": "Constitution Saving Throw: DC 25, each creature within 30 ft. Failure: 56 (16d6) Radiant damage. Success: Half damage. Failure: the target also has the Poisoned condition for 1 minute.",
-      "verified": "not verified"
+      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1920-godzilla-nuclear-pulse-poison-not-granted.md",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1921",
@@ -12671,7 +12675,8 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Jormungandr makes two Bite attacks and one Tail attack.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1922",
@@ -12689,7 +12694,8 @@
       "damageTypeSecondary": "Poison",
       "reach": "25 ft.",
       "description": "Melee Attack Roll: +19, reach 25 ft. Hit: 37 (5d10 + 10) Piercing damage. Plus 27 (6d8) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1923",
@@ -12708,7 +12714,8 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +19, reach 30 ft. Hit: 34 (4d12 + 9) Bludgeoning damage. The target has the Prone condition.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1924",
@@ -12724,7 +12731,8 @@
       "damageDicePrimary": "26d6",
       "damageTypePrimary": "Poison",
       "description": "Constitution Saving Throw: DC 27, each creature within 90 ft. of the water's surface. Failure: 91 (26d6) Poison damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1924-recharge-name-text.md",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1925",
@@ -12737,7 +12745,8 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1926",
@@ -12749,7 +12758,8 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Bite attack.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1927",
@@ -12768,7 +12778,8 @@
         "poisoned"
       ],
       "description": "Ranged Attack Roll: +17, range 60 ft., one target. Hit: 18 (4d8+1) Poison damage and the target has the Poisoned condition until the end of its next turn.",
-      "verified": "not verified"
+      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1927-poisoned-conditions-key.md",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1928",
@@ -12783,7 +12794,8 @@
         "prone"
       ],
       "description": "Jormungandr thrashes the water beneath a vehicle or structure. Each creature within 30 ft. of it must succeed on a DC 25 Strength saving throw or fall Prone and take 18 (4d8) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1928-capsize-delegates-attack-pool.md",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1929",
@@ -12795,7 +12807,8 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Kong makes three Slam attacks. If a Slam hits a creature, he can replace one of his remaining attacks with a Grab.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1930",
@@ -12811,7 +12824,8 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 26 (3d10 + 10) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1931",
@@ -12831,7 +12845,8 @@
         "restrained"
       ],
       "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 26 (3d10 + 10) Bludgeoning damage. If the target is a Huge or smaller creature, it must succeed on a DC 25 Strength saving throw or have the Grappled condition (escape DC 25) and be Restrained until Kong's next turn.",
-      "verified": "not verified"
+      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1931-grab-save-rider-absent.md",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1932",
@@ -12849,7 +12864,8 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 23, each creature within 60 ft. that can hear Kong. Failure: the target has the Frightened condition until the end of its next turn. Success: no effect. No damage.",
-      "verified": "not verified"
+      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1932-thunder-roar-recharge-name-text.md",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1933",
@@ -12862,7 +12878,8 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1934",
@@ -12874,7 +12891,8 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Slam attack.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1935",
@@ -12890,7 +12908,8 @@
       "damageTypePrimary": "Bludgeoning",
       "range": "90 ft.",
       "description": "Ranged Attack Roll: +17, range 90 ft. Hit: 26 (3d10 + 10) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1936",
@@ -12902,7 +12921,8 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Kong moves up to his Speed without provoking Opportunity Attacks, climbing or swinging, and can make one Slam attack at any point along the path.",
-      "verified": "not verified"
+      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1936-climbing-dash-silent-burn.md",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1937",
@@ -12914,7 +12934,8 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Ladon makes two Bite attacks and one Constrict attack.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1938",
@@ -12932,7 +12953,8 @@
       "damageTypeSecondary": "Poison",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 26 (4d8 + 8) Piercing damage. Plus 14 (4d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1939",
@@ -12951,7 +12973,8 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +15, reach 10 ft., one Huge or smaller creature. Hit: 25 (4d8 + 8) Bludgeoning damage and the target has the Grappled condition (escape DC 22). Ladon has five coils; each Grappled target is held by a separate coil. While Grappled this way, a target takes 18 (4d8) Bludgeoning damage at the start of its turn.",
-      "verified": "not verified"
+      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1939-constrict-escape-dc-and-coil-tick-absent.md",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1940",
@@ -12969,7 +12992,8 @@
         "unconscious"
       ],
       "description": "Constitution Saving Throw: DC 23, each creature in a 60-foot Cone. Failure: the target has the Unconscious condition until the end of its next turn, repeating the saving throw at the end of each of its turns to end the effect early. Success: no effect. No damage.",
-      "verified": "not verified"
+      "verified": "broken \u2014 see .opencode/plans/bug-mon-MA-1940-sleeping-mist-recharge-name-text.md",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1941",
@@ -12982,7 +13006,8 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1942",
@@ -12994,7 +13019,8 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Bite attack.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1943",
@@ -13006,7 +13032,8 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "One of Ladon's coils makes a Constrict attack.",
-      "verified": "not verified"
+      "verified": "verified",
+      "lastTouched": "verify-2026-10-11"
     },
     {
       "id": "MA-1944",
