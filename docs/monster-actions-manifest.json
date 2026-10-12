@@ -26833,7 +26833,8 @@
       "damageDicePrimary": "10d10",
       "damageTypePrimary": "Piercing",
       "description": "Dexterity Saving Throw: DC 25, each creature within 30 ft. of her lair mouth. Failure: 55 (10d10) Piercing damage. Success: Half damage. A creature reduced to 0 Hit Points by this tide is dragged into the depths and consumed.",
-      "verified": "broken — see .opencode/plans/bug-mon-MA-1978-blood-tide-recharge-name-text.md"
+      "verified": "verified",
+      "lastTouched": "fix-2026-10-12"
     },
     {
       "id": "MA-1979",
