@@ -75,6 +75,11 @@ export function createCreatureHandlers({
                     setRuntimeValue(creature.name, 'dreadAmbushSpeedActive', null, campaignName)
                 }
             }
+            // no-timers T4: Clear restarts combat — combat-scoped effects of
+            // the old combat end here too (enforcement off ⇒ zero writes).
+            import('../../services/rules/effects/zoneDurationClock.js')
+                .then((m) => m.sweepNewCombatClocks(campaignName))
+                .catch((e) => { console.error('[handleClear:new-combat-sweep]', e) })
         }
     }
 
