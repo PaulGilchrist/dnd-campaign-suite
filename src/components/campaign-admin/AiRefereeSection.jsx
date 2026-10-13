@@ -54,7 +54,7 @@ export default function AiRefereeSection({ campaignName, characters = [] }) {
 
     return (
         <div className="admin-section ai-referee-section">
-            <h3><i className="fas fa-robot"></i> Level 5 — AI Referee <AiStatusBadge status={status} /></h3>
+            <h3><i className="fas fa-robot"></i> AI Referee <AiStatusBadge status={status} /></h3>
             <AiConfigRow aiConfig={aiConfig} onSave={saveConfig} onRemove={removeConfig} />
             {notice && <div className="ai-notice ai-notice--error" role="alert">{notice}</div>}
             {live && <AiAskConsole campaignName={campaignName} characters={characters} aiConfig={aiConfig} enforcement={enforcement} />}

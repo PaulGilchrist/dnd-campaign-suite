@@ -88,7 +88,7 @@ const APPLIERS = {
     target_effect: applyTargetEffect,
     hp_change: applyHpChange,
     async automation({ ruling }) {
-        return { applied: false, detail: `automation '${ruling.actionName}' is surfaced, not auto-run (P3 parked) — run it on the action's own lane` }
+        return { applied: false, detail: `automation '${ruling.actionName}' is proposed, not auto-run — run it on the action's own lane` }
     },
     async needs_human({ ruling }) {
         return { applied: false, detail: ruling.text }

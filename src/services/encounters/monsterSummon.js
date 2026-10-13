@@ -94,7 +94,7 @@ function summonDurationTail({ action, plural, durationMinutes, campaignName }) {
     // L5-003 §8.3 + no-timers T3: authored minute durations are now
     // COMBAT-SCOPED while zones enforcement is live — no round countdown.
     if (zonesClockEnforcementLive(campaignName)) {
-      return { sep: ', ', tail: `${plural ? 'remain' : 'remains'} ${durationMinutes} minutes (combat-scoped — despawn when this combat ends, swept at the next initiative roll or a rest; enforcement: zones; dismiss-as-action is a §70 residual).` };
+      return { sep: ', ', tail: `${plural ? 'remain' : 'remains'} ${durationMinutes} minutes (combat-scoped — despawn when this combat ends, swept at the next initiative roll or a rest; enforcement: zones; dismissing early stays with the GM).` };
     }
     return { sep: ', ', tail: `${plural ? 'remain' : 'remains'} ${durationMinutes} minutes (expiry clock, dismiss-as-action and "can't summon other ${plural ? 'creatures' : 'creature'}" are §70 GM-enforced residuals).` };
   }

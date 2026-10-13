@@ -31,7 +31,7 @@ export default function EnforcementSection({ campaignName, characters = [] }) {
 
     return (
         <div className="admin-section enforcement-section">
-            <h3><i className="fas fa-gavel"></i> Level 5 — Enforcement &amp; Referee</h3>
+            <h3><i className="fas fa-gavel"></i> Enforcement &amp; Referee</h3>
             <div className="enforcement-master">
                 <label className="enforcement-toggle">
                     <input
