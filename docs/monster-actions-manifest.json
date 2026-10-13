@@ -30642,7 +30642,7 @@
         "prone"
       ],
       "description": "Dexterity Saving Throw: DC 25, each creature within 60 ft. Failure: 27 (6d8) Bludgeoning damage and the target is knocked Prone. Success: half damage and not Prone.",
-      "verified": "broken — see .opencode/plans/bug-mon-2045-typhon-earthquake.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1619",

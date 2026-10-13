@@ -66871,7 +66871,6 @@
       },
       {
         "name": "Earthquake (Costs 2 Actions)",
-        "delegates_to": "Storm Breach (Recharge 5-6)",
         "description": "Dexterity Saving Throw: DC 25, each creature within 60 ft. Failure: 27 (6d8) Bludgeoning damage and the target is knocked Prone. Success: half damage and not Prone.",
         "save_dc": 25,
         "save_type": "Dexterity",
@@ -66879,7 +66878,8 @@
           "prone"
         ],
         "damage_dice_primary": "6d8",
-        "damage_type_primary": "Bludgeoning"
+        "damage_type_primary": "Bludgeoning",
+        "save_effect": "The target has the Prone condition."
       }
     ],
     "lair_actions": [],
