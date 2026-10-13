@@ -34642,7 +34642,7 @@
         "blinded"
       ],
       "description": "Strength Saving Throw: DC 23, each creature within 40 ft. Failure: Blinded until the end of its next turn; takes 7 (2d6) Bludgeoning damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-2078-zmey-dust-storm.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2079",

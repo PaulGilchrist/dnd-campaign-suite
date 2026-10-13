@@ -74912,6 +74912,7 @@
         "save_type": "Strength",
         "damage_dice_primary": "2d6",
         "damage_type_primary": "Bludgeoning",
+        "save_effect": "The target has the Blinded condition until the end of its next turn.",
         "conditions": [
           "blinded"
         ]
