@@ -28,7 +28,10 @@
 import express from 'express';
 import { characterChangeData } from '../utils/changeData.js';
 import { addEntry } from './log.js';
-import { askReferee, askNpcDirector, aiConfigLive, probe } from '../services/ai/index.js';
+import { askReferee, askNpcDirector, askWorldKeeper, aiConfigLive, probe } from '../services/ai/index.js';
+import { loadWorldState } from '../services/ai/worldContext.js';
+
+const WORLD_KINDS = new Set(['recap', 'rumor', 'npc_dialogue', 'quest_draft', 'event']);
 
 const router = express.Router();
 
@@ -118,6 +121,32 @@ router.post('/api/campaigns/:campaign/ai/director', async (req, res) => {
     } catch (e) {
         console.error('[campaigns-ai:director]', e);
         res.status(500).json({ error: 'ai director request failed' });
+    }
+});
+
+router.post('/api/campaigns/:campaign/ai/world', async (req, res) => {
+    try {
+        const { campaign } = req.params;
+        const cd = characterChangeData.get(campaign) || {};
+        const cfg = cd.aiConfig;
+        if (!aiConfigLive(cfg)) {
+            return res.status(403).json({ error: 'AI is not enabled for this campaign' });
+        }
+        if (!isReferee(req)) {
+            return res.status(403).json({ error: 'only the referee (or localhost) may ask the AI world keeper' });
+        }
+        const kind = String(req.body?.kind || '');
+        if (!WORLD_KINDS.has(kind)) {
+            return res.status(400).json({ error: `kind must be one of: ${[...WORLD_KINDS].join(', ')}` });
+        }
+        const focus = typeof req.body?.focus === 'string' ? req.body.focus.trim().slice(0, 400) : null;
+
+        const { context, allow } = loadWorldState(campaign, cd);
+        const result = await askWorldKeeper({ campaign, kind, focus, world: context, allow, aiConfig: cfg, log: addEntry });
+        res.status(200).json({ ...result, mode: cfg.mode });
+    } catch (e) {
+        console.error('[campaigns-ai:world]', e);
+        res.status(500).json({ error: 'ai world keeper request failed' });
     }
 });
 

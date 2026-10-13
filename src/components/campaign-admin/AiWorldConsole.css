@@ -1,0 +1,28 @@
+/* L5-006 §9.4 — World keeper console (scoped to .ai-world-console). */
+.ai-world-console {
+    margin-top: 0.9rem;
+    padding-top: 0.6rem;
+    border-top: 1px dashed rgba(139, 148, 158, 0.3);
+}
+.ai-world-console h4 { margin: 0 0 0.4rem; }
+.ai-world-console .ai-world-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.ai-world-console .ai-world-row input[type="text"] {
+    flex: 1 1 220px;
+    min-width: 180px;
+}
+.ai-world-console .ai-world-card {
+    margin-top: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid rgba(139, 148, 158, 0.35);
+    border-left: 4px solid #39b8c9;
+    border-radius: 6px;
+}
+.ai-world-console .ai-world-head { display: flex; gap: 0.5rem; align-items: baseline; }
+.ai-world-console .ai-confidence { color: #8b949e; font-size: 0.75rem; }
+.ai-world-console .ai-world-body { margin: 0.35rem 0 0; white-space: pre-wrap; }
+.ai-world-console .ai-world-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }

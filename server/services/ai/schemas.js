@@ -154,3 +154,51 @@ export function validateNpcIntent(intent, allow = {}) {
     INTENT_CHECKS[intent.intent](intent, allow, errors);
     return { ok: errors.length === 0, errors };
 }
+
+/**
+ * §9.4 world-keeper proposals. The model GENERATES content only — and any
+ * entity it references (NPC, settlement) must be REAL in this campaign's
+ * ledger; fabricated campaign entities fail closed. Confirmed payloads then
+ * ride the normal lanes: narrative → log, quest_draft → quests CRUD.
+ */
+const WORLD_KINDS = new Set(['recap', 'rumor', 'npc_dialogue', 'quest_draft', 'event', 'needs_human']);
+
+const WORLD_CHECKS = {
+    recap: (p, allow, errors) => textField(p, errors, 'text'),
+    event: (p, allow, errors) => textField(p, errors, 'text'),
+    rumor: (p, allow, errors) => {
+        textField(p, errors, 'text');
+        if (p.settlement !== undefined) {
+            const s = matchAllowed(p.settlement, allow.settlementNames);
+            if (!s) errors.push(`rumor.settlement must be an existing settlement: ${(allow.settlementNames || []).join(', ') || '(none)'}`);
+            else p.settlement = s;
+        }
+    },
+    npc_dialogue: (p, allow, errors) => {
+        const npc = matchAllowed(p.npcName, allow.npcNames);
+        if (!npc) errors.push(`npc_dialogue.npcName must be an NPC on file: ${(allow.npcNames || []).join(', ') || '(none)'}`);
+        else p.npcName = npc;
+        textField(p, errors, 'text');
+    },
+    quest_draft: (p, allow, errors) => {
+        if (!trimmedNonEmpty(p.name) || p.name.length > 120) errors.push('quest_draft.name required, ≤120 chars');
+        textField(p, errors, 'description');
+        if (p.rewards !== undefined && !str(p.rewards)) errors.push('quest_draft.rewards must be a string when present');
+    },
+    needs_human: (p, allow, errors) => textField(p, errors, 'text'),
+};
+
+export function validateWorldProposal(proposal, allow = {}) {
+    if (!proposal || typeof proposal !== 'object' || Array.isArray(proposal)) {
+        return { ok: false, errors: ['proposal must be an object'] };
+    }
+    if (!WORLD_KINDS.has(proposal.kind)) {
+        return { ok: false, errors: [`unknown kind: ${JSON.stringify(proposal.kind)} — must be recap|rumor|npc_dialogue|quest_draft|event`] };
+    }
+    const errors = [];
+    if (proposal.confidence !== undefined && !(typeof proposal.confidence === 'number' && Number.isFinite(proposal.confidence) && proposal.confidence >= 0 && proposal.confidence <= 1)) {
+        errors.push('confidence must be a number 0..1 when present');
+    }
+    WORLD_CHECKS[proposal.kind](proposal, allow, errors);
+    return { ok: errors.length === 0, errors };
+}

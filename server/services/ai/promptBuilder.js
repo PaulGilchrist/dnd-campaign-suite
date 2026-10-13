@@ -6,7 +6,7 @@
  * it never rolls dice, never writes state, and must answer in schema JSON.
  */
 
-import { validateRuling, validateNpcIntent } from './schemas.js';
+import { validateRuling, validateNpcIntent, validateWorldProposal } from './schemas.js';
 
 // Compact the shared runtime state into a small context block — token budget
 // discipline (§16 "persistence of AI context"): capped lists, scalar fields
@@ -151,4 +151,46 @@ export function parseIntentAnswer(content, allow) {
     if (!extracted.ok) return extracted;
     const result = validateNpcIntent(extracted.value, allow);
     return result.ok ? { ok: true, intent: extracted.value } : { ok: false, errors: result.errors };
+}
+
+const WORLD_SYSTEM = `You are the world keeper for a D&D (5e/2024) campaign — continuity, atmosphere, consequences. You GENERATE content; a human referee confirms it and normal system lanes write it.
+
+NON-NEGOTIABLE RULES:
+1. Be consistent with the campaign ledger in the context — never contradict quest statuses, faction goals, NPC alignments or established events.
+2. Only reference NPCs and settlements that EXIST in the ledger (exact names). Never invent campaign entities, quest IDs, or mechanical results.
+3. You NEVER roll dice and never state mechanical outcomes ("the quest is now complete") — you PROPOSE content; the referee decides.
+4. Recap = past tense, grounded ONLY in the recent log/notes. Rumor = in-world gossip with a hook. Event = a downtime beat with a hook. Dialogue = in-voice lines for the named NPC (personality/alignment from the ledger).
+5. Answer with ONE JSON object and nothing else, matching the requested kind:
+   {"kind":"recap","text":"...","confidence":0.9}
+   {"kind":"event","text":"...","confidence":0.8}
+   {"kind":"rumor","text":"...","settlement":"OptionalKeep","confidence":0.7}
+   {"kind":"npc_dialogue","npcName":"ExactNpcName","text":"...","tone":"gruff","confidence":0.8}
+   {"kind":"quest_draft","name":"...","description":"...","rewards":"...","confidence":0.7}
+Keep "text" ≤ 1200 characters.`;
+
+/**
+ * Build chat messages for a world-keeper request.
+ * @param {{ kind: string, focus: string|null, world: object, allow: object }} args
+ */
+export function buildWorldMessages({ kind, focus, world, allow }) {
+    const focusLine = focus ? `FOCUS (referee's steer): ${String(focus).slice(0, 400)}` : null;
+    const user = [
+        `REQUESTED KIND: ${kind}`,
+        focusLine,
+        `CAMPAIGN LEDGER (ground every claim in this):\n${JSON.stringify(world)}`,
+        `EXISTING NAMES you may reference: NPCs ${JSON.stringify(allow.npcNames)}; settlements ${JSON.stringify(allow.settlementNames)}; factions ${JSON.stringify(allow.factionNames)}; quests ${JSON.stringify(allow.questNames)}`,
+        kind === 'quest_draft' ? 'The draft goes to the quest ledger unchanged — make it actionable.' : null,
+    ].filter(Boolean).join('\n\n');
+    return [
+        { role: 'system', content: WORLD_SYSTEM },
+        { role: 'user', content: user },
+    ];
+}
+
+/** §9.4 — parse + validate a world-keeper proposal. */
+export function parseWorldAnswer(content, allow) {
+    const extracted = extractJsonObject(content);
+    if (!extracted.ok) return extracted;
+    const result = validateWorldProposal(extracted.value, allow);
+    return result.ok ? { ok: true, proposal: extracted.value } : { ok: false, errors: result.errors };
 }

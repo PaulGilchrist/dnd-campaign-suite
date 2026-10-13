@@ -17,6 +17,7 @@ import { ENFORCEMENT_DEFAULTS } from '../../services/combat/canTakeAction.js'
 import { getAiStatus, askAiReferee } from '../../services/ai/aiClient.js'
 import { applyRuling, isAtomicRuling } from '../../services/ai/applyRuling.js'
 import AiConfigRow, { AiStatusBadge } from './AiConfigRow.jsx'
+import AiWorldConsole from './AiWorldConsole.jsx'
 import './AiRefereeSection.css'
 
 async function postAiConfig(campaignName, value) {
@@ -58,6 +59,7 @@ export default function AiRefereeSection({ campaignName, characters = [] }) {
             <AiConfigRow aiConfig={aiConfig} onSave={saveConfig} onRemove={removeConfig} />
             {notice && <div className="ai-notice ai-notice--error" role="alert">{notice}</div>}
             {live && <AiAskConsole campaignName={campaignName} characters={characters} aiConfig={aiConfig} enforcement={enforcement} />}
+            {live && <AiWorldConsole campaignName={campaignName} />}
         </div>
     )
 }

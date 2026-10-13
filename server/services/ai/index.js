@@ -11,7 +11,7 @@
  * leaks to the browser.
  */
 import { chat, probe, isLocalEndpoint } from './providers/localProvider.js';
-import { buildRefereeMessages, parseRulingAnswer, buildDirectorMessages, parseIntentAnswer } from './promptBuilder.js';
+import { buildRefereeMessages, parseRulingAnswer, buildDirectorMessages, parseIntentAnswer, buildWorldMessages, parseWorldAnswer } from './promptBuilder.js';
 import { needsHumanRuling } from './schemas.js';
 import { lookupMonsterActions } from './monsterActions.js';
 
@@ -164,8 +164,54 @@ async function directorFail(log, campaign, creatureName, reason) {
     return { ok: false, code: 'AI_NEEDS_HUMAN', intent };
 }
 
-async function directorAudit(log, campaign, intent, attempts) {
+/**
+ * §9.4 — ask the AI world keeper for campaign-consistent content (recap,
+ * rumor, downtime event, NPC dialogue, quest draft). Same fail-closed funnel
+ * as the referee/director: retry once → needs_human, audit `ai_world`.
+ * The proposal GENERATES payloads only — confirmed content rides the normal
+ * lanes (log / quests CRUD), the model never writes (§9.5).
+ */
+export async function askWorldKeeper({ campaign, kind, focus, world, allow, aiConfig, log }) {
+    if (!aiConfigLive(aiConfig)) return { ok: false, code: 'AI_OFF' };
+    const messages = buildWorldMessages({ kind, focus, world, allow });
+
+    let lastError = 'no attempt made';
+    for (let attempt = 1; attempt <= 2; attempt++) { // one retry, then human (§9.1)
+        let content;
+        try {
+            content = await chat({ ...chatOpts(aiConfig), messages });
+        } catch (e) {
+            lastError = `${e.code || 'ERROR'}: ${String(e.message || e).slice(0, 160)}`;
+            continue;
+        }
+        const result = parseWorldAnswer(content, allow);
+        if (result.ok) {
+            await worldAudit(log, campaign, result.proposal, attempt);
+            return { ok: true, proposal: result.proposal, mode: aiConfig.mode };
+        }
+        lastError = `invalid proposal: ${result.errors.join('; ')}`;
+    }
+    const proposal = { kind: 'needs_human', text: `AI world keeper unavailable — the GM supplies this. (${String(lastError).slice(0, 160)})` };
+    await worldAudit(log, campaign, proposal, 0);
+    return { ok: false, code: 'AI_NEEDS_HUMAN', proposal };
+}
+
+async function worldAudit(log, campaign, proposal, attempts) {
     if (typeof log !== 'function') return;
+    try {
+        await log(campaign, {
+            type: 'ai_world',
+            name: 'AI world keeper',
+            proposal,
+            attempts,
+            description: `AI world keeper proposed ${proposal.kind}: ${String(proposal.text || proposal.name || '').slice(0, 220)}`,
+        });
+    } catch (e) {
+        console.error('[aiService:world-audit]', e);
+    }
+}
+
+async function directorAudit(log, campaign, intent, attempts) {    if (typeof log !== 'function') return;
     try {
         await log(campaign, {
             type: 'ai_director',
