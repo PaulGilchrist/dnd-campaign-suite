@@ -32795,7 +32795,7 @@
         "restrained"
       ],
       "description": "Strength Saving Throw: DC 26, each creature in a 120-foot-long, 10-foot-wide Line. Failure: 77 (14d10) Bludgeoning damage. Success: Half damage. The target is also Restrained until the end of its next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-2059-ymir-glacier-wave.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2060",
