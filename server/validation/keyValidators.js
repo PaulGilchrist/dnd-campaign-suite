@@ -180,6 +180,16 @@ function validateRechargeMapProp(recharge) {
     return { ok: true };
 }
 
+function validateSessionState(value) {
+    if (value === null) return { ok: true }; // unset ⇒ exploration default (today's behavior)
+    if (!isPlainObject(value)) return { ok: false, reason: 'sessionState must be null or { phase, changedBy, changedAt }' };
+    const phases = ['exploration', 'encounter', 'travel', 'roleplay'];
+    if (!phases.includes(value.phase)) return { ok: false, reason: `sessionState.phase must be one of: ${phases.join(', ')}` };
+    if (value.changedBy !== undefined && typeof value.changedBy !== 'string') return { ok: false, reason: 'sessionState.changedBy must be a string' };
+    if (value.changedAt !== undefined && !Number.isFinite(Number(value.changedAt))) return { ok: false, reason: 'sessionState.changedAt must be a number' };
+    return { ok: true };
+}
+
 /**
  * H1 hardening (§17): monster-side economy shape validation inside creature
  * store writes (POST /:campaign/:storeName posts the full store). The MA
@@ -218,6 +228,9 @@ export const keyValidators = {
     enforcement: chain(validateEnforcement, (v, ctx) => validateAuthority('enforcement', ctx)),
     referee: chain(validateReferee, (v, ctx) => validateAuthority('referee', ctx)),
     turnState: validateTurnState,
+    // L5 Phase 4 (§10.1): session orchestration truth — shape only, phase
+    // enum pinned; unset ⇒ 'exploration' (today's implicit default).
+    sessionState: validateSessionState,
     // AI config engages referee authority on its OWN mode (§12), not the
     // enforcement master — and engaging counts: a WRITE that turns the AI on
     // is itself an act of authority, so an AI-off campaign cannot be

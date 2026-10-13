@@ -17,6 +17,7 @@ import {
 import { generateEncounterSuggestions } from '../../services/encounters/encounterGenerator.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { hasSelfRestoration } from '../../services/combat/automation/automationService.js';
+import { setSessionPhase } from '../../services/combat/sessionService.js';
 
 const MODES = {
   INACTIVE: 'inactive',
@@ -60,7 +61,20 @@ export default function useTravelManagement({
 }) {
   const init = resolveInitialTravelState(initialTravelState);
 
-  const [travelMode, setTravelMode] = useSyncedState('campaign', 'travel-mode', init.travelMode, campaignName);
+  const [travelMode, _setTravelModeRaw] = useSyncedState('campaign', 'travel-mode', init.travelMode, campaignName);
+  // L5 §10.1 session orchestration: wrapping the travel-mode setter is the
+  // single seam every call site (startPlanning/cancel/changePace/…) flows
+  // through. TRAVELING engages the travel phase, INACTIVE returns to
+  // exploration (planning/paused keep the current phase — nothing moves yet).
+  // Action-driven, never wall-clock (AGENTS.md No Game Timers).
+  const setTravelMode = useCallback((mode) => {
+    _setTravelModeRaw(mode);
+    if (mode === MODES.TRAVELING) {
+      setSessionPhase({ campaignName, phase: 'travel', changedBy: 'travel management', reason: 'travel started' }).catch((e) => { console.error('[useTravelManagement] session phase travel failed:', e); });
+    } else if (mode === MODES.INACTIVE) {
+      setSessionPhase({ campaignName, phase: 'exploration', changedBy: 'travel management', reason: 'travel ended' }).catch((e) => { console.error('[useTravelManagement] session phase exploration failed:', e); });
+    }
+  }, [campaignName]);
   const [travelPace, setTravelPace] = useSyncedState('campaign', 'travel-pace', init.travelPace, campaignName);
   const [destination, setDestination] = useSyncedState('campaign', 'travel-destination', init.destination, campaignName);
   const [path, setPath] = useSyncedState('campaign', 'travel-path', init.path, campaignName);

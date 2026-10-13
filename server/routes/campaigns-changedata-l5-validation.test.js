@@ -279,3 +279,31 @@ describe('H1 monster-economy shape validation (§17)', () => {
         expect(res.status).toBe(200);
     });
 });
+
+// P4-a (§10.1): session orchestration truth at the chokepoint.
+describe('P4-a sessionState validation (§10.1)', () => {
+    const post = (value) => request(createTestApp())
+        .post('/api/campaigns/test-campaign/sessionState')
+        .send({ value });
+
+    it('accepts the four authored phases, then null clears to unset', async () => {
+        for (const phase of ['exploration', 'encounter', 'travel', 'roleplay']) {
+            expect((await post({ phase, changedBy: 'referee console' })).status).toBe(200);
+        }
+        expect(characterChangeData.get('test-campaign').sessionState.phase).toBe('roleplay');
+        // Unset write ⇒ null lands (readSessionPhase defaults to exploration).
+        expect((await post(null)).status).toBe(200);
+        expect(characterChangeData.get('test-campaign').sessionState).toBeNull();
+    });
+
+    it('refuses an unknown phase — the enum is the contract', async () => {
+        const res = await post({ phase: 'murderhobo-carnival' });
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/phase must be one of/);
+    });
+
+    it('refuses non-object shapes and junk timestamps', async () => {
+        expect((await post('encounter')).status).toBe(400);
+        expect((await post({ phase: 'encounter', changedAt: 'soon' })).status).toBe(400);
+    });
+});

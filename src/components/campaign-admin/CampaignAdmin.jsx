@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import './CampaignAdmin.css';
 import EnforcementSection from './EnforcementSection.jsx';
 import AiRefereeSection from './AiRefereeSection.jsx';
+import SessionSection from './SessionSection.jsx';
 
 const BUSY_STATUS_TEXT = {
     'snapshotting': 'Creating snapshot...',
@@ -388,6 +389,9 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
 
             {/* L5-001: enforcement master switch + referee claim (default OFF ⇒ L1–4 as-is). */}
             <EnforcementSection campaignName={campaignName} characters={characters} />
+
+            {/* L5 Phase 4 §10: session state machine console + enforcement/AI audit ledger. */}
+            <SessionSection campaignName={campaignName} />
 
             {/* L5-005 §9.2: AI referee console (aiConfig unset/off ⇒ no console, no traffic). */}
             <AiRefereeSection campaignName={campaignName} characters={characters} />

@@ -44,6 +44,9 @@ export const CAMPAIGN_KEYS = new Set([
     'turnState',
     // L5 §7.5 'turnTimer' REMOVED (no-timers plan T1): real-time countdowns
     // are banned — the game advances only on player/GM action (AGENTS.md).
+    // L5 Phase 4 (§10.1): session orchestration { phase, changedBy,
+    // changedAt } — moves ONLY on action, never on wall-clock.
+    'sessionState',
     // L5 Phase 3 (§9): AI service config { endpoint, model, temperature,
     // mode:'off'|'suggest'|'autopilot', provider } — LOCAL endpoint only,
     // server-validated; null/off ⇒ zero AI traffic (L1–4 parity).

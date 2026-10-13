@@ -3,6 +3,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntime
 import storage from '../../services/ui/storage.js'
 import { clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
 import { clearCombat, setInitiative, renameNpc, setTarget, removeNpc, addNpc } from '../../services/encounters/initiativeService.js'
+import { setSessionPhase } from '../../services/combat/sessionService.js'
 import { maybeGrantThiefsReflexesSecondTurn } from '../../services/combat/thiefsReflexesService.js'
 import { vanishSummonAtZeroHp } from '../../services/combat/summons/summonedCreatureService.js'
 import { breakHypnoticPatternOnDamage } from '../../services/rules/features/hypnoticPatternService.js'
@@ -63,6 +64,9 @@ export function createCreatureHandlers({
             const newSummary = clearCombat(characters, numOfNpc, (name) => name)
             storage.set('combatSummary', newSummary, campaignName)
             setCombatSummary(newSummary)
+            // L5 §10.1: clearing combat returns the table to exploration.
+            setSessionPhase({ campaignName, phase: 'exploration', changedBy: 'initiative tracker', reason: 'combat cleared' })
+                .catch((e) => { console.error('[createCreatureHandlers] session phase exploration failed:', e) })
             const firstCreatureName = newSummary.creatures[0].name
             storage.set('activeCreatureName', firstCreatureName, campaignName)
             setActiveCreatureName(firstCreatureName)
@@ -86,6 +90,11 @@ export function createCreatureHandlers({
     const handleInitiativeChange = function handleInitiativeChange(creatureName, value) {
         if (!combatSummary) return
         setInitiative(combatSummary, creatureName, value)
+        // L5 §10.1: initiative being stamped is the table entering combat —
+        // the encounter phase engages here (action-driven; §10.2 makes it
+        // AI-triggerable later). Same-phase ⇒ zero writes.
+        setSessionPhase({ campaignName, phase: 'encounter', changedBy: 'initiative tracker', reason: `initiative recorded for ${creatureName}` })
+            .catch((e) => { console.error('[createCreatureHandlers] session phase encounter failed:', e) })
         // CLA-360: Thief's Reflexes — GM-set initiative in round 1 grants the
         // holder's structural second turn at initiative − 10 (spends the use once).
         maybeGrantThiefsReflexesSecondTurn(combatSummary, creatureName, campaignName, characters)
