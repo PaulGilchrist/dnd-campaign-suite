@@ -18,6 +18,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { resetForTurn, openTurn, closeTurn, rearmReactions } from '../../services/combat/turnState.js'
+import { drainRoundWrapClocks } from '../../services/rules/effects/zoneDurationClock.js'
 
 // Turn-start effects must re-apply each round, so the dedupe key is round-scoped.
 function turnStartGateKey(round, creatureName) {
@@ -128,6 +129,11 @@ function runRoundWrapHousekeeping({ updatedSummary, creatures, campaignName, rou
         clearPerRoundMajestyTrackers(creature.name, campaignName, roundToSet)
         if (creature.type === 'player') clearPlayerRoundLatches(creature.name, campaignName)
     }
+    // L5-003 §8.3 rank 3: initiative-count-20 cadence seam — lair zones
+    // ("until initiative count 20 next round") mature HERE at the wrap, the
+    // top of initiative, independent of owner/target activity. Zones flag
+    // off ⇒ zero writes (byte-identical L1–4). Pass roundToSet (CLA-370).
+    drainRoundWrapClocks({ campaignName, roundToSet })
 }
 
 // L5-001: turn-economy transition pass, riding the existing turn/round-wrap seams.

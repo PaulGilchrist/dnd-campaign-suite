@@ -13,6 +13,7 @@ import { getAuraConditionImmunities, splitAuraCoveredConditions, logAuraConditio
 import { spendMonsterAbilityUse } from '../../services/encounters/monsterAbilityUses.js';
 import { registerTargetEffect, getActiveTargetEffect, getEffectDefinition, abilitySaveDisadvantageActive } from '../../services/combat/conditions/targetEffectDefinitions.js';
 import { addExpiration } from '../../services/rules/effects/expirationQueue.js';
+import { zonesClockEnforcementLive } from '../../services/rules/effects/zoneDurationClock.js';
 import { EXHAUSTION_LEVELS } from '../../services/combat/conditions/exhaustionRules.js';
 import { parseSuccessImmunity } from '../../components/encounter/MonsterCardHelpers.js';
 import { trackFrightfulPresence } from '../../services/rules/features/frightfulPresenceService.js';
@@ -1209,11 +1210,16 @@ async function grantDreamPlaneBanishment({ context, campaignName, attackerName, 
         duration: 'until_initiative_count_20_next_round',
         actionName,
     });
+    // L5-003 §8.3 rank 3: zones enforcement live ⇒ rounds:1 matures at the
+    // NEXT round wrap (the initiative-20 cadence seam — drainRoundWrapClocks
+    // clears it at the top of initiative, RAW-exact). Off ⇒ legacy rounds:2
+    // nearest-seam approximation verbatim (byte-identical L1–4).
+    const cadenceLive = zonesClockEnforcementLive(campaignName);
     addExpiration({
         attackerName,
         targetName: applyTarget,
         campaignName,
-        rounds: 2,
+        rounds: cadenceLive ? 1 : 2,
         effects: [{ type: 'remove_target_effect', effectKey: 'lair_dream_plane', source: attackerName, target: applyTarget }],
     });
     const granted = getActiveTargetEffect(campaignName, applyTarget, 'lair_dream_plane');
@@ -1223,7 +1229,7 @@ async function grantDreamPlaneBanishment({ context, campaignName, attackerName, 
         characterName: applyTarget,
         sourceName: attackerName,
         abilityName: actionName,
-        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — banished to a dream plane until the effect ends on initiative count 20 on the next round; escaping early requires a contested Charisma check and reappearance placement is GM-enforced (no initiative lair seam).${granted ? '' : ' (te write unconfirmed)'}`,
+        description: `${applyTarget} failed ${attackerName}'s ${actionName} save — banished to a dream plane until the effect ends on initiative count 20 on the next round${cadenceLive ? ' (expiry clock armed — enforcement: zones)' : '; escaping early requires a contested Charisma check and reappearance placement is GM-enforced (no initiative lair seam)'}.${granted ? '' : ' (te write unconfirmed)'}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[saveProcessing:dream-plane-banishment-granted]', e); });
 }

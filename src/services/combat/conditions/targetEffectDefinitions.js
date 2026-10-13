@@ -1208,7 +1208,7 @@ const TARGET_EFFECT_DEFINITIONS = [
   {
     effect: 'lair_dream_plane',
     label: 'Dream Plane (Lair)',
-    description: 'Banished to a dream plane by a gold dragon\'s lair action: the target is banished to an imagined plane until the effect ends on initiative count 20 on the next round (modeled as the MA-0038/0104 rounds:2 clock — nearest expiry seam; initiative-20 cadence GM-enforced, no initiative lair seam). Escaping early requires an action and a Charisma check contested by the dragon\'s — GM-enforced (no contested-check consumer). Reappearance placement is GM-enforced.',
+    description: 'Banished to a dream plane by a gold dragon\'s lair action: the target is banished to an imagined plane until the effect ends on initiative count 20 on the next round (cadence engine-clocked: rounds:1 matured at the initiative-20 round wrap when enforcement: zones is on; legacy rounds:2 nearest-expiry seam while off). Escaping early requires an action and a Charisma check contested by the dragon\'s — GM-enforced (no contested-check consumer). Reappearance placement is GM-enforced.',
     icon: 'fa-cloud-moon',
     cls: 'effect-debuff',
     group: 'Lair',
@@ -1244,7 +1244,7 @@ const TARGET_EFFECT_DEFINITIONS = [
   {
     effect: 'lair_fog_cloud',
     label: 'Fog Cloud (Lair)',
-    description: 'Inside a magical fog cloud (20-foot radius, lair action): lightly obscured. No saving throw (canonical fog cloud lair action). Lasts until initiative count 20 on the next round — GM-enforced (no initiative-20 lair seam in this engine).',
+    description: 'Inside a magical fog cloud (20-foot radius, lair action): lightly obscured. No saving throw (canonical fog cloud lair action). Lasts until initiative count 20 on the next round — cadence engine-clocked at the initiative-20 round wrap when zones enforcement is on (enforcement: zones); advisory while enforcement is off.',
     icon: 'fa-cloud-fog',
     cls: 'effect-debuff',
     group: 'Lair',
@@ -1253,7 +1253,7 @@ const TARGET_EFFECT_DEFINITIONS = [
   {
     effect: 'lair_spike_growth',
     label: 'Stone Spikes (Lair)',
-    description: 'Spike-growth terrain (20-foot-radius sphere, lair action): difficult terrain; creatures moving there take piercing damage — GM-enforced (no terrain/area-damage subsystem in this engine). Lasts until the dragon uses this lair action again or the dragon dies — GM-enforced (no initiative-20 lair seam in this engine).',
+    description: 'Spike-growth terrain (20-foot-radius sphere, lair action): difficult terrain; creatures moving there take piercing damage — GM-enforced (no terrain/area-damage subsystem in this engine). Lasts until the dragon uses this lair action again or the dragon dies — GM-enforced (no auto-dismiss-on-recast consumer).',
     icon: 'fa-mountain',
     cls: 'effect-debuff',
     group: 'Lair',
@@ -1262,7 +1262,7 @@ const TARGET_EFFECT_DEFINITIONS = [
   {
     effect: 'lair_slimy_ground',
     label: 'Slimy Ground (Lair)',
-    description: 'Slimy difficult terrain (beholder lair action; canonical 50-foot square, modeled as 25-ft radius): the area is difficult terrain — moving 1 foot costs 2 feet — GM-enforced (no movement-cost consumer in this engine). No saving throw. Lasts until initiative count 20 on the next round — GM-enforced (no initiative-20 lair seam in this engine).',
+    description: 'Slimy difficult terrain (beholder lair action; canonical 50-foot square, modeled as 25-ft radius): the area is difficult terrain — moving 1 foot costs 2 feet — GM-enforced (no movement-cost consumer in this engine). No saving throw. Lasts until initiative count 20 on the next round — cadence engine-clocked at the initiative-20 round wrap when zones enforcement is on (enforcement: zones); advisory while enforcement is off.',
     icon: 'fa-hand-dots',
     cls: 'effect-debuff',
     group: 'Lair',
@@ -1271,7 +1271,7 @@ const TARGET_EFFECT_DEFINITIONS = [
   {
     effect: 'lair_spectral_eyes',
     label: 'Spectral Eyes and Tentacles (Lair)',
-    description: 'Spectral eyes and tentacles zone (death tyrant lair action; canonical 50-foot cube, modeled as 25-ft radius): to creatures other than the tyrant the area is lightly obscured AND difficult terrain — light/vision levels have no consumer and moving 1 foot costs 2 feet has no movement-cost consumer in this engine — GM-enforced. No saving throw. Lasts until initiative count 20 on the next round — GM-enforced (no initiative-20 lair seam in this engine).',
+    description: 'Spectral eyes and tentacles zone (death tyrant lair action; canonical 50-foot cube, modeled as 25-ft radius): to creatures other than the tyrant the area is lightly obscured AND difficult terrain — light/vision levels have no consumer and moving 1 foot costs 2 feet has no movement-cost consumer in this engine — GM-enforced. No saving throw. Lasts until initiative count 20 on the next round — cadence engine-clocked at the initiative-20 round wrap when zones enforcement is on (enforcement: zones); advisory while enforcement is off.',
     icon: 'fa-eye',
     cls: 'effect-debuff',
     group: 'Lair',
@@ -1280,7 +1280,7 @@ const TARGET_EFFECT_DEFINITIONS = [
   {
     effect: 'lair_mud',
     label: 'Liquid Mud (Lair)',
-    description: 'In 3-foot-deep mud (10-foot square, modeled as radius, lair action): Dexterity save (DC indicated) when the mud appears; on a failed save the target is restrained until freed by a DC 15 Strength check action — GM-enforced (no rescue-engine consumer). Moving 1 foot costs 2 feet of movement, and the mud hardens at initiative count 20 next round (Strength DC rises to 20) — GM-enforced (no movement-cost or initiative-20 lair seam in this engine).',
+    description: 'In 3-foot-deep mud (10-foot square, modeled as radius, lair action): Dexterity save (DC indicated) when the mud appears; on a failed save the target is restrained until freed by a DC 15 Strength check action — GM-enforced (no rescue-engine consumer). Moving 1 foot costs 2 feet of movement, and the mud hardens at initiative count 20 next round (Strength DC rises to 20) — movement-cost and hardening-state changes remain GM-enforced (the zone\'s initiative-20 expiry is cadence-clocked when enforcement: zones is on).',
     icon: 'fa-water',
     cls: 'effect-debuff',
     group: 'Lair',
@@ -1289,7 +1289,7 @@ const TARGET_EFFECT_DEFINITIONS = [
   {
     effect: 'lair_volcanic_gas',
     label: 'Volcanic Gas (Lair)',
-    description: 'Inside a volcanic-gas cloud (20-foot-radius sphere, lair action): lightly obscured. CON save (DC indicated) when the cloud appears; on a failed save the target is Poisoned until the end of its turn and Incapacitated while poisoned in this way. A creature that starts its turn in the cloud repeats the save — GM-enforced (no turn-start zone-save consumer for lair clouds and no initiative-20 lair seam in this engine). Lasts until initiative count 20 on the next round — GM-enforced.',
+    description: 'Inside a volcanic-gas cloud (20-foot-radius sphere, lair action): lightly obscured. CON save (DC indicated) when the cloud appears; on a failed save the target is Poisoned until the end of its turn and Incapacitated while poisoned in this way. A creature that starts its turn in the cloud repeats the save — GM-enforced (no turn-start zone-save consumer for lair clouds). Lasts until initiative count 20 on the next round — cadence engine-clocked at the initiative-20 round wrap when zones enforcement is on (enforcement: zones); advisory while enforcement is off.',
     icon: 'fa-smog',
     cls: 'effect-debuff',
     group: 'Lair',
