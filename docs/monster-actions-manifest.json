@@ -27597,7 +27597,7 @@
         "frightened"
       ],
       "description": "Each creature of Smaug's choice within 120 ft. of him and aware of him must succeed on a DC 22 Wisdom saving throw or have the Frightened condition for 1 minute. A creature can repeat the saving throw at the end of each of its turns. On a success or when the effect ends, the creature is immune to his Frightful Presence for 24 hours. No damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-1997-smaug-frightful-presence.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1998",
