@@ -27453,7 +27453,7 @@
         "frightened"
       ],
       "description": "Each ally within 60 ft. is calmed, ending one effect causing them to be Charmed, Frightened, or Confused.",
-      "verified": "broken — see .opencode/plans/bug-mon-1991-simurgh-soothing-cry.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1470",

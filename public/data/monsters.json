@@ -59532,6 +59532,8 @@
       {
         "name": "Soothing Cry (Costs 2 Actions)",
         "delegates_to": null,
+        "advisory": "soothing_cry",
+        "advisory_message": "Each ally within 60 ft. is calmed, ending one effect causing them to be Charmed, Frightened, or Confused \u2014 advisory record: condition-end transport does not exist on the legendary lane; ending the Charmed, Frightened, or Confused effects is GM-enforced. Canonical cost is 2 legendary uses \u2014 the engine spends 2 per press.",
         "description": "Each ally within 60 ft. is calmed, ending one effect causing them to be Charmed, Frightened, or Confused."
       }
     ],

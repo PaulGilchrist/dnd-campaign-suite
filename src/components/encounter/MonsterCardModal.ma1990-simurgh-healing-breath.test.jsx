@@ -134,7 +134,7 @@ describe('MA-1990 disk fingerprint: Simurgh Healing Breath flat advisory (MA-194
     expect(row.recharge).toBeUndefined();
   });
 
-  it('header economy and siblings byte-intact (header uses:3, Talon delegate child, Soothing Cry untouched)', () => {
+  it('header economy and siblings byte-intact (header uses:3, Talon delegate child, Soothing Cry carries the MA-1991 advisory)', () => {
     const h = headerRow();
     expect(h.name).toBe('Legendary Action Uses: 3');
     expect(h.uses).toBe(3);
@@ -142,7 +142,9 @@ describe('MA-1990 disk fingerprint: Simurgh Healing Breath flat advisory (MA-194
     expect(legendaryRows()[1].name).toBe('Talon');
     expect(legendaryRows()[1].delegates_to).toBe('Talon');
     const soothe = legendaryRows().find(a => a.name === 'Soothing Cry (Costs 2 Actions)');
-    expect(soothe.advisory).toBeUndefined();
+    // MA-1991 twin fix landed: Soothing Cry is no longer advisory-free —
+    // stale pre-MA-1991 undefined-pin inverted same pass (§384).
+    expect(soothe.advisory).toBe('soothing_cry');
     expect(legendaryRows().length).toBe(4);
   });
 
