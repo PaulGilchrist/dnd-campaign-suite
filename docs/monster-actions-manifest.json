@@ -34468,7 +34468,7 @@
       "damageDicePrimary": "9d10",
       "damageTypePrimary": "Radiant",
       "description": "Constitution Saving Throw: DC 24, each creature within 60 ft. Failure: 49 (9d10) Radiant damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-2067-ziz-solar-flare-recharge.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2068",
