@@ -27413,7 +27413,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1989",
@@ -27425,7 +27425,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Talon attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1990",
@@ -27437,7 +27437,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The Simurgh exhales warm wind over one creature within 30 ft. The target regains 22 (4d10) Hit Points and the Simurgh regains 5 Hit Points.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-1990-simurgh-healing-breath.md"
     },
     {
       "id": "MA-1991",
@@ -27453,7 +27453,7 @@
         "frightened"
       ],
       "description": "Each ally within 60 ft. is calmed, ending one effect causing them to be Charmed, Frightened, or Confused.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-1991-simurgh-soothing-cry.md"
     },
     {
       "id": "MA-1470",
@@ -27513,7 +27513,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Smaug uses his Frightful Presence. He then makes three attacks: one with his Bite, two with his Claws or Tail.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1993",
@@ -27529,7 +27529,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +17, reach 15 ft. Hit: 27 (4d8 + 9) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1994",
@@ -27545,7 +27545,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +17, reach 10 ft. Hit: 22 (3d8 + 9) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1995",
@@ -27564,7 +27564,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +17, reach 20 ft. Hit: 25 (3d10 + 9) Bludgeoning damage. The target has the Prone condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1996",
@@ -27580,7 +27580,7 @@
       "damageDicePrimary": "22d6",
       "damageTypePrimary": "Fire",
       "description": "Dexterity Saving Throw: DC 24, each creature in a 90-foot Cone. Failure: 77 (22d6) Fire damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-1996-smaug-fire-breath-recharge.md"
     },
     {
       "id": "MA-1997",
@@ -27597,7 +27597,7 @@
         "frightened"
       ],
       "description": "Each creature of Smaug's choice within 120 ft. of him and aware of him must succeed on a DC 22 Wisdom saving throw or have the Frightened condition for 1 minute. A creature can repeat the saving throw at the end of each of its turns. On a success or when the effect ends, the creature is immune to his Frightful Presence for 24 hours. No damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-1997-smaug-frightful-presence.md"
     },
     {
       "id": "MA-1998",
@@ -27610,7 +27610,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1999",
@@ -27622,7 +27622,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Claw attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2000",
@@ -27634,7 +27634,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Tail attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2001",
@@ -27650,7 +27650,7 @@
       "damageTypePrimary": "Fire",
       "range": "90 ft.",
       "description": "Ranged Attack Roll: +15, range 90 ft. Hit: 33 (6d10) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2002",
@@ -27662,7 +27662,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Smaug makes one Perception check.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2002-smaug-detection.md"
     },
     {
       "id": "MA-1473",
@@ -27809,7 +27809,7 @@
       "saveType": "Dexterity",
       "saveEffect": "The target takes 11 (2d10) Radiant damage. Success: The target takes half damage.",
       "description": "The solar teleports up to 60 feet to an unoccupied space it can see. Dexterity Saving Throw: DC 25, each creature in a 10-foot Emanation originating from the solar at its destination space. Failure: 11 (2d10) Radiant damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1481",
@@ -28057,7 +28057,7 @@
       "saveType": "Constitution",
       "saveEffect": "The target gains 1 Exhaustion level and appears 3d10 years older while it has any Exhaustion levels. The sphinx can't take this action again until the start of its next turn.",
       "description": "Constitution Saving Throw: DC 16, one creature the sphinx can see within 120 feet. Failure: The target gains 1 Exhaustion level. While the target has any Exhaustion levels, it appears 3d10 years older. Failure or Success: The sphinx can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1496",
@@ -28280,7 +28280,7 @@
       "saveType": "Constitution",
       "saveEffect": "The target gains 1 Exhaustion level and appears 3d10 years older while it has any Exhaustion levels. The sphinx can't take this action again until the start of its next turn.",
       "description": "Constitution Saving Throw: DC 16, one creature the sphinx can see within 120 feet. Failure: The target gains 1 Exhaustion level. While the target has any Exhaustion levels, it appears 3d10 years older. Failure or Success: The sphinx can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1509",
@@ -28995,7 +28995,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Sun Wukong makes three attacks with the Ruyi Jingu Bang (the golden-club) or one attack with the club and two hair-clone strikes.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2007",
@@ -29014,7 +29014,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +19, reach 10 ft. Hit: 25 (3d10 + 9) Bludgeoning damage. The target has the Prone condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2008",
@@ -29030,7 +29030,7 @@
       "damageTypePrimary": "Necrotic",
       "reach": "5 ft.",
       "description": "Melee Attack Roll: +19, reach 5 ft. Hit: 20 (2d10 + 9) Necrotic damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2009",
@@ -29043,7 +29043,7 @@
       "actionType": "other",
       "uses": 1,
       "description": "Sun Wukong plucks a handful of hairs and breathes on them. Four monkey clones spring forth in unoccupied spaces within 60 ft. Each clone is a monkey-clone token: AC 18, 30 Hit Points, +14 to hit for 11 (2d8 + 2) Bludgeoning damage, acting on Wukong's initiative. A clone dies when it takes damage and a wish can't duplicate this trick.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2010",
@@ -29056,7 +29056,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2011",
@@ -29068,7 +29068,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Ruyi Jingu Bang attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2012",
@@ -29080,7 +29080,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Sun Wukong flies up to his full fly Speed without provoking Opportunity Attacks.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2012-sun-wukong-somersault-leap.md"
     },
     {
       "id": "MA-2013",
@@ -29094,7 +29094,7 @@
       "saveDc": 24,
       "saveType": "Wisdom",
       "description": "Wisdom Saving Throw: DC 24, one creature within 60 ft. Failure: the target is unable to move, take Reactions, or speak until the start of Wukong's next turn. Success: no effect. No damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2013-sun-wukong-locking-word.md"
     },
     {
       "id": "MA-1552",
@@ -29794,7 +29794,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "The Thunderbird makes one Beak attack and two Wing attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2015",
@@ -29810,7 +29810,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +15, reach 15 ft. Hit: 24 (3d10 + 8) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2016",
@@ -29826,7 +29826,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +15, reach 15 ft. Hit: 26 (4d8 + 8) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2017",
@@ -29842,7 +29842,7 @@
       "damageDicePrimary": "12d10",
       "damageTypePrimary": "Lightning",
       "description": "Dexterity Saving Throw: DC 24, each creature within 60 ft. Failure: 66 (12d10) Lightning damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2017-thunderbird-thunderstrike-recharge.md"
     },
     {
       "id": "MA-2018",
@@ -29855,7 +29855,7 @@
       "actionType": "other",
       "trigger": "When the Thunderbird is forced to stop flying.",
       "description": "The Thunderbird immediately rises 60 ft. vertically without provoking Opportunity Attacks.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2018-thunderbird-updraft.md"
     },
     {
       "id": "MA-2019",
@@ -29868,7 +29868,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2020",
@@ -29880,7 +29880,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Wing attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2021",
@@ -29899,7 +29899,7 @@
         "prone"
       ],
       "description": "Strength Saving Throw: DC 23, each creature within 30 ft. Failure: pushed 20 ft. and knocked Prone; takes 7 (2d6) Thunder damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2021-thunderbird-wing-clap.md"
     },
     {
       "id": "MA-2022",
@@ -29911,7 +29911,7 @@
       "category": "legendary_actions",
       "actionType": "save",
       "description": "The Thunderbird calls down a single bolt of lightning on one creature within 120 ft. The target must succeed on a DC 24 Dexterity saving throw or take 27 (6d8) Lightning damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2022-thunderbird-storm-call.md"
     },
     {
       "id": "MA-2023",
@@ -29923,7 +29923,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Tiamat can use her Frightful Presence. She then makes two Claw attacks and one Tail attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2024",
@@ -29939,7 +29939,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +19, reach 15 ft. Hit: 24 (4d6 + 10) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2025",
@@ -29955,7 +29955,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "25 ft.",
       "description": "Melee Attack Roll: +19, reach 25 ft. Hit: 28 (4d8 + 10) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2026",
@@ -29972,7 +29972,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 26, each creature of her choice within 240 ft. of her and aware of her. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. If a creature's saving throw is successful or the effect ends for it, the creature is immune to Tiamat's Frightful Presence for 24 hours. No damage. The target has the Frightened condition on a failed save. No damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2026-tiamat-frightful-presence.md"
     },
     {
       "id": "MA-2027",
@@ -29985,7 +29985,7 @@
       "actionType": "other",
       "uses": 5,
       "description": "Immediately after another creature's turn, Tiamat can expend a use to take one of the following actions. Her options are tied to her five heads; once she picks an option for one head, she can't choose another option for that head until the start of her next turn. She regains all expended uses at the start of each of her turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2028",
@@ -30003,7 +30003,7 @@
       "damageTypeSecondary": "Acid",
       "reach": "20 ft.",
       "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 32 (4d10 + 10) Slashing damage. Plus 14 (4d6) Acid damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2029",
@@ -30021,7 +30021,7 @@
       "damageTypeSecondary": "Lightning",
       "reach": "20 ft.",
       "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 32 (4d10 + 10) Slashing damage. Plus 14 (4d6) Lightning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2030",
@@ -30039,7 +30039,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "20 ft.",
       "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 32 (4d10 + 10) Slashing damage. Plus 14 (4d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2031",
@@ -30057,7 +30057,7 @@
       "damageTypeSecondary": "Fire",
       "reach": "20 ft.",
       "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 32 (4d10 + 10) Slashing damage. Plus 14 (4d6) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2032",
@@ -30075,7 +30075,7 @@
       "damageTypeSecondary": "Cold",
       "reach": "20 ft.",
       "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 32 (4d10 + 10) Slashing damage. Plus 14 (4d6) Cold damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2033",
@@ -30091,7 +30091,7 @@
       "damageDicePrimary": "15d8",
       "damageTypePrimary": "Acid",
       "description": "Dexterity Saving Throw: DC 27, each creature in a 120-foot-long, 10-foot-wide Line. Failure: 67 (15d8) Acid damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2034",
@@ -30107,7 +30107,7 @@
       "damageDicePrimary": "16d10",
       "damageTypePrimary": "Lightning",
       "description": "Dexterity Saving Throw: DC 27, each creature in a 120-foot-long, 10-foot-wide Line. Failure: 88 (16d10) Lightning damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2035",
@@ -30123,7 +30123,7 @@
       "damageDicePrimary": "22d6",
       "damageTypePrimary": "Poison",
       "description": "Constitution Saving Throw: DC 27, each creature in a 90-foot Cone. Failure: 77 (22d6) Poison damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2036",
@@ -30139,7 +30139,7 @@
       "damageDicePrimary": "26d6",
       "damageTypePrimary": "Fire",
       "description": "Dexterity Saving Throw: DC 27, each creature in a 90-foot Cone. Failure: 91 (26d6) Fire damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2037",
@@ -30155,7 +30155,7 @@
       "damageDicePrimary": "16d8",
       "damageTypePrimary": "Cold",
       "description": "Dexterity Saving Throw: DC 27, each creature in a 90-foot Cone. Failure: 72 (16d8) Cold damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1595",
@@ -30532,7 +30532,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Typhon makes four attacks: two with his serpent heads and two with his claws.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2039",
@@ -30550,7 +30550,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +19, reach 15 ft. Hit: 26 (3d10 + 10) Piercing damage. Plus 7 (2d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2040",
@@ -30566,7 +30566,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "20 ft.",
       "description": "Melee Attack Roll: +19, reach 20 ft. Hit: 28 (4d8 + 10) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2041",
@@ -30582,7 +30582,7 @@
       "damageDicePrimary": "26d6",
       "damageTypePrimary": "Bludgeoning",
       "description": "Strength Saving Throw: DC 27, each creature within 120 ft. Failure: 91 (26d6) Bludgeoning damage. Success: Half damage. The area becomes difficult terrain as boulders and debris fly.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2041-typhon-storm-breach-recharge.md"
     },
     {
       "id": "MA-2042",
@@ -30595,7 +30595,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2043",
@@ -30607,7 +30607,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Serpent Head attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2044",
@@ -30623,7 +30623,7 @@
       "damageTypePrimary": "Fire",
       "range": "90 ft.",
       "description": "Ranged Attack Roll: +17, range 90 ft., two targets. Hit: 18 (4d8+1) Fire damage each.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2045",
@@ -30642,7 +30642,7 @@
         "prone"
       ],
       "description": "Dexterity Saving Throw: DC 25, each creature within 60 ft. Failure: 27 (6d8) Bludgeoning damage and the target is knocked Prone. Success: half damage and not Prone.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2045-typhon-earthquake.md"
     },
     {
       "id": "MA-1619",
@@ -30934,7 +30934,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The unicorn targets itself or one creature it can see within 60 feet of itself. The target gains 10 (3d6) Temporary Hit Points, and its AC increases by 2 until the end of the unicorn's next turn. The unicorn can't take this action again until the start of its next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1637",
@@ -31033,7 +31033,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The vampire moves up to half its Speed, and it makes one Grave Strike attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1642",
@@ -31321,7 +31321,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The vampire moves up to half its Speed, and it makes one Grave Strike or Sickening Ray attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1659",
@@ -32570,7 +32570,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Orochi makes four Bite attacks, each against a different target.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2050",
@@ -32588,7 +32588,7 @@
       "damageTypeSecondary": "Poison",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +18, reach 15 ft. Hit: 25 (3d10 + 9) Piercing damage. Plus 7 (2d6) Poison damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2051",
@@ -32604,7 +32604,7 @@
       "damageDicePrimary": "22d6",
       "damageTypePrimary": "Poison",
       "description": "Constitution Saving Throw: DC 26, each creature within 90 ft. Failure: 77 (22d6) Poison damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2051-yamata-venom-mist-recharge.md"
     },
     {
       "id": "MA-2052",
@@ -32617,7 +32617,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2053",
@@ -32629,7 +32629,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Bite attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2054",
@@ -32641,7 +32641,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Orochi makes one Perception check.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2054-yamata-heads-vigil.md"
     },
     {
       "id": "MA-2055",
@@ -32660,7 +32660,7 @@
         "grappled"
       ],
       "description": "Melee Attack Roll: +18, reach 10 ft., one Huge or smaller creature. Hit: 27 (4d10+9) Bludgeoning damage and the target is Grappled (escape DC 26); while Grappled it takes 18 (4d8) Bludgeoning at the start of its next turn.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-1736",
@@ -32739,7 +32739,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Ymir makes two Glacier Club attacks and one Stomp attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2057",
@@ -32757,7 +32757,7 @@
       "damageTypeSecondary": "Cold",
       "reach": "20 ft.",
       "description": "Melee Attack Roll: +18, reach 20 ft. Hit: 26 (3d10 + 10) Bludgeoning damage. Plus 7 (2d6) Cold damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2058",
@@ -32776,7 +32776,7 @@
         "prone"
       ],
       "description": "Melee Attack Roll: +18, reach 10 ft. Hit: 32 (4d10 + 10) Bludgeoning damage. The target has the Prone condition.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2059",
@@ -32795,7 +32795,7 @@
         "restrained"
       ],
       "description": "Strength Saving Throw: DC 26, each creature in a 120-foot-long, 10-foot-wide Line. Failure: 77 (14d10) Bludgeoning damage. Success: Half damage. The target is also Restrained until the end of its next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2059-ymir-glacier-wave.md"
     },
     {
       "id": "MA-2060",
@@ -32808,7 +32808,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2061",
@@ -32820,7 +32820,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Glacier Club attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2062",
@@ -32832,7 +32832,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Stomp attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2063",
@@ -32847,7 +32847,7 @@
         "restrained"
       ],
       "description": "A pillar of ice erupts at a point within 90 ft. Each creature in a 20 ft. radius must succeed on a DC 24 Dexterity saving throw or take 18 (4d8) Cold damage and be Restrained.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2063-ymir-frost-geyser.md"
     },
     {
       "id": "MA-1740",
@@ -34420,7 +34420,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Ziz makes one Beak attack and two Wing attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2065",
@@ -34436,7 +34436,7 @@
       "damageTypePrimary": "Piercing",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +15, reach 15 ft. Hit: 24 (3d10 + 8) Piercing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2066",
@@ -34452,7 +34452,7 @@
       "damageTypePrimary": "Bludgeoning",
       "reach": "15 ft.",
       "description": "Melee Attack Roll: +15, reach 15 ft. Hit: 26 (4d8 + 8) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2067",
@@ -34468,7 +34468,7 @@
       "damageDicePrimary": "9d10",
       "damageTypePrimary": "Radiant",
       "description": "Constitution Saving Throw: DC 24, each creature within 60 ft. Failure: 49 (9d10) Radiant damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2067-ziz-solar-flare-recharge.md"
     },
     {
       "id": "MA-2068",
@@ -34481,7 +34481,7 @@
       "actionType": "other",
       "trigger": "When the Ziz is targeted by a ranged attack.",
       "description": "Ziz folds its wings for armor, adding +5 to AC against the triggering attack.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2068-ziz-wing-shield.md"
     },
     {
       "id": "MA-2069",
@@ -34494,7 +34494,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2070",
@@ -34506,7 +34506,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Wing attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2071",
@@ -34521,7 +34521,7 @@
         "invisible"
       ],
       "description": "Ziz rises into the sun, becoming invisible until the start of his next turn.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2071-ziz-blinding-ascent.md"
     },
     {
       "id": "MA-2072",
@@ -34536,7 +34536,7 @@
         "prone"
       ],
       "description": "Enemies within 60 ft. must succeed on a DC 23 Wisdom saving throw or take 7 (2d6) Thunder damage and be knocked Prone.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2072-ziz-sky-screech.md"
     },
     {
       "id": "MA-2073",
@@ -34548,7 +34548,7 @@
       "category": "actions",
       "actionType": "multiattack",
       "description": "Zmey Gorynych makes three Bite or Claw attacks.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2074",
@@ -34566,7 +34566,7 @@
       "damageTypeSecondary": "Fire",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 26 (4d8 + 8) Piercing damage. Plus 7 (2d6) Fire damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2075",
@@ -34582,7 +34582,7 @@
       "damageTypePrimary": "Slashing",
       "reach": "10 ft.",
       "description": "Melee Attack Roll: +15, reach 10 ft. Hit: 22 (4d8 + 8) Slashing damage.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2081",
@@ -34598,7 +34598,7 @@
       "damageDicePrimary": "11d8",
       "damageTypePrimary": "Fire",
       "description": "Dexterity Saving Throw: DC 23, each creature in a 90-foot Cone. Failure: 49 (11d8) Fire damage. Success: Half damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2081-zmey-triple-fire-breath-recharge.md"
     },
     {
       "id": "MA-2076",
@@ -34611,7 +34611,7 @@
       "actionType": "other",
       "uses": 3,
       "description": "Immediately after another creature's turn, it can expend a use to take one of the following actions. It regains all expended uses at the start of each of its turns.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2077",
@@ -34623,7 +34623,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "It makes one Bite attack.",
-      "verified": "not verified"
+      "verified": "verified"
     },
     {
       "id": "MA-2078",
@@ -34642,7 +34642,7 @@
         "blinded"
       ],
       "description": "Strength Saving Throw: DC 23, each creature within 40 ft. Failure: Blinded until the end of its next turn; takes 7 (2d6) Bludgeoning damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2078-zmey-dust-storm.md"
     },
     {
       "id": "MA-2079",
@@ -34654,7 +34654,7 @@
       "category": "legendary_actions",
       "actionType": "aoe-save",
       "description": "Zmey Gorynych beats his wings in a wide arc, exhaling fire in a 60-foot Cone. Each creature in the area must succeed on a DC 23 Dexterity saving throw or take 11 (2d8) Fire damage.",
-      "verified": "not verified"
+      "verified": "broken — see .opencode/plans/bug-mon-2079-zmey-wing-buffet.md"
     },
     {
       "id": "MA-1838",
