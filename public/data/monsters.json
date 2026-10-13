@@ -65295,7 +65295,9 @@
       {
         "name": "Updraft",
         "trigger": "When the Thunderbird is forced to stop flying.",
-        "description": "The Thunderbird immediately rises 60 ft. vertically without provoking Opportunity Attacks."
+        "description": "The Thunderbird immediately rises 60 ft. vertically without provoking Opportunity Attacks.",
+        "advisory": "updraft",
+        "advisory_message": "when forced to stop flying — immediately rises 60 ft. vertically without provoking Opportunity Attacks — advisory record: flying-stop trigger and movement are GM-enforced (no consumer)."
       }
     ],
     "legendary_actions": [

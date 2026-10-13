@@ -29855,7 +29855,7 @@
       "actionType": "other",
       "trigger": "When the Thunderbird is forced to stop flying.",
       "description": "The Thunderbird immediately rises 60 ft. vertically without provoking Opportunity Attacks.",
-      "verified": "broken — see .opencode/plans/bug-mon-2018-thunderbird-updraft.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2019",
