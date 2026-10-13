@@ -6,7 +6,7 @@
  * it never rolls dice, never writes state, and must answer in schema JSON.
  */
 
-import { validateRuling } from './schemas.js';
+import { validateRuling, validateNpcIntent } from './schemas.js';
 
 // Compact the shared runtime state into a small context block — token budget
 // discipline (§16 "persistence of AI context"): capped lists, scalar fields
@@ -81,12 +81,49 @@ export function buildRefereeMessages({ action, characterName, state }) {
     ];
 }
 
+const DIRECTOR_SYSTEM = `You are the NPC director for a D&D (5e/2024) turn-based combat. It is one monster's turn; choose what it does.
+
+NON-NEGOTIABLE RULES:
+1. Pick ONLY from the ALLOWED ACTIONS list you are given — never invent actions, attacks, spells or items the monster does not have.
+2. You NEVER state results (no "the attack hits", no damage numbers). You only pick an intent; the engine rolls and resolves.
+3. Pick ONLY living targets from the TARGETS list for attacks. Prefer tactically sensible targets per the monster's combat style.
+4. Respect the ECONOMY block: if actions are spent, propose move/talk/pass only.
+5. Movement must be a whole number of feet within the monster's speed.
+6. Answer with ONE JSON object and nothing else, exactly one of:
+   {"intent":"attack","actionName":"Scimitar","targetName":"Rakan","explanation":"...","confidence":0.9}
+   {"intent":"cast","actionName":"Fire Bolt","targetName":"...","explanation":"...","confidence":0.8}
+   {"intent":"utility","actionName":"Hide","targetName":"optional","explanation":"...","confidence":0.7}
+   {"intent":"move","feet":30,"direction":"toward the nearest target","explanation":"...","confidence":0.8}
+   {"intent":"talk","text":"short barks in Goblin","explanation":"...","confidence":0.6}
+   {"intent":"pass","explanation":"...","confidence":0.5}
+Keep "explanation" short (one sentence). "confidence" is 0..1.`;
+
 /**
- * Parse + validate the model's answer. Tolerates fenced code blocks and
- * surrounding prose (small local models love a ```json fence) but NEVER
- * repairs field values — anything malformed fails validation outright.
+ * Build chat messages for an NPC-turn director request.
+ * @param {{ creatureName: string, monster: object, targets: Array, self: object, economy: object, allowedIntents: Array|null, round: number|null }} args
  */
-export function parseRulingAnswer(content) {
+export function buildDirectorMessages({ creatureName, monster, targets, self, economy, allowedIntents, round }) {
+    const user = [
+        `MONSTER (its turn): ${creatureName}`,
+        `SPEED: ${monster.speedFeet ?? 'unknown'} ft.`,
+        `ALLOWED ACTIONS (exact names — pick only from this list):\n${JSON.stringify(monster.actions.map(a => ({ name: a.name, attack_bonus: a.attack_bonus, description: a.description.slice(0, 140) })))}`,
+        `TARGETS (living):\n${JSON.stringify(targets)}`,
+        `YOUR STATE: ${JSON.stringify(self)}`,
+        `ECONOMY: ${JSON.stringify(economy)}`,
+        allowedIntents ? `ALLOWED INTENTS RIGHT NOW: ${allowedIntents.join(', ')}` : null,
+        `ROUND: ${round ?? '?'}`,
+    ].filter(Boolean).join('\n\n');
+    return [
+        { role: 'system', content: DIRECTOR_SYSTEM },
+        { role: 'user', content: user },
+    ];
+}
+
+/**
+ * Extract the first balanced-ish JSON object from a model answer. Tolerates * fenced code blocks and surrounding prose (small local models love a
+ * ```json fence) but NEVER repairs field values.
+ */
+export function extractJsonObject(content) {
     if (typeof content !== 'string') return { ok: false, errors: ['empty answer'] };
     let text = content.trim();
     const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -94,12 +131,24 @@ export function parseRulingAnswer(content) {
     const braceStart = text.indexOf('{');
     const braceEnd = text.lastIndexOf('}');
     if (braceStart === -1 || braceEnd <= braceStart) return { ok: false, errors: ['no JSON object in answer'] };
-    let parsed;
     try {
-        parsed = JSON.parse(text.slice(braceStart, braceEnd + 1));
+        return { ok: true, value: JSON.parse(text.slice(braceStart, braceEnd + 1)) };
     } catch (e) {
         return { ok: false, errors: [`invalid JSON: ${e.message}`] };
     }
-    const result = validateRuling(parsed);
-    return result.ok ? { ok: true, ruling: parsed } : { ok: false, errors: result.errors };
+}
+
+export function parseRulingAnswer(content) {
+    const extracted = extractJsonObject(content);
+    if (!extracted.ok) return extracted;
+    const result = validateRuling(extracted.value);
+    return result.ok ? { ok: true, ruling: extracted.value } : { ok: false, errors: result.errors };
+}
+
+/** §9.3 — parse + allowlist-validate an NPC-director intent. */
+export function parseIntentAnswer(content, allow) {
+    const extracted = extractJsonObject(content);
+    if (!extracted.ok) return extracted;
+    const result = validateNpcIntent(extracted.value, allow);
+    return result.ok ? { ok: true, intent: extracted.value } : { ok: false, errors: result.errors };
 }

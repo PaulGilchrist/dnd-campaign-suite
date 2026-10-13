@@ -11,8 +11,9 @@
  * leaks to the browser.
  */
 import { chat, probe, isLocalEndpoint } from './providers/localProvider.js';
-import { buildRefereeMessages, parseRulingAnswer } from './promptBuilder.js';
+import { buildRefereeMessages, parseRulingAnswer, buildDirectorMessages, parseIntentAnswer } from './promptBuilder.js';
 import { needsHumanRuling } from './schemas.js';
+import { lookupMonsterActions } from './monsterActions.js';
 
 export const AI_MODES = new Set(['off', 'suggest', 'autopilot']);
 
@@ -67,8 +68,119 @@ export async function askReferee({ campaign, action, characterName, aiConfig, st
     return { ok: false, code: 'AI_NEEDS_HUMAN', ruling: fallback };
 }
 
-async function auditLog(log, campaign, characterName, ruling, attempts) {
+/**
+ * §9.3 — ask the AI director to decide an NPC's turn. Same funnel as the
+ * referee (retry once → needs_human, audit-logged) but EVERY proposal is
+ * bounded by the monster's real stat block: action names, living targets and
+ * speed are an allowlist enforced by validateNpcIntent, and the turn-lock +
+ * action-economy truth in the shared state can REFUSE the request outright
+ * (before any model call) — honest refusals, not guesses.
+ * Returns { ok, intent, code? }. The intent is a PROPOSAL; execution routes
+ * through the existing monster lanes only after referee confirmation.
+ */
+const aliveOf = (c) => !c.isDead && (c.currentHp ?? c.hp ?? 1) > 0
+const livingPlayers = (cs) => (cs.creatures || [])
+    .filter(c => c.type === 'player' && aliveOf(c))
+    .slice(0, 12)
+    .map(c => ({ name: c.name, ac: c.ac ?? null, hp: c.currentHp ?? c.hp ?? null }))
+
+function turnLockRefused(creatureName, cs, enforcement) {
+    if (enforcement.mode !== 'on' || !enforcement.turnLock) return false;
+    return (cs.activeCreatureName ?? null) !== creatureName;
+}
+
+/** Turn/economy/target truth — refusals happen before any model call. */
+function directorGate(creatureName, state) {
+    const cs = state.combatSummary || {};
+    const enforcement = state.enforcement || {};
+    if (turnLockRefused(creatureName, cs, enforcement)) {
+        return { code: 'NOT_THEIR_TURN' }; // turn-lock truth — no model call, no guessing
+    }
+    const self = (cs.creatures || []).find(c => c.name === creatureName) || {};
+    if (!aliveOf(self)) {
+        return { code: 'NPC_DOWN' };
+    }
+    const economy = (state.turnState || {})[creatureName] || {};
+    const actionsSpent = enforcement.mode === 'on' && enforcement.actionEconomy && (economy.actionsUsed ?? 0) >= 1;
+    return { self, economy, actionsSpent, targets: livingPlayers(cs), round: cs.round };
+}
+
+function directorPrompt(creatureName, monster, gate) {
+    const allow = {
+        actionNames: monster.actions.map(a => a.name),
+        targetNames: gate.targets.map(t => t.name),
+        speedFeet: monster.speedFeet,
+        allowedIntents: gate.actionsSpent ? ['move', 'talk', 'pass'] : null,
+    };
+    const messages = buildDirectorMessages({
+        creatureName,
+        monster,
+        targets: gate.targets,
+        self: { hp: gate.self.currentHp ?? gate.self.hp ?? null, conditions: Array.isArray(gate.self.conditions) ? gate.self.conditions.slice(0, 8) : [] },
+        economy: { actionsUsed: gate.economy.actionsUsed ?? 0, bonusActionsUsed: gate.economy.bonusActionsUsed ?? 0, movementUsedFeet: gate.economy.movementUsedFeet ?? 0, actionsSpent: gate.actionsSpent },
+        allowedIntents: allow.allowedIntents,
+        round: gate.round ?? null,
+    });
+    return { allow, messages };
+}
+
+export async function askNpcDirector({ campaign, creatureName, aiConfig, state = {}, log }) {
+    if (!aiConfigLive(aiConfig)) return { ok: false, code: 'AI_OFF' };
+
+    const monster = lookupMonsterActions(creatureName);
+    if (!monster || monster.actions.length === 0) {
+        return await directorFail(log, campaign, creatureName, `no stat-block actions on file for '${creatureName}' — the GM directs this one`);
+    }
+    const gate = directorGate(creatureName, state);
+    if (gate.code) return { ok: false, code: gate.code };
+    if (gate.targets.length === 0 && !gate.actionsSpent) {
+        return await directorFail(log, campaign, creatureName, 'no living targets in combat — the GM decides what this monster does');
+    }
+    const { allow, messages } = directorPrompt(creatureName, monster, gate);
+
+    let lastError = 'no attempt made';
+    for (let attempt = 1; attempt <= 2; attempt++) { // one retry, then human (§9.1)
+        let content;
+        try {
+            content = await chat({ ...chatOpts(aiConfig), messages });
+        } catch (e) {
+            lastError = `${e.code || 'ERROR'}: ${String(e.message || e).slice(0, 160)}`;
+            continue;
+        }
+        const result = parseIntentAnswer(content, allow);
+        if (result.ok) {
+            const intent = { ...result.intent, creatureName };
+            await directorAudit(log, campaign, intent, attempt);
+            return { ok: true, intent, mode: aiConfig.mode };
+        }
+        lastError = `invalid intent: ${result.errors.join('; ')}`;
+    }
+    return await directorFail(log, campaign, creatureName, lastError);
+}
+
+async function directorFail(log, campaign, creatureName, reason) {
+    const intent = { intent: 'needs_human', creatureName, text: `AI director: ${String(reason).slice(0, 200)}` };
+    await directorAudit(log, campaign, intent, 0);
+    return { ok: false, code: 'AI_NEEDS_HUMAN', intent };
+}
+
+async function directorAudit(log, campaign, intent, attempts) {
     if (typeof log !== 'function') return;
+    try {
+        await log(campaign, {
+            type: 'ai_director',
+            name: 'AI director',
+            characterName: intent.creatureName,
+            intent,
+            attempts,
+            description: `AI director proposed ${intent.intent}${intent.actionName ? `: ${intent.actionName}` : ''}${intent.targetName ? ` → ${intent.targetName}` : ''}${intent.intent === 'move' ? ` (${intent.feet} ft.)` : ''}${intent.explanation ? ` — ${intent.explanation}` : ''}`.slice(0, 300),
+        });
+    } catch (e) {
+        console.error('[aiService:director-audit]', e);
+    }
+}
+
+async function auditLog(log, campaign, characterName, ruling, attempts) {    if (typeof log !== 'function') return;
     try {
         await log(campaign, {
             type: 'ai_ruling',

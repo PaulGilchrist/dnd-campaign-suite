@@ -1,0 +1,42 @@
+/* L5-005 §9.3 — AI director panel (scoped to .ai-director). */
+.ai-director {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+.ai-director .ai-director-ask {
+    white-space: nowrap;
+}
+.ai-director .ai-director-card {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    padding: 4px 10px;
+    border: 1px solid rgba(163, 113, 247, 0.45);
+    border-left: 4px solid #a371f7;
+    border-radius: 6px;
+}
+.ai-director .ai-director-why {
+    color: #8b949e;
+    font-size: 0.8rem;
+}
+.ai-director .ai-director-actions {
+    display: flex;
+    gap: 0.4rem;
+}
+.ai-director .ai-director-notice {
+    font-size: 0.8rem;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+.ai-director .ai-director-notice.ok {
+    background: rgba(46, 160, 67, 0.14);
+    color: #3fb950;
+}
+.ai-director .ai-director-notice.advisory {
+    background: rgba(210, 153, 34, 0.16);
+    color: #d29922;
+}

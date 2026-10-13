@@ -10,6 +10,13 @@
  *   never a silent auto-decision on the table (§9.5 + AGENTS.md no-timers:
  *   a model timeout becomes "the referee decides", never an auto-ruling).
  *
+ * POST /api/campaigns/:campaign/ai/director { creatureName }
+ *   §9.3 NPC director: the model picks ONLY from the monster's real stat
+ *   block (allowlist-enforced actions / living targets / speed), turn-lock
+ *   and action-economy refusals happen before any model call. Returns an
+ *   intent PROPOSAL — execution rides the existing monster lanes, after
+ *   referee confirm in suggest mode.
+ *
  * GET /api/campaigns/:campaign/ai/status
  *   { configured, mode, endpoint, model, reachable?, models? } for the
  *   (future) Referee console and the health check in server.js.
@@ -21,7 +28,7 @@
 import express from 'express';
 import { characterChangeData } from '../utils/changeData.js';
 import { addEntry } from './log.js';
-import { askReferee, aiConfigLive, probe } from '../services/ai/index.js';
+import { askReferee, askNpcDirector, aiConfigLive, probe } from '../services/ai/index.js';
 
 const router = express.Router();
 
@@ -76,6 +83,41 @@ router.post('/api/campaigns/:campaign/ai/referee', async (req, res) => {
     } catch (e) {
         console.error('[campaigns-ai:referee]', e);
         res.status(500).json({ error: 'ai referee request failed' });
+    }
+});
+
+router.post('/api/campaigns/:campaign/ai/director', async (req, res) => {
+    try {
+        const { campaign } = req.params;
+        const cd = characterChangeData.get(campaign) || {};
+        const cfg = cd.aiConfig;
+        if (!aiConfigLive(cfg)) {
+            return res.status(403).json({ error: 'AI is not enabled for this campaign' });
+        }
+        if (!isReferee(req)) {
+            return res.status(403).json({ error: 'only the referee (or localhost) may direct NPCs with AI' });
+        }
+        const creatureName = typeof req.body?.creatureName === 'string' ? req.body.creatureName.trim().slice(0, 120) : '';
+        if (!creatureName) {
+            return res.status(400).json({ error: 'creatureName is required' });
+        }
+        const creature = (cd.combatSummary?.creatures || []).find(c => c.name === creatureName);
+        if (!creature) {
+            return res.status(404).json({ error: `'${creatureName}' is not in the combat order` });
+        }
+        if (creature.type === 'player') {
+            return res.status(400).json({ error: 'players direct themselves — the AI directs NPCs only' });
+        }
+
+        const result = await askNpcDirector({ campaign, creatureName, aiConfig: cfg, state: cd, log: addEntry });
+        const refusalStatus = { NOT_THEIR_TURN: 409, NPC_DOWN: 409 }[result.code];
+        if (refusalStatus) {
+            return res.status(refusalStatus).json({ error: result.code, intent: result.intent || null });
+        }
+        res.status(200).json({ ...result, mode: cfg.mode });
+    } catch (e) {
+        console.error('[campaigns-ai:director]', e);
+        res.status(500).json({ error: 'ai director request failed' });
     }
 });
 

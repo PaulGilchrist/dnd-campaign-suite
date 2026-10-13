@@ -88,3 +88,69 @@ export function needsHumanRuling(reason) {
         text: `AI referee unavailable — the referee adjudicates this turn. (${String(reason || 'no reason given').slice(0, MAX_REASON)})`,
     };
 }
+
+/**
+ * §9.3 NPC-director intents. The allowlist (real stat-block action names,
+ * live target names, speed) is the CONTRACT — anything off-list is invalid,
+ * never "repaired". Matching is case-insensitive but the canonical spelling
+ * from the allowlist is stamped back onto the intent, so downstream lanes
+ * always see the exact name the rules data uses.
+ */
+const INTENT_TYPES = new Set(['attack', 'cast', 'utility', 'move', 'talk', 'pass']);
+
+function matchAllowed(name, list) {
+    if (!trimmedNonEmpty(name)) return null;
+    const lower = String(name).trim().toLowerCase();
+    return (list || []).find(item => String(item).toLowerCase() === lower) || null;
+}
+
+function attackFields(intent, allow, errors) {
+    const action = matchAllowed(intent.actionName, allow.actionNames);
+    if (!action) errors.push(`actionName must be one of this monster's actions: ${(allow.actionNames || []).join(', ') || '(none)'}`);
+    else intent.actionName = action;
+    const target = matchAllowed(intent.targetName, allow.targetNames);
+    if (!target) errors.push(`targetName must be a living target in the context: ${(allow.targetNames || []).join(', ') || '(none)'}`);
+    else intent.targetName = target;
+}
+
+const INTENT_CHECKS = {
+    attack: attackFields,
+    cast: attackFields,
+    utility: (intent, allow, errors) => {
+        const action = matchAllowed(intent.actionName, allow.actionNames);
+        if (!action) errors.push(`utility actionName must be one of this monster's actions: ${(allow.actionNames || []).join(', ') || '(none)'}`);
+        else intent.actionName = action;
+        if (intent.targetName !== undefined) {
+            if (!trimmedNonEmpty(intent.targetName)) errors.push('utility.targetName must be non-empty when present');
+            // Utilities may target objects/self — canonicalize when it matches
+            // a known combatant, pass other names through untouched.
+            else intent.targetName = matchAllowed(intent.targetName, allow.targetNames) || intent.targetName.trim();
+        }
+    },
+    move: (intent, allow, errors) => {
+        const speed = typeof allow.speedFeet === 'number' ? allow.speedFeet : null;
+        if (!Number.isInteger(intent.feet) || intent.feet < 1) errors.push('move.feet must be a positive integer');
+        else if (speed !== null && intent.feet > speed) errors.push(`move.feet ${intent.feet} exceeds speed ${speed} ft.`);
+    },
+    talk: (intent, allow, errors) => textField(intent, errors, 'text'),
+    pass: () => {},
+};
+
+export function validateNpcIntent(intent, allow = {}) {
+    if (!intent || typeof intent !== 'object' || Array.isArray(intent)) {
+        return { ok: false, errors: ['intent must be an object'] };
+    }
+    if (!INTENT_TYPES.has(intent.intent)) {
+        return { ok: false, errors: [`unknown intent: ${JSON.stringify(intent.intent)} — must be attack|cast|utility|move|talk|pass`] };
+    }
+    if (Array.isArray(allow.allowedIntents) && !allow.allowedIntents.includes(intent.intent)) {
+        return { ok: false, errors: [`intent '${intent.intent}' is not permitted right now (economy spent?) — allowed: ${allow.allowedIntents.join(', ')}`] };
+    }
+    const errors = [];
+    if (trimmedNonEmpty(intent.explanation) && intent.explanation.length > MAX_REASON) errors.push(`explanation must be ≤${MAX_REASON} chars`);
+    if (intent.confidence !== undefined && !(typeof intent.confidence === 'number' && Number.isFinite(intent.confidence) && intent.confidence >= 0 && intent.confidence <= 1)) {
+        errors.push('confidence must be a number 0..1 when present');
+    }
+    INTENT_CHECKS[intent.intent](intent, allow, errors);
+    return { ok: errors.length === 0, errors };
+}

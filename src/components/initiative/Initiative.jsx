@@ -33,6 +33,7 @@ import { createFleshToStoneHandler, createPrismaticSprayIndigoHandler, createPri
 import { useLootHandlers } from './useLootHandlers.js'
 import { createNextCreatureHandler, createPreviousCreatureHandler } from './navigationHandlers.js'
 import TurnEconomyStrip from './TurnEconomyStrip.jsx'
+import AiDirectorPanel from './AiDirectorPanel.jsx'
 import { createCreatureHandlers } from './createCreatureHandlers.js'
 import { createRollConditionSaveHandler } from './createRollConditionSaveHandler.js'
 import { createConcentrationHandlers } from './createConcentrationHandlers.js'
@@ -700,6 +701,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                   {enforcementOn && (
                       <button className='end-turn-button' onClick={handleNextCreature} title="End the active creature's turn (advances initiative and resets their economy)">End Turn</button>
                   )}
+                  {/* §9.3 AI director (hidden unless AI configured + localhost + NPC's turn) */}
+                  <AiDirectorPanel
+                      campaignName={campaignName}
+                      activeCreature={combatSummary.creatures.find(c => c.name === activeCreatureName) || null}
+                      isLocalhost={isLocalhost}
+                      onStampTarget={handleTargetChange}
+                      round={combatSummary.round}
+                  />
               </div>
               <InitiativeLoot
                 lootData={lootData}
