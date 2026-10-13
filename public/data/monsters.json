@@ -66842,6 +66842,7 @@
         "name": "Storm Breach (Recharge 5-6)",
         "save_type": "Strength",
         "save_dc": 27,
+        "recharge": "5-6",
         "description": "Strength Saving Throw: DC 27, each creature within 120 ft. Failure: 91 (26d6) Bludgeoning damage. Success: Half damage. The area becomes difficult terrain as boulders and debris fly.",
         "damage_dice_primary": "26d6",
         "damage_type_primary": "Bludgeoning"
