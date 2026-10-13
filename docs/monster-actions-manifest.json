@@ -27580,7 +27580,7 @@
       "damageDicePrimary": "22d6",
       "damageTypePrimary": "Fire",
       "description": "Dexterity Saving Throw: DC 24, each creature in a 90-foot Cone. Failure: 77 (22d6) Fire damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-1996-smaug-fire-breath-recharge.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1997",
