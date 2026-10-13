@@ -224,3 +224,58 @@ describe('L5-001 change-data validation chokepoint', () => {
         });
     });
 });
+
+// H1 hardening (§17): monster-side economy property scan at the chokepoint.
+describe('H1 monster-economy shape validation (§17)', () => {
+    const monster = (props) => request(createTestApp())
+        .post('/api/campaigns/test-campaign/Goblin%201')
+        .send({ value: props });
+
+    it('accepts honest legendary/recharge state (byte pass-through)', async () => {
+        const res = await monster({
+            activeConditions: ['prone'],
+            monsterLegendaryUses: { max: 3, used: 1 },
+            _legendaryUses_usedRound: { round: 2, activeCreature: 'Rakan' },
+            monsterLegendaryActionCooldowns: { scorching_sands: { round: 2, usedBefore: 0 } },
+            monsterRecharge: { 'Fire Breath': { recharged: false, threshold: 5 } },
+        });
+        expect(res.status).toBe(200);
+        expect(characterChangeData.get('test-campaign')['Goblin 1'].monsterLegendaryUses.used).toBe(1);
+    });
+
+    it('refuses legendary used > max — a client cannot self-forgery past exhaustion', async () => {
+        const res = await monster({ monsterLegendaryUses: { max: 3, used: 4 } });
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/exceeds max/);
+    });
+
+    it('refuses negative/fractional legendary spends', async () => {
+        expect((await monster({ monsterLegendaryUses: { max: 3, used: -1 } })).status).toBe(400);
+        expect((await monster({ monsterLegendaryUses: { max: 3, used: 1.5 } })).status).toBe(400);
+    });
+
+    it('refuses recharge thresholds outside the authored d6 range 1..6', async () => {
+        expect((await monster({ monsterRecharge: { 'Breath': { recharged: false, threshold: 9 } } })).status).toBe(400);
+        expect((await monster({ monsterRecharge: { 'Breath': { recharged: 'yes' } } })).status).toBe(400);
+    });
+
+    it('accepts authored low thresholds (1 and 3 exist in monsters.json)', async () => {
+        const res = await monster({ monsterRecharge: { 'Breath': { recharged: true, threshold: 1 } } });
+        expect(res.status).toBe(200);
+    });
+
+    it('null-cleared economy state stays legal (regain/clear seams)', async () => {
+        const res = await monster({
+            monsterLegendaryUses: null,
+            _legendaryUses_usedRound: null,
+            monsterLegendaryActionCooldowns: null,
+            monsterRecharge: null,
+        });
+        expect(res.status).toBe(200);
+    });
+
+    it('stores without economy props are untouched by the scan', async () => {
+        const res = await monster({ activeConditions: ['stunned'], hitPoints: 7 });
+        expect(res.status).toBe(200);
+    });
+});

@@ -1,14 +1,14 @@
 rank,mechanic,category,decision,tableFrequency,monsterAppearances,actionRefs,markerOccurrences,markerFiles,enforceable,sampleFile,rationale
 1,duration/expiry-clock,duration,verified,352,218,352,29,17,true,src/components/char-sheet/modals/shared/SaveAttackAoeModal.jsx,VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)
-2,economy/legendary-cap,economy,enforce,279,72,279,4,4,true,src/components/encounter/MonsterCardModal.ma1990-simurgh-healing-breath.test.jsx,"engine-clean (table bites 279×: 72 monsters, 4 markers)"
+2,economy/legendary-cap,economy,verified,279,72,279,4,4,true,src/components/encounter/MonsterCardModal.ma1990-simurgh-healing-breath.test.jsx,VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)
 3,zone/aoe-persistent,zone,verified,193,113,193,9,4,true,src/components/encounter/MonsterCardModal.jsx,VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)
 4,zone/lair-regional,zone,verified,120,40,120,53,17,true,src/components/char-sheet/modals/shared/SaveAttackAoeModal.lair-darkness.test.jsx,VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)
 5,movement/distance-consumer,movement,verified,82,71,82,11,4,true,src/components/encounter/MonsterCardModal.legendary-uses-androsphinx.test.jsx,VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)
 6,economy/reaction-cap,economy,verified,68,67,68,13,9,true,src/components/encounter/MonsterCardHelpers.js,VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)
 7,movement/midpath-trigger,movement,verified,66,66,66,6,2,true,src/services/encounters/monsterLegendaryUses.ma1936-king-kong-climbing-dash-advisory.test.js,VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)
-8,economy/recharge,economy,enforce,50,50,50,6,3,true,src/components/encounter/MonsterCardHelpers.js,"engine-clean (table bites 50×: 50 monsters, 6 markers)"
+8,economy/recharge,economy,verified,50,50,50,6,3,true,src/components/encounter/MonsterCardHelpers.js,VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)
 9,zone/aura-persistent,zone,verified,28,25,28,4,3,true,src/services/combat/conditions/targetEffectDefinitions.js,VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)
-10,duration/concentration,duration,enforce,25,23,25,20,12,true,src/components/encounter/MonsterCardHelpers.damageless-spell-save-leg.test.js,"engine-clean (table bites 25×: 23 monsters, 20 markers)"
+10,duration/concentration,duration,verified,25,23,25,20,12,true,src/components/encounter/MonsterCardHelpers.damageless-spell-save-leg.test.js,VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)
 11,spatial/line-of-sight,spatial,verified,25,23,25,9,5,true,src/components/encounter/MonsterCardHelpers.js,VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)
 12,spatial/gridless-teleport,spatial,verified,19,18,19,34,21,true,src/components/encounter/MonsterAction.ma1224-nalfeshnee-pursuit-advisory-chip.test.jsx,VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)
 13,economy/bonus-cap,economy,verified,16,16,16,1,1,true,src/services/combat/conditions/targetEffectDefinitions.js,VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)

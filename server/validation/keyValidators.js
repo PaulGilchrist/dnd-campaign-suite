@@ -139,6 +139,71 @@ function isTemperature(t) {
     return typeof t === 'number' && Number.isFinite(t) && t >= 0 && t <= 2;
 }
 
+function validateLegendaryUsesProp(uses) {
+    if (uses === undefined || uses === null) return { ok: true };
+    if (!isPlainObject(uses)) return { ok: false, reason: 'monsterLegendaryUses must be {max, used} or null' };
+    if (!Number.isInteger(uses.max) || uses.max < 1) return { ok: false, reason: 'monsterLegendaryUses.max must be a positive integer' };
+    if (!Number.isInteger(uses.used) || uses.used < 0) return { ok: false, reason: 'monsterLegendaryUses.used must be a non-negative integer' };
+    if (uses.used > uses.max) return { ok: false, reason: `monsterLegendaryUses.used ${uses.used} exceeds max ${uses.max}` };
+    return { ok: true };
+}
+
+function validateLegendaryLatchProp(latch) {
+    if (latch === undefined || latch === null) return { ok: true };
+    if (!isPlainObject(latch)) return { ok: false, reason: '_legendaryUses_usedRound must be {round, activeCreature} or null' };
+    if (!nonNegNumber(latch.round)) return { ok: false, reason: '_legendaryUses_usedRound.round must be a non-negative number' };
+    return { ok: true };
+}
+
+function validateLegendaryCooldownsProp(cooldowns) {
+    if (cooldowns === undefined || cooldowns === null) return { ok: true };
+    if (!isPlainObject(cooldowns)) return { ok: false, reason: 'monsterLegendaryActionCooldowns must be an object keyed by action slug or null' };
+    for (const [slug, entry] of Object.entries(cooldowns)) {
+        if (!isPlainObject(entry) || !nonNegNumber(entry.round)) {
+            return { ok: false, reason: `monsterLegendaryActionCooldowns.${slug} must be {round, usedBefore}` };
+        }
+    }
+    return { ok: true };
+}
+
+function validateRechargeMapProp(recharge) {
+    if (recharge === undefined || recharge === null) return { ok: true };
+    if (!isPlainObject(recharge)) return { ok: false, reason: 'monsterRecharge must be an object keyed by action or null' };
+    for (const [actionKey, entry] of Object.entries(recharge)) {
+        if (!isPlainObject(entry)) return { ok: false, reason: `monsterRecharge.${actionKey} must be {recharged, threshold}` };
+        if (typeof entry.recharged !== 'boolean') return { ok: false, reason: `monsterRecharge.${actionKey}.recharged must be boolean` };
+        const t = entry.threshold;
+        if (!(Number.isInteger(t) && t >= 1 && t <= 6)) {
+            return { ok: false, reason: `monsterRecharge.${actionKey}.threshold must be an integer 1..6 (d6), got ${JSON.stringify(t)}` };
+        }
+    }
+    return { ok: true };
+}
+
+/**
+ * H1 hardening (§17): monster-side economy shape validation inside creature
+ * store writes (POST /:campaign/:storeName posts the full store). The MA
+ * engines (monsterLegendaryUses/monsterRecharge) enforce the rules client-side
+ * since forever — this cannot forge what the shape cannot express: a client
+ * cannot self-heal exhausted legendary uses past max, invent fractional
+ * spends, or smuggle a recharge entry that never d6s. Well-formed writes
+ * (every honest client today) pass byte-identical; malformed shapes are
+ * refused loudly at the chokepoint and the mirrored store keeps prior truth.
+ */
+function validateMonsterEconomyProps(value) {
+    if (!isPlainObject(value)) return { ok: true }; // scalar store ⇒ nothing to scan
+    for (const check of [
+        [validateLegendaryUsesProp, value.monsterLegendaryUses],
+        [validateLegendaryLatchProp, value._legendaryUses_usedRound],
+        [validateLegendaryCooldownsProp, value.monsterLegendaryActionCooldowns],
+        [validateRechargeMapProp, value.monsterRecharge],
+    ]) {
+        const result = check[0](check[1]);
+        if (!result.ok) return result;
+    }
+    return { ok: true };
+}
+
 function chain(...validators) {
     return (value, ctx) => {
         for (const validator of validators) {
@@ -168,7 +233,12 @@ export const keyValidators = {
  */
 export function validateRuntimeWrite(key, value, ctx) {
     const validator = keyValidators[key];
-    if (!validator) return { ok: true }; // unregistered key ⇒ today's pass-through
+    if (!validator) {
+        // Unregistered key ⇒ today's pass-through — plus the H1 monster-economy
+        // property scan (§17): creature stores ride the same chokepoint, and the
+        // scan only bites on shapes no honest client ever posts.
+        return validateMonsterEconomyProps(value);
+    }
     try {
         return validator(value, ctx);
     } catch (e) {

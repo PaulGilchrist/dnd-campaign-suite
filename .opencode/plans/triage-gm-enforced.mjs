@@ -167,6 +167,14 @@ function main() {
     // by a delivered slice — engine consumer + tests + live verification (see
     // plan §8 notes / Appendix B). Keyed by mechanic so flips survive re-scan.
     const VERIFIED_MECHANICS = new Set([
+        // §8 verified rows (see plan Appendix B for the live proofs).
+        // H1/H2 hardening pass (§17, 2026-10-13): legendary-cap, recharge and
+        // concentration were already engine-clean — audit evidence: MA engine
+        // suites (232 tests) + live chokepoint refusals of forged monster
+        // economy shapes at POST /:campaign/:storeName (used>max, threshold∉1..6).
+        'economy/legendary-cap',
+        'economy/recharge',
+        'duration/concentration',
         'duration/expiry-clock',       // §8.3#1 zoneDurationClock producers + consumer
         'zone/aoe-persistent',         // §8.3 armed zone tes + duration clocks
         'zone/lair-regional',          // §8.3 initiative-20 drainRoundWrapClocks
