@@ -27662,7 +27662,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Smaug makes one Perception check.",
-      "verified": "broken — see .opencode/plans/bug-mon-2002-smaug-detection.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1473",

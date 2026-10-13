@@ -219,7 +219,15 @@ export function legendaryCheckBonus(monster, action) {
   const skillKey = ac.skill
     ? Object.keys(skills).find(k => k.toLowerCase() === String(ac.skill).toLowerCase())
     : null;
-  if (skillKey != null) return Number(skills[skillKey]?.modifier) || 0;
+  if (skillKey != null) {
+    // MA-2002: stat blocks ship skills in two shapes — dict {modifier:N}
+    // (canonical, dracolich +14) or a bare number (Smaug's flat
+    // "Perception": 11). Both carry the full check modifier; the dict-only
+    // read silently collapsed bare numbers to +0 (dishonest RAW).
+    const entry = skills[skillKey];
+    const mod = Number(entry?.modifier ?? entry);
+    return Number.isFinite(mod) ? mod : 0;
+  }
   // ability_score_modifiers are keyed by 3-letter abbr (wis/dex/…).
   const abbr = String(ac.ability).toLowerCase().slice(0, 3);
   const mod = Number(monster?.ability_score_modifiers?.[abbr]);

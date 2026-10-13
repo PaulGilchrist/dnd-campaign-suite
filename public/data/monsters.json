@@ -59922,6 +59922,10 @@
       },
       {
         "name": "Detection",
+        "ability_check": {
+          "ability": "wisdom",
+          "skill": "perception"
+        },
         "description": "Smaug makes one Perception check."
       }
     ],
