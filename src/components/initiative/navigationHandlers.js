@@ -12,6 +12,7 @@ import { applyPetrifyingBiteTurnEnd } from '../../services/rules/features/cockat
 import { applyEyeRaysTurnEnd } from '../../services/rules/features/beholderEyeRayService.js'
 import { applySoulTomeTrapTurnEnd } from '../../services/rules/features/soulTomeTrapService.js'
 import { applyRepeatSaveTurnEnd } from '../../services/rules/features/repeatSaveService.js'
+import { applyZoneRepeatTurnEnd } from '../../services/rules/features/zoneRepeatTurnEndService.js'
 import { applyStinkingCloudTurnEnd } from '../../services/automation/handlers/spells/stinkingCloudHandler.js'
 import { applyCommanderStrikeTurnEnd } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityUtils.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
@@ -234,6 +235,13 @@ function applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters
     // service-specific turn-end seams byte-identical.
     applyRepeatSaveTurnEnd(campaignName, activeCreatureName)
         .catch((e) => { console.error('[navigationHandlers] MA-0610 repeat save turn-end failed:', e) })
+    // H3 (§17): turn-END zone-damage repeat (Insect Cloud family) — the
+    // OUTGOING victim holding a repeatTurnEnd zone te repeats its save at the
+    // end of its own turn; untyped zone damage lands full-on-fail, halved
+    // on-success. ENFORCEMENT-GATED: enforcement.mode==='on' AND
+    // enforcement.zones===true — off ⇒ zero rolls, zero writes (L1–4 parity).
+    applyZoneRepeatTurnEnd(campaignName, activeCreatureName)
+        .catch((e) => { console.error('[navigationHandlers] H3 zone repeat turn-end failed:', e) })
     // MN-003: Commander's Strike — a die bonus armed on the OUTGOING creature
     // that never landed its granted attack lapses at the end of its own turn
     // (miss-persistence hygiene; idempotent, no-op without an armed bonus).

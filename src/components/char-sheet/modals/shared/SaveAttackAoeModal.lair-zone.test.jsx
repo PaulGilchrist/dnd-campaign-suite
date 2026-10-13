@@ -125,7 +125,9 @@ describe('MA-0042 area picker persisting-zone arm', () => {
     const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && (e.description || '').includes('lair_insect_cloud zone armed'));
     expect(log).toBeTruthy();
     expect(log.description).toMatch(/radius 20 ft.*Constitution save DC 15/);
-    expect(log.description).toMatch(/Repeat 3d6 at turn end — GM-enforced/);
+    // H3 (§17): the old "GM-enforced (no turn-end zone-damage consumer)"
+    // confession is retired — enforcement OFF keeps the honest residual copy.
+    expect(log.description).toMatch(/Repeat 3d6 at turn end — engine-consumed while zones enforcement is on \(currently off — GM-adjudicated\)/);
   });
 
   it('stamps caster tracking `_lair_insect_cloud_<caster>` with saveDc/radius/affectedNames', async () => {

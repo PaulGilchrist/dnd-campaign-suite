@@ -10,6 +10,7 @@ import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { triggerBewitchingMagic } from '../../../../services/rules/spells/postCastRiderService.js';
 import { registerTargetEffect, abilitySaveDisadvantageActive } from '../../../../services/combat/conditions/targetEffectDefinitions.js';
+import { isZonesEnforced } from '../../../../services/rules/features/zoneRepeatTurnEndService.js';
 import { isCircleOfPowerActive } from '../../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { resolveAoESaveEvasion, evasionLedgerName } from '../../../../services/rules/combat/evasionUtils.js';
 import { addExpiration } from '../../../../services/rules/effects/expirationQueue.js';
@@ -598,6 +599,18 @@ function ma0610TeDescriptors(zoneTe) {
     };
 }
 
+// H3 (§17): REPEAT rows only — the victim-side te carries the FULL repeat
+// contract (saveType + dice) so the turn-end consumer works in every view,
+// not just the view that armed the zone. Non-repeat zone te payloads stay
+// byte-identical for every legacy row.
+function h3TeRepeatDescriptors({ saveType, zoneTe }) {
+    if (zoneTe.repeatTurnEnd !== true) return {};
+    return {
+        ...(saveType ? { saveType } : {}),
+        ...(zoneTe.damage ? { recurringDie: String(zoneTe.damage).toLowerCase() } : {}),
+    };
+}
+
 function armZoneTargets({ zoneTe, selectedNames, casterName, actionName, saveDc, saveType, campaignName }) {
     if (!zoneTe || !zoneTe.effectKey) return;
     for (const targetName of selectedNames) {
@@ -606,6 +619,7 @@ function armZoneTargets({ zoneTe, selectedNames, casterName, actionName, saveDc,
             radiusFt: zoneTe.radiusFt,
             repeatTurnEnd: zoneTe.repeatTurnEnd === true,
             duration: 'until_end_of_zone',
+            ...h3TeRepeatDescriptors({ saveType, zoneTe }),
             ...ma0610TeDescriptors(zoneTe),
         });
     }
@@ -620,8 +634,13 @@ function armZoneTargets({ zoneTe, selectedNames, casterName, actionName, saveDc,
         affectedNames: [...selectedNames],
     }, campaignName);
     const saveNote = saveDc != null ? `${saveType} save DC ${saveDc}` : 'no save';
+    // H3 (§17): the turn-end repeat consumer (zoneRepeatTurnEndService,
+    // navigationHandlers seam) is LIVE while zones enforcement is engaged —
+    // honest split copy instead of the old blanket "GM-enforced" confession.
     const repeatNote = zoneTe.repeatTurnEnd
-        ? ` Repeat ${zoneTe.damage || 'damage'} at turn end — GM-enforced (no turn-end zone-damage consumer).`
+        ? (isZonesEnforced(campaignName)
+            ? ` Repeat ${zoneTe.damage || 'damage'} at turn end engine-consumed: zone repeat save, full damage on fail / half on success (new occupants adjudicated by the GM).`
+            : ` Repeat ${zoneTe.damage || 'damage'} at turn end — engine-consumed while zones enforcement is on (currently off — GM-adjudicated).`)
         : '';
     const clauseNote = zoneTe.clause ? ` ${zoneTe.clause}` : '';
     // L5-003 §8.3 (triage #1): authored parseable zone duration + zones
