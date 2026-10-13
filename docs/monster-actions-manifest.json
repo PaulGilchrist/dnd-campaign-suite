@@ -32847,7 +32847,7 @@
         "restrained"
       ],
       "description": "A pillar of ice erupts at a point within 90 ft. Each creature in a 20 ft. radius must succeed on a DC 24 Dexterity saving throw or take 18 (4d8) Cold damage and be Restrained.",
-      "verified": "broken — see .opencode/plans/bug-mon-2063-ymir-frost-geyser.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1740",

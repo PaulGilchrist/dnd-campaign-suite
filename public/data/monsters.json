@@ -71972,7 +71972,13 @@
       {
         "name": "Frost Geyser (Costs 2 Actions)",
         "delegates_to": null,
-        "description": "A pillar of ice erupts at a point within 90 ft. Each creature in a 20 ft. radius must succeed on a DC 24 Dexterity saving throw or take 18 (4d8) Cold damage and be Restrained."
+        "save_dc": 24,
+        "save_type": "Dexterity",
+        "damage_dice_primary": "4d8",
+        "damage_type_primary": "Cold",
+        "range": "90 ft.",
+        "save_effect": "The target has the Restrained condition.",
+        "description": "A pillar of ice erupts at a point within 90 ft. Each creature in a 20 ft. radius must succeed on a DC 24 Dexterity saving throw or take 18 (4d8) Cold damage and be Restrained. Success: half damage."
       }
     ],
     "lair_actions": [],
