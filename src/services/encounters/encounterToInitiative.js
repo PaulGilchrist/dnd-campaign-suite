@@ -135,6 +135,12 @@ export async function loadEncounterToInitiative(selectedMonsters, characters, ca
     return { combatSummary, firstName };
 }
 
+export function hasMonsterVariant(baseName, creatures) {
+    const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escaped}( \\d+)?$`);
+    return creatures.some(c => pattern.test(c.name));
+}
+
 export function getNextUniqueMonsterName(baseName, creatures) {
     const escaped = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const exactMatch = new RegExp(`^${escaped}$`).test(baseName);
@@ -179,8 +185,15 @@ export async function addMonstersToInitiative(selectedMonsters, characters, camp
                 }
             }
         }
+        // Number instances only when there are 2+ of this monster or the
+        // tracker already carries this monster's name/series (e.g. a later
+        // join continues 'Goblin 1, Goblin 2' → 'Goblin 3'). A lone monster
+        // joining a tracker where its name is new keeps its plain name.
+        const needsNumbering = qty > 1 || hasMonsterVariant(baseName, combatSummary.creatures);
         for (let i = 0; i < qty; i++) {
-            const name = getNextUniqueMonsterName(baseName, combatSummary.creatures);
+            const name = needsNumbering
+                ? getNextUniqueMonsterName(baseName, combatSummary.creatures)
+                : baseName;
             const rollResult = rollNpcInitiative(monster);
             const irv = resolveMonsterIRV(monster);
              combatSummary.creatures.push({

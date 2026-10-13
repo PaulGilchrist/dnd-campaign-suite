@@ -506,7 +506,29 @@ describe('addMonstersToInitiative', () => {
 
     const npcs = result.creatures.filter((c) => c.type === 'npc');
     expect(npcs).toHaveLength(1);
-    expect(npcs[0].name).toBe('Goblin 1');
+    expect(npcs[0].name).toBe('Goblin');
+  });
+
+  it('keeps the plain name for a single monster and numbers it only when 2+ join', async () => {
+    loadCombatSummary.mockResolvedValue({ round: 1, creatures: [] });
+    rollD20.mockReturnValue(10);
+    const monsters = [createMonster('Bandit', { qty: 2 })];
+
+    const result = await addMonstersToInitiative(monsters, [], 'TestCampaign');
+
+    const names = result.creatures.filter((c) => c.type === 'npc').map((c) => c.name);
+    expect(names).toEqual(['Bandit 1', 'Bandit 2']);
+  });
+
+  it('continues an existing numbered series when the same monster joins again', async () => {
+    loadCombatSummary.mockResolvedValue({ round: 1, creatures: [{ name: 'Orc 1', type: 'npc' }] });
+    rollD20.mockReturnValue(10);
+    const monsters = [createMonster('Orc')];
+
+    const result = await addMonstersToInitiative(monsters, [], 'TestCampaign');
+
+    const orc = result.creatures.find((c) => c.type === 'npc' && c.name !== 'Orc 1');
+    expect(orc.name).toBe('Orc 2');
   });
 
   it('stores monsterIndex on created creatures', async () => {
@@ -525,7 +547,7 @@ describe('addMonstersToInitiative', () => {
 
     const result = await addMonstersToInitiative(monsters, [], 'TestCampaign');
 
-    const npc = result.creatures.find((c) => c.name === 'Aarakocra 1');
+    const npc = result.creatures.find((c) => c.name === 'Aarakocra');
     expect(npc.type).toBe('npc');
     expect(npc.monsterType).toBe('humanoid');
   });
@@ -542,13 +564,13 @@ describe('addMonstersToInitiative', () => {
 
     const result = await addMonstersToInitiative(monsters, [], 'TestCampaign');
 
-    const shadow = result.creatures.find((c) => c.name === 'Shadow 1');
+    const shadow = result.creatures.find((c) => c.name === 'Shadow');
     expect(shadow.resistances).toEqual(['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder']);
     expect(shadow.immunities).toEqual(['Necrotic', 'Poison']);
     expect(shadow.vulnerabilities).toEqual(['Radiant']);
     expect(storage.set).toHaveBeenCalledWith(
       'combatSummary',
-      expect.objectContaining({ creatures: expect.arrayContaining([expect.objectContaining({ name: 'Shadow 1', vulnerabilities: ['Radiant'] })]) }),
+      expect.objectContaining({ creatures: expect.arrayContaining([expect.objectContaining({ name: 'Shadow', vulnerabilities: ['Radiant'] })]) }),
       'TestCampaign',
     );
   });
