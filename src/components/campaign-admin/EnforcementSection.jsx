@@ -17,6 +17,7 @@ const FLAGS = [
     { key: 'actionEconomy', label: 'Action economy', hint: 'Charge 1 Action + 1 Bonus Action + 1 Reaction per creature; extra attempts are refused.' },
     { key: 'movementBudget', label: 'Movement budget', hint: 'Clamp token drags to each creature\u2019s remaining speed (active map only).' },
     { key: 'tokenMoving', label: 'Teleport token-move', hint: 'Teleport automations move the token to the nearest legal space near the selected target (active map only).' },
+    { key: 'autoEncounters', label: 'Auto-encounters', hint: 'Accepting a travel combat event also starts the initiative tracker — the engine rolls initiative for every monster. Off: the encounter map spawns and you start initiative when you like.' },
     // §8.3 follow-up: the spatial/zone flags ride the store — surfaced here
     // so the GM can toggle them without hand-editing runtime state.
     { key: 'zones', label: 'Zones & areas', hint: 'Zone automations arm real expiry clocks and turn-end damage (insect-cloud style); lair cadence matures at the initiative-count-20 wrap.' },

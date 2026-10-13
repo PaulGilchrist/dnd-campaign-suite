@@ -307,3 +307,18 @@ describe('P4-a sessionState validation (§10.1)', () => {
         expect((await post({ phase: 'encounter', changedAt: 'soon' })).status).toBe(400);
     });
 });
+
+// P4-b (§10.2): auto-encounters rides the enforcement flag set.
+describe('P4-b enforcement.autoEncounters flag (§10.2)', () => {
+    const post = (enforcement) => request(createTestApp())
+        .post('/api/campaigns/test-campaign/enforcement')
+        .set('X-Client-Id', 'cid-hoster')
+        .send({ value: enforcement });
+
+    it('accepts autoEncounters with the same honesty contract as the other flags', async () => {
+        const good = await post({ mode: 'off', autoEncounters: true });
+        expect(good.status).toBe(200);
+        const junk = await post({ mode: 'off', autoEncounters: 'sure' });
+        expect(junk.status).toBe(400);
+    });
+});

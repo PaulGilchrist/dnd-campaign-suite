@@ -27,6 +27,10 @@ export const ENFORCEMENT_DEFAULTS = Object.freeze({
     // L5-003 §8.1: teleport automations write real token gridX/gridY (via
     // the map save path) instead of only advisory prose. Off ⇒ byte-identical.
     tokenMoving: false,
+    // L5 Phase 4 §10.2: accepting a travel combat event auto-starts the
+    // initiative tracker (engine rolls). Off ⇒ Accept keeps today's map-only
+    // behavior — the GM starts initiative manually.
+    autoEncounters: false,
 });
 
 /** Merge campaign `enforcement` runtime value over defaults; never trusts shape. */

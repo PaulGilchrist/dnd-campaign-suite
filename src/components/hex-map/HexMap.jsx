@@ -1,5 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import * as mapsService from '../../services/maps/mapsService.js';
+import { autoStartEncounterFromEvent } from '../../services/encounters/autoEncounterService.js';
 import { generateWeather } from '../../services/campaign/weatherService.js';
 import {
     HEX_SIZE, GRID_COLS_MULTIPLIER,
@@ -285,6 +286,12 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             } else if (pos) {
                 handleStartEncounter(pos.q, pos.r);
             }
+            // L5 §10.2: with enforcement.autoEncounters on, the accepted
+            // combat event also starts the initiative tracker (engine rolls)
+            // and moves the session phase to `encounter`. Off ⇒ zero writes;
+            // the map-only behavior above is unchanged.
+            autoStartEncounterFromEvent({ campaignName, event: evt, characters })
+                .catch((e) => { console.error('[handleEventAccept] auto-encounter failed:', e); });
         }
         if (evt?.type === 'weatherChange') {
             handleGenerateWeather();
@@ -295,7 +302,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         const terrainKey = pos ? hexKey(pos.q, pos.r) : null;
         const tileTerrain = terrainKey ? terrain[terrainKey] || 'plains' : null;
         logTravel('event_accept', pos, tileTerrain, weather, evt);
-    }, [travelMgmt, partyPosition, handleStartEncounter, generateMonsterPlacements, handleGenerateWeather, terrain, weather, logTravel]);
+    }, [travelMgmt, partyPosition, handleStartEncounter, generateMonsterPlacements, handleGenerateWeather, terrain, weather, logTravel, campaignName, characters]);
 
     const handleEventSkip = useCallback(() => {
         const evt = travelMgmt.pendingEvent;

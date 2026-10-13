@@ -25,6 +25,8 @@ const ENFORCEMENT_FLAGS = new Set([
     'lineOfSight', 'zones', 'opportunityAttacks', 'serverDice',
     // L5-003 §8.1: teleport automations write real token positions.
     'tokenMoving',
+    // L5 Phase 4 §10.2: accepted travel combat events auto-start initiative.
+    'autoEncounters',
 ]);
 
 // Client turnState economy charges one slot per use; the generous caps here are
