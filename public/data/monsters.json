@@ -65284,6 +65284,7 @@
         "name": "Thunderstrike (Recharge 5-6)",
         "save_type": "Dexterity",
         "save_dc": 24,
+        "recharge": "5-6",
         "description": "Dexterity Saving Throw: DC 24, each creature within 60 ft. Failure: 66 (12d10) Lightning damage. Success: Half damage.",
         "damage_dice_primary": "12d10",
         "damage_type_primary": "Lightning"

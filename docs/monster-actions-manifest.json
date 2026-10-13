@@ -29842,7 +29842,7 @@
       "damageDicePrimary": "12d10",
       "damageTypePrimary": "Lightning",
       "description": "Dexterity Saving Throw: DC 24, each creature within 60 ft. Failure: 66 (12d10) Lightning damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-2017-thunderbird-thunderstrike-recharge.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2018",
