@@ -16,7 +16,7 @@ const AI_MODES = ['off', 'suggest', 'autopilot']; // mirrors server/services/ai 
 
 // D3 privacy contract — single implementation lives with the provider that
 // would obey it; the validator enforces the same rule, not a copy of it.
-import { isLocalEndpoint } from '../services/ai/providers/localProvider.js';
+import { isLocalEndpoint, PROVIDERS } from '../services/ai/providers/localProvider.js';
 
 // Mirrors client ENFORCEMENT_DEFAULTS (src/services/combat/canTakeAction.js).
 // Keeping the list explicit here is the point: the server defines the contract.
@@ -131,7 +131,7 @@ function validateAiConfig(value) {
         if (typeof value.model !== 'string' || value.model.trim() === '') return { ok: false, reason: 'aiConfig.model is required when AI is on' };
     }
     if (value.temperature !== undefined && !isTemperature(value.temperature)) return { ok: false, reason: 'aiConfig.temperature must be a number 0..2' };
-    if (value.provider !== undefined && !['ollama', 'openai'].includes(value.provider)) return { ok: false, reason: "aiConfig.provider must be 'ollama'|'openai'" };
+    if (value.provider !== undefined && !PROVIDERS[value.provider]) return { ok: false, reason: `aiConfig.provider must be one of: ${Object.keys(PROVIDERS).join(', ')}` };
     return { ok: true };
 }
 

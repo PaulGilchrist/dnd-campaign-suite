@@ -123,19 +123,52 @@ export function buildDirectorMessages({ creatureName, monster, targets, self, ec
  * Extract the first balanced-ish JSON object from a model answer. Tolerates * fenced code blocks and surrounding prose (small local models love a
  * ```json fence) but NEVER repairs field values.
  */
+/**
+ * Scan for a balanced {...} JSON object, tolerating reasoning-model prose
+ * before AND after it. Returns the LAST complete balanced object (small
+ * local models, especially reasoning-tuned ones, often think out loud then
+ * answer last); falls back to the first if none parse. Never repairs values.
+ */
+function balancedObjects(text) {
+    const found = [];
+    let depth = 0, start = -1, inStr = false, esc = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inStr) {
+            if (esc) esc = false;
+            else if (c === '\\') esc = true;
+            else if (c === '"') inStr = false;
+            continue;
+        }
+        if (c === '"') inStr = true;
+        else if (c === '{') { if (depth === 0) start = i; depth++; }
+        else if (c === '}') {
+            if (depth > 0) {
+                depth--;
+                if (depth === 0 && start >= 0) found.push(text.slice(start, i + 1));
+            }
+        }
+    }
+    return found;
+}
+
 export function extractJsonObject(content) {
     if (typeof content !== 'string') return { ok: false, errors: ['empty answer'] };
     let text = content.trim();
     const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
     if (fence) text = fence[1].trim();
-    const braceStart = text.indexOf('{');
-    const braceEnd = text.lastIndexOf('}');
-    if (braceStart === -1 || braceEnd <= braceStart) return { ok: false, errors: ['no JSON object in answer'] };
-    try {
-        return { ok: true, value: JSON.parse(text.slice(braceStart, braceEnd + 1)) };
-    } catch (e) {
-        return { ok: false, errors: [`invalid JSON: ${e.message}`] };
+    const candidates = balancedObjects(text);
+    if (candidates.length === 0) return { ok: false, errors: ['no JSON object in answer'] };
+    // Try last-first: the answer follows the reasoning in thinking models.
+    let lastError = 'no JSON object parsed';
+    for (let i = candidates.length - 1; i >= 0; i--) {
+        try {
+            return { ok: true, value: JSON.parse(candidates[i]) };
+        } catch (e) {
+            lastError = e.message;
+        }
     }
+    return { ok: false, errors: [`invalid JSON: ${lastError}`] };
 }
 
 export function parseRulingAnswer(content) {

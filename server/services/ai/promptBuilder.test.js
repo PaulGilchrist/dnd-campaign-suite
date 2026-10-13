@@ -57,4 +57,16 @@ describe('parseRulingAnswer', () => {
         expect(parseRulingAnswer('{"type":"save_roll"}').ok).toBe(false);
         expect(parseRulingAnswer('').ok).toBe(false);
     });
+
+    it('reasoning-model output survives: think out loud (with braces), answer last', () => {
+        const reasoning = 'Let me reason: the player attacks. I could use {"type":"automation"} for a named action, or {"type":"narrative"} if no roll. AC matters here.';
+        const answer = '{"type":"dice","expression":"1d20+5","targetName":"Goblin","explanation":"attack roll","confidence":0.9}';
+        expect(parseRulingAnswer(`${reasoning}\n\n${answer}`)).toMatchObject({ ok: true, ruling: { type: 'dice', expression: '1d20+5' } });
+        // fenced answer after reasoning
+        expect(parseRulingAnswer(`${reasoning}\n\`\`\`json\n${answer}\n\`\`\``)).toMatchObject({ ok: true, ruling: { type: 'dice' } });
+        // answer FIRST, reasoning tail (balanced scan tolerates prose after too)
+        expect(parseRulingAnswer(`${answer}\nI hope that helps the referee!`)).toMatchObject({ ok: true, ruling: { type: 'dice' } });
+        // last object invalid but first valid — fallback picks it up
+        expect(parseRulingAnswer('{"type":"narrative","text":"ok"} trailing {"broken').ok).toBe(true);
+    });
 });

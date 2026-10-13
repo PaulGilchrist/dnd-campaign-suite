@@ -1,6 +1,6 @@
 // L5 Phase 3 — local provider tests (fetch stubbed; D3 privacy contract live here).
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { chat, probe, isLocalEndpoint, resolveApiKey } from './localProvider.js';
+import { chat, probe, isLocalEndpoint, resolveApiKey, inferProvider } from './localProvider.js';
 
 afterEach(() => {
     vi.unstubAllGlobals();
@@ -56,12 +56,13 @@ describe('chat', () => {
         expect(init.signal).toBeDefined(); // bounded — never a forever-wait
     });
 
-    it('openai provider uses /v1/chat/completions with response_format', async () => {
+    it('openai provider uses /v1/chat/completions — deliberately WITHOUT response_format (some servers, observed oMLX, answer with chunk arrays when it is forced)', async () => {
         const fetchFn = stubFetch({ json: { choices: [{ message: { content: 'hi' } }] } });
         expect(await chat({ ...cfg, provider: 'openai', messages: msgs })).toBe('hi');
         const [url, init] = fetchFn.mock.calls[0];
         expect(url).toBe('http://localhost:11434/v1/chat/completions');
-        expect(JSON.parse(init.body).response_format).toEqual({ type: 'json_object' });
+        expect(JSON.parse(init.body).response_format).toBeUndefined();
+        expect(JSON.parse(init.body).temperature).toBeDefined();
     });
 
     it('network refusal / non-200 / non-JSON / empty content ⇒ AI_UNAVAILABLE', async () => {
@@ -84,7 +85,7 @@ describe('chat', () => {
 describe('probe', () => {
     it('reports reachable + model list (ollama tags shape)', async () => {
         stubFetch({ json: { models: [{ name: 'llama3.1:8b' }, { name: 'qwen3:4b' }] } });
-        expect(await probe({ endpoint: 'http://localhost:11434' })).toEqual({ reachable: true, models: ['llama3.1:8b', 'qwen3:4b'] });
+        expect(await probe({ endpoint: 'http://localhost:11434' })).toEqual({ reachable: true, models: ['llama3.1:8b', 'qwen3:4b'], dialect: 'ollama' });
     });
     it('down endpoint ⇒ reachable:false, never throws', async () => {
         stubFetch({ throws: 'ECONNREFUSED' });
@@ -105,7 +106,7 @@ describe('openai-compatible endpoints + optional bearer key', () => {
     it('probe against /v1 lists OpenAI-shaped models', async () => {
         const stub = stubFetch({ json: { data: [{ id: 'qwen3:4b' }, { id: 'llama3' }] } });
         const r = await probe({ endpoint: 'http://localhost:8000/v1/', provider: 'openai' });
-        expect(r).toEqual({ reachable: true, models: ['qwen3:4b', 'llama3'] });
+        expect(r).toEqual({ reachable: true, models: ['qwen3:4b', 'llama3'], dialect: 'openai' });
         expect(stub.mock.calls[0][0]).toBe('http://localhost:8000/v1/models');
     });
 
@@ -126,5 +127,30 @@ describe('openai-compatible endpoints + optional bearer key', () => {
         const stub2 = stubFetch({ json: { choices: [{ message: { content: 'ok' } }] } });
         await chat({ endpoint: 'http://localhost:8000/v1', provider: 'openai', model: 'local', messages: msgs });
         expect(stub2.mock.calls[0][1].headers.Authorization).toBeUndefined();
+    });
+});
+
+describe('provider sniffing', () => {
+    it('ollama native keeps format:json for structured tasks', async () => {
+        const stub = stubFetch({ json: { message: { content: '{"ok":true}' } } });
+        await chat({ endpoint: 'http://localhost:11434', model: 'm', messages: [{ role: 'user', content: 'go' }] });
+        expect(JSON.parse(stub.mock.calls[0][1].body).format).toBe('json');
+    });
+});
+
+describe('inferProvider — different people, different local servers', () => {
+    it('any /v1 endpoint is the OpenAI-compatible family (oMLX, LM Studio, vLLM, llama.cpp)', () => {
+        expect(inferProvider('http://localhost:8000/v1')).toBe('openai');   // oMLX
+        expect(inferProvider('http://localhost:1234/v1')).toBe('openai');    // LM Studio
+        expect(inferProvider('http://localhost:8000/v1/')).toBe('openai');   // trailing slash
+        expect(inferProvider('http://localhost:8080/v1')).toBe('openai');    // vLLM / llama.cpp
+    });
+    it('bare port (plain Ollama default) stays native', () => {
+        expect(inferProvider('http://localhost:11434')).toBe('ollama');
+    });
+    it('explicit aiConfig.provider always wins over the sniff', () => {
+        expect(inferProvider('http://localhost:8000/v1', 'ollama')).toBe('ollama');
+        expect(inferProvider('http://localhost:11434', 'openai')).toBe('openai');
+        expect(inferProvider('http://localhost:8000/v1', 'bogus')).toBe('openai');
     });
 });

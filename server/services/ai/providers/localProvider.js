@@ -26,7 +26,7 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 export function resolveApiKey() {
     if (process.env.AI_API_KEY) return process.env.AI_API_KEY;
     try {
-        const file = new URL('../../config/ai-local.json', import.meta.url);
+        const file = new URL('../../../config/ai-local.json', import.meta.url);
         const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
         return typeof raw.apiKey === 'string' && raw.apiKey.trim() ? raw.apiKey.trim() : null;
     } catch {
@@ -37,6 +37,41 @@ export function resolveApiKey() {
 function authHeaders(extra = {}) {
     const key = resolveApiKey();
     return key ? { ...extra, Authorization: `Bearer ${key}` } : extra;
+}
+
+/** Where the server-local key lives (gitignored; NEVER in aiConfig/change-data). */
+function keyFile() {
+    return new URL('../../../config/ai-local.json', import.meta.url);
+}
+
+/**
+ * Persist the bearer key from the GM admin page (localhost-only route).
+ * @param {string|null} key — null clears it
+ * @returns {{ ok: boolean, set: boolean, reason?: string }}
+ */
+export function saveApiKey(key) {
+    try {
+        const file = keyFile();
+        if (key === null || key === undefined || String(key).trim() === '') {
+            if (fs.existsSync(file)) fs.rmSync(file);
+            return { ok: true, set: false };
+        }
+        const cleaned = String(key).trim().slice(0, 200);
+        fs.mkdirSync(new URL('../../../config/', import.meta.url), { recursive: true });
+        fs.writeFileSync(file, JSON.stringify({ apiKey: cleaned }, null, 2) + '\n', { mode: 0o600 });
+        return { ok: true, set: true };
+    } catch (e) {
+        console.error('[ai:key] save failed:', e);
+        return { ok: false, set: false, reason: String(e?.message || e).slice(0, 160) };
+    }
+}
+
+/** Masked status for the admin UI — the full key never leaves the server. */
+export function apiKeyStatus() {
+    const key = resolveApiKey();
+    if (!key) return { set: false, source: null, hint: null };
+    const fromEnv = !!process.env.AI_API_KEY;
+    return { set: true, source: fromEnv ? 'env' : 'file', hint: `••••${key.slice(-4)}` };
 }
 
 /** Join endpoint + API path without doubling '/v1' ('http://h:8000/v1' accepted). */
@@ -71,31 +106,48 @@ function unavailableError(message, cause) {
     return e;
 }
 
-function requestShape(provider, { model, messages, temperature, jsonMode }) {
-    if (provider === 'openai') {
-        return {
-            path: '/v1/chat/completions',
-            body: {
-                model,
-                messages,
-                temperature,
-                ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
-            },
-            extract: (data) => data?.choices?.[0]?.message?.content,
-        };
-    }
-    // Ollama native (default): /api/chat with format:'json' for structured tasks.
-    return {
-        path: '/api/chat',
-        body: {
+/**
+ * Provider registry — every supported LOCAL API dialect in one entry each.
+ * Different people run different local servers (oMLX, LM Studio, vLLM,
+ * llama.cpp, Ollama…), so nothing is privileged: the GM's aiConfig.provider
+ * selects a dialect explicitly, or inferProvider() sniffs the endpoint.
+ * Adding a new server = one entry here (the validator reads PROVIDERS too).
+ */
+export const PROVIDERS = {
+    openai: {
+        label: 'OpenAI-compatible (oMLX · LM Studio · vLLM…)',
+        modelsPath: '/v1/models',
+        chatPath: '/v1/chat/completions',
+        // jsonMode deliberately IGNORED: forcing response_format on some
+        // servers (observed: oMLX) makes them emit chunk arrays instead of
+        // the contract object. The prompt pins the shape and the schema
+        // validator fails closed — that pairing is the real guarantee.
+        body: ({ model, messages, temperature }) => ({ model, messages, temperature }),
+        extract: (data) => data?.choices?.[0]?.message?.content,
+    },
+    ollama: {
+        label: 'Ollama (native API)',
+        modelsPath: '/api/tags',
+        chatPath: '/api/chat',
+        body: ({ model, messages, temperature, jsonMode }) => ({
             model,
             messages,
             stream: false,
             ...(jsonMode ? { format: 'json' } : {}),
             options: { temperature },
-        },
+        }),
         extract: (data) => data?.message?.content,
-    };
+    },
+};
+
+/** Explicit aiConfig.provider wins; else sniff '/v1' → OpenAI-compatible. */
+export function inferProvider(endpoint, provider) {
+    if (PROVIDERS[provider]) return provider;
+    return /\/v1\/?$/i.test(String(endpoint || '').replace(/\/+$/, '')) ? 'openai' : 'ollama';
+}
+
+function shapeFor(endpoint, provider) {
+    return PROVIDERS[inferProvider(endpoint, provider)];
 }
 
 /**
@@ -108,7 +160,8 @@ export async function chat(cfg) {
     if (!isLocalEndpoint(endpoint)) throw endpointError(`ai endpoint must be a local http(s) URL, got: ${JSON.stringify(endpoint)}`);
     if (!Array.isArray(messages) || messages.length === 0) throw new Error('chat requires a non-empty messages array');
 
-    const shape = requestShape(cfg.provider === 'openai' ? 'openai' : 'ollama', {
+    const shape = shapeFor(endpoint, cfg.provider);
+    const body = shape.body({
         model: model || '',
         messages,
         temperature: typeof cfg.temperature === 'number' ? cfg.temperature : 0.7,
@@ -118,10 +171,10 @@ export async function chat(cfg) {
 
     let res;
     try {
-        res = await fetch(joinApi(endpoint, shape.path), {
+        res = await fetch(joinApi(endpoint, shape.chatPath), {
             method: 'POST',
             headers: authHeaders({ 'Content-Type': 'application/json' }),
-            body: JSON.stringify(shape.body),
+            body: JSON.stringify(body),
             signal: AbortSignal.timeout(timeoutMs),
         });
     } catch (e) {
@@ -143,14 +196,14 @@ export async function chat(cfg) {
 /** Health probe for the Referee console / status surfaces. */
 export async function probe({ endpoint, provider, timeoutMs = 5000 } = {}) {
     if (!isLocalEndpoint(endpoint)) return { reachable: false, reason: 'endpoint is not a local URL' };
-    const path = provider === 'openai' ? '/v1/models' : '/api/tags';
+    const shape = shapeFor(endpoint, provider);
     try {
-        const res = await fetch(joinApi(endpoint, path), { headers: authHeaders(), signal: AbortSignal.timeout(timeoutMs) });
+        const res = await fetch(joinApi(endpoint, shape.modelsPath), { headers: authHeaders(), signal: AbortSignal.timeout(timeoutMs) });
         if (!res.ok) return { reachable: false, reason: `HTTP ${res.status}` };
         const data = await res.json().catch(() => ({}));
-        const models = Array.isArray(data?.models) ? data.models.map((m) => m?.name).filter(Boolean)
-            : Array.isArray(data?.data) ? data.data.map((m) => m?.id).filter(Boolean) : [];
-        return { reachable: true, models };
+        const models = Array.isArray(data?.data) ? data.data.map((m) => m?.id).filter(Boolean)
+            : Array.isArray(data?.models) ? data.models.map((m) => m?.name).filter(Boolean) : [];
+        return { reachable: true, models, dialect: inferProvider(endpoint, provider) };
     } catch (e) {
         return { reachable: false, reason: String(e?.message || e).slice(0, 160) };
     }
