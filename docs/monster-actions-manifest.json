@@ -34536,7 +34536,7 @@
         "prone"
       ],
       "description": "Enemies within 60 ft. must succeed on a DC 23 Wisdom saving throw or take 7 (2d6) Thunder damage and be knocked Prone.",
-      "verified": "broken — see .opencode/plans/bug-mon-2072-ziz-sky-screech.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2073",

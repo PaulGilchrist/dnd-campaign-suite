@@ -74753,6 +74753,11 @@
       {
         "name": "Sky Screech (Costs 2 Actions)",
         "delegates_to": null,
+        "save_dc": 23,
+        "save_type": "Wisdom",
+        "damage_dice_primary": "2d6",
+        "damage_type_primary": "Thunder",
+        "save_effect": "The target has the Prone condition.",
         "description": "Enemies within 60 ft. must succeed on a DC 23 Wisdom saving throw or take 7 (2d6) Thunder damage and be knocked Prone."
       }
     ],
