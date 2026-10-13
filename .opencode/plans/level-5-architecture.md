@@ -546,8 +546,16 @@ Each phase: implement → co-located tests → `npm run lint` + `npm run test:ru
 > - ✅ **Real authentication → KEEP honor-system for trusted LAN.** Durable client UUID + localhost default stays as-is; audit log + server validators remain the safety net. Revisit ONLY if the threat model changes (untrusted network exposure) — parked *decided*, not parked *open*.
 
 ### [E] Revisit with real-play evidence
-- **Local model capability:** which local model size yields reliable structured output for the referee/director — the wired `Qwen3.8-Flash-Next-oQ4e-mtp` (§15 item 4) will answer this over real sessions, not audits.
+- **Local model capability:** which local model size yields reliable structured output for the referee/director — the wired `Qwen3.8-Flash-Next-oQ4e-mtp` (§15 item 4) will answer this over real sessions, not audits. *(First playtest attempt 2026-10-13: model offline at :8000 — AI lanes untested; enforcement lanes fully exercised by a Playwright-driven GM session, evidence below.)*
 - ~~**Multi-campaign AI:** whether `aiConfig` is per-campaign (current design) or global.~~ → **DECIDED 2026-10-13 (owner): KEEP PER-CAMPAIGN.** Each campaign declares its own endpoint/model/mode; a campaign without config is fully offline by default. Zero global coupling — no inheritance, no precedence rules.
+
+#### Playtest evidence — Playwright-driven live GM session, test-campaign, 2026-10-13 (enforcement ON)
+A real UI session (all interactions via clicks, no forged POSTs): enforcement engaged from Admin (turnLock + actionEconomy + autoRewards), referee claimed, Goblin joined via Encounter Builder, turns advanced with Next →/End Turn. Verified live:
+- **Turn-lock:** off-turn sheet attack refused in-UI — *"It is AasimarTest's turn — FeyRanger cannot act now."* — persisted as `enforcement_denied` (source `useCharActionsAttackHandlers`). Turn order advanced correctly through all players.
+- **Action economy:** active monk's Quarterstaff rolled (log `roll`), `turnState.actionsUsed: 1` charged live; second attack refused *"No action left this turn."* and persisted. `reactionCap: 1` + `companionOf: null` visible on live turnState entries (D1/D2 fields real).
+- **Kills-only auto-rewards:** GM set Goblin to 0 HP on the card, Clear combat (confirm) → `loot_awarded {auto:true, xpPerChar:4, totalEncounterXp:50, lootItems:[]}` + automation line *"Auto-rewards at combat close: 4 XP each to 12 characters"* — XP split from the killed roster, zero fabricated loot. Clear semantics confirmed: players preserved, monsters respawn, round→1, active→first creature, phase→exploration.
+- **Take over manually:** enforcement mode→off, sub-flags remembered, audit row *"Referee took over: enforcement and AI switched off — manual control (L1–4 behavior)."*
+- **UX findings (playtest-only; not fixed, owner's call):** (1) the monster-name autocomplete on initiative cards intermittently sticks open, intercepting pointer events over HP inputs (needed Esc×2 + neutral click); (2) the dice-tray popup overlay blocks sheet inputs after a topbar roll until dismissed; (3) sheet attack rows execute a roll with `targetName: null` (no target required) — fine for practice, but in enforced combat the table may want a target-required nudge before the slot charges.
 
 ### [P4] Fold into Phase 4 (execute there, not before)
 - **Persistence of AI context:** how much world/quest/NPC state to include in each AI prompt (token budget) without leaking secrets across clients — the session machine (§10.1) is what assembles context.
