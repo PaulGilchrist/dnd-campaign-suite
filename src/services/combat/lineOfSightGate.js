@@ -30,6 +30,7 @@ import { bresenham } from '../maps/lineOfSight.js';
 import { computeMovementObstacles } from '../maps/reachability.js';
 import { rangeToFeet } from '../rules/combat/rangeValidation.js';
 import { addEntry } from '../ui/logService.js';
+import { isCoverEnforced, adjudicateCoverShot } from './coverService.js';
 
 // Same touch/diagonal constant rangeValidation uses (rangeToFeet('touch')).
 const TOUCH_RANGE_FT = rangeToFeet('touch'); // 8
@@ -69,34 +70,19 @@ export function isLineOfSightEnforced(campaignName, range) {
  * @param {{gridX,gridY}} [ctx.fromPos]       pre-resolved attacker cell (skips token lookup)
  * @param {{gridX,gridY}} [ctx.toPos]         pre-resolved target cell
  */
-export async function checkLineOfSight(ctx) {
-    const { campaignName, attackerName, targetName, range, setPopupHtml, source = 'action' } = ctx;
-
-    // Fast path — enforcement off / melee / unknown range is today's
-    // behavior, untouched (zero map traffic).
-    if (!isLineOfSightEnforced(campaignName, range)) return { allowed: true, gated: false };
-
+/** Active-map load: gridless/fetch-fail degrade to null (⇒ ALLOW). */
+async function loadActiveMap(campaignName) {
     const activeMapName = getRuntimeValue('__map__', 'activeMapName');
-    if (!activeMapName) return { allowed: true, gated: false };
-
-    let data;
+    if (!activeMapName) return null;
     try {
-        data = await loadMapData(campaignName, activeMapName);
+        return await loadMapData(campaignName, activeMapName);
     } catch (e) {
         console.error('[lineOfSightGate] loadMapData failed:', e);
-        return { allowed: true, gated: false };
+        return null;
     }
-    if (!data) return { allowed: true, gated: false };
+}
 
-    const tokens = [...(data.players || []), ...(data.placedItems || [])];
-    const from = ctx.fromPos || tokens.find((t) => t.name === attackerName);
-    const to = ctx.toPos || tokens.find((t) => t.name === targetName);
-    if (!hasPosition(from) || !hasPosition(to)) return { allowed: true, gated: false };
-
-    const blockers = computeMovementObstacles(data.walls, data.placedItems);
-    const blockedAt = sightBlockedBetween(from, to, blockers);
-    if (!blockedAt) return { allowed: true, gated: true };
-
+function denyBlockedShot({ campaignName, attackerName, targetName, blockedAt, setPopupHtml, source }) {
     const reason = `${targetName} is behind a wall at (${blockedAt.x},${blockedAt.y}) — no line of sight.`;
     if (typeof setPopupHtml === 'function') setPopupHtml(reason);
     if (campaignName) {
@@ -110,4 +96,38 @@ export async function checkLineOfSight(ctx) {
         }).catch((e) => { console.error('[lineOfSightGate] denial log failed:', e); });
     }
     return { allowed: false, reason };
+}
+
+export async function checkLineOfSight(ctx) {
+    const { campaignName, attackerName, targetName, range, setPopupHtml, source = 'action' } = ctx;
+
+    // Fast path — neither gate live / melee / unknown range is today's
+    // behavior, untouched (zero map traffic). §8.3: the zones flag routes
+    // through here too for the intervening-creature half-cover check.
+    const losLive = isLineOfSightEnforced(campaignName, range);
+    const coverLive = isCoverEnforced(campaignName, range);
+    if (!losLive && !coverLive) return { allowed: true, gated: false };
+
+    const data = await loadActiveMap(campaignName);
+    if (!data) return { allowed: true, gated: false };
+
+    const tokens = [...(data.players || []), ...(data.placedItems || [])];
+    const from = ctx.fromPos || tokens.find((t) => t.name === attackerName);
+    const to = ctx.toPos || tokens.find((t) => t.name === targetName);
+    if (!hasPosition(from) || !hasPosition(to)) return { allowed: true, gated: false };
+
+    if (losLive) {
+        const blockers = computeMovementObstacles(data.walls, data.placedItems);
+        const blockedAt = sightBlockedBetween(from, to, blockers);
+        if (blockedAt) return denyBlockedShot({ campaignName, attackerName, targetName, blockedAt, setPopupHtml, source });
+    }
+
+    // §8.3 cover: an intervening COMBATANT (creature token, never a wall —
+    // walls denied above or are the GM's fiction while LoS is unenforced)
+    // grants the target half cover −2, stamped for computeTargetAc to read
+    // back at the roll seam.
+    if (coverLive) {
+        adjudicateCoverShot({ campaignName, attackerName, targetName, from, to, players: data.players });
+    }
+    return { allowed: true, gated: true };
 }

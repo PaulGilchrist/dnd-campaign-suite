@@ -44,6 +44,7 @@ vi.mock('../runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../services/encounters/combatData.js', () => ({
     loadCombatSummary: vi.fn().mockResolvedValue({ creatures: [] }),
+    getCurrentCombatRound: () => 1,
 }));
 
 vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({

@@ -49,6 +49,7 @@ vi.mock('../../services/rules/effects/expirations.js', () => ({
 vi.mock('../../services/encounters/combatData.js', () => ({
     loadCombatSummary: vi.fn(),
     getCombatSummary: vi.fn(),
+    getCurrentCombatRound: () => 1,
 }));
 
 vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({

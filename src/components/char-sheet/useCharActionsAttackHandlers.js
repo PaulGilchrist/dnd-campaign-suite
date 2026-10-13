@@ -1,6 +1,7 @@
 import { getActiveCreatureName, getCurrentCombatRound, getCombatSummary } from '../../services/encounters/combatData.js'
 import { assertCanAct } from '../../services/combat/assertCanAct.js'
 import { isLineOfSightEnforced, checkLineOfSight } from '../../services/combat/lineOfSightGate.js'
+import { isCoverEnforced } from '../../services/combat/coverService.js'
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
 import { toggleBuff } from '../../services/automation/common/buffToggle.js'
 import { addExpiration } from '../../services/rules/effects/expirations.js'
@@ -55,7 +56,10 @@ export default function useCharActionsAttackHandlers({
         // Enforcement off ⇒ isLineOfSightEnforced is a synchronous false and
         // the whole click path is byte-identical to Levels 1–4.
         const losTarget = getTargetFromAttacker(getCombatSummary(campaignName), playerName)?.name || null;
-        if (losTarget && isLineOfSightEnforced(campaignName, attack?.range ?? attack?.reach)) {
+        const shotRange = attack?.range ?? attack?.reach;
+        // L5 §8.3: zones half-cover rides the SAME gate pass — either gate
+        // live routes the click through the (async) map consult.
+        if (losTarget && (isLineOfSightEnforced(campaignName, shotRange) || isCoverEnforced(campaignName, shotRange))) {
             checkLineOfSight({
                 campaignName,
                 attackerName: playerName,

@@ -3,6 +3,7 @@ import { executeSpellCast } from '../../services/rules/spells/spellCastService.j
 import { assertCanAct } from '../../services/combat/assertCanAct.js'
 import { classifyBucket } from '../../services/combat/automation/classifyBucket.js'
 import { isLineOfSightEnforced, checkLineOfSight } from '../../services/combat/lineOfSightGate.js'
+import { isCoverEnforced } from '../../services/combat/coverService.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
 
@@ -91,7 +92,7 @@ export function useSpellCastExecutor({ rollAttack, rollDamage, playerStats, getT
         const losTargetName = metaCtx?.targetName
             || getTargetFromAttacker(getCombatSummary(campaignName), playerStats.name)?.name
             || null;
-        if (losTargetName && isLineOfSightEnforced(campaignName, spell?.range)) {
+        if (losTargetName && (isLineOfSightEnforced(campaignName, spell?.range) || isCoverEnforced(campaignName, spell?.range))) {
             const pos = ref.current;
             checkLineOfSight({
                 campaignName,

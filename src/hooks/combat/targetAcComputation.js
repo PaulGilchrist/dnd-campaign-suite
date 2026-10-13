@@ -1,6 +1,8 @@
 // Shared AC computation for attack rolls (hit resolution and roll logging).
 
 import { getRuntimeValue } from '../runtime/useRuntimeState.js';
+import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
+import { readCoverShot } from '../../services/combat/coverService.js';
 
 // SP-013: Barkskin floor: AC can't be less than 17 (2024; display consumers
 // displayCreatureUtils.js / CharSummary.jsx stamp 17). FLOOR semantics, NOT an
@@ -30,6 +32,16 @@ export function computeTargetAc(context, target, characters, campaignName) {
     }
     if (isBarkskinAcFloorActive(target.name, campaignName)) {
         targetAc = Math.max(targetAc, 17);
+    }
+    // L5-003 §8.3 cover: half-cover stamp armed by the LoS/cover gate at
+    // this shot's click (sync cached read). Covers stack ON TOP of the
+    // Barkskin floor (floor is a base-AC rule; −2 is a circumstance
+    // penalty). Matched by attacker + target + round; clear shots write
+    // null so a clean line is never taxed. Zones off ⇒ stamp never
+    // written ⇒ byte-parity.
+    const cover = readCoverShot(context, target.name, campaignName, getCurrentCombatRound(campaignName));
+    if (cover) {
+        targetAc += cover.ac;
     }
     return targetAc;
 }
