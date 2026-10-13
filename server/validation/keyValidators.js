@@ -27,6 +27,8 @@ const ENFORCEMENT_FLAGS = new Set([
     'tokenMoving',
     // L5 Phase 4 §10.2: accepted travel combat events auto-start initiative.
     'autoEncounters',
+    // L5 Phase 4 §10.3: combat close auto-awards loot + XP.
+    'autoRewards',
 ]);
 
 // Client turnState economy charges one slot per use; the generous caps here are

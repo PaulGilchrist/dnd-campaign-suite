@@ -4,6 +4,7 @@ import storage from '../../services/ui/storage.js'
 import { clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
 import { clearCombat, setInitiative, renameNpc, setTarget, removeNpc, addNpc } from '../../services/encounters/initiativeService.js'
 import { setSessionPhase } from '../../services/combat/sessionService.js'
+import { autoAwardCombatRewards } from '../../services/items/autoRewardService.js'
 import { maybeGrantThiefsReflexesSecondTurn } from '../../services/combat/thiefsReflexesService.js'
 import { vanishSummonAtZeroHp } from '../../services/combat/summons/summonedCreatureService.js'
 import { breakHypnoticPatternOnDamage } from '../../services/rules/features/hypnoticPatternService.js'
@@ -61,6 +62,10 @@ export function createCreatureHandlers({
 
     const handleClear = function handleClear() {
         if (window.confirm('Are you sure you want to clear all combat status?')) {
+            // L5 §10.3: capture the closing roster BEFORE clear wipes it —
+            // auto-rewards (flag-gated, off ⇒ zero writes) need the NPCs
+            // that were on the tracker to compute loot + XP.
+            const closingSummary = cloneDeep(combatSummary)
             const newSummary = clearCombat(characters, numOfNpc, (name) => name)
             storage.set('combatSummary', newSummary, campaignName)
             setCombatSummary(newSummary)
@@ -84,6 +89,11 @@ export function createCreatureHandlers({
             import('../../services/rules/effects/zoneDurationClock.js')
                 .then((m) => m.sweepNewCombatClocks(campaignName))
                 .catch((e) => { console.error('[handleClear:new-combat-sweep]', e) })
+            // L5 §10.3: with enforcement.autoRewards on, the closed encounter
+            // awards loot + split XP through normal character management.
+            // Off ⇒ zero writes (the loot panel stays the only lane).
+            autoAwardCombatRewards({ campaignName, combatSummary: closingSummary, characters })
+                .catch((e) => { console.error('[handleClear:auto-rewards]', e) })
         }
     }
 

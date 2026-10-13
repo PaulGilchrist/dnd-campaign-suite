@@ -31,6 +31,9 @@ export const ENFORCEMENT_DEFAULTS = Object.freeze({
     // initiative tracker (engine rolls). Off ⇒ Accept keeps today's map-only
     // behavior — the GM starts initiative manually.
     autoEncounters: false,
+    // L5 Phase 4 §10.3: Clear-Combat auto-awards loot + split XP through
+    // normal character management. Off ⇒ the GM uses the loot panel buttons.
+    autoRewards: false,
 });
 
 /** Merge campaign `enforcement` runtime value over defaults; never trusts shape. */

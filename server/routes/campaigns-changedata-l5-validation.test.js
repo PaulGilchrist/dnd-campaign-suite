@@ -322,3 +322,15 @@ describe('P4-b enforcement.autoEncounters flag (§10.2)', () => {
         expect(junk.status).toBe(400);
     });
 });
+
+// P4-c (§10.3): auto-rewards rides the enforcement flag set.
+describe('P4-c enforcement.autoRewards flag (§10.3)', () => {
+    it('accepts autoRewards; refuses junk', async () => {
+        const post = (enforcement) => request(createTestApp())
+            .post('/api/campaigns/test-campaign/enforcement')
+            .set('X-Client-Id', 'cid-hoster')
+            .send({ value: enforcement });
+        expect((await post({ mode: 'off', autoRewards: true })).status).toBe(200);
+        expect((await post({ mode: 'off', autoRewards: 'free xp' })).status).toBe(400);
+    });
+});
