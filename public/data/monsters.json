@@ -71679,6 +71679,10 @@
       },
       {
         "name": "Head's Vigil",
+        "ability_check": {
+          "ability": "wisdom",
+          "skill": "perception"
+        },
         "description": "Orochi makes one Perception check."
       },
       {

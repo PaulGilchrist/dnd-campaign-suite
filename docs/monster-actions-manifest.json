@@ -32641,7 +32641,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Orochi makes one Perception check.",
-      "verified": "broken — see .opencode/plans/bug-mon-2054-yamata-heads-vigil.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2055",
