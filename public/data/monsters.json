@@ -74919,8 +74919,11 @@
       },
       {
         "name": "Wing Buffet (Costs 2 Actions)",
-        "delegates_to": "Triple Fire Breath (Recharge 5-6)",
-        "description": "Zmey Gorynych beats his wings in a wide arc, exhaling fire in a 60-foot Cone. Each creature in the area must succeed on a DC 23 Dexterity saving throw or take 11 (2d8) Fire damage."
+        "description": "Zmey Gorynych beats his wings in a wide arc, exhaling fire in a 60-foot Cone. Each creature in the area must succeed on a DC 23 Dexterity saving throw or take 11 (2d8) Fire damage.",
+        "save_dc": 23,
+        "save_type": "Dexterity",
+        "damage_dice_primary": "2d8",
+        "damage_type_primary": "Fire"
       }
     ],
     "lair_actions": [],

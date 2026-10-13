@@ -71,10 +71,14 @@ describe('MA-2078 disk fingerprint: Zmey Dust Storm save_effect authored, MA-205
     expect(legendaryActionCost(HEADER)).toBe(1);
   });
 
-  it('MA-2079 sibling Wing Buffet untouched: still zero-numeric delegate (separate ticket)', () => {
+  it('MA-2079 sibling Wing Buffet self-resolving save row (§384 inversion of stale delegate pin)', () => {
     expect(WING.name).toBe('Wing Buffet (Costs 2 Actions)');
-    expect(WING.delegates_to).toBe('Triple Fire Breath (Recharge 5-6)');
-    expect(WING.save_dc).toBeUndefined();
+    expect(WING.delegates_to).toBeUndefined(); // delegate-hijack dropped (MA-2022 pattern)
+    expect(WING.save_dc).toBe(23);
+    expect(WING.save_type).toBe('Dexterity');
+    expect(WING.damage_dice_primary).toBe('2d8');
+    expect(WING.damage_type_primary).toBe('Fire');
+    expect(WING.dc_success).toBeUndefined(); // half-default — RAW "Success: Half"
     expect(WING.save_effect).toBeUndefined();
     expect(legendaryActionCost(WING)).toBe(2);
   });

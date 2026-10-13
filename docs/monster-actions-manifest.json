@@ -34654,7 +34654,7 @@
       "category": "legendary_actions",
       "actionType": "aoe-save",
       "description": "Zmey Gorynych beats his wings in a wide arc, exhaling fire in a 60-foot Cone. Each creature in the area must succeed on a DC 23 Dexterity saving throw or take 11 (2d8) Fire damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-2079-zmey-wing-buffet.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1838",
