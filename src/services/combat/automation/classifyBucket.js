@@ -31,6 +31,17 @@ const ROW_BUCKET = {
     'free interaction': 'free',
     'special action': 'special',
     'passive': 'passive',
+    // §18 D3 (2024 dual-ruleset audit): the passive family appears in BOTH
+    // rulesets' data (passive_rule/passive_buff/passive_immunity/save_proficiency/
+    // conditional_advantage) — classify them passive instead of defaulting them
+    // to 'action'. Rows never clicked (passive prose) never reach the gate, so
+    // off-mode gameplay is untouched; clicked bonus_action-typed rows (feats in
+    // 2024 classes/feats data) now charge the BONUS slot, not the Action slot.
+    'passive rule': 'passive',
+    'passive buff': 'passive',
+    'passive immunity': 'passive',
+    'save proficiency': 'passive',
+    'conditional advantage': 'passive',
 }
 const ACTION_BUCKET = {
     bonus_action: 'bonusAction',
@@ -48,7 +59,11 @@ const CASTING_BUCKET = {
 export function classifyBucket(subject) {
     if (!subject || typeof subject !== 'object') return 'action'
     const auto = (subject.automation && typeof subject.automation === 'object') ? subject.automation : subject
-    const byRow = ROW_BUCKET[String(subject.type || auto.type || '').toLowerCase()]
+    // §18 D3: row types arrive in both dialects — 'Bonus Action' (5e sheets),
+    // 'bonus_action' (2024 Essentials data). Normalize like casting times so
+    // one table serves both rulesets (never diverge on what an action "is").
+    const typeKey = String(subject.type || auto.type || '').toLowerCase().replace(/_/g, ' ').replace(/\s+/g, ' ').trim()
+    const byRow = ROW_BUCKET[typeKey]
     if (byRow) return byRow
     const byAction = ACTION_BUCKET[String(auto.action || '').toLowerCase()]
     if (byAction) return byAction
@@ -56,6 +71,11 @@ export function classifyBucket(subject) {
     if (CASTING_BUCKET[ct]) return CASTING_BUCKET[ct]
     // Compounds the normalizer passes through ('1 bonus action (ritual)',
     // '1 reaction, when targeted'…) still classify by their leading form.
-    if (/^1?\s*(bonus action)/i.test(String(ct))) return 'bonusAction'
+    // §18 D3 audit BUGFIX: the leading-form promise existed for bonus ONLY —
+    // compound reaction casts ('1 reaction, when targeted' — counterspell/
+    // hellish rebuke shapes) silently defaulted to 'action' and would have
+    // charged an Action slot under enforcement.
+    if (/^1?\s*bonus action/i.test(String(ct))) return 'bonusAction'
+    if (/^1?\s*reaction/i.test(String(ct))) return 'reaction'
     return 'action'
 }
