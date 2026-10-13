@@ -4,6 +4,7 @@ import { setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRunt
 import { clampSelectionOffset, FEET_PER_CELL } from '../../../services/combat/movementBudget.js';
 import { remainingMovement, DEFAULT_SPEED_FEET } from '../../../services/combat/turnState.js';
 import { chargeMovement } from '../../../services/combat/chargeEconomy.js';
+import { onTokenMoveLanded } from '../../../services/combat/opportunityTrigger.js';
 
 function collectWallsInRect(walls, rect) {
     const { minX, maxX, minY, maxY } = rect;
@@ -206,6 +207,21 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignNa
             for (const it of selectedPlayers) {
                 chargeMovement({ creatureName: it.name || it.id, feet: costFeet, campaignName });
             }
+        }
+
+        // L5-003 §8.4: opportunity-attack trigger per moved token (returns
+        // synchronously with zero work while enforcement is off).
+        const mapNow = mapDataRef.current || {};
+        const movedTokens = (placedItemsRef.current || []).filter(it => selectedItemsRef.current.has(it.id));
+        for (const it of movedTokens) {
+            onTokenMoveLanded({
+                campaignName,
+                moverName: it.name || it.id,
+                moverIsPlayer: it.type === 'player',
+                fromCell: { gridX: it.gridX, gridY: it.gridY },
+                toCell: { gridX: it.gridX + dx, gridY: it.gridY + dy },
+                mapData: mapNow,
+            }).catch((e) => { console.error('[useSelectMove:opportunity-trigger]', e); });
         }
     }, [campaignName]);
 

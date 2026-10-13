@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { CELL_SIZE } from '../../../config/mapConfig';
 import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { onTokenMoveLanded } from '../../../services/combat/opportunityTrigger.js';
 
 export default function useItemDragging({
     svgRef,
@@ -12,6 +13,7 @@ export default function useItemDragging({
     rulerMode,
     spellMode,
     campaignName,
+    mapData,
 }) {
     const [itemDragging, setItemDragging] = useState(null);
 
@@ -43,6 +45,10 @@ export default function useItemDragging({
             pointerId: e.pointerId,
             offsetX: svgPt.x - cx,
             offsetY: svgPt.y - cy,
+            startGridX: item.gridX,
+            startGridY: item.gridY,
+            moverName: item.name || item.id,
+            moverIsPlayer: item.type === 'player',
         });
     }, [rulerMode, spellMode, placedItems, gridCenterX, gridCenterY, svgRef]);
 
@@ -90,8 +96,27 @@ export default function useItemDragging({
         if (!itemDragging) return;
         const svg = svgRef.current;
         if (svg) svg.releasePointerCapture(e.pointerId);
+
+        // L5-003 §8.4: NPC/player token dropped at a new cell — opportunity
+        // trigger (synchronous zero-work while enforcement is off).
+        const item = (placedItems || []).find((i) => i.id === itemDragging.itemId);
+        if (
+            campaignName && item &&
+            Number.isFinite(itemDragging.startGridX) &&
+            (item.gridX !== itemDragging.startGridX || item.gridY !== itemDragging.startGridY)
+        ) {
+            onTokenMoveLanded({
+                campaignName,
+                moverName: itemDragging.moverName || item.name || item.id,
+                moverIsPlayer: !!itemDragging.moverIsPlayer,
+                fromCell: { gridX: itemDragging.startGridX, gridY: itemDragging.startGridY },
+                toCell: { gridX: item.gridX, gridY: item.gridY },
+                mapData,
+            }).catch((err) => { console.error('[useItemDragging:opportunity-trigger]', err); });
+        }
+
         setItemDragging(null);
-    }, [itemDragging, svgRef]);
+    }, [itemDragging, svgRef, campaignName, placedItems, mapData]);
 
     const handleItemPointerLeave = useCallback((e) => {
         if (!itemDragging) return;

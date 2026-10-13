@@ -217,7 +217,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     });
 
     const { itemDragging, handleItemPointerDown, handleItemPointerMove, handleItemPointerUp: handleItemPointerUpHook, handleItemPointerLeave } = useItemDragging({
-        svgRef, placedItems, setPlacedItems, gridSize, gridCenterX, gridCenterY, rulerMode, spellMode, campaignName,
+        svgRef, placedItems, setPlacedItems, gridSize, gridCenterX, gridCenterY, rulerMode, spellMode, campaignName, mapData,
     });
 
     // Exploration memory: merge newly revealed cells into the persisted set so

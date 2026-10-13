@@ -8,6 +8,7 @@ import { computeMovementObstacles,
 import { clampMovementDrop } from '../../../services/combat/movementBudget.js';
 import { DEFAULT_SPEED_FEET } from '../../../services/combat/turnState.js';
 import { chargeMovement } from '../../../services/combat/chargeEconomy.js';
+import { onTokenMoveLanded } from '../../../services/combat/opportunityTrigger.js';
 import { addEntry } from '../../../services/ui/logService.js';
 
 function toSvgPoint(svg, clientX, clientY) {
@@ -74,10 +75,12 @@ function resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData
 }
 
 /**
- * Post-drop bookkeeping: Steady Aim's moved-this-turn stamp, plus the
- * movement-budget charge (budgetActive:false ⇒ no-op, enforcement off).
+ * Post-drop bookkeeping: Steady Aim's moved-this-turn stamp, the
+ * movement-budget charge (budgetActive:false ⇒ no-op, enforcement off),
+ * and the §8.4 opportunity-attack trigger (returns synchronously with
+ * zero work while enforcement.opportunityAttacks is off).
  */
-function finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, budget }) {
+function finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, budget, mapData }) {
     if (!campaignName || !player) return;
     const startGridX = dragging.startX ?? player.gridX;
     const startGridY = dragging.startY ?? player.gridY;
@@ -86,6 +89,14 @@ function finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, 
     if (budget.budgetActive) {
         chargeMovement({ creatureName: player.name || player.id, feet: budget.moveCostFeet, campaignName });
     }
+    onTokenMoveLanded({
+        campaignName,
+        moverName: player.name || player.id,
+        moverIsPlayer: true,
+        fromCell: { gridX: startGridX, gridY: startGridY },
+        toCell: { gridX: targetX, gridY: targetY },
+        mapData,
+    }).catch((e) => { console.error('[usePlayerDragging:opportunity-trigger]', e); });
 }
 
 export default function usePlayerDragging({
@@ -246,7 +257,7 @@ export default function usePlayerDragging({
         if (svg) svg.releasePointerCapture(e.pointerId);
         setDragging(null);
 
-        finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, budget });
+        finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, budget, mapData });
     }, [dragging, mapData, gridSize, setMapData, svgRef, campaignName, walls, placedItems]);
 
     const handlePointerLeave = useCallback((e) => {
