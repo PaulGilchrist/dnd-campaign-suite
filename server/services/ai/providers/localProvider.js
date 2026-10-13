@@ -13,7 +13,38 @@
  * AGENTS.md "No Game Timers" — the fallback here is 'needs_human').
  */
 
+import fs from 'fs';
+
 const DEFAULT_TIMEOUT_MS = 60_000;
+
+/**
+ * Optional bearer key for the local endpoint. NEVER stored in aiConfig /
+ * change-data (that mirrors to every client) — it lives in the environment
+ * or a gitignored server-local file. Privacy holds even though the endpoint
+ * is localhost-only: player browsers never see the key.
+ */
+export function resolveApiKey() {
+    if (process.env.AI_API_KEY) return process.env.AI_API_KEY;
+    try {
+        const file = new URL('../../config/ai-local.json', import.meta.url);
+        const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+        return typeof raw.apiKey === 'string' && raw.apiKey.trim() ? raw.apiKey.trim() : null;
+    } catch {
+        return null; // no key configured — keyless endpoints (plain Ollama) keep working
+    }
+}
+
+function authHeaders(extra = {}) {
+    const key = resolveApiKey();
+    return key ? { ...extra, Authorization: `Bearer ${key}` } : extra;
+}
+
+/** Join endpoint + API path without doubling '/v1' ('http://h:8000/v1' accepted). */
+function joinApi(endpoint, path) {
+    let base = String(endpoint).replace(/\/+$/, '');
+    if (/\/v1$/i.test(base)) base = base.replace(/\/v1$/i, '');
+    return `${base}${path}`;
+}
 
 /** D3 privacy contract: http(s)://localhost|127.0.0.1|::1[:port] only. */
 export function isLocalEndpoint(url) {
@@ -87,9 +118,9 @@ export async function chat(cfg) {
 
     let res;
     try {
-        res = await fetch(`${endpoint.replace(/\/+$/, '')}${shape.path}`, {
+        res = await fetch(joinApi(endpoint, shape.path), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(shape.body),
             signal: AbortSignal.timeout(timeoutMs),
         });
@@ -114,7 +145,7 @@ export async function probe({ endpoint, provider, timeoutMs = 5000 } = {}) {
     if (!isLocalEndpoint(endpoint)) return { reachable: false, reason: 'endpoint is not a local URL' };
     const path = provider === 'openai' ? '/v1/models' : '/api/tags';
     try {
-        const res = await fetch(`${endpoint.replace(/\/+$/, '')}${path}`, { signal: AbortSignal.timeout(timeoutMs) });
+        const res = await fetch(joinApi(endpoint, path), { headers: authHeaders(), signal: AbortSignal.timeout(timeoutMs) });
         if (!res.ok) return { reachable: false, reason: `HTTP ${res.status}` };
         const data = await res.json().catch(() => ({}));
         const models = Array.isArray(data?.models) ? data.models.map((m) => m?.name).filter(Boolean)

@@ -1,6 +1,6 @@
 // L5 Phase 3 — local provider tests (fetch stubbed; D3 privacy contract live here).
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { chat, probe, isLocalEndpoint } from './localProvider.js';
+import { chat, probe, isLocalEndpoint, resolveApiKey } from './localProvider.js';
 
 afterEach(() => {
     vi.unstubAllGlobals();
@@ -90,5 +90,41 @@ describe('probe', () => {
         stubFetch({ throws: 'ECONNREFUSED' });
         expect(await probe({ endpoint: 'http://localhost:11434' })).toMatchObject({ reachable: false });
         expect(await probe({ endpoint: 'https://evil.example' })).toMatchObject({ reachable: false, reason: /not a local URL/ });
+    });
+});
+
+describe('openai-compatible endpoints + optional bearer key', () => {
+    it('/v1 endpoint + openai provider posts to /v1/chat/completions WITHOUT doubling /v1', async () => {
+        const stub = stubFetch({ json: { choices: [{ message: { content: 'ok' } }] } });
+        const content = await chat({ endpoint: 'http://localhost:8000/v1', provider: 'openai', model: 'local', messages: msgs });
+        expect(content).toBe('ok');
+        const url = stub.mock.calls[0][0];
+        expect(url).toBe('http://localhost:8000/v1/chat/completions');
+    });
+
+    it('probe against /v1 lists OpenAI-shaped models', async () => {
+        const stub = stubFetch({ json: { data: [{ id: 'qwen3:4b' }, { id: 'llama3' }] } });
+        const r = await probe({ endpoint: 'http://localhost:8000/v1/', provider: 'openai' });
+        expect(r).toEqual({ reachable: true, models: ['qwen3:4b', 'llama3'] });
+        expect(stub.mock.calls[0][0]).toBe('http://localhost:8000/v1/models');
+    });
+
+    it('resolveApiKey: env wins; absent ⇒ null (keyless stays working)', () => {
+        delete process.env.AI_API_KEY;
+        expect(resolveApiKey()).toBeNull();
+        process.env.AI_API_KEY = 'sk-test-123';
+        expect(resolveApiKey()).toBe('sk-test-123');
+        delete process.env.AI_API_KEY;
+    });
+
+    it('key present ⇒ Authorization header on chat + probe; keyless ⇒ none', async () => {
+        process.env.AI_API_KEY = 'sk-test-123';
+        const stub = stubFetch({ json: { choices: [{ message: { content: 'ok' } }] } });
+        await chat({ endpoint: 'http://localhost:8000/v1', provider: 'openai', model: 'local', messages: msgs });
+        expect(stub.mock.calls[0][1].headers.Authorization).toBe('Bearer sk-test-123');
+        delete process.env.AI_API_KEY;
+        const stub2 = stubFetch({ json: { choices: [{ message: { content: 'ok' } }] } });
+        await chat({ endpoint: 'http://localhost:8000/v1', provider: 'openai', model: 'local', messages: msgs });
+        expect(stub2.mock.calls[0][1].headers.Authorization).toBeUndefined();
     });
 });

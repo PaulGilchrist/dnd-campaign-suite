@@ -68,3 +68,6 @@ coverage-report.txt
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Local AI endpoint bearer key (server-local secret — never in aiConfig/change-data)
+server/config/ai-local.json
