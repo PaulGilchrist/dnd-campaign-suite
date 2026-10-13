@@ -74889,7 +74889,8 @@
         "save_dc": 23,
         "description": "Dexterity Saving Throw: DC 23, each creature in a 90-foot Cone. Failure: 49 (11d8) Fire damage. Success: Half damage.",
         "damage_dice_primary": "11d8",
-        "damage_type_primary": "Fire"
+        "damage_type_primary": "Fire",
+        "recharge": "5-6"
       }
     ],
     "bonus_actions": [],

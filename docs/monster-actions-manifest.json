@@ -34598,7 +34598,7 @@
       "damageDicePrimary": "11d8",
       "damageTypePrimary": "Fire",
       "description": "Dexterity Saving Throw: DC 23, each creature in a 90-foot Cone. Failure: 49 (11d8) Fire damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-2081-zmey-triple-fire-breath-recharge.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2076",

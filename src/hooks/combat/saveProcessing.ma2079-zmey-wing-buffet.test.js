@@ -77,15 +77,15 @@ describe('MA-2079 disk fingerprint: Zmey Wing Buffet self-resolving save row', (
     expect(monsterRechargeGate(WING, { 'Triple Fire Breath': { recharged: false, threshold: 5 } })).toBeNull();
   });
 
-  it('master Triple Fire Breath stays byte-untouched (11d8 kept; recharge:"5-6" ABSENT — MA-2081 queue, not authored here)', () => {
+  it('master Triple Fire Breath fixed by MA-2081 same-pass: recharge:"5-6" authored, 11d8 core byte-kept', () => {
     expect(BREATH.save_dc).toBe(23);
     expect(BREATH.save_type).toBe('Dexterity');
     expect(BREATH.damage_dice_primary).toBe('11d8');
     expect(BREATH.damage_type_primary).toBe('Fire');
     expect(BREATH.description).toBe('Dexterity Saving Throw: DC 23, each creature in a 90-foot Cone. Failure: 49 (11d8) Fire damage. Success: Half damage.');
     expect(BREATH.dc_success).toBeUndefined(); // master "Success: Half" half-default pinned as-is
-    expect(BREATH.recharge).toBeUndefined(); // MA-2081 territory — name-only "(Recharge 5-6)" stays pending
-    expect(rechargeUsageOf(BREATH)).toBeNull(); // disk-canonical pending state
+    expect(BREATH.recharge).toBe('5-6'); // §384 inverted: MA-2081 authored the flat field (was pending name-only)
+    expect(rechargeUsageOf(BREATH)).toEqual({ threshold: 5 }); // gate now LIVE on the master row
     expect(rechargeActionKey(BREATH)).toBe('Triple Fire Breath');
   });
 });
