@@ -235,6 +235,11 @@ export function createNextCreatureHandler({
         // Round-wrap-only work: bump the round counter and clear per-round trackers.
         const roundToSet = (roundRef.current ?? 1) + (roundIncrement ? 1 : 0)
         const updatedSummary = cloneDeep(cs)
+        // BUG (MA-1966 infra): every tracker step advances the boundary stamp — the
+        // cloned summary would otherwise re-bake a stale activeCreatureName into the
+        // persisted combatSummary on every POST (getCombatContext now also prefers the
+        // live top-level key, but the mirror must stay fresh for cache consumers/SSE).
+        updatedSummary.activeCreatureName = newActiveName
         if (roundIncrement) {
             runRoundWrapHousekeeping({ updatedSummary, creatures: cs.creatures, campaignName, roundToSet, setCombatSummary })
         }
@@ -256,6 +261,10 @@ export function createNextCreatureHandler({
             // persist the cache (round + damage) last so nothing stale overwrites it.
             finalSummary = await applyTurnStartGate({ gateKey, newActiveName, characters, campaignName, lastAppliedTurnStartCreatureRef, updatedSummary })
         }
+        // BUG (MA-1966 infra): stamp the live boundary onto the summary we persist so
+        // the cs.activeCreatureName mirror advances on every Next step (a cache copy
+        // adopted from turn-start effects must carry the new active creature too).
+        finalSummary.activeCreatureName = newActiveName
         storage.set('combatSummary', finalSummary, campaignName)
         setCombatSummary(cloneDeep(finalSummary))
         if (shouldApply) {
@@ -288,6 +297,7 @@ export function createPreviousCreatureHandler({
         // Round-wrap-only work: decrement the round counter.
         const roundToSet = (roundRef.current ?? 1) - (roundDecrement ? 1 : 0)
         const updatedSummary = cloneDeep(cs)
+        updatedSummary.activeCreatureName = newActiveName
         if (roundDecrement) {
             updatedSummary.round = roundToSet
             setCombatSummary(updatedSummary)
@@ -306,6 +316,9 @@ export function createPreviousCreatureHandler({
         if (shouldApply) {
             finalSummary = await applyTurnStartGate({ gateKey, newActiveName, characters, campaignName, lastAppliedTurnStartCreatureRef, updatedSummary })
         }
+        // BUG (MA-1966 infra): mirror the next-handler — rewinding also advances the
+        // boundary stamp consumed by the legendary gate (getCombatContext).
+        finalSummary.activeCreatureName = newActiveName
         storage.set('combatSummary', finalSummary, campaignName)
         setCombatSummary(cloneDeep(finalSummary))
         if (shouldApply) {

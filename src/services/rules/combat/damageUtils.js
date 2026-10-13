@@ -47,7 +47,12 @@ export async function getCombatContext(campaignName) {
     }
     const data = await response.json();
     const combatSummary = data.combatSummary || null;
-    if (combatSummary && !combatSummary.activeCreatureName && data.activeCreatureName) {
+    // BUG (MA-1966 infra): the baked combatSummary.activeCreatureName only moves at
+    // round-wrap/resort writes, so it goes stale mid-round and legendary/gate consumers
+    // over-refuse fresh boundaries. The top-level activeCreatureName key is the LIVE
+    // tracker truth — every Next/Prev step advances it first — so it wins whenever
+    // present; the baked field is the fallback (playbook §31: "top-level is truth").
+    if (combatSummary && data.activeCreatureName) {
       combatSummary.activeCreatureName = data.activeCreatureName;
     }
     return combatSummary;
