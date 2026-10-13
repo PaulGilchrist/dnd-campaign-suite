@@ -36,6 +36,13 @@ vi.mock('../../../rules/effects/expirationQueue.js', () => ({
     addExpiration: vi.fn(),
 }));
 
+// L5-003 §8.1: token-move seam — default OFF keeps legacy prose byte-identical.
+vi.mock('../../../combat/teleportService.js', () => ({
+    applyTeleportTokenMove: vi.fn(async () => ({ moved: false, reason: 'token-moving-off' })),
+}));
+
+import * as teleportService from '../../../combat/teleportService.js';
+
 // ── Re-import after mocking ────────────────────────────────────
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -639,6 +646,32 @@ describe('tempTeleportHandler', () => {
         it('returns true when flag is falsy', () => {
             getRuntimeValue.mockReturnValue(null);
             expect(isExtendedAvailable(PLAYER_NAME, CAMPAIGN_NAME)).toBe(true);
+        });
+    });
+
+    describe('§8.1 teleport token-move seam', () => {
+        it('passes the resolved target as anchor with the chosen distance in feet', async () => {
+            await confirmTeleport(makeAction(), makePlayerStats(), CAMPAIGN_NAME, false);
+
+            expect(teleportService.applyTeleportTokenMove).toHaveBeenCalledWith(
+                expect.objectContaining({ campaignName: CAMPAIGN_NAME, creatureName: PLAYER_NAME, anchorName: 'Goblin', maxFeet: 60 }),
+            );
+        });
+
+        it('OFF / degrade ⇒ prose byte-identical, no coordinate suffix', async () => {
+            teleportService.applyTeleportTokenMove.mockResolvedValue({ moved: false, reason: 'no-target-selected' });
+            const result = await confirmTeleport(makeAction(), makePlayerStats(), CAMPAIGN_NAME, false);
+
+            expect(result.payload.description).not.toContain('Token moved');
+        });
+
+        it('ON + moved ⇒ description carries coordinates and a token-move log fires', async () => {
+            teleportService.applyTeleportTokenMove.mockResolvedValue({ moved: true, from: { gridX: 4, gridY: 4 }, to: { gridX: 6, gridY: 4 }, distanceFeet: 10 });
+            const result = await confirmTeleport(makeAction(), makePlayerStats(), CAMPAIGN_NAME, false);
+
+            expect(result.payload.description).toContain('Token moved (4,4) → (6,4)');
+            const moveLog = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'teleport_token_move');
+            expect(moveLog?.description).toContain('(4,4) → (6,4)');
         });
     });
 });

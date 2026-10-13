@@ -12,6 +12,7 @@ import { getActiveCreatureName, getCombatSummary, getCurrentCombatRound, loadCom
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { createSaveListener } from '../../common/savePrompt.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
+import { applyTeleportTokenMove } from '../../../combat/teleportService.js';
 
 function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
@@ -219,13 +220,28 @@ async function applyBranchesFailedSave({ campaignName, playerName, activeCreatur
         { type: 'remove_target_effect', effectKey: 'speed_reduction', source: featureName, target: activeCreatureName }
     ], campaignName, rounds: 1 });
 
+    // L5-003 §8.1: the RAW destination is "an unoccupied space you can see
+    // within {range} feet of you" — mover = the active creature, anchor =
+    // this player, so teleportService can resolve it honestly. Off ⇒
+    // moved:false and the advisory wording below stays exactly as today.
+    const move = await applyTeleportTokenMove({
+        campaignName,
+        mapName: null,
+        creatureName: activeCreatureName,
+        anchorName: playerName,
+        maxFeet: teleportRangeFt,
+    });
+    const moveNote = move.moved
+        ? ` Token moved (${move.from.gridX},${move.from.gridY}) → (${move.to.gridX},${move.to.gridY}).`
+        : ' — token position GM-enforced gridless (no token-movement consumer).';
+
     addEntry(campaignName, {
         type: 'automation',
         characterName: playerName,
         automationType: 'branches_of_the_tree_teleported',
         name: featureName,
         targetName: activeCreatureName,
-        description: `${activeCreatureName} is teleported to an unoccupied space you can see within ${teleportRangeFt} feet of ${playerName} (or the nearest unoccupied space visible) — token position GM-enforced gridless (no token-movement consumer).`,
+        description: `${activeCreatureName} is teleported to an unoccupied space you can see within ${teleportRangeFt} feet of ${playerName} (or the nearest unoccupied space visible)${moveNote}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[branchesOfTheTree] Error:", e); });
 

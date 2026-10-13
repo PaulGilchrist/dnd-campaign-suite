@@ -79,6 +79,11 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(),
 }));
 
+// L5-003 §8.1: token-move seam — default OFF keeps the advisory log byte-identical.
+vi.mock('../../../combat/teleportService.js', () => ({
+  applyTeleportTokenMove: vi.fn(async () => ({ moved: false, reason: 'token-moving-off' })),
+}));
+
 import { handle } from './reactionDebuffHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
@@ -88,6 +93,7 @@ import * as combatData from '../../../encounters/combatData.js';
 import * as abilityLookup from '../../../shared/abilityLookup.js';
 import * as savePrompt from '../../common/savePrompt.js';
 import * as expirations from '../../../rules/effects/expirations.js';
+import * as teleportService from '../../../combat/teleportService.js';
 
 const campaignName = 'test-campaign';
 const mapName = 'test-map';
@@ -442,6 +448,34 @@ describe('branchesOfTheTree (teleport_and_slow)', () => {
         description: expect.stringContaining('within 5 feet of Thulgar'),
       })
     );
+  });
+
+  it('§8.1 seam OFF ⇒ advisory log byte-identical (gridless suffix preserved)', async () => {
+    combatData.getActiveCreatureName.mockReturnValue('Bandit 1');
+    teleportService.applyTeleportTokenMove.mockResolvedValue({ moved: false, reason: 'token-moving-off' });
+
+    await handle(makeTeleportAction(), makeBarbarianStats(), campaignName, mapName);
+    await getSaveHandler()({ detail: { promptId: 'test-prompt-id', success: false } });
+
+    const log = logService.addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'branches_of_the_tree_teleported');
+    expect(log.description).toContain('GM-enforced gridless');
+    expect(log.description).not.toContain('Token moved');
+  });
+
+  it('§8.1 seam ON ⇒ mover = active creature, anchor = player, log carries coordinates', async () => {
+    combatData.getActiveCreatureName.mockReturnValue('Bandit 1');
+    rangeValidation.rangeToFeet.mockImplementation(r => (String(r).includes('5') ? 5 : 30));
+    teleportService.applyTeleportTokenMove.mockResolvedValue({ moved: true, from: { gridX: 7, gridY: 2 }, to: { gridX: 5, gridY: 2 }, distanceFeet: 10 });
+
+    await handle(makeTeleportAction(), makeBarbarianStats(), campaignName, mapName);
+    await getSaveHandler()({ detail: { promptId: 'test-prompt-id', success: false } });
+
+    expect(teleportService.applyTeleportTokenMove).toHaveBeenCalledWith(
+      expect.objectContaining({ creatureName: 'Bandit 1', anchorName: 'Thulgar', maxFeet: 5 }),
+    );
+    const log = logService.addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'branches_of_the_tree_teleported');
+    expect(log.description).toContain('Token moved (7,2) → (5,2)');
+    expect(log.description).not.toContain('GM-enforced gridless');
   });
 
   it('on fail: adds expiration to remove speed_reduction', async () => {

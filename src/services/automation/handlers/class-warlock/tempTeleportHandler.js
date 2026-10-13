@@ -6,6 +6,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirationQueue.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { getEffectDefinition, registerTargetEffect } from '../../../combat/conditions/targetEffectDefinitions.js';
+import { applyTeleportTokenMove } from '../../../combat/teleportService.js';
 
 function isIllusionActive(playerName, campaignName) {
     const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
@@ -240,6 +241,38 @@ function applyStepTeleportAdvantage({ action, playerStats, playerName, campaignN
     }
 }
 
+// Plain (non-transposition) teleport leg: legacy prose + the L5-003 §8.1
+// token-move seam. Destination anchor = the resolved combat target (same
+// trust this file places in resolveTarget for Improved Shadow Step).
+// Off / gridless / no target ⇒ moved:false and the prose stays as before.
+async function applyPlainTeleport({ action, playerName, campaignName, distance, useExtended, auto }) {
+    let description = `${action.name}: Teleported ${distance} to an unoccupied space you can see.`;
+    if (useExtended && auto.bringAllies && auto.allyCount > 0) {
+        description += ` Also brought up to ${auto.allyCount} willing creatures within ${auto.teleportRange || '10 ft'} of your destination.`;
+    }
+
+    const targetInfo = await resolveTarget(campaignName, playerName);
+    const move = await applyTeleportTokenMove({
+        campaignName,
+        mapName: null,
+        creatureName: playerName,
+        anchorName: targetInfo?.target?.name || null,
+        maxFeet: rangeToFeet(distance),
+    });
+    if (move.moved) {
+        description += ` Token moved (${move.from.gridX},${move.from.gridY}) → (${move.to.gridX},${move.to.gridY}) — ${Math.round(move.distanceFeet)} ft.`;
+        addEntry(campaignName, {
+            type: 'automation',
+            characterName: playerName,
+            automationType: 'teleport_token_move',
+            name: action.name,
+            description: `${action.name}: token relocated (${move.from.gridX},${move.from.gridY}) → (${move.to.gridX},${move.to.gridY}) within ${distance}.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[tempTeleport] Error logging token move:", e); });
+    }
+    return description;
+}
+
 export async function confirmTeleport(action, playerStats, campaignName, useExtended, consumedSlotLevel) {
     const auto = action?.automation || {};
     const playerName = playerStats.name;
@@ -258,10 +291,7 @@ export async function confirmTeleport(action, playerStats, campaignName, useExte
     if (auto.effect === 'teleport_swap_with_illusion') {
         description = applyTranspositionOutcome(action, playerName, campaignName, auto);
     } else {
-        description = `${action.name}: Teleported ${distance} to an unoccupied space you can see.`;
-        if (useExtended && auto.bringAllies && auto.allyCount > 0) {
-            description += ` Also brought up to ${auto.allyCount} willing creatures within ${auto.teleportRange || '10 ft'} of your destination.`;
-        }
+        description = await applyPlainTeleport({ action, playerName, campaignName, distance, useExtended, auto });
     }
 
     if (auto.effect === 'shadow_step_teleport') {
