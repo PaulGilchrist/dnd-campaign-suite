@@ -2,6 +2,9 @@ import { useRef, useCallback } from 'react'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { assertCanAct } from '../../services/combat/assertCanAct.js'
 import { classifyBucket } from '../../services/combat/automation/classifyBucket.js'
+import { isLineOfSightEnforced, checkLineOfSight } from '../../services/combat/lineOfSightGate.js'
+import { getCombatSummary } from '../../services/encounters/combatData.js'
+import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
 
 function buildHealPopup(spell, result) {
     const bonusHealDetail = result.bonusDetails?.length > 0
@@ -48,7 +51,9 @@ export function useSpellCastExecutor({ rollAttack, rollDamage, playerStats, getT
     const internalPosRef = useRef(null);
     const ref = cachedPosRef || internalPosRef;
 
-    const castAction = useCallback((spell, metaCtx) => {
+    // Execute-on-allow body of the cast chokepoint (declared BEFORE castAction
+    // so the memoized castAction never captures a stale first-render copy).
+    const runCast = useCallback((spell, metaCtx) => {
         // L5-001/002: enforcement gate at the single spell-cast chokepoint (no-op
         // while enforcement off). executeSpellCast runs immediately on allow, so
         // this site charges the classified slot (plan §7.2).
@@ -78,6 +83,32 @@ export function useSpellCastExecutor({ rollAttack, rollDamage, playerStats, getT
             .catch((e) => { console.error(`[useSpellCastExecutor] executeSpellCast error for ${spell.name}:`, e); });
         ref.current = null;
     }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters, setPopupHtml, extraMeta, ref, setModalState]);
+
+    const castAction = useCallback((spell, metaCtx) => {
+        // L5-003 §8.2: line-of-sight pre-check for enforced RANGED casts —
+        // runs BEFORE assertCanAct so a blocked cast never charges its slot.
+        // Enforcement off ⇒ synchronous false, byte-identical Levels 1–4.
+        const losTargetName = metaCtx?.targetName
+            || getTargetFromAttacker(getCombatSummary(campaignName), playerStats.name)?.name
+            || null;
+        if (losTargetName && isLineOfSightEnforced(campaignName, spell?.range)) {
+            const pos = ref.current;
+            checkLineOfSight({
+                campaignName,
+                attackerName: playerStats.name,
+                targetName: losTargetName,
+                range: spell?.range,
+                setPopupHtml,
+                source: 'useSpellCastExecutor',
+                fromPos: pos?.attackerPos || undefined,
+                toPos: pos?.targetPos || undefined,
+            }).then((los) => {
+                if (los.allowed) runCast(spell, metaCtx);
+            });
+            return;
+        }
+        runCast(spell, metaCtx);
+    }, [playerStats, campaignName, setPopupHtml, ref, runCast]);
 
     return { castAction, cachedPosRef: ref };
 }

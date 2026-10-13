@@ -7,6 +7,7 @@ import useCharActionsAttackHandlers from './useCharActionsAttackHandlers.js';
 vi.mock('../../services/encounters/combatData.js', () => ({
     getActiveCreatureName: vi.fn(() => 'Disciplined_Monk'),
     getCurrentCombatRound: vi.fn(() => 3),
+    getCombatSummary: vi.fn(() => null),
 }));
 vi.mock('../../services/automation/common/buffToggle.js', () => ({
     toggleBuff: vi.fn(),

@@ -1,5 +1,7 @@
-import { getActiveCreatureName, getCurrentCombatRound } from '../../services/encounters/combatData.js'
+import { getActiveCreatureName, getCurrentCombatRound, getCombatSummary } from '../../services/encounters/combatData.js'
 import { assertCanAct } from '../../services/combat/assertCanAct.js'
+import { isLineOfSightEnforced, checkLineOfSight } from '../../services/combat/lineOfSightGate.js'
+import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
 import { toggleBuff } from '../../services/automation/common/buffToggle.js'
 import { addExpiration } from '../../services/rules/effects/expirations.js'
 import { addEntry } from '../../services/ui/logService.js'
@@ -47,6 +49,29 @@ export default function useCharActionsAttackHandlers({
             reportCannotActAttack(attack);
             return;
         }
+        // L5-003 §8.2: line-of-sight pre-check for enforced RANGED rows.
+        // Runs BEFORE assertCanAct so a blocked shot never charges its slot
+        // (denied refusals must not consume economy — plan §7.2 semantics).
+        // Enforcement off ⇒ isLineOfSightEnforced is a synchronous false and
+        // the whole click path is byte-identical to Levels 1–4.
+        const losTarget = getTargetFromAttacker(getCombatSummary(campaignName), playerName)?.name || null;
+        if (losTarget && isLineOfSightEnforced(campaignName, attack?.range ?? attack?.reach)) {
+            checkLineOfSight({
+                campaignName,
+                attackerName: playerName,
+                targetName: losTarget,
+                range: attack?.range ?? attack?.reach,
+                setPopupHtml,
+                source: 'attack-row',
+            }).then((los) => {
+                if (los.allowed) runAttackClick(attack);
+            });
+            return;
+        }
+        runAttackClick(attack);
+    }
+
+    function runAttackClick(attack) {
         // L5-001/002: enforcement gate (no-op while enforcement off). Bonus action
         // rows charge the bonusAction bucket; an attack roll charges its slot here
         // because this site executes immediately on allow (charge:true, plan §7.2).

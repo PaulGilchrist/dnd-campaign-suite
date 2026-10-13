@@ -85,6 +85,7 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
 
 vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
   getNearestPlacedItem: vi.fn(() => null),
+    rangeToFeet: vi.fn(() => null),
 }));
 
 vi.mock('../../services/ui/sanitize.js', () => ({

@@ -127,7 +127,7 @@ export function assertCanAct(input) {
         enforcement,
         creatureName: ctx.creatureName,
         bucket: ctx.bucket,
-        activeCreatureName: readActiveCreatureName(),
+        activeCreatureName: readActiveCreatureName(enforcementOn),
         turnState: getRuntimeValue('campaign', 'turnState'),
         cannotAct: !!blockers.cannotAct,
         cannotActActions: !!ctx.cannotActActions || !!blockers.cannotActActions,

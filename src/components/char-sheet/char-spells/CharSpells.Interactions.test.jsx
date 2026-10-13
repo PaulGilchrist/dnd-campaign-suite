@@ -81,6 +81,7 @@ vi.mock('../../../services/maps/mapsService.js', () => ({
 
 vi.mock('../../../services/rules/combat/rangeValidation.js', () => ({
   getNearestPlacedItem: vi.fn(() => null),
+    rangeToFeet: vi.fn(() => null),
 }));
 
 vi.mock('../../../services/combat/buffs/buffService.js', () => ({

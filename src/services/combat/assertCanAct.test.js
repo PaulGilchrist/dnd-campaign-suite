@@ -1,15 +1,17 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
+const { storeMirror } = vi.hoisted(() => ({ storeMirror: { activeCreatureName: null } }));
+
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
-    getStore: vi.fn(() => ({ get: () => null })),
+    getStore: vi.fn(() => ({ get: (k) => (k === 'activeCreatureName' ? storeMirror.activeCreatureName : null) })),
 }));
 vi.mock('../../services/ui/logService.js', () => ({
     addEntry: vi.fn(async () => ({})),
 }));
 
 import { assertCanAct } from './assertCanAct.js';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, getStore } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { spend } from './turnState.js';
 
@@ -21,9 +23,40 @@ function mockStore(map) {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    storeMirror.activeCreatureName = null;
 });
 
 describe('assertCanAct (L5-001)', () => {
+    it('enforcement on + turn-lock ⇒ combatSummary mirror OUTRANKS the stale campaign-key copy (live-boundary fix)', () => {
+        mockStore({
+            'campaign.enforcement': ON,
+            'campaign.activeCreatureName': 'Stale Bob',
+            'campaign.turnState': {},
+        });
+        storeMirror.activeCreatureName = 'Alice';
+
+        const popup = vi.fn();
+        const alice = assertCanAct({ campaignName: 'test-campaign', creatureName: 'Alice', bucket: 'action', setPopupHtml: popup });
+        const bob = assertCanAct({ campaignName: 'test-campaign', creatureName: 'Bob', bucket: 'action', setPopupHtml: popup });
+
+        expect(alice.allowed).toBe(true);
+        expect(bob.allowed).toBe(false);
+        expect(popup).toHaveBeenCalled();
+    });
+
+    it('mirror empty (no combat) ⇒ campaign-key fallback still decides', () => {
+        mockStore({
+            'campaign.enforcement': ON,
+            'campaign.activeCreatureName': 'Bob',
+            'campaign.turnState': {},
+        });
+        storeMirror.activeCreatureName = null;
+
+        const r = assertCanAct({ campaignName: 'test-campaign', creatureName: 'Bob', bucket: 'action' });
+        expect(r.allowed).toBe(true);
+        expect(getStore).toHaveBeenCalledWith('combatSummary');
+    });
+
     it('enforcement absent/off ⇒ allowed with ZERO store reads beyond the flag', () => {
         mockStore({});
         const popup = vi.fn();

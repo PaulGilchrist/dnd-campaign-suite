@@ -10,6 +10,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 vi.mock('../../services/encounters/combatData.js', () => ({
     getActiveCreatureName: vi.fn(() => 'AasimarTest'),
     getCurrentCombatRound: vi.fn(() => 3),
+    getCombatSummary: vi.fn(() => null),
 }));
 vi.mock('../../services/automation/common/buffToggle.js', () => ({
     toggleBuff: vi.fn(),
