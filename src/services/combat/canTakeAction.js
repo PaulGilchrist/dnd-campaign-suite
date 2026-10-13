@@ -24,6 +24,9 @@ export const ENFORCEMENT_DEFAULTS = Object.freeze({
     zones: false,
     opportunityAttacks: false,
     serverDice: false,
+    // L5-003 §8.1: teleport automations write real token gridX/gridY (via
+    // the map save path) instead of only advisory prose. Off ⇒ byte-identical.
+    tokenMoving: false,
 });
 
 /** Merge campaign `enforcement` runtime value over defaults; never trusts shape. */

@@ -16,6 +16,7 @@ const FLAGS = [
     { key: 'turnLock', label: 'Turn lock', hint: 'Only the active creature may take Actions or Bonus Actions (Reactions stay allowed off-turn).' },
     { key: 'actionEconomy', label: 'Action economy', hint: 'Charge 1 Action + 1 Bonus Action + 1 Reaction per creature; extra attempts are refused.' },
     { key: 'movementBudget', label: 'Movement budget', hint: 'Clamp token drags to each creature\u2019s remaining speed (active map only).' },
+    { key: 'tokenMoving', label: 'Teleport token-move', hint: 'Teleport automations move the token to the nearest legal space near the selected target (active map only).' },
 ]
 
 export default function EnforcementSection({ campaignName, characters = [] }) {

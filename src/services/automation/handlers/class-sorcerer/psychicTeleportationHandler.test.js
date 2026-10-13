@@ -23,6 +23,18 @@ vi.mock('../../../combat/automation/automationService.js', () => ({
     evaluateAutoExpression: vi.fn(),
 }));
 
+// L5-003 §8.1: token-move seam — default OFF/moved:false keeps the legacy
+// prose path byte-identical; the tokenMoving ON case overrides it.
+vi.mock('../../../combat/teleportService.js', () => ({
+    applyTeleportTokenMove: vi.fn(async () => ({ moved: false, reason: 'token-moving-off' })),
+}));
+vi.mock('../../../encounters/combatData.js', () => ({
+    getCombatSummary: vi.fn(() => null),
+}));
+
+import * as teleportService from '../../../combat/teleportService.js';
+import * as combatData from '../../../encounters/combatData.js';
+
 const campaignName = 'test-campaign';
 const playerName = 'TestSorcerer';
 
@@ -137,6 +149,38 @@ describe('psychicTeleportationHandler', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('No Psionic Energy remaining');
             expect(result.payload.description).toContain('Recharges on a Short or Long Rest');
+        });
+    });
+
+    describe('token-moving seam (L5-003 §8.1)', () => {
+        beforeEach(() => {
+            runtimeState.getRuntimeValue.mockImplementation(() => 5);
+            automationService.evaluateAutoExpression.mockReturnValue(8);
+        });
+
+        it('tokenMoving OFF ⇒ prose unchanged, no coordinate appended, seam called in degrade mode', async () => {
+            teleportService.applyTeleportTokenMove.mockResolvedValue({ moved: false, reason: 'token-moving-off' });
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'battle-arena');
+
+            expect(teleportService.applyTeleportTokenMove).toHaveBeenCalledWith(
+                expect.objectContaining({ campaignName, creatureName: playerName }),
+            );
+            expect(result.payload.description).not.toContain('Token moved');
+            expect(result.payload.description).toContain('10 feet');
+        });
+
+        it('tokenMoving ON + a real move ⇒ description + log carry the moved coordinates', async () => {
+            combatData.getCombatSummary.mockReturnValue({ creatures: [{ name: playerName, targetName: 'Goblin' }, { name: 'Goblin' }] });
+            teleportService.applyTeleportTokenMove.mockResolvedValue({ moved: true, from: { gridX: 2, gridY: 3 }, to: { gridX: 5, gridY: 3 }, distanceFeet: 15 });
+
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'battle-arena');
+
+            expect(teleportService.applyTeleportTokenMove).toHaveBeenCalledWith(
+                expect.objectContaining({ creatureName: playerName, anchorName: 'Goblin', maxFeet: 10 }),
+            );
+            expect(result.payload.description).toContain('Token moved (2,3) → (5,3)');
+            const logged = logService.addEntry.mock.calls.at(-1)[1];
+            expect(logged.description).toContain('Token moved (2,3) → (5,3)');
         });
     });
 });
