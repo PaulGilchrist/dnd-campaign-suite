@@ -44,9 +44,13 @@ describe('MA-2021 disk fingerprint: Thunderbird Wing Clap save_effect authored, 
     expect(extractConditionsFromSaveEffect(undefined)).toEqual([]); // pre-fix input: zero save-lane producers
   });
 
-  it('Storm Call sibling byte-guarded (same board, untouched by this fix)', () => {
+  it('Storm Call sibling fixed MA-2022 same-pass — delegates_to GONE, own save fields authored (stale pre-fix pin inverted §384)', () => {
     expect(STORM_CALL.name).toBe('Storm Call (Costs 2 Actions)');
-    expect(STORM_CALL.delegates_to).toBe('Thunderstrike (Recharge 5-6)');
+    expect(STORM_CALL.delegates_to).toBeUndefined(); // MA-2022: master 12d10 hijack dead, self-resolves DC24 Dex 6d8
+    expect(STORM_CALL.save_dc).toBe(24);
+    expect(STORM_CALL.save_type).toBe('Dexterity');
+    expect(STORM_CALL.damage_dice_primary).toBe('6d8');
+    expect(STORM_CALL.dc_success).toBe('none');
     expect(STORM_CALL.save_effect).toBeUndefined();
   });
 });

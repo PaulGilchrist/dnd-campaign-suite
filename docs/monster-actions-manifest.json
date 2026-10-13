@@ -29911,7 +29911,7 @@
       "category": "legendary_actions",
       "actionType": "save",
       "description": "The Thunderbird calls down a single bolt of lightning on one creature within 120 ft. The target must succeed on a DC 24 Dexterity saving throw or take 27 (6d8) Lightning damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-2022-thunderbird-storm-call.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2023",

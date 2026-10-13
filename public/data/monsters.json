@@ -65325,8 +65325,12 @@
       },
       {
         "name": "Storm Call (Costs 2 Actions)",
-        "delegates_to": "Thunderstrike (Recharge 5-6)",
-        "description": "The Thunderbird calls down a single bolt of lightning on one creature within 120 ft. The target must succeed on a DC 24 Dexterity saving throw or take 27 (6d8) Lightning damage."
+        "description": "The Thunderbird calls down a single bolt of lightning on one creature within 120 ft. The target must succeed on a DC 24 Dexterity saving throw or take 27 (6d8) Lightning damage.",
+        "save_dc": 24,
+        "save_type": "Dexterity",
+        "damage_dice_primary": "6d8",
+        "damage_type_primary": "Lightning",
+        "dc_success": "none"
       }
     ],
     "lair_actions": [],
