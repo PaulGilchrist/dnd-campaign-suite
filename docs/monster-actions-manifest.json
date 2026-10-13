@@ -32604,7 +32604,7 @@
       "damageDicePrimary": "22d6",
       "damageTypePrimary": "Poison",
       "description": "Constitution Saving Throw: DC 26, each creature within 90 ft. Failure: 77 (22d6) Poison damage. Success: Half damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-2051-yamata-venom-mist-recharge.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2052",
