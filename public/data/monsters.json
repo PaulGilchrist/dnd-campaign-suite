@@ -65320,7 +65320,8 @@
         "damage_type_primary": "Thunder",
         "hit_conditions": [
           "prone"
-        ]
+        ],
+        "save_effect": "The target has the Prone condition."
       },
       {
         "name": "Storm Call (Costs 2 Actions)",

@@ -29899,7 +29899,7 @@
         "prone"
       ],
       "description": "Strength Saving Throw: DC 23, each creature within 30 ft. Failure: pushed 20 ft. and knocked Prone; takes 7 (2d6) Thunder damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-2021-thunderbird-wing-clap.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2022",
