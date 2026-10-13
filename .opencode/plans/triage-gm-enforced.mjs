@@ -163,14 +163,33 @@ function main() {
         || (b.markerOccurrences - a.markerOccurrences)
         || a.mechanic.localeCompare(b.mechanic))
 
+    // L5 §8.5 exit criteria: mechanics whose marker category was CONVERTED
+    // by a delivered slice — engine consumer + tests + live verification (see
+    // plan §8 notes / Appendix B). Keyed by mechanic so flips survive re-scan.
+    const VERIFIED_MECHANICS = new Set([
+        'duration/expiry-clock',       // §8.3#1 zoneDurationClock producers + consumer
+        'zone/aoe-persistent',         // §8.3 armed zone tes + duration clocks
+        'zone/lair-regional',          // §8.3 initiative-20 drainRoundWrapClocks
+        'zone/aura-persistent',        // §8.3 self-aura clocks (parseable authored durations)
+        'movement/distance-consumer',  // Phase 1 movementBudget clamp (both drag paths)
+        'economy/reaction-cap',        // Phase 1 reactions + §8.4 OA charge/deny
+        'movement/midpath-trigger',    // §8.4 opportunityTrigger leaving-reach legs
+        'spatial/line-of-sight',       // §8.2 lineOfSightGate (attack + cast seams)
+        'spatial/gridless-teleport',   // §8.1 teleportService token moves
+        'economy/bonus-cap',           // Phase 1 bonusAction bucket charge/cap (classifyBucket + turnState)
+    ])
+
     rows.forEach((r, i) => {
         r.rank = i + 1
-        r.decision = (r.enforceable && i < ENFORCE_CUT) ? 'enforce' : 'park'
-        r.rationale = r.enforceable
-            ? (r.decision === 'enforce'
-                ? `engine-clean (table bites ${r.tableFrequency}×: ${r.monsterAppearances} monsters, ${r.markerOccurrences} markers)`
-                : `deterministic but below top-${ENFORCE_CUT} cut`)
-            : 'narrative / table-feel — park (GM judgment, no numeric answer)'
+        const wasVerified = VERIFIED_MECHANICS.has(r.mechanic)
+        r.decision = wasVerified ? 'verified' : (r.enforceable && i < ENFORCE_CUT) ? 'enforce' : 'park'
+        r.rationale = wasVerified
+            ? 'VERIFIED — engine consumer + tests + live-checked (§8/Appendix B)'
+            : (r.enforceable
+                ? (r.decision === 'enforce'
+                    ? `engine-clean (table bites ${r.tableFrequency}×: ${r.monsterAppearances} monsters, ${r.markerOccurrences} markers)`
+                    : `deterministic but below top-${ENFORCE_CUT} cut`)
+                : 'narrative / table-feel — park (GM judgment, no numeric answer)')
     })
 
     const header = ['rank', 'mechanic', 'category', 'decision', 'tableFrequency', 'monsterAppearances', 'actionRefs', 'markerOccurrences', 'markerFiles', 'enforceable', 'sampleFile', 'rationale']
@@ -178,8 +197,9 @@ function main() {
     fs.writeFileSync(OUT_CSV, csv)
 
     const enforce = rows.filter((r) => r.decision === 'enforce')
-    const parked = rows.filter((r) => r.decision !== 'enforce')
-    console.log(`triage: ${rows.length} mechanics | ${enforce.length} enforce | ${parked.length} park`)
+    const verified = rows.filter((r) => r.decision === 'verified')
+    const parked = rows.filter((r) => r.decision === 'park')
+    console.log(`triage: ${rows.length} mechanics | ${verified.length} verified | ${enforce.length} enforce | ${parked.length} park`)
     console.log(`markers: ${hits.length} GM-enforced lines\n`)
     console.log('rank  category     freq  monsters  markers  decision  mechanic')
     rows.slice(0, 24).forEach((r) => {
