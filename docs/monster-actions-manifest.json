@@ -29094,7 +29094,7 @@
       "saveDc": 24,
       "saveType": "Wisdom",
       "description": "Wisdom Saving Throw: DC 24, one creature within 60 ft. Failure: the target is unable to move, take Reactions, or speak until the start of Wukong's next turn. Success: no effect. No damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-2013-sun-wukong-locking-word.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1552",

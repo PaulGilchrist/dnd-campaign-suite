@@ -62760,7 +62760,9 @@
         "name": "Locking Word (Costs 2 Actions)",
         "description": "Wisdom Saving Throw: DC 24, one creature within 60 ft. Failure: the target is unable to move, take Reactions, or speak until the start of Wukong's next turn. Success: no effect. No damage.",
         "save_dc": 24,
-        "save_type": "Wisdom"
+        "save_type": "Wisdom",
+        "dc_success": "none",
+        "save_effect": "The target can't take Reactions, its speed is 0, and it can't speak until the start of Wukong's next turn."
       }
     ],
     "lair_actions": [],
