@@ -29080,7 +29080,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "Sun Wukong flies up to his full fly Speed without provoking Opportunity Attacks.",
-      "verified": "broken — see .opencode/plans/bug-mon-2012-sun-wukong-somersault-leap.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2013",

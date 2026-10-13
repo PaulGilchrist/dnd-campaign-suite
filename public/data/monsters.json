@@ -62752,6 +62752,8 @@
       },
       {
         "name": "Somersault Leap",
+        "advisory": "somersault_leap",
+        "advisory_message": "flies up to his full fly Speed (300 ft.) without provoking Opportunity Attacks \u2014 advisory record: movement distance and opportunity-attack suppression have no engine consumer (no movement subsystem, MA-1936 King Kong Climbing Dash twin) \u2014 GM-enforced movement.",
         "description": "Sun Wukong flies up to his full fly Speed without provoking Opportunity Attacks."
       },
       {
