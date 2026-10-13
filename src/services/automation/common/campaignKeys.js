@@ -36,6 +36,12 @@ export const CAMPAIGN_KEYS = new Set([
     'travel-rerollsRemaining',
     'travel-horseback',
     'music',
+    // Level 5 (L5-001): enforcement foundation — off-by-default flags, referee
+    // assignment {name, clientId}, and the per-creature turn economy
+    // (see src/services/combat/turnState.js + canTakeAction.js).
+    'enforcement',
+    'referee',
+    'turnState',
 ]);
 
 /**

@@ -1,4 +1,5 @@
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
+import { assertCanAct } from '../../services/combat/assertCanAct.js'
 import { hasNaturallyStealthy } from '../../services/combat/automation/automationPassives.js'
 import { isWithinRange } from '../../services/rules/combat/rangeCheck.js'
 
@@ -243,7 +244,8 @@ export default function useCharActionsBaseActions({
     }
 
     async function handleHideAction() {
-        if (cannotAct) return;
+        // L5-001: enforcement gate (no-op while enforcement off).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'action', cannotAct, setPopupHtml, source: 'hide-action' }).allowed) return;
         const currentConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
         const isAlreadyInvisible = currentConditions.some(c => String(c).toLowerCase() === 'invisible');
         if (isAlreadyInvisible) {
@@ -289,7 +291,8 @@ export default function useCharActionsBaseActions({
     }
 
     async function handleDodgeAction() {
-        if (cannotAct) return;
+        // L5-001: enforcement gate (no-op while enforcement off).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'action', cannotAct, setPopupHtml, source: 'dodge-action' }).allowed) return;
         const result = toggleBuff(
             playerStats.name,
             'Dodge',
@@ -434,7 +437,8 @@ export default function useCharActionsBaseActions({
     }
 
     async function handleGrappleAction() {
-        if (cannotAct) return;
+        // L5-001: enforcement gate (no-op while enforcement off).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'action', cannotAct, setPopupHtml, source: 'grapple-action' }).allowed) return;
         const cs = await loadCombatSummary(campaignName);
         const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
         if (!target) {

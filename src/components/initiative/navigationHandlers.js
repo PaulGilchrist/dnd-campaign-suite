@@ -16,6 +16,8 @@ import { applyStinkingCloudTurnEnd } from '../../services/automation/handlers/sp
 import { applyCommanderStrikeTurnEnd } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityUtils.js'
 import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { isSecondTurnEntry } from '../../services/combat/thiefsReflexesService.js'
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import { resetForTurn, openTurn, closeTurn, rearmReactions } from '../../services/combat/turnState.js'
 
 // Turn-start effects must re-apply each round, so the dedupe key is round-scoped.
 function turnStartGateKey(round, creatureName) {
@@ -126,6 +128,30 @@ function runRoundWrapHousekeeping({ updatedSummary, creatures, campaignName, rou
         clearPerRoundMajestyTrackers(creature.name, campaignName, roundToSet)
         if (creature.type === 'player') clearPlayerRoundLatches(creature.name, campaignName)
     }
+}
+
+// L5-001: turn-economy transition pass, riding the existing turn/round-wrap seams.
+// Off ⇒ ZERO writes (L1–4 untouched); on ⇒ close outgoing turn, re-arm reactions at
+// the round wrap, open the new active creature's economy. Orthogonal to the
+// PLAYER_ROUND_LATCH_KEYS idiom above — those stay authoritative for their features.
+function applyTurnStateTransition({ campaignName, outgoingName, newActiveName, roundIncrement }) {
+    const enforcement = getRuntimeValue('campaign', 'enforcement')
+    if (!enforcement || enforcement.mode !== 'on') return
+    let ts = cloneDeep(getRuntimeValue('campaign', 'turnState') || {})
+    if (outgoingName) ts = closeTurn(ts, outgoingName)
+    if (roundIncrement) ts = rearmReactions(ts)
+    ts = resetForTurn(ts, newActiveName)
+    setRuntimeValue('campaign', 'turnState', ts, campaignName)
+}
+
+// L5-001: enforcement gate (action lane) for the initiative rewind target —
+// re-opens turnActive WITHOUT refunding spent budgets (rewind is not a real
+// turn start; budget rollback belongs to snapshot undo — plan §16).
+function markRewoundTurnActive(campaignName, newActiveName) {
+    const enforcement = getRuntimeValue('campaign', 'enforcement')
+    if (!enforcement || enforcement.mode !== 'on') return
+    const ts = openTurn(cloneDeep(getRuntimeValue('campaign', 'turnState') || {}), newActiveName)
+    setRuntimeValue('campaign', 'turnState', ts, campaignName)
 }
 
 // Shared turn-start gate: arm the round-scoped gate key, persist it, and run
@@ -245,6 +271,8 @@ export function createNextCreatureHandler({
         }
         storage.set('activeCreatureName', newActiveName, campaignName)
         setActiveCreatureName(newActiveName)
+        // L5-001: reset the new creature's economy at the turn seam (no-op when enforcement off).
+        applyTurnStateTransition({ campaignName, outgoingName: activeCreatureName, newActiveName, roundIncrement })
         if (activeCreatureName && !isSecondTurnEntry(activeEntry)) {
             applyOutgoingTurnEndPasses(activeCreatureName, campaignName, characters)
         }
@@ -326,6 +354,8 @@ export function createPreviousCreatureHandler({
         }
         storage.set('activeCreatureName', newActiveName, campaignName)
         setActiveCreatureName(newActiveName)
+        // L5-001: rewind re-opens turnActive without refunding budgets (CLA-307 philosophy).
+        markRewoundTurnActive(campaignName, newActiveName)
         for (const creature of cs.creatures) {
             if (isSecondTurnEntry(creature)) continue
             clearPerRoundMajestyTrackers(creature.name, campaignName, roundToSet)

@@ -1,0 +1,52 @@
+.enforcement-section .enforcement-master {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.enforcement-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.enforcement-toggle .enforcement-flag-hint {
+    color: inherit;
+    opacity: 0.65;
+    font-style: normal;
+    font-size: 0.85em;
+    margin-left: 4px;
+}
+
+.enforcement-flags {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border: none;
+    padding: 0;
+    margin: 10px 0;
+}
+
+.enforcement-hint {
+    opacity: 0.75;
+    margin: 4px 0;
+}
+
+.enforcement-referee {
+    margin-top: 12px;
+}
+
+.enforcement-claim {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 8px 0;
+}
+
+.enforcement-client-id {
+    opacity: 0.6;
+    font-size: 0.8em;
+}

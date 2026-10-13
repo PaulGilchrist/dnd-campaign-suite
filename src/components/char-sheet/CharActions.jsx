@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { assertCanAct } from '../../services/combat/assertCanAct.js'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { getCategories } from '../../services/character/featureCategories.js'
@@ -164,8 +165,11 @@ function renderCannotActLabel(cannotAct, cannotActReason) {
     return <span className='disabled-attack-label'>({cannotActReason || 'Incapacitated'})</span>;
 }
 
-function handleActionSpellDamageClick({ attackItem, spell, isSpellAtk, resolvedDamage, cannotAct, resolveSpellDamage, actionGateMetamagic }) {
+function handleActionSpellDamageClick({ attackItem, spell, isSpellAtk, resolvedDamage, cannotAct, resolveSpellDamage, actionGateMetamagic, campaignName, playerStats, setPopupHtml }) {
     if (cannotAct) return;
+    // L5-001: enforcement gate (no-op while enforcement off). Spell action rows
+    // charge the action slot (bonus-action casts charge via useSpellCastExecutor).
+    if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'action', setPopupHtml, source: 'char-actions-spell-damage' }).allowed) return;
     // SINGLE ENTRY POINT for action spell casting:
     // - Save DC spells: resolveSpellDamage (from useActionSpellMetamagic) handles AoE modals + prepareSpellCast
     // - Non-save-DC spells: actionGateMetamagic is the single entry point (calls prepareSpellCast → spell slots, concentration)
@@ -549,6 +553,8 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
                                 : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} title={hitTitle} onClick={() => handleAttackClick(attackItem)}>{signFormatter.format(effectiveHit - exhaustionPenalty)}</div>}
                             <div className={attack.damage ? "clickable" : ""} onClick={() => {
                                 if (cannotAct) return;
+                                // L5-001: enforcement gate (no-op while enforcement off).
+                                if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'action', setPopupHtml, source: 'char-actions-attack-damage' }).allowed) return;
                                 if (attack.saveDc) { resolveSpellDamage(attackItem); return; }
                                 handleSimpleDamageRoll(attackItem);
                             }}>{attack.damage}</div>
@@ -563,7 +569,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
                             <div>{spell.level === 0 ? 'Cantrip' : spell.level}</div>
                             <div>{formatRange(spell.range)}</div>
                             {renderActionSpellHitCell({ autoHit, isSpellAtk, hasAttackType, cannotAct, conditionAttackMode, toHit: playerStats.spellAbilities?.toHit, exhaustionPenalty, saveDc: playerStats.spellAbilities?.saveDc, displaySaveDcBonus, dcType: spell.dc?.dc_type, attackItem, handleSpellAttackClick })}
-                            <div className={resolvedDamage ? "clickable" : ""} onClick={() => handleActionSpellDamageClick({ attackItem, spell, isSpellAtk, resolvedDamage, cannotAct, resolveSpellDamage, actionGateMetamagic })}>{getSpellDamageDisplay(spell)}</div>
+                            <div className={resolvedDamage ? "clickable" : ""} onClick={() => handleActionSpellDamageClick({ attackItem, spell, isSpellAtk, resolvedDamage, cannotAct, resolveSpellDamage, actionGateMetamagic, campaignName, playerStats, setPopupHtml })}>{getSpellDamageDisplay(spell)}</div>
                             {renderActionSpellTypeCell(spell, damageType)}
                             {showMastery && <div></div>}
                         </React.Fragment>;

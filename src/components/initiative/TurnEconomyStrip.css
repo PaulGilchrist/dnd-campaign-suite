@@ -1,0 +1,12 @@
+.turn-economy-strip {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0;
+}
+
+.turn-economy-name {
+    font-weight: 700;
+    margin-right: 4px;
+}

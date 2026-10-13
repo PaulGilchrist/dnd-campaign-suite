@@ -4,6 +4,7 @@ import useSSEEqualityGuard from '../../hooks/runtime/useSSEEqualityGuard.js'
 import utils from '../../services/ui/utils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
+import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import storage from '../../services/ui/storage.js'
 import { stripSummonedFromCombatSummary } from '../../services/combat/summons/summonedCreatureService.js'
 import { getMonsterImageUrl } from '../../services/npcs/monsterUtils.js'
@@ -31,6 +32,7 @@ import { createNpcClickHandler } from './createNpcClickHandler.js'
 import { createFleshToStoneHandler, createPrismaticSprayIndigoHandler, createPrismaticSprayVioletHandler } from './saveResultHandlers.js'
 import { useLootHandlers } from './useLootHandlers.js'
 import { createNextCreatureHandler, createPreviousCreatureHandler } from './navigationHandlers.js'
+import TurnEconomyStrip from './TurnEconomyStrip.jsx'
 import { createCreatureHandlers } from './createCreatureHandlers.js'
 import { createRollConditionSaveHandler } from './createRollConditionSaveHandler.js'
 import { createConcentrationHandlers } from './createConcentrationHandlers.js'
@@ -216,6 +218,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const [conditionPopup, setConditionPopup] = React.useState(null)
 
     const [effectAdderTarget, setEffectAdderTarget] = useSyncedState('campaign', 'combat-ui-effectAdderTarget', null, campaignName)
+    // L5-001: End Turn renders only while enforcement is on (off ⇒ today's view, byte-identical)
+    const enforcement = useRuntimeValue('campaign', 'enforcement')
+    const enforcementOn = !!enforcement && enforcement.mode === 'on'
     const [effectAdderTab, setEffectAdderTab] = React.useState('conditions')
 
     const [campaignNpcs, setCampaignNpcs] = React.useState([])
@@ -616,6 +621,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             {combatSummary && combatSummary.creatures && characters.length > 0 ? (
              <>
              <h4>Initiative (round {combatSummary.round})</h4>
+             <TurnEconomyStrip
+                 creatureName={activeCreatureName}
+                 speedFeet={(() => {
+                     const ch = characters.find(c => utils.getName(c.name) === activeCreatureName)
+                     return ch?.computedStats?.speed ?? ch?.speed
+                 })()}
+             />
              <div className='carousel-container' ref={carouselRef}>
                   {displayCreatures.map((creature) => {
                     const isActive = creature.name === activeCreatureName
@@ -683,6 +695,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                   <button onClick={handleAddNpc} title='Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — rename it to a monster name or drop a monster from the Encounter Builder to set real stats'>+ NPC</button>
                   <button onClick={handlePreviousCreature} disabled={isPrevDisabledValue}>← Prev</button>
                   <button onClick={handleNextCreature}>Next →</button>
+                  {/* L5-001: End Turn — the enforced-pace affordance (advance + economy reset
+                      happen at the existing turn seam in navigationHandlers). Enforcement off ⇒ hidden. */}
+                  {enforcementOn && (
+                      <button className='end-turn-button' onClick={handleNextCreature} title="End the active creature's turn (advances initiative and resets their economy)">End Turn</button>
+                  )}
               </div>
               <InitiativeLoot
                 lootData={lootData}

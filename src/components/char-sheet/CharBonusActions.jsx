@@ -28,6 +28,7 @@ import { resolveSpellDamageAtLevel, isAutoHitSpell, resolveHealExpression } from
 import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
 import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
+import { assertCanAct } from '../../services/combat/assertCanAct.js';
 import { resolveSpiritualWeaponMoveAndAttack } from '../../services/rules/features/spiritualWeaponService.js';
 import ArcaneVigorModal from './ArcaneVigorModal.jsx';
 import WarBondChooserModal from './modals/WarBondChooserModal.jsx';
@@ -249,6 +250,8 @@ function BonusAttackRow({ attack, playerStats, campaignName, exhaustionPenalty, 
         })}
         <div className={attack.damage ? "clickable" : ""} onClick={() => {
             if (cannotAct) return;
+            // L5-001: enforcement gate (no-op while enforcement off).
+            if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', setPopupHtml, source: 'bonus-attack-damage-cell' }).allowed) return;
             if (isHbRow) { hbClick(); return; }
             if (attack.saveDc) { onResolveSpellDamage(attackItem); return; }
             handleSimpleDamageRoll(attackItem);
@@ -595,6 +598,8 @@ function SpiritualWeaponMoveRow({ playerStats, activeBuffs, campaignName, cannot
         <div>
             <b className={"clickable" + (cannotAct ? " disabled-attack" : "")} onClick={async () => {
                 if (cannotAct) return;
+                // L5-001: enforcement gate (no-op while enforcement off).
+                if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', setPopupHtml, source: 'spiritual-weapon-move' }).allowed) return;
                 const res = await resolveSpiritualWeaponMoveAndAttack(playerStats, campaignName);
                 if (res.refused) { setPopupHtml({ type: 'automation_info', name: 'Spiritual Weapon', description: res.message }); return; }
                 rollAttack(res.attack.name, res.attack.hitBonus - (exhaustionPenalty || 0), {
@@ -773,6 +778,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const handleApplyPoison = React.useCallback(async () => {
         if (cannotAct) return;
+        // L5-001: enforcement gate (no-op while enforcement off).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', setPopupHtml, source: 'apply-poison' }).allowed) return;
         const currentDoses = Number(getRuntimeValue(playerStats.name, 'poisonDoses', campaignName) ?? 0);
         if (currentDoses <= 0) return;
         const dexMod = playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus ?? 0;
@@ -795,6 +802,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const handleEatBolsteringTreat = React.useCallback(async () => {
         if (cannotAct) return;
+        // L5-001: enforcement gate (no-op while enforcement off).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', setPopupHtml, source: 'eat-bolstering-treat' }).allowed) return;
         const isChef = hasChefBolsteringTreats;
         const usesKey = isChef ? 'chefBolsteringTreats' : 'bolsteringTreat';
         const current = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
@@ -891,7 +900,11 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     const displayedBonusAttacks = visibleHordeBreakerItem ? [...bonusActionAttacks, visibleHordeBreakerItem] : bonusActionAttacks;
 
     const handleHordeBreakerClick = React.useCallback(async () => {
-        if (cannotAct || !hordeBreakerAttackItem || !hordeBreakerReady) return;
+        if (!hordeBreakerAttackItem || !hordeBreakerReady) return;
+        // L5-001: enforcement gate (no-op while enforcement off) — arming must not
+        // consume attention reserved for a spent bonus-action budget.
+        if (cannotAct) return;
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', setPopupHtml, source: 'horde-breaker' }).allowed) return;
         const cs = await getCombatContext(campaignName);
         const creatures = cs?.creatures || [];
         const validTargets = [];

@@ -1,4 +1,5 @@
 import { getActiveCreatureName, getCurrentCombatRound } from '../../services/encounters/combatData.js'
+import { assertCanAct } from '../../services/combat/assertCanAct.js'
 import { toggleBuff } from '../../services/automation/common/buffToggle.js'
 import { addExpiration } from '../../services/rules/effects/expirations.js'
 import { addEntry } from '../../services/ui/logService.js'
@@ -46,6 +47,16 @@ export default function useCharActionsAttackHandlers({
             reportCannotActAttack(attack);
             return;
         }
+        // L5-001: enforcement gate (no-op while enforcement off). Bonus action
+        // rows charge the bonusAction bucket.
+        if (!assertCanAct({
+            campaignName,
+            creatureName: playerName,
+            bucket: attack?.type === 'Bonus Action' ? 'bonusAction' : 'action',
+            cannotAct,
+            setPopupHtml,
+            source: 'useCharActionsAttackHandlers',
+        }).allowed) return;
         if (gatePsychicBladeAttack(attack)) return;
         // CLA-143: arm after_attack_action triggers (Flurry of Blows, Patient
         // Defense, Step of the Wind) for this round — round-keyed latch on the

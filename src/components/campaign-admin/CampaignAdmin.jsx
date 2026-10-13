@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './CampaignAdmin.css';
+import EnforcementSection from './EnforcementSection.jsx';
 
 const BUSY_STATUS_TEXT = {
     'snapshotting': 'Creating snapshot...',
@@ -152,7 +153,7 @@ function SnapshotList({ snapshots }) {
     );
 }
 
-function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampaign, restoredSnapshot }) {
+function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampaign, restoredSnapshot, characters = [] }) {
     const [status, setStatus] = useState(null);
     const [renameModal, setRenameModal] = useState(false);
     const [newName, setNewName] = useState('');
@@ -383,6 +384,9 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
             )}
 
             <AppearanceSection theme={theme} toggleTheme={toggleTheme} />
+
+            {/* L5-001: enforcement master switch + referee claim (default OFF ⇒ L1–4 as-is). */}
+            <EnforcementSection campaignName={campaignName} characters={characters} />
 
             <div className="admin-section">
                 <h3>Campaign Management</h3>

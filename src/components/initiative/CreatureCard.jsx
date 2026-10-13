@@ -7,6 +7,7 @@ import CreatureHp from './CreatureHp.jsx'
 import { getAbilityLabel } from '../../services/combat/conditions/conditionUtils.js'
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx'
+import TurnEconomyStrip from './TurnEconomyStrip.jsx'
 import utils from '../../services/ui/utils.js'
 
 const FLESH_TO_STONE_PREFIX = '_fleshToStone_';
@@ -534,6 +535,8 @@ function ConditionsSection({
                     />
                 )
             })}
+            {/* L5-001: enforcement economy readout (renders nothing while enforcement off). */}
+            <TurnEconomyStrip creatureName={creature.name} speedFeet={creature.speed} />
             <ConditionEffectBadges conditions={creature.conditions?.filter(c => c && typeof c === 'object' && c.key) || []} targetEffects={myTargetEffects} creatureName={creature.name} campaignName={campaignName} allCreatures={allCreatures} hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage} hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore} isLocalhost={isLocalhost} coronaDisadvantage={coronaDisadvantage} characters={characters} activeMapName={mapName} onRollConditionSave={canRoll ? onRollConditionSave : undefined} />
             {isLocalhost && (
                 <button

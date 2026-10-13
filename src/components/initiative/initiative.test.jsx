@@ -12,6 +12,8 @@ vi.mock('../../hooks/runtime/useSSEEqualityGuard.js', () => ({ default: (setter)
 vi.mock('../../services/ui/utils.js', () => ({ default: { getName: (name) => name } }));
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getStore: vi.fn(() => syncStateStore),
+    // L5-001: TurnEconomyStrip subscribes via useRuntimeValue; null ⇒ enforcement off.
+    useRuntimeValue: vi.fn(() => null),
     useSyncedState: vi.fn((key, prop, defaultValue) => {
         const storeKey = `${key}-${prop}`;
         if (!syncStateStore.has(storeKey)) {

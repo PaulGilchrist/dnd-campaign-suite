@@ -1,4 +1,5 @@
 import React from 'react'
+import { assertCanAct } from '../../services/combat/assertCanAct.js'
 import Popup from '../common/popup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
@@ -451,6 +452,9 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
     const handleReactionClick = async (reaction) => {
         if (cannotAct) return;
+        // L5-001: enforcement gate (no-op while enforcement off). Reactions are
+        // rules-correct off-turn but charge the once-per-round reaction budget.
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'reaction', setPopupHtml, source: 'char-reactions' }).allowed) return;
         if (isSlowed()) {
             refuseSlowedReaction(reaction.name);
             return;
@@ -500,7 +504,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     };
 
     const handleAutomationReaction = async (reaction) => {
-        if (cannotAct) return;
+        // L5-001: gate carries the legacy silent cannotAct semantics (no-op while enforcement off).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'reaction', cannotAct, setPopupHtml, source: 'char-reactions-automation' }).allowed) return;
         const auto = reaction.automation;
         if (!auto) return;
 

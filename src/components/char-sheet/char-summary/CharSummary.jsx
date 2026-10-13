@@ -6,6 +6,7 @@ import { isAuraOfLifeActive } from '../../../services/automation/handlers/buffs/
 import { isCircleOfPowerActive } from '../../../services/automation/handlers/buffs/circleOfPowerHandler.js'
 import { isDeathWardActive } from '../../../services/automation/handlers/buffs/deathWardHandler.js'
 import CharGold from './CharGold.jsx'
+import TurnEconomyStrip from '../../initiative/TurnEconomyStrip.jsx'
 import CharHitPoints from './CharHitPoints.jsx'
 import CharClassFeatures from './CharClassFeatures.jsx'
 import CharRaceFeatures from './CharRaceFeatures.jsx'
@@ -739,6 +740,8 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 />
             )}
                 <div className='char-summary-badges'>
+                    {/* L5-001: enforcement economy readout (renders nothing while enforcement off). */}
+                    <TurnEconomyStrip creatureName={playerStats.name} speedFeet={playerStats.speed} />
                     <SummaryBadges
                         playerStats={playerStats}
                         campaignName={campaignName}

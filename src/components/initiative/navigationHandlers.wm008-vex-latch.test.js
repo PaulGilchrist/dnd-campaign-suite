@@ -20,6 +20,8 @@ vi.mock('../../services/rules/effects/expirations.js', () => ({
 }));
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
+    // L5-001: navigationHandlers reads enforcement via getRuntimeValue; null ⇒ off (legacy behavior).
+    getRuntimeValue: vi.fn(() => null),
 }));
 vi.mock('../../services/ui/storage.js', () => ({
     default: { get: vi.fn(), set: vi.fn(), getProperty: vi.fn(), setProperty: vi.fn() },

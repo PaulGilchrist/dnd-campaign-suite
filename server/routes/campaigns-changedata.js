@@ -1,6 +1,7 @@
 import express from 'express';
 import { publish, characterChangeData, markDirty } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { validateRuntimeWrite } from '../validation/keyValidators.js';
 
 const router = express.Router();
 
@@ -132,6 +133,16 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     }
 
     const propertyValue = extractPropertyValue(key, value);
+
+    // L5-001 (D2): per-key validators guard enforcement truth. No validator
+    // registered for this key ⇒ the write passes through exactly as today.
+    const validation = validateRuntimeWrite(key, propertyValue, { req, campaign, current: characterChangeData.get(campaign) });
+    if (!validation.ok) {
+        // Broadcast the rejection so every client can surface the denied write.
+        publish(`denied-${campaign}-${key}`, { key, reason: validation.reason }, campaign);
+        return res.status(400).json({ error: validation.reason });
+    }
+
     characterChangeData.get(campaign)[key] = propertyValue;
     markDirty(campaign);
 

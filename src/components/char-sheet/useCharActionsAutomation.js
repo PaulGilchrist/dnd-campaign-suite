@@ -1,4 +1,5 @@
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js'
+import { assertCanAct, bucketForAction } from '../../services/combat/assertCanAct.js'
 import { confirmTelepathicSpeech } from '../../services/automation/handlers/buffs/buffHandler.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
@@ -401,7 +402,18 @@ export default function useCharActionsAutomation({
             summonSpirit: simpleModal('summonSpiritModal'),
         };
 
-        if (cannotAct) return;
+        // L5-001: enforcement gate (no-op while enforcement.mode === 'off').
+        // Bonus-action rows charge the bonusAction bucket; everything else the
+        // action slot (multi-attack still consumes ONE action — plan §7.2).
+        const gate = assertCanAct({
+            campaignName,
+            creatureName: playerStats.name,
+            bucket: bucketForAction(action),
+            cannotAct,
+            setPopupHtml,
+            source: 'useCharActionsAutomation',
+        });
+        if (!gate.allowed) return;
 
         const playerName = playerStats.name;
         const activeBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];

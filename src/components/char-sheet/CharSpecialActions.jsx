@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { assertCanAct } from '../../services/combat/assertCanAct.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
 import { useCombatSuperiorityModal } from '../../hooks/combat/useCombatSuperiorityModal.js';
@@ -158,6 +159,8 @@ function useReplenishingMeal(playerStats, campaignName, cannotAct, characters, s
     const [replenishingMealModal, setReplenishingMealModal] = useState(null);
     const handleReplenishingMealClick = useCallback(async () => {
         if (cannotAct) return;
+        // L5-001: enforcement gate (no-op while enforcement off).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'special', setPopupHtml, source: 'replenishing-meal' }).allowed) return;
         if (!hasReplenishingMeal) return;
         const current = Number(replenishingMeals ?? replenishingMealMax);
         if (current <= 0) {
@@ -167,7 +170,7 @@ function useReplenishingMeal(playerStats, campaignName, cannotAct, characters, s
         const combatSummary = await getCombatContext(campaignName);
         const targets = buildDistributeTargetList(characters, combatSummary);
         setReplenishingMealModal({ targets, maxTargets: current });
-    }, [cannotAct, hasReplenishingMeal, replenishingMeals, replenishingMealMax, campaignName, characters, setPopupHtml]);
+    }, [cannotAct, hasReplenishingMeal, replenishingMeals, replenishingMealMax, campaignName, characters, setPopupHtml, playerStats.name]);
     const handleReplenishingMealConfirm = useCallback(async (selectedNames) => {
         if (!replenishingMealModal) return;
         const { maxTargets } = replenishingMealModal;
@@ -200,6 +203,8 @@ function useBolsteringTreats(playerStats, campaignName, cannotAct, characters, s
     const [bolsteringTreatsModal, setBolsteringTreatsModal] = useState(null);
     const handleBolsteringTreatsClick = useCallback(async () => {
         if (cannotAct) return;
+        // L5-001: enforcement gate (no-op while enforcement off).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'special', setPopupHtml, source: 'bolstering-treats' }).allowed) return;
         if (!hasBolsteringTreats) return;
         const current = Number(chefBolsteringTreats ?? bolsteringTreatsMax);
         if (current <= 0) {
@@ -209,7 +214,7 @@ function useBolsteringTreats(playerStats, campaignName, cannotAct, characters, s
         const combatSummary = await getCombatContext(campaignName);
         const targets = buildDistributeTargetList(characters, combatSummary);
         setBolsteringTreatsModal({ targets, maxTargets: current });
-    }, [cannotAct, hasBolsteringTreats, chefBolsteringTreats, bolsteringTreatsMax, campaignName, characters, setPopupHtml]);
+    }, [cannotAct, hasBolsteringTreats, chefBolsteringTreats, bolsteringTreatsMax, campaignName, characters, setPopupHtml, playerStats.name]);
     const handleBolsteringTreatsConfirm = useCallback(async (selectedNames) => {
         if (!bolsteringTreatsModal) return;
         const { maxTargets } = bolsteringTreatsModal;
@@ -240,7 +245,8 @@ function useBrewPoison(playerStats, campaignName, cannotAct, setPopupHtml) {
     const poisonDoses = useRuntimeValue(playerStats.name, 'poisonDoses', campaignName);
     const poisonDosesMax = hasPoisonerFeat ? (playerStats.proficiency || 0) : 0;
     const handleBrewPoisonClick = useCallback(async () => {
-        if (cannotAct) return;
+        // L5-001: gate carries the legacy silent cannotAct semantics (no-op while enforcement off).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'special', cannotAct, setPopupHtml, source: 'brew-poison' }).allowed) return;
         if (!hasPoisonerFeat) return;
         const current = Number(poisonDoses ?? 0);
         const max = poisonDosesMax;
@@ -781,6 +787,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
     });
     const handleShapeShiftClick = useCallback(async () => {
         if (cannotAct) return;
+        // L5-001: enforcement gate (no-op while enforcement off).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'special', setPopupHtml, source: 'shapechange' }).allowed) return;
         const action = {
             name: 'Shapechange',
             spell: { name: 'Shapechange', level: 9 },
@@ -792,6 +800,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters, 
     }, [cannotAct, characters, playerStats, campaignName, mapName, setPopupHtml]);
     const handleAutomationClick = useCallback(async (action) => {
         if (cannotAct) return;
+        // L5-001: enforcement gate (no-op while enforcement off).
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'special', setPopupHtml, source: 'special-action-automation' }).allowed) return;
         const auto = action.automation;
         if (openChoicePromptIfNeeded(action, auto, playerStats, campaignName, { setFeatureChoiceModal, setPopupHtml, setAspectOfTheWildsModal })) return;
         if (delegateAutomationClick(auto, { handleReplenishingMealClick, handleBolsteringTreatsClick, handleBrewPoisonClick, handleShapeShiftClick })) return;

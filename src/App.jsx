@@ -235,6 +235,7 @@ function OverlayViews({ activeView, campaignName, characters, isLocalhost, theme
     campaignRepair: (
       <CampaignAdmin
         campaignName={campaignName}
+        characters={characters}
         onBack={() => setActiveView(null)}
         theme={theme}
         toggleTheme={toggleTheme}

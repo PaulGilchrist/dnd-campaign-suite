@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { isCampaignKey } from '../../services/automation/common/campaignKeys.js';
+import { withClientId } from '../../services/ui/clientId.js';
 
 const stores = new Map();
 export const listeners = new Map();
@@ -110,7 +111,9 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
       return fetch(fullUrl, {
         method: 'POST',
         mode: 'cors',
-        headers: { 'Content-Type': 'application/json' },
+        // L5-001: attribute campaign-scoped writes (enforcement/referee/turnState)
+        // to this client — server validator checks referee authority on these.
+        headers: withClientId({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ value })
       }).catch((e) => { console.error("[useRuntimeState] Error:", e); });
     }

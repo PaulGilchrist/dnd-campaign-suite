@@ -1,5 +1,6 @@
 
 import React from 'react'
+import { assertCanAct } from '../../../services/combat/assertCanAct.js'
 import { cloneDeep } from 'lodash';
 import useActionPopup from '../../../hooks/combat/useActionPopup.js'
 import useLoggedDiceRoll from '../../../hooks/combat/useLoggedDiceRoll.js'
@@ -91,13 +92,15 @@ function spellAttackPenalizedClassName(exhaustionPenalty, conditionAttackMode, c
     return (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? ' stat--penalized' : '');
 }
 
-function SpellAttackHeaderRow({ playerStats, cannotAct, exhaustionPenalty, conditionAttackMode, innateSorceryActive, isSorcerer, rollAttack }) {
+function SpellAttackHeaderRow({ playerStats, cannotAct, exhaustionPenalty, conditionAttackMode, innateSorceryActive, isSorcerer, rollAttack, campaignName, setPopupHtml }) {
     const toHit = playerStats.spellAbilities.toHit - exhaustionPenalty;
     const forcedMode = conditionAttackMode !== 'normal' ? conditionAttackMode : (isSorcerer && innateSorceryActive ? 'advantage' : undefined);
     return (
         <div>
             <b className={'clickable' + (cannotAct ? ' disabled-attack' : '') + spellAttackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannotAct)} onClick={() => {
                 if (cannotAct) return;
+                // L5-001: enforcement gate (no-op while enforcement off).
+                if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'action', setPopupHtml, source: 'spell-attack-header' }).allowed) return;
                 rollAttack('Spell Attack', toHit, { forcedMode });
             }}>Attack (to hit):</b> <span className={spellAttackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannotAct).trim()}>+{toHit}</span><br/>
             <b>Modifier:</b> <span className={exhaustionPenalty > 0 ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.modifier - exhaustionPenalty}</span><br/>
@@ -449,7 +452,7 @@ return (
                  * and shown via popups.
                  */}
                 <div className="sectionHeader"><h4>&nbsp;Spells</h4></div>
-                <SpellAttackHeaderRow playerStats={playerStats} cannotAct={cannotAct} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} innateSorceryActive={innateSorceryActive} isSorcerer={isSorcerer} rollAttack={rollAttack} />
+                <SpellAttackHeaderRow playerStats={playerStats} cannotAct={cannotAct} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} innateSorceryActive={innateSorceryActive} isSorcerer={isSorcerer} rollAttack={rollAttack} campaignName={campaignName} setPopupHtml={setPopupHtml} />
                  <SpellAbilitySummary spellAbilities={playerStats.spellAbilities} showPreparedColumn={showPreparedColumn} />
                 <CharSpellSlots playerStats={playerStats} campaignName={campaignName}></CharSpellSlots>
             </div>

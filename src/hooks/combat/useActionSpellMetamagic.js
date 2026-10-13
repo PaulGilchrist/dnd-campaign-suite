@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { assertCanAct } from '../../services/combat/assertCanAct.js'
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints, logMetamagicUse } from './useMetamagic.js'
 import { addEntry } from '../../services/ui/logService.js'
 import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/metamagicRules.js'
@@ -314,7 +315,16 @@ export function useActionSpellMetamagic({
     };
 
     const handleSpellAttackClick = async (attack) => {
-        if (cannotAct) return;
+        // L5-001: enforcement gate (no-op while enforcement off). Spell attack
+        // rows charge the action slot unless they are bonus-action castings.
+        if (!assertCanAct({
+            campaignName,
+            creatureName: playerStats.name,
+            bucket: attack?.type === 'Bonus Action' ? 'bonusAction' : 'action',
+            cannotAct,
+            setPopupHtml,
+            source: 'useActionSpellMetamagic',
+        }).allowed) return;
         const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attack.name);
         if (!spell) {
             handleAttackClick(attack);
