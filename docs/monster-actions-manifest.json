@@ -29972,7 +29972,7 @@
         "frightened"
       ],
       "description": "Wisdom Saving Throw: DC 26, each creature of her choice within 240 ft. of her and aware of her. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. If a creature's saving throw is successful or the effect ends for it, the creature is immune to Tiamat's Frightful Presence for 24 hours. No damage. The target has the Frightened condition on a failed save. No damage.",
-      "verified": "broken — see .opencode/plans/bug-mon-2026-tiamat-frightful-presence.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2027",
