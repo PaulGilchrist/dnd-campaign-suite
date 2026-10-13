@@ -24,12 +24,10 @@ async function runUnbreakableMajesty({ target, attackerName, campaignName, logEn
         abilityName: 'Unbreakable Majesty',
         description: `${target.name}'s Unbreakable Majesty — ${attackerName} must make a CHA save (DC ${majSaveDc}) or the attack misses.`,
     });
-    let saveResolved = false;
     await new Promise((resolve) => {
         const handler = (event) => {
             if (event.detail.promptId !== promptId) return;
             window.removeEventListener('save-result', handler);
-            saveResolved = true;
             if (!event.detail.success) {
                 state.hit = false;
                 state.isAutoMiss = true;
@@ -50,19 +48,10 @@ async function runUnbreakableMajesty({ target, attackerName, campaignName, logEn
             resolve();
         };
         window.addEventListener('save-result', handler);
-        setTimeout(() => {
-            if (!saveResolved) {
-                window.removeEventListener('save-result', handler);
-                console.error('[unbreakableMajesty] CHA save prompt timed out after 30s — attack stands unresolved (fail-open).');
-                logEntry({
-                    type: 'ability_use',
-                    characterName: target.name,
-                    abilityName: 'Unbreakable Majesty',
-                    description: `${attackerName}'s Unbreakable Majesty CHA save (DC ${majSaveDc}) was not resolved within 30 seconds — attack stands (save-window timeout).`,
-                });
-                resolve();
-            }
-        }, 30000);
+        // no-timers plan T2 (was 30s fail-open): the prompt waits INDEFINITELY
+        // — the player's save is their turn to take at their own pace
+        // (AGENTS.md "No Game Timers"). The handler above removes itself on
+        // resolution; the listener never races a clock.
     });
 }
 
@@ -78,21 +67,15 @@ function applyBardicInspirationDefense({ context, target, campaignName, characte
 }
 
 function waitForVeerConfirm(targetName) {
-    let veerResultResolved = false;
     return new Promise((resolve) => {
         const handler = (event) => {
             if (event.detail.promptId !== `veer-${targetName}`) return;
             window.removeEventListener('veer-confirm', handler);
-            veerResultResolved = true;
             resolve(event.detail.confirm);
         };
         window.addEventListener('veer-confirm', handler);
-        setTimeout(() => {
-            if (!veerResultResolved) {
-                window.removeEventListener('veer-confirm', handler);
-                resolve(true);
-            }
-        }, 15000);
+        // no-timers plan T2 (was 15s auto-true): the clock must never make
+        // the player's Veer decision for them — wait indefinitely (AGENTS.md).
     });
 }
 

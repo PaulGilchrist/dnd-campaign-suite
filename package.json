@@ -22,6 +22,7 @@
         "type": "git"
     },
     "scripts": {
+        "guard:no-timers": "node .opencode/plans/no-timers-guard.mjs",
         "api": "node server.js",
         "api:locked": "CAMPAIGN_LOCK=test-campaign node server.js",
         "dev": "concurrently \"npm run api\" \"npm run dev:react\"",

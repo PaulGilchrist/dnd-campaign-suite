@@ -148,16 +148,34 @@ describe('createLogAndShow - Unbreakable Majesty Save Flow', () => {
         return createLogAndShow(deps);
     }
 
+    // no-timers T2: the majesty save prompt now waits INDEFINITELY (no 30s
+    // fail-open). Tests answer the prompt exactly as the player would —
+    // dispatching save-result for the majesty promptId until the flow settles.
+    async function runAnsweringMajestySave(weapon, bonus, ctx, success = true) {
+        globalThis.setTimeout = (cb) => { cb(); return 0; }; // benign deferrals only
+        try {
+            const fn = createFn();
+            let settled = false;
+            const run = fn(weapon, bonus, 'attack', ctx).then((r) => { settled = true; return r; });
+            for (let i = 0; i < 40 && !settled; i++) {
+                await new Promise((r) => origSetTimeout(r, 5));
+                window.dispatchEvent(new CustomEvent('save-result', {
+                    detail: { promptId: 'majesty-majesty-guid-001', success },
+                }));
+            }
+            return await run;
+        } finally {
+            globalThis.setTimeout = origSetTimeout;
+        }
+    }
+
     describe('majesty triggers when attack hits defender with active majesty', () => {
         it('checks majesty state, marks attacker, and dispatches save when hit and target has majesty active', async () => {
             isUnbreakableMajestyActive.mockReturnValue(true);
             hasAttackerTriggeredMajesty.mockReturnValue(false);
             getUnbreakableMajestySaveDc.mockReturnValue(15);
 
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mage' });
-            globalThis.setTimeout = origSetTimeout;
+            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
 
             expect(isUnbreakableMajestyActive).toHaveBeenCalledWith('Mage', 'test-campaign');
             expect(hasAttackerTriggeredMajesty).toHaveBeenCalledWith('Mage', 'TestFighter', 'test-campaign');
@@ -176,10 +194,7 @@ describe('createLogAndShow - Unbreakable Majesty Save Flow', () => {
             hasAttackerTriggeredMajesty.mockReturnValue(false);
             getUnbreakableMajestySaveDc.mockReturnValue(15);
 
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mage' });
-            globalThis.setTimeout = origSetTimeout;
+            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
 
             const majestyLogEntries = deps.logEntry.mock.calls.filter(
                 (call) => call[0]?.type === 'ability_use' && call[0]?.abilityName === 'Unbreakable Majesty',
@@ -197,42 +212,48 @@ describe('createLogAndShow - Unbreakable Majesty Save Flow', () => {
             const markSpy = vi.fn();
             vi.mocked(markAttackerTriggeredMajesty).mockImplementation(markSpy);
 
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mage' });
-            globalThis.setTimeout = origSetTimeout;
+            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
 
             expect(markSpy).toHaveBeenCalledWith('Mage', 'TestFighter', 'test-campaign');
         });
     });
 
-        it('logs a fail-open timeout line when the save window expires unresolved', async () => {
+        it('never auto-resolves by the clock — waits for the player, then honors their failed save', async () => {
             isUnbreakableMajestyActive.mockReturnValue(true);
             hasAttackerTriggeredMajesty.mockReturnValue(false);
             getUnbreakableMajestySaveDc.mockReturnValue(19);
 
+            // no-timers T2: the old 30s fail-open window is gone. The flow
+            // must still be PENDING after real time has passed (no timeout log,
+            // no silent resolution) and complete only when the player saves.
             globalThis.setTimeout = (cb) => { cb(); return 0; };
             const fn = createFn();
-            await fn('Mace', 5, 'attack', { targetName: 'Mage' });
             globalThis.setTimeout = origSetTimeout;
+            let settled = false;
+            const run = fn('Mace', 5, 'attack', { targetName: 'Mage' }).then((r) => { settled = true; return r; });
+            await new Promise((r) => origSetTimeout(r, 80));
+            expect(settled).toBe(false);
+
+            window.dispatchEvent(new CustomEvent('save-result', {
+                detail: { promptId: 'majesty-majesty-guid-001', success: false },
+            }));
+            await run;
 
             const timeoutLogs = deps.logEntry.mock.calls.filter(
                 (call) => /timeout/i.test(call[0]?.description || ''),
             );
-            expect(timeoutLogs.length).toBe(1);
-            expect(timeoutLogs[0][0].type).toBe('ability_use');
-            expect(timeoutLogs[0][0].description).toContain('DC 19');
-            expect(timeoutLogs[0][0].description).toContain('attack stands');
+            expect(timeoutLogs.length).toBe(0);
+            const missLogs = deps.logEntry.mock.calls.filter(
+                (call) => call[0]?.abilityName === 'Unbreakable Majesty' && /attack misses due to Unbreakable Majesty/i.test(call[0]?.description || ''),
+            );
+            expect(missLogs.length).toBe(1);
         });
 
     describe('majesty does not trigger', () => {
         it('does not trigger majesty when majesty is not active on the target', async () => {
             isUnbreakableMajestyActive.mockReturnValue(false);
 
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mage' });
-            globalThis.setTimeout = origSetTimeout;
+            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
 
             expect(isUnbreakableMajestyActive).toHaveBeenCalledWith('Mage', 'test-campaign');
             expect(hasAttackerTriggeredMajesty).not.toHaveBeenCalled();
@@ -244,10 +265,7 @@ describe('createLogAndShow - Unbreakable Majesty Save Flow', () => {
             isUnbreakableMajestyActive.mockReturnValue(true);
             hasAttackerTriggeredMajesty.mockReturnValue(true);
 
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mage' });
-            globalThis.setTimeout = origSetTimeout;
+            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
 
             expect(hasAttackerTriggeredMajesty).toHaveBeenCalledWith('Mage', 'TestFighter', 'test-campaign');
             expect(markAttackerTriggeredMajesty).not.toHaveBeenCalled();
@@ -260,10 +278,7 @@ describe('createLogAndShow - Unbreakable Majesty Save Flow', () => {
             getUnbreakableMajestySaveDc.mockReturnValue(15);
             rollD20.mockReturnValue(3);
 
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mage' });
-            globalThis.setTimeout = origSetTimeout;
+            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
 
             expect(dispatchUnbreakableMajestySave).not.toHaveBeenCalled();
             expect(markAttackerTriggeredMajesty).not.toHaveBeenCalled();
@@ -276,10 +291,7 @@ describe('createLogAndShow - Unbreakable Majesty Save Flow', () => {
             hasAttackerTriggeredMajesty.mockReturnValue(false);
             getUnbreakableMajestySaveDc.mockReturnValue(20);
 
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mage' });
-            globalThis.setTimeout = origSetTimeout;
+            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
 
             expect(dispatchUnbreakableMajestySave).toHaveBeenCalledWith(
                 'test-campaign',
@@ -295,10 +307,7 @@ describe('createLogAndShow - Unbreakable Majesty Save Flow', () => {
             hasAttackerTriggeredMajesty.mockReturnValue(false);
             getUnbreakableMajestySaveDc.mockReturnValue(0);
 
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mage' });
-            globalThis.setTimeout = origSetTimeout;
+            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
 
             expect(dispatchUnbreakableMajestySave).toHaveBeenCalledWith(
                 'test-campaign',
@@ -316,10 +325,7 @@ describe('createLogAndShow - Unbreakable Majesty Save Flow', () => {
             hasAttackerTriggeredMajesty.mockReturnValue(false);
             getUnbreakableMajestySaveDc.mockReturnValue(15);
 
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Eldritch Blast', 5, 'attack', { targetName: 'Mage' });
-            globalThis.setTimeout = origSetTimeout;
+            await runAnsweringMajestySave('Eldritch Blast', 5, { targetName: 'Mage' });
 
             expect(dispatchUnbreakableMajestySave).toHaveBeenCalled();
             expect(markAttackerTriggeredMajesty).toHaveBeenCalled();
@@ -330,10 +336,7 @@ describe('createLogAndShow - Unbreakable Majesty Save Flow', () => {
             hasAttackerTriggeredMajesty.mockReturnValue(false);
             getUnbreakableMajestySaveDc.mockReturnValue(15);
 
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            await fn('Greatsword', 8, 'attack', { targetName: 'Mage' });
-            globalThis.setTimeout = origSetTimeout;
+            await runAnsweringMajestySave('Greatsword', 8, { targetName: 'Mage' });
 
             expect(dispatchUnbreakableMajestySave).toHaveBeenCalled();
             expect(markAttackerTriggeredMajesty).toHaveBeenCalled();

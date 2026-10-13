@@ -81,19 +81,10 @@ function validateTurnState(value) {
 }
 
 /**
- * L5-002 §7.5 turn timer: { seconds, running, endsAt, autoAdvance } or null.
- * Shape-only — timing logic is client-side; the server just refuses junk that
- * would desync every client's clock.
+ * L5 §7.5 validateTurnTimer REMOVED (no-timers plan T1): the turnTimer key
+ * no longer exists — real-time countdowns are banned (AGENTS.md "No Game
+ * Timers"); initiative advances only on player/GM action.
  */
-function validateTurnTimer(value) {
-    if (value === null) return { ok: true }; // off
-    if (!isPlainObject(value)) return { ok: false, reason: 'turnTimer must be null or an object' };
-    const { seconds, running, endsAt, autoAdvance } = value;
-    if (!nonNegNumber(seconds) || seconds > 3600) return { ok: false, reason: 'turnTimer.seconds must be a number 0..3600' };
-    if (typeof running !== 'boolean' || typeof autoAdvance !== 'boolean') return { ok: false, reason: 'turnTimer.running/autoAdvance must be boolean' };
-    if (endsAt !== null && !nonNegNumber(endsAt)) return { ok: false, reason: 'turnTimer.endsAt must be null or a non-negative number' };
-    return { ok: true };
-}
 
 /**
  * Authority check for enforcement/referee writes (D2/D4): while enforcement is
@@ -130,9 +121,6 @@ export const keyValidators = {
     enforcement: chain(validateEnforcement, (v, ctx) => validateAuthority('enforcement', ctx)),
     referee: chain(validateReferee, (v, ctx) => validateAuthority('referee', ctx)),
     turnState: validateTurnState,
-    // L5-002: shape-guarded like turnState — the clock is broadcast to every
-    // client so fabricated shapes would desync the table.
-    turnTimer: validateTurnTimer,
 };
 
 /**

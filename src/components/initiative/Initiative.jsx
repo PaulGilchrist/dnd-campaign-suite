@@ -33,7 +33,6 @@ import { createFleshToStoneHandler, createPrismaticSprayIndigoHandler, createPri
 import { useLootHandlers } from './useLootHandlers.js'
 import { createNextCreatureHandler, createPreviousCreatureHandler } from './navigationHandlers.js'
 import TurnEconomyStrip from './TurnEconomyStrip.jsx'
-import TurnTimer from './TurnTimer.jsx'
 import { createCreatureHandlers } from './createCreatureHandlers.js'
 import { createRollConditionSaveHandler } from './createRollConditionSaveHandler.js'
 import { createConcentrationHandlers } from './createConcentrationHandlers.js'
@@ -701,8 +700,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                   {enforcementOn && (
                       <button className='end-turn-button' onClick={handleNextCreature} title="End the active creature's turn (advances initiative and resets their economy)">End Turn</button>
                   )}
-                  {/* L5-002 §7.5: optional per-turn countdown (off ⇒ zero DOM). */}
-                  <TurnTimer campaignName={campaignName} enforcementOn={enforcementOn} isLocalhost={isLocalhost} onExpire={handleNextCreature} />
               </div>
               <InitiativeLoot
                 lootData={lootData}

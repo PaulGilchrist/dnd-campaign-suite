@@ -497,10 +497,19 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
             isUnbreakableMajestyActive.mockReturnValue(true);
             hasAttackerTriggeredMajesty.mockReturnValue(false);
             getUnbreakableMajestySaveDc.mockReturnValue(15);
+            // no-timers T2: no timeout auto-resolve — answer the save prompt
+            // as the player would, until the flow settles.
+            const run = fn('Longsword', 5, 'attack', { targetName: 'Mage' });
+            let settled = false;
+            run.then(() => { settled = true; });
             const origSetTimeout = globalThis.setTimeout;
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            await fn('Longsword', 5, 'attack', { targetName: 'Mage' });
-            globalThis.setTimeout = origSetTimeout;
+            for (let i = 0; i < 40 && !settled; i++) {
+                await new Promise((r) => origSetTimeout(r, 5));
+                window.dispatchEvent(new CustomEvent('save-result', {
+                    detail: { promptId: 'majesty-test-guid-1234', success: true },
+                }));
+            }
+            await run;
             expect(isUnbreakableMajestyActive).toHaveBeenCalledWith('Mage', defaultCampaignName);
             expect(markAttackerTriggeredMajesty).toHaveBeenCalledWith('Mage', defaultCharacterName, defaultCampaignName);
             expect(dispatchUnbreakableMajestySave).toHaveBeenCalled();

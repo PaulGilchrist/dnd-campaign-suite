@@ -27,7 +27,6 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
     const failures = storedFailures ?? EMPTY_TRACK
     const isDead = !!useRuntimeValue(name, 'isDead', campaignName)
     const [lastRoll, setLastRoll] = React.useState(null)
-    const stableHealTimeoutRef = React.useRef(null)
 
     React.useEffect(() => {
         const handler = (e) => {
@@ -43,14 +42,6 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
         window.addEventListener('death-save-result', handler);
         return () => window.removeEventListener('death-save-result', handler);
     }, [name])
-
-    React.useEffect(() => {
-        return () => {
-            if (stableHealTimeoutRef.current) {
-                clearTimeout(stableHealTimeoutRef.current);
-            }
-        };
-    }, []);
 
     const isStable = deathSaveRules.isStable(saves)
     const isDeadState = deathSaveRules.isDead(failures)
@@ -108,9 +99,10 @@ function DeathSavingThrows({ playerStats, campaignName, isLocalhost }) {
         }
 
         if (result.result === 'stable') {
-            stableHealTimeoutRef.current = setTimeout(() => {
-                setRuntimeValue(name, 'currentHitPoints', 1, campaignName);
-            }, 1500);
+            // no-timers plan T2: stabilization writes HP=1 IMMEDIATELY (was a
+            // 1.5s setTimeout — state must never hang on a wall-clock delay;
+            // an unmount inside that window used to silently LOSE the write).
+            setRuntimeValue(name, 'currentHitPoints', 1, campaignName);
             logEntry({
                 type: 'death_save',
                 characterName: name,

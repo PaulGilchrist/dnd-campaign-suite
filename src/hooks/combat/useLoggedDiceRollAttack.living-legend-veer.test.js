@@ -330,20 +330,24 @@ describe('createLogAndShow - Living Legend & Veer', () => {
             });
         }
 
-        function fakeTimersSync() {
-            const orig = globalThis.setTimeout;
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            return () => { globalThis.setTimeout = orig; };
-        }
+        // no-timers T2: fakeTimersSync helper removed — prompts no longer have
+        // timeout branches to fire; tests answer them with real events instead.
 
         it('redirects attack to rider when veer is active and rider confirms', async () => {
-            const restoreTimer = fakeTimersSync();
             mockVeerSetup('Mount', 'Rider');
 
+            // no-timers T2: the confirm waits forever — dispatch the rider's
+            // answer as the player would (the old 15s auto-confirm is gone).
             const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mount' });
-
-            restoreTimer();
+            let settled = false;
+            const run = fn('Longsword', 5, 'attack', { targetName: 'Mount' }).then((r) => { settled = true; return r; });
+            for (let i = 0; i < 40 && !settled; i++) {
+                await new Promise((r) => setTimeout(r, 5));
+                window.dispatchEvent(new CustomEvent('veer-confirm', {
+                    detail: { promptId: 'veer-Mount', confirm: true },
+                }));
+            }
+            await run;
 
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
                 abilityName: 'Veer',
@@ -380,7 +384,8 @@ describe('createLogAndShow - Living Legend & Veer', () => {
                 }));
             }
 
-            // Advance past the timeout so the promise fully resolves
+            // Resolve via the captured handler (no timer involved anymore —
+            // the prompt would otherwise wait forever, AGENTS.md "No Game Timers").
             await vi.advanceTimersByTimeAsync(1);
 
             await promise;
@@ -434,13 +439,19 @@ describe('createLogAndShow - Living Legend & Veer', () => {
         });
 
         it('logs veer ability use when redirecting attack to rider', async () => {
-            const restoreTimer = fakeTimersSync();
             mockVeerSetup('Mount', 'Rider');
 
+            // no-timers T2: answer the confirm prompt as the rider would.
             const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mount' });
-
-            restoreTimer();
+            let settled = false;
+            const run = fn('Longsword', 5, 'attack', { targetName: 'Mount' }).then((r) => { settled = true; return r; });
+            for (let i = 0; i < 40 && !settled; i++) {
+                await new Promise((r) => setTimeout(r, 5));
+                window.dispatchEvent(new CustomEvent('veer-confirm', {
+                    detail: { promptId: 'veer-Mount', confirm: true },
+                }));
+            }
+            await run;
 
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
                 type: 'ability_use',

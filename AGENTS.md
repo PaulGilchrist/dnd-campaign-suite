@@ -117,6 +117,17 @@ setRuntimeValue(characterKey, 'myKey', newValue, campaignName);
 - **Automation registry:** 200+ handler functions in `src/services/automation/`. Features declare automation metadata (type, trigger, damage expressions) that is collected, categorized, and dispatched at runtime.
 - **Per-spell feature services:** ~74 service files in `src/services/rules/features/`, each implementing automation for a specific spell or class feature.
 
+## No Game Timers (MANDATORY — every future change)
+
+This game is **strictly turn-based**. Game state NEVER advances, expires, resolves, or penalizes on wall-clock time. Users have unlimited time to execute their turn.
+
+- **"Clock" means a round counter**, matured only at initiative seams (turn end, round wrap, new initiative roll). Never a `Date.now()` comparison or a scheduled callback that moves game state.
+- **Duration policy:** authored durations convert to rounds when < 1 minute ("1 round", "until end of your next turn"). **Anything ≥ 1 minute is combat-scoped** — lasts the whole combat, cleared by a new initiative roll, a short rest, or a long rest. Never store a ≥1-minute duration as a round countdown (the old minutes×10/hours×600 recipe is retired for these). Concentration stays concentration — never a fabricated clock.
+- **Adjudication prompts** (saves, Bardic Inspiration offers, Veer confirms, anything a player must answer) wait **indefinitely** — no `setTimeout` auto-resolve, no fail-open/fail-closed windows, no auto-decisions on expiry.
+- **`setTimeout`/`setInterval` are permitted ONLY in benign UI categories:** toasts/auto-hiding feedback, network/save debounces, animation-close after a selection is already made, drag-ghost cleanup, event-loop yields, autocomplete debounce, network fetch timeouts, popup-visibility DOM polls. Anything that resolves, advances, or expires GAME state on a timer is forbidden.
+- **Enforcement:** run `node .opencode/plans/no-timers-guard.mjs` (`npm run guard:no-timers`) alongside lint/tests. New timer usages must be added to its allowlist with a one-line justification.
+- Background: full audit + rationale in `.opencode/plans/no-timers.md`.
+
 ## Code Simplicity
 
 - **Single source of truth:** One variable, one concept. Derive state once at the top of the function.

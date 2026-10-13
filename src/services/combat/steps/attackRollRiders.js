@@ -177,12 +177,10 @@ export function buildBardicInspirationOffenseStep() {
       const promptId = `bi-offense-${utils.guid()}`;
       sendBardicInspirationOffensePrompt(ctx.campaignName, ctx.playerStats.name, targetName, dieSize, promptId);
 
-      let biResolved = false;
       await new Promise(resolve => {
         const handler = event => {
           if (event.detail.promptId !== promptId) return;
           window.removeEventListener('bardic-inspiration-offense-result', handler);
-          biResolved = true;
           if (event.detail.used) {
             const biRoll = event.detail.biRoll;
             spendResource(ctx.playerStats.name, 'bardicInspirationUses', 1, ctx.campaignName);
@@ -199,12 +197,9 @@ export function buildBardicInspirationOffenseStep() {
           resolve();
         };
         window.addEventListener('bardic-inspiration-offense-result', handler);
-        setTimeout(() => {
-          if (!biResolved) {
-            window.removeEventListener('bardic-inspiration-offense-result', handler);
-            resolve();
-          }
-        }, 30000);
+        // no-timers plan T2 (was 30s silent auto-decline): the offer waits
+        // INDEFINITELY for the player — accept AND decline are both real
+        // choices carried by the event; neither is ever made by a clock.
       });
       return { data: {} };
     },
