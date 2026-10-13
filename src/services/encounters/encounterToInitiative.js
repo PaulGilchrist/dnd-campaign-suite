@@ -127,6 +127,13 @@ export async function loadEncounterToInitiative(selectedMonsters, characters, ca
 
     storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
 
+    // no-timers plan T4: a new initiative roll IS a new combat — every
+    // combat-scoped effect of the previous combat ends here (enforcement
+    // off ⇒ zero writes). Dynamic import keeps this module graph light.
+    await import('../rules/effects/zoneDurationClock.js')
+        .then((m) => m.sweepNewCombatClocks(campaignName))
+        .catch((e) => { console.error('[loadEncounterToInitiative:new-combat-sweep]', e); });
+
     const firstName = creatures[0]?.name;
     storage.set('activeCreatureName', firstName, campaignName);
 
@@ -167,6 +174,11 @@ export async function addMonstersToInitiative(selectedMonsters, characters, camp
     let combatSummary = await loadCombatSummary(campaignName);
     if (!combatSummary) {
         combatSummary = { round: 1, creatures: [] };
+        // no-timers T4: no prior initiative = new combat — sweep stale
+        // combat-scoped clocks any earlier encounter left behind.
+        await import('../rules/effects/zoneDurationClock.js')
+            .then((m) => m.sweepNewCombatClocks(campaignName))
+            .catch((e) => { console.error('[addMonstersToInitiative:new-combat-sweep]', e); });
     }
 
     const npcRollResults = [];

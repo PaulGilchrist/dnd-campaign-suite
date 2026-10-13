@@ -91,10 +91,10 @@ export function buildSummonCoinFlipLog({ monsterName, action, verdict }) {
 // (MA-0648/0651/0664/0757) stay byte-identical.
 function summonDurationTail({ action, plural, durationMinutes, campaignName }) {
   if (durationMinutes != null) {
-    // L5-003 §8.3: while zones enforcement is live the clock is ARMED above,
-    // so the log says so; otherwise the legacy §70 advisory stays verbatim.
+    // L5-003 §8.3 + no-timers T3: authored minute durations are now
+    // COMBAT-SCOPED while zones enforcement is live — no round countdown.
     if (zonesClockEnforcementLive(campaignName)) {
-      return { sep: ', ', tail: `${plural ? 'remain' : 'remains'} ${durationMinutes} minutes (expiry clock armed — enforcement: zones; dismiss-as-action is a §70 residual).` };
+      return { sep: ', ', tail: `${plural ? 'remain' : 'remains'} ${durationMinutes} minutes (combat-scoped — despawn when this combat ends, swept at the next initiative roll or a rest; enforcement: zones; dismiss-as-action is a §70 residual).` };
     }
     return { sep: ', ', tail: `${plural ? 'remain' : 'remains'} ${durationMinutes} minutes (expiry clock, dismiss-as-action and "can't summon other ${plural ? 'creatures' : 'creature'}" are §70 GM-enforced residuals).` };
   }
@@ -182,7 +182,7 @@ function summonCountNote(countRoll) {
 function summonPopupStay(durationMinutes, action, campaignName) {
   if (durationMinutes != null) {
     if (zonesClockEnforcementLive(campaignName)) {
-      return `, for ${durationMinutes} ${durationMinutes === 1 ? 'minute' : 'minutes'} (expiry clock armed — enforcement: zones).`;
+      return `, for ${durationMinutes} ${durationMinutes === 1 ? 'minute' : 'minutes'} (combat-scoped — despawn when this combat ends, swept at the next initiative roll or a rest; enforcement: zones).`;
     }
     return `, for ${durationMinutes} ${durationMinutes === 1 ? 'minute' : 'minutes'} (§70 expiry GM-enforced).`;
   }
@@ -422,7 +422,9 @@ async function resolveSummonSpawn({ action, monsterName, campaignName, setPopupH
       automationType: 'duration_clock_armed',
       characterName: monsterName,
       abilityName: action.name,
-      description: `Expiry clock armed: ${summonedNames.join(', ')} despawn after ${armedRounds} rounds (enforcement: zones).`,
+      description: armedRounds === 'combat'
+        ? `Expiry clock armed: ${summonedNames.join(', ')} despawn when this combat ends — swept at the next initiative roll or a rest (enforcement: zones).`
+        : `Expiry clock armed: ${summonedNames.join(', ')} despawn after ${armedRounds} rounds (enforcement: zones).`,
       timestamp: Date.now(),
     }).catch((e) => { console.error('[monsterSummon] clock-arm log failed:', e); });
   }

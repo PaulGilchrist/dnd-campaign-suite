@@ -14,7 +14,7 @@
 // darkvision/light-immunity clause rides the arm log + popup, GM-enforced.
 import { addEntry } from '../ui/logService.js';
 import { registerTargetEffect } from '../combat/conditions/targetEffectDefinitions.js';
-import { armDurationClockIfEnforced } from '../rules/effects/zoneDurationClock.js';
+import { armDurationClockIfEnforced, durationArmNote } from '../rules/effects/zoneDurationClock.js';
 import { monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup } from './monsterAbilityUses.js';
 
 export const SELF_AURA_LIGHT_ADVISORY = 'No illumination model (§70): darkness does not obscure, suppress darkvision, or block light in-engine — GM-enforced.';
@@ -34,7 +34,7 @@ function selfAuraAdvisory(action) {
 export function buildSelfAuraArmLog({ monsterName, action, effectKey, radiusFt, armedRounds = null }) {
   const duration = action?.duration || 'GM-adjudicated';
   const durNote = armedRounds != null
-    ? `Duration ${duration} — expiry clock armed (${armedRounds} rounds, enforcement: zones).`
+    ? `Duration ${duration} — expiry clock armed (${durationArmNote(armedRounds)}).`
     : `Duration ${duration} — GM-enforced.`;
   return {
     type: 'automation',

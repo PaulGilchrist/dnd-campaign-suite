@@ -592,6 +592,13 @@ function resetPerSpellFreeCastCounters(name, playerStats, campaignName) {
 export async function applyLongRest(playerStats, campaignName) {
   const name = playerStats.name
 
+  // no-timers plan T4: long rest ends every combat-scoped effect (§: rests
+  // are explicit player actions — one of the three turn-based boundaries).
+  // Dynamic import keeps rest's module graph light.
+  await import('./zoneDurationClock.js')
+    .then((m) => m.sweepRestClocks(campaignName, 'long'))
+    .catch((e) => { console.error('[applyLongRest:combat-scoped-sweep]', e); });
+
   const charData = buildLongRestCharData(playerStats)
 
   clearLongRestSummonEffects(campaignName)

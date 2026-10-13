@@ -18,7 +18,7 @@ import { stageSleepTargets } from '../../../../services/rules/features/sleepServ
 import { stageParalysisTargets } from '../../../../services/rules/features/paralyzingBreathService.js';
 import { grantWeakeningBreath } from '../../../../services/rules/features/weakeningBreathService.js';
 import { stagePetrifyingBiteTargets } from '../../../../services/rules/features/cockatricePetrifyService.js';
-import { armDurationClockIfEnforced } from '../../../../services/rules/effects/zoneDurationClock.js';
+import { armDurationClockIfEnforced, durationArmNote } from '../../../../services/rules/effects/zoneDurationClock.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
@@ -639,7 +639,7 @@ function armZoneTargets({ zoneTe, selectedNames, casterName, actionName, saveDc,
         durationText: zoneTe.duration,
     });
     const durNote = armedRounds != null
-        ? `Duration ${zoneTe.duration} — expiry clock armed (${armedRounds} rounds, enforcement: zones).`
+        ? `Duration ${zoneTe.duration} — expiry clock armed (${durationArmNote(armedRounds)}).`
         : `Duration ${zoneTe.duration || 'GM-adjudicated'} — GM-enforced.`;
     addEntry(campaignName, {
         type: 'ability_use',

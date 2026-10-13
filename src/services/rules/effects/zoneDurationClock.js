@@ -12,30 +12,36 @@
  * This module closes that gap honestly:
  *  - enforcement OFF or `zones` flag off ⇒ returns null with ZERO writes —
  *    byte-identical Levels 1–4 (no extra runtime traffic at all).
- *  - The duration text must PARSE to a finite round count — indefinite
- *    durations ("concentration", "until dismissed") get NO fabricated clock
+ *  - The duration text must PARSE — sub-minute durations ("2 rounds",
+ *    initiative-count-20) arm finite round clocks; indefinite durations
+ *    ("concentration", "until dismissed") get NO fabricated clock
  *    (MA-1215 discipline: never invent a clock the rules don't author).
- *  - Round conversion reuses the app-wide CLA-334 recipe (minutes×10,
- *    hours×600) — one merged addExpiration (§38, no competing clocks).
+ *  - no-timers plan T3 (AGENTS.md): authored durations ≥1 MINUTE are
+ *    COMBAT-SCOPED (`until: 'combat'`, rounds Infinity) — never round
+ *    countdowns. They end only at a new initiative roll, a short rest, or a
+ *    long rest via the sweep seams below. (CLA-334 minutes×10/hours×600
+ *    retired for these; one merged addExpiration §38.)
  */
 import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCurrentCombatRound } from '../../encounters/combatData.js';
-import { addExpiration, processExpirationList } from './expirationQueue.js';
+import { addExpiration, processExpirationList, sweepCombatScopedExpirations } from './expirationQueue.js';
 import { KEY } from './turnStartEffects.js';
 import { addEntry } from '../../ui/logService.js';
 
-/** CLA-334 duration→rounds: "2 rounds"→2, "1 minute"→10, "8 hours"→4800.
+/** Duration→rounds for SUB-MINUTE authored durations only: "2 rounds"→2.
  *  Initiative-20 lair cadence ("until initiative count 20 on the next round")
  *  maps to rounds:1 — mature at the very next round wrap, where the
  *  round-wrap drain (drainRoundWrapClocks) clears them exactly at the top of
  *  initiative — the nearest engine seam to RAW count 20.
+ *  ≥1 MINUTE durations return undefined HERE — they are COMBAT-SCOPED, not
+ *  countdowns (no-timers plan T3, AGENTS.md): see clauseCombatScopedDuration.
  *  Unparseable/indefinite ⇒ undefined (no clock, never a guess). */
 export function clauseDurationRounds(duration) {
     const s = String(duration || '').toLowerCase();
     const rounds = s.match(/(\d+)\s*_?\s*rounds?/);
     if (rounds) return parseInt(rounds[1], 10);
     const long = s.match(/(\d+)\s*(minute|hour)/);
-    if (long) return long[2] === 'hour' ? parseInt(long[1], 10) * 600 : parseInt(long[1], 10) * 10;
+    if (long) return undefined; // ≥1 minute ⇒ combat-scoped, never a round countdown
     const initIdx = s.indexOf('initiative');
     if (initIdx >= 0) {
         // Guard: "until the dragon uses this lair action again or dies; mud
@@ -46,6 +52,21 @@ export function clauseDurationRounds(duration) {
         return 1;
     }
     return undefined;
+}
+
+/** no-timers plan T3: authored durations of ≥1 MINUTE are combat-scoped —
+ *  they last the WHOLE combat and end only at a new initiative roll, a short
+ *  rest, or a long rest (sweepCombatScopedExpirations). The old CLA-334
+ *  minutes×10/hours×600 round countdowns are retired for these. */
+export function clauseCombatScopedDuration(duration) {
+    return /(\d+)\s*(minute|hour)/.test(String(duration || '').toLowerCase());
+}
+
+/** One log-prose recipe for every armed-clock consumer. */
+export function durationArmNote(armedRounds) {
+    return armedRounds === 'combat'
+        ? 'combat-scoped — lasts the whole combat, swept at the next initiative roll or a rest (enforcement: zones)'
+        : `${armedRounds} rounds (enforcement: zones)`;
 }
 
 /** True only while enforcement.mode==='on' AND the zones flag is on. */
@@ -72,9 +93,60 @@ export function armDurationClockIfEnforced(ctx) {
     if (!campaignName || !ownerName || !Array.isArray(effects) || effects.length === 0) return null;
     if (!zonesClockEnforcementLive(campaignName)) return null;
     const rounds = clauseDurationRounds(durationText);
-    if (rounds == null) return null;
-    addExpiration({ attackerName: ownerName, targetName, effects, campaignName, rounds });
-    return rounds;
+    if (rounds != null) {
+        addExpiration({ attackerName: ownerName, targetName, effects, campaignName, rounds });
+        return rounds;
+    }
+    // no-timers T3: authored ≥1 minute ⇒ combat-scoped, never a countdown.
+    if (clauseCombatScopedDuration(durationText)) {
+        addExpiration({ attackerName: ownerName, targetName, effects, campaignName, rounds: Infinity, until: 'combat' });
+        return 'combat';
+    }
+    return null;
+}
+
+/**
+ * no-timers plan T4 seams — combat-scoped sweeps.
+ *
+ * NEW COMBAT (a fresh initiative roll): every combat-scoped clock across ALL
+ * stores ends — the previous combat is over. Enforcement off / zones off ⇒
+ * ZERO writes (byte-identical L1–4).
+ */
+export async function sweepNewCombatClocks(campaignName) {
+    if (!campaignName || !zonesClockEnforcementLive(campaignName)) return 0;
+    const swept = sweepCombatScopedExpirations({ campaignName });
+    if (swept > 0) {
+        await addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'enforcement_clock_expired',
+            characterName: 'Campaign',
+            description: `New initiative roll: ${swept} combat-scoped effect${swept === 1 ? '' : 's'} ended (enforcement: zones).`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[zoneDurationClock:new-combat-sweep-log]', e); });
+    }
+    return swept;
+}
+
+/**
+ * REST seams (short & long): the resting creature's combat-scoped clocks end
+ * — rests are explicit player actions, one of the three boundaries the
+ * turn-based principle names. Unconditional by design: combat-scoped entries
+ * are only ever written while enforcement is armed, so enforcement-off play
+ * has nothing to sweep and stays byte-identical.
+ */
+export async function sweepRestClocks(campaignName, restKind) {
+    if (!campaignName) return 0;
+    const swept = sweepCombatScopedExpirations({ campaignName });
+    if (swept > 0) {
+        await addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'enforcement_clock_expired',
+            characterName: 'Campaign',
+            description: `${restKind === 'long' ? 'Long' : 'Short'} rest: ${swept} combat-scoped effect${swept === 1 ? '' : 's'} ended (enforcement: zones).`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[zoneDurationClock:rest-sweep-log]', e); });
+    }
+    return swept;
 }
 
 /**
