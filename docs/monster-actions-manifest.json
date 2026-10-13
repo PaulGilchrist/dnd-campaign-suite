@@ -34481,7 +34481,7 @@
       "actionType": "other",
       "trigger": "When the Ziz is targeted by a ranged attack.",
       "description": "Ziz folds its wings for armor, adding +5 to AC against the triggering attack.",
-      "verified": "broken — see .opencode/plans/bug-mon-2068-ziz-wing-shield.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2069",

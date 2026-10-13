@@ -74725,7 +74725,9 @@
       {
         "name": "Wing Shield",
         "trigger": "When the Ziz is targeted by a ranged attack.",
-        "description": "Ziz folds its wings for armor, adding +5 to AC against the triggering attack."
+        "description": "Ziz folds its wings for armor, adding +5 to AC against the triggering attack.",
+        "advisory": "wing_shield",
+        "advisory_message": "when targeted by a ranged attack — folds wings for armor, +5 to AC against the triggering attack — advisory record: no ranged-target reaction gate or temporary-AC-vs-trigger consumer exists; GM-enforced."
       }
     ],
     "legendary_actions": [
