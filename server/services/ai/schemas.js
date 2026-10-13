@@ -1,0 +1,90 @@
+/**
+ * Level 5 Phase 3 (L5-004, plan §9) — AI output schemas.
+ *
+ * Principle 3 / §9.5: the AI is a PROPOSER, never a state-writer. Every
+ * model response must validate against one of these ruling shapes before it
+ * touches anything — invalid output fails closed to a `needs_human` fallback,
+ * it is never "repaired" by guessing.
+ *
+ * Ruling types map 1:1 onto engine operations the app already has:
+ *  - 'dice'          → an expression for the ENGINE to roll (serverDice oracle
+ *                      §7.4, or client dice when off). The AI never rolls.
+ *  - 'automation'    → an existing named action to run through the existing
+ *                      automation lanes (charged via assertCanAct in P3-b).
+ *  - 'target_effect' → a targetEffect key for targetEffectDefinitions.js.
+ *  - 'hp_change'     → a signed HP delta the engine applies (confirm-gated).
+ *  - 'narrative'     → prose outcome logged for the table; mutates nothing.
+ * 'needs_human' is engine-produced only (AI unavailable / invalid output).
+ */
+
+const DICE_MODES = new Set(['normal', 'advantage', 'disadvantage']);
+const EXPR_RE = /^\d*d\d+([+-]\d+)?$/i; // same grammar as campaigns-roll.js
+const KEY_RE = /^[a-z0-9_]+$/;
+
+const MAX_TEXT = 2000;      // narrative prose cap
+const MAX_REASON = 200;
+const MAX_HP_MAGNITUDE = 200; // sanity bound, not a rule
+
+function str(v) { return typeof v === 'string'; }
+function trimmedNonEmpty(v) { return str(v) && v.trim() !== ''; }
+
+/**
+ * Validate one ruling object. Returns { ok, errors:[...] } — errors are
+ * joined into the referee-facing reason when invalid. Type-specific field
+ * checks live in a table (one row per ruling type), the shape sanity in the
+ * dispatcher — so adding a ruling type never grows the dispatcher.
+ */
+const TYPE_CHECKS = {
+    narrative: (r, e) => textField(r, e, 'text'),
+    needs_human: (r, e) => textField(r, e, 'text'),
+    dice: (r, e) => {
+        if (!str(r.expression) || !EXPR_RE.test(r.expression.trim())) {
+            e.push("dice ruling requires a valid expression 'NdM(+K)' — the engine rolls, the AI never states a result");
+        }
+        if (r.mode !== undefined && !DICE_MODES.has(r.mode)) e.push("dice.mode must be 'normal'|'advantage'|'disadvantage'");
+    },
+    automation: (r, e) => {
+        if (!trimmedNonEmpty(r.actionName)) e.push('automation ruling requires actionName');
+        if (r.targetName !== undefined && !trimmedNonEmpty(r.targetName)) e.push('automation.targetName must be non-empty when present');
+    },
+    target_effect: (r, e) => {
+        if (!str(r.effect) || !KEY_RE.test(r.effect)) e.push('target_effect.effect must be a snake_case key from targetEffectDefinitions.js');
+        if (!trimmedNonEmpty(r.targetName)) e.push('target_effect requires targetName');
+    },
+    hp_change: (r, e) => {
+        if (!Number.isInteger(r.amount) || r.amount === 0 || Math.abs(r.amount) > MAX_HP_MAGNITUDE) {
+            e.push(`hp_change.amount must be a non-zero integer within ±${MAX_HP_MAGNITUDE}`);
+        }
+        if (!trimmedNonEmpty(r.targetName)) e.push('hp_change requires targetName');
+    },
+};
+
+function textField(r, errors, field) {
+    if (!trimmedNonEmpty(r[field])) errors.push(`${field} required and non-empty`);
+    else if (r[field].length > MAX_TEXT) errors.push(`${field} must be ≤${MAX_TEXT} chars`);
+}
+
+export function validateRuling(ruling) {
+    const errors = [];
+    if (!ruling || typeof ruling !== 'object' || Array.isArray(ruling)) {
+        return { ok: false, errors: ['ruling must be an object'] };
+    }
+    const check = TYPE_CHECKS[ruling.type];
+    if (!check) return { ok: false, errors: [`unknown ruling type: ${JSON.stringify(ruling.type)}`] };
+    if (trimmedNonEmpty(ruling.explanation) && ruling.explanation.length > MAX_REASON) {
+        errors.push(`explanation must be ≤${MAX_REASON} chars`);
+    }
+    if (ruling.confidence !== undefined && !(typeof ruling.confidence === 'number' && Number.isFinite(ruling.confidence) && ruling.confidence >= 0 && ruling.confidence <= 1)) {
+        errors.push('confidence must be a number 0..1 when present');
+    }
+    check(ruling, errors);
+    return { ok: errors.length === 0, errors };
+}
+
+/** Engine-side fail-closed fallback (never model-proposed). */
+export function needsHumanRuling(reason) {
+    return {
+        type: 'needs_human',
+        text: `AI referee unavailable — the referee adjudicates this turn. (${String(reason || 'no reason given').slice(0, MAX_REASON)})`,
+    };
+}

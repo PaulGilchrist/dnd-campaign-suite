@@ -154,4 +154,73 @@ describe('L5-001 change-data validation chokepoint', () => {
             expect(res.status).toBe(400);
         });
     });
+
+    describe('aiConfig (Phase 3 §9, D3 privacy contract)', () => {
+        const LOCAL = { endpoint: 'http://localhost:11434', model: 'llama3.1:8b', mode: 'suggest' };
+
+        function proxyApp() {
+            const app = createTestApp();
+            app.set('trust proxy', true);
+            return app;
+        }
+
+        it('null ⇒ allowed (AI unset = today)', async () => {
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/aiConfig')
+                .send({ value: null });
+            expect(res.status).toBe(200);
+        });
+
+        it('local endpoint + known mode ⇒ accepted from localhost', async () => {
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/aiConfig')
+                .send({ value: LOCAL });
+            expect(res.status).toBe(200);
+            expect(characterChangeData.get('test-campaign').aiConfig.mode).toBe('suggest');
+        });
+
+        it('REMOTE endpoint ⇒ 400 — campaign/world data must never leave the machine', async () => {
+            for (const mode of ['suggest', 'autopilot']) {
+                const res = await request(createTestApp())
+                    .post('/api/campaigns/test-campaign/aiConfig')
+                    .send({ value: { ...LOCAL, mode, endpoint: 'https://api.openai.com' } });
+                expect(res.status).toBe(400);
+                expect(res.body.reason || JSON.stringify(res.body)).toMatch(/LOCAL/i);
+            }
+        });
+
+        it('unknown mode / bad temperature / missing model ⇒ 400', async () => {
+            const bad = [
+                { ...LOCAL, mode: 'yolo' },
+                { ...LOCAL, temperature: 9 },
+                { endpoint: 'http://localhost:11434', mode: 'suggest' },
+                { ...LOCAL, provider: 'claude' },
+            ];
+            for (const value of bad) {
+                const res = await request(createTestApp())
+                    .post('/api/campaigns/test-campaign/aiConfig')
+                    .send({ value });
+                expect(res.status).toBe(400);
+            }
+        });
+
+        it('ENGAGING the AI from a non-localhost anonymous client ⇒ 400 (a write that turns AI on is an act of authority)', async () => {
+            const res = await request(proxyApp())
+                .post('/api/campaigns/test-campaign/aiConfig')
+                .set('Host', '203.0.113.7')
+                .send({ value: LOCAL });
+            expect(res.status).toBe(400);
+        });
+
+        it('engaged aiConfig change by referee clientId ⇒ allowed', async () => {
+            characterChangeData.get('test-campaign').referee = { name: 'Ref', clientId: 'ref-1' };
+            characterChangeData.get('test-campaign').aiConfig = LOCAL;
+            const res = await request(proxyApp())
+                .post('/api/campaigns/test-campaign/aiConfig')
+                .set('Host', '203.0.113.7')
+                .set('X-Client-Id', 'ref-1')
+                .send({ value: { ...LOCAL, mode: 'autopilot' } });
+            expect(res.status).toBe(200);
+        });
+    });
 });

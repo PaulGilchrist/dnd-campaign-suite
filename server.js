@@ -17,6 +17,7 @@ import inventoryRoutes from './server/routes/inventory.js';
 import campaignsBasic from './server/routes/campaigns-basic.js';
 import campaignsCharacter from './server/routes/campaigns-character.js';
 import campaignsRoll from './server/routes/campaigns-roll.js';
+import campaignsAi from './server/routes/campaigns-ai.js';
 import campaignsChangedata from './server/routes/campaigns-changedata.js';
 import campaignsAdmin from './server/routes/campaigns-admin.js';
 import logRoutes from './server/routes/log.js';
@@ -157,6 +158,11 @@ app.use(campaignsCharacter);
 // L5 server-dice oracle — BEFORE campaignsChangedata so POST :campaign/roll
 // is not swallowed by the generic :campaign/:key change-data route.
 app.use(campaignsRoll);
+
+// L5 Phase 3 AI referee endpoints (§9.2) — /:campaign/ai/* has more path
+// segments than the generic :campaign/:key route, but mount beside the roll
+// oracle anyway: L5 server surfaces live together.
+app.use(campaignsAi);
 
 // Change data routes (after character file route so .json files aren't captured by :key)
 app.use(campaignsChangedata);

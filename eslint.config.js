@@ -35,6 +35,7 @@ export default [
         document: 'readonly',
         fetch: 'readonly',
         Response: 'readonly',
+        AbortSignal: 'readonly',
         CustomEvent: 'readonly',
         console: 'readonly',
         localStorage: 'readonly',

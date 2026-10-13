@@ -12,6 +12,11 @@
  */
 
 const MODES = new Set(['off', 'on']);
+const AI_MODES = ['off', 'suggest', 'autopilot']; // mirrors server/services/ai aiConfig modes
+
+// D3 privacy contract — single implementation lives with the provider that
+// would obey it; the validator enforces the same rule, not a copy of it.
+import { isLocalEndpoint } from '../services/ai/providers/localProvider.js';
 
 // Mirrors client ENFORCEMENT_DEFAULTS (src/services/combat/canTakeAction.js).
 // Keeping the list explicit here is the point: the server defines the contract.
@@ -90,21 +95,48 @@ function validateTurnState(value) {
  * Authority check for enforcement/referee writes (D2/D4): while enforcement is
  * engaged these may only come from the referee client (X-Client-Id header) or
  * localhost. With enforcement off the surface stays exactly as open as today.
+ * `engaged` may be overridden by the caller (e.g. aiConfig engages on its own
+ * mode, not the enforcement master).
  */
-function validateAuthority(key, ctx) {
+function validateAuthority(key, ctx, engaged) {
     const { req, current } = ctx;
     const enforcement = (current || {}).enforcement;
     const referee = (current || {}).referee;
-    const engaged = isPlainObject(enforcement) && enforcement.mode === 'on';
-    if (!engaged) return { ok: true };
+    const live = engaged !== undefined ? engaged
+        : isPlainObject(enforcement) && enforcement.mode === 'on';
+    if (!live) return { ok: true };
     const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
     if (isLocalhost) return { ok: true };
     const clientId = req.header('x-client-id');
     if (isPlainObject(referee) && clientId && clientId === referee.clientId) return { ok: true };
     return {
         ok: false,
-        reason: `only the referee (or localhost) may change ${key} while enforcement is on`,
+        reason: `only the referee (or localhost) may change ${key} while it is engaged`,
     };
+}
+
+/**
+ * L5 Phase 3 (plan §5.3/§9.1, D3): aiConfig governs the local model. The
+ * LOCALHOST-ENDPOINT guard is the privacy contract — campaign/world context
+ * must never be POSTed to a remote URL by configuration drift. mode
+ * non-'off' engages referee authority for changes (§12).
+ */
+function validateAiConfig(value) {
+    if (value === null) return { ok: true }; // unset ⇒ AI off (today's behavior)
+    if (!isPlainObject(value)) return { ok: false, reason: 'aiConfig must be null or an object' };
+    if (!AI_MODES.includes(value.mode)) return { ok: false, reason: "aiConfig.mode must be 'off'|'suggest'|'autopilot'" };
+    if (value.mode !== 'off') {
+        // Single source of truth for the local-endpoint contract (D3).
+        if (!isLocalEndpoint(value.endpoint)) return { ok: false, reason: 'aiConfig.endpoint must be a LOCAL http(s) URL (D3: local model only — campaign data never leaves the machine)' };
+        if (typeof value.model !== 'string' || value.model.trim() === '') return { ok: false, reason: 'aiConfig.model is required when AI is on' };
+    }
+    if (value.temperature !== undefined && !isTemperature(value.temperature)) return { ok: false, reason: 'aiConfig.temperature must be a number 0..2' };
+    if (value.provider !== undefined && !['ollama', 'openai'].includes(value.provider)) return { ok: false, reason: "aiConfig.provider must be 'ollama'|'openai'" };
+    return { ok: true };
+}
+
+function isTemperature(t) {
+    return typeof t === 'number' && Number.isFinite(t) && t >= 0 && t <= 2;
 }
 
 function chain(...validators) {
@@ -121,6 +153,13 @@ export const keyValidators = {
     enforcement: chain(validateEnforcement, (v, ctx) => validateAuthority('enforcement', ctx)),
     referee: chain(validateReferee, (v, ctx) => validateAuthority('referee', ctx)),
     turnState: validateTurnState,
+    // AI config engages referee authority on its OWN mode (§12), not the
+    // enforcement master — and engaging counts: a WRITE that turns the AI on
+    // is itself an act of authority, so an AI-off campaign cannot be
+    // silently autopiloted by a random client.
+    aiConfig: chain(validateAiConfig, (v, ctx) => validateAuthority('aiConfig', ctx,
+        (isPlainObject(v) && v.mode && v.mode !== 'off')
+        || (isPlainObject(ctx.current?.aiConfig) && ctx.current.aiConfig.mode !== 'off'))),
 };
 
 /**

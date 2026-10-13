@@ -20,17 +20,14 @@ Scope: 3,624 `*.js|jsx` files (~910k lines incl. 2,399 tests). ts/tsx: none.
 
 Verified: no importer anywhere (imports resolved incl. case-insensitive; only one `import.meta.glob` exists, in `map3dAssets.js`; no lazy imports; namespace imports checked). Removing these strands also orphans their co-located tests.
 
-- ~~Deleted (234d56073)~~: `rules/core/savageAttacker.js`, `combat/steps/features/savageAttacker.js`, warlock `beguilingTwistHandler.js`, `rageUtils.js`, `calmEmotionsCleanup.js`, `shared/{getClassLevelData,injectSpecialActions}.js`, `automation/common/conditionEventStore.js`, `ui/syncStoreValue.js`, `popups/PsionicChoicePopup.jsx`, `initiative/{ConcentrationPicker,ConditionPicker}.jsx`, `character-creation/WizardStepRaceClass.jsx` + stranded tests.
 - **CORRECTION**: `src/encounters/combatData.js` is NOT an orphan — `../../../encounters/combatData.js` imports from `src/services/combat/steps/*.js` resolve to it. Keep.
 - **`vi.mock`-referenced UI components** (no production importers; kept because surviving CharSpells/CharActionModals tests mock these paths): `popups/{MultiTargetCountPopup,SingleTargetPopup,TargetWithCheckboxesPopup,TargetWithTypePopup}.jsx`, `modals/shared/{ChoiceListModal,HealingIllusionModal}.jsx`.
-- ~~DONE (1bcbf83df)~~: deleted orphan `rules/features/{aid,antimagicField,calmEmotions,feignDeath,massHeal,powerWordFortify}Service.js` + stranded tests. `fearService.js` KEPT — live `vi.mock` paths in 9 surviving spellCastService tests reference it.
 - **Unreferenced module** with caveat: `src/routes/config.js` — only its test imports it, but AGENTS.md calls it "canonical view config"; App.jsx hardcodes views. Document drift, not automatic removal.
 
 ## Unused Symbols
 
 Exports whose names appear **nowhere outside their defining file** (and dynamic-dispatch via namespace import ruled out):
 
-- ~~DONE (d546738f6)~~: deleted all top-tier zero-referenced exports in savePromptService (…Prompt variants), magicSpells, attackCalc, sleepService, travelService, race-sources, cunningStrikeUtils.
 - Lower-confidence tier (used in-file once, never imported): ~40 `build*Popup/RefusalPopup/SpendLog/…Log` helpers across the `monster*.js` services listed above — safe to drop the `export` keyword only.
 
 ## Complexity
@@ -55,9 +52,4 @@ Brace-nesting depth / function-length scan of the largest production files:
 
 ## Prioritized Low-Risk Opportunities
 
-1. ~~DONE~~ (63deb3844 Subscriber.jsx, 88f1ebb23 Initiative.jsx).
-2. ~~DONE~~ (234d56073 — 13 sources + 17 stranded tests/CSS removed, −5,002 L; `src/encounters/combatData.js` re-verified LIVE — not deleted).
-3. ~~DONE~~ (d546738f6 — 16 zero-referenced exports deleted).
-4. ~~DONE~~ (1bcbf83df — 6 orphan services + 9 tests removed; `fearService.js` kept: live `vi.mock` refs).
-5. ~~DONE (985e517f2)~~: extracted `AreaEffectSaveFlow.utils.js` (hooks: useCarefulSpellSelection, usePendingPromptsCleanup, useSaveResultListener, rollNpcSave, issuePlayerSavePrompt, …) shared by the 4 area-effect modals; net −192 lines; full suite green.
-6. Cosmetic backlog (deferred, not zero-risk / architectural): camelCase dirs → kebab-case, inline styles (89 files), `!important` usages, dice rolls → `diceRoller.js` (changes RNG call order), hooks-layer imports in initiative components.
+1. Cosmetic backlog (deferred, not zero-risk / architectural): camelCase dirs → kebab-case, inline styles (89 files), `!important` usages, dice rolls → `diceRoller.js` (changes RNG call order), hooks-layer imports in initiative components.
