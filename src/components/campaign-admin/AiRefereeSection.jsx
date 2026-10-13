@@ -105,7 +105,7 @@ function AiAskConsole({ campaignName, characters, aiConfig, enforcement }) {
                     <i className="fas fa-brain"></i> {asking ? 'AI thinking…' : 'Ask AI referee'}
                 </button>
             </div>
-            {proposal && <AiProposalCard ruling={proposal} onConfirm={() => confirm(proposal)} onDismiss={() => setProposal(null)} />}
+            {proposal && <AiProposalCard ruling={proposal} onConfirm={confirm} onDismiss={() => setProposal(null)} />}
             {result && (
                 <div className={`ai-notice ${result.applied ? 'ai-notice--ok' : 'ai-notice--refused'}`} role="status">
                     {result.applied ? 'Applied: ' : 'Not applied: '}{result.detail}
@@ -116,6 +116,17 @@ function AiAskConsole({ campaignName, characters, aiConfig, enforcement }) {
 }
 
 function AiProposalCard({ ruling, onConfirm, onDismiss }) {
+    // §10.4 override: the referee may edit the proposed HP delta before it
+    // touches the sheet — AI proposes, the HUMAN disposes.
+    const [amountOverride, setAmountOverride] = React.useState(
+        ruling.type === 'hp_change' && ruling.amount !== undefined ? String(ruling.amount) : '')
+    const confirmClick = () => {
+        if (ruling.type === 'hp_change' && amountOverride !== '' && Number(amountOverride) !== ruling.amount) {
+            onConfirm({ ...ruling, amount: Number(amountOverride), overridden: true })
+        } else {
+            onConfirm(ruling)
+        }
+    }
     return (
         <div className="ai-proposal-card">
             <div className="ai-proposal-head">
@@ -126,11 +137,23 @@ function AiProposalCard({ ruling, onConfirm, onDismiss }) {
                 {ruling.text || ruling.expression || ruling.actionName || ruling.effect || ''}
                 {ruling.targetName ? ` → ${ruling.targetName}` : ''}
                 {ruling.type === 'dice' && ruling.mode && ruling.mode !== 'normal' ? ` (${ruling.mode})` : ''}
-                {ruling.amount !== undefined ? ` (${ruling.amount > 0 ? '+' : ''}${ruling.amount} HP)` : ''}
+                {ruling.type === 'hp_change' && ruling.amount !== undefined ? ` (${ruling.amount > 0 ? '+' : ''}${ruling.amount} HP)` : ''}
             </p>
             {ruling.explanation && <p className="ai-proposal-why">{ruling.explanation}</p>}
+            {ruling.type === 'hp_change' && (
+                <label className="ai-override-row">
+                    Override HP
+                    <input
+                        type="number"
+                        className="ai-override-input"
+                        value={amountOverride}
+                        onChange={(e) => setAmountOverride(e.target.value)}
+                        aria-label="Override HP amount"
+                    />
+                </label>
+            )}
             <div className="ai-proposal-actions">
-                <button className="ct-btn ct-btn-primary" onClick={onConfirm}><i className="fas fa-check"></i> Confirm &amp; Apply</button>
+                <button className="ct-btn ct-btn-primary" onClick={confirmClick}><i className="fas fa-check"></i> Confirm &amp; Apply</button>
                 <button className="ct-btn" onClick={onDismiss}>Dismiss</button>
             </div>
         </div>

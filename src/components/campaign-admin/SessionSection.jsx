@@ -10,6 +10,7 @@
  */
 import React from 'react'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
+import { getClientId } from '../../services/ui/clientId.js'
 import { SESSION_PHASES, setSessionPhase, readSessionPhase } from '../../services/combat/sessionService.js'
 import './SessionSection.css'
 
@@ -44,7 +45,8 @@ function useAuditFeed(campaignName) {
 
 function entryMatchesAudit(e) {
     const type = String(e?.type || '')
-    return AUDIT_TYPES.includes(type) || String(e?.automationType || '').startsWith('ai_')
+    const automationType = String(e?.automationType || '')
+    return AUDIT_TYPES.includes(type) || automationType.startsWith('ai_') || automationType === 'manual_takeover'
 }
 
 export default function SessionSection({ campaignName }) {
@@ -56,11 +58,41 @@ export default function SessionSection({ campaignName }) {
     const move = (next) => setSessionPhase({ campaignName, phase: next, changedBy: 'referee console', reason: 'manual' })
         .catch((e) => { console.error('[SessionSection] phase change failed:', e) })
 
+    // §10.4 "take over the GM": one click drops every automation lane back
+    // to manual L1–4 (enforcement master off, AI off — sub-flag/config
+    // values are read-merged, not wiped, so the GM can re-engage selectively).
+    const takeOverManual = async () => {
+        const url = (key) => `/api/campaigns/${encodeURIComponent(campaignName)}/${key}`
+        const get = async (key) => {
+            try { const res = await fetch(url(key)); return res.ok ? (await res.json())?.[key] ?? null : null }
+            catch (e) { console.error(`[SessionSection] takeover read ${key} failed:`, e); return null }
+        }
+        const post = async (key, value) => {
+            try { await fetch(url(key), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Client-Id': getClientId() }, body: JSON.stringify({ value }) }) }
+            catch (e) { console.error(`[SessionSection] takeover ${key} failed:`, e) }
+        }
+        const enforcement = await get('enforcement')
+        await post('enforcement', { ...(enforcement || {}), mode: 'off' })
+        const aiConfig = await get('aiConfig')
+        await post('aiConfig', { ...(aiConfig || {}), mode: 'off' })
+        await fetch(url('log'), {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'automation', automationType: 'manual_takeover', description: 'Referee took over: enforcement and AI switched off — manual control (L1–4 behavior).' }),
+        }).catch((e) => { console.error('[SessionSection] takeover audit failed:', e) })
+        refresh()
+    }
+
     const audit = (entries || []).filter(entryMatchesAudit).slice(-25).reverse()
 
     return (
         <div className="admin-section session-section">
-            <h3><i className="fas fa-map"></i> Session</h3>
+            <div className="session-head">
+                <h3><i className="fas fa-map"></i> Session</h3>
+                {/* §10.4 safety valve: a person can always take the table back. */}
+                <button type="button" className="ct-btn session-takeover" onClick={takeOverManual} title="Switch enforcement and AI off — back to manual play">
+                    <i className="fas fa-hand"></i> Take over manually
+                </button>
+            </div>
             <div className="session-phase-row" role="group" aria-label="Session phase">
                 {SESSION_PHASES.map(p => (
                     <button

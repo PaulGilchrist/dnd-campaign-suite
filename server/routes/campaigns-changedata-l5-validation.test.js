@@ -334,3 +334,42 @@ describe('P4-c enforcement.autoRewards flag (§10.3)', () => {
         expect((await post({ mode: 'off', autoRewards: 'free xp' })).status).toBe(400);
     });
 });
+
+// P4-d (§10.4): server-validator denials are PERSISTENT audit, not just
+// an SSE moment — the audit ledger must be able to show refusals later.
+describe('P4-d denial persistence (§10.4)', () => {
+    // The debounced server flush must never touch the real campaign log from
+    // a test process — evict the cache key when done (flush loops cache keys).
+    let realLog;
+    beforeEach(async () => {
+        const { logCache } = await import('./log.js');
+        realLog = logCache.get('test-campaign');
+    });
+    afterEach(async () => {
+        const { logCache } = await import('./log.js');
+        if (realLog) logCache.set('test-campaign', realLog); else logCache.delete('test-campaign');
+    });
+
+    it('a refused write lands in the campaign log as server-validator origin', async () => {
+        const { logCache } = await import('./log.js');
+        logCache.set('test-campaign', []);
+        const res = await request(createTestApp())
+            .post('/api/campaigns/test-campaign/sessionState')
+            .send({ value: { phase: 'chaos-mode' } });
+        expect(res.status).toBe(400);
+        const entry = (logCache.get('test-campaign') || []).find(e => e.origin === 'server-validator');
+        expect(entry).toBeTruthy();
+        expect(entry).toMatchObject({ type: 'enforcement_denied', key: 'sessionState' });
+        expect(entry.description).toContain('phase must be one of');
+    });
+
+    it('an accepted write does NOT log a denial', async () => {
+        const { logCache } = await import('./log.js');
+        logCache.set('test-campaign', []);
+        const res = await request(createTestApp())
+            .post('/api/campaigns/test-campaign/sessionState')
+            .send({ value: { phase: 'encounter' } });
+        expect(res.status).toBe(200);
+        expect((logCache.get('test-campaign') || []).some(e => e.origin === 'server-validator')).toBe(false);
+    });
+});

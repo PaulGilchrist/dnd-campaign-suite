@@ -76,3 +76,17 @@
 .session-section .session-audit-text {
     opacity: 0.85;
 }
+
+.session-section .session-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.session-section .session-takeover {
+    white-space: nowrap;
+}
+
+.session-section .session-audit-row.manual_takeover,
+.session-section .session-audit-row.origin-server-validator { border-left-color: #d35400; }

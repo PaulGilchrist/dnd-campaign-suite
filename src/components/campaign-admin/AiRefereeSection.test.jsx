@@ -123,3 +123,34 @@ describe('AiRefereeSection', () => {
         await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('LOCAL http(s)'));
     });
 });
+
+// §10.4 — referee override on a proposal before it touches the sheet.
+describe('P4-d proposal override (§10.4)', () => {
+    it('hp_change proposal: edited amount is what applies (overridden ruling audited)', async () => {
+        const runtime = await import('../../hooks/runtime/useRuntimeState.js');
+        runtime.getRuntimeValue.mockImplementation((who, key) => (who === 'Rakan' && key === 'currentHitPoints' ? 20 : null));
+        synced.aiConfig = CONFIGURED;
+        stubFetch({ referee: { ok: true, ruling: { type: 'hp_change', targetName: 'Rakan', amount: -7, explanation: 'claws rake Rakan' } } });
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        fireEvent.change(document.querySelector('.ai-action-input'), { target: { value: 'the claw hits' } });
+        fireEvent.click(screen.getByText(/Ask AI referee/));
+        await waitFor(() => expect(screen.getByText(/AI proposes: hp_change/)).toBeInTheDocument());
+        const override = document.querySelector('.ai-override-input');
+        expect(override).toBeTruthy();
+        fireEvent.change(override, { target: { value: '-3' } });
+        fireEvent.click(screen.getByText(/Confirm & Apply/));
+        await waitFor(() => expect(screen.getByText(/Applied: Rakan: 20 → 17 HP/)).toBeInTheDocument());
+        const audit = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ai_ruling_applied');
+        expect(audit.ruling).toMatchObject({ type: 'hp_change', amount: -3, overridden: true });
+    });
+
+    it('dice proposal shows NO override box (engine dice stay engine dice)', async () => {
+        synced.aiConfig = CONFIGURED;
+        stubFetch();
+        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        fireEvent.change(document.querySelector('.ai-action-input'), { target: { value: 'I swing' } });
+        fireEvent.click(screen.getByText(/Ask AI referee/));
+        await waitFor(() => expect(screen.getByText(/AI proposes: dice/)).toBeInTheDocument());
+        expect(document.querySelector('.ai-override-input')).toBeNull();
+    });
+});

@@ -2,6 +2,7 @@ import express from 'express';
 import { publish, characterChangeData, markDirty } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { validateRuntimeWrite } from '../validation/keyValidators.js';
+import { addEntry as addLogEntry } from './log.js';
 
 const router = express.Router();
 
@@ -140,6 +141,15 @@ router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     if (!validation.ok) {
         // Broadcast the rejection so every client can surface the denied write.
         publish(`denied-${campaign}-${key}`, { key, reason: validation.reason }, campaign);
+        // §10.4: denials are PERSISTENT audit — the audit ledger must show
+        // what the server refused even after the SSE moment has passed.
+        addLogEntry(campaign, {
+            type: 'enforcement_denied',
+            origin: 'server-validator',
+            key,
+            reason: validation.reason,
+            description: `Server rejected write to ${key}: ${validation.reason}`,
+        });
         return res.status(400).json({ error: validation.reason });
     }
 

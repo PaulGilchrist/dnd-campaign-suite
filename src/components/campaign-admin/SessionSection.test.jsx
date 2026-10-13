@@ -75,3 +75,24 @@ it('empty audit shows the honest empty copy', async () => {
     expect(await findByText(/Nothing to show/)).toBeTruthy();
     vi.unstubAllGlobals();
 });
+
+// §10.4 — the safety valve: one click hands the table back to manual.
+it('Take over manually: enforcement+AI off (merged), manual_takeover audited', async () => {
+    const calls = [];
+    vi.stubGlobal('fetch', vi.fn(async (url, opts = {}) => {
+        const u = String(url);
+        if (opts.method === 'POST' && u.endsWith('/enforcement')) { calls.push({ key: 'enforcement', body: JSON.parse(opts.body).value }); return { ok: true, json: async () => ({}) }; }
+        if (opts.method === 'POST' && u.endsWith('/aiConfig')) { calls.push({ key: 'aiConfig', body: JSON.parse(opts.body).value }); return { ok: true, json: async () => ({}) }; }
+        if (opts.method === 'POST' && u.endsWith('/log')) { calls.push({ key: 'log', body: JSON.parse(opts.body) }); return { ok: true, json: async () => ({}) }; }
+        if (u.includes('/enforcement')) return { ok: true, json: async () => ({ enforcement: { mode: 'on', turnLock: true } }) };
+        if (u.includes('/aiConfig')) return { ok: true, json: async () => ({ aiConfig: { endpoint: 'http://x/v1', model: 'm', mode: 'suggest' } }) };
+        return { ok: true, json: async () => [] };
+    }));
+    const { findByText } = render(<SessionSection campaignName={CN} />);
+    fireEvent.click(await findByText(/Take over manually/));
+    await waitFor(() => expect(calls.some(c => c.key === 'enforcement')).toBe(true));
+    expect(calls.find(c => c.key === 'enforcement').body).toMatchObject({ mode: 'off', turnLock: true }); // flags preserved, master off
+    expect(calls.find(c => c.key === 'aiConfig').body).toMatchObject({ mode: 'off', model: 'm' });          // config kept, AI off
+    expect(calls.find(c => c.key === 'log').body).toMatchObject({ automationType: 'manual_takeover' });
+    vi.unstubAllGlobals();
+});
