@@ -1,5 +1,6 @@
 import React from 'react'
 import { assertCanAct } from '../../services/combat/assertCanAct.js'
+import { chargeSlot } from '../../services/combat/chargeEconomy.js'
 import Popup from '../common/popup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
@@ -452,8 +453,10 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
     const handleReactionClick = async (reaction) => {
         if (cannotAct) return;
-        // L5-001: enforcement gate (no-op while enforcement off). Reactions are
-        // rules-correct off-turn but charge the once-per-round reaction budget.
+        // L5-001/002: enforcement gate (no-op while enforcement off). Reactions are
+        // rules-correct off-turn but consume on activation. Charging happens on the
+        // concrete lane below (OA / automation / stand) — this dispatch site defers
+        // so delegated paths can't double-charge.
         if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'reaction', setPopupHtml, source: 'char-reactions' }).allowed) return;
         if (isSlowed()) {
             refuseSlowedReaction(reaction.name);
@@ -468,6 +471,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
             return;
         }
         if (reaction.name === 'Stand (Power Word Heal)') {
+            // L5-002: standing here consumes the reaction.
+            chargeSlot({ creatureName: playerStats.name, bucket: 'reaction', campaignName });
             const conditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
             const newConditions = conditions.filter(c => String(c).toLowerCase() !== 'prone');
             if (newConditions.length !== conditions.length) {
@@ -499,13 +504,16 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         }
         const attackRoll = pickOpportunityAttackRoll(playerStats);
         if (attackRoll) {
+            // L5-002: the OA fires here — charge the reaction budget.
+            chargeSlot({ creatureName: playerStats.name, bucket: 'reaction', campaignName });
             rollAttack(attackRoll.name, attackRoll.hitBonus, { forcedMode: undefined, isOpportunityAttack: true });
         }
     };
 
     const handleAutomationReaction = async (reaction) => {
-        // L5-001: gate carries the legacy silent cannotAct semantics (no-op while enforcement off).
-        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'reaction', cannotAct, setPopupHtml, source: 'char-reactions-automation' }).allowed) return;
+        // L5-001/002: gate carries the legacy silent cannotAct semantics (no-op while
+        // enforcement off). Reaction features consume on activation ⇒ charge here.
+        if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'reaction', cannotAct, setPopupHtml, source: 'char-reactions-automation', charge: true }).allowed) return;
         const auto = reaction.automation;
         if (!auto) return;
 

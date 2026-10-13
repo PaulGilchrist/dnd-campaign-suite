@@ -17,19 +17,18 @@ import { getRuntimeValue, getStore } from '../../hooks/runtime/useRuntimeState.j
 import { canTakeAction } from './canTakeAction.js';
 import { hasBudget } from './turnState.js';
 import { addEntry } from '../ui/logService.js';
+import { classifyBucket, isChargeableBucket } from './automation/classifyBucket.js';
+import { chargeSlot } from './chargeEconomy.js';
 
 const ACTION_BUCKETS = new Set(['action', 'bonusAction']);
 
 /**
- * Infer the economy bucket from an action/attack row's metadata
- * (single source of the bonus-vs-action decision until Phase 1's
- * classifyBucket formalizes the full taxonomy — plan §7.2).
+ * Infer the economy bucket from an action/attack row's metadata — delegates
+ * to classifyBucket, the single taxonomy shared with the automation router
+ * consumers (plan §7.2). Never returns undefined.
  */
 export function bucketForAction(action) {
-    const auto = action?.automation
-    const castingTime = String(auto?.casting_time || action?.casting_time || auto?.castTime || '')
-    if (auto?.action === 'bonus_action' || /bonus\s*action/i.test(castingTime) || action?.type === 'Bonus Action') return 'bonusAction'
-    return 'action'
+    return classifyBucket(action);
 }
 
 /** Blocker targetEffects search — SP-111 Stinking Cloud / no_reactions shapes. */
@@ -56,12 +55,21 @@ function resolveBlockerFlags(ctx) {
     return { cannotAct: true, cannotActReason: te.reason || fallback };
 }
 
-/** Active creature: live campaign key first, combatSummary mirror as fallback
- *  (initiative writes the boundary via storage.set; the store copy can lag SSE).
+/** Active creature resolution:
+ *  - Combat is live (enforcement ON) ⇒ combatSummary is authoritative: it is
+ *    an OBJECT, so every transition updates it via SSE (initiative writes
+ *    both the object and a boundary stamp; scalar change events are ignored
+ *    by the client's change-key handler, so the campaign-key copy only
+ *    refreshes on full loads and can go stale mid-session).
+ *  - No combat ⇒ campaign key (seeded by the change-data load; CLA-044
+ *    precedence preserved outside combat).
  *  Reads the mirror via getStore — getRuntimeValue guards campaign-key/char-key pairs. */
-function readActiveCreatureName() {
-    return getRuntimeValue('campaign', 'activeCreatureName')
-        || getStore('combatSummary')?.get?.('activeCreatureName')
+function readActiveCreatureName(enforcementOn) {
+    const summaryActive = enforcementOn
+        ? getStore('combatSummary')?.get?.('activeCreatureName')
+        : null;
+    return summaryActive
+        || getRuntimeValue('campaign', 'activeCreatureName')
         || null;
 }
 
@@ -90,6 +98,12 @@ function reportDenial(ctx, reason) {
  * @param {string|null} [ctx.cannotActReason]  optional precomputed reason
  * @param {Function} [ctx.setPopupHtml]        deny-reason UI sink (call-site popup)
  * @param {string} [ctx.source]                call-site label for the audit log
+ * @param {boolean} [ctx.charge]               L5-002: when true AND the gate
+ *                                             allows, charge the bucket now
+ *                                             (actionEconomy off ⇒ no-op). Use
+ *                                             only at sites that EXECUTE on
+ *                                             allow — modal-opening sites must
+ *                                             charge at their confirm seam.
  * @returns {{ allowed: boolean, reason: string|null }}
  */
 export function assertCanAct(input) {
@@ -121,6 +135,24 @@ export function assertCanAct(input) {
         hasBudget,
     });
 
-    if (!result.allowed) reportDenial(ctx, result.reason);
+    if (!result.allowed) {
+        reportDenial(ctx, result.reason);
+        return result;
+    }
+
+    // L5-002: charge-on-execute (plan §7.2). Sites that open a modal first
+    // pass charge:false (default) and charge at their confirm seam — matching
+    // the existing charge-on-resolve latch semantics. A failed charge here
+    // means a double-click race consumed the slot between decision and
+    // charge: deny rather than overspend.
+    if (ctx.charge && enforcement.actionEconomy && isChargeableBucket(ctx.bucket)) {
+        const charged = chargeSlot({ creatureName: ctx.creatureName, bucket: ctx.bucket, campaignName: ctx.campaignName });
+        if (!charged) {
+            const spent = { allowed: false, reason: 'No actions left this turn.' };
+            reportDenial(ctx, spent.reason);
+            return spent;
+        }
+    }
+
     return result;
 }

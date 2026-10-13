@@ -1,11 +1,14 @@
 import { useState, useCallback } from 'react';
 import { CELL_SIZE } from '../../../config/mapConfig';
-import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import {
-    computeMovementObstacles,
+import { setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { computeMovementObstacles,
     computeReachable,
     findNearestValid,
 } from '../../../services/maps/reachability.js';
+import { clampMovementDrop } from '../../../services/combat/movementBudget.js';
+import { DEFAULT_SPEED_FEET } from '../../../services/combat/turnState.js';
+import { chargeMovement } from '../../../services/combat/chargeEconomy.js';
+import { addEntry } from '../../../services/ui/logService.js';
 
 function toSvgPoint(svg, clientX, clientY) {
     const pt = svg.createSVGPoint();
@@ -28,6 +31,61 @@ function findFreeSquare(startX, startY, occupiedSquares, gridSize) {
         gridSize
     );
     return { targetX: found ? found.x : startX, targetY: found ? found.y : startY };
+}
+
+/**
+ * L5-002 (§7.3): clamp a drop to the creature's remaining movement budget.
+ * Returns { targetX, targetY, moveCostFeet, budgetActive }. Enforcement off,
+ * no campaign, or GM Shift unconstrained ⇒ budgetActive:false and the drop
+ * passes through untouched (the L1–4 guarantee). Snapped drops log a reason.
+ */
+function resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData, walls, placedItems, gridSize, campaignName }) {
+    const enforcement = campaignName ? getRuntimeValue('campaign', 'enforcement') : null;
+    const passthrough = { targetX, targetY, moveCostFeet: 0, budgetActive: false };
+    if (!enforcement || enforcement.mode !== 'on' || !enforcement.movementBudget || dragging.unconstrained) {
+        return passthrough;
+    }
+    const creatureName = player.name || player.id;
+    const speedFeet = Number(player.speedFeet) > 0 ? Number(player.speedFeet) : DEFAULT_SPEED_FEET;
+    const clamped = clampMovementDrop({
+        turnState: getRuntimeValue('campaign', 'turnState') || {},
+        creatureName,
+        speedFeet,
+        from: { gridX: dragging.startX, gridY: dragging.startY },
+        to: { gridX: targetX, gridY: targetY },
+        obstacles: computeMovementObstacles(walls, placedItems),
+        terrain: mapData.terrain,
+        gridSize,
+    });
+    let outX = targetX;
+    let outY = targetY;
+    if (clamped.target.gridX !== targetX || clamped.target.gridY !== targetY) {
+        addEntry(campaignName, {
+            type: 'enforcement_denied',
+            creature: creatureName,
+            bucket: 'movement',
+            source: 'map-drag',
+            reason: `Out of movement — snapped to the remaining budget (${clamped.costFeet} ft this move).`,
+        }).catch((e) => { console.error('[usePlayerDragging:movement-log]', e); });
+        outX = clamped.target.gridX;
+        outY = clamped.target.gridY;
+    }
+    return { targetX: outX, targetY: outY, moveCostFeet: clamped.costFeet, budgetActive: true };
+}
+
+/**
+ * Post-drop bookkeeping: Steady Aim's moved-this-turn stamp, plus the
+ * movement-budget charge (budgetActive:false ⇒ no-op, enforcement off).
+ */
+function finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, budget }) {
+    if (!campaignName || !player) return;
+    const startGridX = dragging.startX ?? player.gridX;
+    const startGridY = dragging.startY ?? player.gridY;
+    if (startGridX === targetX && startGridY === targetY) return;
+    setRuntimeValue(player.name || player.id, 'steadyAimMovedThisTurn', true, campaignName);
+    if (budget.budgetActive) {
+        chargeMovement({ creatureName: player.name || player.id, feet: budget.moveCostFeet, campaignName });
+    }
 }
 
 export default function usePlayerDragging({
@@ -78,6 +136,10 @@ export default function usePlayerDragging({
             offsetY: svgPt.y - cy,
             unconstrained,
             reachable,
+            // L5-002: mapData.players mutates live during pointermove, so the
+            // turn-start cell must be captured at press time for budget clamping.
+            startX: player.gridX,
+            startY: player.gridY,
         });
     }, [rulerMode, spellMode, mapData, gridCenterX, gridCenterY, svgRef, isLocalhost, walls, placedItems, gridSize]);
 
@@ -168,6 +230,12 @@ export default function usePlayerDragging({
             targetY = found ? found.y : player.gridY;
         }
 
+        // L5-002: clamp the drop to the movement budget (budgetActive:false ⇒
+        // passthrough — enforcement off is byte-identical to today).
+        const budget = resolveMovementBudgetDrop({ dragging, targetX, targetY, player, mapData, walls, placedItems, gridSize, campaignName });
+        targetX = budget.targetX;
+        targetY = budget.targetY;
+
         setMapData((prev) => ({
             ...prev,
             players: prev.players.map((c) =>
@@ -178,15 +246,8 @@ export default function usePlayerDragging({
         if (svg) svg.releasePointerCapture(e.pointerId);
         setDragging(null);
 
-        // Track movement for Steady Aim: if the player moved, mark them as having moved
-        if (campaignName && player) {
-            const oldGridX = player.gridX;
-            const oldGridY = player.gridY;
-            if (oldGridX !== targetX || oldGridY !== targetY) {
-                setRuntimeValue(player.name || player.id, 'steadyAimMovedThisTurn', true, campaignName);
-            }
-        }
-    }, [dragging, mapData, gridSize, setMapData, svgRef, campaignName]);
+        finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, budget });
+    }, [dragging, mapData, gridSize, setMapData, svgRef, campaignName, walls, placedItems]);
 
     const handlePointerLeave = useCallback((e) => {
         if (!dragging) return;

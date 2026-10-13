@@ -47,8 +47,9 @@ export default function useCharActionsAttackHandlers({
             reportCannotActAttack(attack);
             return;
         }
-        // L5-001: enforcement gate (no-op while enforcement off). Bonus action
-        // rows charge the bonusAction bucket.
+        // L5-001/002: enforcement gate (no-op while enforcement off). Bonus action
+        // rows charge the bonusAction bucket; an attack roll charges its slot here
+        // because this site executes immediately on allow (charge:true, plan §7.2).
         if (!assertCanAct({
             campaignName,
             creatureName: playerName,
@@ -56,6 +57,7 @@ export default function useCharActionsAttackHandlers({
             cannotAct,
             setPopupHtml,
             source: 'useCharActionsAttackHandlers',
+            charge: true,
         }).allowed) return;
         if (gatePsychicBladeAttack(attack)) return;
         // CLA-143: arm after_attack_action triggers (Flurry of Blows, Patient

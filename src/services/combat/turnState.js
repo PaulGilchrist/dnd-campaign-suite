@@ -82,6 +82,24 @@ export function spend(turnState, creatureName, bucket) {
 /** Movement cap fallback when a creature has no known speed (30 ft is the common baseline). */
 export const DEFAULT_SPEED_FEET = 30;
 
+/**
+ * Un-charge one economy slot (modal-cancel / referee correction seam, L5-002).
+ * Mirrors spend(); floors at 0. Returns the new turnState (caller persists).
+ */
+export function refund(turnState, creatureName, bucket) {
+    const cap = BUCKET_CAPS[bucket];
+    if (cap === undefined || FREE_BUCKETS.has(bucket)) {
+        return { ok: true, turnState: turnState || {} };
+    }
+    const entry = getTurnState(turnState, creatureName);
+    const field = `${bucket}sUsed`;
+    if (entry[field] === 0) return { ok: false, turnState: turnState || {} };
+    const next = { ...(turnState || {}) };
+    next[creatureName] = { ...entry, [field]: entry[field] - 1 };
+    return { ok: true, turnState: next };
+}
+
+
 /** Remaining movement for a creature with `speedFeet` this turn (≥0). */
 export function remainingMovement(turnState, creatureName, speedFeet) {
     const speed = Number.isFinite(speedFeet) && speedFeet >= 0 ? speedFeet : DEFAULT_SPEED_FEET;

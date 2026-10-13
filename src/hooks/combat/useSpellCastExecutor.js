@@ -1,6 +1,7 @@
 import { useRef, useCallback } from 'react'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { assertCanAct } from '../../services/combat/assertCanAct.js'
+import { classifyBucket } from '../../services/combat/automation/classifyBucket.js'
 
 function buildHealPopup(spell, result) {
     const bonusHealDetail = result.bonusDetails?.length > 0
@@ -48,14 +49,16 @@ export function useSpellCastExecutor({ rollAttack, rollDamage, playerStats, getT
     const ref = cachedPosRef || internalPosRef;
 
     const castAction = useCallback((spell, metaCtx) => {
-        // L5-001: enforcement gate at the single spell-cast chokepoint (no-op
-        // while enforcement off). Bonus-action castings charge the bonus slot.
+        // L5-001/002: enforcement gate at the single spell-cast chokepoint (no-op
+        // while enforcement off). executeSpellCast runs immediately on allow, so
+        // this site charges the classified slot (plan §7.2).
         if (!assertCanAct({
             campaignName,
             creatureName: playerStats.name,
-            bucket: /bonus\s*action/i.test(String(spell?.casting_time || '')) ? 'bonusAction' : 'action',
+            bucket: classifyBucket(spell),
             setPopupHtml,
             source: 'useSpellCastExecutor',
+            charge: true,
         }).allowed) return;
         const pos = ref.current;
         const promise = executeSpellCast(spell, metaCtx, {

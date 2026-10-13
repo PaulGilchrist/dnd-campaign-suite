@@ -1,5 +1,10 @@
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js'
 import { assertCanAct, bucketForAction } from '../../services/combat/assertCanAct.js'
+import { chargeSlot } from '../../services/combat/chargeEconomy.js'
+
+// L5-002: automation descriptors that resolve into an immediate roll and
+// therefore charge their economy slot (modal results defer — plan §7.2).
+const AUTOMATION_CHARGEABLE_RESULTS = new Set(['roll', 'attack_roll'])
 import { confirmTelepathicSpeech } from '../../services/automation/handlers/buffs/buffHandler.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
@@ -444,6 +449,14 @@ export default function useCharActionsAutomation({
         if (!result) return;
 
         dispatchAutomationResult(result, { modalMap, setPopupHtml, rollDamage, rollAttack, onBuffsChange });
+
+        // L5-002: charge the economy slot when the descriptor rolls immediately
+        // (no-op while enforcement off). 'modal' results defer — their apply
+        // callbacks stamp the per-feature latches, which stay authoritative
+        // (charge-on-resolve semantics, plan §7.2).
+        if (AUTOMATION_CHARGEABLE_RESULTS.has(result.type)) {
+            chargeSlot({ creatureName: playerStats.name, bucket: bucketForAction(action), campaignName });
+        }
 
         finalizeAutomationOutcome(result, auto, addEntry, campaignName, onBuffsChange);
 

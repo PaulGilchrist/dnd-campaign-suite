@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react'
 import { assertCanAct } from '../../services/combat/assertCanAct.js'
+import { chargeSlot } from '../../services/combat/chargeEconomy.js'
+import { classifyBucket } from '../../services/combat/automation/classifyBucket.js'
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints, logMetamagicUse } from './useMetamagic.js'
 import { addEntry } from '../../services/ui/logService.js'
 import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/metamagicRules.js'
@@ -204,6 +206,9 @@ export function useActionSpellMetamagic({
 
         const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attack.name)
         if (!isBonusSorcerer) {
+            // L5-002: immediate cast path — charge the economy slot at resolve
+            // (no-op while enforcement off; metamagic paths charge at confirm).
+            chargeSlot({ creatureName: playerStats.name, bucket: classifyBucket(spell || attack), campaignName });
             if (!spell) await castNoSpellAttack(attack)
             else await castKnownSpell(attack, spell)
             return;
@@ -226,6 +231,8 @@ export function useActionSpellMetamagic({
             isPsionic: isPsionic && hasPsionic,
             psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
             action: async (metaCtx) => {
+                // L5-002: metamagic confirm is the resolution seam — charge now.
+                chargeSlot({ creatureName: playerStats.name, bucket: classifyBucket(spell), campaignName });
                 const castResult = await executeSpellCast({ ...spell, level: spellLevel }, metaCtx, {
                     rollAttack,
                     rollDamage,
@@ -297,6 +304,8 @@ export function useActionSpellMetamagic({
                 const castMetaCtx = attackCtx?.forcedMode && metaCtx?.forcedMode == null
                     ? { ...metaCtx, forcedMode: attackCtx.forcedMode }
                     : metaCtx;
+                // L5-002: metamagic confirm is the resolution seam — charge now.
+                chargeSlot({ creatureName: playerStats.name, bucket: classifyBucket(spell), campaignName });
                 const castResult = await executeSpellCast({ ...spell, level: spell.level || 0 }, castMetaCtx, {
                     rollAttack,
                     rollDamage,
@@ -331,6 +340,8 @@ export function useActionSpellMetamagic({
             return;
         }
         if (!isBonusSorcerer) {
+            // L5-002: immediate cast — charge the slot at resolve (no-op off).
+            chargeSlot({ creatureName: playerStats.name, bucket: classifyBucket(spell), campaignName });
             await castSpellAttackWithoutMetamagic(attack, spell);
             return;
         }

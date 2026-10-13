@@ -7,6 +7,8 @@ import { TOOL_SELECT } from '../../../config/mapConfig.js';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
+  // L5-002: clampSelectOffset reads enforcement; null ⇒ passthrough (off).
+  getRuntimeValue: vi.fn(() => null),
 }));
 
 describe('useSelectMove', () => {

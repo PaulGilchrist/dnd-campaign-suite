@@ -42,6 +42,10 @@ export const CAMPAIGN_KEYS = new Set([
     'enforcement',
     'referee',
     'turnState',
+    // L5-002 (§7.5): optional per-turn countdown { seconds, running, endsAt,
+    // autoAdvance } — off (null) by default; GM-initiated, broadcast so every
+    // client shows the same clock. Auto-advance executes only on the GM client.
+    'turnTimer',
 ]);
 
 /**

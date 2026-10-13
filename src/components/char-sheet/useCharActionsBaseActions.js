@@ -1,5 +1,6 @@
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
 import { assertCanAct } from '../../services/combat/assertCanAct.js'
+import { chargeSlot } from '../../services/combat/chargeEconomy.js'
 import { hasNaturallyStealthy } from '../../services/combat/automation/automationPassives.js'
 import { isWithinRange } from '../../services/rules/combat/rangeCheck.js'
 
@@ -244,7 +245,9 @@ export default function useCharActionsBaseActions({
     }
 
     async function handleHideAction() {
-        // L5-001: enforcement gate (no-op while enforcement off).
+        // L5-001/002: enforcement gate (no-op while enforcement off). Charge is
+        // deferred until the Stealth roll actually fires — the "already hidden"
+        // refusal below must not consume the action.
         if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'action', cannotAct, setPopupHtml, source: 'hide-action' }).allowed) return;
         const currentConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
         const isAlreadyInvisible = currentConditions.some(c => String(c).toLowerCase() === 'invisible');
@@ -255,6 +258,8 @@ export default function useCharActionsBaseActions({
         const stealthBonus = computeStealthBonus(conditionEffects, playerStats, exhaustionPenalty);
         const { checkContext, skulkerFogOfWarApplied } = resolveStealthCheckContext(conditionEffects, playerStats);
         const naturallyStealthyObscuredBy = hasNaturallyStealthy(playerStats) ? await findLargerObscuringCreature() : null;
+        // L5-002: the Hide action is taken here — charge the action slot.
+        chargeSlot({ creatureName: playerStats.name, bucket: 'action', campaignName });
         await rollSkillCheck('Stealth', stealthBonus, checkContext);
         await new Promise(resolve => setTimeout(resolve, 50));
         const lastAttackData = await getRuntimeValue('campaign', 'lastAttack', campaignName);
@@ -300,6 +305,10 @@ export default function useCharActionsBaseActions({
             campaignName,
             playerStats.name
         );
+        // L5-002: activating Dodge takes the action; toggling it off is free.
+        if (!result.wasActive) {
+            chargeSlot({ creatureName: playerStats.name, bucket: 'action', campaignName });
+        }
         // BA-001: 2014 Dodge also grants advantage on Dexterity saving throws;
         // 2024 Dodge is attack-roll disadvantage only (public/data manifest BA-001).
         const dexSaveClause = playerStats.rules === '2024'
@@ -453,6 +462,8 @@ export default function useCharActionsBaseActions({
         }
         const { isMonk, useAbility, skillName, checkBonus } = computeGrappleCheckBonus(playerStats, exhaustionPenalty);
         const checkContext = resolveGrappleCheckContext(isMonk, useAbility);
+        // L5-002: the grapple contest is taken here — charge the action slot.
+        chargeSlot({ creatureName: playerStats.name, bucket: 'action', campaignName });
         await rollAbilityCheck(useAbility, checkBonus, checkContext);
         await new Promise(resolve => setTimeout(resolve, 50));
         const lastAttack = await getRuntimeValue('campaign', 'lastAttack', campaignName);

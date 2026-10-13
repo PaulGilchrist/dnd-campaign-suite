@@ -29,6 +29,7 @@ import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
 import { useSpellPositionResolver } from '../../hooks/combat/useSpellPositionResolver.js';
 import { useSpellCastExecutor } from '../../hooks/combat/useSpellCastExecutor.js';
 import { assertCanAct } from '../../services/combat/assertCanAct.js';
+import { chargeSlot } from '../../services/combat/chargeEconomy.js';
 import { resolveSpiritualWeaponMoveAndAttack } from '../../services/rules/features/spiritualWeaponService.js';
 import ArcaneVigorModal from './ArcaneVigorModal.jsx';
 import WarBondChooserModal from './modals/WarBondChooserModal.jsx';
@@ -602,6 +603,8 @@ function SpiritualWeaponMoveRow({ playerStats, activeBuffs, campaignName, cannot
                 if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', setPopupHtml, source: 'spiritual-weapon-move' }).allowed) return;
                 const res = await resolveSpiritualWeaponMoveAndAttack(playerStats, campaignName);
                 if (res.refused) { setPopupHtml({ type: 'automation_info', name: 'Spiritual Weapon', description: res.message }); return; }
+                // L5-002: the bonus attack fires here — charge the bonus slot.
+                chargeSlot({ creatureName: playerStats.name, bucket: 'bonusAction', campaignName });
                 rollAttack(res.attack.name, res.attack.hitBonus - (exhaustionPenalty || 0), {
                     targetName: res.targetName,
                     damageType: res.attack.damageType,
@@ -782,6 +785,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'bonusAction', setPopupHtml, source: 'apply-poison' }).allowed) return;
         const currentDoses = Number(getRuntimeValue(playerStats.name, 'poisonDoses', campaignName) ?? 0);
         if (currentDoses <= 0) return;
+        // L5-002: the poison is applied here — charge the bonus slot.
+        chargeSlot({ creatureName: playerStats.name, bucket: 'bonusAction', campaignName });
         const dexMod = playerStats.abilities?.find(a => a.name === 'Dexterity')?.bonus ?? 0;
         const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus ?? 0;
         const poisonerAbilityModifier = Math.max(dexMod, intMod);
@@ -808,6 +813,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         const usesKey = isChef ? 'chefBolsteringTreats' : 'bolsteringTreat';
         const current = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
         if (current <= 0) return;
+        // L5-002: the treat is eaten here — charge the bonus slot.
+        chargeSlot({ creatureName: playerStats.name, bucket: 'bonusAction', campaignName });
         const tempHpAmount = playerStats.proficiency || 0;
         setTempHp(playerStats.name, tempHpAmount, campaignName);
         setRuntimeValue(playerStats.name, usesKey, current - 1, campaignName);
@@ -927,6 +934,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
     const handleHordeBreakerTargetSelected = React.useCallback(async (selectedName) => {
         setHordeBreakerTargets(null);
         if (!hordeBreakerAttackItem || !hordeBreakerReady) return;
+        // L5-002: the bonus attack fires here — charge the bonus slot.
+        chargeSlot({ creatureName: playerStats.name, bucket: 'bonusAction', campaignName });
         rollAttack('Horde Breaker', (hordeBreakerAttackItem.hitBonus || 0) - (exhaustionPenalty || 0), {
             targetName: selectedName,
             damageType: hordeBreakerAttackItem.damageType,

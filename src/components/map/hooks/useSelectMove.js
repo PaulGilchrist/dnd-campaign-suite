@@ -1,6 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
 import { TOOL_SELECT } from '../../../config/mapConfig';
-import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { clampSelectionOffset, FEET_PER_CELL } from '../../../services/combat/movementBudget.js';
+import { remainingMovement, DEFAULT_SPEED_FEET } from '../../../services/combat/turnState.js';
+import { chargeMovement } from '../../../services/combat/chargeEconomy.js';
 
 function collectWallsInRect(walls, rect) {
     const { minX, maxX, minY, maxY } = rect;
@@ -34,6 +37,26 @@ function offsetBounds(bounds, dx, dy) {
         minY: bounds.minY + dy,
         maxY: bounds.maxY + dy,
     };
+}
+
+/**
+ * L5-002 (§7.3): clamp a rigid multi-select offset to the MINIMUM remaining
+ * movement budget across the selected player tokens. Returns { dx, dy,
+ * costFeet, budgetActive }. Enforcement off / no players selected ⇒
+ * budgetActive:false with the offset unchanged (the L1–4 guarantee).
+ */
+function clampSelectOffset(offset, selectedPlayers, campaignName) {
+    const direct = { dx: offset.dx, dy: offset.dy, costFeet: (Math.abs(offset.dx) + Math.abs(offset.dy)) * FEET_PER_CELL, budgetActive: false };
+    const enforcement = campaignName ? getRuntimeValue('campaign', 'enforcement') : null;
+    if (!enforcement || enforcement.mode !== 'on' || !enforcement.movementBudget || selectedPlayers.length === 0) {
+        return direct;
+    }
+    const ts = getRuntimeValue('campaign', 'turnState') || {};
+    const budgets = selectedPlayers.map(it =>
+        remainingMovement(ts, it.name || it.id, Number(it.speedFeet) > 0 ? Number(it.speedFeet) : DEFAULT_SPEED_FEET)
+    );
+    const clamped = clampSelectionOffset({ dx: offset.dx, dy: offset.dy, minBudgetFeet: Math.min(...budgets) });
+    return { dx: clamped.dx, dy: clamped.dy, costFeet: clamped.costFeet, budgetActive: true };
 }
 
 function shiftKeys(keys, dx, dy) {
@@ -147,16 +170,24 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignNa
     }, [isLocalhost, tool, getGridFromEvent]);
 
     const applySelectionMove = useCallback((offset, setMapData, setPlacedItems) => {
+        // L5-002: rigid multi-select clamp to the group's minimum movement
+        // budget (budgetActive:false ⇒ offset unchanged, enforcement off).
+        const selectedPlayers = (placedItemsRef.current || []).filter(
+            it => selectedItemsRef.current.has(it.id) && it.type === 'player'
+        );
+        const { dx, dy, costFeet, budgetActive } = clampSelectOffset(offset, selectedPlayers, campaignName);
+        if (budgetActive && dx === 0 && dy === 0) return; // nothing fits the budget — group stays put
+
         const curSelWalls = selectedWallsRef.current;
         const curSelItems = selectedItemsRef.current;
         const bounds = selectionBoundsRef.current;
-        const dstBounds = offsetBounds(bounds, offset.dx, offset.dy);
+        const dstBounds = offsetBounds(bounds, dx, dy);
 
-        setMapData(prev => buildMovedWalls(prev, curSelWalls, dstBounds, offset));
-        setSelectedWalls(prev => shiftKeys(prev, offset.dx, offset.dy));
+        setMapData(prev => buildMovedWalls(prev, curSelWalls, dstBounds, { dx, dy }));
+        setSelectedWalls(prev => shiftKeys(prev, dx, dy));
 
         if (bounds) {
-            selectionBoundsRef.current = offsetBounds(bounds, offset.dx, offset.dy);
+            selectionBoundsRef.current = offsetBounds(bounds, dx, dy);
         }
 
         setPlacedItems(prev =>
@@ -166,9 +197,16 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignNa
                 if (campaignName && item.type === 'player') {
                     setRuntimeValue(item.name || item.id, 'steadyAimMovedThisTurn', true, campaignName);
                 }
-                return { ...item, gridX: item.gridX + offset.dx, gridY: item.gridY + offset.dy };
+                return { ...item, gridX: item.gridX + dx, gridY: item.gridY + dy };
             })
         );
+
+        // Charge movement once per selected player token, on drop (no-op off).
+        if (budgetActive && costFeet > 0) {
+            for (const it of selectedPlayers) {
+                chargeMovement({ creatureName: it.name || it.id, feet: costFeet, campaignName });
+            }
+        }
     }, [campaignName]);
 
     const handleSelectPointerUp = useCallback((e, placedItems, mapData, setMapData, setPlacedItems) => {

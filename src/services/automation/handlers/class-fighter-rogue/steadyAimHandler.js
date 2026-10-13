@@ -1,5 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
+import { getTurnState } from '../../../combat/turnState.js';
 
 const MOVED_THIS_TURN_KEY = 'steadyAimMovedThisTurn';
 const SPEED_ZERO_KEY = 'steadyAimSpeedZero';
@@ -25,8 +26,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
-    // Check if the player has moved this turn
-    const hasMoved = getRuntimeValue(playerName, MOVED_THIS_TURN_KEY, campaignName);
+    // Check if the player has moved this turn — with enforcement +
+    // movementBudget ON the engine's turnState is the authoritative movement
+    // truth; the legacy stamp stays the source otherwise (plan §7.3).
+    const enforcement = getRuntimeValue('campaign', 'enforcement', campaignName);
+    const engineMoved = !!(enforcement && enforcement.mode === 'on' && enforcement.movementBudget)
+        && getTurnState(getRuntimeValue('campaign', 'turnState', campaignName), playerName).hasMoved;
+    const hasMoved = engineMoved || getRuntimeValue(playerName, MOVED_THIS_TURN_KEY, campaignName);
     if (hasMoved) {
         return {
             type: 'popup',

@@ -3,6 +3,7 @@ import {
     getTurnState,
     hasBudget,
     spend,
+    refund,
     spendMovement,
     remainingMovement,
     resetForTurn,
@@ -136,6 +137,29 @@ describe('turnState (L5-001)', () => {
             expect(getTurnState(ts, 'Goblin').reactionsUsed).toBe(0);
             expect(getTurnState(ts, 'Rakan').reactionsUsed).toBe(0);
             expect(getTurnState(ts, 'Goblin').movementUsedFeet).toBe(20);
+        });
+    });
+
+    describe('refund (L5-002, modal-cancel seam)', () => {
+        it('un-charges a spent slot', () => {
+            let ts = spend({}, 'Rakan', 'action').turnState;
+            expect(getTurnState(ts, 'Rakan').actionsUsed).toBe(1);
+            const r = refund(ts, 'Rakan', 'action');
+            expect(r.ok).toBe(true);
+            expect(getTurnState(r.turnState, 'Rakan').actionsUsed).toBe(0);
+        });
+
+        it('floors at zero — no phantom credit', () => {
+            const r = refund({}, 'Rakan', 'action');
+            expect(r.ok).toBe(false);
+            expect(getTurnState(r.turnState, 'Rakan').actionsUsed).toBe(0);
+        });
+
+        it('free/special buckets are no-ops (ok:true, unchanged)', () => {
+            const ts = spend({}, 'Rakan', 'action').turnState;
+            const r = refund(ts, 'Rakan', 'free');
+            expect(r.ok).toBe(true);
+            expect(getTurnState(r.turnState, 'Rakan').actionsUsed).toBe(1);
         });
     });
 });

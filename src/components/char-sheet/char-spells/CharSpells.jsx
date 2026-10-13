@@ -99,8 +99,9 @@ function SpellAttackHeaderRow({ playerStats, cannotAct, exhaustionPenalty, condi
         <div>
             <b className={'clickable' + (cannotAct ? ' disabled-attack' : '') + spellAttackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannotAct)} onClick={() => {
                 if (cannotAct) return;
-                // L5-001: enforcement gate (no-op while enforcement off).
-                if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'action', setPopupHtml, source: 'spell-attack-header' }).allowed) return;
+                // L5-001/002: enforcement gate (no-op while enforcement off).
+                // Spell attack rolls immediately on allow ⇒ charge the action slot.
+                if (!assertCanAct({ campaignName, creatureName: playerStats.name, bucket: 'action', setPopupHtml, source: 'spell-attack-header', charge: true }).allowed) return;
                 rollAttack('Spell Attack', toHit, { forcedMode });
             }}>Attack (to hit):</b> <span className={spellAttackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannotAct).trim()}>+{toHit}</span><br/>
             <b>Modifier:</b> <span className={exhaustionPenalty > 0 ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.modifier - exhaustionPenalty}</span><br/>

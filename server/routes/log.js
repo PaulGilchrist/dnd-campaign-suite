@@ -46,7 +46,8 @@ function saveLogFile() {
   }, 1000);
 }
 
-function addEntry(campaign, entry) {
+// Exported for L5 server-dice (campaigns-roll.js) — one log pipeline.
+export function addEntry(campaign, entry) {
   const log = loadLog(campaign);
   const newEntry = {
     id: guid.create().toString(),
@@ -57,8 +58,7 @@ function addEntry(campaign, entry) {
   logCache.set(campaign, log);
   saveLogFile();
 
-  publish(`log-${campaign}`, newEntry, campaign);
-  return newEntry;
+  publish(`log-${campaign}`, newEntry, campaign);  return newEntry;
 }
 
 // GET /api/campaigns/:campaign/log - returns full log (last 500 entries)

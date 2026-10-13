@@ -16,6 +16,7 @@ import sessionsRoutes from './server/routes/sessions.js';
 import inventoryRoutes from './server/routes/inventory.js';
 import campaignsBasic from './server/routes/campaigns-basic.js';
 import campaignsCharacter from './server/routes/campaigns-character.js';
+import campaignsRoll from './server/routes/campaigns-roll.js';
 import campaignsChangedata from './server/routes/campaigns-changedata.js';
 import campaignsAdmin from './server/routes/campaigns-admin.js';
 import logRoutes from './server/routes/log.js';
@@ -152,6 +153,10 @@ app.use(campaignsBasic);
 
 // Character routes (GET/PUT/DELETE /:file, POST /character)
 app.use(campaignsCharacter);
+
+// L5 server-dice oracle — BEFORE campaignsChangedata so POST :campaign/roll
+// is not swallowed by the generic :campaign/:key change-data route.
+app.use(campaignsRoll);
 
 // Change data routes (after character file route so .json files aren't captured by :key)
 app.use(campaignsChangedata);
