@@ -59525,6 +59525,8 @@
       },
       {
         "name": "Healing Breath (Costs 2 Actions)",
+        "advisory": "healing_breath",
+        "advisory_message": "exhales warm wind over one creature within 30 ft — the target regains 22 (4d10) Hit Points and the Simurgh regains 5 Hit Points — advisory record: no ally-target heal transport exists in the legendary lane (self_heal heals the monster only); healing is GM-enforced. Canonical cost is 2 legendary uses — the engine spends 2 per press.",
         "description": "The Simurgh exhales warm wind over one creature within 30 ft. The target regains 22 (4d10) Hit Points and the Simurgh regains 5 Hit Points."
       },
       {

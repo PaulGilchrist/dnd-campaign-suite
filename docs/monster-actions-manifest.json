@@ -27437,7 +27437,7 @@
       "category": "legendary_actions",
       "actionType": "other",
       "description": "The Simurgh exhales warm wind over one creature within 30 ft. The target regains 22 (4d10) Hit Points and the Simurgh regains 5 Hit Points.",
-      "verified": "broken — see .opencode/plans/bug-mon-1990-simurgh-healing-breath.md"
+      "verified": "verified"
     },
     {
       "id": "MA-1991",
