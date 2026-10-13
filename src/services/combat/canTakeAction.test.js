@@ -107,3 +107,47 @@ describe('canTakeAction (L5-001)', () => {
         });
     });
 });
+
+// §18 D1/D2 — feature-raised reaction caps + companion turn-lock exception.
+describe('D1 reaction cap at the gate (§18)', () => {
+    const economyOn = { mode: 'on', turnLock: false, actionEconomy: true };
+    it('default cap 1 denies the second reaction, raised cap 2 admits it', () => {
+        const spent = { Rakan: { actionsUsed: 0, bonusActionsUsed: 0, reactionsUsed: 1, movementUsedFeet: 0, hasMoved: false, turnActive: true } };
+        expect(canTakeAction(ctx({ enforcement: economyOn, bucket: 'reaction', turnState: spent })).allowed).toBe(false);
+        const raised = { Rakan: { ...spent.Rakan, reactionCap: 2 } };
+        expect(canTakeAction(ctx({ enforcement: economyOn, bucket: 'reaction', turnState: raised })).allowed).toBe(true);
+    });
+});
+
+describe('D2 companion at the turn-lock gate (§18)', () => {
+    it('a registered companion acts while its OWNER is active', () => {
+        const ts = { 'Wolf 1': { actionsUsed: 0, bonusActionsUsed: 0, reactionsUsed: 0, movementUsedFeet: 0, hasMoved: false, turnActive: false, companionOf: 'FeyRanger' } };
+        const r = canTakeAction(ctx({ creatureName: 'Wolf 1', activeCreatureName: 'FeyRanger', turnState: ts }));
+        expect(r.allowed).toBe(true);
+    });
+
+    it('off the owner\'s turn the normal denial stands', () => {
+        const ts = { 'Wolf 1': { actionsUsed: 0, bonusActionsUsed: 0, reactionsUsed: 0, movementUsedFeet: 0, hasMoved: false, turnActive: false, companionOf: 'FeyRanger' } };
+        const r = canTakeAction(ctx({ creatureName: 'Wolf 1', activeCreatureName: 'HexWarlock', turnState: ts }));
+        expect(r.allowed).toBe(false);
+        expect(r.reason).toContain('HexWarlock');
+    });
+
+    it('companion economy charges itself: owner slots stay whole', () => {
+        const ts = {
+            FeyRanger: { actionsUsed: 1, bonusActionsUsed: 1, reactionsUsed: 0, movementUsedFeet: 0, hasMoved: true, turnActive: true },
+            'Wolf 1': { actionsUsed: 0, bonusActionsUsed: 0, reactionsUsed: 0, movementUsedFeet: 0, hasMoved: false, turnActive: true, companionOf: 'FeyRanger' },
+        };
+        // Owner spent everything — the companion still has its own budget.
+        expect(canTakeAction(ctx({ creatureName: 'FeyRanger', activeCreatureName: 'FeyRanger', bucket: 'action', turnState: ts })).allowed).toBe(false);
+        expect(canTakeAction(ctx({ creatureName: 'Wolf 1', activeCreatureName: 'FeyRanger', bucket: 'action', turnState: ts })).allowed).toBe(true);
+        const after = spend(ts, 'Wolf 1', 'action').turnState;
+        expect(after.FeyRanger.actionsUsed).toBe(1); // owner untouched by companion spend
+        expect(after['Wolf 1'].actionsUsed).toBe(1);
+    });
+
+    it('turnLock off ⇒ companion exception is moot (master honesty)', () => {
+        const r = canTakeAction(ctx({ creatureName: 'Wolf 1', activeCreatureName: 'FeyRanger', enforcement: { mode: 'on', turnLock: false, actionEconomy: false } }));
+        expect(r.allowed).toBe(true);
+    });
+});

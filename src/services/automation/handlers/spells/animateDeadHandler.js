@@ -6,6 +6,8 @@ import cloneDeep from 'lodash/cloneDeep.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
 import { getMonsterSaveBonuses, getNextUniqueMonsterName } from '../../../encounters/encounterToInitiative.js';
 import { infoPopup } from '../../common/infoPopup.js';
+import { resolveEnforcement } from '../../../combat/canTakeAction.js';
+import { registerCompanion } from '../../../combat/turnState.js';
 
 const MAX_TARGETS_KEY = 'animateDeadMaxTargets';
 
@@ -149,6 +151,15 @@ export async function confirmAnimateDead(action, playerStats, campaignName, { zo
 
     await storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
     await setRuntimeValue('campaign', 'targetEffects', targetEffects, campaignName);
+    // §18 D2: with enforcement.turnLock engaged, the animated undead are
+    // LINKED to the caster's turn — the turn-lock admits them while the
+    // caster is active, and their economy charges their own entries.
+    // Off ⇒ zero writes (byte parity with today's summon flow).
+    if (resolveEnforcement(getRuntimeValue('campaign', 'enforcement', campaignName)).turnLock) {
+        let ts = cloneDeep(getRuntimeValue('campaign', 'turnState', campaignName) || {});
+        for (const name of creatureNames) ts = registerCompanion(ts, name, casterName);
+        await storage.set('turnState', ts, campaignName);
+    }
     window.dispatchEvent(new CustomEvent('initiative-rolled'));
 
     const zombieLabel = pluralCountLabel(zombieCount, 'Zombie');

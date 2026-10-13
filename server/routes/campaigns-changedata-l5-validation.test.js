@@ -373,3 +373,24 @@ describe('P4-d denial persistence (§10.4)', () => {
         expect((logCache.get('test-campaign') || []).some(e => e.origin === 'server-validator')).toBe(false);
     });
 });
+
+// §18 D1/D2: reaction caps and companion links at the chokepoint.
+describe('D1/D2 turnState extensions (§18)', () => {
+    const post = (entry) => request(createTestApp())
+        .post('/api/campaigns/test-campaign/turnState')
+        .set('X-Client-Id', 'cid-hoster')
+        .send({ value: { Rakan: { ...VALID_TURN_STATE.Rakan, ...entry } } });
+
+    it('accepts feature-granted reaction caps and companion ownership', async () => {
+        expect((await post({ reactionCap: 2 })).status).toBe(200);
+        expect((await post({ companionOf: 'FeyRanger' })).status).toBe(200);
+        expect((await post({ reactionCap: 3, reactionsUsed: 3, companionOf: 'FeyRanger' })).status).toBe(200); // D1: 3 legit at cap 3
+    });
+
+    it('refuses unlimited caps and junk ownership', async () => {
+        expect((await post({ reactionCap: 7 })).status).toBe(400);
+        expect((await post({ reactionCap: 'infinite' })).status).toBe(400);
+        expect((await post({ companionOf: 42 })).status).toBe(400);
+        expect((await post({ companionOf: '   ' })).status).toBe(400);
+    });
+});

@@ -23,6 +23,11 @@ export const BUCKET_CAPS = Object.freeze({
 /** Buckets that never charge an economy slot (free interactions, legendary/special). */
 const FREE_BUCKETS = new Set(['free', 'special', 'legendary', 'passive', 'none']);
 
+/** §18 D1/D2 sane bounds — the server validator enforces these; the client
+ * floors junk so a corrupted store can never grant unlimited reactions or
+ * orphan a companion link. */
+export const REACTION_CAP_MAX = 3;
+
 export function emptyTurnEntry() {
     return {
         actionsUsed: 0,
@@ -31,6 +36,12 @@ export function emptyTurnEntry() {
         movementUsedFeet: 0,
         hasMoved: false,
         turnActive: false,
+        // §18 D1: per-creature reaction cap (default 1; features may raise it
+        // — Sentinel-style grants, monster multi-reactions).
+        reactionCap: 1,
+        // §18 D2: commanded creatures (companion/steed/familiar/undead) act
+        // on their OWNER's turn; the owner's own economy is untouched.
+        companionOf: null,
     };
 }
 
@@ -41,6 +52,8 @@ export function emptyTurnEntry() {
 export function getTurnState(turnState, creatureName) {
     const entry = turnState && turnState[creatureName];
     if (!entry || typeof entry !== 'object') return emptyTurnEntry();
+    const cap = Math.floor(Number(entry.reactionCap));
+    const companion = typeof entry.companionOf === 'string' && entry.companionOf.trim() !== '' ? entry.companionOf : null;
     return {
         actionsUsed: Number(entry.actionsUsed) || 0,
         bonusActionsUsed: Number(entry.bonusActionsUsed) || 0,
@@ -48,13 +61,21 @@ export function getTurnState(turnState, creatureName) {
         movementUsedFeet: Number(entry.movementUsedFeet) || 0,
         hasMoved: !!entry.hasMoved,
         turnActive: !!entry.turnActive,
+        reactionCap: Number.isFinite(cap) && cap >= 1 && cap <= REACTION_CAP_MAX ? cap : 1,
+        companionOf: companion,
     };
+}
+
+/** Budget cap for a bucket on a given creature (§18 D1: features raise reaction). */
+export function budgetCap(turnState, creatureName, bucket) {
+    if (bucket === 'reaction') return getTurnState(turnState, creatureName).reactionCap;
+    return BUCKET_CAPS[bucket];
 }
 
 /** True when the creature still has budget in `bucket` (free buckets always pass). */
 export function hasBudget(turnState, creatureName, bucket) {
     if (FREE_BUCKETS.has(bucket)) return true;
-    const cap = BUCKET_CAPS[bucket];
+    const cap = budgetCap(turnState, creatureName, bucket);
     if (cap === undefined) return true; // unknown bucket → do not invent enforcement
     return getTurnState(turnState, creatureName)[`${bucket}sUsed`] < cap;
 }
@@ -65,7 +86,7 @@ export function hasBudget(turnState, creatureName, bucket) {
  * and ok:false — the caller (assertCanAct) must surface the reason BEFORE calling.
  */
 export function spend(turnState, creatureName, bucket) {
-    const cap = BUCKET_CAPS[bucket];
+    const cap = budgetCap(turnState, creatureName, bucket);
     if (cap === undefined || FREE_BUCKETS.has(bucket)) {
         return { ok: true, turnState: turnState || {} };
     }
@@ -161,11 +182,28 @@ export function openTurn(turnState, creatureName) {
 /**
  * Re-arm the once-per-round reaction budget for every creature (round-wrap seam).
  * Movement/actions reset per-turn in resetForTurn, so they are untouched here.
+ * §18 D1: feature-granted reactionCap PERSISTS across the wrap (it is a
+ * standing grant, not a per-round charge); only reactionsUsed re-arms.
  */
 export function rearmReactions(turnState) {
     const next = { ...(turnState || {}) };
     for (const name of Object.keys(next)) {
         next[name] = { ...getTurnState(next, name), reactionsUsed: 0 };
     }
+    return next;
+}
+
+/**
+ * §18 D2 — register a commanded creature: its own turnState entry, linked to
+ * its owner. Economy charges land on the companion's own entry; the command
+ * itself is charged to the OWNER on the owner's own lane (as authored).
+ * Returns the new turnState (caller persists). Re-registration only re-links
+ * (never refunds spent budget).
+ */
+export function registerCompanion(turnState, companionName, ownerName) {
+    if (!companionName || !ownerName || companionName === ownerName) return turnState || {};
+    const next = { ...(turnState || {}) };
+    const entry = getTurnState(next, companionName);
+    next[companionName] = { ...entry, companionOf: ownerName };
     return next;
 }

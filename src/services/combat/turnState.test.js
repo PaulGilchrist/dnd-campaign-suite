@@ -20,6 +20,8 @@ describe('turnState (L5-001)', () => {
             movementUsedFeet: 0,
             hasMoved: false,
             turnActive: false,
+            reactionCap: 1,   // §18 D1
+            companionOf: null, // §18 D2
         });
     });
 
@@ -161,5 +163,63 @@ describe('turnState (L5-001)', () => {
             expect(r.ok).toBe(true);
             expect(getTurnState(r.turnState, 'Rakan').actionsUsed).toBe(1);
         });
+    });
+});
+
+// §18 D1/D2 — reaction cap model + companion ownership.
+import { registerCompanion, budgetCap, REACTION_CAP_MAX, emptyTurnEntry } from './turnState.js';
+
+describe('D1 reactionCap (§18)', () => {
+    it('defaults to 1 and behaves exactly like the old fixed cap', () => {
+        let ts = { Rakan: getTurnState({}, 'Rakan') };
+        expect(budgetCap(ts, 'Rakan', 'reaction')).toBe(1);
+        expect(hasBudget(ts, 'Rakan', 'reaction')).toBe(true);
+        ts = spend(ts, 'Rakan', 'reaction').turnState;
+        expect(hasBudget(ts, 'Rakan', 'reaction')).toBe(false);
+    });
+
+    it('a feature-raised cap admits a second reaction and denies the third', () => {
+        let ts = { Rakan: { ...emptyTurnEntry(), reactionCap: 2 } };
+        ts = spend(ts, 'Rakan', 'reaction').turnState;
+        expect(ts.Rakan.reactionsUsed).toBe(1);
+        expect(hasBudget(ts, 'Rakan', 'reaction')).toBe(true);
+        ts = spend(ts, 'Rakan', 'reaction').turnState;
+        expect(ts.Rakan.reactionsUsed).toBe(2);
+        expect(spend(ts, 'Rakan', 'reaction').ok).toBe(false);
+    });
+
+    it('junk caps floor to 1 (never trusts shape; unlimited is impossible)', () => {
+        for (const junk of ['lots', 0, -2, 99, null, NaN]) {
+            expect(getTurnState({ R: { reactionCap: junk } }, 'R').reactionCap).toBe(1);
+        }
+        expect(getTurnState({ R: { reactionCap: 3 } }, 'R').reactionCap).toBe(REACTION_CAP_MAX);
+    });
+
+    it('round-wrap re-arm zeroes usage but PRESERVES the grant', () => {
+        let ts = { R: { ...emptyTurnEntry(), reactionCap: 2, reactionsUsed: 2 } };
+        ts = rearmReactions(ts);
+        expect(ts.R.reactionsUsed).toBe(0);
+        expect(ts.R.reactionCap).toBe(2);
+        expect(hasBudget(ts, 'R', 'reaction')).toBe(true);
+    });
+});
+
+describe('D2 companionOf (§18)', () => {
+    it('registerCompanion links the entry without touching spent economy', () => {
+        let ts = { 'Wolf 1': { ...emptyTurnEntry(), actionsUsed: 1 } };
+        ts = registerCompanion(ts, 'Wolf 1', 'FeyRanger');
+        expect(ts['Wolf 1'].companionOf).toBe('FeyRanger');
+        expect(ts['Wolf 1'].actionsUsed).toBe(1); // never refunds
+    });
+
+    it('self-link and blank names are refused (no phantom owners)', () => {
+        expect(registerCompanion({}, 'Wolf', 'Wolf')).toEqual({});
+        expect(registerCompanion({}, '', 'FeyRanger')).toEqual({});
+        expect(registerCompanion({}, null, 'FeyRanger')).toEqual({});
+    });
+
+    it('junk companionOf normalizes to null', () => {
+        expect(getTurnState({ W: { companionOf: 42 } }, 'W').companionOf).toBeNull();
+        expect(getTurnState({ W: { companionOf: '  ' } }, 'W').companionOf).toBeNull();
     });
 });

@@ -37,7 +37,9 @@ const ENFORCEMENT_FLAGS = new Set([
 const SANITY_CAPS = {
     actionsUsed: 2,        // 1 + Action Surge-style double action
     bonusActionsUsed: 2,   // rare multi-bonus builds/monsters
-    reactionsUsed: 2,      // 1 + generous margin for granted reactions
+    // §18 D1: features may RAISE a creature's reactionCap (client floors it
+    // to 1..3) — reactionsUsed is legitimate up to that bound, not just 1.
+    reactionsUsed: 3,
 };
 
 function isPlainObject(v) {
@@ -84,6 +86,14 @@ function validateTurnState(value) {
         }
         if (typeof entry.hasMoved !== 'boolean' || typeof entry.turnActive !== 'boolean') {
             return { ok: false, reason: `turnState.${creatureName}.hasMoved/turnActive must be boolean` };
+        }
+        // §18 D1: feature-granted reaction caps — 1..3 integers only.
+        if (entry.reactionCap !== undefined && (!Number.isInteger(entry.reactionCap) || entry.reactionCap < 1 || entry.reactionCap > 3)) {
+            return { ok: false, reason: `turnState.${creatureName}.reactionCap must be an integer 1..3` };
+        }
+        // §18 D2: companion ownership links — a non-empty string naming the owner.
+        if (entry.companionOf !== undefined && entry.companionOf !== null && (typeof entry.companionOf !== 'string' || entry.companionOf.trim() === '')) {
+            return { ok: false, reason: `turnState.${creatureName}.companionOf must be null or a non-empty string` };
         }
     }
     return { ok: true };

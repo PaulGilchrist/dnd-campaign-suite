@@ -53,9 +53,14 @@ function conditionDenial({ bucket, cannotAct, cannotActActions, cannotActReason 
     return null;
 }
 
-/** Step 3 — turn-lock: actions/bonus only on own turn; reactions/free off-turn are rules-correct. */
-function turnLockDenial({ flags, bucket, creatureName, activeCreatureName }) {
+/** Step 3 — turn-lock: actions/bonus only on own turn; reactions/free off-turn are rules-correct.
+ * §18 D2 exception: a registered companion acts on its OWNER's turn — while
+ * the owner is active the turn-lock admits it (its own economy still charges
+ * its own entry); at any other time the normal off-turn denial stands. */
+function turnLockDenial({ flags, bucket, creatureName, activeCreatureName, turnState }) {
     if (flags.turnLock && ACTION_BUCKETS.has(bucket) && creatureName !== activeCreatureName) {
+        const companionOf = turnState && turnState[creatureName] && turnState[creatureName].companionOf;
+        if (typeof companionOf === 'string' && companionOf === activeCreatureName) return null;
         return {
             allowed: false,
             reason: `It is ${activeCreatureName || 'another creature'}'s turn — ${creatureName} cannot act now.`,
