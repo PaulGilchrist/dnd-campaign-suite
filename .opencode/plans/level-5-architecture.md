@@ -306,8 +306,8 @@ The owner's explicit asks (turn enforcement, action economy, movement limit).
 - When the flag is on, contested rolls (attack/h/save) route through it; when off, client `diceRoller.js` runs untouched.
 - In enforced mode this also gives Phase 3's AI-director an honest oracle (AI selects, server rolls, engine applies).
 
-### 7.5 Turn timer (optional)
-- Per-turn countdown in the Referee/Initiative panel; auto-advance on expiry (toggle). Pure client UI + runtime key; off by default.
+### 7.5 Turn timer (optional) — **ABANDONED (no-timers plan T1)**
+- ~~Per-turn countdown in the Referee/Initiative panel; auto-advance on expiry (toggle).~~ Removed 2026-10-13: a real-time countdown violates the turn-based principle (AGENTS.md "No Game Timers") — the initiative advances only on player/GM action. Component, runtime key and server validator all deleted.
 
 ### 7.6 Exit criteria
 - A creature cannot exceed 1 action / 1 bonus / 1 reaction per turn, or its movement budget, when the flags are on; can do all of it freely when off.

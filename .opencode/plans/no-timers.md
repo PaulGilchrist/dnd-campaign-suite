@@ -1,6 +1,8 @@
 # No-Timers Plan — Turn-Based Durations & Timer Removal
 
-> Status: **ACTIVE — pauses Level 5 continuation until complete.**
+> Status: **COMPLETE — delivered 2026-10-13 (T1 `35c50b9d7`, T2 in same commit,
+> T3+T4 `a54f95947`, T4b `ddc7ce0c6`, guard + AGENTS.md rule same day).
+> Level 5 is un-paused and may resume at its §16 backlog.**
 > Origin: 2026-10-13 user directive — *"This is a turn-based game, not a time-based
 > game. All users have as much time as they need to execute their turn… this game
 > should have no actual timers."*
@@ -120,3 +122,30 @@ Registry descs updated for affected authored rows.
   timeout removals (documented in Appendix B of the Level 5 plan).
 - Full suite + lint green; live verification on `test-campaign` :80 only; restored
   after each check; plan marked COMPLETE → Level 5 resumes (§16 backlog).
+
+## 4. Delivery notes (2026-10-13)
+
+- **Honest audit correction (§1d):** short/long rest already swept the
+  RESTING creature's own outgoing/incoming expirations via
+  `clearAllExpirationEffects(name)`. The real gaps were (a) cross-store —
+  monster-owned combat-scoped zones survived a party rest — and (b) no
+  new-combat boundary sweep. T4's all-stores sweep closes both; short & long
+  rest & Clear-Combat & encounter-loaded initiative rolls all sweep
+  (`until: 'combat'` entries ONLY — legacy round clocks and concentration are
+  never touched).
+- **Wire shape:** `expiryRounds: Infinity` serializes to `null` over the API;
+  readers do `?? Infinity` so combat-scoped entries never mature by rounds —
+  the sweep is their only exit. Live POSTs must send `null`, not `Infinity`.
+- **Live verification (:80, test-campaign):** armed `until:'combat'` entry on
+  EvasiveFighter + `_noTimersProbe` on DraconicDragon ⇒ AasimarTest Short Rest
+  swept the cross-store clock AND executed the `clear_runtime_value` effect,
+  logging "Short rest: 1 combat-scoped effect ended (enforcement: zones).";
+  Clear Combat logged "New initiative roll: 1 combat-scoped effect ended…"
+  with the same result. Campaign restored from snapshot + server restarted;
+  disk byte-matches HEAD.
+- **TurnTimer removal verified:** POST `turnTimer` key round-trips clean
+  (generic store accepts, nothing reads it), store + disk key null/ABSENT.
+- Guard `npm run guard:no-timers`: 27 timer sites, all benign categories;
+  the five game-state timers (TurnTimer tick, 3 prompt timeouts, death-save
+  delayed HP write) are gone from the codebase.
+- Full suite 39,826 green; lint clean; bundle rebuilt and live.
