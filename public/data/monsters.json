@@ -74743,7 +74743,12 @@
       },
       {
         "name": "Blinding Ascent",
-        "description": "Ziz rises into the sun, becoming invisible until the start of his next turn."
+        "description": "Ziz rises into the sun, becoming invisible until the start of his next turn.",
+        "automation": {
+          "type": "monster_self_buff",
+          "effect": "invisible",
+          "rounds": 2
+        }
       },
       {
         "name": "Sky Screech (Costs 2 Actions)",

@@ -34521,7 +34521,7 @@
         "invisible"
       ],
       "description": "Ziz rises into the sun, becoming invisible until the start of his next turn.",
-      "verified": "broken — see .opencode/plans/bug-mon-2071-ziz-blinding-ascent.md"
+      "verified": "verified"
     },
     {
       "id": "MA-2072",
