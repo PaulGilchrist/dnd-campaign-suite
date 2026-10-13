@@ -35,6 +35,7 @@ import { resolveMonsterIRV } from '../npcs/monsterIrvUtils.js';
 import { monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup } from './monsterAbilityUses.js';
 import { MONSTER_RECHARGE_KEY, monsterRechargeGate, spendMonsterRecharge, buildRechargeRefusalPopup, buildRechargeRefusalLog } from './monsterRecharge.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { armDurationClockIfEnforced, zonesClockEnforcementLive } from '../rules/effects/zoneDurationClock.js';
 import { loadMonsters } from '../ui/dataLoader.js';
 import storage from '../ui/storage.js';
 import cloneDeep from 'lodash/cloneDeep.js';
@@ -88,18 +89,23 @@ export function buildSummonCoinFlipLog({ monsterName, action, verdict }) {
 // primitive, §70) never print a fabricated "10 minutes": the authored
 // advisory carries the honest RAW clocks. Rows WITH duration_minutes
 // (MA-0648/0651/0664/0757) stay byte-identical.
-function summonDurationTail({ action, plural, durationMinutes }) {
+function summonDurationTail({ action, plural, durationMinutes, campaignName }) {
   if (durationMinutes != null) {
+    // L5-003 §8.3: while zones enforcement is live the clock is ARMED above,
+    // so the log says so; otherwise the legacy §70 advisory stays verbatim.
+    if (zonesClockEnforcementLive(campaignName)) {
+      return { sep: ', ', tail: `${plural ? 'remain' : 'remains'} ${durationMinutes} minutes (expiry clock armed — enforcement: zones; dismiss-as-action is a §70 residual).` };
+    }
     return { sep: ', ', tail: `${plural ? 'remain' : 'remains'} ${durationMinutes} minutes (expiry clock, dismiss-as-action and "can't summon other ${plural ? 'creatures' : 'creature'}" are §70 GM-enforced residuals).` };
   }
   return { sep: '. ', tail: action.automation.advisory || `${plural ? 'remain' : 'remains'} animate until destroyed (GM-adjudicated, §70).` };
 }
 
-export function buildSummonSpawnLog({ monsterName, action, summonedNames, countRoll = null, durationMinutes }) {
+export function buildSummonSpawnLog({ monsterName, action, summonedNames, countRoll = null, durationMinutes, campaignName }) {
   const names = summonedNames.join(', ');
   const countDetail = countRoll ? `${action.automation.count} rolled ${countRoll.total} (${countRoll.rolls.join(' + ')}): ` : '';
   const plural = summonedNames.length > 1;
-  const { sep, tail } = summonDurationTail({ action, plural, durationMinutes });
+  const { sep, tail } = summonDurationTail({ action, plural, durationMinutes, campaignName });
   return {
     type: 'summons',
     characterName: monsterName,
@@ -173,14 +179,17 @@ function summonCountNote(countRoll) {
 // prints the exact legacy "for N minutes" clause; an unauthored row (spore
 // servant — weeks-clock §70) rides its advisory verbatim instead of the
 // fabricated default.
-function summonPopupStay(durationMinutes, action) {
+function summonPopupStay(durationMinutes, action, campaignName) {
   if (durationMinutes != null) {
+    if (zonesClockEnforcementLive(campaignName)) {
+      return `, for ${durationMinutes} ${durationMinutes === 1 ? 'minute' : 'minutes'} (expiry clock armed — enforcement: zones).`;
+    }
     return `, for ${durationMinutes} ${durationMinutes === 1 ? 'minute' : 'minutes'} (§70 expiry GM-enforced).`;
   }
   return `. ${action?.automation?.advisory || 'Duration and corpse eligibility are GM-adjudicated (§70).'}`;
 }
 
-export function buildSummonPopup({ monsterName, summonedNames, verdict, remaining, countRoll = null, durationMinutes = 10, action = null }) {
+export function buildSummonPopup({ monsterName, summonedNames, verdict, remaining, countRoll = null, durationMinutes = 10, action = null, campaignName = null }) {
   const flip = summonFlipNote(verdict);
   const usesNote = remaining != null ? ` ${remaining} use(s) left today (resets at dawn, GM-enforced).` : '';
   if (!summonedNames || summonedNames.length === 0) {
@@ -192,7 +201,7 @@ export function buildSummonPopup({ monsterName, summonedNames, verdict, remainin
   const plural = summonedNames.length > 1;
   const crowd = plural ? `${summonedNames.length} copies join` : `${names} joins`;
   const ally = plural ? 'allies' : 'an ally';
-  const stay = summonPopupStay(durationMinutes, action);
+  const stay = summonPopupStay(durationMinutes, action, campaignName);
   return `<div class="mc-prerequisite-refusal"><h3>${monsterName} summons ${names}</h3><p>${flip}${crowd} the fight as ${ally} of ${monsterName}, acting right after it${stay}${summonCountNote(countRoll)}${usesNote}</p></div>`;
 }
 
@@ -396,7 +405,29 @@ async function resolveSummonSpawn({ action, monsterName, campaignName, setPopupH
   const summonMods = resolveSummonMods({ action, monster, combatSummary, monsterName, verdict });
   const summonedNames = spawnSummonedCreatures({ combatSummary, monster, monsterName, campaignName, count, durationMinutes, summonMods, deps });
 
-  await log(campaignName, buildSummonSpawnLog({ monsterName, action, summonedNames, countRoll, durationMinutes }));
-  setPopupHtml(buildSummonPopup({ monsterName, summonedNames, verdict, remaining, countRoll, durationMinutes, action }));
+  // L5-003 §8.3 (triage #1): authored duration_minutes + zones enforcement
+  // live ⇒ a REAL expiry clock (CLA-334 minutes×10) despawning via the
+  // existing remove_summoned_creatures handler. OFF / unauthored duration ⇒
+  // armDurationClockIfEnforced writes nothing — legacy advisory verbatim.
+  const armedRounds = armDurationClockIfEnforced({
+    campaignName,
+    ownerName: monsterName,
+    targetName: monsterName,
+    effects: [{ type: 'remove_summoned_creatures', spell: action.name }],
+    durationText: durationMinutes != null ? `${durationMinutes} minute` : null,
+  });
+  if (armedRounds != null) {
+    await log(campaignName, {
+      type: 'automation',
+      automationType: 'duration_clock_armed',
+      characterName: monsterName,
+      abilityName: action.name,
+      description: `Expiry clock armed: ${summonedNames.join(', ')} despawn after ${armedRounds} rounds (enforcement: zones).`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[monsterSummon] clock-arm log failed:', e); });
+  }
+
+  await log(campaignName, buildSummonSpawnLog({ monsterName, action, summonedNames, countRoll, durationMinutes, campaignName }));
+  setPopupHtml(buildSummonPopup({ monsterName, summonedNames, verdict, remaining, countRoll, durationMinutes, action, campaignName }));
   return { resolved: true, summonedName: summonedNames[0], summonedNames, countRoll, verdict, remaining };
 }

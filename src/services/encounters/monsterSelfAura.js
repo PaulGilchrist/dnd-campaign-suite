@@ -14,6 +14,7 @@
 // darkvision/light-immunity clause rides the arm log + popup, GM-enforced.
 import { addEntry } from '../ui/logService.js';
 import { registerTargetEffect } from '../combat/conditions/targetEffectDefinitions.js';
+import { armDurationClockIfEnforced } from '../rules/effects/zoneDurationClock.js';
 import { monsterAbilitySaveUsesGate, spendMonsterAbilityUse, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup } from './monsterAbilityUses.js';
 
 export const SELF_AURA_LIGHT_ADVISORY = 'No illumination model (§70): darkness does not obscure, suppress darkvision, or block light in-engine — GM-enforced.';
@@ -30,14 +31,17 @@ function selfAuraAdvisory(action) {
   return action?.zone?.advisory || SELF_AURA_LIGHT_ADVISORY;
 }
 
-export function buildSelfAuraArmLog({ monsterName, action, effectKey, radiusFt }) {
+export function buildSelfAuraArmLog({ monsterName, action, effectKey, radiusFt, armedRounds = null }) {
   const duration = action?.duration || 'GM-adjudicated';
+  const durNote = armedRounds != null
+    ? `Duration ${duration} — expiry clock armed (${armedRounds} rounds, enforcement: zones).`
+    : `Duration ${duration} — GM-enforced.`;
   return {
     type: 'automation',
     automationType: 'self_aura_armed',
     characterName: monsterName,
     abilityName: action?.name || 'Self Aura',
-    description: `${monsterName} ${action?.name || 'Self Aura'}: ${effectKey} self aura armed on ${monsterName} (radius ${radiusFt} ft, no save). ${selfAuraAdvisory(action)} Duration ${duration} — GM-enforced.`,
+    description: `${monsterName} ${action?.name || 'Self Aura'}: ${effectKey} self aura armed on ${monsterName} (radius ${radiusFt} ft, no save). ${selfAuraAdvisory(action)} ${durNote}`,
     timestamp: Date.now(),
   };
 }
@@ -72,7 +76,17 @@ export async function resolveSelfAuraRow({ action, monsterName, campaignName, se
     noun: action.zone.noun || 'darkness',
     duration: 'concentration',
   });
-  await log(campaignName, buildSelfAuraArmLog({ monsterName, action, effectKey, radiusFt }));
+  // L5-003 §8.3 (triage #1): authored parseable duration + zones live ⇒
+  // real expiry clock stripping the te. Indefinite ('concentration') or
+  // enforcement off ⇒ no clock, advisory prose verbatim.
+  const armedRounds = armDurationClockIfEnforced({
+    campaignName,
+    ownerName: monsterName,
+    targetName: monsterName,
+    effects: [{ type: 'remove_target_effect', effectKey, source: monsterName, target: monsterName }],
+    durationText: action?.duration,
+  });
+  await log(campaignName, buildSelfAuraArmLog({ monsterName, action, effectKey, radiusFt, armedRounds }));
   setPopupHtml(buildSelfAuraPopup({ monsterName, action, effectKey, radiusFt, remaining }));
   return { resolved: true, effectKey, radiusFt, remaining };
 }

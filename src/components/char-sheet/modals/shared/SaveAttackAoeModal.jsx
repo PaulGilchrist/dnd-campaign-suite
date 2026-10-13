@@ -18,6 +18,7 @@ import { stageSleepTargets } from '../../../../services/rules/features/sleepServ
 import { stageParalysisTargets } from '../../../../services/rules/features/paralyzingBreathService.js';
 import { grantWeakeningBreath } from '../../../../services/rules/features/weakeningBreathService.js';
 import { stagePetrifyingBiteTargets } from '../../../../services/rules/features/cockatricePetrifyService.js';
+import { armDurationClockIfEnforced } from '../../../../services/rules/effects/zoneDurationClock.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
@@ -623,11 +624,28 @@ function armZoneTargets({ zoneTe, selectedNames, casterName, actionName, saveDc,
         ? ` Repeat ${zoneTe.damage || 'damage'} at turn end — GM-enforced (no turn-end zone-damage consumer).`
         : '';
     const clauseNote = zoneTe.clause ? ` ${zoneTe.clause}` : '';
+    // L5-003 §8.3 (triage #1): authored parseable zone duration + zones
+    // enforcement live ⇒ ONE merged expiry clock (§38) that strips every
+    // armed zone te + the caster tracking key at expiry. OFF or indefinite
+    // ("until dismissed") ⇒ zero writes, advisory prose verbatim.
+    const armedRounds = armDurationClockIfEnforced({
+        campaignName,
+        ownerName: casterName,
+        targetName: casterName,
+        effects: [
+            { type: 'clear_runtime_value', creatureName: casterName, key: trackingKey },
+            ...selectedNames.map((n) => ({ type: 'remove_target_effect', effectKey: zoneTe.effectKey, source: casterName, target: n })),
+        ],
+        durationText: zoneTe.duration,
+    });
+    const durNote = armedRounds != null
+        ? `Duration ${zoneTe.duration} — expiry clock armed (${armedRounds} rounds, enforcement: zones).`
+        : `Duration ${zoneTe.duration || 'GM-adjudicated'} — GM-enforced.`;
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: casterName,
         abilityName: actionName,
-        description: `${casterName} ${actionName}: ${zoneTe.effectKey} zone armed (radius ${zoneTe.radiusFt} ft, ${saveNote}) over ${selectedNames.join(', ') || 'no targets'}.${repeatNote}${clauseNote} Duration ${zoneTe.duration || 'GM-adjudicated'} — GM-enforced.`,
+        description: `${casterName} ${actionName}: ${zoneTe.effectKey} zone armed (radius ${zoneTe.radiusFt} ft, ${saveNote}) over ${selectedNames.join(', ') || 'no targets'}.${repeatNote}${clauseNote} ${durNote}`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[SaveAttackAoeModal] Error logging zone arm:', e); });
 }
