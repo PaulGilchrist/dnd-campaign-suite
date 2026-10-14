@@ -1,87 +1,106 @@
+// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import UpcastPopup from './UpcastPopup.jsx';
 
-const mockSpell = {
-  name: 'Fireball',
-  level: 3,
-};
-
-const mockLevels = [
-  { level: 3, formula: '+1d6', availableSlots: 3 },
-  { level: 4, formula: '+2d6', availableSlots: 2 },
-  { level: 5, formula: '+3d6', availableSlots: 0 },
-];
-
-function renderUpcastPopup(props = {}) {
-  return render(
+function renderUpcastPopup({
+  spell = { name: 'Fireball', level: 3 },
+  levels = [
+    { level: 3, formula: '+1d6', availableSlots: 3 },
+    { level: 4, formula: '+2d6', availableSlots: 2 },
+    { level: 5, formula: '+3d6', availableSlots: 0 },
+  ],
+  onConfirm = vi.fn(),
+  onCancel = vi.fn(),
+} = {}) {
+  const utils = render(
     <UpcastPopup
-      spell={mockSpell}
-      levels={mockLevels}
-      onConfirm={vi.fn()}
-      onCancel={vi.fn()}
-      {...props}
+      spell={spell}
+      levels={levels}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
     />
   );
+  return { ...utils, onConfirm, onCancel };
 }
 
-function getRadioByLevel(level) {
-  return screen.getByRole('radio', { name: new RegExp(`^Level ${level}`) });
+function castButton() {
+  return screen.getByRole('button', { name: /cast at level/i });
 }
 
 describe('UpcastPopup events', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  describe('casting a spell', () => {
+    it('confirms the default selected level when the cast button is clicked', () => {
+      const { onConfirm } = renderUpcastPopup();
 
-  describe('cast behavior', () => {
-    it('calls onConfirm with the default selected level when cast button clicked', () => {
-      const onConfirm = vi.fn();
-      renderUpcastPopup({ onConfirm });
-      fireEvent.click(screen.getByRole('button', { name: /Cast at Level 3/ }));
+      fireEvent.click(castButton());
+
+      expect(onConfirm).toHaveBeenCalledTimes(1);
       expect(onConfirm).toHaveBeenCalledWith(3);
     });
 
-    it('calls onConfirm with a non-default level when a different level is selected', () => {
-      const onConfirm = vi.fn();
-      renderUpcastPopup({ onConfirm });
-      fireEvent.click(getRadioByLevel(4));
-      fireEvent.click(screen.getByRole('button', { name: /Cast at Level 4/ }));
+    it('confirms the newly selected level after the player picks a higher slot', () => {
+      const { onConfirm } = renderUpcastPopup();
+
+      fireEvent.click(screen.getByRole('radio', { name: /^Level 4/ }));
+      fireEvent.click(screen.getByRole('button', { name: /cast at level 4/i }));
+
+      expect(onConfirm).toHaveBeenCalledTimes(1);
       expect(onConfirm).toHaveBeenCalledWith(4);
     });
 
-    it('does not call onConfirm when cast button is disabled', () => {
-      const onConfirm = vi.fn();
-      const levels = [{ level: 3, formula: '+1d6', availableSlots: 0 }];
-      renderUpcastPopup({ onConfirm, levels });
-      const castButton = screen.getByRole('button', { name: /Cast at Level 3/ });
-      expect(castButton).toBeDisabled();
-      fireEvent.click(castButton);
+    it('does not cast when every spell slot is exhausted', () => {
+      const { onConfirm } = renderUpcastPopup({
+        levels: [
+          { level: 3, formula: '+1d6', availableSlots: 0 },
+          { level: 4, formula: '+2d6', availableSlots: 0 },
+        ],
+      });
+
+      const button = castButton();
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+
       expect(onConfirm).not.toHaveBeenCalled();
     });
   });
 
-  describe('cancel behavior', () => {
-    it('calls onCancel when pressing Escape key', () => {
-      const onCancel = vi.fn();
-      renderUpcastPopup({ onCancel });
-      fireEvent.keyDown(document, { key: 'Escape' });
+  describe('cancelling', () => {
+    it('calls onCancel when the Cancel button is clicked', () => {
+      const { onCancel } = renderUpcastPopup();
+
+      fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
       expect(onCancel).toHaveBeenCalledTimes(1);
     });
-  });
 
-  describe('event listener cleanup', () => {
-    it('removes the keydown event listener on unmount', () => {
-      const onCancel = vi.fn();
-      const { unmount } = renderUpcastPopup({ onCancel });
-      // Confirm listener is active before unmount
+    it('calls onCancel once when the Escape key is pressed', () => {
+      const { onCancel } = renderUpcastPopup();
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      expect(onCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores keys other than Escape', () => {
+      const { onCancel } = renderUpcastPopup();
+
+      fireEvent.keyDown(document, { key: 'Enter' });
+      fireEvent.keyDown(document, { key: 'Delete' });
+
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it('stops responding to Escape after the popup is unmounted', () => {
+      const { unmount, onCancel } = renderUpcastPopup();
+
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(onCancel).toHaveBeenCalledTimes(1);
-      onCancel.mockClear();
+
       unmount();
-      // Firing Escape after unmount should not trigger onCancel
       fireEvent.keyDown(document, { key: 'Escape' });
-      expect(onCancel).not.toHaveBeenCalled();
+
+      expect(onCancel).toHaveBeenCalledTimes(1);
     });
   });
 });

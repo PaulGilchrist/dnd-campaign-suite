@@ -1,23 +1,21 @@
+// @improved-by-ai
 //
-// Cleanup (2026-08-18):
-//   - Reduced from 16 tests to 5 tests (69% reduction).
-//   - Removed 11 redundant negative tests that assert JavaScript truthiness/falsiness
-//     rather than observable behavior. The cover badge rendering logic uses simple
-//     if-statements and array.includes() — testing falsy paths (false, null, undefined, [])
-//     provides no confidence beyond what the positive tests verify.
-//   - Consolidated 3 parameterized "cover badges absent" tests into base rendering test.
-//   - Removed unused mocks: AllySelectionModal, TrackedResourceInput,
-//     ConditionEffectBadges, CreatureBadge, buffToggle, unbreakableMajesty,
-//     auraOfLifeHandler, circleOfPowerHandler, deathWardHandler,
-//     useLoggedDiceRoll, useActionPopup, rulesFactory, attackCalc, combatData.
-//   - Added @testing-library/jest-dom import (required for toBeInTheDocument).
+// Coverage ownership (CharSummary family delegation):
+//   This file is the ONLY owner of the AC-row cover badges — the
+//   "(+2 Cover: <source>)" spans rendered by AC_BADGE_SPECS in CharSummary.jsx
+//   from the cover guards in charSummaryCalc.js (checkSmiteOfProtectionCover /
+//   computeCoverBadges), driven by the `characters` prop + runtime store.
+//   - Cover resolution math at attack time → services/combat/coverService.test.js
+//     and services/rules/combat/coverService.test.js
+//   - AC totals and non-cover AC attribution → CharSummary-BadgesAndAC.test.jsx
+//   - Wrath of the Sea / sanctuary creature badges → CharSummary-Badges.test.jsx,
+//     CharSummary-AdditionalCoverage.test.jsx
 //
-// Kept (5 tests):
-//   - Base rendering sanity (verifies component renders at all)
-//   - smiteOfProtection positive case (one positive per badge validates the logic)
-//   - bulwarkOfForce positive case
-//   - naturesSanctuary positive case
-//   - Multiple cover badges integration (verifies all three render simultaneously)
+// Strategy: getRuntimeValue is a NAME+KEY aware fake (mirrors the real store's
+// per-character namespaces) so a badge can only appear when the rules say it
+// should — from the right source character, only if that source actively
+// grants the effect and names the player as a beneficiary. Key-only mocks
+// (the previous approach) masked all identity and conjunction logic.
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -58,157 +56,202 @@ vi.mock('../../../services/combat/buffs/buffService.js', () => ({
     getActiveBuffs: vi.fn(() => []),
 }));
 
-const mockPlayerStats = {
-    name: 'Thorin',
-    xp: 2300,
-    xpMode: 'milestone',
-    race: { name: 'Dwarf', type: 'Hill Dwarf', subrace: { name: 'Hill Dwarf', speed: 25 } },
-    class: { name: 'Cleric', subclass: { name: 'War', type: 'Choice' }, major: { name: 'Cleric' } },
-    level: 5,
-    alignment: 'Lawful Good',
-    proficiency: 3,
-    initiative: 2,
-    initiativeAdvantage: false,
-    abilities: [{ name: 'Wisdom', bonus: 3 }, { name: 'Strength', bonus: 2 }],
-    armorClass: 18,
-    armorClassFormula: '16 + 2 (shield)',
-    hitPoints: 45,
-    inventory: { equipped: ['Scale Mail', 'Shield'] },
-    equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }, { name: 'Shield', type: 'Shield' }],
-    background: 'Soldier',
-    immunities: [],
-    resistances: [],
-    vulnerabilities: [],
-    senses: [],
-    proficiencies: [],
-    languages: [],
-    automation: { passives: [], actions: [] },
-    passives: [],
-    exhaustionLevel: 0,
-};
+const CAMPAIGN = 'test-campaign';
 
-const mockCampaignName = 'test-campaign';
+function makePlayerStats(overrides = {}) {
+    return {
+        name: 'Thorin',
+        xp: 2300,
+        xpMode: 'milestone',
+        race: { name: 'Dwarf', type: 'Hill Dwarf', subrace: { name: 'Hill Dwarf', speed: 25 } },
+        class: { name: 'Cleric', subclass: { name: 'War', type: 'Choice' }, major: { name: 'Cleric' } },
+        level: 5,
+        alignment: 'Lawful Good',
+        proficiency: 3,
+        initiative: 2,
+        initiativeAdvantage: false,
+        abilities: [{ name: 'Wisdom', bonus: 3 }, { name: 'Strength', bonus: 2 }],
+        armorClass: 18,
+        armorClassFormula: '16 + 2 (shield)',
+        hitPoints: 45,
+        inventory: { equipped: ['Scale Mail', 'Shield'] },
+        equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }, { name: 'Shield', type: 'Shield' }],
+        background: 'Soldier',
+        immunities: [],
+        resistances: [],
+        vulnerabilities: [],
+        senses: [],
+        proficiencies: [],
+        languages: [],
+        automation: { passives: [], actions: [] },
+        passives: [],
+        exhaustionLevel: 0,
+        ...overrides,
+    };
+}
 
-// ---------------------------------------------------------------------------
-// Base rendering sanity
-// ---------------------------------------------------------------------------
-describe('CharSummary base rendering', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getActiveBuffs.mockReturnValue([]);
-    });
+function makeCharacter(name, { passives = [] } = {}) {
+    return {
+        name,
+        type: 'player',
+        computedStats: { automation: { passives: passives.map(p => ({ name: p })) } },
+    };
+}
 
-    it('renders the player name', () => {
-        render(
-            <CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-                characters={[]}
-            />
-        );
+const auraAlly = (name) => makeCharacter(name, { passives: ['Aura of Protection'] });
+
+// Name+key aware runtime fake — mirrors the real store's per-character
+// namespaces. Anything not listed reads as null (neutral).
+function seedRuntime(valuesByCharacterKey) {
+    getRuntimeValue.mockImplementation((name, key) =>
+        valuesByCharacterKey[`${name}.${key}`] ?? null);
+}
+
+function renderSummary({ playerStats = makePlayerStats(), characters = [] } = {}) {
+    return render(
+        <CharSummary
+            playerStats={playerStats}
+            campaignName={CAMPAIGN}
+            exhaustionLevel={0}
+            characters={characters}
+        />
+    );
+}
+
+const COVER_BADGE_TEXT = /\(\+2 Cover: .+\)/;
+
+const coverBadges = () => screen.queryAllByText(COVER_BADGE_TEXT);
+
+beforeEach(() => {
+    // mockReset (not just clear) so a mockImplementation seeded by a prior
+    // test can never leak into the next one.
+    getRuntimeValue.mockReset().mockReturnValue(null);
+    getActiveBuffs.mockReturnValue([]);
+});
+
+describe('CharSummary cover badges — neutral state', () => {
+    it('renders the summary with no cover badges when nothing grants cover', () => {
+        renderSummary({ characters: [makeCharacter('Sister')] });
+
         expect(screen.getByText('Thorin')).toBeInTheDocument();
+        expect(coverBadges()).toHaveLength(0);
     });
 
-    it('renders without cover badges when characters is null', () => {
-        render(
-            <CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-                characters={null}
-            />
-        );
-        expect(screen.queryByText(/Cover:/)).not.toBeInTheDocument();
+    it('renders the summary without cover badges when characters prop is null', () => {
+        renderSummary({ characters: null });
+
+        expect(screen.getByText('Thorin')).toBeInTheDocument();
+        expect(coverBadges()).toHaveLength(0);
     });
 });
 
-// ---------------------------------------------------------------------------
-// Cover badges — positive cases (one per badge type validates the logic)
-// ---------------------------------------------------------------------------
-describe('Cover badges', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getActiveBuffs.mockReturnValue([]);
+describe('Smite of Protection cover badge', () => {
+    it('shows half-cover badge when an ally in Aura of Protection has the smite active', () => {
+        seedRuntime({ 'Sister.smiteOfProtectionActive': true });
+
+        renderSummary({ characters: [auraAlly('Sister')] });
+
+        const badge = screen.getByText('(+2 Cover: Smite of Protection)');
+        expect(badge).toHaveAttribute('title', expect.stringContaining('Half Cover from Smite of Protection'));
     });
 
-    const allyWithAura = {
-        name: 'Ally',
-        type: 'player',
-        computedStats: {
-            automation: {
-                passives: [{ name: 'Aura of Protection' }],
-            },
-        },
-    };
+    it('does NOT show the badge when the smiting ally lacks Aura of Protection', () => {
+        seedRuntime({ 'Sister.smiteOfProtectionActive': true });
 
-    it('renders smiteOfProtection cover badge when smite is active and ally has Aura of Protection', () => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-            if (key === 'smiteOfProtectionActive') return true;
-            return null;
-        });
-        render(
-            <CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-                characters={[allyWithAura]}
-            />
-        );
-        expect(screen.getByText(/Cover: Smite of Protection/)).toBeInTheDocument();
+        renderSummary({ characters: [makeCharacter('Sister')] });
+
+        expect(coverBadges()).toHaveLength(0);
     });
 
-    it('renders bulwarkOfForce cover badge when bulwark is active and player is in the target list', () => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-            if (key === 'bulwarkOfForceActive') return true;
-            if (key === 'bulwarkOfForceTargets') return ['Thorin'];
-            return null;
+    it('does NOT show the badge when no ally has the smite active', () => {
+        renderSummary({ characters: [auraAlly('Sister')] });
+
+        expect(coverBadges()).toHaveLength(0);
+    });
+});
+
+describe('Bulwark of Force cover badge', () => {
+    it('shows half-cover badge when an ally raised the bulwark and named the player as a target', () => {
+        seedRuntime({
+            'Ally.bulwarkOfForceActive': true,
+            'Ally.bulwarkOfForceTargets': ['Thorin'],
         });
-        render(
-            <CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-                characters={[{ name: 'Ally', type: 'player' }]}
-            />
-        );
-        expect(screen.getByText(/Cover: Bulwark of Force/)).toBeInTheDocument();
+
+        renderSummary({ characters: [makeCharacter('Ally')] });
+
+        const badge = screen.getByText('(+2 Cover: Bulwark of Force)');
+        expect(badge).toHaveAttribute('title', expect.stringContaining('Half Cover from Bulwark of Force'));
     });
 
-    it('renders naturesSanctuary cover badge when player is in the sanctuary creatures list', () => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === 'naturesSanctuaryCreatures') return ['Thorin'];
-            return null;
+    it('does NOT show the badge when the player is not in the bulwark target list', () => {
+        seedRuntime({
+            'Ally.bulwarkOfForceActive': true,
+            'Ally.bulwarkOfForceTargets': ['Merric'],
         });
-        render(
-            <CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-                characters={[{ name: 'Ally', type: 'player' }]}
-            />
-        );
-        expect(screen.getByText(/Cover: Nature's Sanctuary/)).toBeInTheDocument();
+
+        renderSummary({ characters: [makeCharacter('Ally')] });
+
+        expect(coverBadges()).toHaveLength(0);
     });
 
-    it('renders all three cover badges when all conditions are met', () => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === 'smiteOfProtectionActive') return true;
-            if (key === 'bulwarkOfForceActive') return true;
-            if (key === 'bulwarkOfForceTargets') return ['Thorin'];
-            if (key === 'naturesSanctuaryCreatures') return ['Thorin'];
-            return null;
+    it('does NOT show the badge when only the player themselves raised the bulwark', () => {
+        seedRuntime({
+            'Thorin.bulwarkOfForceActive': true,
+            'Thorin.bulwarkOfForceTargets': ['Thorin'],
         });
-        render(
-            <CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-                characters={[allyWithAura]}
-            />
-        );
-        expect(screen.getByText(/Cover: Smite of Protection/)).toBeInTheDocument();
-        expect(screen.getByText(/Cover: Bulwark of Force/)).toBeInTheDocument();
-        expect(screen.getByText(/Cover: Nature's Sanctuary/)).toBeInTheDocument();
+
+        renderSummary({ characters: [makeCharacter('Thorin')] });
+
+        expect(coverBadges()).toHaveLength(0);
+    });
+});
+
+describe("Nature's Sanctuary cover badge", () => {
+    it('shows half-cover badge when an ally sanctuary names the player among its creatures', () => {
+        seedRuntime({ 'Ally.naturesSanctuaryCreatures': ['Thorin'] });
+
+        renderSummary({ characters: [makeCharacter('Ally')] });
+
+        const badge = screen.getByText("(+2 Cover: Nature's Sanctuary)");
+        expect(badge).toHaveAttribute('title', expect.stringContaining("Half Cover from Nature's Sanctuary"));
+    });
+
+    it('does NOT show the badge when the sanctuary protects only other creatures', () => {
+        seedRuntime({ 'Ally.naturesSanctuaryCreatures': ['Merric'] });
+
+        renderSummary({ characters: [makeCharacter('Ally')] });
+
+        expect(coverBadges()).toHaveLength(0);
+    });
+});
+
+describe('Multiple cover sources', () => {
+    it('renders exactly one badge per cover type even when two allies grant the same cover', () => {
+        seedRuntime({
+            'Ally.bulwarkOfForceActive': true,
+            'Ally.bulwarkOfForceTargets': ['Thorin'],
+            'Bram.bulwarkOfForceActive': true,
+            'Bram.bulwarkOfForceTargets': ['Thorin'],
+        });
+
+        renderSummary({ characters: [makeCharacter('Ally'), makeCharacter('Bram')] });
+
+        expect(screen.getAllByText('(+2 Cover: Bulwark of Force)')).toHaveLength(1);
+    });
+
+    it('renders all three cover badges together when all three sources grant cover', () => {
+        seedRuntime({
+            'Sister.smiteOfProtectionActive': true,
+            'Ally.bulwarkOfForceActive': true,
+            'Ally.bulwarkOfForceTargets': ['Thorin'],
+            'Ally.naturesSanctuaryCreatures': ['Thorin'],
+        });
+
+        renderSummary({ characters: [auraAlly('Sister'), makeCharacter('Ally')] });
+
+        expect(coverBadges()).toHaveLength(3);
+        expect(screen.getByText('(+2 Cover: Smite of Protection)'.replace('+', '+'))).toBeInTheDocument();
+        expect(screen.getByText('(+2 Cover: Bulwark of Force)'.replace('+', '+'))).toBeInTheDocument();
+        expect(screen.getByText("(+2 Cover: Nature's Sanctuary)")).toBeInTheDocument();
     });
 });

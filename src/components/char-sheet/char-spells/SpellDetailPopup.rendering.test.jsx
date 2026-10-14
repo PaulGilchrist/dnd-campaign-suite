@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+// @improved-by-ai
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
 
@@ -35,7 +36,7 @@ vi.mock('../../../services/rules/spells/materialComponents.js', () => ({
   hasMaterial: vi.fn(() => true),
 }));
 
-const baseMockPlayerStats = {
+const basePlayerStats = {
   name: 'Elara',
   level: 5,
   class: { name: 'Sorcerer', major: { name: 'Sorcerer' } },
@@ -51,7 +52,7 @@ const baseMockPlayerStats = {
   automation: { passives: [], actions: [] },
 };
 
-const baseMockSpell = {
+const baseSpell = {
   name: 'Magic Missile',
   level: 1,
   description: 'Three darts of force strike a creature.',
@@ -62,7 +63,6 @@ const baseMockSpell = {
     damage_at_slot_level: {
       '1': '3d4+1',
       '2': '4d4+1',
-      '3': '5d4+1',
     },
   },
   school: 'Evocation',
@@ -70,48 +70,158 @@ const baseMockSpell = {
 
 const mockCampaignName = 'test-campaign';
 
-const renderPopup = (spell = baseMockSpell, playerStats = baseMockPlayerStats, extraProps = {}) =>
-  render(
+const renderPopup = (spell = baseSpell, playerStats = basePlayerStats, extraProps = {}) => {
+  const onClose = vi.fn();
+  const result = render(
     <SpellDetailPopup
       spell={spell}
       playerStats={playerStats}
       campaignName={mockCampaignName}
-      onClose={vi.fn()}
+      onClose={onClose}
       {...extraProps}
     />,
   );
+  return { ...result, onClose };
+};
+
+// Meta rows render as <span><b>Label:</b> value</span> — locate the <b> label
+// and assert the row it belongs to carries the expected value.
+const expectMetaRow = (label, value) => {
+  expect(screen.getByText(`${label}:`).closest('span')).toHaveTextContent(`${label}: ${value}`);
+};
+
+const upcastRadio = (level) =>
+  screen.getAllByRole('radio').find((radio) => radio.value === String(level));
 
 describe('SpellDetailPopup - rendering', () => {
-  describe('upcast selector visibility', () => {
-    it('shows the upcast selector when the spell is upcastable and multiple levels are available', () => {
+  describe('spell detail content', () => {
+    it('renders the spell name as a heading with its description body', () => {
+      renderPopup();
+      expect(screen.getByRole('heading', { name: 'Magic Missile' })).toBeInTheDocument();
+      expect(screen.getByText('Three darts of force strike a creature.')).toBeInTheDocument();
+    });
+
+    it('renders an array description joined into a single block', () => {
+      renderPopup({ ...baseSpell, description: ['First paragraph.', 'Second paragraph.'] });
+      expect(screen.getByText('First paragraph.Second paragraph.')).toBeInTheDocument();
+    });
+
+    it('shows level, casting time, range, duration, and school from the spell data', () => {
+      renderPopup();
+      expectMetaRow('Level', '1');
+      expectMetaRow('Casting Time', '1 action');
+      expectMetaRow('Range', '120 feet');
+      expectMetaRow('Duration', 'Instantaneous');
+      expectMetaRow('School', 'Evocation');
+    });
+
+    it('shows an em dash for casting time, range, and duration the spell data omits', () => {
+      renderPopup({ ...baseSpell, casting_time: undefined, range: undefined, duration: undefined });
+      expectMetaRow('Casting Time', '—');
+      expectMetaRow('Range', '—');
+      expectMetaRow('Duration', '—');
+    });
+
+    it('hides the school row for a spell without a school', () => {
+      renderPopup({ ...baseSpell, school: undefined });
+      expect(screen.queryByText('School:')).not.toBeInTheDocument();
+    });
+
+    it.each([
+      { area: { type: 'Cone', size: '60-foot' }, expected: 'Cone - 60-foot', label: 'a sized area' },
+      { area: { type: 'Self' }, expected: 'Self', label: 'a sizeless area' },
+    ])('shows the area of effect for $label', ({ area, expected }) => {
+      renderPopup({ ...baseSpell, area_of_effect: area });
+      expectMetaRow('Area', expected);
+    });
+
+    it('shows "Level: Cantrip" with no slots row and no upcast selector for a cantrip', () => {
+      const cantrip = {
+        ...baseSpell,
+        name: 'Fire Bolt',
+        level: 0,
+        casting_time: '1 action',
+        damage: { damage_at_slot_level: { '0': '1d10', '1': '2d10' } },
+      };
+      renderPopup(cantrip);
+      expectMetaRow('Level', 'Cantrip');
+      expect(screen.queryByText(/Cast at Level:/)).not.toBeInTheDocument();
+      expect(screen.queryAllByRole('radio')).toHaveLength(0);
+      expect(screen.queryByText(/Slots Remaining:/)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Cast Spell/ })).toBeEnabled();
+    });
+  });
+
+  describe('upcast selector', () => {
+    it('shows one radio per upcast level, pre-selects the first level, and hides the slots row', () => {
       const upcastLevels = [
         { level: 1, formula: '3d4+1', availableSlots: 4 },
         { level: 2, formula: '4d4+1', availableSlots: 3 },
       ];
-      renderPopup(baseMockSpell, baseMockPlayerStats, { upcastLevels });
+      renderPopup(baseSpell, basePlayerStats, { upcastLevels });
+
       expect(screen.getByText(/Cast at Level:/)).toBeInTheDocument();
+      const radios = screen.getAllByRole('radio');
+      expect(radios.map((radio) => radio.value)).toEqual(['1', '2']);
+      expect(upcastRadio(1)).toBeChecked();
+      expect(upcastRadio(2)).not.toBeChecked();
+      expect(screen.getByText('3d4+1')).toBeInTheDocument();
+      expect(screen.getByText('4d4+1')).toBeInTheDocument();
+      expect(screen.getByText('4 slots')).toBeInTheDocument();
+      expect(screen.getByText('3 slots')).toBeInTheDocument();
+      // The per-level radios replace the single slots row — both together is a bug.
+      expect(screen.queryByText(/Slots Remaining:/)).not.toBeInTheDocument();
     });
 
-    it('hides the upcast selector when only one upcast level exists', () => {
+    it('pre-selects the first level with available slots when the base level is exhausted', () => {
+      const upcastLevels = [
+        { level: 1, formula: '3d4+1', availableSlots: 0 },
+        { level: 2, formula: '4d4+1', availableSlots: 1 },
+      ];
+      renderPopup(baseSpell, basePlayerStats, { upcastLevels });
+
+      expect(upcastRadio(1)).toBeDisabled();
+      expect(upcastRadio(1)).not.toBeChecked();
+      expect(upcastRadio(2)).toBeEnabled();
+      expect(upcastRadio(2)).toBeChecked();
+      expect(screen.getByText('1 slot')).toBeInTheDocument();
+    });
+
+    it('hides the selector but keeps the slots row when only one upcast level exists', () => {
       const upcastLevels = [
         { level: 1, formula: '3d4+1', availableSlots: 4 },
       ];
-      renderPopup(baseMockSpell, baseMockPlayerStats, { upcastLevels });
+      renderPopup(baseSpell, basePlayerStats, { upcastLevels });
+
       expect(screen.queryByText(/Cast at Level:/)).not.toBeInTheDocument();
+      expect(screen.queryAllByRole('radio')).toHaveLength(0);
+      expect(screen.getByText(/Slots Remaining:/)).toBeInTheDocument();
+      expect(screen.getByText('4 slots')).toBeInTheDocument();
     });
 
-    it('hides the upcast selector when the spell has only a single damage value (not upcastable)', () => {
+    it('hides the selector for a non-upcastable spell even when upcast levels are offered', () => {
       const nonUpcastableSpell = {
-        ...baseMockSpell,
+        ...baseSpell,
         damage: { damage_at_slot_level: { '1': '3d4+1' } },
       };
-      renderPopup(nonUpcastableSpell, baseMockPlayerStats, {
+      renderPopup(nonUpcastableSpell, basePlayerStats, {
         upcastLevels: [
           { level: 1, formula: '3d4+1', availableSlots: 4 },
           { level: 2, formula: '4d4+1', availableSlots: 3 },
         ],
       });
+
       expect(screen.queryByText(/Cast at Level:/)).not.toBeInTheDocument();
+      expect(screen.queryAllByRole('radio')).toHaveLength(0);
+      expect(screen.getByText(/Slots Remaining:/)).toBeInTheDocument();
+    });
+  });
+
+  describe('actions', () => {
+    it('the Close button notifies the parent', () => {
+      const { onClose } = renderPopup();
+      fireEvent.click(screen.getByRole('button', { name: /Close/ }));
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
 });

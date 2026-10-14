@@ -1,71 +1,117 @@
+// @improved-by-ai
+//
+// Coverage ownership (CharSummary family delegation):
+//   OWNED HERE (per sibling delegation comments):
+//   - Feat popup content: showFeatDetailPopup rendering of prerequisites
+//     (level / ability_scores / proficiency, combinations, iteration),
+//     5e array desc, 2024 string description, benefits, and the
+//     "no desc → popup never opens" guard.
+//   - Short Rest modal open/close flow (delegated here by
+//     CharSummary-EventHandlers and CharSummary-Display): Close button
+//     dismisses without completing; Complete button dismisses AND fires the
+//     parent onLongRest callback.
+//   - Ally modal Cancel flow (delegated here by CharSummary-Ally-Initiative):
+//     cancel dismisses and persists NOTHING.
+//   - Avatar modal open/close incl. the imagePath guard (owned by no sibling).
+//
+// NOT owned here (delegated — do not re-add):
+//   - Ally modal creature-list data source (combat summary vs characters
+//     fallback) and confirm persistence → CharSummary-Ally-Initiative.test.jsx
+//   - Ally confirm error path → CharSummary-Remaining.test.jsx
+//   - 'open-short-rest' window event → CharSummary-EventHandlers.test.jsx
+//   - Background popup → CharSummary-UI-Interactions.test.jsx
+//
+// Improvements (2026-10-14):
+//   - Removed the "Ally Modal Open Fallback Characters Map" describe — it
+//     merely asserted the modal opens (passes even if the fallback produced
+//     an empty list); CharSummary-Ally-Initiative proves the fallback with
+//     real creature-name assertions.
+//   - Removed the pair-combination prerequisite cases (level+ability,
+//     level+proficiency, ability+proficiency): the three single-facet cases
+//     plus the all-three case cover the same independent truthy branches.
+//   - Each it.each case now carries an explicit feat fixture instead of
+//     deriving the feat name from its prerequisites (`?.proficiency ? 'Heavy
+//     Armor' : 'Tough'` cleverness) — every popup is also asserted to carry
+//     the feat name and description.
+//   - Short rest mock splits Close (onClose only) from Complete (onComplete)
+//     so closing no longer silently triggers completion; added a Complete
+//     test asserting the parent onLongRest callback fires, and a Close test
+//     asserting it does NOT.
+//   - Added missing-description guard test, empty-benefits negative test,
+//     5e array-desc and 2024 string-description content cases.
+//   - Ally cancel now proves "cancel persists nothing": setRuntimeValue and
+//     addEntry must not have been called.
+//   - Copy-pasted 12-field stats overrides removed — every test renders
+//     through mockPlayerStats + spread.
+//   - Dropped unused mocks/imports (getActiveBuffs re-defaults, attackCalc
+//     duplicate is kept only where the module graph needs it — it does,
+//     charSummaryCalc imports it), the externalWrapper merge in the render
+//     helper (never used), and the redundant jest-dom import (setup.js
+//     registers it).
+//
+// Before: 14 tests / 345 lines
+// After:  16 tests / ~300 lines
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import '@testing-library/jest-dom';
 import { mockPlayerStats, mockCampaignName } from './CharSummary.test-mocks.test.jsx';
 import CharSummary from './CharSummary.jsx';
-import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 import { DiceRollContext } from '../../../hooks/combat/DiceRollContext.js';
-import { getCombatSummary } from '../../../services/encounters/combatData.js';
+import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../services/ui/logService.js';
 
 // ---------------------------------------------------------------------------
-// Shared mocks
+// Mocks — only what the feat-popup, short-rest, ally-cancel and
+// avatar-modal code paths touch.
 // ---------------------------------------------------------------------------
-vi.mock('./CharGold.jsx', () => ({ default: () => <div>Gold</div> }));
-vi.mock('./CharHitPoints.jsx', () => ({ default: () => <div>HP</div> }));
-vi.mock('./CharClassFeatures.jsx', () => ({ default: () => <div>Class Features</div> }));
+vi.mock('./CharGold.jsx', () => ({ default: () => <div data-testid="char-gold">Gold</div> }));
+vi.mock('./CharHitPoints.jsx', () => ({ default: () => <div data-testid="char-hp">HP</div> }));
+vi.mock('./CharClassFeatures.jsx', () => ({ default: () => <div data-testid="char-class-features">Class Features</div> }));
+vi.mock('./CharConditions.jsx', () => ({ default: () => <div data-testid="char-conditions">Conditions</div> }));
+vi.mock('../LongRestButton.jsx', () => ({ default: () => <div data-testid="long-rest-btn">Long Rest</div> }));
+vi.mock('../ShortRestButton.jsx', () => ({ default: ({ onClick }) => <button onClick={onClick}>Short Rest</button> }));
+
+// CharFeats stand-in: clicking it forwards the character's first feat to
+// CharSummary's showPopup handler (which builds the detail popup HTML).
 vi.mock('../char-feats/CharFeats.jsx', () => ({
-    default: vi.fn(({ showPopup, playerStats }) => (
-        <button
-            onClick={() => {
-                const feat = (playerStats?.feats && playerStats.feats[0]) || {
-                    name: 'Heavy Armor',
-                    desc: 'Can wear heavy armor',
-                };
-                showPopup(feat);
-            }}
-        >
-            Feats
-        </button>
-    )),
+    default: ({ showPopup, playerStats }) => (
+        <button onClick={() => playerStats.feats?.[0] && showPopup(playerStats.feats[0])}>Feats</button>
+    ),
 }));
+
 vi.mock('../../common/AvatarImage.jsx', () => ({
-    default: vi.fn(({ onClick }) => (
-        <div onClick={onClick}>Avatar</div>
-    )),
+    default: ({ onClick }) => <div role="button" onClick={onClick}>Avatar</div>,
 }));
 vi.mock('../../common/AvatarModal.jsx', () => ({
-    default: vi.fn(({ onClose }) => (
-        <div>
+    default: ({ onClose }) => (
+        <div data-testid="avatar-modal">
             Avatar Modal
-            <button onClick={onClose}>Close</button>
+            <button onClick={onClose}>Close Avatar</button>
         </div>
-    )),
+    ),
 }));
+
+// ShortRestModal stand-in: Close and Complete are distinct buttons so a
+// close test can prove it does NOT silently trigger completion.
+vi.mock('../ShortRestModal.jsx', () => ({
+    default: ({ onClose, onComplete }) => (
+        <div data-testid="short-rest-modal">
+            Short Rest Modal
+            <button onClick={onClose}>Close</button>
+            <button onClick={onComplete}>Complete</button>
+        </div>
+    ),
+}));
+
 vi.mock('../../common/AllySelectionModal.jsx', () => ({
-    default: vi.fn(({ onConfirm, onCancel, currentAllies }) => (
-        <div>
+    default: ({ onConfirm, onCancel }) => (
+        <div data-testid="ally-selection-modal">
             Select Allies
-            <button onClick={() => onConfirm(currentAllies || ['Thorin'])}>Confirm</button>
+            <button onClick={onConfirm}>Confirm</button>
             <button onClick={onCancel}>Cancel</button>
         </div>
-    )),
+    ),
 }));
-vi.mock('../LongRestButton.jsx', () => ({ default: () => <div>Long Rest</div> }));
-vi.mock('../ShortRestButton.jsx', () => ({
-    default: vi.fn(({ onClick }) => (
-        <button onClick={onClick}>Short Rest</button>
-    )),
-}));
-vi.mock('../ShortRestModal.jsx', () => ({
-    default: vi.fn(({ onClose, onComplete }) => (
-        <div>
-            Short Rest Modal
-            <button onClick={() => { onClose(); onComplete?.(); }}>Close</button>
-        </div>
-    )),
-}));
-vi.mock('./CharConditions.jsx', () => ({ default: () => <div>Conditions</div> }));
 
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
     default: vi.fn(({ maxGetter }) => ({ current: maxGetter(), update: vi.fn() })),
@@ -73,8 +119,8 @@ vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
-    useRuntimeValue: vi.fn((_name, _key, _campaign) => null),
-    getRuntimeValue: vi.fn((_name, _key, _campaign) => null),
+    useRuntimeValue: vi.fn(() => null),
+    getRuntimeValue: vi.fn(() => null),
     getStore: vi.fn(() => new Map()),
 }));
 
@@ -123,223 +169,247 @@ vi.mock('../../../services/combat/auras/unbreakableMajesty.js', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Shared render helper — provides DiceRollContext and returns the spy
+// Render helper — real DiceRollContext.Provider; returns the setPopupHtml spy
+// so tests can inspect the popup HTML the component would display.
 // ---------------------------------------------------------------------------
-const renderWithDiceContext = (ui, { wrapper: externalWrapper, ...renderOptions } = {}) => {
-    const mockSetPopupHtml = vi.fn();
-    const wrapper = ({ children }) => (
-        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-            {children}
+function renderSummary(statsOverride = {}, props = {}) {
+    const setPopupHtml = vi.fn();
+    render(
+        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml }}>
+            <CharSummary
+                playerStats={{ ...mockPlayerStats, ...statsOverride }}
+                campaignName={mockCampaignName}
+                exhaustionLevel={0}
+                {...props}
+            />
         </DiceRollContext.Provider>
     );
-    return {
-        ...render(ui, {
-            wrapper: externalWrapper ? (p) => <wrapper><externalWrapper {...p} /></wrapper> : wrapper,
-            ...renderOptions,
-        }),
-        mockSetPopupHtml,
-    };
-};
+    return setPopupHtml;
+}
+
+function openFeatPopup(feat, statsOverride = {}) {
+    const setPopupHtml = renderSummary({ ...statsOverride, feats: [feat] });
+    fireEvent.click(screen.getByRole('button', { name: 'Feats' }));
+    return setPopupHtml;
+}
 
 // ---------------------------------------------------------------------------
-// Feat Popup Prerequisites
+// Feat popup — prerequisites section
 // ---------------------------------------------------------------------------
 describe('CharSummary - Feat Popup Prerequisites', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getActiveBuffs.mockReturnValue([]);
     });
 
     it.each([
-        [
-            'level only',
-            { prerequisites: { level: 1 } },
-            ['Level 1'],
-            ['or higher', 'Proficiency with'],
-        ],
-        [
-            'ability_scores only',
-            { prerequisites: { ability_scores: [{ name: 'STR', minimum: 16 }] } },
-            ['STR 16 or higher'],
-            ['Level', 'Proficiency with'],
-        ],
-        [
-            'proficiency only',
-            { prerequisites: { proficiency: 'Heavy Armor' } },
-            ['Proficiency with Heavy Armor'],
-            ['Level', 'or higher'],
-        ],
-        [
-            'level + ability_scores',
-            { prerequisites: { level: 1, ability_scores: [{ name: 'STR', minimum: 16 }] } },
-            ['Level 1', 'STR 16 or higher'],
-            ['Proficiency with'],
-        ],
-        [
-            'level + proficiency',
-            { prerequisites: { level: 1, proficiency: 'Heavy Armor' } },
-            ['Level 1', 'Proficiency with Heavy Armor'],
-            ['or higher'],
-        ],
-        [
-            'ability_scores + proficiency',
-            { prerequisites: { ability_scores: [{ name: 'STR', minimum: 16 }], proficiency: 'Heavy Armor' } },
-            ['STR 16 or higher', 'Proficiency with Heavy Armor'],
-            ['Level'],
-        ],
-        [
-            'null prerequisites',
-            { prerequisites: null },
-            ['Tough'],
-            ['Prerequisites:'],
-        ],
-        [
-            'empty prerequisites object',
-            { prerequisites: {} },
-            ['Tough', 'Prerequisites:'],
-            ['Level', 'or higher', 'Proficiency with'],
-        ],
-        [
-            'multiple ability_scores entries',
-            { prerequisites: { ability_scores: [
-                { name: 'INT', minimum: 13 },
-                { name: 'WIS', minimum: 13 },
-                { name: 'CHA', minimum: 13 },
-            ] } },
-            ['INT 13 or higher', 'WIS 13 or higher', 'CHA 13 or higher'],
-            [],
-        ],
-    ])('renders feat popup with %s prerequisite', (_name, featOverrides, expectedIncludes, expectedExcludes) => {
-        const { mockSetPopupHtml } = renderWithDiceContext(
-            <CharSummary
-                playerStats={{
-                    ...mockPlayerStats,
-                    feats: [{
-                        name: featOverrides.prerequisites?.proficiency ? 'Heavy Armor' : 'Tough',
-                        desc: 'Can wear heavy armor',
-                        ...featOverrides,
-                    }],
-                }}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-            />
-        );
-        const featsBtn = screen.getByRole('button', { name: 'Feats' });
-        fireEvent.click(featsBtn);
-        expect(mockSetPopupHtml).toHaveBeenCalled();
-        const html = mockSetPopupHtml.mock.calls[0][0];
-        for (const text of expectedIncludes) {
+        {
+            label: 'a level requirement only',
+            feat: { name: 'Tough', desc: 'Extra hit points', prerequisites: { level: 9 } },
+            expected: ['Level 9'],
+            unexpected: ['or higher', 'Proficiency with'],
+        },
+        {
+            label: 'an ability score requirement only',
+            feat: { name: 'Alert', desc: 'Quick to react', prerequisites: { ability_scores: [{ name: 'STR', minimum: 13 }] } },
+            expected: ['STR 13 or higher'],
+            unexpected: ['Level ', 'Proficiency with'],
+        },
+        {
+            label: 'a proficiency requirement only',
+            feat: { name: 'Heavily Armored', desc: 'Can wear heavy armor', prerequisites: { proficiency: 'Heavy Armor' } },
+            expected: ['Proficiency with Heavy Armor'],
+            unexpected: ['Level ', 'or higher'],
+        },
+        {
+            label: 'all three prerequisite types',
+            feat: {
+                name: 'Grappler',
+                desc: 'You are a master of grappling',
+                prerequisites: {
+                    level: 4,
+                    ability_scores: [{ name: 'DEX', minimum: 15 }],
+                    proficiency: 'Martial Weapons',
+                },
+            },
+            expected: ['Prerequisites:', 'Level 4', 'DEX 15 or higher', 'Proficiency with Martial Weapons'],
+            unexpected: [],
+        },
+        {
+            label: 'multiple ability score entries (each on its own line)',
+            feat: {
+                name: 'Metamagic Adept',
+                desc: 'You have learned some of a sorcerer\u2019s magic',
+                prerequisites: {
+                    ability_scores: [
+                        { name: 'INT', minimum: 13 },
+                        { name: 'WIS', minimum: 13 },
+                        { name: 'CHA', minimum: 13 },
+                    ],
+                },
+            },
+            expected: ['INT 13 or higher', 'WIS 13 or higher', 'CHA 13 or higher'],
+            unexpected: ['Level ', 'Proficiency with'],
+        },
+    ])('lists $label when the feat popup opens', ({ feat, expected, unexpected }) => {
+        const setPopupHtml = openFeatPopup(feat);
+
+        expect(setPopupHtml).toHaveBeenCalledTimes(1);
+        const html = setPopupHtml.mock.calls[0][0];
+        expect(html).toContain('<b>Prerequisites:</b>');
+        expect(html).toContain(feat.name);
+        expect(html).toContain(feat.desc);
+        for (const text of expected) {
             expect(html).toContain(text);
         }
-        for (const text of expectedExcludes) {
+        for (const text of unexpected) {
             expect(html).not.toContain(text);
         }
     });
 
-    it('does not call setPopupHtml when feat has no desc or description', () => {
-        const { mockSetPopupHtml } = renderWithDiceContext(
-            <CharSummary
-                playerStats={{
-                    ...mockPlayerStats,
-                    feats: [{ name: 'Tough', desc: null, prerequisites: {} }],
-                }}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-            />
-        );
-        const featsBtn = screen.getByRole('button', { name: 'Feats' });
-        fireEvent.click(featsBtn);
-        expect(mockSetPopupHtml).not.toHaveBeenCalled();
+    it('omits the Prerequisites section entirely when prerequisites is null', () => {
+        const feat = { name: 'Tough', desc: 'Extra hit points', prerequisites: null };
+        const setPopupHtml = openFeatPopup(feat);
+
+        expect(setPopupHtml).toHaveBeenCalledTimes(1);
+        const html = setPopupHtml.mock.calls[0][0];
+        expect(html).toContain(feat.name);
+        expect(html).toContain(feat.desc);
+        expect(html).not.toContain('Prerequisites:');
+    });
+
+    it('renders 5e array descriptions entry by entry', () => {
+        const feat = {
+            name: 'Lucky',
+            desc: ['You have inexplicable luck.', 'You can reroll one roll.'],
+            prerequisites: null,
+        };
+        const html = openFeatPopup(feat).mock.calls[0][0];
+
+        expect(html).toContain(feat.desc[0]);
+        expect(html).toContain(feat.desc[1]);
+    });
+
+    it('renders the 2024 string description field when desc is absent', () => {
+        const feat = { name: 'Alert', description: 'You gain a +5 bonus to initiative.', prerequisites: null };
+        const html = openFeatPopup(feat).mock.calls[0][0];
+
+        expect(html).toContain('You gain a +5 bonus to initiative.');
+        expect(html).not.toContain('undefined');
+    });
+
+    it('renders benefits from both object and string entries', () => {
+        const feat = {
+            name: 'Tough',
+            desc: 'Extra hit points',
+            prerequisites: null,
+            benefits: [{ description: 'Hit point maximum increases by 2 per level' }, 'No encumbrance penalty'],
+        };
+        const html = openFeatPopup(feat).mock.calls[0][0];
+
+        expect(html).toContain('<b>Benefits:</b>');
+        expect(html).toContain('<li>Hit point maximum increases by 2 per level</li>');
+        expect(html).toContain('<li>No encumbrance penalty</li>');
+    });
+
+    it('omits the Benefits section for an empty benefits array', () => {
+        const feat = { name: 'Tough', desc: 'Extra hit points', prerequisites: null, benefits: [] };
+        const html = openFeatPopup(feat).mock.calls[0][0];
+
+        expect(html).not.toContain('Benefits:');
+    });
+
+    it('never opens the popup when the feat has no desc or description', () => {
+        const setPopupHtml = openFeatPopup({ name: 'Tough', desc: null, prerequisites: null });
+
+        expect(setPopupHtml).not.toHaveBeenCalled();
     });
 });
 
 // ---------------------------------------------------------------------------
-// Modal onClose Handlers
+// Short Rest modal open/close/complete flow (delegated here by EventHandlers)
 // ---------------------------------------------------------------------------
-describe('CharSummary - Modal onClose Handlers', () => {
+describe('CharSummary - Short Rest Modal Flow', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getActiveBuffs.mockReturnValue([]);
     });
 
-    it('closes ally modal when cancel is clicked', () => {
-        const stats = {
-            ...mockPlayerStats,
-            race: { name: 'Human', type: 'Human', subrace: null },
-            class: { name: 'Rogue', subclass: null, major: { name: 'Rogue' } },
-            armorClass: 14,
-            armorClassFormula: '14 + Dex',
-            inventory: { equipped: [] },
-            equipment: [],
-            automation: { passives: [], actions: [] },
-            passives: [],
-        };
-        vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] });
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} characters={[{ name: 'Ally' }]} />);
-        const allyBadge = screen.getByText(/Allies \(1\)/);
-        fireEvent.click(allyBadge);
-        expect(screen.getByText('Select Allies')).toBeInTheDocument();
-        const cancelButton = screen.getByRole('button', { name: 'Cancel' });
-        fireEvent.click(cancelButton);
-        expect(screen.queryByText('Select Allies')).not.toBeInTheDocument();
+    it('opens the short rest modal from the Short Rest button and closes it without completing', () => {
+        const onLongRest = vi.fn();
+        renderSummary({}, { onLongRest });
+
+        expect(screen.queryByTestId('short-rest-modal')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Short Rest' }));
+        expect(screen.getByTestId('short-rest-modal')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        expect(screen.queryByTestId('short-rest-modal')).not.toBeInTheDocument();
+        // Dismissing is not completing — the parent refresh callback must not fire.
+        expect(onLongRest).not.toHaveBeenCalled();
     });
 
-    it('closes short rest modal when close button is clicked', () => {
-        vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] });
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        const shortRestBtn = screen.getByRole('button', { name: 'Short Rest' });
-        fireEvent.click(shortRestBtn);
-        expect(screen.getByText('Short Rest Modal')).toBeInTheDocument();
-        const closeModalBtn = screen.getByRole('button', { name: 'Close' });
-        fireEvent.click(closeModalBtn);
-        expect(screen.queryByText('Short Rest Modal')).not.toBeInTheDocument();
-    });
+    it('completing the short rest closes the modal and notifies the parent', () => {
+        const onLongRest = vi.fn();
+        renderSummary({}, { onLongRest });
 
-    it('closes avatar modal when close button is clicked', () => {
-        const stats = {
-            ...mockPlayerStats,
-            imagePath: '/images/thorin.png',
-        };
-        vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] });
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        const avatarImage = screen.getByText('Avatar');
-        fireEvent.click(avatarImage);
-        expect(screen.getByText('Avatar Modal')).toBeInTheDocument();
-        const closeModalBtn = screen.getByRole('button', { name: 'Close' });
-        fireEvent.click(closeModalBtn);
-        expect(screen.queryByText('Avatar Modal')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Short Rest' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Complete' }));
+
+        expect(screen.queryByTestId('short-rest-modal')).not.toBeInTheDocument();
+        expect(onLongRest).toHaveBeenCalledTimes(1);
     });
 });
 
 // ---------------------------------------------------------------------------
-// Ally Modal Open Fallback Characters Map
+// Ally modal cancel flow (delegated here by CharSummary-Ally-Initiative)
 // ---------------------------------------------------------------------------
-describe('CharSummary - Ally Modal Open Fallback Characters Map', () => {
+describe('CharSummary - Ally Modal Cancel', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getActiveBuffs.mockReturnValue([]);
     });
 
-    it('uses characters.map fallback when combatSummary.creatures is null', () => {
-        const stats = {
-            ...mockPlayerStats,
-            race: { name: 'Human', type: 'Human', subrace: null },
-            class: { name: 'Rogue', subclass: null, major: { name: 'Rogue' } },
-            armorClass: 14,
-            armorClassFormula: '14 + Dex',
-            inventory: { equipped: [] },
-            equipment: [],
-            automation: { passives: [], actions: [] },
-            passives: [],
-        };
-        vi.mocked(getCombatSummary).mockReturnValue(null);
-        const characters = [
-            { name: 'Thorin', type: 'player' },
-            { name: 'Grimjaw', type: 'monster' },
-        ];
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} characters={characters} />);
-        const allyBadge = screen.getByText(/Allies \(1\)/);
-        fireEvent.click(allyBadge);
-        expect(screen.getByText('Select Allies')).toBeInTheDocument();
+    it('dismisses the modal on cancel without persisting anything', () => {
+        renderSummary({}, { characters: [{ name: 'Ally', type: 'player' }] });
+
+        expect(screen.queryByTestId('ally-selection-modal')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByText(/Allies \(1\)/));
+        expect(screen.getByTestId('ally-selection-modal')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+        expect(screen.queryByTestId('ally-selection-modal')).not.toBeInTheDocument();
+        // Cancel must write nothing: no runtime-store selection, no campaign log entry.
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Avatar modal open/close (incl. the imagePath guard — owned by no sibling)
+// ---------------------------------------------------------------------------
+describe('CharSummary - Avatar Modal', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('opens on avatar click when the character has an image and closes on Close', () => {
+        renderSummary({ imagePath: '/images/thorin.png' });
+
+        expect(screen.queryByTestId('avatar-modal')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Avatar' }));
+        expect(screen.getByTestId('avatar-modal')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close Avatar' }));
+        expect(screen.queryByTestId('avatar-modal')).not.toBeInTheDocument();
+    });
+
+    it('does not open the modal when the character has no image', () => {
+        renderSummary({ imagePath: null });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Avatar' }));
+
+        expect(screen.queryByTestId('avatar-modal')).not.toBeInTheDocument();
     });
 });

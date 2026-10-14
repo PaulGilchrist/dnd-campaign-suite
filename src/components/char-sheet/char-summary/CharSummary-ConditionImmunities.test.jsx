@@ -1,67 +1,64 @@
+// @improved-by-ai
 //
-// Cleanup (2026-08-18):
-//   - Removed 4 redundant tests that add no unique behavioral coverage:
-//     * "does not render Immunities header when base immunities are empty" —
-//       covered by Heroes' Feast negative test and base case (empty immunities defaults).
-//     * "renders multiple automation condition immunities" —
-//       identical execution path to "renders automationConditionImmunities" test;
-//       rendering logic is trivial string formatting, no logic to exercise.
-//     * "does not render Heroes Feast condition immunities when buff is inactive" —
-//       redundant with base empty-immunities test; empty getActiveBuffs is the default.
-//     * "renders both base immunities and buff-derived condition immunities" —
-//       deduplication logic handles base + buff sources identically;
-//       "multiple different buffs" test already covers combined rendering.
-//   - Consolidated 5 describe blocks → 3 (reduces nesting, improves readability).
-//   - Removed unused mocks: Popup.jsx, logService.js, unbreakableMajesty.js,
-//     auraOfLifeHandler.js, circleOfPowerHandler.js, deathWardHandler.js.
-//   - Simplified rulesFactory mock (removed redundant default export wrapper).
-//   - Reduced file from 377 lines / 9 tests to 239 lines / 5 tests.
+// Coverage ownership: the condition-immunity sources of the "Immunities:" row
+// (charSummaryCalc.js computeResistances, lines 180-186) — NOT the aura source.
+//   - playerStats.immunities (base) and playerStats.automationConditionImmunities
+//   - automationConditionalImmunities gated on an active 'Rage' buff
+//     (collectRageConditionalImmunities — previously untested anywhere)
+//   - conditionImmunity from buffs whose name is in CONDITION_IMMUNITY_BUFF_NAMES,
+//     including the allow-list guard (previously untested anywhere)
+//   - cross-source deduplication with lowercase normalization
+//
+// NOT owned here (delegated to siblings — do not re-add):
+//   - auraComboEffects immunities merge/dedup → CharSummary-AuraAndInitiative.test.jsx
+//   - Feign Death resistance + condition immunity → CharSummary-BuffResistances.test.jsx
+//   - Heroes' Feast / Rage / Aura BADGES and tooltips → CharSummary-BuffResistances.test.jsx
+//
+// Quality improvements over previous revision (6 tests → 9 tests / 12 runs):
+//   - Queries scoped to the "Immunities:" row via statRow helper (was page-wide
+//     regex: /Poison/ matched any element anywhere, including badges and tooltips).
+//   - Positive tests assert the full rendered row text, so ordering, capitalization,
+//     and separator formatting are pinned — text-presence checks passed even if a
+//     type rendered twice or in the wrong place.
+//   - Old "buff is inactive" negative passed even if the buff code were deleted
+//     (empty getActiveBuffs is the fixture default). Replaced with negatives that
+//     fail when the guards break: non-allow-listed buff names, missing Rage buff,
+//     and requiresActive mismatch.
+//   - Added Rage-gate coverage (positive + two gate negatives) and the
+//     CONDITION_IMMUNITY_BUFF_NAMES allow-list guard.
+//   - Imports shared mockPlayerStats/mockCampaignName (removed 38-line local
+//     duplicate fixture); per-test overrides via spread.
+//   - Removed unused mocks (rulesFactory is only called for Monks; attackCalc is
+//     exercised harmlessly by the real module) and the unnecessary
+//     window.location.hostname mutation.
+//   - One beforeEach re-pins inert getActiveBuffs (mockReturnValue survives
+//     clearAllMocks; re-pinning makes ordering explicit).
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
+import { mockPlayerStats, mockCampaignName } from './CharSummary.test-mocks.test.jsx';
 
-vi.mock('./CharGold.jsx', () => ({
-    default: () => <div data-testid="char-gold">Gold</div>,
-}));
-vi.mock('./CharHitPoints.jsx', () => ({
-    default: () => <div data-testid="char-hp">HP</div>,
-}));
-vi.mock('./CharClassFeatures.jsx', () => ({
-    default: () => <div data-testid="char-class-features">Class Features</div>,
-}));
-vi.mock('../char-feats/CharFeats.jsx', () => ({
-    default: () => <div data-testid="char-feats">Feats</div>,
-}));
-vi.mock('../../common/AvatarImage.jsx', () => ({
-    default: () => <div data-testid="avatar-image">Avatar</div>,
-}));
+vi.mock('./CharGold.jsx', () => ({ default: () => <div data-testid="char-gold">Gold</div> }));
+vi.mock('./CharHitPoints.jsx', () => ({ default: () => <div data-testid="char-hp">HP</div> }));
+vi.mock('./CharClassFeatures.jsx', () => ({ default: () => <div data-testid="char-class-features">Class Features</div> }));
+vi.mock('../char-feats/CharFeats.jsx', () => ({ default: () => <div data-testid="char-feats">Feats</div> }));
+vi.mock('../../common/AvatarImage.jsx', () => ({ default: () => <div data-testid="avatar-image">Avatar</div> }));
 vi.mock('../../common/AvatarModal.jsx', () => ({ default: () => null }));
-vi.mock('../LongRestButton.jsx', () => ({
-    default: () => <div data-testid="long-rest-btn">Long Rest</div>,
-}));
-vi.mock('../ShortRestButton.jsx', () => ({
-    default: () => <div data-testid="short-rest-btn">Short Rest</div>,
-}));
-vi.mock('../ShortRestModal.jsx', () => ({
-    default: () => <div data-testid="short-rest-modal">Short Rest Modal</div>,
-}));
-vi.mock('./CharConditions.jsx', () => ({
-    default: () => <div data-testid="char-conditions">Conditions</div>,
-}));
+vi.mock('../LongRestButton.jsx', () => ({ default: () => <div data-testid="long-rest-btn">Long Rest</div> }));
+vi.mock('../ShortRestButton.jsx', () => ({ default: () => <div data-testid="short-rest-btn">Short Rest</div> }));
+vi.mock('../ShortRestModal.jsx', () => ({ default: () => <div data-testid="short-rest-modal">Short Rest Modal</div> }));
+vi.mock('./CharConditions.jsx', () => ({ default: () => <div data-testid="char-conditions">Conditions</div> }));
 
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
-    default: vi.fn(({ maxGetter }) => ({
-        current: maxGetter(),
-        update: vi.fn(),
-    })),
+    default: vi.fn(({ maxGetter }) => ({ current: maxGetter(), update: vi.fn() })),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
-    useRuntimeValue: vi.fn((_name, _key, _campaign) => null),
-    getRuntimeValue: vi.fn((_name, _key, _campaign) => null),
+    useRuntimeValue: vi.fn(() => null),
+    getRuntimeValue: vi.fn(() => null),
     getStore: vi.fn(() => new Map()),
 }));
 
@@ -74,201 +71,142 @@ vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
 }));
 
 vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
-    default: vi.fn(() => ({
-        popupHtml: null,
-        setPopupHtml: vi.fn(),
-        rollInitiative: vi.fn(),
-    })),
+    default: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn(), rollInitiative: vi.fn() })),
 }));
 
 vi.mock('../../../services/combat/buffs/buffService.js', () => ({
     getActiveBuffs: vi.fn(() => []),
 }));
 
-vi.mock('../../../services/rules/rulesFactory.js', () => ({
-    getRules: () => ({
-        classRules: { getUnarmoredMovementIncrease: () => 0 },
-    }),
-}));
-
-vi.mock('../../../services/rules/core/attackCalc.js', () => ({
-    parseMagicItemName: (name) => ({ baseName: name }),
-}));
-
 vi.mock('../../../services/encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(() => ({ creatures: [] })),
 }));
 
-const mockPlayerStats = {
-    name: 'Thorin',
-    xp: 2300,
-    xpMode: 'milestone',
-    race: { name: 'Dwarf', type: 'Hill Dwarf', subrace: { name: 'Hill Dwarf', speed: 25 } },
-    class: {
-        name: 'Cleric',
-        subclass: { name: 'War', type: 'Choice' },
-        major: { name: 'Cleric' },
-    },
-    level: 5,
-    alignment: 'Lawful Good',
-    proficiency: 3,
-    initiative: 2,
-    initiativeAdvantage: false,
-    abilities: [
-        { name: 'Wisdom', bonus: 3 },
-        { name: 'Strength', bonus: 2 },
-    ],
-    armorClass: 18,
-    armorClassFormula: '16 + 2 (shield)',
-    hitPoints: 45,
-    inventory: { equipped: ['Scale Mail', 'Shield'] },
-    equipment: [
-        { name: 'Scale Mail', equipment_category: 'Armor' },
-        { name: 'Shield', type: 'Shield' },
-    ],
-    background: 'Soldier',
-    immunities: [],
-    resistances: [],
-    vulnerabilities: [],
-    senses: [],
-    proficiencies: [],
-    languages: [],
-    automation: { passives: [], actions: [] },
-    passives: [],
-    exhaustionLevel: 0,
-};
+function renderSummary(props = {}) {
+    return render(
+        <CharSummary
+            playerStats={mockPlayerStats}
+            campaignName={mockCampaignName}
+            exhaustionLevel={0}
+            {...props}
+        />
+    );
+}
 
-const mockCampaignName = 'test-campaign';
+function statRow(label) {
+    return screen.getByText(label).closest('div');
+}
 
-// ---------------------------------------------------------------------------
-// Base immunities from playerStats.immunities
-// ---------------------------------------------------------------------------
-describe('CharSummary - Base Immunities', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        window.location.hostname = 'localhost';
-        getActiveBuffs.mockReturnValue([]);
-    });
-
-    it('renders base immunities from playerStats.immunities array', () => {
-        const stats = {
-            ...mockPlayerStats,
-            immunities: ['poison', 'charm'],
-        };
-        render(
-            <CharSummary
-                playerStats={stats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-            />
-        );
-        expect(screen.getByText(/Immunities:/)).toBeInTheDocument();
-        expect(screen.getByText(/Poison/)).toBeInTheDocument();
-        expect(screen.getByText(/Charm/)).toBeInTheDocument();
-    });
+beforeEach(() => {
+    vi.clearAllMocks();
+    getActiveBuffs.mockReturnValue([]);
 });
 
 // ---------------------------------------------------------------------------
-// Automation condition immunities + Heroes' Feast buff condition immunities
+// Direct sources: playerStats.immunities, automationConditionImmunities,
+// and Rage-gated automationConditionalImmunities.
 // ---------------------------------------------------------------------------
-describe('CharSummary - Automation + Heroes Feast Condition Immunities', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        window.location.hostname = 'localhost';
-        getActiveBuffs.mockReturnValue([]);
+describe('CharSummary - Immunities row direct sources', () => {
+    it('renders the Immunities row from playerStats.immunities, capitalized and comma-separated', () => {
+        renderSummary({ playerStats: { ...mockPlayerStats, immunities: ['poison', 'charm'] } });
+
+        expect(statRow('Immunities:')).toHaveTextContent('Immunities: Poison, Charm');
     });
 
-    it('renders automationConditionImmunities from playerStats', () => {
-        const stats = {
-            ...mockPlayerStats,
-            class: { name: 'Barbarian', subclass: { name: '' }, major: { name: 'Barbarian' } },
-            automationConditionImmunities: ['poison'],
-        };
-        render(
-            <CharSummary
-                playerStats={stats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-            />
-        );
-        expect(screen.getByText(/Immunities:/)).toBeInTheDocument();
-        expect(screen.getByText(/Poison/)).toBeInTheDocument();
-    });
-
-    it('renders condition immunities from Heroes Feast buff', () => {
-        getActiveBuffs.mockReturnValue([
-            {
-                name: "Heroes' Feast",
-                conditionImmunity: ['poisoned', 'frightened'],
+    it('merges automationConditionImmunities into the row without duplicating a shared type', () => {
+        renderSummary({
+            playerStats: {
+                ...mockPlayerStats,
+                immunities: ['poison'],
+                automationConditionImmunities: ['poison', 'charmed'],
             },
-        ]);
-        render(
-            <CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-            />
-        );
-        expect(screen.getByText(/Immunities:/)).toBeInTheDocument();
-        expect(screen.getByText(/Poisoned/)).toBeInTheDocument();
-        expect(screen.getByText(/Frightened/)).toBeInTheDocument();
+        });
+
+        const row = statRow('Immunities:');
+        // Dedup: a broken merge would render "Poison" twice.
+        expect(within(row).getAllByText(/Poison/)).toHaveLength(1);
+        expect(row).toHaveTextContent('Immunities: Poison, Charmed');
     });
 
-    it('does not render Heroes Feast condition immunities when buff is inactive', () => {
-        getActiveBuffs.mockReturnValue([]);
-        render(
-            <CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-            />
-        );
-        expect(screen.queryByText(/Poisoned/)).not.toBeInTheDocument();
-        expect(screen.queryByText(/Frightened/)).not.toBeInTheDocument();
+    it('surfaces automationConditionalImmunities only while Rage is active', () => {
+        getActiveBuffs.mockReturnValue([{ name: 'Rage' }]);
+        renderSummary({
+            playerStats: {
+                ...mockPlayerStats,
+                automationConditionalImmunities: [{ requiresActive: 'Rage', immunities: ['charmed'] }],
+            },
+        });
+
+        expect(statRow('Immunities:')).toHaveTextContent('Immunities: Charmed');
+    });
+
+    it.each([
+        {
+            desc: 'no Rage buff is active',
+            buffs: [],
+            conditionals: [{ requiresActive: 'Rage', immunities: ['charmed'] }],
+        },
+        {
+            desc: 'Rage is active but the feature requires Heroism',
+            buffs: [{ name: 'Rage' }],
+            conditionals: [{ requiresActive: 'Heroism', immunities: ['charmed'] }],
+        },
+    ])('gates conditional immunities OFF when $desc', ({ buffs, conditionals }) => {
+        getActiveBuffs.mockReturnValue(buffs);
+        renderSummary({
+            playerStats: { ...mockPlayerStats, automationConditionalImmunities: conditionals },
+        });
+
+        expect(screen.queryByText(/Charmed/)).not.toBeInTheDocument();
     });
 });
 
 // ---------------------------------------------------------------------------
-// Condition immunity deduplication + combined buffs
+// Buff-derived sources: only buffs named in CONDITION_IMMUNITY_BUFF_NAMES
+// contribute their conditionImmunity to the row.
 // ---------------------------------------------------------------------------
-describe('CharSummary - Condition Immunity Deduplication + Combined', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        window.location.hostname = 'localhost';
-        getActiveBuffs.mockReturnValue([]);
+describe('CharSummary - Immunities row from buffs', () => {
+    it.each(["Heroes' Feast", 'Calm Emotions', 'Heroism'])('surfaces $name condition immunities in the row', (buffName) => {
+        getActiveBuffs.mockReturnValue([{ name: buffName, conditionImmunity: ['frightened'] }]);
+        renderSummary();
+
+        expect(statRow('Immunities:')).toHaveTextContent('Immunities: Frightened');
     });
 
-    it('does not duplicate condition immunity types from multiple sources', () => {
-        // Both Heroes' Feast and Calm Emotions provide frightened immunity
-        getActiveBuffs.mockReturnValue([
-            { name: "Heroes' Feast", conditionImmunity: ['frightened'] },
-            { name: 'Calm Emotions', conditionImmunity: ['frightened'] },
-        ]);
-        render(
-            <CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-            />
-        );
-        const frightenedElements = screen.queryAllByText(/Frightened/);
-        expect(frightenedElements.length).toBe(1);
+    it('ignores conditionImmunity on buffs outside the condition-immunity allow-list', () => {
+        getActiveBuffs.mockReturnValue([{ name: 'Bless', conditionImmunity: ['charmed'] }]);
+        renderSummary();
+
+        expect(screen.queryByText('Immunities:')).not.toBeInTheDocument();
     });
 
-    it('renders condition immunities from multiple different buffs', () => {
+    it('unions condition immunities from multiple buffs, listing each type exactly once', () => {
         getActiveBuffs.mockReturnValue([
+            { name: 'Bless', conditionImmunity: ['charmed'] },
+            { name: "Heroes' Feast", conditionImmunity: ['Poisoned'] },
             { name: 'Calm Emotions', conditionImmunity: ['frightened'] },
-            { name: "Heroes' Feast", conditionImmunity: ['poisoned'] },
         ]);
-        render(
-            <CharSummary
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                exhaustionLevel={0}
-            />
-        );
-        expect(screen.getByText(/Immunities:/)).toBeInTheDocument();
-        expect(screen.getByText(/Frightened/)).toBeInTheDocument();
-        expect(screen.getByText(/Poisoned/)).toBeInTheDocument();
+        renderSummary();
+
+        // Allow-list filter drops "Bless"; buff-name-list order (Calm Emotions
+        // before Heroes' Feast in CONDITION_IMMUNITY_BUFF_NAMES) fixes the row
+        // order, and the mixed-case "Poisoned" is normalized identically.
+        expect(statRow('Immunities:')).toHaveTextContent('Immunities: Frightened, Poisoned');
+    });
+
+    it('deduplicates a condition shared between base immunities and a buff', () => {
+        getActiveBuffs.mockReturnValue([{ name: 'Calm Emotions', conditionImmunity: ['Frightened'] }]);
+        renderSummary({ playerStats: { ...mockPlayerStats, immunities: ['frightened'] } });
+
+        const row = statRow('Immunities:');
+        // Case-insensitive dedup: base "frightened" + buff "Frightened" → one entry.
+        expect(within(row).getAllByText(/Frightened/)).toHaveLength(1);
+        expect(row).toHaveTextContent('Immunities: Frightened');
+    });
+
+    it('omits the Immunities row when no source provides an immunity', () => {
+        renderSummary({ playerStats: { ...mockPlayerStats, immunities: [] } });
+
+        expect(screen.queryByText('Immunities:')).not.toBeInTheDocument();
     });
 });

@@ -1,191 +1,163 @@
+// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import UpcastPopup from './UpcastPopup.jsx';
 
-const mockSpell = { name: 'Fireball', level: 3 };
-
-const mockLevels = [
-  { level: 3, formula: '+1d6', availableSlots: 3 },
-  { level: 4, formula: '+2d6', availableSlots: 2 },
-  { level: 5, formula: '+3d6', availableSlots: 0 },
-];
-
-function renderUpcastPopup(props = {}) {
+function renderUpcastPopup({
+  spell = { name: 'Fireball', level: 3 },
+  levels = [
+    { level: 3, formula: '+1d6', availableSlots: 3 },
+    { level: 4, formula: '+2d6', availableSlots: 2 },
+    { level: 5, formula: '+3d6', availableSlots: 0 },
+  ],
+  onConfirm = vi.fn(),
+  onCancel = vi.fn(),
+} = {}) {
   return render(
     <UpcastPopup
-      spell={mockSpell}
-      levels={mockLevels}
-      onConfirm={vi.fn()}
-      onCancel={vi.fn()}
-      {...props}
+      spell={spell}
+      levels={levels}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
     />
   );
 }
 
-describe('UpcastPopup', () => {
-  // ── Rendering: structure and content ──
+function castButton() {
+  return screen.getByRole('button', { name: /cast at level/i });
+}
 
-  describe('rendering structure and content', () => {
-    it('renders the popup overlay and modal container', () => {
-      renderUpcastPopup();
+describe('UpcastPopup rendering', () => {
+  // ── Structure and content ──
 
-      expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
-      expect(document.querySelector('.popup-modal.upcast-popup')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: /upcast fireball/i })).toBeInTheDocument();
-    });
+  it('renders a popup overlay containing the upcast modal', () => {
+    renderUpcastPopup();
 
-    it('renders the descriptive instruction text', () => {
-      renderUpcastPopup();
-
-      expect(screen.getByText(/This spell can be cast using a higher-level spell slot/)).toBeInTheDocument();
-    });
-
-    it('renders all available upcast levels as radio options', () => {
-      renderUpcastPopup();
-
-      const radios = screen.getAllByRole('radio');
-      expect(radios).toHaveLength(3);
-    });
-
-    it('renders level numbers, formulas, and slot counts for each option', () => {
-      renderUpcastPopup();
-
-      expect(screen.getByText('Level 3')).toBeInTheDocument();
-      expect(screen.getByText('+1d6')).toBeInTheDocument();
-      expect(screen.getByText('3 slots remaining')).toBeInTheDocument();
-
-      expect(screen.getByText('Level 4')).toBeInTheDocument();
-      expect(screen.getByText('+2d6')).toBeInTheDocument();
-      expect(screen.getByText('2 slots remaining')).toBeInTheDocument();
-
-      expect(screen.getByText('Level 5')).toBeInTheDocument();
-      expect(screen.getByText('+3d6')).toBeInTheDocument();
-      expect(screen.getByText('0 slots remaining')).toBeInTheDocument();
-    });
-
-    it('renders the spell name in the heading', () => {
-      renderUpcastPopup({ spell: { name: 'Magic Missile', level: 1 } });
-
-      expect(screen.getByText(/upcast magic missile/i)).toBeInTheDocument();
-    });
+    expect(document.querySelector('.popup-overlay .popup-modal.upcast-popup')).toBeInTheDocument();
   });
 
-  // ── Rendering: disabled levels ──
+  it('titles the popup with the spell being upcast', () => {
+    renderUpcastPopup();
 
-  describe('disabled levels', () => {
-    it('disables radio inputs for levels with no available slots', () => {
-      renderUpcastPopup();
-
-      const level5Radio = screen.getAllByRole('radio').find(r => r.value === '5');
-      expect(level5Radio).toBeDisabled();
-    });
-
-    it('applies disabled styling class to levels with no available slots', () => {
-      renderUpcastPopup();
-
-      const level5Label = screen.getByText('Level 5').closest('label');
-      expect(level5Label).toHaveClass('upcast-level-disabled');
-    });
-
-    it('enables radio inputs for levels with available slots', () => {
-      renderUpcastPopup();
-
-      const level3Radio = screen.getAllByRole('radio').find(r => r.value === '3');
-      const level4Radio = screen.getAllByRole('radio').find(r => r.value === '4');
-      expect(level3Radio).not.toBeDisabled();
-      expect(level4Radio).not.toBeDisabled();
-    });
+    expect(screen.getByRole('heading', { name: /upcast fireball/i })).toBeInTheDocument();
   });
 
-  // ── Rendering: default selection ──
+  it('shows the spell name in the title for any spell', () => {
+    renderUpcastPopup({ spell: { name: 'Magic Missile', level: 1 } });
 
-  describe('default selection', () => {
-    it('selects the first level with available slots by default', () => {
-      renderUpcastPopup();
+    expect(screen.getByRole('heading', { name: /upcast magic missile/i })).toBeInTheDocument();
+  });
 
-      const selectedRadio = screen.getByRole('radio', { checked: true });
-      expect(selectedRadio.value).toBe('3');
+  it('explains that the spell can be cast using a higher-level slot', () => {
+    renderUpcastPopup();
+
+    expect(screen.getByText(/This spell can be cast using a higher-level spell slot/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^cancel$/i })).toBeInTheDocument();
+  });
+
+  // ── Level options ──
+
+  it('renders one radio option per upcast level with its formula and slot count', () => {
+    renderUpcastPopup();
+
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+    expect(screen.getByRole('radio', { name: /Level 3.*\+1d6.*3 slots remaining/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Level 4.*\+2d6.*2 slots remaining/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Level 5.*\+3d6.*0 slots remaining/ })).toBeInTheDocument();
+  });
+
+  it('uses singular "slot" wording when exactly one slot remains', () => {
+    renderUpcastPopup({
+      levels: [{ level: 2, formula: '+1d8', availableSlots: 1 }],
     });
 
-    it('skips unavailable levels when selecting the default', () => {
-      const levels = [
+    expect(screen.getByRole('radio', { name: /Level 2.*1 slot remaining/ })).toBeInTheDocument();
+    expect(screen.queryByText('1 slots remaining')).not.toBeInTheDocument();
+  });
+
+  // ── Exhausted levels ──
+
+  it('disables levels with no available slots', () => {
+    renderUpcastPopup();
+
+    expect(screen.getByRole('radio', { name: /Level 5/ })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: /Level 5/ }).closest('label')).toHaveClass('upcast-level-disabled');
+  });
+
+  it('keeps levels with available slots selectable', () => {
+    renderUpcastPopup();
+
+    expect(screen.getByRole('radio', { name: /Level 3/ })).not.toBeDisabled();
+    expect(screen.getByRole('radio', { name: /Level 4/ })).not.toBeDisabled();
+  });
+
+  it('never enables casting an exhausted level, even after clicking it', () => {
+    renderUpcastPopup();
+
+    fireEvent.click(screen.getByRole('radio', { name: /Level 5/ }));
+
+    expect(castButton()).toBeDisabled();
+  });
+
+  // ── Default selection ──
+
+  it('defaults to the first level that has an available slot', () => {
+    renderUpcastPopup();
+
+    expect(screen.getByRole('radio', { checked: true })).toHaveAccessibleName(/Level 3/);
+  });
+
+  it('skips exhausted levels when choosing the default selection', () => {
+    renderUpcastPopup({
+      levels: [
         { level: 3, formula: '+1d6', availableSlots: 0 },
         { level: 4, formula: '+2d6', availableSlots: 0 },
         { level: 5, formula: '+3d6', availableSlots: 2 },
-      ];
-
-      renderUpcastPopup({ levels });
-
-      const selectedRadio = screen.getByRole('radio', { checked: true });
-      expect(selectedRadio.value).toBe('5');
+      ],
     });
 
-    it('falls back to the first level when no slots are available at all', () => {
-      const levels = [
-        { level: 3, formula: '+1d6', availableSlots: 0 },
-        { level: 4, formula: '+2d6', availableSlots: 0 },
-      ];
-
-      renderUpcastPopup({ levels });
-
-      const selectedRadio = screen.getByRole('radio', { checked: true });
-      expect(selectedRadio.value).toBe('3');
-    });
-
-    it('renders empty level list when levels array is empty but still shows confirm button with fallback level', () => {
-      const spell = { name: 'Fireball', level: 3 };
-
-      renderUpcastPopup({ spell, levels: [] });
-
-      expect(screen.queryByRole('radio')).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /cast at level 3/i })).toBeInTheDocument();
-    });
+    expect(screen.getByRole('radio', { checked: true })).toHaveAccessibleName(/Level 5/);
+    expect(castButton()).toBeEnabled();
+    expect(castButton()).toHaveAccessibleName(/cast at level 5/i);
   });
 
-  // ── Rendering: confirm button state ──
-
-  describe('confirm button state', () => {
-    it('is enabled when a level with available slots is selected', () => {
-      renderUpcastPopup();
-
-      const confirmBtn = screen.getByRole('button', { name: /cast at level 3/i });
-      expect(confirmBtn).not.toBeDisabled();
-    });
-
-    it('is disabled when only unavailable levels exist', () => {
-      const levels = [
+  it('selects the first level and blocks casting when every slot is exhausted', () => {
+    renderUpcastPopup({
+      levels: [
         { level: 3, formula: '+1d6', availableSlots: 0 },
         { level: 4, formula: '+2d6', availableSlots: 0 },
-      ];
-
-      renderUpcastPopup({ levels });
-
-      const confirmBtn = screen.getByRole('button', { name: /cast at level 3/i });
-      expect(confirmBtn).toBeDisabled();
+      ],
     });
+
+    expect(screen.getByRole('radio', { checked: true })).toHaveAccessibleName(/Level 3/);
+    expect(castButton()).toBeDisabled();
   });
 
-  // ── Interactions: selection ──
+  it('renders no options and offers the spell level, disabled, when there are no upcast levels', () => {
+    renderUpcastPopup({ levels: [] });
 
-  describe('selection interactions', () => {
-    it('changes selection when clicking a different available level', () => {
-      renderUpcastPopup();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    expect(castButton()).toHaveAccessibleName(/cast at level 3/i);
+    expect(castButton()).toBeDisabled();
+  });
 
-      const level4Radio = screen.getAllByRole('radio').find(r => r.value === '4');
-      fireEvent.click(level4Radio);
+  // ── Selection state ──
 
-      const selectedRadio = screen.getByRole('radio', { checked: true });
-      expect(selectedRadio.value).toBe('4');
-    });
+  it('moves the checked state to the newly selected level', () => {
+    renderUpcastPopup();
 
-    it('keeps confirm button disabled when attempting to select a disabled level', () => {
-      renderUpcastPopup();
+    fireEvent.click(screen.getByRole('radio', { name: /Level 4/ }));
 
-      const level5Radio = screen.getAllByRole('radio').find(r => r.value === '5');
-      fireEvent.click(level5Radio);
+    expect(screen.getByRole('radio', { name: /Level 4/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /Level 3/ })).not.toBeChecked();
+    expect(screen.getAllByRole('radio', { checked: true })).toHaveLength(1);
+  });
 
-      const confirmBtn = screen.getByRole('button', { name: /cast at level 5/i });
-      expect(confirmBtn).toBeDisabled();
-    });
+  it('updates the cast button to the newly selected level', () => {
+    renderUpcastPopup();
+
+    fireEvent.click(screen.getByRole('radio', { name: /Level 4/ }));
+
+    expect(screen.getByRole('button', { name: /cast at level 4/i })).toBeEnabled();
   });
 });

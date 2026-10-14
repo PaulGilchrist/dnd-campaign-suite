@@ -1,37 +1,40 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import React from 'react';
 import CharClassFeatures from './CharClassFeatures.jsx';
 import * as classFeatures from '../../../services/character/classFeatures.js';
 import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 
-// TrackedResourceInput mock that renders label text so tests can assert
-// on visible content instead of data-testid implementation details.
-vi.mock('./TrackedResourceInput.jsx', () => {
-  return {
-    default: function MockTrackedResourceInput({ label, getMax }) {
-      const max = getMax ? getMax() : 0;
-      return React.createElement('div', null, `${label}: ${max}`);
-    },
-  };
-});
+// Warlock Features are reached through the CharClassFeatures registry entry
+// point (class name 'Warlock' → WarlockFeatures, region testid 'char-class-warlock').
+
+// Mock with a resourceKey-scoped testid so assertions can verify a specific
+// tracked resource's computed max, not just that "some" number rendered.
+vi.mock('./TrackedResourceInput.jsx', () => ({
+  default: function MockTrackedResourceInput({ label, getMax, resourceKey }) {
+    const max = getMax ? getMax() : 0;
+    return (
+      <div data-testid={`tracked-resource-${resourceKey}`}>
+        <b>{label}:</b> <span>{max}/{max}</span>
+      </div>
+    );
+  },
+}));
 
 vi.mock('../../../services/character/classFeatures.js', () => ({
-  getClassFeatures: vi.fn(() => ({
-    invocationsKnown: 4,
-    hasArcanum: false,
-    arcanumLevels: {},
-    pactBoon: 'Pact of the Blade',
-    invocations: ['Agonizing Blast', 'Eldritch Sight'],
-  })),
+  getClassFeatures: vi.fn(),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn(() => undefined),
-  getRuntimeValue: vi.fn(),
+  getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
 }));
 
+const CAMPAIGN = 'test-campaign';
+
+// Mirrors the shape classRules.getWarlockFeatures returns in the real
+// service (5e lv5 baseline).
 const defaultWarlockFeatures = {
   invocationsKnown: 4,
   hasArcanum: false,
@@ -40,359 +43,260 @@ const defaultWarlockFeatures = {
   invocations: ['Agonizing Blast', 'Eldritch Sight'],
 };
 
-const basePlayerStats = {
-  name: 'TestWarlock',
-  level: 5,
-  abilities: [{ name: 'Charisma', bonus: 3 }],
-  proficiency: 3,
-  class: {
-    name: 'Warlock',
-    major: {},
-    subclass: {},
-    class_levels: [],
-    fightingStyles: [],
-  },
-  automation: { bonusActions: [] },
-};
-
-function buildPlayerStats(overrides = {}) {
-  return { ...basePlayerStats, ...overrides };
+function mockWarlockFeatures(overrides = {}) {
+  classFeatures.getClassFeatures.mockReturnValue({ ...defaultWarlockFeatures, ...overrides });
 }
 
-function renderComponent(playerStats, campaign = 'test') {
-  return render(<CharClassFeatures playerStats={playerStats} campaignName={campaign} />);
+function mockRuntime({ buffs = [], awakenedMindTarget = undefined } = {}) {
+  runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
+    switch (key) {
+      case 'activeBuffs': return buffs;
+      case 'awakenedMindTarget': return awakenedMindTarget;
+      default: return undefined;
+    }
+  });
+}
+
+function warlockStats(level = 5, overrides = {}) {
+  return {
+    name: 'Test Warlock',
+    level,
+    rules: '5e',
+    proficiency: 3,
+    class: {
+      name: 'Warlock',
+      major: {},
+      subclass: {},
+      class_levels: [],
+      fightingStyles: [],
+    },
+    abilities: [{ name: 'Charisma', bonus: 3 }],
+    automation: { bonusActions: [] },
+    ...overrides,
+  };
+}
+
+// Patron lives on class.major OR class.subclass — this helper places the
+// name in exactly one slot so tests prove the "either slot" match.
+function patronStats(slot, patronName, level = 5, overrides = {}) {
+  return warlockStats(level, {
+    class: {
+      name: 'Warlock',
+      major: slot === 'major' ? { name: patronName } : {},
+      subclass: slot === 'subclass' ? { name: patronName } : {},
+      class_levels: [],
+      fightingStyles: [],
+    },
+    ...overrides,
+  });
+}
+
+function renderWarlock(playerStats) {
+  render(<CharClassFeatures playerStats={playerStats} campaignName={CAMPAIGN} />);
+  return screen.getByTestId('char-class-warlock');
 }
 
 describe('WarlockFeatures', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(classFeatures.getClassFeatures).mockReturnValue({ ...defaultWarlockFeatures });
-    runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-      if (key === 'activeBuffs') return [];
-      return undefined;
+    mockWarlockFeatures();
+    mockRuntime();
+  });
+
+  describe('class features wiring', () => {
+    it('reads class features for the exact playerStats object it was given', () => {
+      const stats = warlockStats();
+      renderWarlock(stats);
+      expect(classFeatures.getClassFeatures).toHaveBeenCalledWith(stats);
     });
   });
 
-  describe('invocations display', () => {
-    it('renders "Eldritch Invocations" label when invocationsKnown > 0', () => {
-      const stats = buildPlayerStats({ level: 5 });
-      renderComponent(stats);
-      expect(screen.getByText(/Eldritch Invocations:/)).toBeInTheDocument();
+  describe('invocations', () => {
+    it.each([
+      [4, 'Eldritch Invocations', 'Eldritch Invocations: 4'],
+      [0, 'Invocations Known', 'Invocations Known: 0'],
+      [null, 'Invocations Known', 'Invocations Known: '],
+      [undefined, 'Invocations Known', 'Invocations Known: '],
+    ])('labels known-count %s as "%s" and renders the raw value after it', (_known, label, expectedText) => {
+      mockWarlockFeatures({ invocationsKnown: _known });
+      renderWarlock(warlockStats());
+      const labelEl = screen.getByText(`${label}:`);
+      expect(labelEl.closest('div').textContent).toBe(expectedText);
     });
 
-    it.each([0, null, undefined])(
-      'renders "Invocations Known" label when invocationsKnown is %s',
-      (value) => {
-        vi.mocked(classFeatures.getClassFeatures).mockReturnValue({
-          ...defaultWarlockFeatures,
-          invocationsKnown: value,
-        });
-        renderComponent(buildPlayerStats());
-        expect(screen.getByText(/Invocations Known:/)).toBeInTheDocument();
-      },
-    );
-
-    it('renders invocations list sorted alphabetically', () => {
-      vi.mocked(classFeatures.getClassFeatures).mockReturnValue({
-        ...defaultWarlockFeatures,
+    it('renders invocations alphabetically sorted, comma-joined', () => {
+      mockWarlockFeatures({
         invocations: ['Zephyr Invocation', 'Agonizing Blast', 'Mighty Invocation'],
       });
-      const stats = buildPlayerStats();
-      renderComponent(stats);
-      expect(
-        screen.getByText(/Agonizing Blast, Mighty Invocation, Zephyr Invocation/),
-      ).toBeInTheDocument();
+      const section = renderWarlock(warlockStats());
+      expect(screen.getByText('Agonizing Blast, Mighty Invocation, Zephyr Invocation')).toBeInTheDocument();
+      expect(section.textContent).toContain('Invocations: Agonizing Blast, Mighty Invocation, Zephyr Invocation');
     });
 
-    it.each([null, undefined])(
-      'does not render invocations list when invocations is %s',
-      (value) => {
-        vi.mocked(classFeatures.getClassFeatures).mockReturnValue({
-          ...defaultWarlockFeatures,
-          invocations: value,
-        });
-        renderComponent(buildPlayerStats());
-        expect(screen.queryByText('Agonizing Blast')).not.toBeInTheDocument();
-      },
-    );
+    it.each([
+      ['null', null],
+      ['undefined', undefined],
+      ['an empty array (no falsy-value fallback to an empty row)', []],
+    ])('omits the invocations list row when invocations is %s', (_label, invocations) => {
+      mockWarlockFeatures({ invocations });
+      const section = renderWarlock(warlockStats());
+      // Exact query for the list row's <b> label — the count row's
+      // "Eldritch Invocations:" must not satisfy this via substring.
+      expect(screen.queryByText('Invocations:')).not.toBeInTheDocument();
+      expect(section.textContent).not.toContain('Agonizing Blast');
+    });
 
-    it('renders invocations count matching invocationsKnown value', () => {
-      vi.mocked(classFeatures.getClassFeatures).mockReturnValue({
-        ...defaultWarlockFeatures,
-        invocationsKnown: 7,
-        invocations: ['Inv1', 'Inv2', 'Inv3', 'Inv4', 'Inv5', 'Inv6', 'Inv7'],
-      });
-      const stats = buildPlayerStats();
-      const { container } = renderComponent(stats);
-      expect(container.textContent).toContain('Eldritch Invocations');
-      expect(container.textContent).toContain('7');
+    it('renders the default invocation list verbatim', () => {
+      const section = renderWarlock(warlockStats());
+      expect(section.textContent).toContain('Invocations: Agonizing Blast, Eldritch Sight');
     });
   });
 
   describe('pact boon', () => {
-    it('renders pact boon text and button when pactBoon is present', () => {
-      const stats = buildPlayerStats();
-      renderComponent(stats);
-      expect(screen.getByText('Pact Boon:')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Pact of the Blade/ })).toBeInTheDocument();
-    });
-
-    it.each([null, undefined])(
-      'does not render pact boon when pactBoon is %s',
-      (value) => {
-        vi.mocked(classFeatures.getClassFeatures).mockReturnValue({
-          ...defaultWarlockFeatures,
-          pactBoon: value,
-        });
-        renderComponent(buildPlayerStats());
-        expect(screen.queryByText('Pact Boon')).not.toBeInTheDocument();
-      },
-    );
-
-    it('renders pact boon button with correct title attribute', () => {
-      const stats = buildPlayerStats();
-      renderComponent(stats);
+    it('renders the pact boon row and a titled button when pactBoon is present', () => {
+      const section = renderWarlock(warlockStats());
+      expect(section.textContent).toContain('Pact Boon: Pact of the Blade');
       const button = screen.getByRole('button', { name: /Pact of the Blade/ });
       expect(button).toHaveAttribute('title', 'Pact Boon: Pact of the Blade');
     });
 
+    it.each([
+      ['null', null],
+      ['undefined', undefined],
+      ['an empty string (|| null guard)', ''],
+    ])('omits the pact boon row and button entirely when pactBoon is %s', (_label, pactBoon) => {
+      mockWarlockFeatures({ pactBoon });
+      const section = renderWarlock(warlockStats());
+      expect(section.textContent).not.toContain('Pact Boon');
+      expect(screen.queryByRole('button', { name: /Pact of the Blade/ })).not.toBeInTheDocument();
+    });
   });
 
   describe('arcanum', () => {
-    it('renders arcanum tracked resources for levels with count > 0', () => {
-      vi.mocked(classFeatures.getClassFeatures).mockReturnValue({
-        ...defaultWarlockFeatures,
+    it('renders one fixed 1/1 slot per arcanum level with count > 0', () => {
+      mockWarlockFeatures({
         hasArcanum: true,
         arcanumLevels: { level6: 1, level7: 1, level8: 0, level9: 1 },
       });
-      const stats = buildPlayerStats({ level: 13 });
-      renderComponent(stats);
-      expect(screen.getByText(/6th Level Arcanum:/)).toBeInTheDocument();
-      expect(screen.getByText(/7th Level Arcanum:/)).toBeInTheDocument();
-      expect(screen.getByText(/9th Level Arcanum:/)).toBeInTheDocument();
-      expect(screen.queryByText(/8th Level Arcanum:/)).not.toBeInTheDocument();
+      renderWarlock(warlockStats(13));
+      expect(screen.getByTestId('tracked-resource-mysticArcanumLevel6')).toHaveTextContent('6th Level Arcanum: 1/1');
+      expect(screen.getByTestId('tracked-resource-mysticArcanumLevel7')).toHaveTextContent('7th Level Arcanum: 1/1');
+      expect(screen.getByTestId('tracked-resource-mysticArcanumLevel9')).toHaveTextContent('9th Level Arcanum: 1/1');
+      expect(screen.queryByTestId('tracked-resource-mysticArcanumLevel8')).not.toBeInTheDocument();
     });
 
-    it('does not render arcanum when hasArcanum is false', () => {
-      vi.mocked(classFeatures.getClassFeatures).mockReturnValue({
-        ...defaultWarlockFeatures,
-        hasArcanum: false,
-        arcanumLevels: { level6: 0, level7: 0, level8: 0, level9: 0 },
-      });
-      const stats = buildPlayerStats({ level: 13 });
-      renderComponent(stats);
-      expect(screen.queryByText(/Arcanum/)).not.toBeInTheDocument();
-    });
-
-    it('does not render arcanum tracked resources when hasArcanum is true but all counts are 0', () => {
-      vi.mocked(classFeatures.getClassFeatures).mockReturnValue({
-        ...defaultWarlockFeatures,
-        hasArcanum: true,
-        arcanumLevels: { level6: 0, level7: 0, level8: 0, level9: 0 },
-      });
-      const stats = buildPlayerStats({ level: 13 });
-      renderComponent(stats);
-      expect(screen.queryByText(/Arcanum/)).not.toBeInTheDocument();
+    it.each([
+      ['hasArcanum false even with nonzero counts', false, { level6: 1, level7: 1 }],
+      ['hasArcanum true but every count 0', true, { level6: 0, level7: 0, level8: 0, level9: 0 }],
+      ['hasArcanum true but arcanumLevels undefined (|| {} guard)', true, undefined],
+    ])('omits every arcanum slot when %s', (_label, hasArcanum, arcanumLevels) => {
+      mockWarlockFeatures({ hasArcanum, arcanumLevels });
+      const section = renderWarlock(warlockStats(13));
+      expect(section.textContent).not.toContain('Arcanum');
     });
   });
 
   describe('celestial patron', () => {
-    function celestialStats(overrides = {}) {
-      return buildPlayerStats({
-        level: 5,
-        class: {
-          name: 'Warlock',
-          major: { name: 'Celestial Patron' },
-          subclass: { name: 'Celestial Patron' },
-          class_levels: [],
-          fightingStyles: [],
-        },
-        ...overrides,
-      });
-    }
-
-    it('renders healing light tracked resource when major is Celestial Patron', () => {
-      const stats = celestialStats();
-      renderComponent(stats);
-      expect(screen.getByText(/Healing Light:/)).toBeInTheDocument();
+    it.each([
+      ['major', 'Celestial Patron', 5, 6],
+      ['subclass', 'Celestial Patron', 10, 11],
+    ])('tracks Healing Light at 1 + level (%i → %i) when patron is set on %s', (slot, patron, level, expectedMax) => {
+      renderWarlock(patronStats(slot, patron, level));
+      expect(screen.getByTestId('tracked-resource-healinglightPool'))
+        .toHaveTextContent(`Healing Light: ${expectedMax}/${expectedMax}`);
     });
 
-    it('renders healing light tracked resource when subclass is Celestial Patron', () => {
-      const stats = buildPlayerStats({
-        level: 5,
-        class: {
-          name: 'Warlock',
-          major: {},
-          subclass: { name: 'Celestial Patron' },
-          class_levels: [],
-          fightingStyles: [],
-        },
-      });
-      renderComponent(stats);
-      expect(screen.getByText(/Healing Light:/)).toBeInTheDocument();
-    });
-
-    it('does not render healing light for non-celestial patron', () => {
-      const stats = buildPlayerStats({
-        level: 5,
-        class: {
-          name: 'Warlock',
-          major: { name: 'Fiend' },
-          subclass: { name: 'Fiend' },
-          class_levels: [],
-          fightingStyles: [],
-        },
-      });
-      renderComponent(stats);
-      expect(screen.queryByText(/Healing Light/)).not.toBeInTheDocument();
-    });
-
-    it('renders healing light max as 1 + level', () => {
-      const stats = celestialStats({ level: 10 });
-      renderComponent(stats);
-      expect(screen.getByText(/Healing Light: 11/)).toBeInTheDocument();
+    it('does not render healing light for a non-celestial patron', () => {
+      const section = renderWarlock(patronStats('major', 'Fiend'));
+      expect(screen.queryByTestId('tracked-resource-healinglightPool')).not.toBeInTheDocument();
+      expect(section.textContent).not.toContain('Healing Light');
     });
   });
 
   describe('fiend patron', () => {
-    function fiendStats(overrides = {}) {
-      return buildPlayerStats({
-        level: 5,
-        class: {
-          name: 'Warlock',
-          major: { name: 'Fiend' },
-          subclass: {},
-          class_levels: [],
-          fightingStyles: [],
-        },
-        ...overrides,
-      });
-    }
-
-    it('renders dark one\'s own luck when major is Fiend', () => {
-      const stats = fiendStats();
-      renderComponent(stats);
-      expect(screen.getByText(/Dark One's Own Luck:/)).toBeInTheDocument();
+    it.each([
+      ['major', 'Fiend'],
+      ['major', 'Fiend Patron'],
+      ['subclass', 'Fiend'],
+      ['subclass', 'Fiend Patron'],
+    ])('tracks Dark One\'s Own Luck for name "%s" on %s', (slot, patron) => {
+      renderWarlock(patronStats(slot, patron));
+      expect(screen.getByTestId('tracked-resource-darkOnesLuckUses')).toBeInTheDocument();
     });
 
-    it('renders dark one\'s own luck when subclass is Fiend Patron', () => {
-      const stats = buildPlayerStats({
-        level: 5,
-        class: {
-          name: 'Warlock',
-          major: {},
-          subclass: { name: 'Fiend Patron' },
-          class_levels: [],
-          fightingStyles: [],
-        },
-      });
-      renderComponent(stats);
-      expect(screen.getByText(/Dark One's Own Luck:/)).toBeInTheDocument();
+    it.each([
+      [3, 3],
+      [0, 1],
+      [-2, 1],
+    ])('clamps Dark One\'s Own Luck max to max(1, chaMod) — cha %i → %i', (cha, expectedMax) => {
+      renderWarlock(patronStats('major', 'Fiend', 5, {
+        abilities: [{ name: 'Charisma', bonus: cha }],
+      }));
+      expect(screen.getByTestId('tracked-resource-darkOnesLuckUses'))
+        .toHaveTextContent(`Dark One's Own Luck: ${expectedMax}/${expectedMax}`);
     });
 
-    it('does not render dark one\'s own luck for non-fiend patron', () => {
-      const stats = buildPlayerStats({
-        level: 5,
-        class: {
-          name: 'Warlock',
-          major: { name: 'Celestial Patron' },
-          subclass: {},
-          class_levels: [],
-          fightingStyles: [],
-        },
-      });
-      renderComponent(stats);
-      expect(screen.queryByText(/Dark One's Own Luck/)).not.toBeInTheDocument();
-    });
-
-    it('renders dark one\'s own luck max as max(1, chaMod)', () => {
-      const stats = fiendStats();
-      renderComponent(stats);
-      expect(screen.getByText(/Dark One's Own Luck: 3/)).toBeInTheDocument();
+    it('does not render dark one\'s own luck for a non-fiend patron', () => {
+      const section = renderWarlock(patronStats('major', 'Celestial Patron'));
+      expect(screen.queryByTestId('tracked-resource-darkOnesLuckUses')).not.toBeInTheDocument();
+      expect(section.textContent).not.toContain('Dark One');
     });
   });
 
   describe('great old one patron', () => {
-    function goeStats(overrides = {}) {
-      return buildPlayerStats({
-        class: {
-          name: 'Warlock',
-          major: { name: 'Great Old One Patron' },
-          subclass: { name: 'Great Old One Patron' },
-          class_levels: [],
-          fightingStyles: [],
-        },
-        ...overrides,
-      });
-    }
-
-    it('shows awakened mind badge when patron matches and target is set', () => {
-      runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'awakenedMindTarget') return 'A goblin';
-        return undefined;
-      });
-      const stats = goeStats();
-      renderComponent(stats);
-      expect(screen.getByText(/Awakened Mind: A goblin/)).toBeInTheDocument();
+    it.each([
+      ['major', 'Great Old One Patron'],
+      ['subclass', 'Great Old One Patron'],
+    ])('shows the awakened mind badge with target when patron is set on %s', (slot, patron) => {
+      mockRuntime({ awakenedMindTarget: 'A goblin' });
+      const section = renderWarlock(patronStats(slot, patron));
+      expect(section.textContent).toContain('Awakened Mind: A goblin');
     });
 
-    it.each([null, ''])(
-      'does not show awakened mind badge when target is %s',
-      (value) => {
-        runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-          if (key === 'awakenedMindTarget') return value;
-          return undefined;
-        });
-        renderComponent(goeStats());
-        expect(screen.queryByText(/Awakened Mind/)).not.toBeInTheDocument();
-      },
-    );
+    it.each([
+      ['null', null],
+      ['undefined', undefined],
+      ['an empty string', ''],
+    ])('omits the awakened mind badge when target is %s', (_label, target) => {
+      mockRuntime({ awakenedMindTarget: target });
+      const section = renderWarlock(patronStats('major', 'Great Old One Patron'));
+      expect(section.textContent).not.toContain('Awakened Mind');
+    });
 
-    it('does not show awakened mind badge for non-great old one patron', () => {
-      runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'awakenedMindTarget') return 'A goblin';
-        return undefined;
-      });
-      const stats = buildPlayerStats({
-        class: {
-          name: 'Warlock',
-          major: { name: 'Fiend' },
-          subclass: {},
-          class_levels: [],
-          fightingStyles: [],
-        },
-      });
-      renderComponent(stats);
-      expect(screen.queryByText(/Awakened Mind/)).not.toBeInTheDocument();
+    it('omits the awakened mind badge for a non-great-old-one patron even with a target', () => {
+      mockRuntime({ awakenedMindTarget: 'A goblin' });
+      const section = renderWarlock(patronStats('major', 'Fiend'));
+      expect(section.textContent).not.toContain('Awakened Mind');
     });
   });
 
   describe('steps of the fey', () => {
-    it('renders steps of the fey when bonus action exists', () => {
-      const stats = buildPlayerStats({
+    it.each([
+      [3, 3],
+      [1, 1],
+      [0, 1],
+      [-2, 1],
+    ])('clamps Steps of the Fey max to max(chaMod, 1) — cha %i → %i', (cha, expectedMax) => {
+      const stats = warlockStats(5, {
+        abilities: [{ name: 'Charisma', bonus: cha }],
         automation: { bonusActions: [{ type: 'steps_of_the_fey' }] },
       });
-      renderComponent(stats);
-      expect(screen.getByText(/Steps of the Fey:/)).toBeInTheDocument();
+      renderWarlock(stats);
+      expect(screen.getByTestId('tracked-resource-_Steps_of_the_Fey_freeCastCount'))
+        .toHaveTextContent(`Steps of the Fey: ${expectedMax}/${expectedMax}`);
     });
 
-    it.each([{ bonusActions: [] }, { bonusActions: undefined }])(
-      'does not render steps of the fey when bonusActions is %s',
-      ({ bonusActions }) => {
-        const stats = buildPlayerStats({ automation: { bonusActions } });
-        renderComponent(stats);
-        expect(screen.queryByText(/Steps of the Fey/)).not.toBeInTheDocument();
-      },
-    );
-
-    it('renders steps of the fey max as max(chaMod, 1) with chaMod 3', () => {
-      const stats = buildPlayerStats({
-        abilities: [{ name: 'Charisma', bonus: 3 }],
-        automation: { bonusActions: [{ type: 'steps_of_the_fey' }] },
+    it.each([
+      ['an empty array', []],
+      ['undefined', undefined],
+      ['automation itself undefined', undefined],
+    ])('omits steps of the fey when bonusActions is %s', (_label, bonusActions) => {
+      const stats = warlockStats(5, {
+        automation: bonusActions === undefined ? undefined : { bonusActions },
       });
-      renderComponent(stats);
-      expect(screen.getByText(/Steps of the Fey: 3/)).toBeInTheDocument();
+      const section = renderWarlock(stats);
+      expect(screen.queryByTestId('tracked-resource-_Steps_of_the_Fey_freeCastCount')).not.toBeInTheDocument();
+      expect(section.textContent).not.toContain('Steps of the Fey');
     });
-
   });
 });

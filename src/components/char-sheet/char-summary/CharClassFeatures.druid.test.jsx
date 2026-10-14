@@ -1,9 +1,15 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
 import * as classFeatures from '../../../services/character/classFeatures.js';
 import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 
+// Druid Features are reached through the CharClassFeatures registry entry
+// point (class name 'Druid' → DruidFeatures).
+
+// Mock with a resourceKey-scoped testid so assertions can verify a specific
+// tracked resource's computed max, not just that "some" number rendered.
 vi.mock('./TrackedResourceInput.jsx', () => ({
   default: function MockTrackedResourceInput({ label, getMax, resourceKey }) {
     const max = getMax ? getMax() : 0;
@@ -16,12 +22,7 @@ vi.mock('./TrackedResourceInput.jsx', () => ({
 }));
 
 vi.mock('../../../services/character/classFeatures.js', () => ({
-  getClassFeatures: vi.fn(() => ({
-    maxWildShapeUses: 2,
-    maxWildShapeChallengeRating: 1,
-    beastKnownForms: 0,
-    wildShapeLimitations: 'walk only (no swim or fly)',
-  })),
+  getClassFeatures: vi.fn(),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -30,12 +31,55 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-const MOCK_CAMPAIGN = 'test';
+const CAMPAIGN = 'test-campaign';
 
-function buildPlayerStats(overrides = {}) {
+// Mirrors the shape getDruidFeatures returns in the real service
+// (5e lv2 baseline).
+const defaultDruidFeatures = {
+  maxWildShapeUses: 2,
+  maxWildShapeChallengeRating: 1,
+  beastKnownForms: 0,
+  wildShapeLimitations: 'walk only (no swim or fly)',
+};
+
+function mockDruidFeatures(overrides = {}) {
+  classFeatures.getClassFeatures.mockReturnValue({ ...defaultDruidFeatures, ...overrides });
+}
+
+function mockRuntime({
+  buffs = [],
+  cosmicOmenEffect = undefined,
+  circleOfTheLandType = undefined,
+  elementalFury = undefined,
+  improvedElementalFury = undefined,
+  wrathOfTheSeaActive = undefined,
+} = {}) {
+  runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
+    switch (key) {
+      case 'activeBuffs': return buffs;
+      case 'cosmicOmenEffect': return cosmicOmenEffect;
+      case '_circleOfTheLandType': return circleOfTheLandType;
+      case '_Elemental_Fury_option': return elementalFury;
+      case '_Improved_Elemental_Fury_option': return improvedElementalFury;
+      case 'wrathOfTheSeaActive': return wrathOfTheSeaActive;
+      default: return undefined;
+    }
+  });
+}
+
+// Natural Recovery values are read via standalone getRuntimeValue (no campaign arg).
+function mockGetRuntime({ freeCast = null, freeCastUsed = null } = {}) {
+  runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
+    if (key === 'naturalRecoveryFreeCast') return freeCast;
+    if (key === 'naturalRecoveryFreeCastUsed') return freeCastUsed;
+    return null;
+  });
+}
+
+function druidStats(level, overrides = {}) {
   return {
     name: 'Test Druid',
-    level: 1,
+    level,
     rules: '5e',
     proficiency: 2,
     class: {
@@ -45,422 +89,305 @@ function buildPlayerStats(overrides = {}) {
       class_levels: [],
       fightingStyles: [],
     },
-    abilities: [
-      { name: 'Wisdom', bonus: 3 },
-    ],
-    automation: {},
+    abilities: [{ name: 'Wisdom', bonus: 3 }],
+    automation: { passives: [] },
     ...overrides,
   };
 }
 
-function setBuffs(buffs) {
-  runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-    if (key === 'activeBuffs') return buffs;
-    return undefined;
+function circleStats(circle, level, overrides = {}) {
+  return druidStats(level, {
+    class: {
+      name: 'Druid',
+      major: { name: circle },
+      subclass: { name: circle },
+      class_levels: [],
+      fightingStyles: [],
+    },
+    ...overrides,
   });
 }
 
-function setCosmicOmenEffect(effect) {
-  runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-    if (key === 'cosmicOmenEffect') return effect;
-    if (key === 'activeBuffs') return [];
-    return undefined;
-  });
+const starsStats = (level, overrides = {}) => circleStats('Circle of the Stars', level, overrides);
+const moonStats = (level, overrides = {}) => circleStats('Circle of the Moon', level, overrides);
+const landStats = (level, overrides = {}) => circleStats('Circle of the Land', level, overrides);
+const stormStats = (level, overrides = {}) => circleStats('Circle of the Storm', level, overrides);
+const seaStats = (level = 2, overrides = {}) => circleStats('Circle of the Sea', level, overrides);
+
+function renderDruid(playerStats) {
+  render(<CharClassFeatures playerStats={playerStats} campaignName={CAMPAIGN} />);
+  return screen.getByTestId('char-class-druid');
 }
 
-function setCircleOfTheLandType(type) {
-  runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-    if (key === '_circleOfTheLandType') return type;
-    if (key === 'activeBuffs') return [];
-    return undefined;
-  });
-}
-
-function setElementalFuryChoices(elementalFury, improvedElementalFury) {
-  runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-    if (key === '_Elemental_Fury_option') return elementalFury;
-    if (key === '_Improved_Elemental_Fury_option') return improvedElementalFury;
-    if (key === 'activeBuffs') return [];
-    return undefined;
-  });
-}
-
-function setWrathOfTheSeaActive(active) {
-  runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-    if (key === 'wrathOfTheSeaActive') return active;
-    if (key === 'activeBuffs') return [];
-    return undefined;
-  });
-}
-
-describe('DruidFeatures (via CharClassFeatures entry point)', () => {
+describe('DruidFeatures', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-      switch (key) {
-        case 'activeBuffs': return [];
-        case 'cosmicOmenEffect': return undefined;
-        case 'wrathOfTheSeaActive': return undefined;
-        case '_circleOfTheLandType': return undefined;
-        case '_Elemental_Fury_option': return undefined;
-        case '_Improved_Elemental_Fury_option': return undefined;
-        default: return undefined;
-      }
-    });
-    runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-      switch (key) {
-        case 'naturalRecoveryFreeCast': return undefined;
-        case 'naturalRecoveryFreeCastUsed': return undefined;
-        default: return null;
-      }
-    });
+    mockDruidFeatures();
+    mockRuntime();
+    mockGetRuntime();
   });
-
-  // @cleaned: removed afterEach(cleanup) — DOM is auto-cleaned by vitest setup
 
   describe('level gating', () => {
-    it('returns null for level 1 druid', () => {
-      const level1Stats = buildPlayerStats({ level: 1 });
-      const { container } = render(<CharClassFeatures playerStats={level1Stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(container.innerHTML).toBe('');
+    it('renders nothing below level 2 (Wild Shape is a level 2 feature)', () => {
+      render(<CharClassFeatures playerStats={druidStats(1)} campaignName={CAMPAIGN} />);
+      expect(screen.queryByTestId('char-class-druid')).not.toBeInTheDocument();
     });
 
-    it('renders class features for level 2+', () => {
-      const level2Stats = buildPlayerStats({ level: 2 });
-      render(<CharClassFeatures playerStats={level2Stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText('Wild Shape Limitations:')).toBeInTheDocument();
+    it('renders the druid section at level 2', () => {
+      const section = renderDruid(druidStats(2));
+      expect(section).toBeInTheDocument();
     });
   });
 
-  describe('base wild shape features', () => {
-    it('renders beast forms known when count > 0', () => {
-      vi.mocked(classFeatures.getClassFeatures).mockReturnValue({
-        maxWildShapeUses: 2,
-        maxWildShapeChallengeRating: 1,
-        beastKnownForms: 5,
-        wildShapeLimitations: 'walk only (no swim or fly)',
+  describe('wild shape basics', () => {
+    it('passes limitations and challenge rating values through from class features', () => {
+      mockDruidFeatures({
+        wildShapeLimitations: 'swim, but not fly',
+        maxWildShapeChallengeRating: 3,
       });
-      const stats = buildPlayerStats({ level: 2 });
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText(/Beast Forms Known:/).parentElement).toHaveTextContent(/5/);
+      const section = renderDruid(druidStats(4));
+      expect(section.textContent).toContain('Wild Shape Limitations: swim, but not fly');
+      expect(section.textContent).toContain('Wild Shape Max Challenge Rating: 3');
     });
 
-    it('renders wild shape limitations, challenge rating, and tracked resource', () => {
-      const stats = buildPlayerStats({ level: 2 });
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText('Wild Shape Limitations:')).toBeInTheDocument();
-      expect(screen.getByText('Wild Shape Max Challenge Rating:')).toBeInTheDocument();
-      expect(screen.getByText('Wild Shape Uses:')).toBeInTheDocument();
+    it('tracks Wild Shape Uses with max from maxWildShapeUses', () => {
+      mockDruidFeatures({ maxWildShapeUses: 3 });
+      renderDruid(druidStats(2));
+      expect(screen.getByTestId('tracked-resource-wildShapeUses'))
+        .toHaveTextContent('Wild Shape Uses: 3/3');
     });
 
-    it('uses maxWildShapeUses from class features as the max value', () => {
-      vi.mocked(classFeatures.getClassFeatures).mockReturnValue({
-        maxWildShapeUses: 3,
-        maxWildShapeChallengeRating: 1,
-        beastKnownForms: 0,
-        wildShapeLimitations: 'None',
-      });
-      const stats = buildPlayerStats({ level: 2 });
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText(/Wild Shape Uses:/).parentElement).toHaveTextContent(/3\/3/);
+    it('lists Beast Forms Known when the count is positive', () => {
+      mockDruidFeatures({ beastKnownForms: 5 });
+      const section = renderDruid(druidStats(2));
+      expect(section.textContent).toContain('Beast Forms Known: 5');
     });
 
-    it('CLA-013: Infinity max (5e lv20 Archdruid) renders Unlimited instead of a numeric counter', () => {
-      vi.mocked(classFeatures.getClassFeatures).mockReturnValue({
-        maxWildShapeUses: Infinity,
-        maxWildShapeChallengeRating: 1,
-        beastKnownForms: 0,
-        wildShapeLimitations: 'walk, swim, or fly',
-      });
-      const stats = buildPlayerStats({ level: 20 });
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText(/Unlimited/)).toBeInTheDocument();
-      expect(screen.getByText(/Wild Shape Uses:/).parentElement).toHaveTextContent(/Unlimited/);
+    it.each([
+      ['zero forms', 0],
+      ['count is undefined', undefined],
+    ])('omits Beast Forms Known when %s', (_label, beastKnownForms) => {
+      mockDruidFeatures({ beastKnownForms });
+      const section = renderDruid(druidStats(2));
+      expect(section.textContent).not.toContain('Beast Forms Known');
+    });
+
+    it('CLA-013: renders Unlimited (Archdruid) badge instead of a counter when max is Infinity', () => {
+      mockDruidFeatures({ maxWildShapeUses: Infinity });
+      const section = renderDruid(druidStats(20));
       expect(screen.queryByTestId('tracked-resource-wildShapeUses')).not.toBeInTheDocument();
+      expect(section.textContent).toContain('Unlimited');
+      expect(section.textContent).toContain('(Archdruid)');
     });
   });
 
   describe('circle of the stars', () => {
-    const starsDruidStats = (level) => buildPlayerStats({
-      level,
-      class: {
-        name: 'Druid',
-        major: { name: 'Circle of the Stars' },
-        subclass: { name: 'Circle of the Stars' },
-        class_levels: [],
-        fightingStyles: [],
-      },
-      automation: { passives: [] },
+    it.each([
+      [2, false],
+      [5, false],
+      [6, true],
+      [20, true],
+    ])('at level %i renders cosmic omen tracked resources: %s', (level, expected) => {
+      renderDruid(starsStats(level));
+      const check = (label) => {
+        const query = screen.queryByText(label);
+        if (expected) expect(query).toBeInTheDocument();
+        else expect(query).not.toBeInTheDocument();
+      };
+      check('Cosmic Omen Uses:');
+      check('Star Map Free Casts:');
     });
 
-    it('renders cosmic omen tracked resources at level >= 6', () => {
-      const stats = starsDruidStats(6);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText('Cosmic Omen Uses:')).toBeInTheDocument();
-      expect(screen.getByText('Star Map Free Casts:')).toBeInTheDocument();
+    it.each([
+      [5, '5/5'],
+      [0, '1/1'],
+      [-2, '1/1'],
+    ])('caps cosmic omen and star map max at max(WIS,1) for WIS %i', (wisBonus, expected) => {
+      renderDruid(starsStats(6, { abilities: [{ name: 'Wisdom', bonus: wisBonus }] }));
+      expect(screen.getByTestId('tracked-resource-cosmicomenUses'))
+        .toHaveTextContent(`Cosmic Omen Uses: ${expected}`);
+      expect(screen.getByTestId('tracked-resource-_Star_Map_freeCastCount'))
+        .toHaveTextContent(`Star Map Free Casts: ${expected}`);
     });
 
-    it('does not render cosmic omen tracked resources below level 6', () => {
-      const stats = starsDruidStats(5);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.queryByText('Cosmic Omen Uses:')).not.toBeInTheDocument();
-      expect(screen.queryByText('Star Map Free Casts:')).not.toBeInTheDocument();
+    it.each([
+      ['Fortune, even', { type: 'Fortune', isEven: true }, 'Cosmic Omen: Fortune (Even)'],
+      ['Bane, odd', { type: 'Bane', isEven: false }, 'Cosmic Omen: Bane (Odd)'],
+      ['Fortune with isEven absent (Odd)', { type: 'Fortune' }, 'Cosmic Omen: Fortune (Odd)'],
+    ])('renders the omen badge for %s', (_label, effect, expectedText) => {
+      mockRuntime({ cosmicOmenEffect: JSON.stringify(effect) });
+      const section = renderDruid(starsStats(6));
+      expect(section.textContent).toContain(expectedText);
     });
 
-    it('renders cosmic omen effect with parsed type and even/odd variant', () => {
-      setCosmicOmenEffect(JSON.stringify({ type: 'Fortune', isEven: true }));
-      const stats = starsDruidStats(6);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText(/Cosmic Omen: Fortune \(Even\)/)).toBeInTheDocument();
-
-      setCosmicOmenEffect(JSON.stringify({ type: 'Bane', isEven: false }));
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText(/Cosmic Omen: Bane \(Odd\)/)).toBeInTheDocument();
-    });
-
-    it('does not render cosmic omen effect when effect is null', () => {
-      setCosmicOmenEffect(null);
-      const stats = starsDruidStats(6);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.queryByText(/Cosmic Omen:/)).not.toBeInTheDocument();
-    });
-
-    it('does not render cosmic omen effect when effect is empty string', () => {
-      setCosmicOmenEffect('');
-      const stats = starsDruidStats(6);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.queryByText(/Cosmic Omen:/)).not.toBeInTheDocument();
-    });
-
-    it('does not render cosmic omen effect when effect is invalid JSON', () => {
-      setCosmicOmenEffect('invalid json');
-      const stats = starsDruidStats(6);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.queryByText(/Cosmic Omen:/)).not.toBeInTheDocument();
-    });
-
-    it('uses wisdom bonus as max with minimum 1 when bonus is 0', () => {
-      const wisStats = buildPlayerStats({
-        level: 6,
-        abilities: [{ name: 'Wisdom', bonus: 5 }],
-        class: {
-          name: 'Druid',
-          major: { name: 'Circle of the Stars' },
-          subclass: { name: 'Circle of the Stars' },
-          class_levels: [],
-          fightingStyles: [],
-        },
-        automation: { passives: [] },
-      });
-      render(<CharClassFeatures playerStats={wisStats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText(/Cosmic Omen Uses:/).parentElement).toHaveTextContent(/5\/5/);
-    });
-
-    it('uses minimum 1 when wisdom bonus is 0', () => {
-      const zeroWisStats = buildPlayerStats({
-        level: 6,
-        abilities: [{ name: 'Wisdom', bonus: 0 }],
-        class: {
-          name: 'Druid',
-          major: { name: 'Circle of the Stars' },
-          subclass: { name: 'Circle of the Stars' },
-          class_levels: [],
-          fightingStyles: [],
-        },
-        automation: { passives: [] },
-      });
-      render(<CharClassFeatures playerStats={zeroWisStats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText(/Cosmic Omen Uses:/).parentElement).toHaveTextContent(/1\/1/);
+    it.each([
+      ['null', null],
+      ['an empty string', ''],
+      ['invalid JSON', 'invalid json'],
+      ['JSON without a type', '{"isEven":true}'],
+    ])('omits the omen badge when the effect is %s', (_label, effect) => {
+      mockRuntime({ cosmicOmenEffect: effect });
+      const section = renderDruid(starsStats(6));
+      expect(section.textContent).not.toContain('Cosmic Omen:');
     });
   });
 
   describe('circle of the moon', () => {
-    const moonDruidStats = (level) => buildPlayerStats({
-      level,
-      class: {
-        name: 'Druid',
-        major: { name: 'Circle of the Moon' },
-        subclass: { name: 'Circle of the Moon' },
-        class_levels: [],
-        fightingStyles: [],
-      },
-      automation: { passives: [] },
+    it('tracks Moonlight Step Uses for moon druids', () => {
+      renderDruid(moonStats(10));
+      expect(screen.getByTestId('tracked-resource-moonlightStepUses')).toBeInTheDocument();
     });
 
-    it('renders moonlight step uses for circle of the moon', () => {
-      const stats = moonDruidStats(10);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText('Moonlight Step Uses:')).toBeInTheDocument();
+    it('omits Moonlight Step Uses for non-moon circles', () => {
+      const section = renderDruid(landStats(10));
+      expect(screen.queryByTestId('tracked-resource-moonlightStepUses')).not.toBeInTheDocument();
+      expect(section.textContent).not.toContain('Moonlight Step');
     });
 
-    it('does not render moonlight step uses for non-moon circles', () => {
-      const nonMoonStats = buildPlayerStats({
-        level: 10,
-        class: {
-          name: 'Druid',
-          major: { name: 'Circle of the Land' },
-          subclass: { name: 'Circle of the Land' },
-          class_levels: [],
-          fightingStyles: [],
-        },
-        automation: { passives: [] },
-      });
-      render(<CharClassFeatures playerStats={nonMoonStats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.queryByText('Moonlight Step Uses:')).not.toBeInTheDocument();
+    it.each([
+      [3, '3/3'],
+      [0, '1/1'],
+      [-2, '1/1'],
+    ])('caps Moonlight Step max at max(WIS,1) for WIS %i', (wisBonus, expected) => {
+      renderDruid(moonStats(10, { abilities: [{ name: 'Wisdom', bonus: wisBonus }] }));
+      expect(screen.getByTestId('tracked-resource-moonlightStepUses'))
+        .toHaveTextContent(`Moonlight Step Uses: ${expected}`);
     });
 
-    it('uses wisdom bonus as max with minimum 1 when wisdom is negative', () => {
-      const stats = moonDruidStats(10);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText(/Moonlight Step Uses:/).parentElement).toHaveTextContent(/3\/3/);
-    });
-
-    it('CLA-230: renders Restore Uses control that dispatches the moonlight-step-restore bus event', () => {
-      const stats = moonDruidStats(10);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      const btn = screen.getByRole('button', { name: /Restore Uses/i });
+    it('CLA-230: Restore Uses button dispatches the moonlight-step-restore bus event', () => {
+      const section = renderDruid(moonStats(10));
       const handler = vi.fn();
       window.addEventListener('moonlight-step-restore', handler);
-      fireEvent.click(btn);
-      window.removeEventListener('moonlight-step-restore', handler);
-      expect(handler).toHaveBeenCalledTimes(1);
+      try {
+        fireEvent.click(screen.getByRole('button', { name: /Restore Uses/i }));
+        expect(handler).toHaveBeenCalledTimes(1);
+        expect(section.querySelector('.moonlight-step-restore-btn')).not.toBeNull();
+      } finally {
+        window.removeEventListener('moonlight-step-restore', handler);
+      }
     });
 
-    it('CLA-230: hides Restore Uses below level 10', () => {
-      const stats = moonDruidStats(3);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
+    it.each([3, 9])('CLA-230: hides Restore Uses at level %i (unlocks at 10)', (level) => {
+      renderDruid(moonStats(level));
       expect(screen.queryByRole('button', { name: /Restore Uses/i })).not.toBeInTheDocument();
     });
+  });
 
-    it('uses minimum 1 when wisdom bonus is negative', () => {
-      const negativeWisStats = buildPlayerStats({
-        level: 10,
-        abilities: [{ name: 'Wisdom', bonus: -2 }],
-        class: {
-          name: 'Druid',
-          major: { name: 'Circle of the Moon' },
-          subclass: { name: 'Circle of the Moon' },
-          class_levels: [],
-          fightingStyles: [],
-        },
-        automation: { passives: [] },
-      });
-      render(<CharClassFeatures playerStats={negativeWisStats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText(/Moonlight Step Uses:/).parentElement).toHaveTextContent(/1\/1/);
+  describe('circle badges (land and storm)', () => {
+    it('renders the Circle of the Land badge with its chosen type', () => {
+      mockRuntime({ circleOfTheLandType: 'Forest' });
+      const section = renderDruid(landStats(3));
+      expect(section.textContent).toContain('Circle of the Land: Forest');
+    });
+
+    it.each([
+      ['null', null],
+      ['an empty string', ''],
+      ['undefined', undefined],
+    ])('omits the Circle of the Land badge when the type is %s', (_label, type) => {
+      mockRuntime({ circleOfTheLandType: type });
+      const section = renderDruid(landStats(3));
+      expect(section.textContent).not.toContain('Circle of the Land');
+    });
+
+    it('renders elemental fury badges for the storm druid without needing a land type', () => {
+      mockRuntime({ elementalFury: 'Lightning', improvedElementalFury: 'Fire' });
+      const section = renderDruid(stormStats(18));
+      expect(section.textContent).toContain('Elemental Fury: Lightning');
+      expect(section.textContent).toContain('Improved Elemental Fury: Fire');
+      expect(section.textContent).not.toContain('Circle of the Land');
+    });
+
+    it('renders fury badges independently of the land type when only choices are set', () => {
+      mockRuntime({ improvedElementalFury: 'Thunder' });
+      const section = renderDruid(stormStats(18));
+      const badgeTexts = [...section.querySelectorAll('.automation-badge')].map(el => el.textContent.trim());
+      expect(badgeTexts).toContain('Improved Elemental Fury: Thunder');
+      expect(badgeTexts.filter(t => t.startsWith('Elemental Fury:'))).toHaveLength(0);
+      expect(section.textContent).not.toContain('Circle of the Land');
+    });
+
+    it('omits elemental fury badges when no choices are set', () => {
+      const section = renderDruid(stormStats(18));
+      expect(section.textContent).not.toContain('Elemental Fury');
     });
   });
 
-  describe('circle of the land', () => {
-    const landDruidStats = (level) => buildPlayerStats({
-      level,
-      class: {
-        name: 'Druid',
-        major: { name: 'Circle of the Land' },
-        subclass: { name: 'Circle of the Land' },
-        class_levels: [],
-        fightingStyles: [],
-      },
-      automation: { passives: [] },
+  describe('natural recovery', () => {
+    it('omits the section when no natural_recovery passive exists', () => {
+      const section = renderDruid(druidStats(2));
+      expect(section.textContent).not.toContain('Natural Recovery');
     });
 
-    it('renders circle of the land badge when type is set', () => {
-      setCircleOfTheLandType('Forest');
-      const stats = landDruidStats(3);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText(/Circle of the Land: Forest/)).toBeInTheDocument();
+    it('renders the section header when the passive exists', () => {
+      const stats = druidStats(2, { automation: { passives: [{ type: 'natural_recovery' }] } });
+      const section = renderDruid(stats);
+      expect(section.textContent).toContain('Natural Recovery:');
+      expect(section.textContent).not.toContain('Free cast');
     });
 
-    it('does not render circle of the land badge when type is null', () => {
-      setCircleOfTheLandType(null);
-      const stats = landDruidStats(3);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.queryByText(/Circle of the Land:/)).not.toBeInTheDocument();
+    it('badges the first selected free cast spell', () => {
+      mockGetRuntime({ freeCast: ['Moonbeam', 'Speak with Animals'] });
+      const stats = druidStats(2, { automation: { passives: [{ type: 'natural_recovery' }] } });
+      const section = renderDruid(stats);
+      expect(section.textContent).toContain('Free cast: Moonbeam');
+      expect(section.textContent).not.toContain('Speak with Animals');
     });
 
-    it('does not render circle of the land badge when type is empty', () => {
-      setCircleOfTheLandType('');
-      const stats = landDruidStats(3);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.queryByText(/Circle of the Land:/)).not.toBeInTheDocument();
-    });
-  });
-
-  describe('elemental fury (circle of the storm)', () => {
-    const stormDruidStats = (level) => buildPlayerStats({
-      level,
-      class: {
-        name: 'Druid',
-        major: { name: 'Circle of the Storm' },
-        subclass: { name: 'Circle of the Storm' },
-        class_levels: [],
-        fightingStyles: [],
-      },
-      automation: { passives: [] },
-    });
-
-    it('renders elemental fury and improved elemental fury badges when choices are set', () => {
-      setElementalFuryChoices('Lightning', 'Fire');
-      const stats = stormDruidStats(18);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText(/Elemental Fury: Lightning/)).toBeInTheDocument();
-      expect(screen.getByText(/Improved Elemental Fury: Fire/)).toBeInTheDocument();
-    });
-
-    it('does not render elemental fury badges when choices are not set', () => {
-      const stats = stormDruidStats(18);
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.queryByText(/Elemental Fury/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Improved Elemental Fury/)).not.toBeInTheDocument();
+    it.each([
+      [true, true],
+      [false, false],
+      [null, false],
+    ])('shows the free-cast-used badge only when the flag is truthy (%s)', (used, expected) => {
+      mockGetRuntime({ freeCastUsed: used });
+      const stats = druidStats(2, { automation: { passives: [{ type: 'natural_recovery' }] } });
+      const section = renderDruid(stats);
+      expect(section.textContent.includes('Free cast used')).toBe(expected);
     });
   });
 
   describe('wrath of the sea', () => {
-    const seaDruidStats = () => buildPlayerStats({
-      level: 2,
-      class: {
-        name: 'Druid',
-        major: { name: 'Circle of the Sea' },
-        subclass: { name: 'Circle of the Sea' },
-        class_levels: [],
-        fightingStyles: [],
-      },
-      automation: { passives: [] },
+    it('renders the active badge when wrathOfTheSeaActive is true', () => {
+      mockRuntime({ wrathOfTheSeaActive: true });
+      const section = renderDruid(seaStats());
+      expect(section.textContent).toContain('Wrath of the Sea Active');
     });
 
-    it('renders wrath of the sea badge when active', () => {
-      setWrathOfTheSeaActive(true);
-      const stats = seaDruidStats();
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText('Wrath of the Sea Active')).toBeInTheDocument();
-    });
-
-    it('does not render wrath of the sea badge when inactive', () => {
-      setWrathOfTheSeaActive(false);
-      const stats = seaDruidStats();
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.queryByText('Wrath of the Sea Active')).not.toBeInTheDocument();
-    });
-
-    it('does not render wrath of the sea badge when undefined', () => {
-      setWrathOfTheSeaActive(undefined);
-      const stats = seaDruidStats();
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.queryByText('Wrath of the Sea Active')).not.toBeInTheDocument();
+    it.each([
+      ['false', false],
+      ['undefined', undefined],
+    ])('omits the badge when the flag is %s', (_label, active) => {
+      mockRuntime({ wrathOfTheSeaActive: active });
+      const section = renderDruid(seaStats());
+      expect(section.textContent).not.toContain('Wrath of the Sea Active');
     });
   });
 
-  describe('multi-minute badges', () => {
-    it('renders multi-minute duration badges', () => {
-      setBuffs([{ name: 'Some Buff', duration: '10_minutes' }]);
-      const stats = buildPlayerStats({ level: 2 });
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText('Some Buff: 10_minutes')).toBeInTheDocument();
+  describe('multi-minute buff badges', () => {
+    it.each([
+      ['1_minute'],
+      ['hour'],
+      ['long_rest'],
+      ['while_illusion_active'],
+    ])('renders a badge for %s duration', (duration) => {
+      mockRuntime({ buffs: [{ name: 'Test Buff', duration }] });
+      const section = renderDruid(druidStats(2));
+      expect(section.textContent).toContain(`Test Buff: ${duration}`);
     });
 
-    it('formats half_druid_level_hours as half of Druid LEVEL not half of uses (CLA-391)', () => {
-      setBuffs([{ name: 'Wild Shape', effect: 'shape_shift', duration: 'half_druid_level_hours' }]);
-      const stats = buildPlayerStats({
-        level: 20,
+    it.each([
+      ['combat-scoped round', '1_round'],
+      ['instant', 'instant'],
+      ['missing duration', undefined],
+    ])('filters out %s', (_label, duration) => {
+      mockRuntime({ buffs: [{ name: 'Test Buff', duration }] });
+      const section = renderDruid(druidStats(2));
+      expect(section.textContent).not.toContain('Test Buff');
+    });
+
+    it('CLA-391: formats half_druid_level_hours from druid LEVEL, not wild shape uses', () => {
+      mockRuntime({ buffs: [{ name: 'Wild Shape', effect: 'shape_shift', duration: 'half_druid_level_hours' }] });
+      const stats = druidStats(20, {
         class: {
           name: 'Druid',
           major: {},
@@ -469,36 +396,25 @@ describe('DruidFeatures (via CharClassFeatures entry point)', () => {
           fightingStyles: [],
         },
       });
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText('Wild Shape: 10 hours')).toBeInTheDocument();
-      expect(screen.queryByText('Wild Shape: 2 hours')).not.toBeInTheDocument();
+      const section = renderDruid(stats);
+      expect(section.textContent).toContain('Wild Shape: 10 hours');
+      expect(section.textContent).not.toContain('Wild Shape: 2 hours');
     });
 
-    it('suppresses non-multi-minute duration badges', () => {
-      setBuffs([{ name: 'Some Buff', duration: '1_round' }]);
-      const stats = buildPlayerStats({ level: 2 });
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.queryByText('Some Buff')).not.toBeInTheDocument();
+    it('pluralizes half_druid_level_hours for odd levels (lv3 → 1 hour)', () => {
+      mockRuntime({ buffs: [{ name: 'Test Buff', duration: 'half_druid_level_hours' }] });
+      const section = renderDruid(druidStats(3));
+      expect(section.textContent).toContain('Test Buff: 1 hour');
     });
 
-    it('handles undefined activeBuffs gracefully', () => {
-      runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return undefined;
-        return undefined;
-      });
-      const stats = buildPlayerStats({ level: 2 });
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText(/Wild Shape Limitations:/)).toBeInTheDocument();
-    });
-
-    it('handles null activeBuffs gracefully', () => {
-      runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return null;
-        return undefined;
-      });
-      const stats = buildPlayerStats({ level: 2 });
-      render(<CharClassFeatures playerStats={stats} campaignName={MOCK_CAMPAIGN} />);
-      expect(screen.getByText(/Wild Shape Limitations:/)).toBeInTheDocument();
+    it.each([
+      ['undefined', undefined],
+      ['null', null],
+    ])('survives a non-array activeBuffs value (%s) while still rendering wild shape basics', (_label, buffs) => {
+      mockRuntime({ buffs });
+      const section = renderDruid(druidStats(2));
+      expect(section.querySelectorAll('.automation-badge')).toHaveLength(0);
+      expect(section.textContent).toContain('Wild Shape Limitations:');
     });
   });
 });

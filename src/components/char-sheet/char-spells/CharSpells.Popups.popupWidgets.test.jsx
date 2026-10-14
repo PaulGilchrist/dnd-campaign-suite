@@ -1,10 +1,40 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+// @improved-by-ai
+/**
+ * Scope: the four popup widgets rendered by SpellTargetPopups from CharSpells —
+ * MetamagicPopup, MultiTargetPopup, MagicMissileTargetPopup, UpcastPopup.
+ *
+ * These tests verify the CharSpells/SpellTargetPopups boundary: how pending state
+ * produced by useSpellMetamagicFlow / useSpellUpcastFlow is mapped into popup props
+ * (spellName → spell.name, _currentSP → playerStats._metamagicCurrentSP, etc.),
+ * how the active combat target is resolved, and that confirm/skip clicks are routed
+ * back to the correct flow handler. The popup components themselves are stubbed so
+ * failures here always point at the wiring, not at popup internals.
+ *
+ * NOT covered here (see sibling files to avoid duplication):
+ * - target-selection modals + staged flows → CharSpells.Popups.targetSelection.test.jsx
+ * - cast flow via SpellDetailPopup, innate sorcery → CharSpells.Popups.spellCast.test.jsx
+ * - restoration modals → CharSpells.Popups.restoration.test.jsx
+ * - shapechange creature selection → CharSpells.Popups.creatureSelection.test.jsx
+ * - UpcastPopup internals → UpcastPopup.rendering/events.test.jsx
+ */
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpells from './CharSpells.jsx';
 import { mockPlayerStats } from './CharSpells.test-utils.js';
 
-// --- Shared mock infrastructure ---
-let mockDiceRoll = { rollAttack: vi.fn(), rollDamage: vi.fn(), autoDamageRoll: null };
+const CAMPAIGN = 'test-campaign';
+
+// --- Flow mocks (the pending state under test) ---
+
+vi.mock('../../../hooks/combat/useSpellMetamagicFlow.js', () => ({
+  useSpellMetamagicFlow: vi.fn(),
+}));
+
+vi.mock('../../../hooks/combat/useSpellUpcastFlow.js', () => ({
+  useSpellUpcastFlow: vi.fn(),
+}));
+
+// --- Infrastructure stubs: never render, never run game logic ---
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn(() => []),
@@ -13,32 +43,18 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
-  default: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn() })),
+  default: vi.fn(),
 }));
 
+const rollAttack = vi.fn();
+const rollDamage = vi.fn();
+
 vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
-  default: vi.fn((name, campaignName, options) => {
-    mockDiceRoll.autoDamageRoll = options?.autoDamageRoll;
-    return {
-      popupHtml: null,
-      setPopupHtml: vi.fn(),
-      rollAttack: mockDiceRoll.rollAttack,
-      rollDamage: mockDiceRoll.rollDamage,
-      quickRollPlayerSave: vi.fn(),
-    };
-  }),
+  default: vi.fn(() => ({ rollAttack, rollDamage })),
 }));
 
 vi.mock('../../../hooks/combat/DiceRollContext.js', () => ({
   useDiceRollPopup: vi.fn(() => ({ setPopupHtml: vi.fn() })),
-}));
-
-vi.mock('../../../hooks/combat/useSpellMetamagicFlow.js', () => ({
-  useSpellMetamagicFlow: vi.fn(),
-}));
-
-vi.mock('../../../hooks/combat/useSpellUpcastFlow.js', () => ({
-  useSpellUpcastFlow: vi.fn(),
 }));
 
 vi.mock('../../../hooks/combat/useSpellCastExecutor.js', () => ({
@@ -55,18 +71,20 @@ vi.mock('../../../hooks/combat/useSpellPositionResolver.js', () => ({
 vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(() => Promise.resolve(null)),
   getTargetFromAttacker: vi.fn(() => null),
+  getAttackerTargetName: vi.fn(() => null),
 }));
 
 vi.mock('../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({ creatures: [] })),
 }));
 
-vi.mock('../../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue({ players: [], placedItems: [] }),
-}));
-
 vi.mock('../../../services/rules/combat/rangeValidation.js', () => ({
   getNearestPlacedItem: vi.fn(() => null),
+  rangeToFeet: vi.fn(() => null),
+}));
+
+vi.mock('../../../services/maps/mapsService.js', () => ({
+  loadMapData: vi.fn(() => Promise.resolve({ players: [], placedItems: [] })),
 }));
 
 vi.mock('../../../services/ui/dataLoader.js', () => ({
@@ -78,163 +96,127 @@ vi.mock('../../../services/combat/buffs/buffService.js', () => ({
 }));
 
 vi.mock('../../../services/automation/handlers/spells/shapechangeService.js', () => ({
-  confirmShapechangeTransform: vi.fn().mockResolvedValue(undefined),
+  confirmShapechangeTransform: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
-  prepareSpellCast: vi.fn().mockResolvedValue(undefined),
+  prepareSpellCast: vi.fn(() => Promise.resolve()),
   isFreeCastAuthorized: vi.fn(() => false),
   isWizardRitualAdeptSpell: vi.fn(() => false),
 }));
 
 vi.mock('../useAttackDamageResolution.js', () => ({
-  normalizeAutoDamage: vi.fn(() => ({ attack: { name: 'Fire Bolt' }, ctx: { targetName: 'Orc' } })),
+  normalizeAutoDamage: vi.fn(() => ({ attack: {}, ctx: {} })),
   resolveAttackDamageStandalone: vi.fn(() => Promise.resolve()),
 }));
 
+// --- Widget stubs outside this file's scope: render nothing ---
+
 vi.mock('./CharSpellSlots.jsx', () => ({
-  default: function CharSpellSlots() {
-    return <div data-testid="char-spell-slots">Spell Slots</div>;
-  },
+  default: () => null,
 }));
 
 vi.mock('./SpellDetailPopup.jsx', () => ({
-  default: function SpellDetailPopup({ spell, onCast }) {
-    return (
-      <div data-testid="spell-detail-popup">
-        <span>{spell?.name}</span>
-        <button data-testid="cast-spell-button" onClick={() => onCast(spell, {})}>Cast</button>
-      </div>
-    );
-  },
+  default: () => null,
 }));
+
+vi.mock('../modals/shared/CreatureSelectionModal.jsx', () => ({
+  default: () => null,
+}));
+
+vi.mock('../modals/shared/SecondaryTargetModal.jsx', () => ({
+  default: () => null,
+}));
+
+vi.mock('../modals/TruePolymorphPathModal.jsx', () => ({
+  default: () => null,
+}));
+
+vi.mock('../modals/SingleResistanceSelectionModal.jsx', () => ({
+  default: () => null,
+}));
+
+vi.mock('../modals/HexAbilityModal.jsx', () => ({
+  default: () => null,
+}));
+
+// --- The four popup widgets under test ---
+// Stubs echo back the props CharSpells is responsible for mapping, so a broken
+// prop mapping or handler swap fails these tests rather than a popup internals test.
 
 vi.mock('../popups/MetamagicPopup.jsx', () => ({
   default: function MetamagicPopup({ spell, playerStats, onConfirm, onSkip }) {
     return (
-      <div data-testid="metamagic-popup">
-        <span data-testid="metamagic-spell-name">{spell?.name}</span>
-        <span data-testid="metamagic-sp">{playerStats?._metamagicCurrentSP}</span>
-        <button data-testid="metamagic-confirm" onClick={onConfirm}>confirm</button>
-        <button data-testid="metamagic-skip" onClick={onSkip}>skip</button>
+      <div role="dialog" aria-label="Metamagic">
+        <span>{`${spell?.name} (${spell?.level})`}</span>
+        <span>{`SP ${playerStats?._metamagicCurrentSP}`}</span>
+        {playerStats?._isPsionicSpell && (
+          <span>{`psionic cost ${playerStats?._psionicCost}`}</span>
+        )}
+        <button onClick={onConfirm}>Confirm</button>
+        <button onClick={onSkip}>Skip</button>
       </div>
     );
   },
 }));
 
 vi.mock('../popups/MultiTargetPopup.jsx', () => ({
-  default: function MultiTargetPopup({ spell, creatureTargets, onConfirm, onSkip }) {
+  default: function MultiTargetPopup({ spell, range, creatureTargets, onConfirm, onSkip }) {
+    const names = (creatureTargets || []).map(t => (typeof t === 'string' ? t : t.name));
     return (
-      <div data-testid="multi-target-popup">
-        <span data-testid="mt-spell-name">{spell?.name}</span>
-        <button data-testid="mt-confirm" onClick={() => onConfirm({ targets: creatureTargets })}>confirm</button>
-        <button data-testid="mt-skip" onClick={onSkip}>skip</button>
+      <div role="dialog" aria-label="Select targets">
+        <span>{spell?.name}</span>
+        <span>{range}</span>
+        <ul>{names.map(n => <li key={n}>{n}</li>)}</ul>
+        <button onClick={() => onConfirm({ targets: creatureTargets })}>Confirm</button>
+        <button onClick={onSkip}>Skip</button>
       </div>
     );
   },
 }));
 
 vi.mock('../popups/MagicMissileTargetPopup.jsx', () => ({
-  default: function MagicMissileTargetPopup({ spell, totalMissiles, currentTargetName, creatureTargets, onConfirm, onSkip }) {
+  default: function MagicMissileTargetPopup({ spell, totalMissiles, missileDamage, currentTargetName, creatureTargets, onConfirm, onSkip }) {
     return (
-      <div data-testid="magic-missile-popup">
-        <span data-testid="mm-spell-name">{spell?.name}</span>
-        <span data-testid="mm-total">{totalMissiles}</span>
-        <span data-testid="mm-current-target">{currentTargetName}</span>
-        <button data-testid="mm-confirm" onClick={() => onConfirm({ targets: creatureTargets })}>confirm</button>
-        <button data-testid="mm-skip" onClick={onSkip}>skip</button>
+      <div role="dialog" aria-label="Magic Missile targets">
+        <span>{`${spell?.name} x${totalMissiles} missiles`}</span>
+        <span>{missileDamage}</span>
+        <span>{`Current target: ${currentTargetName || 'none'}`}</span>
+        <button onClick={() => onConfirm({ targets: creatureTargets })}>Confirm</button>
+        <button onClick={onSkip}>Skip</button>
       </div>
     );
   },
 }));
 
 vi.mock('./UpcastPopup.jsx', () => ({
-  default: function UpcastPopup({ spell }) {
-    return <div data-testid="upcast-popup">{spell?.name}</div>;
-  },
-}));
-
-vi.mock('../modals/shared/CreatureSelectionModal.jsx', () => ({
-  default: function CreatureSelectionModal({ title, targets, onConfirm, onSkip }) {
+  default: function UpcastPopup({ spell, levels, onConfirm, onCancel }) {
     return (
-      <div data-testid="creature-selection-modal" data-title={title}>
-        <span>{title}</span>
-        {targets?.map(t => {
-          const name = typeof t === 'string' ? t : t.name;
-          return <button key={name} data-testid={`csm-${name}`} onClick={() => onConfirm?.([name])}>{name}</button>;
-        })}
-        <button data-testid="csm-skip" onClick={() => onSkip?.()}>skip</button>
+      <div role="dialog" aria-label="Upcast spell">
+        <span>{spell?.name}</span>
+        <span>{(levels || []).join(',')}</span>
+        <button onClick={onConfirm}>Confirm</button>
+        <button onClick={onCancel}>Cancel</button>
       </div>
     );
   },
 }));
-
-vi.mock('../modals/shared/SecondaryTargetModal.jsx', () => ({
-  default: function SecondaryTargetModal({ title, targets, onTargetSelected, onSkip, hideConfirm, description }) {
-    return (
-      <div data-testid="secondary-target-modal" data-title={title} data-hideconfirm={String(Boolean(hideConfirm))}>
-        <span>{title}</span>
-        <span data-testid="stm-description">{description}</span>
-        <button data-testid="stm-skip" onClick={() => onSkip?.()}>skip</button>
-        {targets?.map(t => (
-          <button key={t.value || t.name} data-testid={`stm-${t.value || t.name}`} onClick={() => onTargetSelected?.(t.value || t.name)}>
-            {t.label || t.name}
-          </button>
-        ))}
-        {!hideConfirm && targets?.length > 0 && (
-          <button data-testid="stm-confirm" onClick={() => onTargetSelected?.(targets[0].value || targets[0].name)}>confirm</button>
-        )}
-      </div>
-    );
-  },
-}));
-
-vi.mock('../modals/TruePolymorphPathModal.jsx', () => ({
-  default: function TruePolymorphPathModal({ onConfirm, onCancel }) {
-    return (
-      <div data-testid="true-polymorph-path-modal">
-        <button data-testid="tp-path-creature" onClick={() => onConfirm('creature_to_creature')}>creature to creature</button>
-        <button data-testid="tp-path-object" onClick={() => onConfirm('creature_to_object')}>creature to object</button>
-        <button data-testid="tp-cancel" onClick={onCancel}>cancel</button>
-      </div>
-    );
-  },
-}));
-
-vi.mock('../modals/SingleResistanceSelectionModal.jsx', () => ({
-  default: function SingleResistanceSelectionModal({ title, action }) {
-    return (
-      <div data-testid="single-resistance-selection-modal">
-        <span>{title}</span>
-        <span data-testid="res-damage-types">{action?.automation?.damageTypes?.join(',')}</span>
-      </div>
-    );
-  },
-}));
-
-vi.mock('../modals/HexAbilityModal.jsx', () => ({
-  default: function HexAbilityModal({ title, onAbilitySelected, onCancel }) {
-    return (
-      <div data-testid="hex-ability-modal" data-title={title}>
-        <button data-testid="hex-ability-STR" onClick={() => onAbilitySelected('STR')}>Strength</button>
-        <button data-testid="hex-cancel" onClick={onCancel}>cancel</button>
-      </div>
-    );
-  },
-}));
-
-// --- Shared test helpers ---
 
 import { useSpellMetamagicFlow } from '../../../hooks/combat/useSpellMetamagicFlow.js';
 import { useSpellUpcastFlow } from '../../../hooks/combat/useSpellUpcastFlow.js';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { isInnateSorceryActive } from '../../../services/combat/buffs/buffService.js';
 import { getTargetFromAttacker } from '../../../services/rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
-import { normalizeAutoDamage, resolveAttackDamageStandalone } from '../useAttackDamageResolution.js';
 
-function createFlow(overrides = {}) {
-  const flow = {
+// --- Per-test fixtures ---
+
+let flow;
+let upcastFlow;
+
+function createFlow() {
+  return {
+    pendingMetamagic: null,
+    pendingMultiTarget: null,
+    pendingMagicMissile: null,
     gateMetamagic: vi.fn(),
     handleConfirm: vi.fn(),
     handleSkip: vi.fn(),
@@ -243,47 +225,47 @@ function createFlow(overrides = {}) {
     handleMagicMissileConfirm: vi.fn(),
     handleMagicMissileSkip: vi.fn(),
   };
-  return { ...flow, ...overrides };
 }
 
-let flow;
-let upcastFlow;
-
-function renderWithProps(props = {}) {
-  return render(
-    <CharSpells
-      playerStats={mockPlayerStats}
-      campaignName="test-campaign"
-      {...props}
-    />
-  );
+function createUpcastFlow() {
+  return {
+    pendingUpcast: null,
+    buildUpcastLevels: vi.fn(() => []),
+    handleUpcastConfirm: vi.fn(),
+    handleUpcastCancel: vi.fn(),
+  };
 }
 
-describe('CharSpells - Popup Modal Rendering', () => {
+function renderCharSpells() {
+  return render(<CharSpells playerStats={mockPlayerStats} campaignName={CAMPAIGN} />);
+}
+
+function getPopup(ariaLabel) {
+  return screen.queryByRole('dialog', { name: ariaLabel });
+}
+
+describe('CharSpells - Spell target popup widgets', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
     flow = createFlow();
-    upcastFlow = {
-      pendingUpcast: null,
-      buildUpcastLevels: vi.fn(() => []),
-      gateUpcast: vi.fn(() => false),
-      handleUpcastConfirm: vi.fn(),
-      handleUpcastCancel: vi.fn(),
-      getCantripAutoLevel: vi.fn(() => null),
-    };
-    mockDiceRoll = { rollAttack: vi.fn(), rollDamage: vi.fn(), autoDamageRoll: null };
+    upcastFlow = createUpcastFlow();
     vi.mocked(useSpellMetamagicFlow).mockReturnValue(flow);
     vi.mocked(useSpellUpcastFlow).mockReturnValue(upcastFlow);
-    vi.mocked(getRuntimeValue).mockReturnValue(null);
-    vi.mocked(isInnateSorceryActive).mockReturnValue(false);
     vi.mocked(getTargetFromAttacker).mockReturnValue(null);
     vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] });
-    vi.mocked(normalizeAutoDamage).mockReturnValue({ attack: { name: 'Fire Bolt' }, ctx: { targetName: 'Orc' } });
-    vi.mocked(resolveAttackDamageStandalone).mockResolvedValue(undefined);
   });
 
-  describe('metamagic popup', () => {
-    it('renders MetamagicPopup with correct spell name and SP, and wires confirm/skip handlers', () => {
+  it('renders no popup widgets when no spell step is pending', () => {
+    renderCharSpells();
+
+    expect(getPopup('Metamagic')).not.toBeInTheDocument();
+    expect(getPopup('Select targets')).not.toBeInTheDocument();
+    expect(getPopup('Magic Missile targets')).not.toBeInTheDocument();
+    expect(getPopup('Upcast spell')).not.toBeInTheDocument();
+  });
+
+  describe('MetamagicPopup', () => {
+    beforeEach(() => {
       flow.pendingMetamagic = {
         spellName: 'Fireball',
         spellLevel: 3,
@@ -291,72 +273,159 @@ describe('CharSpells - Popup Modal Rendering', () => {
         isPsionic: false,
         psionicCost: 0,
       };
-      renderWithProps();
+    });
 
-      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-      expect(screen.getByTestId('metamagic-spell-name')).toHaveTextContent('Fireball');
-      expect(screen.getByTestId('metamagic-sp')).toHaveTextContent('7');
+    it('shows the pending spell, its level, and available sorcery points', () => {
+      renderCharSpells();
 
-      fireEvent.click(screen.getByTestId('metamagic-confirm'));
-      expect(flow.handleConfirm).toHaveBeenCalled();
+      const dialog = screen.getByRole('dialog', { name: 'Metamagic' });
+      expect(within(dialog).getByText('Fireball (3)')).toBeInTheDocument();
+      expect(within(dialog).getByText('SP 7')).toBeInTheDocument();
+      expect(within(dialog).queryByText(/psionic/i)).not.toBeInTheDocument();
+    });
 
-      fireEvent.click(screen.getByTestId('metamagic-skip'));
-      expect(flow.handleSkip).toHaveBeenCalled();
+    it('defaults the spell level to 0 when the pending step omits it', () => {
+      flow.pendingMetamagic = { spellName: 'Shield', _currentSP: 2 };
+      renderCharSpells();
+
+      expect(within(screen.getByRole('dialog', { name: 'Metamagic' })).getByText('Shield (0)')).toBeInTheDocument();
+    });
+
+    it('surfaces psionic payment details for psionic spells', () => {
+      flow.pendingMetamagic = {
+        spellName: 'Fireball',
+        spellLevel: 3,
+        _currentSP: 7,
+        isPsionic: true,
+        psionicCost: 2,
+      };
+      renderCharSpells();
+
+      expect(within(screen.getByRole('dialog', { name: 'Metamagic' })).getByText('psionic cost 2')).toBeInTheDocument();
+    });
+
+    it('routes confirm and skip clicks to their own metamagic flow handlers', () => {
+      renderCharSpells();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+      expect(flow.handleConfirm).toHaveBeenCalledTimes(1);
+      expect(flow.handleSkip).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+      expect(flow.handleSkip).toHaveBeenCalledTimes(1);
+      expect(flow.handleMultiTargetConfirm).not.toHaveBeenCalled();
+      expect(flow.handleMagicMissileConfirm).not.toHaveBeenCalled();
     });
   });
 
-  describe('multi-target popup', () => {
-    it('renders MultiTargetPopup with spell name and target list, and wires confirm/skip handlers', () => {
+  describe('MultiTargetPopup', () => {
+    beforeEach(() => {
       flow.pendingMultiTarget = {
         spellName: 'Aid',
         spellLevel: 2,
         range: '30 feet',
         creatureTargets: ['Orc', 'Goblin'],
       };
-      renderWithProps();
+    });
 
-      expect(screen.getByTestId('multi-target-popup')).toBeInTheDocument();
-      expect(screen.getByTestId('mt-spell-name')).toHaveTextContent('Aid');
+    it('shows the spell name, range, and every creature target', () => {
+      renderCharSpells();
 
-      fireEvent.click(screen.getByTestId('mt-confirm'));
-      expect(flow.handleMultiTargetConfirm).toHaveBeenCalled();
+      const dialog = screen.getByRole('dialog', { name: 'Select targets' });
+      expect(within(dialog).getByText('Aid')).toBeInTheDocument();
+      expect(within(dialog).getByText('30 feet')).toBeInTheDocument();
+      expect(within(dialog).getByText('Orc')).toBeInTheDocument();
+      expect(within(dialog).getByText('Goblin')).toBeInTheDocument();
+    });
 
-      fireEvent.click(screen.getByTestId('mt-skip'));
-      expect(flow.handleMultiTargetSkip).toHaveBeenCalled();
+    it('passes the pending creature targets to the confirm handler', () => {
+      renderCharSpells();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+      expect(flow.handleMultiTargetConfirm).toHaveBeenCalledWith({ targets: ['Orc', 'Goblin'] });
+    });
+
+    it('routes skip clicks to handleMultiTargetSkip without confirming', () => {
+      renderCharSpells();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+      expect(flow.handleMultiTargetSkip).toHaveBeenCalledTimes(1);
+      expect(flow.handleMultiTargetConfirm).not.toHaveBeenCalled();
+      expect(flow.handleSkip).not.toHaveBeenCalled();
     });
   });
 
-  describe('magic missile popup', () => {
-    it('renders MagicMissileTargetPopup with missile count and current target, and wires confirm/skip handlers', () => {
+  describe('MagicMissileTargetPopup', () => {
+    beforeEach(() => {
       flow.pendingMagicMissile = {
         spell: { name: 'Magic Missile', level: 1 },
         totalMissiles: 3,
         missileDamage: '1d4+1',
         creatureTargets: ['Orc', 'Goblin'],
       };
+    });
+
+    it('shows missile count, per-missile damage, and resolves the active target from combat', () => {
+      const summary = { creatures: [{ name: 'Goblin' }] };
+      vi.mocked(getCombatSummary).mockReturnValue(summary);
       vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Goblin' });
-      renderWithProps();
+      renderCharSpells();
 
-      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
-      expect(screen.getByTestId('mm-spell-name')).toHaveTextContent('Magic Missile');
-      expect(screen.getByTestId('mm-total')).toHaveTextContent('3');
-      expect(screen.getByTestId('mm-current-target')).toHaveTextContent('Goblin');
+      const dialog = screen.getByRole('dialog', { name: 'Magic Missile targets' });
+      expect(within(dialog).getByText('Magic Missile x3 missiles')).toBeInTheDocument();
+      expect(within(dialog).getByText('1d4+1')).toBeInTheDocument();
+      expect(within(dialog).getByText('Current target: Goblin')).toBeInTheDocument();
+      expect(getCombatSummary).toHaveBeenCalledWith(CAMPAIGN);
+      expect(getTargetFromAttacker).toHaveBeenCalledWith(summary, mockPlayerStats.name);
+    });
 
-      fireEvent.click(screen.getByTestId('mm-confirm'));
-      expect(flow.handleMagicMissileConfirm).toHaveBeenCalled();
+    it('shows no current target when the attacker has none selected', () => {
+      vi.mocked(getTargetFromAttacker).mockReturnValue(null);
+      renderCharSpells();
 
-      fireEvent.click(screen.getByTestId('mm-skip'));
-      expect(flow.handleMagicMissileSkip).toHaveBeenCalled();
+      const dialog = screen.getByRole('dialog', { name: 'Magic Missile targets' });
+      expect(within(dialog).getByText('Current target: none')).toBeInTheDocument();
+    });
+
+    it('passes the pending creature targets to confirm and routes skip separately', () => {
+      renderCharSpells();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+      expect(flow.handleMagicMissileConfirm).toHaveBeenCalledWith({ targets: ['Orc', 'Goblin'] });
+      expect(flow.handleMagicMissileSkip).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+      expect(flow.handleMagicMissileSkip).toHaveBeenCalledTimes(1);
+      expect(flow.handleMagicMissileConfirm).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('upcast popup', () => {
-    it('does not render UpcastPopup when pendingUpcast is null', () => {
-      upcastFlow.pendingUpcast = null;
-      renderWithProps();
+  describe('UpcastPopup', () => {
+    it('shows the pending spell with the levels offered by the upcast flow', () => {
+      const spell = { name: 'Cure Wounds', level: 1 };
+      upcastFlow.pendingUpcast = { spell };
+      upcastFlow.buildUpcastLevels = vi.fn(s => (s === spell ? [2, 3] : []));
+      vi.mocked(useSpellUpcastFlow).mockReturnValue(upcastFlow);
+      renderCharSpells();
 
-      expect(screen.queryByTestId('upcast-popup')).not.toBeInTheDocument();
+      const dialog = screen.getByRole('dialog', { name: 'Upcast spell' });
+      expect(within(dialog).getByText('Cure Wounds')).toBeInTheDocument();
+      expect(within(dialog).getByText('2,3')).toBeInTheDocument();
+      expect(upcastFlow.buildUpcastLevels).toHaveBeenCalledWith(spell);
+    });
+
+    it('routes confirm and cancel clicks to their own upcast flow handlers', () => {
+      upcastFlow.pendingUpcast = { spell: { name: 'Cure Wounds', level: 1 } };
+      vi.mocked(useSpellUpcastFlow).mockReturnValue(upcastFlow);
+      renderCharSpells();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+      expect(upcastFlow.handleUpcastConfirm).toHaveBeenCalledTimes(1);
+      expect(upcastFlow.handleUpcastCancel).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(upcastFlow.handleUpcastCancel).toHaveBeenCalledTimes(1);
+      expect(flow.gateMetamagic).not.toHaveBeenCalled();
     });
   });
-
 });

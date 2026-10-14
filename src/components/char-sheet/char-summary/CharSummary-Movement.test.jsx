@@ -1,28 +1,42 @@
+// @improved-by-ai
 //
-// Quality improvements applied:
-//   - Added missing mocks: logService, buffToggle, unbreakableMajesty, auraOfLifeHandler,
-//     circleOfPowerHandler, deathWardHandler, combatData (getCombatSummary)
-//   - Added negative test: non-Barbarian class with armor should NOT show unarmored movement
-//   - Added test: Barbarian without armor still shows base speed (not reduced by missing armor)
-//   - Improved test naming to describe behavior, not test data shape
-//   - Made rulesFactory mock deterministic (single shared mock function instead of per-call vi.fn())
-//   - Added jest-dom import for toBeInTheDocument consistency
-//   - Added getRuntimeValue mock to useRuntimeState for sanctuary info computation
-//   - Removed unused Popup mock (not needed by movement-related rendering)
+// Coverage ownership (per family delegation):
+//   - Class-based unarmored movement in the Speed row: Barbarian (fixture-driven
+//     class_levels lookup, incl. level-index and shield-only blocking) and Monk
+//     (rulesFactory classRules lane — the only place that seam is verified).
+//   - Circle Forms AC override (delegated here by CharSummary-BadgesAndAC).
 //
-// Cleanup (2026-08-18):
-//   - Removed 2 "Missing class_specific Graceful Handling" tests — charSummaryCalc.js:59 has
-//     `|| 0` default so these test a defensive fallback that can never fail (low value).
-//   - Consolidated 4 Circle Forms AC Override tests into 1 parameterized test — all test the
-//     same circleFormsACOverride computation with different inputs.
-//   - Replaced brittle nextElementSibling assertions with text-based regex — tests now assert
-//     observable rendered behavior, not DOM structure (survives markup changes).
-//   - Reduced file from 246 lines / 9 tests to 193 lines / 5 tests.
+// NOT owned here (delegated — do not re-add):
+//   - Exhaustion / condition speed / fly / ice walk → CharSummary-SpeedCalculations.test.jsx
+//   - Passive speed_bonus passives (Fast Movement etc.) → CharSummary-PassiveEffects.test.jsx
+//   - AC totals, penalties, barkskin/mage-armor numbers → CharSummary-BadgesAndAC.test.jsx
+//   - Climb/swim stat overrides → CharSummary-AdditionalCoverage.test.jsx
+//
+// Quality improvements over previous revision (9 tests → 15 runs):
+//   - AC assertions now scope to the Armor Class row (armorClassLine helper,
+//     family convention) instead of a document-wide /\bNN\b/ that could match
+//     any unrelated "16"/"18" text and pass on broken AC rendering.
+//   - Speed assertions now assert the full speed span text AND that the bonus
+//     value is absent on negative paths — the old getByText(/25 ft/) passed
+//     even if the +10 bonus leaked in elsewhere on the line.
+//   - Added Monk unarmored movement lane (was zero-coverage): rulesFactory mock
+//     now exposes a shared getUnarmoredMovementIncrease fn so tests can pin a
+//     non-zero bonus; armored Monk asserting 25 ft fails loudly if the
+//     armor/no-shield guard breaks.
+//   - Added Barbarian level-index test (class_levels[level - 1]): catches
+//     off-by-one class level lookups, which the old single level-1 case could not.
+//   - Added shield-only blocking (computeHasArmorOrShield shield branch) and
+//     large_form as a second shape-shift trigger for Circle Forms.
+//   - Dropped window.location.hostname mutations (jsdom default is already
+//     localhost) and over-mocks of auraOfLife/circleOfPower/deathWard handlers
+//     (real guards read the already-mocked runtime store and return false —
+//     same mock set as CharSummary-BadgesAndAC.test.jsx).
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom';
 import CharSummary from './CharSummary.jsx';
+import rulesFactory from '../../../services/rules/rulesFactory.js';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 import { mockPlayerStats, mockCampaignName } from './CharSummary.test-mocks.test.jsx';
 
@@ -64,12 +78,13 @@ vi.mock('../../../services/combat/buffs/buffService.js', () => ({
     getActiveBuffs: vi.fn(() => []),
 }));
 
-vi.mock('../../../services/rules/rulesFactory.js', () => ({
-    default: {
-        getRules: vi.fn(() => ({ classRules: { getUnarmoredMovementIncrease: vi.fn(() => 0) } })),
-    },
-    getRules: vi.fn(() => ({ classRules: { getUnarmoredMovementIncrease: vi.fn(() => 0) } })),
-}));
+// Shared mock fn so Monk tests can pin the unarmored movement bonus the sheet
+// should apply; default 0 keeps non-Monk fixtures unaffected.
+vi.mock('../../../services/rules/rulesFactory.js', () => {
+    const getUnarmoredMovementIncrease = vi.fn(() => 0);
+    const getRules = vi.fn(() => ({ classRules: { getUnarmoredMovementIncrease } }));
+    return { default: { getRules }, getRules };
+});
 
 vi.mock('../../../services/rules/core/attackCalc.js', () => ({
     parseMagicItemName: (name) => ({ baseName: name }),
@@ -92,130 +107,139 @@ vi.mock('../../../services/combat/auras/unbreakableMajesty.js', () => ({
     getUnbreakableMajestySaveDc: vi.fn(() => 0),
 }));
 
-vi.mock('../../../services/automation/handlers/buffs/auraOfLifeHandler.js', () => ({
-    isAuraOfLifeActive: vi.fn(() => false),
-    handle: vi.fn(),
-}));
+// ---------------------------------------------------------------------------
+// Helpers — speed row span is <b>Speed: </b><span>{n} ft.{suffix}</span>;
+// AC row is <div class="clickable"><b>Armor Class: </b>{value}{badges}</div>
+// mockPlayerStats base: Hill Dwarf, 25 ft walk, AC 18.
+// ---------------------------------------------------------------------------
+const renderSummary = (stats, buffs = []) => {
+    getActiveBuffs.mockReturnValue(buffs);
+    render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+};
 
-vi.mock('../../../services/automation/handlers/buffs/circleOfPowerHandler.js', () => ({
-    isCircleOfPowerActive: vi.fn(() => false),
-    handle: vi.fn(),
-}));
-
-vi.mock('../../../services/automation/handlers/buffs/deathWardHandler.js', () => ({
-    isDeathWardActive: vi.fn(() => false),
-    handle: vi.fn(),
-}));
+const speedSpan = () => screen.getByText(/^\d+ ft\./);
+const armorClassLine = () => screen.getByText(/^Armor Class:/).parentElement;
 
 // ---------------------------------------------------------------------------
-// Barbarian unarmored movement — class feature adds speed on top of base
+// Barbarian unarmored movement — fixture class_levels[level - 1] adds a flat
+// speed bonus when nothing armor-like is equipped.
 // ---------------------------------------------------------------------------
 describe('CharSummary - Barbarian Unarmored Movement', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        window.location.hostname = 'localhost';
         getActiveBuffs.mockReturnValue([]);
     });
 
-    it('adds barbarian unarmored movement when no armor is equipped', () => {
-        const stats = {
-            ...mockPlayerStats,
-            level: 1,
-            class: { name: 'Barbarian', major: { name: 'Barbarian' }, class_levels: [{ class_specific: { unarmored_movement: 10 } }] },
-            inventory: { equipped: [] },
-            equipment: [],
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/35 ft/)).toBeInTheDocument();
+    const barbarian = (level, over = {}) => ({
+        ...mockPlayerStats,
+        level,
+        class: {
+            name: 'Barbarian',
+            major: { name: 'Barbarian' },
+            class_levels: [{ class_specific: { unarmored_movement: 10 } }],
+        },
+        inventory: { equipped: [] },
+        equipment: [],
+        ...over,
     });
 
-    it('does not add unarmored movement when armor is equipped', () => {
-        const stats = {
-            ...mockPlayerStats,
-            level: 1,
-            class: { name: 'Barbarian', major: { name: 'Barbarian' }, class_levels: [{ class_specific: { unarmored_movement: 10 } }] },
-            inventory: { equipped: ['Scale Mail'] },
-            equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }],
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/25 ft/)).toBeInTheDocument();
+    it('shows 35 ft for an unarmored Barbarian (25 base + 10 feature)', () => {
+        renderSummary(barbarian(1));
+        expect(speedSpan()).toHaveTextContent(/^35 ft\.$/);
     });
 
-    it('does not add unarmored movement for non-Barbarian classes', () => {
-        const stats = {
-            ...mockPlayerStats,
-            level: 1,
-            class: { name: 'Cleric', major: { name: 'Cleric' }, class_levels: [{ class_specific: { unarmored_movement: 10 } }] },
-            inventory: { equipped: [] },
-            equipment: [],
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/25 ft/)).toBeInTheDocument();
+    it('reads the bonus for the current level, not just the first class_levels entry', () => {
+        const stats = barbarian(2);
+        stats.class.class_levels = [
+            { class_specific: { unarmored_movement: 35 } },
+            { class_specific: { unarmored_movement: 10 } },
+        ];
+        renderSummary(stats);
+        expect(speedSpan()).toHaveTextContent(/^35 ft\.$/);
+    });
+
+    it.each([
+        { name: 'armor equipped', inventory: { equipped: ['Scale Mail'] }, equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }] },
+        { name: 'shield equipped', inventory: { equipped: ['Shield'] }, equipment: [] },
+    ])('blocks the bonus when $name — speed stays at base 25 ft', ({ inventory, equipment }) => {
+        renderSummary(barbarian(1, { inventory, equipment }));
+        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
+        expect(screen.queryByText(/35 ft/)).not.toBeInTheDocument();
+    });
+
+    it('keeps base speed for a non-Barbarian even when its data carries unarmored_movement', () => {
+        const stats = barbarian(1);
+        stats.class = { ...stats.class, name: 'Cleric', major: { name: 'Cleric' } };
+        renderSummary(stats);
+        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
+        expect(screen.queryByText(/35 ft/)).not.toBeInTheDocument();
     });
 });
 
 // ---------------------------------------------------------------------------
-// Circle Forms AC Override — Moon Druid shape shift AC calculation
+// Monk unarmored movement — the only lane that consumes rulesFactory's
+// classRules.getUnarmoredMovementIncrease for the Speed row.
+// ---------------------------------------------------------------------------
+describe('CharSummary - Monk Unarmored Movement (rulesFactory lane)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getActiveBuffs.mockReturnValue([]);
+        rulesFactory.getRules().classRules.getUnarmoredMovementIncrease.mockReturnValue(10);
+    });
+
+    const monk = (over = {}) => ({
+        ...mockPlayerStats,
+        level: 5,
+        class: { name: 'Monk', major: { name: 'Monk' } },
+        inventory: { equipped: [] },
+        equipment: [],
+        ...over,
+    });
+
+    it('adds the class-rule bonus to an unarmored, unshielded Monk', () => {
+        renderSummary(monk());
+        expect(speedSpan()).toHaveTextContent(/^35 ft\.$/);
+    });
+
+    it.each([
+        { name: 'armor equipped', inventory: { equipped: ['Scale Mail'] }, equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }] },
+        { name: 'shield equipped', inventory: { equipped: ['Shield'] }, equipment: [] },
+    ])('applies no class-rule bonus when $name', ({ inventory, equipment }) => {
+        renderSummary(monk({ inventory, equipment }));
+        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
+        expect(screen.queryByText(/35 ft/)).not.toBeInTheDocument();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Circle Forms AC override — 13 + WIS modifier while shape_shift/large_form
+// is active for Circle of the Moon; every other case keeps base AC 18.
 // ---------------------------------------------------------------------------
 describe('CharSummary - Circle Forms AC Override', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        window.location.hostname = 'localhost';
+        getActiveBuffs.mockReturnValue([]);
+    });
+
+    const druid = (classInfo, over = {}) => ({
+        ...mockPlayerStats,
+        class: classInfo,
+        abilities: [{ name: 'Wisdom', bonus: 3 }],
+        inventory: { equipped: [] },
+        equipment: [],
+        ...over,
     });
 
     it.each([
-        {
-            name: 'Circle of the Moon Druid with shape_shift and WIS +3',
-            class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: { name: 'Circle of the Moon' } },
-            abilities: [{ name: 'Wisdom', bonus: 3 }],
-            buffs: [{ effect: 'shape_shift' }],
-            expectedAC: '16',
-        },
-        {
-            name: 'Circle of the Moon Druid (app shape: major null) with shape_shift and WIS +3',
-            class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: null },
-            abilities: [{ name: 'Wisdom', bonus: 3 }],
-            buffs: [{ effect: 'shape_shift' }],
-            expectedAC: '16',
-        },
-        {
-            name: 'Circle of the Moon Druid with shape_shift and no WIS ability',
-            class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: { name: 'Circle of the Moon' } },
-            abilities: [],
-            buffs: [{ effect: 'shape_shift' }],
-            expectedAC: '13',
-        },
-        {
-            name: 'non-Moon Druid with shape_shift (no override)',
-            class: { name: 'Druid', subclass: { name: 'Land' }, major: { name: 'Druid' } },
-            abilities: [{ name: 'Wisdom', bonus: 3 }],
-            buffs: [{ effect: 'shape_shift' }],
-            expectedAC: '18',
-        },
-        {
-            name: 'short-name Moon subclass (not app-canonical) gets no override',
-            class: { name: 'Druid', subclass: { name: 'Moon' }, major: null },
-            abilities: [{ name: 'Wisdom', bonus: 3 }],
-            buffs: [{ effect: 'shape_shift' }],
-            expectedAC: '18',
-        },
-        {
-            name: 'Circle of the Moon Druid without shape_shift (no override)',
-            class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: { name: 'Circle of the Moon' } },
-            abilities: [{ name: 'Wisdom', bonus: 3 }],
-            buffs: [],
-            expectedAC: '18',
-        },
-    ])('renders correct AC for $name', ({ class: classInfo, abilities, buffs, expectedAC }) => {
-        getActiveBuffs.mockReturnValue(buffs);
-        const stats = {
-            ...mockPlayerStats,
-            class: classInfo,
-            abilities,
-            inventory: { equipped: [] },
-            equipment: [],
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(new RegExp(`\\b${expectedAC}\\b`))).toBeInTheDocument();
+        { name: 'subclass field identifies Moon Druid', class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: { name: 'Circle of the Moon' } }, abilities: [{ name: 'Wisdom', bonus: 3 }], buffs: [{ effect: 'shape_shift' }], expectedAC: 16 },
+        { name: 'major field identifies Moon Druid when subclass is absent', class: { name: 'Druid', subclass: null, major: { name: 'Circle of the Moon' } }, abilities: [{ name: 'Wisdom', bonus: 3 }], buffs: [{ effect: 'shape_shift' }], expectedAC: 16 },
+        { name: 'large_form triggers the override like shape_shift', class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: { name: 'Circle of the Moon' } }, abilities: [{ name: 'Wisdom', bonus: 3 }], buffs: [{ effect: 'large_form' }], expectedAC: 16 },
+        { name: 'missing Wisdom scores the override at flat 13', class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: { name: 'Circle of the Moon' } }, abilities: [], buffs: [{ effect: 'shape_shift' }], expectedAC: 13 },
+        { name: 'non-Moon Druid keeps base AC', class: { name: 'Druid', subclass: { name: 'Land' }, major: { name: 'Druid' } }, abilities: [{ name: 'Wisdom', bonus: 3 }], buffs: [{ effect: 'shape_shift' }], expectedAC: 18 },
+        { name: 'short-name subclass is not app-canonical and gets no override', class: { name: 'Druid', subclass: { name: 'Moon' }, major: null }, abilities: [{ name: 'Wisdom', bonus: 3 }], buffs: [{ effect: 'shape_shift' }], expectedAC: 18 },
+        { name: 'Moon Druid out of beast form keeps base AC', class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: { name: 'Circle of the Moon' } }, abilities: [{ name: 'Wisdom', bonus: 3 }], buffs: [], expectedAC: 18 },
+    ])('renders Armor Class $expectedAC when $name', ({ class: classInfo, abilities, buffs, expectedAC }) => {
+        renderSummary(druid(classInfo, { abilities }), buffs);
+        expect(armorClassLine()).toHaveTextContent(`Armor Class: ${expectedAC}`);
     });
 });

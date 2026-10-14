@@ -1,7 +1,10 @@
+// @improved-by-ai
+// CLA-322 Spell Breaker and Psychic Spells damage-type override — cast-payload behavior.
+// Casting-time display is covered in SpellDetailPopup.spellBreaker.test.jsx;
+// the cantrip psychic path is covered in SpellDetailPopup.castCantrip.test.jsx.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
@@ -17,10 +20,6 @@ vi.mock('../../../services/ui/sanitize.js', () => ({
   sanitizeHtml: (html) => html,
 }));
 
-vi.mock('../../../services/encounters/combatData.js', () => ({
-  getCombatSummary: vi.fn(() => null),
-}));
-
 vi.mock('../../../services/automation/handlers/class-wizard/overchannelHandler.js', () => ({
   getOverchannelNecroticDamage: vi.fn(() => null),
 }));
@@ -30,12 +29,21 @@ vi.mock('../../../services/rules/spells/metamagicRules.js', () => ({
   hasPsionicSorcery: vi.fn(() => false),
 }));
 
+// The component calls these synchronously — return plain booleans.
+// (A Promise is truthy, which would silently make every cast possible.)
 vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
-  isFreeCastAuthorized: vi.fn(() => Promise.resolve(false)),
+  isFreeCastAuthorized: vi.fn(() => false),
   isWizardRitualAdeptSpell: vi.fn(() => false),
 }));
 
-const baseMockPlayerStats = {
+vi.mock('../../../services/rules/spells/materialComponents.js', () => ({
+  getConsumedMaterial: vi.fn(() => null),
+  hasMaterial: vi.fn(() => true),
+}));
+
+const CAMPAIGN = 'test-campaign';
+
+const makeStats = (overrides = {}) => ({
   name: 'Elara',
   level: 5,
   class: { name: 'Sorcerer', major: { name: 'Sorcerer' } },
@@ -48,106 +56,91 @@ const baseMockPlayerStats = {
     spells: [],
   },
   automation: { passives: [], actions: [] },
-};
+  ...overrides,
+});
 
-const mockCampaignName = 'test-campaign';
-
-const baseMockSpell = {
+const makeSpell = (overrides = {}) => ({
   name: 'Magic Missile',
   level: 1,
-  description: 'Three darts of force strike a creature.',
+  description: 'A spell with an explicit description.',
   casting_time: '1 action',
   range: '120 feet',
   duration: 'Instantaneous',
-  damage: {
-    damage_at_slot_level: {
-      '1': '3d4+1',
-      '2': '4d4+1',
-      '3': '5d4+1',
-    },
-  },
   school: 'Evocation',
-};
+  damage: null,
+  ...overrides,
+});
 
-const renderPopup = (
-  spell = baseMockSpell,
-  playerStats = baseMockPlayerStats,
-  campaignName = mockCampaignName,
-  extraProps = {},
-) =>
+const renderPopup = (spell, playerStats, onCast = vi.fn()) =>
   render(
     <SpellDetailPopup
       spell={spell}
       playerStats={playerStats}
-      campaignName={campaignName}
+      campaignName={CAMPAIGN}
       onClose={vi.fn()}
-      {...extraProps}
+      onCast={onCast}
     />,
   );
 
-describe('SpellDetailPopup - handleCast: Special features', () => {
+const castSpellButton = () => screen.getByRole('button', { name: /Cast Spell/ });
+
+describe('SpellDetailPopup — special feature cast payloads', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getRuntimeValue).mockReturnValue(null);
   });
 
-  describe('SpellBreaker — Dispel Magic as bonus action', () => {
-    function makeSpellBreakerStats() {
-      return {
-        ...baseMockPlayerStats,
-        automation: {
-          passives: [{ type: 'spell_breaker', bonusActionSpells: ['Dispel Magic'], slotRetentionSpells: ['Counterspell', 'Dispel Magic'] }],
-          actions: [],
-        },
-      };
-    }
+  describe('Spell Breaker — dispelAbilityCheckBonus on cast (CLA-322)', () => {
+    const SPELL_BREAKER = {
+      type: 'spell_breaker',
+      name: 'Spell Breaker',
+      bonusActionSpells: ['Dispel Magic'],
+      slotRetentionSpells: ['Counterspell', 'Dispel Magic'],
+    };
 
-    function setupSpellSlots(slots) {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        return slots[key] ?? null;
-      });
-    }
+    const spellBreakerStats = (overrides = {}) =>
+      makeStats({ automation: { passives: [SPELL_BREAKER], actions: [] }, ...overrides });
 
+    const dispelMagic = () =>
+      makeSpell({ name: 'Dispel Magic', level: 3, school: 'Abjuration' });
+
+    // The bonus mirrors the proficiency-bonus ladder: floor((level - 1) / 4) + 2.
+    // Multiple levels pin the formula; a hard-coded constant would pass even if
+    // the level scaling were broken.
     it.each([
-      { spellName: 'Dispel Magic', spellLevel: 3, expectedBonus: 3, label: 'Dispel Magic receives dispelAbilityCheckBonus' },
-    ])('passes $label', ({ spellName, spellLevel, expectedBonus }) => {
+      { level: 1, expectedBonus: 2 },
+      { level: 5, expectedBonus: 3 },
+      { level: 9, expectedBonus: 4 },
+    ])('passes proficiency bonus $expectedBonus as dispelAbilityCheckBonus for Dispel Magic at player level $level', ({ level, expectedBonus }) => {
       const onCast = vi.fn();
-      const spellBreakerStats = makeSpellBreakerStats();
-      setupSpellSlots({ [`spell_slots_level_${spellLevel}`]: 4 });
+      renderPopup(dispelMagic(), spellBreakerStats({ level }), onCast);
 
-      const spell = {
-        ...baseMockSpell,
-        name: spellName,
-        level: spellLevel,
-        casting_time: '1 action',
-        damage: null,
-      };
-
-      renderPopup(spell, spellBreakerStats, mockCampaignName, { onCast });
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
+      fireEvent.click(castSpellButton());
 
       expect(onCast).toHaveBeenCalledTimes(1);
-      expect(onCast.mock.calls[0][1]).toEqual(
-        expect.objectContaining({
-          dispelAbilityCheckBonus: expectedBonus,
-        }),
-      );
+      const [castSpell, metaCtx] = onCast.mock.calls[0];
+      expect(castSpell.name).toBe('Dispel Magic');
+      expect(metaCtx.dispelAbilityCheckBonus).toBe(expectedBonus);
     });
 
-    it('does not pass dispelAbilityCheckBonus when casting a non-Dispel Magic spell with SpellBreaker', () => {
+    it('omits dispelAbilityCheckBonus when a Spell Breaker casts a spell outside bonusActionSpells', () => {
       const onCast = vi.fn();
-      const spellBreakerStats = makeSpellBreakerStats();
-      setupSpellSlots({ spell_slots_level_1: 4 });
+      renderPopup(
+        makeSpell({ name: 'Counterspell', level: 3, casting_time: '1 reaction', school: 'Abjuration' }),
+        spellBreakerStats(),
+        onCast,
+      );
 
-      const spell = {
-        ...baseMockSpell,
-        name: 'Magic Missile',
-        level: 1,
-        casting_time: '1 action',
-      };
+      fireEvent.click(castSpellButton());
 
-      renderPopup(spell, spellBreakerStats, mockCampaignName, { onCast });
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
+      expect(onCast).toHaveBeenCalledTimes(1);
+      expect(onCast.mock.calls[0][1]).not.toHaveProperty('dispelAbilityCheckBonus');
+    });
+
+    it('omits dispelAbilityCheckBonus for Dispel Magic without the Spell Breaker passive', () => {
+      const onCast = vi.fn();
+      renderPopup(dispelMagic(), makeStats(), onCast);
+
+      fireEvent.click(castSpellButton());
 
       expect(onCast).toHaveBeenCalledTimes(1);
       expect(onCast.mock.calls[0][1]).not.toHaveProperty('dispelAbilityCheckBonus');
@@ -155,54 +148,76 @@ describe('SpellDetailPopup - handleCast: Special features', () => {
   });
 
   describe('Psychic Spells — damage type override', () => {
-    function makeWarlockStats() {
-      return {
-        ...baseMockPlayerStats,
+    const PSYCHIC_PASSIVE = { type: 'psychic_spells' };
+
+    const warlockStats = (passives = [PSYCHIC_PASSIVE]) =>
+      makeStats({
         class: { name: 'Warlock', major: { name: 'Warlock' } },
-        automation: {
-          passives: [{ type: 'psychic_spells' }],
-          actions: [],
-        },
-      };
-    }
-
-    function makeBurningHands() {
-      return {
-        ...baseMockSpell,
-        name: 'Burning Hands',
-        level: 1,
-        school: 'Evocation',
-        damage: { damage_at_slot_level: { '1': '3d4' } },
-      };
-    }
-
-    function setupWarlockSlots() {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'spell_slots_level_1') return 4;
-        return null;
+        automation: { passives, actions: [] },
       });
-    }
 
-    it.each([
-      { toggleOn: true, expectedPsychic: true, label: 'usePsychicDamage:true when toggle is checked' },
-      { toggleOn: false, expectedPsychic: false, label: 'usePsychicDamage:false when toggle is not checked' },
-    ])('passes $label', ({ toggleOn, expectedPsychic }) => {
+    const burningHands = () =>
+      makeSpell({
+        name: 'Burning Hands',
+        damage: { damage_at_slot_level: { '1': '3d4' } },
+      });
+
+    const psychicCheckbox = () =>
+      screen.getByRole('checkbox', { name: /Change damage type to Psychic/ });
+
+    it('offers the Psychic damage checkbox unchecked by default', () => {
+      renderPopup(burningHands(), warlockStats());
+      expect(psychicCheckbox()).not.toBeChecked();
+    });
+
+    it('passes usePsychicDamage:true when the checkbox is checked', () => {
       const onCast = vi.fn();
-      setupWarlockSlots();
+      renderPopup(burningHands(), warlockStats(), onCast);
 
-      renderPopup(makeBurningHands(), makeWarlockStats(), mockCampaignName, { onCast });
+      fireEvent.click(psychicCheckbox());
+      expect(psychicCheckbox()).toBeChecked();
 
-      if (toggleOn) {
-        fireEvent.click(screen.getByText('Change damage type to Psychic'));
-      }
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
+      fireEvent.click(castSpellButton());
 
       expect(onCast).toHaveBeenCalledTimes(1);
-      expect(onCast.mock.calls[0][0]).toEqual(
-        expect.objectContaining({
-          usePsychicDamage: expectedPsychic,
-        }),
-      );
+      expect(onCast.mock.calls[0][0]).toMatchObject({
+        name: 'Burning Hands',
+        usePsychicDamage: true,
+      });
+    });
+
+    it('passes usePsychicDamage:false when the checkbox is left unchecked', () => {
+      const onCast = vi.fn();
+      renderPopup(burningHands(), warlockStats(), onCast);
+
+      fireEvent.click(castSpellButton());
+
+      expect(onCast).toHaveBeenCalledTimes(1);
+      expect(onCast.mock.calls[0][0]).toMatchObject({ usePsychicDamage: false });
+    });
+
+    // canChangeDamageType requires ALL of: Warlock class, psychic_spells passive, damaging spell.
+    it.each([
+      {
+        label: 'a non-Warlock caster holding the passive',
+        spell: burningHands(),
+        stats: makeStats({ automation: { passives: [PSYCHIC_PASSIVE], actions: [] } }),
+      },
+      {
+        label: 'a Warlock without the psychic_spells passive',
+        spell: burningHands(),
+        stats: warlockStats([]),
+      },
+      {
+        label: 'a spell that deals no damage',
+        spell: makeSpell({ name: 'Shield', casting_time: '1 reaction', school: 'Abjuration' }),
+        stats: warlockStats(),
+      },
+    ])('hides the Psychic damage checkbox for $label', ({ spell, stats }) => {
+      renderPopup(spell, stats);
+      expect(
+        screen.queryByRole('checkbox', { name: /Change damage type to Psychic/ }),
+      ).not.toBeInTheDocument();
     });
   });
 });

@@ -1,3 +1,14 @@
+// @improved-by-ai
+/**
+ * TrackedResourceInput is a thin seam: it wires props into useTrackedResource,
+ * displays "Label: current/max", and toggles an inline editor via click/Enter.
+ *
+ * Seam rationale (no duplicate coverage elsewhere):
+ *  - useTrackedResource's own state/runtime behavior → useTrackedResource.test.js
+ *  - HiddenInput clamping/commit/event-containment  → HiddenInput.test.jsx
+ * So this file mocks the hook and verifies only the component's own contract:
+ * what it requests from the hook and what it displays/commits back.
+ */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TrackedResourceInput from './TrackedResourceInput.jsx';
@@ -8,90 +19,112 @@ vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
 
 import useTrackedResource from '../../../hooks/runtime/useTrackedResource.js';
 
+const baseProps = {
+  label: 'Sorcery Points',
+  resourceKey: 'sorceryPoints',
+  playerName: 'Test Character',
+  getMax: () => 10,
+  deps: [],
+  campaignName: 'test-campaign',
+  playerStats: {
+    name: 'Test Character',
+    _trackedResources: {},
+  },
+};
+
+// Renders with a fresh hook result + update spy per test; no shared mock state.
+function setup(hookOverrides = {}, props = baseProps) {
+  const update = vi.fn();
+  useTrackedResource.mockReturnValue({ current: 5, max: 10, update, ...hookOverrides });
+  render(<TrackedResourceInput {...props} />);
+  return { update, props };
+}
+
+// The whole row is one keyboard-focusable toggle; found via its unique label.
+const getRow = () => screen.getByText('Sorcery Points:').closest('.clickable');
+
 describe('TrackedResourceInput', () => {
-  const baseProps = {
-    label: 'Sorcery Points',
-    resourceKey: 'sorceryPoints',
-    playerName: 'Test Character',
-    getMax: () => 10,
-    deps: [],
-    campaignName: 'test-campaign',
-    playerStats: {
-      name: 'Test Character',
-      _trackedResources: {},
-    },
-  };
-
-  const createTrackedResource = (overrides = {}) => ({
-    current: 5,
-    max: 10,
-    update: vi.fn(),
-    ...overrides,
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
-    useTrackedResource.mockReturnValue(createTrackedResource());
   });
 
-  describe('rendering', () => {
-    it('renders the label, value display, and is focusable', () => {
-      render(<TrackedResourceInput {...baseProps} />);
-      expect(screen.getByText('Sorcery Points:')).toBeInTheDocument();
-      expect(screen.getByText('(cur/max)')).toBeInTheDocument();
-      const clickable = screen.getByText('Sorcery Points:').closest('.clickable');
-      expect(clickable.textContent).toContain('5/10');
-      expect(clickable).toHaveAttribute('tabIndex', '0');
+  describe('display', () => {
+    it('shows "Label: current/max" with the cur/max legend from the hook', () => {
+      setup();
+
+      expect(getRow()).toHaveTextContent('Sorcery Points: 5/10 (cur/max)');
     });
 
-    it('renders with zero current value', () => {
-      useTrackedResource.mockReturnValue(createTrackedResource({ current: 0, max: 5 }));
-      render(<TrackedResourceInput {...baseProps} getMax={() => 5} />);
-      const clickable = screen.getByText('Sorcery Points:').closest('.clickable');
-      expect(clickable.textContent).toContain('0/5');
+    it('shows a zero current value as "0/max", not blank', () => {
+      setup({ current: 0, max: 5 });
+
+      expect(getRow()).toHaveTextContent('Sorcery Points: 0/5 (cur/max)');
+    });
+
+    it('is keyboard focusable so Enter can open the editor', () => {
+      setup();
+
+      expect(getRow()).toHaveAttribute('tabIndex', '0');
     });
   });
 
-  describe('toggle behavior', () => {
-    it('toggles input visibility on click', () => {
-      render(<TrackedResourceInput {...baseProps} />);
-      const clickable = screen.getByText('Sorcery Points:').closest('.clickable');
+  describe('hook wiring', () => {
+    it('requests the resource under resourceKey for this character, passing getMax through', () => {
+      const getMax = () => 12;
+      const props = { ...baseProps, getMax };
+      setup({ current: 3, max: 12 }, props);
 
-      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+      expect(useTrackedResource).toHaveBeenCalledWith({
+        storageKey: 'sorceryPoints',
+        playerName: 'Test Character',
+        maxGetter: getMax,
+        deps: [],
+        campaignName: 'test-campaign',
+        playerStats: baseProps.playerStats,
+      });
+      // Displayed max comes from the hook, keeping the shown bound in sync.
+      expect(getRow()).toHaveTextContent('3/12');
+    });
+  });
 
-      fireEvent.click(clickable);
+  describe('editing toggles', () => {
+    it('opens the editor on click and closes it on a second click without touching the resource', () => {
+      const { update } = setup();
+      const row = getRow();
+
+      fireEvent.click(row);
       expect(screen.getByRole('spinbutton')).toBeInTheDocument();
 
-      fireEvent.click(clickable);
+      fireEvent.click(row);
       expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+      expect(update).not.toHaveBeenCalled();
     });
 
-    it('toggles input visibility on Enter key', () => {
-      render(<TrackedResourceInput {...baseProps} />);
-      const clickable = screen.getByText('Sorcery Points:').closest('.clickable');
+    it('opens the editor on Enter and closes it on a second Enter', () => {
+      const { update } = setup();
+      const row = getRow();
 
-      fireEvent.keyDown(clickable, { key: 'Enter' });
+      fireEvent.keyDown(row, { key: 'Enter' });
       expect(screen.getByRole('spinbutton')).toBeInTheDocument();
 
-      fireEvent.keyDown(clickable, { key: 'Enter' });
+      fireEvent.keyDown(row, { key: 'Enter' });
       expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+      expect(update).not.toHaveBeenCalled();
     });
   });
 
-  describe('integration', () => {
-    it('passes the update function from the hook for value changes', () => {
-      const mockUpdate = vi.fn();
-      useTrackedResource.mockReturnValue(createTrackedResource({ update: mockUpdate }));
-      render(<TrackedResourceInput {...baseProps} />);
+  describe('committing a value', () => {
+    it('passes a typed value to the hook once on blur and closes the editor', () => {
+      const { update } = setup();
 
-      const clickable = screen.getByText('Sorcery Points:').closest('.clickable');
-      fireEvent.click(clickable);
-
+      fireEvent.click(getRow());
       const input = screen.getByRole('spinbutton');
       fireEvent.change(input, { target: { value: '7' } });
       fireEvent.blur(input);
 
-      expect(mockUpdate).toHaveBeenCalled();
+      expect(update).toHaveBeenCalledTimes(1);
+      expect(update).toHaveBeenCalledWith(7);
+      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
     });
   });
 });

@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -18,196 +19,217 @@ vi.mock('../../../services/ui/sanitize.js', () => ({
   sanitizeHtml: (html) => html,
 }));
 
-const baseMockPlayerStats = {
+const CAMPAIGN = 'test-campaign';
+
+// Per-test fixture builders — each test owns the exact data it asserts on.
+const makeStats = (overrides = {}) => ({
   name: 'Elara',
   level: 5,
   class: { name: 'Sorcerer', major: { name: 'Sorcerer' } },
   abilities: [{ name: 'Charisma', bonus: 3 }],
   proficiency: 3,
-  spellAbilities: {
-    spell_slots_level_1: 4,
-    spell_slots_level_2: 3,
-    spell_slots_level_3: 2,
-    spells: [],
-  },
+  spellAbilities: { spells: [] },
   automation: { passives: [], actions: [] },
-};
+  ...overrides,
+});
 
-const mockCampaignName = 'test-campaign';
-
-const fireBoltSpell = {
+const makeCantrip = (overrides = {}) => ({
   name: 'Fire Bolt',
   level: 0,
   description: 'A flash of fire.',
   casting_time: '1 action',
   range: '120 feet',
   duration: 'Instantaneous',
-  damage: {
-    damage_at_character_level: {
-      1: '1d10',
-      5: '2d10',
-      11: '3d10',
-      17: '4d10',
-    },
-  },
-};
+  ...overrides,
+});
 
-const renderPopup = (
-  spell,
-  playerStats = baseMockPlayerStats,
-  campaignName = mockCampaignName,
-  extraProps = {}
-) =>
+// Renders the popup for a cantrip cast attempt and returns the cast handler
+// plus the (possibly disabled) Cast Spell button.
+const castCantrip = ({
+  spell = makeCantrip(),
+  playerStats = makeStats(),
+  playerLevel,
+  beforeClick,
+} = {}) => {
+  const onCast = vi.fn();
   render(
     <SpellDetailPopup
       spell={spell}
       playerStats={playerStats}
-      campaignName={campaignName}
+      campaignName={CAMPAIGN}
       onClose={vi.fn()}
-      {...extraProps}
+      onCast={onCast}
+      playerLevel={playerLevel}
     />
   );
+  const castButton = screen.getByRole('button', { name: /Cast Spell/ });
+  if (beforeClick) beforeClick();
+  fireEvent.click(castButton);
+  return onCast;
+};
 
-describe('SpellDetailPopup - handleCast: Cantrip casting', () => {
+// Cantrip cast contract: exact level, baseLevel 0, and the unmodified
+// meta context (cantrips never overchannel).
+const expectCastAtLevel = (onCast, level) => {
+  expect(onCast).toHaveBeenCalledTimes(1);
+  expect(onCast).toHaveBeenCalledWith(
+    expect.objectContaining({ level, baseLevel: 0 }),
+    expect.objectContaining({ overchannel: false })
+  );
+};
+
+describe('SpellDetailPopup - casting cantrips', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getRuntimeValue).mockReturnValue(null);
     vi.mocked(getActiveBuffs).mockReturnValue([]);
   });
 
-  describe('cantripAutoLevel with damage_at_character_level', () => {
-    it.each([
-      { playerLevel: 1, expectedLevel: 1, label: 'level 1 matches tier 1' },
-      { playerLevel: 5, expectedLevel: 5, label: 'level 5 matches tier 5' },
-      { playerLevel: 11, expectedLevel: 11, label: 'level 11 matches tier 11' },
-      { playerLevel: 20, expectedLevel: 17, label: 'level 20 capped at tier 17' },
-    ])('auto-levels cantrip: $label', ({ playerLevel, expectedLevel }) => {
-      const onCast = vi.fn();
-      const stats = playerLevel !== 5 ? { ...baseMockPlayerStats, level: playerLevel } : baseMockPlayerStats;
-      renderPopup(fireBoltSpell, stats, mockCampaignName, { onCast, playerLevel });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-
-      expect(onCast).toHaveBeenCalledTimes(1);
-      expect(onCast).toHaveBeenLastCalledWith(
-        expect.objectContaining({ level: expectedLevel, baseLevel: 0 }),
-        expect.any(Object)
-      );
+  describe('auto-levels from damage_at_character_level', () => {
+    const scalingCantrip = makeCantrip({
+      damage: {
+        damage_at_character_level: { 1: '1d10', 5: '2d10', 11: '3d10', 17: '4d10' },
+      },
     });
 
-    it('keeps cantrip at base level (0) when no character level tier is applicable', () => {
-      const onCast = vi.fn();
-      const lowLevelCantrip = {
-        ...fireBoltSpell,
+    it.each([
+      { playerLevel: 1, expectedLevel: 1, label: 'tier 1 at level 1' },
+      { playerLevel: 5, expectedLevel: 5, label: 'tier 5 at level 5' },
+      { playerLevel: 11, expectedLevel: 11, label: 'tier 11 at level 11' },
+      { playerLevel: 20, expectedLevel: 17, label: 'top tier 17 at level 20' },
+    ])('casts at $expectedLevel: $label', ({ playerLevel, expectedLevel }) => {
+      expectCastAtLevel(castCantrip({ spell: scalingCantrip, playerLevel }), expectedLevel);
+    });
+
+    it('casts at base level when the ladder starts above the character level', () => {
+      const spell = makeCantrip({
+        damage: { damage_at_character_level: { 5: '2d10', 11: '3d10' } },
+      });
+      expectCastAtLevel(castCantrip({ spell, playerLevel: 3 }), 0);
+    });
+
+    it('casts at base level when the ladder contains string keys below the level', () => {
+      const spell = makeCantrip({
+        damage: { damage_at_character_level: { '1': '1d10', '5': '2d10' } },
+      });
+      expectCastAtLevel(castCantrip({ spell, playerLevel: 6 }), 5);
+    });
+  });
+
+  describe('auto-levels fall back to damage_at_slot_level', () => {
+    it('uses slot-level tiers when no character-level ladder exists', () => {
+      const spell = makeCantrip({
+        name: 'Ray of Frost',
+        damage: { damage_at_slot_level: { '0': '1d8', '1': '2d8', '3': '3d8', '5': '4d8' } },
+      });
+      expectCastAtLevel(castCantrip({ spell, playerLevel: 5 }), 5);
+    });
+
+    it('casts at base level when no slot tier applies to the character level', () => {
+      const spell = makeCantrip({
+        name: 'Ray of Frost',
+        damage: { damage_at_slot_level: { '3': '3d8' } },
+      });
+      expectCastAtLevel(castCantrip({ spell, playerLevel: 1 }), 0);
+    });
+
+    it('prefers the character-level ladder when both ladders exist', () => {
+      const spell = makeCantrip({
         damage: {
-          damage_at_character_level: {
-            5: '2d10',
-            11: '3d10',
-          },
+          damage_at_character_level: { 5: '2d10', 11: '3d10' },
+          damage_at_slot_level: { '0': '1d10', '1': '2d10' },
         },
-      };
-      renderPopup(lowLevelCantrip, baseMockPlayerStats, mockCampaignName, { onCast, playerLevel: 3 });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-
-      expect(onCast).toHaveBeenCalledTimes(1);
-      expect(onCast).toHaveBeenLastCalledWith(
-        expect.objectContaining({ level: 0, baseLevel: 0 }),
-        expect.any(Object)
-      );
+      });
+      // 11 comes from the char ladder — the slot ladder tops out at 1.
+      expectCastAtLevel(castCantrip({ spell, playerLevel: 12 }), 11);
     });
   });
 
-  describe('cantripAutoLevel with damage_at_slot_level fallback', () => {
+  describe('cantrips with no damage scaling', () => {
     it.each([
+      { damage: null, label: 'damage is null' },
+      { damage: {}, label: 'damage has no ladders' },
       {
-        cantrip: {
-          name: 'Ray of Frost',
-          level: 0,
-          description: 'A beam of freezing air.',
-          casting_time: '1 action',
-          range: '60 feet',
-          duration: 'Instantaneous',
-          damage: {
-            damage_at_slot_level: {
-              '0': '1d8',
-              '1': '2d8',
-              '3': '3d8',
-              '5': '4d8',
-            },
-          },
-        },
-        playerLevel: 5,
-        expectedLevel: 5,
-        label: 'uses damage_at_slot_level tiers when present',
+        damage: { damage_at_character_level: {}, damage_at_slot_level: {} },
+        label: 'both ladders are empty objects',
       },
-      {
-        cantrip: {
-          name: 'Ray of Frost',
-          level: 0,
-          description: 'A beam of freezing air.',
-          casting_time: '1 action',
-          range: '60 feet',
-          duration: 'Instantaneous',
-          damage: {
-            damage_at_slot_level: {
-              '0': '1d8',
-              '3': '3d8',
-            },
-          },
-        },
-        playerLevel: 1,
-        expectedLevel: 0,
-        label: 'falls back to base level when no slot tier applies',
-      },
-      {
-        cantrip: {
-          name: 'Guidance',
-          level: 0,
-          description: 'Add d4 to ability check.',
-          casting_time: '1 action',
-          range: 'Touch',
-          duration: 'Concentration, up to 1 minute',
-          damage: { damage_at_slot_level: { '0': '1d4' } },
-        },
-        playerLevel: 5,
-        expectedLevel: 0,
-        label: 'resolves to base level when only level 0 tier exists',
-      },
-    ])('$label', ({ cantrip, playerLevel, expectedLevel }) => {
-      const onCast = vi.fn();
-      renderPopup(cantrip, baseMockPlayerStats, mockCampaignName, { onCast, playerLevel });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-
-      expect(onCast).toHaveBeenCalledTimes(1);
-      expect(onCast).toHaveBeenLastCalledWith(
-        expect.objectContaining({ level: expectedLevel, baseLevel: 0 }),
-        expect.any(Object)
-      );
+    ])('casts at base level when $label', ({ damage }) => {
+      const spell = makeCantrip({ name: 'Minor Illusion', damage });
+      expectCastAtLevel(castCantrip({ spell, playerLevel: 5 }), 0);
     });
   });
 
-  describe('cantrip with no damage scaling', () => {
-    it('calls onCast with base level when cantrip has no damage_at_character_level or damage_at_slot_level', () => {
-      const onCast = vi.fn();
-      const cantrip = {
-        name: 'Minor Illusion',
-        level: 0,
-        description: 'A sound or image.',
-        casting_time: '1 action',
-        range: '30 feet',
-        duration: '1 minute',
-        damage: null,
-      };
-      renderPopup(cantrip, baseMockPlayerStats, mockCampaignName, { onCast, playerLevel: 5 });
+  describe('cantrip casting is slot-free', () => {
+    it('enables casting and fires onCast when every spell slot is exhausted', () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+        key.startsWith('spell_slots_level_') ? 0 : null
+      );
+      const spell = makeCantrip({
+        damage: { damage_at_character_level: { 1: '1d10', 5: '2d10' } },
+      });
+      const stats = makeStats({
+        spellAbilities: { spells: [], spell_slots_level_1: 0, spell_slots_level_2: 0 },
+      });
 
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
+      const onCast = castCantrip({ spell, playerStats: stats, playerLevel: 5 });
+      expect(screen.getByRole('button', { name: /Cast Spell/ })).toBeEnabled();
+      expectCastAtLevel(onCast, 5);
+    });
+
+    it('does not carry upcast payment fields in the cantrip payload', () => {
+      const spell = makeCantrip({
+        damage: { damage_at_character_level: { 1: '1d10', 5: '2d10' } },
+      });
+      const onCast = castCantrip({ spell, playerLevel: 5 });
 
       expect(onCast).toHaveBeenCalledTimes(1);
-      expect(onCast).toHaveBeenLastCalledWith(
-        expect.objectContaining({ level: 0, baseLevel: 0 }),
-        expect.any(Object)
+      const [passedSpell] = onCast.mock.calls[0];
+      expect(passedSpell.upcastLevel).toBeUndefined();
+      expect(passedSpell.freeCastAuthorized).toBeFalsy();
+    });
+  });
+
+  it('blocks cantrip casting while raging', () => {
+    vi.mocked(getActiveBuffs).mockReturnValue([{ name: 'Rage' }]);
+    const spell = makeCantrip({
+      damage: { damage_at_character_level: { 1: '1d10', 5: '2d10' } },
+    });
+
+    const onCast = castCantrip({ spell, playerLevel: 5 });
+    expect(screen.getByRole('button', { name: /Cast Spell/ })).toBeDisabled();
+    expect(onCast).not.toHaveBeenCalled();
+  });
+
+  describe('psychic damage opt-in travels the cantrip payload (CLA-268)', () => {
+    const psychicStats = makeStats({
+      name: 'Nyxis',
+      class: { name: 'Warlock', major: { name: 'Warlock' } },
+      automation: { passives: [{ type: 'psychic_spells' }], actions: [] },
+    });
+    const spell = makeCantrip({
+      school: 'Evocation',
+      damage: { damage_at_character_level: { 1: '1d10', 5: '2d10' } },
+    });
+
+    it.each([
+      { toggleOn: true, expected: true, label: 'checked' },
+      { toggleOn: false, expected: false, label: 'unchecked' },
+    ])('passes usePsychicDamage:$expected when the checkbox is $label', ({ toggleOn, expected }) => {
+      const onCast = castCantrip({
+        spell,
+        playerStats: psychicStats,
+        playerLevel: 5,
+        beforeClick: () => {
+          if (toggleOn) {
+            fireEvent.click(screen.getByRole('checkbox', { name: /Change damage type to Psychic/ }));
+          }
+        },
+      });
+
+      expect(onCast).toHaveBeenCalledTimes(1);
+      expect(onCast).toHaveBeenCalledWith(
+        expect.objectContaining({ level: 5, baseLevel: 0, usePsychicDamage: expected }),
+        expect.objectContaining({ overchannel: false })
       );
     });
   });

@@ -1,23 +1,42 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @improved-by-ai
+// Unit tests for the handleAttackClick lane of useCharActionsAttackHandlers.
+// Scope note: confirm/cancel chooser handlers are covered by
+// useCharActionsAttackHandlers-2.test.js and .brutalGate.test.js; CLA-143 /
+// CLA-274 / CLA-405 latch lanes by the cla143-stamp / psychicBlade /
+// fleetStep suites; rider selection & sorting by .improvedBrutalStrike.test.js
+// — this file deliberately does not re-test those.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useCharActionsAttackHandlers from './useCharActionsAttackHandlers.js';
 
-vi.mock('../../hooks/runtime/useRuntimeState.js');
-vi.mock('../../services/ui/logService.js', () => ({
-    addEntry: vi.fn().mockResolvedValue(undefined),
-}));
+import * as assertCanActModule from '../../services/combat/assertCanAct.js';
+import * as lineOfSightGate from '../../services/combat/lineOfSightGate.js';
+import * as coverService from '../../services/combat/coverService.js';
+import * as damageUtils from '../../services/rules/combat/damageUtils.js';
+import * as logService from '../../services/ui/logService.js';
+import * as friendsService from '../../services/rules/features/friendsService.js';
+import * as invisibilityService from '../../services/rules/features/invisibilityService.js';
+import * as fleetStepService from '../../services/rules/features/fleetStepService.js';
+
 vi.mock('../../services/encounters/combatData.js', () => ({
     getActiveCreatureName: vi.fn(() => 'TestFighter'),
     getCurrentCombatRound: vi.fn(() => 1),
     getCombatSummary: vi.fn(() => null),
 }));
-vi.mock('../../services/automation/common/buffToggle.js', () => ({
-    toggleBuff: vi.fn(),
+vi.mock('../../services/combat/assertCanAct.js', () => ({
+    assertCanAct: vi.fn(() => ({ allowed: true })),
 }));
-vi.mock('../../services/rules/effects/expirations.js', () => ({
-    addExpiration: vi.fn(),
+vi.mock('../../services/combat/lineOfSightGate.js', () => ({
+    isLineOfSightEnforced: vi.fn(() => false),
+    checkLineOfSight: vi.fn(() => Promise.resolve({ allowed: true })),
 }));
-vi.mock('../../services/automation/common/oncePerTurn.js', () => ({
-    markOncePerTurn: vi.fn().mockResolvedValue({ round: 1, activeCreature: 'TestFighter' }),
+vi.mock('../../services/combat/coverService.js', () => ({
+    isCoverEnforced: vi.fn(() => false),
+}));
+vi.mock('../../services/rules/combat/damageUtils.js', () => ({
+    getTargetFromAttacker: vi.fn(() => null),
+}));
+vi.mock('../../services/ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve(undefined)),
 }));
 vi.mock('../../services/rules/features/friendsService.js', () => ({
     endFriendsOnHostileAction: vi.fn(),
@@ -25,603 +44,372 @@ vi.mock('../../services/rules/features/friendsService.js', () => ({
 vi.mock('../../services/rules/features/invisibilityService.js', () => ({
     endInvisibilityOnHostileAction: vi.fn(),
 }));
-
-import * as friendsService from '../../services/rules/features/friendsService.js';
-import * as invisibilityService from '../../services/rules/features/invisibilityService.js';
+vi.mock('../../services/rules/features/fleetStepService.js', () => ({
+    grantFleetStep: vi.fn(() => Promise.resolve()),
+}));
+// buffToggle / expirations / oncePerTurn are only touched by the confirm
+// lane (covered elsewhere); stub them so the click lane stays isolated.
+vi.mock('../../services/automation/common/buffToggle.js', () => ({ toggleBuff: vi.fn() }));
+vi.mock('../../services/rules/effects/expirations.js', () => ({ addExpiration: vi.fn() }));
+vi.mock('../../services/automation/common/oncePerTurn.js', () => ({
+    markOncePerTurn: vi.fn(() => Promise.resolve()),
+}));
 
 const campaignName = 'test-campaign';
+const playerName = 'TestFighter';
 
-const basePlayerStats = {
-    name: 'TestFighter',
-    level: 5,
-    class: { name: 'Fighter' },
+const RECKLESS_FEATURE = {
+    name: 'Reckless Attack',
+    effect: 'advantage_attacks_advantage_against',
+    trigger: 'first_attack_of_turn',
+};
+const BRUTAL_RIDER = {
+    name: 'Brutal Strike',
+    type: 'attack_rider',
+    trigger: 'strength_attack_hit_after_reckless',
+    damageExpression: '2d6',
+    options: ['Forceful Blow', 'Hamstring Blow'],
+    maxEffects: 2,
 };
 
-function createDeps(overrides = {}) {
-    const {
-        cannotAct = false,
-        playerName = 'TestFighter',
-        playerStats = basePlayerStats,
-        getRuntimeValue = vi.fn(),
-        setRuntimeValue = vi.fn(),
-        buildCtx = vi.fn(() => Promise.resolve({})),
-        rollAttack = vi.fn(),
-        setModalState = vi.fn(),
-        specialActions = [],
-        passives = [],
-        exhaustionPenalty = 0,
-    } = overrides;
+/** Per-test attack row fixture (fresh object, never shared mutable state). */
+function makeAttack(overrides = {}) {
+    return { name: 'Longsword', type: 'Action', hitBonus: 7, damage: '1d8+5', ...overrides };
+}
 
+/**
+ * Runtime-store read stub with sensible defaults; override individual keys
+ * instead of hand-rolling a switch in every test.
+ */
+function makeRuntimeStore(overrides = {}) {
+    const store = {
+        activeCreatureName: playerName,
+        activeBuffs: [],
+        targetEffects: [],
+        '_recklessAttack_offeredThisTurn': null,
+        '_BrutalStrike_usedRound': null,
+        ...overrides,
+    };
+    return vi.fn((_charKey, key) => store[key]);
+}
+
+function createDeps(overrides = {}) {
     return {
-        cannotAct,
-        buildCtx,
-        rollAttack,
-        exhaustionPenalty,
+        cannotAct: false,
+        buildCtx: vi.fn(() => Promise.resolve({ hitBonus: 9 })),
+        rollAttack: vi.fn(),
+        exhaustionPenalty: 0,
         playerName,
         campaignName,
-        setModalState,
-        specialActions,
-        passives,
-        playerStats,
-        getRuntimeValue,
-        setRuntimeValue,
+        setModalState: vi.fn(),
+        specialActions: [],
+        passives: [],
+        playerStats: { name: playerName, level: 5, class: { name: 'Fighter' } },
+        getRuntimeValue: makeRuntimeStore(),
+        setRuntimeValue: vi.fn(),
+        setPopupHtml: vi.fn(),
+        ...overrides,
     };
 }
 
-describe('useCharActionsAttackHandlers', () => {
+function lastModal(deps) {
+    return deps.setModalState.mock.calls.at(-1)?.[0]?.recklessAttackModal;
+}
+
+describe('useCharActionsAttackHandlers — handleAttackClick', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        // Re-arm defaults so per-test overrides can never leak sideways.
+        assertCanActModule.assertCanAct.mockReturnValue({ allowed: true });
+        lineOfSightGate.isLineOfSightEnforced.mockReturnValue(false);
+        coverService.isCoverEnforced.mockReturnValue(false);
+        lineOfSightGate.checkLineOfSight.mockResolvedValue({ allowed: true });
+        damageUtils.getTargetFromAttacker.mockReturnValue(null);
+        fleetStepService.grantFleetStep.mockResolvedValue(undefined);
     });
 
-    describe('handleAttackClick', () => {
-        it('should return early without any action when cannotAct is true', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    describe('enforcement gates', () => {
+        it('refuses a blocked attacker with zero side effects', () => {
             const deps = createDeps({ cannotAct: true });
             const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
 
-            handlers.handleAttackClick(attack);
+            handlers.handleAttackClick(makeAttack());
 
             expect(deps.setModalState).not.toHaveBeenCalled();
             expect(deps.buildCtx).not.toHaveBeenCalled();
             expect(deps.rollAttack).not.toHaveBeenCalled();
+            expect(deps.setRuntimeValue).not.toHaveBeenCalled();
             expect(friendsService.endFriendsOnHostileAction).not.toHaveBeenCalled();
             expect(invisibilityService.endInvisibilityOnHostileAction).not.toHaveBeenCalled();
         });
 
-        it('should return the five handler functions', () => {
-            const deps = createDeps();
-            const handlers = useCharActionsAttackHandlers(deps);
-
-            expect(typeof handlers.handleAttackClick).toBe('function');
-            expect(typeof handlers.handleRecklessAttackConfirm).toBe('function');
-            expect(typeof handlers.handleRecklessAttackCancel).toBe('function');
-            expect(typeof handlers.handleBrutalStrikeConfirm).toBe('function');
-            expect(typeof handlers.handleBrutalStrikeCancel).toBe('function');
-        });
-
-        it('should call endFriendsOnHostileAction and endInvisibilityOnHostileAction before proceeding', () => {
-            const deps = createDeps();
-            const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
-
-            handlers.handleAttackClick(attack);
-
-            expect(friendsService.endFriendsOnHostileAction).toHaveBeenCalledWith('TestFighter', campaignName);
-            expect(invisibilityService.endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestFighter', campaignName);
-        });
-
-        it('should open reckless attack modal when feature exists, buff not active, and not offered this turn', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-            const specialActions = [
-                { effect: 'advantage_attacks_advantage_against', trigger: 'first_attack_of_turn' },
-            ];
-
+        it('logs and pops a Stinking Cloud refusal when the attacker holds no_action_and_bonus_action', () => {
+            const cloudTe = { target: playerName, effect: 'no_action_and_bonus_action' };
             const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions,
-                passives: [],
+                cannotAct: true,
+                getRuntimeValue: makeRuntimeStore({ targetEffects: [cloudTe] }),
             });
             const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
+
+            handlers.handleAttackClick(makeAttack({ name: 'Longbow' }));
+
+            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'automation blocked',
+                characterName: playerName,
+                abilityName: 'Longbow',
+            }));
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Stinking Cloud'));
+            expect(deps.rollAttack).not.toHaveBeenCalled();
+        });
+
+        it('stays silent when blocked by something other than Stinking Cloud', () => {
+            const deps = createDeps({
+                cannotAct: true,
+                getRuntimeValue: makeRuntimeStore({
+                    targetEffects: [{ target: playerName, effect: 'stunned' }],
+                }),
+            });
+            const handlers = useCharActionsAttackHandlers(deps);
+
+            handlers.handleAttackClick(makeAttack());
+
+            expect(logService.addEntry).not.toHaveBeenCalled();
+            expect(deps.setPopupHtml).not.toHaveBeenCalled();
+        });
+
+        it('stops before rolling when the action economy denies the click', () => {
+            assertCanActModule.assertCanAct.mockReturnValue({ allowed: false });
+            const deps = createDeps();
+            const handlers = useCharActionsAttackHandlers(deps);
+
+            handlers.handleAttackClick(makeAttack());
+
+            expect(deps.rollAttack).not.toHaveBeenCalled();
+            expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+            // A denied shot must not break invisible/Friends concentration.
+            expect(friendsService.endFriendsOnHostileAction).not.toHaveBeenCalled();
+            expect(invisibilityService.endInvisibilityOnHostileAction).not.toHaveBeenCalled();
+        });
+
+        it('charges the bonusAction bucket for Bonus Action rows and action otherwise', () => {
+            const deps = createDeps();
+            const handlers = useCharActionsAttackHandlers(deps);
+
+            handlers.handleAttackClick(makeAttack());
+            expect(assertCanActModule.assertCanAct).toHaveBeenCalledWith(expect.objectContaining({
+                creatureName: playerName,
+                bucket: 'action',
+                charge: true,
+            }));
+
+            handlers.handleAttackClick(makeAttack({ type: 'Bonus Action', name: 'Handaxe' }));
+            expect(assertCanActModule.assertCanAct).toHaveBeenLastCalledWith(expect.objectContaining({
+                bucket: 'bonusAction',
+            }));
+        });
+
+        it('defers the roll to the line-of-sight consult when enforcement is on', async () => {
+            lineOfSightGate.isLineOfSightEnforced.mockReturnValue(true);
+            damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            const deps = createDeps();
+            const handlers = useCharActionsAttackHandlers(deps);
+            const attack = makeAttack({ range: '20/60' });
 
             handlers.handleAttackClick(attack);
 
-            expect(deps.setModalState).toHaveBeenCalledWith({
-                recklessAttackModal: {
-                    attack,
-                    mode: 'full',
-                    hasBrutalStrike: false,
-                    brutalStrikeOptions: [],
-                    maxEffects: 1,
-                    riderName: 'Brutal Strike',
-                },
-            });
+            expect(lineOfSightGate.checkLineOfSight).toHaveBeenCalledWith(expect.objectContaining({
+                campaignName,
+                attackerName: playerName,
+                targetName: 'Goblin',
+                source: 'attack-row',
+            }));
+            expect(deps.rollAttack).not.toHaveBeenCalled();
+
+            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 9, expect.any(Object)));
+        });
+
+        it('never rolls a shot the line-of-sight consult denies', async () => {
+            lineOfSightGate.isLineOfSightEnforced.mockReturnValue(true);
+            damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            lineOfSightGate.checkLineOfSight.mockResolvedValue({ allowed: false });
+            const deps = createDeps();
+            const handlers = useCharActionsAttackHandlers(deps);
+
+            handlers.handleAttackClick(makeAttack({ range: '20/60' }));
+
+            await vi.waitFor(() => expect(lineOfSightGate.checkLineOfSight).toHaveBeenCalled());
+            expect(deps.buildCtx).not.toHaveBeenCalled();
+            expect(deps.rollAttack).not.toHaveBeenCalled();
+            expect(friendsService.endFriendsOnHostileAction).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('hostile-action commitments', () => {
+        it('ends Friends and Invisibility when the click commits to an attack', () => {
+            const deps = createDeps();
+            const handlers = useCharActionsAttackHandlers(deps);
+
+            handlers.handleAttackClick(makeAttack());
+
+            expect(friendsService.endFriendsOnHostileAction).toHaveBeenCalledWith(playerName, campaignName);
+            expect(invisibilityService.endInvisibilityOnHostileAction).toHaveBeenCalledWith(playerName, campaignName);
+        });
+
+        it('reads the runtime store scoped to this campaign', () => {
+            const getRuntimeValue = makeRuntimeStore();
+            const deps = createDeps({ getRuntimeValue });
+            const handlers = useCharActionsAttackHandlers(deps);
+
+            handlers.handleAttackClick(makeAttack());
+
+            expect(getRuntimeValue).toHaveBeenCalledWith(playerName, 'activeBuffs', campaignName);
+        });
+    });
+
+    describe('Reckless / Brutal Strike chooser', () => {
+        it('opens the full chooser once when reckless is owed on the turn', () => {
+            const attack = makeAttack();
+            const deps = createDeps({ specialActions: [RECKLESS_FEATURE] });
+            const handlers = useCharActionsAttackHandlers(deps);
+
+            handlers.handleAttackClick(attack);
+
+            expect(lastModal(deps)).toEqual(expect.objectContaining({
+                attack,
+                mode: 'full',
+                hasBrutalStrike: false,
+                brutalStrikeOptions: [],
+                riderName: 'Brutal Strike',
+            }));
             expect(deps.buildCtx).not.toHaveBeenCalled();
             expect(deps.rollAttack).not.toHaveBeenCalled();
         });
 
-        it('should open brutal strike only modal when reckless is active and brutal strike exists but not used this turn', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_advantage_against' }];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-            const specialActions = [
-                { effect: 'advantage_attacks_advantage_against', trigger: 'first_attack_of_turn' },
-            ];
-            const passives = [
-                { type: 'attack_rider', trigger: 'strength_attack_hit_after_reckless', damageExpression: '2d6', options: ['option1'], maxEffects: 2 },
-            ];
-
+        it('does not re-offer the chooser once the current creature has been offered', async () => {
             const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions,
-                passives,
+                specialActions: [RECKLESS_FEATURE],
+                getRuntimeValue: makeRuntimeStore({
+                    '_recklessAttack_offeredThisTurn': { activeCreature: playerName },
+                }),
             });
             const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
+
+            handlers.handleAttackClick(makeAttack());
+
+            expect(deps.setModalState).not.toHaveBeenCalled();
+            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 9, expect.any(Object)));
+        });
+
+        it('still offers the chooser when the offered latch belongs to another creature', () => {
+            const deps = createDeps({
+                specialActions: [RECKLESS_FEATURE],
+                getRuntimeValue: makeRuntimeStore({
+                    '_recklessAttack_offeredThisTurn': { activeCreature: 'OtherCreature' },
+                }),
+            });
+            const handlers = useCharActionsAttackHandlers(deps);
+
+            handlers.handleAttackClick(makeAttack());
+
+            expect(lastModal(deps)).toMatchObject({ mode: 'full' });
+        });
+
+        it('opens the brutalOnly chooser with the selected rider payload when reckless is active', () => {
+            const attack = makeAttack();
+            const deps = createDeps({
+                specialActions: [RECKLESS_FEATURE],
+                passives: [BRUTAL_RIDER],
+                getRuntimeValue: makeRuntimeStore({
+                    activeBuffs: [{ effect: 'advantage_attacks_advantage_against' }],
+                    '_recklessAttack_offeredThisTurn': { activeCreature: playerName },
+                }),
+            });
+            const handlers = useCharActionsAttackHandlers(deps);
 
             handlers.handleAttackClick(attack);
 
-            expect(deps.setModalState).toHaveBeenCalledWith({
-                recklessAttackModal: {
-                    attack,
-                    mode: 'brutalOnly',
-                    hasBrutalStrike: true,
-                    brutalStrikeOptions: ['option1'],
-                    maxEffects: 2,
-                    riderName: 'Brutal Strike',
-                },
-            });
+            expect(lastModal(deps)).toEqual(expect.objectContaining({
+                attack,
+                mode: 'brutalOnly',
+                hasBrutalStrike: true,
+                brutalStrikeOptions: ['Forceful Blow', 'Hamstring Blow'],
+                maxEffects: 2,
+                riderName: 'Brutal Strike',
+            }));
             expect(deps.buildCtx).not.toHaveBeenCalled();
         });
 
-        it('should skip modal and go straight to buildCtx when reckless is active and brutal strike already used this turn', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_advantage_against' }];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return { activeCreature: 'TestFighter' };
-                return undefined;
-            });
-            const specialActions = [
-                { effect: 'advantage_attacks_advantage_against', trigger: 'first_attack_of_turn' },
-            ];
-            const passives = [
-                { type: 'attack_rider', trigger: 'strength_attack_hit_after_reckless', damageExpression: '2d6' },
-            ];
-
-            const buildCtx = vi.fn(() => Promise.resolve({ hitBonus: 6 }));
-            const rollAttack = vi.fn();
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions,
-                passives,
-                buildCtx,
-                rollAttack,
-            });
+        it('rolls straight through when there is no reckless feature', async () => {
+            const deps = createDeps();
             const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
 
-            handlers.handleAttackClick(attack);
+            handlers.handleAttackClick(makeAttack());
 
             expect(deps.setModalState).not.toHaveBeenCalled();
-
-            vi.waitFor(() => {
-                expect(buildCtx).toHaveBeenCalledWith(attack);
-                expect(rollAttack).toHaveBeenCalledWith('Longsword', 6, expect.any(Object));
-            });
+            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 9, expect.any(Object)));
         });
 
-        it('should skip modal and go straight to buildCtx when no reckless feature', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-            const buildCtx = vi.fn(() => Promise.resolve({ hitBonus: 6 }));
-            const rollAttack = vi.fn();
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions: [],
-                passives: [],
-                buildCtx,
-                rollAttack,
-            });
+        it.each([
+            ['missing passives', { passives: undefined }],
+            ['missing specialActions', { specialActions: undefined }],
+        ])('rolls through without crashing on %s', async (_label, overrides) => {
+            const deps = createDeps(overrides);
             const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
 
-            handlers.handleAttackClick(attack);
-
+            expect(() => handlers.handleAttackClick(makeAttack())).not.toThrow();
             expect(deps.setModalState).not.toHaveBeenCalled();
-
-            vi.waitFor(() => {
-                expect(buildCtx).toHaveBeenCalledWith(attack);
-                expect(rollAttack).toHaveBeenCalledWith('Longsword', 6, expect.any(Object));
-            });
+            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 9, expect.any(Object)));
         });
+    });
 
-        it('should skip modal and go straight to buildCtx when reckless offered this turn for current creature', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return { activeCreature: 'TestFighter' };
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-            const specialActions = [
-                { effect: 'advantage_attacks_advantage_against', trigger: 'first_attack_of_turn' },
-            ];
-            const buildCtx = vi.fn(() => Promise.resolve({ hitBonus: 6 }));
-            const rollAttack = vi.fn();
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions,
-                passives: [],
-                buildCtx,
-                rollAttack,
-            });
+    describe('attack roll resolution', () => {
+        it.each([
+            ['ctx.hitBonus wins over the row value', { hitBonus: 10 }, 10],
+            ['ctx without hitBonus falls back to the row', {}, 7],
+            ['null ctx falls back to the row', null, 7],
+        ])('%s', async (_label, ctx, expected) => {
+            const deps = createDeps({ buildCtx: vi.fn(() => Promise.resolve(ctx)) });
             const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
 
-            handlers.handleAttackClick(attack);
+            handlers.handleAttackClick(makeAttack());
 
-            expect(deps.setModalState).not.toHaveBeenCalled();
-
-            vi.waitFor(() => {
-                expect(buildCtx).toHaveBeenCalledWith(attack);
-                expect(rollAttack).toHaveBeenCalledWith('Longsword', 6, expect.any(Object));
-            });
+            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', expected, ctx));
         });
 
-        it('should open modal when reckless offered this turn but for a different creature', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return { activeCreature: 'OtherCreature' };
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-            const specialActions = [
-                { effect: 'advantage_attacks_advantage_against', trigger: 'first_attack_of_turn' },
-            ];
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions,
-                passives: [],
-            });
+        it('rolls with the row hit bonus when buildCtx resolves undefined', async () => {
+            const deps = createDeps({ buildCtx: vi.fn(() => Promise.resolve(undefined)) });
             const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
 
-            handlers.handleAttackClick(attack);
+            handlers.handleAttackClick(makeAttack());
 
-            expect(deps.setModalState).toHaveBeenCalledWith({
-                recklessAttackModal: {
-                    attack,
-                    mode: 'full',
-                    hasBrutalStrike: false,
-                    brutalStrikeOptions: [],
-                    maxEffects: 1,
-                    riderName: 'Brutal Strike',
-                },
-            });
-            expect(deps.buildCtx).not.toHaveBeenCalled();
+            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 7, undefined));
         });
 
-        it('should open brutal modal when brutal strike used this turn but by a different creature', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_advantage_against' }];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return { activeCreature: 'OtherCreature' };
-                return undefined;
-            });
-            const specialActions = [
-                { effect: 'advantage_attacks_advantage_against', trigger: 'first_attack_of_turn' },
-            ];
-            const passives = [
-                { type: 'attack_rider', trigger: 'strength_attack_hit_after_reckless', damageExpression: '2d6', options: ['option1'], maxEffects: 2 },
-            ];
-
+        it('subtracts the exhaustion penalty from the effective hit bonus', async () => {
             const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions,
-                passives,
-            });
-            const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
-
-            handlers.handleAttackClick(attack);
-
-            expect(deps.setModalState).toHaveBeenCalledWith({
-                recklessAttackModal: {
-                    attack,
-                    mode: 'brutalOnly',
-                    hasBrutalStrike: true,
-                    brutalStrikeOptions: ['option1'],
-                    maxEffects: 2,
-                    riderName: 'Brutal Strike',
-                },
-            });
-            expect(deps.buildCtx).not.toHaveBeenCalled();
-        });
-
-        it('should apply exhaustionPenalty to the attack roll', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-            const buildCtx = vi.fn(() => Promise.resolve({ hitBonus: 6 }));
-            const rollAttack = vi.fn();
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions: [],
-                passives: [],
-                buildCtx,
-                rollAttack,
+                buildCtx: vi.fn(() => Promise.resolve({ hitBonus: 6 })),
                 exhaustionPenalty: 2,
             });
             const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
 
-            handlers.handleAttackClick(attack);
+            handlers.handleAttackClick(makeAttack());
 
-            vi.waitFor(() => {
-                expect(rollAttack).toHaveBeenCalledWith('Longsword', 4, expect.any(Object));
-            });
+            await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith('Longsword', 4, expect.any(Object)));
         });
 
-        it('should use ctx.hitBonus when available, falling back to attack.hitBonus', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-            const buildCtx = vi.fn(() => Promise.resolve({ hitBonus: 10 }));
-            const rollAttack = vi.fn();
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions: [],
-                passives: [],
-                buildCtx,
-                rollAttack,
-                exhaustionPenalty: 0,
-            });
+        it('logs the error and rolls nothing when buildCtx rejects', async () => {
+            const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const deps = createDeps({ buildCtx: vi.fn(() => Promise.reject(new Error('build failed'))) });
             const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword', hitBonus: 5 };
 
-            handlers.handleAttackClick(attack);
+            handlers.handleAttackClick(makeAttack());
 
-            vi.waitFor(() => {
-                expect(rollAttack).toHaveBeenCalledWith('Longsword', 10, expect.any(Object));
-            });
-        });
-
-        it('should fall back to attack.hitBonus when ctx.hitBonus is absent', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-            const buildCtx = vi.fn(() => Promise.resolve({}));
-            const rollAttack = vi.fn();
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions: [],
-                passives: [],
-                buildCtx,
-                rollAttack,
-                exhaustionPenalty: 0,
-            });
-            const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword', hitBonus: 7 };
-
-            handlers.handleAttackClick(attack);
-
-            vi.waitFor(() => {
-                expect(rollAttack).toHaveBeenCalledWith('Longsword', 7, expect.any(Object));
-            });
-        });
-
-        it('should fall back to attack.hitBonus when ctx is null', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-            const buildCtx = vi.fn(() => Promise.resolve(null));
-            const rollAttack = vi.fn();
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions: [],
-                passives: [],
-                buildCtx,
-                rollAttack,
-                exhaustionPenalty: 0,
-            });
-            const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword', hitBonus: 3 };
-
-            handlers.handleAttackClick(attack);
-
-            vi.waitFor(() => {
-                expect(rollAttack).toHaveBeenCalledWith('Longsword', 3, expect.any(Object));
-            });
-        });
-
-        it('should sort brutal strike passives by damage expression count descending', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-            const specialActions = [
-                { effect: 'advantage_attacks_advantage_against', trigger: 'first_attack_of_turn' },
-            ];
-            const passives = [
-                { type: 'attack_rider', trigger: 'strength_attack_hit_after_reckless', damageExpression: '1d6', options: ['low'], maxEffects: 1 },
-                { type: 'attack_rider', trigger: 'strength_attack_hit_after_reckless', damageExpression: '3d6', options: ['high'], maxEffects: 3 },
-                { type: 'attack_rider', trigger: 'strength_attack_hit_after_reckless', damageExpression: '2d6', options: ['mid'], maxEffects: 2 },
-            ];
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions,
-                passives,
-            });
-            const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
-
-            handlers.handleAttackClick(attack);
-
-            expect(deps.setModalState).toHaveBeenCalledWith({
-                recklessAttackModal: expect.objectContaining({
-                    hasBrutalStrike: true,
-                    brutalStrikeOptions: ['high'],
-                    maxEffects: 3,
-                }),
-            });
-        });
-
-        it('should handle missing passives array gracefully', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions: [],
-                passives: undefined,
-            });
-            const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
-
-            handlers.handleAttackClick(attack);
-
-            expect(deps.setModalState).not.toHaveBeenCalled();
-        });
-
-        it('should handle missing specialActions gracefully', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions: undefined,
-                passives: [],
-            });
-            const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
-
-            handlers.handleAttackClick(attack);
-
-            expect(deps.setModalState).not.toHaveBeenCalled();
-        });
-
-        it('should handle buildCtx rejection gracefully', async () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-            const buildCtx = vi.fn(() => Promise.reject(new Error('build failed')));
-            const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions: [],
-                passives: [],
-                buildCtx,
-            });
-            const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
-
-            handlers.handleAttackClick(attack);
-
-            await new Promise(process.nextTick);
-            expect(consoleErrorSpy).toHaveBeenCalledWith('[CharActions] Error:', expect.any(Error));
-            consoleErrorSpy.mockRestore();
-        });
-
-        it('should handle buildCtx returning undefined gracefully', () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'activeBuffs') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-            const buildCtx = vi.fn(() => Promise.resolve(undefined));
-            const rollAttack = vi.fn();
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions: [],
-                passives: [],
-                buildCtx,
-                rollAttack,
-                exhaustionPenalty: 0,
-            });
-            const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword', hitBonus: 4 };
-
-            handlers.handleAttackClick(attack);
-
-            vi.waitFor(() => {
-                expect(rollAttack).toHaveBeenCalledWith('Longsword', 4, expect.any(Object));
-            });
-        });
-
-        it('should use 3rd arg (campaignName) when reading activeBuffs', () => {
-            const grv = vi.fn((charKey, key, cn) => {
-                if (charKey === 'TestFighter' && key === 'activeBuffs' && cn === 'test-campaign') return [];
-                if (key === '_recklessAttack_offeredThisTurn') return null;
-                if (key === '_BrutalStrike_usedRound') return null;
-                return undefined;
-            });
-            const buildCtx = vi.fn(() => Promise.resolve({ hitBonus: 6 }));
-            const rollAttack = vi.fn();
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                specialActions: [],
-                passives: [],
-                buildCtx,
-                rollAttack,
-            });
-            const handlers = useCharActionsAttackHandlers(deps);
-            const attack = { name: 'Longsword' };
-
-            handlers.handleAttackClick(attack);
-
-            expect(grv).toHaveBeenCalledWith('TestFighter', 'activeBuffs', 'test-campaign');
-            vi.waitFor(() => {
-                expect(buildCtx).toHaveBeenCalledWith(attack);
-            });
+            await vi.waitFor(() => expect(consoleErrorSpy).toHaveBeenCalledWith('[CharActions] Error:', expect.any(Error)));
+            expect(deps.rollAttack).not.toHaveBeenCalled();
         });
     });
 });

@@ -1,16 +1,31 @@
+// @improved-by-ai
 //
-// Cleaned: Removed low-value and redundant tests:
-//   - Consolidated null/undefined auraComboEffects "does not crash" tests into single test
-//   - Removed Heroes' Feast tests (3 tests) -- redundant with CharSummary-BuffResistances.test.jsx and CharSummary-ConditionImmunities.test.jsx
-//   - Removed Rage of the Wilds tests (3 tests) -- redundant with CharSummary-BuffResistances.test.jsx
-//   - Removed Speed CSS Classes tests (2 tests) -- redundant with CharSummary-SpeedCalculations.test.jsx which has better parameterized coverage
-//   - Removed brittle nextElementSibling DOM traversal selector in speed class test
-//   - Removed low-value negative test "does not display resistances section when no buffs"
-//   - Removed low-value negative test "does not display Heroes Feast badge when buff is not active"
+// Coverage ownership: the `auraComboEffects` prop — the ONLY owner of this prop across the
+// CharSummary-* family (verified by grep over all siblings).
+//   - Aura of Warding resistance attribution markers (+ dedup with base resistances)
+//   - Aura immunities merge (+ dedup) into the Immunities row
+//   - Aura of Alacrity speed bonus marker (previously untested anywhere)
 //
-// Kept: Aura source marker rendering (resistance + immunity), merge/deduplication coverage
+// NOT owned here (delegated to siblings — do not re-add):
+//   - Initiative click-to-roll / advantage / exhaustion penalty → CharSummary-Ally-Initiative.test.jsx
+//   - initiative-rolled event clearing surge effects → CharSummary-EventHandlers.test.jsx
+//   - Aura/buff BADGES (Aura of Life, Heroes' Feast, Rage resistances) → CharSummary-BuffResistances.test.jsx
+//   - Speed CSS classes / speed calculation recipes → CharSummary-SpeedCalculations.test.jsx
+//
+// Improvements over previous revision:
+//   - "merge with deduplication" tests now actually assert deduplication (duplicate entries
+//     would previously still have passed — both types rendered regardless).
+//   - Resistance tests scope queries to the Resistances/Immunities row (was page-wide text match).
+//   - Attribution marker assertions verify the structural `.aura-source` marker element and its
+//     count, not just any element whose title matches somewhere on the page.
+//   - Renamed the immunity test: the component renders NO source marker for immunities, so the
+//     old name ("displays aura source marker for immunity") promised behavior that does not exist.
+//     Fixture no longer passes `immunitySources` (a phantom key the calc ignores).
+//   - "null or undefined" smoke test now covers both values via it.each, and asserts the absence
+//     of resistance/immunity rows and aura markers instead of only checking the name renders.
+//   - Added Aura of Alacrity speed-bonus marker coverage (owning gap).
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
@@ -97,66 +112,95 @@ vi.mock('../../../services/automation/handlers/buffs/deathWardHandler.js', () =>
     handle: vi.fn(),
 }));
 
-describe('CharSummary - Aura Sources', () => {
+function renderSummary(props) {
+    return render(
+        <CharSummary
+            playerStats={mockPlayerStats}
+            campaignName={mockCampaignName}
+            exhaustionLevel={0}
+            {...props}
+        />
+    );
+}
+
+function statRow(label) {
+    return screen.getByText(label).closest('div');
+}
+
+describe('CharSummary - auraComboEffects', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getActiveBuffs.mockReturnValue([]);
     });
 
-    it('displays aura source marker for resistance from auraComboEffects', () => {
-        const stats = { ...mockPlayerStats, resistances: [] };
-        render(<CharSummary
-            playerStats={stats}
-            campaignName={mockCampaignName}
-            exhaustionLevel={0}
-            auraComboEffects={{ resistances: ['radiant'], resistanceSource: 'Aura of Protection' }}
-        />);
-        expect(screen.getByText('Radiant')).toBeInTheDocument();
-        expect(screen.getByTitle(/Aura of Protection/)).toBeInTheDocument();
+    it('attributes aura resistances to their source with an .aura-source marker', () => {
+        renderSummary({
+            playerStats: { ...mockPlayerStats, resistances: [] },
+            auraComboEffects: { resistances: ['radiant'], resistanceSource: 'Aura of Protection' },
+        });
+
+        const row = statRow('Resistances:');
+        expect(within(row).getByText('Radiant')).toBeInTheDocument();
+        const markers = within(row).getAllByTitle(/Aura of Protection/);
+        expect(markers).toHaveLength(1);
+        expect(markers[0]).toHaveClass('aura-source');
     });
 
-    it('displays aura source marker for immunity from auraComboEffects', () => {
-        const stats = { ...mockPlayerStats, immunities: [] };
-        render(<CharSummary
-            playerStats={stats}
-            campaignName={mockCampaignName}
-            exhaustionLevel={0}
-            auraComboEffects={{ immunities: ['poison'], immunitySources: { poison: 'Aura of Protection' } }}
-        />);
-        expect(screen.getByText('Poison')).toBeInTheDocument();
+    it('omits the attribution marker when the aura grants no resistanceSource', () => {
+        renderSummary({
+            playerStats: { ...mockPlayerStats, resistances: [] },
+            auraComboEffects: { resistances: ['radiant'] },
+        });
+
+        const row = statRow('Resistances:');
+        expect(within(row).getByText('Radiant')).toBeInTheDocument();
+        expect(row.querySelectorAll('.aura-source')).toHaveLength(0);
     });
 
-    it('merges base and aura resistances with deduplication', () => {
-        const stats = { ...mockPlayerStats, resistances: ['fire'] };
-        render(<CharSummary
-            playerStats={stats}
-            campaignName={mockCampaignName}
-            exhaustionLevel={0}
-            auraComboEffects={{ resistances: ['fire', 'cold'], resistanceSource: 'Aura of Protection' }}
-        />);
-        expect(screen.getByText(/Fire/)).toBeInTheDocument();
-        expect(screen.getByText(/Cold/)).toBeInTheDocument();
+    it('merges aura resistances into the base list, listing a shared type exactly once', () => {
+        renderSummary({
+            playerStats: { ...mockPlayerStats, resistances: ['fire'] },
+            auraComboEffects: { resistances: ['fire', 'cold'], resistanceSource: 'Aura of Protection' },
+        });
+
+        const row = statRow('Resistances:');
+        // Deduplication: a broken merge would render "Fire" twice — only one entry may appear.
+        expect(within(row).getAllByText(/Fire/)).toHaveLength(1);
+        expect(within(row).getAllByText(/Cold/)).toHaveLength(1);
+        // Every aura-provided type carries the source attribution.
+        expect(within(row).getAllByTitle(/Aura of Protection/)).toHaveLength(2);
     });
 
-    it('merges base and aura immunities with deduplication', () => {
-        const stats = { ...mockPlayerStats, immunities: ['poison'] };
-        render(<CharSummary
-            playerStats={stats}
-            campaignName={mockCampaignName}
-            exhaustionLevel={0}
-            auraComboEffects={{ immunities: ['poison', 'cold'], immunitySources: { cold: 'Aura of Protection' } }}
-        />);
-        expect(screen.getByText(/Poison/)).toBeInTheDocument();
-        expect(screen.getByText(/Cold/)).toBeInTheDocument();
+    it('merges aura immunities into the base list, listing a shared type exactly once', () => {
+        renderSummary({
+            playerStats: { ...mockPlayerStats, immunities: ['poison'] },
+            auraComboEffects: { immunities: ['poison', 'cold'] },
+        });
+
+        const row = statRow('Immunities:');
+        expect(within(row).getAllByText(/Poison/)).toHaveLength(1);
+        expect(within(row).getAllByText(/Cold/)).toHaveLength(1);
     });
 
-    it('does not crash when auraComboEffects is null or undefined', () => {
-        render(<CharSummary
-            playerStats={mockPlayerStats}
-            campaignName={mockCampaignName}
-            exhaustionLevel={0}
-            auraComboEffects={null}
-        />);
+    it('shows the aura speed bonus attributed to its source', () => {
+        renderSummary({
+            auraComboEffects: { speedBonus: 10, speedSource: 'Aelar' },
+        });
+
+        const marker = screen.getByTitle("From Aelar's Aura of Alacrity");
+        expect(marker).toHaveClass('aura-source');
+        expect(marker).toHaveTextContent('(+10)');
+    });
+
+    it.each([null, undefined])('renders plain stats with no rows or markers when auraComboEffects is %s', (auraComboEffects) => {
+        renderSummary({
+            playerStats: { ...mockPlayerStats, resistances: [], immunities: [] },
+            auraComboEffects,
+        });
+
         expect(screen.getByText(mockPlayerStats.name)).toBeInTheDocument();
+        expect(screen.queryByText('Resistances:')).not.toBeInTheDocument();
+        expect(screen.queryByText('Immunities:')).not.toBeInTheDocument();
+        expect(document.querySelectorAll('.aura-source')).toHaveLength(0);
     });
 });

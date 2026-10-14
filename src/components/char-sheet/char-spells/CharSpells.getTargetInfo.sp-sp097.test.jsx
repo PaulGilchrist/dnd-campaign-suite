@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpells from './CharSpells.jsx';
@@ -58,9 +59,9 @@ vi.mock('../../../hooks/combat/useSpellPositionResolver.js', () => ({
 }));
 
 vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => Promise.resolve(null)),
-  getTargetFromAttacker: vi.fn(() => null),
-  getAttackerTargetName: vi.fn(() => null),
+  getCombatContext: vi.fn(),
+  getTargetFromAttacker: vi.fn(),
+  getAttackerTargetName: vi.fn(),
 }));
 
 vi.mock('../../../services/combat/buffs/buffService.js', () => ({
@@ -96,61 +97,85 @@ vi.mock('./TargetSpellPopups.jsx', () => ({
   },
 }));
 
-function renderSpells() {
+const CAMPAIGN = 'test-campaign';
+
+function renderSpells(props = {}) {
   return render(<CharSpells
     playerStats={mockPlayerStats}
-    campaignName="test-campaign"
+    campaignName={CAMPAIGN}
     mapName="test-map"
     characters={[]}
     setModalState={vi.fn()}
+    {...props}
   />);
 }
 
-function getCastExecutorTargetInfo() {
-  const call = vi.mocked(useSpellCastExecutor).mock.calls.at(-1);
-  return call[0].getTargetInfo;
+// Stub the three combat-context lookups the seam depends on, explicitly per
+// test, so no test inherits another test's stubbed return values.
+function stubTargetSources({ combatSummary = null, target = null, overlayName = null } = {}) {
+  vi.mocked(getCombatContext).mockResolvedValue(combatSummary);
+  vi.mocked(getTargetFromAttacker).mockReturnValue(target);
+  vi.mocked(getAttackerTargetName).mockReturnValue(overlayName);
+}
+
+// Render CharSpells and hand back the getTargetInfo it passed to the spell
+// cast executor, asserting SP-097's contract (a real function, not a null
+// stub) before any test invokes the seam.
+function renderAndGetTargetInfo(props = {}) {
+  renderSpells(props);
+  const { getTargetInfo } = vi.mocked(useSpellCastExecutor).mock.calls.at(-1)[0];
+  expect(typeof getTargetInfo).toBe('function');
+  return getTargetInfo;
 }
 
 describe('CharSpells getTargetInfo seam (SP-097)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getCombatContext).mockResolvedValue(null);
-    vi.mocked(getTargetFromAttacker).mockReturnValue(null);
-    vi.mocked(getAttackerTargetName).mockReturnValue(null);
   });
 
-  it('passes a real getTargetInfo function into useSpellCastExecutor (not a null stub)', async () => {
-    const { getTargetFromAttacker } = await import('../../../services/rules/combat/damageUtils.js');
-    const cs = { creatures: [{ name: mockPlayerStats.name, targetName: 'Thug 1' }] };
-    vi.mocked(getCombatContext).mockResolvedValue(cs);
-    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Thug 1' });
+  it('resolves to the attacker\'s target creature and skips the overlay lookup', async () => {
+    const thug = { name: 'Thug 1' };
+    const combatSummary = { creatures: [{ name: mockPlayerStats.name, targetName: 'Thug 1' }] };
+    stubTargetSources({ combatSummary, target: thug });
 
-    renderSpells();
+    const getTargetInfo = renderAndGetTargetInfo();
 
-    const getTargetInfo = getCastExecutorTargetInfo();
-    expect(typeof getTargetInfo).toBe('function');
+    // The full target object is handed through untouched, not a copy.
+    await expect(getTargetInfo()).resolves.toBe(thug);
+    expect(getCombatContext).toHaveBeenCalledWith(CAMPAIGN);
+    expect(getTargetFromAttacker).toHaveBeenCalledWith(combatSummary, mockPlayerStats.name);
+    expect(getAttackerTargetName).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the overlay attacker target name when no target creature is selected', async () => {
+    const combatSummary = { creatures: [{ name: mockPlayerStats.name, targetName: 'Thug 1' }] };
+    stubTargetSources({ combatSummary, target: null, overlayName: 'Thug 1' });
+
+    const getTargetInfo = renderAndGetTargetInfo();
+
     await expect(getTargetInfo()).resolves.toEqual({ name: 'Thug 1' });
-    expect(getCombatContext).toHaveBeenCalledWith('test-campaign');
-    expect(getTargetFromAttacker).toHaveBeenCalledWith(cs, mockPlayerStats.name);
+    expect(getTargetFromAttacker).toHaveBeenCalledWith(combatSummary, mockPlayerStats.name);
+    expect(getAttackerTargetName).toHaveBeenCalledWith(combatSummary, mockPlayerStats.name);
   });
 
-  it('falls back to overlay attacker target name when no target creature found', async () => {
-    const cs = { creatures: [{ name: mockPlayerStats.name, targetName: 'Thug 1' }] };
-    vi.mocked(getCombatContext).mockResolvedValue(cs);
-    vi.mocked(getTargetFromAttacker).mockReturnValue(null);
-    vi.mocked(getAttackerTargetName).mockReturnValue('Thug 1');
+  it('returns null when there is no combat context, without consulting target lookups', async () => {
+    stubTargetSources({ combatSummary: null });
 
-    renderSpells();
+    const getTargetInfo = renderAndGetTargetInfo();
 
-    await expect(getCastExecutorTargetInfo()()).resolves.toEqual({ name: 'Thug 1' });
-  });
-
-  it('returns null when there is no combat context', async () => {
-    vi.mocked(getCombatContext).mockResolvedValue(null);
-
-    renderSpells();
-
-    await expect(getCastExecutorTargetInfo()()).resolves.toBeNull();
+    await expect(getTargetInfo()).resolves.toBeNull();
     expect(getTargetFromAttacker).not.toHaveBeenCalled();
+    expect(getAttackerTargetName).not.toHaveBeenCalled();
+  });
+
+  it('returns null when combat context has neither a selected target nor an overlay name', async () => {
+    const combatSummary = { creatures: [{ name: mockPlayerStats.name, targetName: null }] };
+    stubTargetSources({ combatSummary, target: null, overlayName: null });
+
+    const getTargetInfo = renderAndGetTargetInfo();
+
+    await expect(getTargetInfo()).resolves.toBeNull();
+    expect(getTargetFromAttacker).toHaveBeenCalledWith(combatSummary, mockPlayerStats.name);
+    expect(getAttackerTargetName).toHaveBeenCalledWith(combatSummary, mockPlayerStats.name);
   });
 });

@@ -1,20 +1,38 @@
+// @improved-by-ai
 //
-// Cleanup (2026-08-18):
-//   - Consolidated Fiendish Resilience: 3 tests → 2 via it.each parameterization.
-//     Removed "renders different damage types" (redundant with positive test, same code path).
-//   - Consolidated Epitome Resistance: 3 tests → 2 via it.each parameterization.
-//     Removed "renders different damage types" (redundant, same code path).
-//   - Consolidated Boon of Energy: 4 tests → 2.
-//     Removed "renders single boon energy resistance type" (subset of multi-type, same code path).
-//     Merged "empty array" and "null" negative tests into 1 it.each parameterized test.
-//   - Consolidated Elemental Adept: 4 tests → 2 via it.each parameterization.
-//     Removed "does not render when passive not present" and "does not render when chosenType not set"
-//     (negative tests implied by positive). Removed "renders different damage types" (redundant).
-//   - Removed window.location.hostname mutation from all beforeEach (unnecessary, component only
-//     uses it for isLocalhost which does not affect resistance type rendering).
-//   - Imported shared mockPlayerStats from CharSummary.test-mocks.test.jsx (eliminated duplication).
-//   - Removed unused useRuntimeValue import (only needed via mocked module, not directly used).
-//   - Reduced file from 391 lines / 18 tests to 198 lines / 8 tests.
+// Coverage ownership (CharSummary family delegation): runtime-store-driven damage
+// types on the "Resistances:" row (charSummaryCalc.js computeResistances) —
+// the ONLY owner of these four runtime keys across the family:
+//   - '_Fiendish_Resilience_chosenType'   (single value)
+//   - 'epitomeResistanceType'             (single value)
+//   - '_Energy_Resistances_chosenTypes'   (array, Boon of Energy Resistance)
+//   - '_Elemental_Adept_chosenType'       (array of passives via collectElementalAdeptTypes)
+// plus deduplication of these runtime inputs against other sources.
+//
+// NOT owned here (delegated to siblings — do not re-add):
+//   - buff-derived resistanceTypes / Feign Death / Stone Skin buffs → CharSummary-BuffResistances.test.jsx
+//   - auraComboEffects resistances + asterisk markers → CharSummary-AuraAndInitiative.test.jsx
+//   - Stormborn gated on wrathOfTheSeaActive → CharSummary-AdditionalCoverage.test.jsx
+//   - base playerStats.resistances verbatim row → CharSummary-OtherEffects.test.jsx
+//   - rest persistence of the chosen keys → services/rules/effects/restRules-*.test.js
+//
+// Quality improvements over previous revision (8 tests / 17 runs → 10 tests / 19 runs):
+//   - All assertions are scoped to the "Resistances:" row and pin the FULL row
+//     text (label + capitalization + join order). The previous page-wide
+//     getByText(/Fire/) regex passed if "Fire" appeared in any element anywhere
+//     (badges, tooltips, sibling rows) and proved nothing about the resistance row.
+//   - Negatives now assert the ENTIRE row is absent (queryByText('Resistances:')),
+//     not just absence of one type name scattered across the page.
+//   - Added missing edge/negative paths: elemental_adept effect filter (a
+//     damage_type_choice passive with a different effect must not contribute),
+//     the typeof-string filter in ResistanceImmunityLines (null entries in the
+//     boon array must not render), and dedup ACROSS two runtime sources
+//     (fiendish + boon energy granting the same type) — previously only
+//     runtime-vs-base dedup was tested.
+//   - One module-level beforeEach replaces five identical blocks; a mockRuntime()
+//     helper replaces repeated if-chain mockImplementations.
+//   - Pins the runtime wiring (player name + campaign) once, so a key looked up
+//     against the wrong character store fails here.
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -110,197 +128,181 @@ vi.mock('../../../services/combat/auras/unbreakableMajesty.js', () => ({
     getUnbreakableMajestySaveDc: vi.fn(() => 0),
 }));
 
+beforeEach(() => {
+    vi.resetAllMocks();
+    getActiveBuffs.mockReturnValue([]);
+});
+
+function renderSummary(stats = mockPlayerStats) {
+    render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+}
+
+// Serve the given runtime keys; every other key returns undefined, mirroring
+// the real store's missing-key behavior.
+function mockRuntime(values) {
+    vi.mocked(getRuntimeValue).mockImplementation((_name, key) => values[key]);
+}
+
+// Exact (not substring) row match so duplicates or wrong join order fail.
+function expectResistancesRow(expectedRowText) {
+    const row = screen.getByText('Resistances:').closest('div');
+    expect(row.textContent.replace(/\s+/g, ' ').trim()).toBe(expectedRowText);
+}
+
+function expectNoResistancesRow() {
+    expect(screen.queryByText('Resistances:')).not.toBeInTheDocument();
+}
+
 // ---------------------------------------------------------------------------
-// Fiendish Resilience — parameterized across damage types
+// Fiendish Resilience — single runtime value folded into the Resistances row
 // ---------------------------------------------------------------------------
 describe('CharSummary - Fiendish Resilience', () => {
-    beforeEach(() => {
-        vi.resetAllMocks();
-        getActiveBuffs.mockReturnValue([]);
-    });
+    it.each(['fire', 'poison', 'cold'])(
+        'shows capitalized %s as the only resistance when chosenType is set',
+        (type) => {
+            mockRuntime({ '_Fiendish_Resilience_chosenType': type });
+            renderSummary();
+            expectResistancesRow(`Resistances: ${type.charAt(0).toUpperCase()}${type.slice(1)}`);
+            // Runtime lookups must be scoped to this character and campaign.
+            expect(getRuntimeValue).toHaveBeenCalledWith('Thorin', '_Fiendish_Resilience_chosenType', mockCampaignName);
+        }
+    );
 
-    it.each([
-        ['fire', /Fire/],
-        ['poison', /Poison/],
-        ['cold', /Cold/],
-    ])('renders fiendish resilience type %s when chosenType is set', (type, expectedText) => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === '_Fiendish_Resilience_chosenType') return type;
-            return null;
-        });
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(expectedText)).toBeInTheDocument();
-    });
+    it.each([['not set (undefined)', undefined], ['null', null]])(
+        'shows no Resistances row when chosenType is %s',
+        (_label, value) => {
+            mockRuntime({ '_Fiendish_Resilience_chosenType': value });
+            renderSummary();
+            expectNoResistancesRow();
+        }
+    );
+});
 
-    it('does not render fiendish resilience when chosenType is not set', () => {
-        vi.mocked(getRuntimeValue).mockReturnValue(null);
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.queryByText(/Fire/)).not.toBeInTheDocument();
+// ---------------------------------------------------------------------------
+// Elemental Epitome — single runtime value folded into the Resistances row
+// ---------------------------------------------------------------------------
+describe('CharSummary - Elemental Epitome', () => {
+    it.each(['lightning', 'acid'])(
+        'shows capitalized %s as the only resistance when epitomeResistanceType is set',
+        (type) => {
+            mockRuntime({ epitomeResistanceType: type });
+            renderSummary();
+            expectResistancesRow(`Resistances: ${type.charAt(0).toUpperCase()}${type.slice(1)}`);
+        }
+    );
+
+    it('shows no Resistances row when epitomeResistanceType is not set', () => {
+        mockRuntime({});
+        renderSummary();
+        expectNoResistancesRow();
     });
 });
 
 // ---------------------------------------------------------------------------
-// Epitome Resistance — parameterized across damage types
-// ---------------------------------------------------------------------------
-describe('CharSummary - Epitome Resistance', () => {
-    beforeEach(() => {
-        vi.resetAllMocks();
-        getActiveBuffs.mockReturnValue([]);
-    });
-
-    it.each([
-        ['lightning', /Lightning/],
-        ['acid', /Acid/],
-    ])('renders epitome resistance type %s when set', (type, expectedText) => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === 'epitomeResistanceType') return type;
-            return null;
-        });
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(expectedText)).toBeInTheDocument();
-    });
-
-    it('does not render epitome resistance when not set', () => {
-        vi.mocked(getRuntimeValue).mockReturnValue(null);
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.queryByText(/Lightning/)).not.toBeInTheDocument();
-    });
-});
-
-// ---------------------------------------------------------------------------
-// Boon of Energy Resistance
+// Boon of Energy Resistance — array runtime value
 // ---------------------------------------------------------------------------
 describe('CharSummary - Boon of Energy Resistance', () => {
-    beforeEach(() => {
-        vi.resetAllMocks();
-        getActiveBuffs.mockReturnValue([]);
+    it('lists every chosen type, capitalized, in stored order', () => {
+        mockRuntime({ '_Energy_Resistances_chosenTypes': ['fire', 'cold'] });
+        renderSummary();
+        expectResistancesRow('Resistances: Fire, Cold');
     });
 
-    it('renders boon energy resistance types when set', () => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === '_Energy_Resistances_chosenTypes') return ['fire', 'cold'];
-            return null;
-        });
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/Fire/)).toBeInTheDocument();
-        expect(screen.getByText(/Cold/)).toBeInTheDocument();
-    });
+    it.each([['null', null], ['an empty array', []]])(
+        'shows no Resistances row when the chosen types value is %s',
+        (_label, value) => {
+            mockRuntime({ '_Energy_Resistances_chosenTypes': value });
+            renderSummary();
+            expectNoResistancesRow();
+        }
+    );
 
-    it.each([
-        [null],
-        [[]],
-    ])('does not render boon energy resistances when value is %s', (_value) => {
-        vi.mocked(getRuntimeValue).mockReturnValue(_value);
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.queryByText(/Fire/)).not.toBeInTheDocument();
+    it('filters non-string entries out of the chosen types array', () => {
+        mockRuntime({ '_Energy_Resistances_chosenTypes': ['fire', null, undefined] });
+        renderSummary();
+        expectResistancesRow('Resistances: Fire');
     });
 });
 
 // ---------------------------------------------------------------------------
-// Elemental Adept — parameterized across damage types
+// Elemental Adept — types collected from damage_type_choice passives, keyed
+// by passive name ('_Elemental_Adept_chosenType')
 // ---------------------------------------------------------------------------
 describe('CharSummary - Elemental Adept', () => {
-    beforeEach(() => {
-        vi.resetAllMocks();
-        getActiveBuffs.mockReturnValue([]);
+    const elementalAdeptPassives = [
+        { type: 'damage_type_choice', effect: 'elemental_adept', name: 'Elemental Adept' },
+    ];
+
+    function statsWithPassives(passives) {
+        return {
+            ...mockPlayerStats,
+            automation: { ...mockPlayerStats.automation, passives },
+        };
+    }
+
+    it.each(['fire', 'cold'])(
+        'shows capitalized %s chosen via the elemental_adept passive',
+        (type) => {
+            mockRuntime({ '_Elemental_Adept_chosenType': type });
+            renderSummary(statsWithPassives(elementalAdeptPassives));
+            expectResistancesRow(`Resistances: ${type.charAt(0).toUpperCase()}${type.slice(1)}`);
+        }
+    );
+
+    it('shows no Resistances row when the passive exists but no type is chosen', () => {
+        mockRuntime({});
+        renderSummary(statsWithPassives(elementalAdeptPassives));
+        expectNoResistancesRow();
     });
 
-    it.each([
-        ['fire', /Fire/],
-        ['cold', /Cold/],
-    ])('renders elemental adept chosen type %s from passives', (type, expectedText) => {
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ type: 'damage_type_choice', effect: 'elemental_adept', name: 'Elemental Adept' }],
-            },
-        };
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === '_Elemental_Adept_chosenType') return type;
-            return null;
-        });
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(expectedText)).toBeInTheDocument();
-    });
-
-    it('does not render elemental adept when chosenType is not set', () => {
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ type: 'damage_type_choice', effect: 'elemental_adept', name: 'Elemental Adept' }],
-            },
-        };
-        vi.mocked(getRuntimeValue).mockReturnValue(null);
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.queryByText(/Fire/)).not.toBeInTheDocument();
+    it('ignores damage_type_choice passives whose effect is not elemental_adept', () => {
+        mockRuntime({ '_Energy_Weapons_chosenType': 'fire' });
+        renderSummary(statsWithPassives([
+            { type: 'damage_type_choice', effect: 'energy_weapons', name: 'Energy Weapons' },
+        ]));
+        expectNoResistancesRow();
     });
 });
 
 // ---------------------------------------------------------------------------
-// Resistance deduplication: runtime value types matching base resistances
+// Deduplication: runtime-set types already present via another source are
+// listed exactly once
 // ---------------------------------------------------------------------------
-describe('CharSummary - Resistance Deduplication', () => {
-    beforeEach(() => {
-        vi.resetAllMocks();
-        getActiveBuffs.mockReturnValue([]);
+describe('CharSummary - Resistance deduplication', () => {
+    it('does not repeat a runtime fiendish type already in base resistances', () => {
+        mockRuntime({ '_Fiendish_Resilience_chosenType': 'fire' });
+        renderSummary({ ...mockPlayerStats, resistances: ['fire'] });
+        expectResistancesRow('Resistances: Fire');
     });
 
-    it('does not duplicate fiendish resilience type when already in base resistances', () => {
-        const stats = { ...mockPlayerStats, resistances: ['fire'] };
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === '_Fiendish_Resilience_chosenType') return 'fire';
-            return null;
-        });
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        const fireElements = screen.queryAllByText(/Fire/);
-        expect(fireElements.length).toBe(1);
+    it('does not repeat a runtime epitome type already in base resistances', () => {
+        mockRuntime({ epitomeResistanceType: 'lightning' });
+        renderSummary({ ...mockPlayerStats, resistances: ['lightning'] });
+        expectResistancesRow('Resistances: Lightning');
     });
 
-    it('does not duplicate epitome type when already in base resistances', () => {
-        const stats = { ...mockPlayerStats, resistances: ['lightning'] };
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === 'epitomeResistanceType') return 'lightning';
-            return null;
+    it('does not repeat a type granted by two different runtime sources', () => {
+        mockRuntime({
+            '_Fiendish_Resilience_chosenType': 'fire',
+            '_Energy_Resistances_chosenTypes': ['fire', 'cold'],
         });
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        const lightningElements = screen.queryAllByText(/Lightning/);
-        expect(lightningElements.length).toBe(1);
+        renderSummary();
+        expectResistancesRow('Resistances: Fire, Cold');
     });
 });
 
 // ---------------------------------------------------------------------------
-// Multiple runtime-set resistance types active simultaneously
+// Multiple runtime sources active together — pins join order
+// (epitome → fiendish → boon energy, per computeResistances insertion order)
 // ---------------------------------------------------------------------------
-describe('CharSummary - Multiple Runtime Resistance Types', () => {
-    beforeEach(() => {
-        vi.resetAllMocks();
-        getActiveBuffs.mockReturnValue([]);
-    });
-
-    it('renders fiendish resilience and epitome resistance together', () => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === '_Fiendish_Resilience_chosenType') return 'fire';
-            if (key === 'epitomeResistanceType') return 'cold';
-            return null;
+describe('CharSummary - Multiple runtime resistance sources together', () => {
+    it('renders all three sources once, in computed order', () => {
+        mockRuntime({
+            epitomeResistanceType: 'lightning',
+            '_Fiendish_Resilience_chosenType': 'fire',
+            '_Energy_Resistances_chosenTypes': ['poison', 'radiant'],
         });
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/Fire/)).toBeInTheDocument();
-        expect(screen.getByText(/Cold/)).toBeInTheDocument();
-    });
-
-    it('renders fiendish resilience, epitome, and boon energy types together', () => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === '_Fiendish_Resilience_chosenType') return 'fire';
-            if (key === 'epitomeResistanceType') return 'lightning';
-            if (key === '_Energy_Resistances_chosenTypes') return ['poison', 'radiant'];
-            return null;
-        });
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/Fire/)).toBeInTheDocument();
-        expect(screen.getByText(/Lightning/)).toBeInTheDocument();
-        expect(screen.getByText(/Poison/)).toBeInTheDocument();
-        expect(screen.getByText(/Radiant/)).toBeInTheDocument();
+        renderSummary();
+        expectResistancesRow('Resistances: Lightning, Fire, Poison, Radiant');
     });
 });

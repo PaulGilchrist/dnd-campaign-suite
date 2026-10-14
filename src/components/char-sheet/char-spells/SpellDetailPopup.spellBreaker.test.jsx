@@ -1,4 +1,10 @@
-// CLA-322: Spell Breaker — spell detail popup shows converted Bonus Action casting time.
+// @improved-by-ai
+// CLA-322: Spell Breaker — spell detail popup casting-time display.
+// Scope: this file owns ONLY the popup's "Casting Time:" meta row.
+// Related CLA-322 coverage lives elsewhere — do not duplicate it here:
+//   - registry helper:  src/services/ui/spellSectionUtils.spellBreaker.test.js
+//   - cast payload:   SpellDetailPopup.specialFeatures.test.jsx (dispelAbilityCheckBonus)
+//   - table display:  CharSpells.Rendering.test.jsx
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -17,6 +23,8 @@ vi.mock('../../../services/ui/sanitize.js', () => ({
   sanitizeHtml: (html) => html,
 }));
 
+// The component calls these synchronously — return plain booleans.
+// (A Promise is truthy, which would silently make every cast possible.)
 vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
   isFreeCastAuthorized: vi.fn(() => false),
   isWizardRitualAdeptSpell: vi.fn(() => false),
@@ -36,12 +44,18 @@ vi.mock('../../../services/rules/spells/materialComponents.js', () => ({
   hasMaterial: vi.fn(() => true),
 }));
 
-const SPELL_BREAKER = {
+// NOTE: spellSectionUtils is deliberately NOT mocked — the popup's display must
+// be exercised through the real registry helper so the full CLA-322 path is tested.
+
+const CAMPAIGN = 'test-campaign';
+
+const spellBreaker = (overrides = {}) => ({
   type: 'spell_breaker',
   name: 'Spell Breaker',
   bonusActionSpells: ['Dispel Magic'],
   slotRetentionSpells: ['Counterspell', 'Dispel Magic'],
-};
+  ...overrides,
+});
 
 const wizardStats = (passives = []) => ({
   name: 'DivinationWizard',
@@ -50,10 +64,10 @@ const wizardStats = (passives = []) => ({
   abilities: [{ name: 'Intelligence', bonus: 3 }],
   proficiency: 6,
   spellAbilities: { spell_slots_level_3: 3, spells: [], modifier: 3 },
-  automation: { passives },
+  automation: { passives, actions: [] },
 });
 
-const dispelMagic = {
+const dispelMagic = (overrides = {}) => ({
   name: 'Dispel Magic',
   level: 3,
   description: 'Choose one creature, object, or magical effect.',
@@ -61,35 +75,73 @@ const dispelMagic = {
   range: '120 feet',
   duration: 'Instantaneous',
   school: 'Abjuration',
-};
+  ...overrides,
+});
+
+const counterspell = (overrides = {}) => ({
+  name: 'Counterspell',
+  level: 3,
+  description: 'You attempt to interrupt a creature in the middle of casting a spell.',
+  casting_time: 'Reaction',
+  range: '60 feet',
+  duration: 'Instantaneous',
+  school: 'Abjuration',
+  ...overrides,
+});
 
 const renderPopup = (spell, playerStats) =>
   render(
     <SpellDetailPopup
       spell={spell}
       playerStats={playerStats}
-      campaignName="test-campaign"
+      campaignName={CAMPAIGN}
       onClose={vi.fn()}
       onCast={vi.fn()}
-      upcastLevels={[]}
-      playerLevel={20}
     />
   );
 
-describe('SpellDetailPopup — Spell Breaker casting time (CLA-322)', () => {
-  it('shows "Bonus Action" for Dispel Magic when Spell Breaker is held', () => {
-    renderPopup(dispelMagic, wizardStats([SPELL_BREAKER]));
-    expect(screen.getByText('Bonus Action')).toBeInTheDocument();
+// Meta rows render as <span><b>Label:</b> value</span> — scope assertions to the
+// Casting Time row so a stray "Bonus Action" elsewhere can never satisfy them.
+const expectCastingTime = (value) => {
+  expect(screen.getByText('Casting Time:').closest('span')).toHaveTextContent(`Casting Time: ${value}`);
+};
+
+describe('SpellDetailPopup — Spell Breaker casting time display (CLA-322)', () => {
+  it('shows "Bonus Action" in the Casting Time row for a listed spell', () => {
+    renderPopup(dispelMagic(), wizardStats([spellBreaker()]));
+    expectCastingTime('Bonus Action');
   });
 
-  it('shows base casting time without Spell Breaker', () => {
-    renderPopup(dispelMagic, wizardStats([]));
-    expect(screen.getByText('Action')).toBeInTheDocument();
+  it('converts any listed spell, not just Dispel Magic — registry-driven, not hard-coded', () => {
+    renderPopup(
+      counterspell(),
+      wizardStats([spellBreaker({ bonusActionSpells: ['Counterspell'] })]),
+    );
+    expectCastingTime('Bonus Action');
+  });
+
+  it('converts a listed spell even when its casting_time is omitted', () => {
+    renderPopup(dispelMagic({ casting_time: undefined }), wizardStats([spellBreaker()]));
+    expectCastingTime('Bonus Action');
+  });
+
+  it('shows the base casting time without the Spell Breaker passive', () => {
+    renderPopup(dispelMagic(), wizardStats([]));
+    expectCastingTime('Action');
     expect(screen.queryByText('Bonus Action')).not.toBeInTheDocument();
   });
 
-  it('shows base casting time for non-bonusActionSpells even with Spell Breaker', () => {
-    renderPopup({ ...dispelMagic, name: 'Counterspell', casting_time: 'Reaction' }, wizardStats([SPELL_BREAKER]));
-    expect(screen.getByText('Reaction')).toBeInTheDocument();
+  it('leaves spells outside bonusActionSpells unchanged, even when listed in slotRetentionSpells', () => {
+    // Counterspell sits in slotRetentionSpells but not bonusActionSpells —
+    // slot retention must not leak into the casting-time display.
+    renderPopup(counterspell(), wizardStats([spellBreaker()]));
+    expectCastingTime('Reaction');
+    expect(screen.queryByText('Bonus Action')).not.toBeInTheDocument();
+  });
+
+  it('shows the base casting time when the passive lists no bonusActionSpells', () => {
+    renderPopup(dispelMagic(), wizardStats([spellBreaker({ bonusActionSpells: [] })]));
+    expectCastingTime('Action');
+    expect(screen.queryByText('Bonus Action')).not.toBeInTheDocument();
   });
 });

@@ -1,3 +1,13 @@
+// @improved-by-ai
+// SpellDetailPopup paid-cast slot lane for NON-upcastable spells (single
+// damage tier at base level). The popup pays a slot at the spell's FIXED
+// base level: the runtime counter takes precedence over the spellAbilities
+// max (falling back to max only when the runtime has no value), higher-level
+// slots can never cover a non-upcastable spell, and the cast payload must
+// report the cast as a paid, non-upcast cast. Rage, cantrips, warlock
+// slots, free casts, and upcast-selector visibility have their own suites
+// (castCantrip / warlockSlots / freeCast / rendering) and are not re-tested
+// here.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -18,152 +28,143 @@ vi.mock('../../../services/ui/sanitize.js', () => ({
   sanitizeHtml: (html) => html,
 }));
 
-const baseMockPlayerStats = {
-  name: 'Elara',
-  level: 5,
-  class: { name: 'Bard', major: { name: 'Bard' } },
-  abilities: [{ name: 'Charisma', bonus: 3 }],
-  proficiency: 3,
-  spellAbilities: {
-    spell_slots_level_1: 4,
-    spell_slots_level_2: 3,
-    spell_slots_level_3: 2,
-    spells: [],
-  },
-  automation: { passives: [], actions: [] },
-};
+const CAMPAIGN = 'test-campaign';
+const noSlotsText = 'No spell slots available for this level.';
 
-const mockCampaignName = 'test-campaign';
-
-const animalFriendshipSpell = {
-  name: 'Animal Friendship',
+// A level 1 spell with a SINGLE damage tier — this is what makes a spell
+// non-upcastable in the popup (no level ladder to select from).
+const makeSpell = (overrides = {}) => ({
+  name: 'Thunderwave',
   level: 1,
-  description: 'This spell lets you suggest a course of action to a beast.',
+  description: 'A wave of thunderous force sweeps out from you.',
   casting_time: '1 action',
-  range: '30 feet',
-  duration: '24 hours',
-  school: 'Enchantment',
+  range: '15 feet',
+  duration: 'Instantaneous',
+  school: 'Evocation',
   damage: {
-    damage_at_slot_level: {
-      '1': '1d8',
-    },
+    damage_at_slot_level: { '1': '2d8' },
+    damage_type: 'thunder',
   },
-  dc: { dc_type: 'WIS', dc_success: 'none' },
+  ...overrides,
+});
+
+// Full-caster (Bard) stats; per-test overrides, no shared mutable fixtures.
+const makeStats = (overrides = {}) => {
+  const { spellAbilities: spellAbilitiesOverrides, ...rest } = overrides;
+  return {
+    name: 'Elara',
+    level: 5,
+    class: { name: 'Bard', major: { name: 'Bard' } },
+    abilities: [{ name: 'Charisma', bonus: 3 }],
+    proficiency: 3,
+    spellAbilities: {
+      spell_slots_level_1: 4,
+      spell_slots_level_2: 3,
+      spell_slots_level_3: 2,
+      spells: [],
+      ...spellAbilitiesOverrides,
+    },
+    automation: { passives: [], actions: [] },
+    ...rest,
+  };
 };
 
-const renderPopup = (
-  spell = animalFriendshipSpell,
-  playerStats = baseMockPlayerStats,
-  campaignName = mockCampaignName,
-  extraProps = {}
-) =>
+// Stub the runtime store from a key → value map; unlisted keys read null.
+const stubRuntime = (values = {}) => {
+  vi.mocked(getRuntimeValue).mockImplementation((_playerName, key) =>
+    Object.prototype.hasOwnProperty.call(values, key) ? values[key] : null);
+};
+
+const renderPopup = (spell, playerStats = makeStats(), extraProps = {}) => {
+  const onCast = extraProps.onCast || vi.fn();
   render(
     <SpellDetailPopup
       spell={spell}
       playerStats={playerStats}
-      campaignName={campaignName}
+      campaignName={CAMPAIGN}
       onClose={vi.fn()}
+      onCast={onCast}
       {...extraProps}
     />
   );
+  return onCast;
+};
 
-describe('SpellDetailPopup - Non-upcastable spell slot availability', () => {
+const castButton = () => screen.getByRole('button', { name: /Cast Spell/ });
+
+describe('SpellDetailPopup — paid casting of non-upcastable spells', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getRuntimeValue).mockReturnValue(null);
     vi.mocked(getActiveBuffs).mockReturnValue([]);
   });
 
-  describe('non-upcastable spell (single damage tier at base level)', () => {
-    it('enables cast button when character has available spell slots at the spell level', () => {
-      const spell = {
-        ...animalFriendshipSpell,
-        damage: { damage_at_slot_level: { '1': '1d8' } },
-      };
+  it('enables the paid cast while current slots remain at the base level', () => {
+    stubRuntime({ spell_slots_level_1: 2 });
+    renderPopup(makeSpell());
 
-      renderPopup(spell, baseMockPlayerStats, mockCampaignName);
+    expect(castButton()).toBeEnabled();
+    expect(screen.getByText(/Slots Remaining:/)).toBeInTheDocument();
+    expect(screen.getByText(/2 slots/)).toBeInTheDocument();
+    expect(screen.queryByText(noSlotsText)).not.toBeInTheDocument();
+  });
 
-      const button = screen.getByRole('button', { name: /Cast Spell/ });
-      expect(button).toBeEnabled();
-    });
+  it('prefers the runtime counter over the spellAbilities max — exhausted slots disable the cast', () => {
+    // spellAbilities max is 4, but the runtime says every slot is spent:
+    // the live counter must win and the popup must say so.
+    stubRuntime({ spell_slots_level_1: 0 });
+    renderPopup(makeSpell());
 
-    it('disables cast button when character has no spell slots at the spell level', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'spell_slots_level_1') return 0;
-        return null;
-      });
+    expect(castButton()).toBeDisabled();
+    expect(screen.getByText(noSlotsText)).toBeInTheDocument();
+  });
 
-      const spell = {
-        ...animalFriendshipSpell,
-        damage: { damage_at_slot_level: { '1': '1d8' } },
-      };
+  it('falls back to the spellAbilities max when the runtime has no value', () => {
+    stubRuntime({});
+    renderPopup(makeSpell());
 
-      renderPopup(spell, baseMockPlayerStats, mockCampaignName);
+    expect(castButton()).toBeEnabled();
+    expect(screen.getByText(/Slots Remaining:/)).toBeInTheDocument();
+    expect(screen.getByText(/4 slots/)).toBeInTheDocument();
+  });
 
-      const button = screen.getByRole('button', { name: /Cast Spell/ });
-      expect(button).toBeDisabled();
-    });
+  it('disables the cast when no slots exist at the spell level in either source', () => {
+    stubRuntime({ spell_slots_level_1: null });
+    renderPopup(makeSpell(), makeStats({ spellAbilities: { spell_slots_level_1: 0, spells: [] } }));
 
-    it('enables cast button when runtime value shows available slots (not null)', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'spell_slots_level_1') return 2;
-        return null;
-      });
+    expect(castButton()).toBeDisabled();
+    expect(screen.getByText(noSlotsText)).toBeInTheDocument();
+  });
 
-      const spell = {
-        ...animalFriendshipSpell,
-        damage: { damage_at_slot_level: { '1': '1d8' } },
-      };
+  it('never pays with a higher-level slot — zero base slots disables the cast even when upcastLevels report availability', () => {
+    // Non-upcastable spells are locked to their base level: slots at other
+    // levels (and any upcastLevels offered upstream) cannot cover the cost.
+    stubRuntime({ spell_slots_level_1: 0, spell_slots_level_2: 2 });
+    renderPopup(
+      makeSpell(),
+      makeStats(),
+      { upcastLevels: [{ level: 2, formula: '3d8', availableSlots: 2 }] }
+    );
 
-      renderPopup(spell, baseMockPlayerStats, mockCampaignName);
+    expect(castButton()).toBeDisabled();
+    expect(screen.getByText(noSlotsText)).toBeInTheDocument();
+    expect(screen.queryByText(/Cast at Level:/)).not.toBeInTheDocument();
+  });
 
-      const button = screen.getByRole('button', { name: /Cast Spell/ });
-      expect(button).toBeEnabled();
-    });
+  it('reports a paid, non-upcast cast on the onCast payload', () => {
+    stubRuntime({ spell_slots_level_1: 1 });
+    const spell = makeSpell();
+    const onCast = renderPopup(spell);
 
-    it('falls back to spellAbilities max when runtime value is null', () => {
-      vi.mocked(getRuntimeValue).mockImplementation(() => null);
+    fireEvent.click(castButton());
 
-      const spell = {
-        ...animalFriendshipSpell,
-        damage: { damage_at_slot_level: { '1': '1d8' } },
-      };
-
-      renderPopup(spell, baseMockPlayerStats, mockCampaignName);
-
-      const button = screen.getByRole('button', { name: /Cast Spell/ });
-      expect(button).toBeEnabled();
-    });
-
-    it('disables cast button when slots are exhausted (runtime value = 0)', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'spell_slots_level_1') return 0;
-        return null;
-      });
-
-      const spell = {
-        ...animalFriendshipSpell,
-        damage: { damage_at_slot_level: { '1': '1d8' } },
-      };
-
-      renderPopup(spell, baseMockPlayerStats, mockCampaignName);
-
-      const button = screen.getByRole('button', { name: /Cast Spell/ });
-      expect(button).toBeDisabled();
-    });
-
-    it('calls onCast when cast button is clicked for non-upcastable spell', () => {
-      const onCast = vi.fn();
-
-      renderPopup(animalFriendshipSpell, baseMockPlayerStats, mockCampaignName, { onCast });
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-
-      expect(onCast).toHaveBeenCalledTimes(1);
-      expect(onCast).toHaveBeenLastCalledWith(
-        expect.objectContaining({ name: 'Animal Friendship', level: 1 }),
-        expect.any(Object)
-      );
-    });
+    expect(onCast).toHaveBeenCalledTimes(1);
+    const [payload, metaCtx] = onCast.mock.calls[0];
+    expect(payload.name).toBe(spell.name);
+    expect(payload.level).toBe(1);
+    expect(payload.isUpcast).toBe(false);
+    expect(payload.upcastLevel).toBeUndefined();
+    expect(payload.freeCastAuthorized).toBe(false);
+    expect(metaCtx).toMatchObject({ overchannel: false });
   });
 });

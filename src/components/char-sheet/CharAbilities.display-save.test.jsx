@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
@@ -49,26 +50,29 @@ function createPlayerStats(overrides = {}) {
       { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [{ name: 'Acrobatics', bonus: 6 }] },
       { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
       { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [{ name: 'Arcana', bonus: 2 }] },
-      { name: 'Wisdom', bonus: -1, save: 1, totalScore: 9, skills: [{ name: 'Perception', bonus: 3 }] },
+      { name: 'Wisdom', bonus: -1, save: 1, totalScore: 9, skills: [] },
       { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [] },
     ],
     skillProficiencies: ['Athletics', 'Arcana'],
-    automation: { primalKnowledge: ['Athletics'], passives: [] },
+    automation: { primalKnowledge: [], passives: [] },
     expertise: [],
     ...overrides,
   };
 }
 
-const defaultProps = {
-  allAbilityScores: mockAllAbilityScores,
-  playerStats: createPlayerStats(),
-  campaignName: 'test-campaign',
-  exhaustionPenalty: 0,
-  conditionEffects: {},
-  isRaging: false,
-  onReroll: vi.fn(),
-  onStrokeOfLuck: vi.fn(),
-};
+function renderAbilities(statsOverrides = {}, propOverrides = {}) {
+  return render(
+    <CharAbilities
+      allAbilityScores={mockAllAbilityScores}
+      playerStats={createPlayerStats(statsOverrides)}
+      campaignName="test-campaign"
+      exhaustionPenalty={0}
+      conditionEffects={{}}
+      isRaging={false}
+      {...propOverrides}
+    />
+  );
+}
 
 describe('CharAbilities expertise display', () => {
   beforeEach(() => {
@@ -76,31 +80,60 @@ describe('CharAbilities expertise display', () => {
     mockStore.clear();
   });
 
-  const expertiseTests = [
-    { expertise: ['Athletics'], expected: 'Athletics (Expert) (+8)', notFound: null },
-    { expertise: ['Athletics', 'Arcana'], expected: 'Arcana (Expert) (+2)', notFound: null },
-    { expertise: [], expected: 'Athletics (+8)', notFound: 'Athletics (Expert) (+8)' },
-  ];
-
-  for (const { expertise, expected, notFound } of expertiseTests) {
-    it(`renders ${expertise.length ? `"(Expert)" suffix for ${expertise.join(', ')}` : 'no "(Expert)" suffix when no expertise'}`, () => {
-      const stats = createPlayerStats({
-        level: 5,
-        expertise,
-        abilities: [
-          { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [{ name: 'Athletics', bonus: 8 }] },
-          { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [] },
-          { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
-          { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [{ name: 'Arcana', bonus: 2 }] },
-          { name: 'Wisdom', bonus: -1, save: 1, totalScore: 9, skills: [] },
-          { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [] },
-        ],
-      });
-      render(<CharAbilities {...defaultProps} playerStats={stats} />);
-      expect(screen.getByText(expected)).toBeInTheDocument();
-      if (notFound) {
-        expect(screen.queryByText(notFound)).not.toBeInTheDocument();
-      }
+  it('marks every expert skill with "(Expert)" and leaves non-expert skills unsuffixed', () => {
+    renderAbilities({
+      expertise: ['Athletics', 'Arcana'],
+      abilities: [
+        { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [{ name: 'Athletics', bonus: 8 }] },
+        { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [{ name: 'Acrobatics', bonus: 3 }] },
+        { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [{ name: 'Arcana', bonus: 2 }] },
+      ],
     });
-  }
+
+    expect(screen.getByText('Athletics (Expert) (+8)')).toBeInTheDocument();
+    expect(screen.getByText('Arcana (Expert) (+2)')).toBeInTheDocument();
+    expect(screen.getByText('Acrobatics (+3)')).toBeInTheDocument();
+    expect(screen.queryByText('Acrobatics (Expert) (+3)')).not.toBeInTheDocument();
+  });
+
+  it('renders no "(Expert)" suffixes when the character has no expertise, even for proficient skills', () => {
+    renderAbilities({ expertise: [] });
+
+    // Athletics and Arcana are proficient in the base fixture — proficiency alone must not suffix.
+    expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
+    expect(screen.getByText('Arcana (+2)')).toBeInTheDocument();
+    expect(screen.queryByText(/\(Expert\)/)).not.toBeInTheDocument();
+  });
+
+  it('drives the suffix from the expertise list rather than skill proficiencies', () => {
+    renderAbilities({
+      expertise: ['Stealth'],
+      skillProficiencies: ['Athletics'],
+      abilities: [
+        { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [{ name: 'Stealth', bonus: 5 }] },
+        { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [{ name: 'Athletics', bonus: 8 }] },
+      ],
+    });
+
+    expect(screen.getByText('Stealth (Expert) (+5)')).toBeInTheDocument();
+    expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
+  });
+
+  it('formats a negative expert skill bonus with a minus sign', () => {
+    renderAbilities({
+      expertise: ['Sleight of Hand'],
+      abilities: [
+        { name: 'Dexterity', bonus: -1, save: 4, totalScore: 8, skills: [{ name: 'Sleight of Hand', bonus: -1 }] },
+      ],
+    });
+
+    expect(screen.getByText('Sleight of Hand (Expert) (-1)')).toBeInTheDocument();
+  });
+
+  it('subtracts the exhaustion penalty from an expert skill bonus while keeping the suffix', () => {
+    renderAbilities({ expertise: ['Athletics'] }, { exhaustionPenalty: 2 });
+
+    expect(screen.getByText('Athletics (Expert) (+6)')).toBeInTheDocument();
+    expect(screen.queryByText('Athletics (Expert) (+8)')).not.toBeInTheDocument();
+  });
 });

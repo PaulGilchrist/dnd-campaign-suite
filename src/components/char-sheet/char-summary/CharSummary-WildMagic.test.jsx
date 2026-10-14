@@ -1,18 +1,28 @@
+// @improved-by-ai
 //
-// Cleanup:
-//   - Removed "renders single surge effect without duration" — redundant with multi-item test
-//   - Removed "renders duration tooltip on hourglass icon" — already covered by multi-item test
-//   - Removed "does not render surge effects section when surgeEffects is empty array" —
-//     redundant with null test (source checks surgeEffects && Array.isArray && length > 0)
+// Owns: WildSurgeBadge rendering in CharSummary —
+//   - one list item per surge effect, "#roll — effect" format
+//   - name tooltip (on the item) and duration tooltip (hourglass icon)
+//   - "Tamed" special case replacing the roll number
+//   - no-render guards: null AND empty array (distinct branches of the
+//     `surgeEffects && Array.isArray && length > 0` guard in CharSummary.jsx)
 //
-// Remaining tests (4):
-//   1. Multi-item surge effects list rendering + duration tooltip (covers rendering, #roll format, tooltips)
-//   2. Tamed roll special case (unique behavior: displays "Tamed" instead of "#roll")
-//   3. Null surgeEffects (covers no-render path)
+// NOT covered here (owned by siblings):
+//   - CharSummary-EventHandlers.test.jsx: 'initiative-rolled' event clears
+//     surge effects and writes null through the synced setter.
 //
-// CharSummary-EventHandlers.test.jsx retains: initiative-rolled event clears surge effects (different behavior)
+// Improvement notes (2026-10-14):
+//   - Removed createUseSyncedStateMock/defaultSyncedStateKeys: every branch
+//     of that helper returned the same [defaultValue, vi.fn()] except the
+//     surge key, so it was noise. Replaced with a focused mockSurgeEffects.
+//   - Assertions are now scoped inside the surge list via role queries and
+//     check exact item count/text and per-item tooltip presence, so a broken
+//     length guard or unconditional duration icon can no longer pass silently.
+//   - Restored the empty-array test removed by a previous pass: the null test
+//     cannot catch a regression of the `length === 0` guard (null short-circuits
+//     before it), so the previous "redundant" judgment was wrong.
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
 import { useSyncedState } from '../../../hooks/runtime/useSyncedState.js';
@@ -109,39 +119,21 @@ vi.mock('../../../services/ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-const defaultSyncedStateKeys = [
-    'wildMagicSurgeEffects',
-    'smiteOfProtectionActive',
-    'bulwarkOfForceActive',
-    'naturesSanctuaryActive',
-    'bulwarkOfForceTargets',
-    'naturesSanctuaryCreatures',
-    'wrathOfTheSeaActive',
-    'mantleOfMajestyActive',
-    'innerRadianceActive',
-    'unbreakableMajestyActive',
-    'baitAndSwitchActive',
-    'baitAndSwitchBonus',
-    'activeBuffs',
-    'coverRefresh',
-];
-
-function createUseSyncedStateMock(overrides) {
-    return vi.fn((_name, key, defaultValue) => {
-        if (key === 'wildMagicSurgeEffects' && overrides.surgeEffects !== undefined) {
-            return [overrides.surgeEffects, vi.fn()];
-        }
-        if (defaultSyncedStateKeys.includes(key)) {
-            return [defaultValue, vi.fn()];
-        }
-        return [defaultValue, vi.fn()];
-    });
+/**
+ * Serve `value` for the 'wildMagicSurgeEffects' synced-state key; every
+ * other key falls back to its own default (all other summary features off).
+ */
+function mockSurgeEffects(value) {
+    vi.mocked(useSyncedState).mockImplementation((_name, key, defaultValue) =>
+        key === 'wildMagicSurgeEffects' ? [value, vi.fn()] : [defaultValue, vi.fn()]
+    );
 }
 
-function renderWithDiceContext(ui) {
+function renderSummary(surgeEffects) {
+    mockSurgeEffects(surgeEffects);
     return render(
         <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
-            {ui}
+            <CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />
         </DiceRollContext.Provider>
     );
 }
@@ -149,44 +141,57 @@ function renderWithDiceContext(ui) {
 describe('CharSummary - Wild Magic Surge Effects', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        // CharSummary gates GM-only affordances on hostname; jsdom defaults
+        // to localhost, but pin it so the tests stay explicit and hermetic.
         window.location.hostname = 'localhost';
-        vi.mocked(useSyncedState).mockImplementation(createUseSyncedStateMock({}));
         vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] });
         vi.mocked(getRuntimeValue).mockReturnValue(null);
+        mockSurgeEffects(null);
     });
 
-    it('renders surge effects list with duration tooltips when surgeEffects array has entries', () => {
-        vi.mocked(useSyncedState).mockImplementation(
-            createUseSyncedStateMock({
-                surgeEffects: [
-                    { timestamp: 1000, roll: 5, effect: 'Fireball', duration: '1 round' },
-                    { timestamp: 2000, roll: 12, effect: 'Healing' },
-                ],
-            })
-        );
-        renderWithDiceContext(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/Surge Effects:/)).toBeInTheDocument();
-        expect(screen.getByText(/#5 — Fireball/)).toBeInTheDocument();
-        expect(screen.getByText(/#12 — Healing/)).toBeInTheDocument();
-        expect(screen.getByTitle('1 round')).toBeInTheDocument();
+    it('renders one list item per surge effect with roll number and tooltips', () => {
+        renderSummary([
+            { timestamp: 1000, roll: 5, effect: 'Fireball', duration: '1 round' },
+            { timestamp: 2000, roll: 12, effect: 'Healing' },
+        ]);
+
+        expect(screen.getByText('Surge Effects:')).toBeInTheDocument();
+
+        const list = screen.getByRole('list');
+        const items = within(list).getAllByRole('listitem');
+        expect(items).toHaveLength(2);
+
+        // "#roll — effect" format, with the effect name as item tooltip.
+        expect(items[0]).toHaveTextContent('#5 — Fireball');
+        expect(items[0]).toHaveAttribute('title', 'Fireball');
+        expect(items[1]).toHaveTextContent('#12 — Healing');
+        expect(items[1]).toHaveAttribute('title', 'Healing');
+
+        // Duration tooltip only on entries that carry a duration.
+        expect(within(items[0]).getByTitle('1 round')).toBeInTheDocument();
+        expect(within(items[1]).queryByTitle(/.*/)).not.toBeInTheDocument();
     });
 
-    it('shows "Tamed" text when roll value is "tamed"', () => {
-        vi.mocked(useSyncedState).mockImplementation(
-            createUseSyncedStateMock({
-                surgeEffects: [{ timestamp: 3000, roll: 'tamed', effect: 'Wild Surge' }],
-            })
-        );
-        renderWithDiceContext(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/Tamed/)).toBeInTheDocument();
-        expect(screen.queryByText(/#\d+/)).not.toBeInTheDocument();
+    it("shows 'Tamed' instead of a roll number for tamed surges", () => {
+        renderSummary([{ timestamp: 3000, roll: 'tamed', effect: 'Wild Surge' }]);
+
+        const items = within(screen.getByRole('list')).getAllByRole('listitem');
+        expect(items).toHaveLength(1);
+        expect(items[0]).toHaveTextContent('Tamed — Wild Surge');
+        expect(items[0].textContent).not.toContain('#');
     });
 
-    it('does not render surge effects section when surgeEffects is null', () => {
-        vi.mocked(useSyncedState).mockImplementation(
-            createUseSyncedStateMock({ surgeEffects: null })
-        );
-        renderWithDiceContext(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.queryByText(/Surge Effects:/)).not.toBeInTheDocument();
+    it('does not render the surge section when surgeEffects is null', () => {
+        renderSummary(null);
+
+        expect(screen.queryByText('Surge Effects:')).not.toBeInTheDocument();
+        expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    });
+
+    it('does not render the surge section when surgeEffects is an empty array', () => {
+        renderSummary([]);
+
+        expect(screen.queryByText('Surge Effects:')).not.toBeInTheDocument();
+        expect(screen.queryByRole('list')).not.toBeInTheDocument();
     });
 });

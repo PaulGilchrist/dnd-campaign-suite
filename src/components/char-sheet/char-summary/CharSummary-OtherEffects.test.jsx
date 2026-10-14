@@ -1,3 +1,31 @@
+// @improved-by-ai
+//
+// Coverage ownership (CharSummary family delegation): the "Vulnerabilities:"
+// row of StatListsBlock (CharSummary.jsx:273) — the ONLY non-empty
+// vulnerabilities fixture anywhere in the family (every sibling and the
+// shared mockPlayerStats pin vulnerabilities: []).
+//
+// NOT owned here (delegated to siblings — do not re-add):
+//   - Senses / Proficiencies / Languages rows → CharSummary-Display.test.jsx
+//   - Resistances & Immunities rows (capitals, dedup, buffs, auras)
+//     → CharSummary-ConditionImmunities / -BuffResistances / -ResistanceTypes
+//       / -AuraAndInitiative.test.jsx
+//   - Background popup content → CharSummary-UI-Interactions.test.jsx
+//
+// Quality improvements over previous revision (2 tests → 3 tests / 6 runs):
+//   - Positives assert the FULL row text (label + join order + separator),
+//     not a page-wide /fire/ regex that passed if "fire" appeared in any
+//     element anywhere (badges, tooltips, other rows).
+//   - Pinned the verbatim-render contract: unlike the Resistances/Immunities
+//     rows, vulnerabilities are NOT capitalized. A test mixes case-sensitive
+//     values next to populated sibling rows so a copy-paste of the sibling
+//     capitalization into this row now fails here.
+//   - Negative covers all three guard branches on line 273 ([] / null /
+//     undefined) via it.each — previously only [] was tested.
+//   - Reduced over-mocking: dropped Popup, rulesFactory, and attackCalc
+//     mocks (this path never touches them; the identical-fixture sibling
+//     CharSummary-ConditionImmunities renders without them).
+
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
@@ -9,7 +37,6 @@ vi.mock('./CharGold.jsx', () => ({ default: () => <div data-testid="char-gold">G
 vi.mock('./CharHitPoints.jsx', () => ({ default: () => <div data-testid="char-hp">HP</div> }));
 vi.mock('./CharClassFeatures.jsx', () => ({ default: () => <div data-testid="char-class-features">Class Features</div> }));
 vi.mock('../char-feats/CharFeats.jsx', () => ({ default: () => <div data-testid="char-feats">Feats</div> }));
-vi.mock('../../common/Popup.jsx', () => ({ default: ({ children, onClick }) => <div data-testid="popup" onClick={onClick}>{children}</div> }));
 vi.mock('../../common/AvatarImage.jsx', () => ({ default: () => <div data-testid="avatar-image">Avatar</div> }));
 vi.mock('../../common/AvatarModal.jsx', () => ({ default: () => null }));
 vi.mock('../LongRestButton.jsx', () => ({ default: () => <div data-testid="long-rest-btn">Long Rest</div> }));
@@ -23,8 +50,8 @@ vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
-    useRuntimeValue: vi.fn((_name, _key, _campaign) => null),
-    getRuntimeValue: vi.fn(),
+    useRuntimeValue: vi.fn(() => null),
+    getRuntimeValue: vi.fn(() => null),
     getStore: vi.fn(() => new Map()),
 }));
 
@@ -44,36 +71,64 @@ vi.mock('../../../services/combat/buffs/buffService.js', () => ({
     getActiveBuffs: vi.fn(() => []),
 }));
 
-vi.mock('../../../services/rules/rulesFactory.js', () => ({
-    default: {
-        getRules: vi.fn(() => ({ classRules: { getUnarmoredMovementIncrease: vi.fn(() => 0) } })),
-    },
-    getRules: vi.fn(() => ({ classRules: { getUnarmoredMovementIncrease: vi.fn(() => 0) } })),
-}));
+function renderSummary(props = {}) {
+    return render(
+        <CharSummary
+            playerStats={mockPlayerStats}
+            campaignName={mockCampaignName}
+            exhaustionLevel={0}
+            {...props}
+        />
+    );
+}
 
-vi.mock('../../../services/rules/core/attackCalc.js', () => ({
-    parseMagicItemName: (name) => ({ baseName: name }),
-}));
+// The row is <span><b>Vulnerabilities: </b>{values}</span> — the bold label
+// is the only element whose own text is "Vulnerabilities:", and its nearest
+// span ancestor is the row itself.
+function vulnerabilityRow() {
+    return screen.getByText('Vulnerabilities:').closest('span');
+}
+
+beforeEach(() => {
+    vi.clearAllMocks();
+    // Re-pin inert buffs: this lane reads vulnerabilities straight from
+    // playerStats, so an empty buff list keeps the render deterministic.
+    getActiveBuffs.mockReturnValue([]);
+});
 
 // ---------------------------------------------------------------------------
-// Vulnerabilities rendering
+// Vulnerabilities row
 // ---------------------------------------------------------------------------
-describe('CharSummary - Vulnerabilities', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getActiveBuffs.mockReturnValue([]);
+describe('CharSummary - Vulnerabilities row', () => {
+    it.each([
+        { values: ['poison'], expected: 'Vulnerabilities: poison' },
+        { values: ['fire', 'Piercing', 'cold'], expected: 'Vulnerabilities: fire, Piercing, cold' },
+    ])('renders the row as "$expected"', ({ values, expected }) => {
+        renderSummary({ playerStats: { ...mockPlayerStats, vulnerabilities: values } });
+
+        // Exact content pins label, join order, ", " separator, and that
+        // values render verbatim (no forced capitalization).
+        expect(vulnerabilityRow()).toHaveTextContent(expected);
     });
 
-    it('renders vulnerabilities when present', () => {
-        const stats = { ...mockPlayerStats, vulnerabilities: ['fire'] };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/Vulnerabilities:/)).toBeInTheDocument();
-        expect(screen.getByText(/fire/)).toBeInTheDocument();
+    it('renders vulnerabilities verbatim without leaking into the capitalized Resistances row', () => {
+        renderSummary({
+            playerStats: { ...mockPlayerStats, vulnerabilities: ['fire'], resistances: ['fire'] },
+        });
+
+        // Same raw type, two rows, two render contracts: Resistances is
+        // capitalized ("Fire"), Vulnerabilities stays verbatim ("fire").
+        expect(screen.getByText('Resistances:').closest('div')).toHaveTextContent('Resistances: Fire');
+        expect(vulnerabilityRow()).toHaveTextContent('Vulnerabilities: fire');
     });
 
-    it('does not render vulnerabilities when absent', () => {
-        const stats = { ...mockPlayerStats, vulnerabilities: [] };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.queryByText(/Vulnerabilities:/)).not.toBeInTheDocument();
+    it.each([
+        { label: 'an empty array', vulnerabilities: [] },
+        { label: 'null', vulnerabilities: null },
+        { label: 'undefined', vulnerabilities: undefined },
+    ])('omits the row when vulnerabilities is $label', ({ vulnerabilities }) => {
+        renderSummary({ playerStats: { ...mockPlayerStats, vulnerabilities } });
+
+        expect(screen.queryByText('Vulnerabilities:')).not.toBeInTheDocument();
     });
 });

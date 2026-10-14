@@ -1,3 +1,19 @@
+// @improved-by-ai
+/**
+ * CharAbilities — event-driven roll context lane.
+ * Verifies that the `internal-skill-check` window event routes to the correct
+ * roll function with the right bonus, and that makeCheckContext/makeSaveContext
+ * stamp condition-effect context onto rolls (via events and via cell clicks for
+ * effects unique to this lane).
+ *
+ * Covered by sibling lanes (do NOT re-add here):
+ * - event-context: exhaustion on ability-check events, wisCheckReplace, peerless
+ *   athlete skills, unknown checkType, unmatched skill names.
+ * - clickHandlers: click → roll calls, d20Floor10/strokeOfLuck/autoReroll ctx,
+ *   strCheckReplace, strCheckDisadvantage-on-STRENGTH (positive), save ctx matrix.
+ * - reliableTalent: CLA-291 proficiency gate via clicks.
+ * - conditionEffects / saveBonus / display-save / toolEntries / rendering: display.
+ */
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
@@ -18,18 +34,18 @@ vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
   useDiceRollPopup: vi.fn(() => ({ setPopupHtml: vi.fn() })),
 }));
 
+vi.mock('../../services/ui/dataLoader.js', () => ({
+  loadEquipment: vi.fn(() => Promise.resolve([])),
+}));
+
 const mockStore = new Map();
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getStore: vi.fn(() => new Map()),
+  getStore: vi.fn(() => mockStore),
   useSyncedState: vi.fn(() => [null, vi.fn()]),
   listeners: new Map(),
   getRuntimeValue: vi.fn((key, prop) => mockStore.get(`${key}:${prop}`) ?? null),
   setRuntimeValue: vi.fn(),
   useRuntimeValue: vi.fn((key, prop) => mockStore.get(`${key}:${prop}`) ?? null),
-}));
-
-vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadEquipment: vi.fn(() => Promise.resolve([])),
 }));
 
 const mockAllAbilityScores = [
@@ -71,122 +87,174 @@ const defaultProps = {
   onStrokeOfLuck: vi.fn(),
 };
 
+function dispatchSkillCheck(detail) {
+  window.dispatchEvent(new CustomEvent('internal-skill-check', { detail }));
+}
+
 function getMocks() {
   return vi.mocked(useLoggedDiceRoll).mock.results[0].value;
 }
 
-function findClickableByText(text) {
-  const clickableEls = document.querySelectorAll('.clickable');
-  return Array.from(clickableEls).find((el) => el.textContent === text);
+// Rows render as: 1=name 2=score 3=check bonus 4=save 5=skills.
+// Scope by ability-name so tests don't depend on bonus values being unique.
+function rowCell(container, abilityName, nth) {
+  const row = Array.from(container.querySelectorAll('.abilities'))
+    .find(r => r.querySelector('.left')?.textContent === abilityName);
+  return row ? row.children[nth - 1] : null;
 }
 
-describe('CharAbilities event listener and context features', () => {
+function findClickableByStartText(text) {
+  return Array.from(document.querySelectorAll('.clickable'))
+    .find(el => el.textContent.startsWith(text));
+}
+
+describe('CharAbilities internal-skill-check event routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStore.clear();
   });
 
-  describe('INTERNAL_SKILL_CHECK_EVENT', () => {
-    it('dispatches rollAbilityCheck for check type with exhaustion penalty applied', () => {
-      render(<CharAbilities {...defaultProps} exhaustionPenalty={2} />);
-      window.dispatchEvent(
-        new CustomEvent('internal-skill-check', { detail: { skillName: 'Strength', checkType: 'check' } })
-      );
-      expect(getMocks().rollAbilityCheck).toHaveBeenCalledWith('Strength', 2, undefined);
-    });
-
-    it('dispatches rollSkillCheck for skill type with getSkillBonus result', () => {
-      render(<CharAbilities {...defaultProps} />);
-      window.dispatchEvent(
-        new CustomEvent('internal-skill-check', { detail: { skillName: 'Athletics', checkType: 'skill' } })
-      );
-      const [, bonus] = getMocks().rollSkillCheck.mock.calls[0];
-      expect(Number.isNaN(bonus)).toBe(false);
-      expect(bonus).toBe(8);
-    });
-
-    it('does nothing when event has no skillName', () => {
-      render(<CharAbilities {...defaultProps} />);
-      window.dispatchEvent(new CustomEvent('internal-skill-check', { detail: {} }));
-      expect(getMocks().rollAbilityCheck).not.toHaveBeenCalled();
-      expect(getMocks().rollSkillCheck).not.toHaveBeenCalled();
-    });
-
-    it('applies makeCheckContext to skill checks from event', () => {
-      render(<CharAbilities {...defaultProps} conditionEffects={{ reliableTalent: true }} />);
-      window.dispatchEvent(
-        new CustomEvent('internal-skill-check', { detail: { skillName: 'Athletics', checkType: 'skill' } })
-      );
-      expect(getMocks().rollSkillCheck).toHaveBeenCalledWith(
-        'Athletics',
-        8,
-        expect.objectContaining({ reliableTalent: true })
-      );
-    });
-
-    it('applies makeCheckContext to ability checks from event', () => {
-      render(<CharAbilities {...defaultProps} conditionEffects={{ d20Floor10: true }} />);
-      window.dispatchEvent(
-        new CustomEvent('internal-skill-check', { detail: { skillName: 'Strength', checkType: 'check' } })
-      );
-      expect(getMocks().rollAbilityCheck).toHaveBeenCalledWith(
-        'Strength',
-        expect.any(Number),
-        expect.objectContaining({ d20Floor10: true })
-      );
-    });
-
-    it('removes event listener on unmount', () => {
-      const { unmount } = render(<CharAbilities {...defaultProps} />);
-      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-      unmount();
-      expect(removeEventListenerSpy).toHaveBeenCalled();
-    });
+  it('rolls a skill check with the computed skill bonus when the event names a skill', () => {
+    render(<CharAbilities {...defaultProps} />);
+    dispatchSkillCheck({ skillName: 'Athletics', checkType: 'skill' });
+    // No condition effects → context is undefined
+    expect(getMocks().rollSkillCheck).toHaveBeenCalledWith('Athletics', 8, undefined);
   });
 
-  describe('makeCheckContext - advantage/disadvantage interactions', () => {
-    it('applies Powerful Build advantage for STR checks (no prior forcedMode)', () => {
-      render(<CharAbilities {...defaultProps} conditionEffects={{ strCheckAdvantage: true }} />);
-      const bonusCell = findClickableByText('+4');
-      expect(bonusCell).toBeTruthy();
-      fireEvent.click(bonusCell);
-      expect(getMocks().rollAbilityCheck).toHaveBeenCalledWith(
-        'Strength',
-        expect.any(Number),
-        expect.objectContaining({ forcedMode: 'advantage' })
-      );
-    });
-
-    it('applies Ray of Enfeeblement disadvantage for Dexterity ability check', () => {
-      render(<CharAbilities {...defaultProps} conditionEffects={{ strCheckDisadvantage: true }} />);
-      const bonusCells = document.querySelectorAll('.abilities > div:nth-child(3)');
-      fireEvent.click(bonusCells[1]);
-      const callArgs = getMocks().rollAbilityCheck.mock.calls[0];
-      expect(callArgs[2]).not.toHaveProperty('forcedMode');
-    });
+  it('subtracts the exhaustion penalty from the skill bonus for skill-type events', () => {
+    render(<CharAbilities {...defaultProps} exhaustionPenalty={2} />);
+    dispatchSkillCheck({ skillName: 'Athletics', checkType: 'skill' });
+    expect(getMocks().rollSkillCheck).toHaveBeenCalledWith('Athletics', 6, undefined);
   });
 
-  describe('makeSaveContext - strSaveReplace behavior', () => {
-    it('passes strSaveReplace context with strScore', () => {
-      const stats = createPlayerStats({
-        abilities: [
-          { name: 'Strength', bonus: 2, save: 4, totalScore: 14, skills: [] },
-          { name: 'Dexterity', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Constitution', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Wisdom', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Charisma', bonus: 0, save: 0, totalScore: 10, skills: [] },
-        ],
-      });
-      render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ strSaveReplace: true }} />);
-      const saveCell = findClickableByText('+4');
-      expect(saveCell).toBeTruthy();
-      fireEvent.click(saveCell);
-      expect(getMocks().rollSavingThrow).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.any(Number),
-        expect.objectContaining({ strSaveReplace: true, strScore: 14 })
-      );
+  it('applies makeCheckContext to skill checks triggered by events', () => {
+    render(<CharAbilities {...defaultProps} conditionEffects={{ reliableTalent: true }} />);
+    dispatchSkillCheck({ skillName: 'Athletics', checkType: 'skill' });
+    expect(getMocks().rollSkillCheck).toHaveBeenCalledWith(
+      'Athletics',
+      8,
+      expect.objectContaining({ reliableTalent: true })
+    );
+  });
+
+  it('applies makeCheckContext to ability checks triggered by events', () => {
+    render(<CharAbilities {...defaultProps} conditionEffects={{ d20Floor10: true }} />);
+    dispatchSkillCheck({ skillName: 'Strength', checkType: 'check' });
+    expect(getMocks().rollAbilityCheck).toHaveBeenCalledWith(
+      'Strength',
+      4,
+      expect.objectContaining({ d20Floor10: true })
+    );
+  });
+
+  it('does nothing when the event detail has no skillName', () => {
+    render(<CharAbilities {...defaultProps} />);
+    dispatchSkillCheck({});
+    expect(getMocks().rollAbilityCheck).not.toHaveBeenCalled();
+    expect(getMocks().rollSkillCheck).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when the event carries no detail at all', () => {
+    render(<CharAbilities {...defaultProps} />);
+    window.dispatchEvent(new CustomEvent('internal-skill-check'));
+    expect(getMocks().rollAbilityCheck).not.toHaveBeenCalled();
+    expect(getMocks().rollSkillCheck).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when checkType "check" names a skill instead of an ability', () => {
+    render(<CharAbilities {...defaultProps} />);
+    dispatchSkillCheck({ skillName: 'Athletics', checkType: 'check' });
+    expect(getMocks().rollAbilityCheck).not.toHaveBeenCalled();
+    expect(getMocks().rollSkillCheck).not.toHaveBeenCalled();
+  });
+
+  it('ignores the event after the component unmounts', () => {
+    const { unmount } = render(<CharAbilities {...defaultProps} />);
+    unmount();
+    dispatchSkillCheck({ skillName: 'Strength', checkType: 'check' });
+    expect(getMocks().rollAbilityCheck).not.toHaveBeenCalled();
+  });
+});
+
+describe('CharAbilities STR forced-mode rules', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockStore.clear();
+  });
+
+  it('grants Powerful Build advantage on STR ability checks clicked directly', () => {
+    const { container } = render(
+      <CharAbilities {...defaultProps} conditionEffects={{ strCheckAdvantage: true }} />
+    );
+    const strCheckCell = rowCell(container, 'Strength', 3);
+    expect(strCheckCell).toBeTruthy();
+    fireEvent.click(strCheckCell);
+    expect(getMocks().rollAbilityCheck).toHaveBeenCalledWith(
+      'Strength',
+      4,
+      expect.objectContaining({ forcedMode: 'advantage' })
+    );
+  });
+
+  it('grants Powerful Build advantage on Athletics skill clicks', () => {
+    render(<CharAbilities {...defaultProps} conditionEffects={{ strCheckAdvantage: true }} />);
+    const athleticsCell = findClickableByStartText('Athletics');
+    expect(athleticsCell).toBeTruthy();
+    fireEvent.click(athleticsCell);
+    expect(getMocks().rollSkillCheck).toHaveBeenCalledWith(
+      'Athletics',
+      8,
+      expect.objectContaining({ forcedMode: 'advantage' })
+    );
+  });
+
+  it('does not apply STR disadvantage to non-STR ability checks', () => {
+    render(<CharAbilities {...defaultProps} conditionEffects={{ strCheckDisadvantage: true }} />);
+    dispatchSkillCheck({ skillName: 'Dexterity', checkType: 'check' });
+    const dexCall = getMocks().rollAbilityCheck.mock.calls.find(args => args[0] === 'Dexterity');
+    expect(dexCall).toBeTruthy();
+    expect(dexCall[1]).toBe(2);
+    expect(dexCall[2] ?? {}).not.toHaveProperty('forcedMode');
+  });
+});
+
+describe('CharAbilities makeSaveContext strSaveReplace', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockStore.clear();
+  });
+
+  it('passes strSaveReplace context with strScore when the flag is set', () => {
+    const stats = createPlayerStats({
+      abilities: [
+        { name: 'Strength', bonus: 2, save: 4, totalScore: 14, skills: [] },
+        { name: 'Dexterity', bonus: 0, save: 0, totalScore: 10, skills: [] },
+        { name: 'Constitution', bonus: 0, save: 0, totalScore: 10, skills: [] },
+        { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
+        { name: 'Wisdom', bonus: 0, save: 0, totalScore: 10, skills: [] },
+        { name: 'Charisma', bonus: 0, save: 0, totalScore: 10, skills: [] },
+      ],
     });
+    const { container } = render(
+      <CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ strSaveReplace: true }} />
+    );
+    const strSaveCell = rowCell(container, 'Strength', 4);
+    expect(strSaveCell).toBeTruthy();
+    fireEvent.click(strSaveCell);
+    expect(getMocks().rollSavingThrow).toHaveBeenCalledWith(
+      'Strength',
+      4,
+      expect.objectContaining({ strSaveReplace: true, strScore: 14 })
+    );
+  });
+
+  it('omits strSaveReplace context when the flag is not set', () => {
+    const { container } = render(<CharAbilities {...defaultProps} />);
+    fireEvent.click(rowCell(container, 'Strength', 4));
+    expect(getMocks().rollSavingThrow).toHaveBeenCalledWith(
+      'Strength',
+      6,
+      expect.not.objectContaining({ strSaveReplace: expect.anything(), strScore: expect.anything() })
+    );
   });
 });

@@ -1,17 +1,41 @@
+// @improved-by-ai
+/**
+ * CharAbilities — event-context roll lane (`internal-skill-check` window event).
+ * Verifies the event handler's routing contract and the bonus/context it derives
+ * from CURRENT props (exhaustion penalty, wisCheckReplace, peerless athlete),
+ * plus the wisCheckReplace charisma-skill DISPLAY this lane uniquely owns.
+ *
+ * Notes on the handler's contract (CharAbilities.jsx):
+ * - `checkType === 'check'` resolves skillName against ABILITIES and sends the
+ *   raw ability bonus (wisCheckReplace affects only the ctx: the roller applies
+ *   `wisCheckMinBonus` downstream — that stamping is what these tests pin).
+ * - every OTHER checkType (including unknown ones) falls through to SKILL lookup.
+ *
+ * Covered by sibling lanes (do NOT re-add here):
+ * - contextFeatures: baseline event routing (skill + ability), exhaustion on skill
+ *   events, reliableTalent/d20Floor10 ctx on events, empty/missing detail,
+ *   ability-vs-skill name mismatches, unmount teardown, STR forced-mode clicks,
+ *   strSaveReplace saves.
+ * - clickHandlers: click → roll calls, wisCheckReplace click ctx, save ctx matrix.
+ * - conditionEffects / rendering / saveBonus / toolEntries / missingCoverage: display.
+ */
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
+// Stable mock object: every render must hand the component the SAME roll fns,
+// otherwise async re-renders (loadEquipment) re-register the event listener
+// against fresh mocks and captured mocks go stale.
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  const mockFn = vi.fn(() => ({
+  const rollMocks = {
     popupHtml: null,
     setPopupHtml: vi.fn(),
     rollAbilityCheck: vi.fn(),
     rollSavingThrow: vi.fn(),
     rollSkillCheck: vi.fn(),
-  }));
-  return { default: mockFn };
+  };
+  return { default: vi.fn(() => rollMocks) };
 });
 
 vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
@@ -41,8 +65,11 @@ const mockAllAbilityScores = [
   { full_name: 'Charisma', description: 'CHA desc' },
 ];
 
+// Per-test fixture factory. `abilityOverrides` patches single abilities by name
+// so tests don't re-list all six to tweak one modifier.
 function createPlayerStats(overrides = {}) {
-  return {
+  const { abilityOverrides, ...rest } = overrides;
+  const stats = {
     name: 'Test Fighter',
     level: 5,
     abilities: [
@@ -56,8 +83,12 @@ function createPlayerStats(overrides = {}) {
     skillProficiencies: ['Athletics', 'Arcana'],
     automation: { primalKnowledge: ['Athletics'], passives: [] },
     expertise: [],
-    ...overrides,
+    ...rest,
   };
+  if (abilityOverrides) {
+    stats.abilities = stats.abilities.map(a => (abilityOverrides[a.name] ? { ...a, ...abilityOverrides[a.name] } : a));
+  }
+  return stats;
 }
 
 const defaultProps = {
@@ -71,150 +102,129 @@ const defaultProps = {
   onStrokeOfLuck: vi.fn(),
 };
 
-function getMocks() {
-  return vi.mocked(useLoggedDiceRoll).mock.results[0].value;
+function dispatchSkillCheck(detail) {
+  window.dispatchEvent(new CustomEvent('internal-skill-check', { detail }));
 }
 
-// ── Tests ──
+function getRollMocks() {
+  const results = vi.mocked(useLoggedDiceRoll).mock.results;
+  // Clear failure if a test forgot to render before dispatching.
+  expect(results.length).toBeGreaterThan(0);
+  return results[results.length - 1].value;
+}
 
-describe('CharAbilities internal-skill-check event handler', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockStore.clear();
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockStore.clear();
+});
+
+describe('CharAbilities internal-skill-check → ability checks (checkType "check")', () => {
+  it('rolls with the raw ability bonus minus the exhaustion penalty', () => {
+    render(<CharAbilities {...defaultProps} exhaustionPenalty={2} />);
+    dispatchSkillCheck({ skillName: 'Strength', checkType: 'check' });
+    expect(getRollMocks().rollAbilityCheck).toHaveBeenCalledWith('Strength', 2, undefined);
   });
 
-  describe('checkType === "check" (ability check)', () => {
-    it('applies exhaustionPenalty to the ability check bonus from event', () => {
-      render(<CharAbilities {...defaultProps} exhaustionPenalty={2} />);
-      window.dispatchEvent(new CustomEvent('internal-skill-check', { detail: { skillName: 'Strength', checkType: 'check' } }));
-      expect(getMocks().rollAbilityCheck).toHaveBeenCalledWith('Strength', 2, undefined);
-    });
-
-    it('applies wisCheckReplace context for Charisma when wisCheckReplace is set', () => {
-      const stats = createPlayerStats({
-        abilities: [
-          { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [] },
-          { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [] },
-          { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
-          { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Wisdom', bonus: 3, save: 5, totalScore: 16, skills: [] },
-          { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [] },
-        ],
-      });
-      render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ wisCheckReplace: true }} />);
-      window.dispatchEvent(new CustomEvent('internal-skill-check', { detail: { skillName: 'Charisma', checkType: 'check' } }));
-      expect(getMocks().rollAbilityCheck).toHaveBeenCalledWith(
-        'Charisma',
-        expect.any(Number),
-        expect.objectContaining({ wisCheckReplace: true, wisCheckMinBonus: 3 })
-      );
-    });
+  it('uses the exhaustion penalty from current props after a re-render', () => {
+    const { rerender } = render(<CharAbilities {...defaultProps} exhaustionPenalty={0} />);
+    rerender(<CharAbilities {...defaultProps} exhaustionPenalty={2} />);
+    dispatchSkillCheck({ skillName: 'Strength', checkType: 'check' });
+    // Guards the listener effect's prop deps: a stale closure would roll 4, not 2.
+    expect(getRollMocks().rollAbilityCheck).toHaveBeenCalledWith('Strength', 2, undefined);
   });
 
-  describe('checkType === "skill" (skill check)', () => {
-    it('calls rollSkillCheck for a charisma skill', () => {
-      render(<CharAbilities {...defaultProps} />);
-      window.dispatchEvent(new CustomEvent('internal-skill-check', { detail: { skillName: 'Deception', checkType: 'skill' } }));
-      expect(getMocks().rollSkillCheck).toHaveBeenCalledWith('Deception', expect.any(Number), undefined);
-    });
-
-    it('applies peerlessAthleteAdvantageSkills context from event', () => {
-      const stats = createPlayerStats({
-        abilities: [
-          { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [{ name: 'Athletics', bonus: 8 }] },
-          { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [{ name: 'Acrobatics', bonus: 6 }] },
-          { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
-          { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
-          { name: 'Wisdom', bonus: -1, save: 1, totalScore: 9, skills: [] },
-          { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [] },
-        ],
-      });
-      render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ peerlessAthleteAdvantageSkills: ['Athletics'] }} />);
-      window.dispatchEvent(new CustomEvent('internal-skill-check', { detail: { skillName: 'Athletics', checkType: 'skill' } }));
-      expect(getMocks().rollSkillCheck).toHaveBeenCalledWith(
-        'Athletics',
-        expect.any(Number),
-        expect.objectContaining({ forcedMode: 'advantage' })
-      );
-    });
-
-    it('does nothing when event skillName does not match any skill', () => {
-      render(<CharAbilities {...defaultProps} />);
-      window.dispatchEvent(new CustomEvent('internal-skill-check', { detail: { skillName: 'NonExistent', checkType: 'skill' } }));
-      expect(getMocks().rollSkillCheck).not.toHaveBeenCalled();
-    });
+  it('stamps wisCheckReplace context with the Wisdom-derived minimum on Charisma checks', () => {
+    const stats = createPlayerStats({ abilityOverrides: { Wisdom: { bonus: 3 } } });
+    render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ wisCheckReplace: true }} />);
+    dispatchSkillCheck({ skillName: 'Charisma', checkType: 'check' });
+    // Event lane deliberately sends the RAW Charisma bonus (0); the roller applies
+    // the wisdom floor from ctx.wisCheckMinBonus.
+    expect(getRollMocks().rollAbilityCheck).toHaveBeenCalledWith(
+      'Charisma',
+      0,
+      { wisCheckReplace: true, wisCheckMinBonus: 3 }
+    );
   });
 
-  describe('unknown checkType', () => {
-    it('does nothing when checkType is neither "check" nor "skill"', () => {
-      render(<CharAbilities {...defaultProps} />);
-      window.dispatchEvent(new CustomEvent('internal-skill-check', { detail: { skillName: 'Strength', checkType: 'invalid' } }));
-      expect(getMocks().rollAbilityCheck).not.toHaveBeenCalled();
-      expect(getMocks().rollSkillCheck).not.toHaveBeenCalled();
-    });
+  it('floors wisCheckMinBonus at 1 when the Wisdom modifier is negative', () => {
+    render(<CharAbilities {...defaultProps} conditionEffects={{ wisCheckReplace: true }} />);
+    dispatchSkillCheck({ skillName: 'Charisma', checkType: 'check' });
+    // Base fixture Wisdom is -1 → max(1, -1) = 1.
+    expect(getRollMocks().rollAbilityCheck).toHaveBeenCalledWith(
+      'Charisma',
+      0,
+      { wisCheckReplace: true, wisCheckMinBonus: 1 }
+    );
   });
 });
 
-describe('CharAbilities wisCheckReplace for charisma skills display', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockStore.clear();
+describe('CharAbilities internal-skill-check → skill checks', () => {
+  it('forces advantage only for skills listed in peerlessAthleteAdvantageSkills', () => {
+    render(
+      <CharAbilities {...defaultProps} conditionEffects={{ peerlessAthleteAdvantageSkills: ['Athletics'] }} />
+    );
+    dispatchSkillCheck({ skillName: 'Athletics', checkType: 'skill' });
+    expect(getRollMocks().rollSkillCheck).toHaveBeenCalledWith('Athletics', 8, { forcedMode: 'advantage' });
   });
 
-  it('replaces charisma skill bonuses with wisdom-based calculation when wisCheckReplace is set', () => {
+  it('does not force advantage for skills absent from peerlessAthleteAdvantageSkills', () => {
+    render(
+      <CharAbilities {...defaultProps} conditionEffects={{ peerlessAthleteAdvantageSkills: ['Athletics'] }} />
+    );
+    dispatchSkillCheck({ skillName: 'Acrobatics', checkType: 'skill' });
+    expect(getRollMocks().rollSkillCheck).toHaveBeenCalledWith('Acrobatics', 6, undefined);
+  });
+
+  it('routes unrecognized checkTypes through the skill lookup (only "check" means ability)', () => {
+    render(<CharAbilities {...defaultProps} />);
+    dispatchSkillCheck({ skillName: 'Arcana', checkType: 'save' });
+    expect(getRollMocks().rollSkillCheck).toHaveBeenCalledWith('Arcana', 2, undefined);
+    expect(getRollMocks().rollAbilityCheck).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when the event names neither a skill nor an ability', () => {
+    render(<CharAbilities {...defaultProps} />);
+    dispatchSkillCheck({ skillName: 'NonExistent', checkType: 'skill' });
+    expect(getRollMocks().rollSkillCheck).not.toHaveBeenCalled();
+    expect(getRollMocks().rollAbilityCheck).not.toHaveBeenCalled();
+
+    // An ability name is not a skill name — the skill lookup must not match it.
+    dispatchSkillCheck({ skillName: 'Strength', checkType: 'invalid' });
+    expect(getRollMocks().rollSkillCheck).not.toHaveBeenCalled();
+    expect(getRollMocks().rollAbilityCheck).not.toHaveBeenCalled();
+  });
+});
+
+describe('CharAbilities wisCheckReplace charisma display', () => {
+  it('replaces a proficient charisma skill bonus with max(1, WIS) + proficiency', () => {
     const stats = createPlayerStats({
-      level: 5,
-      automation: { primalKnowledge: [], passives: [] },
+      abilityOverrides: { Wisdom: { bonus: 3 } },
       skillProficiencies: ['Deception'],
-      expertise: [],
-      abilities: [
-        { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [] },
-        { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [] },
-        { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
-        { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
-        { name: 'Wisdom', bonus: 3, save: 5, totalScore: 16, skills: [] },
-        { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [{ name: 'Deception', bonus: 2 }] },
-      ],
     });
     render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ wisCheckReplace: true }} />);
+    // 3 (wis) + 3 (proficiency at level 5) = +6, vs the raw +2 without the flag.
     expect(screen.getByText('Deception (+6)')).toBeInTheDocument();
   });
 
-  it('does not replace non-charisma skill bonuses when wisCheckReplace is set', () => {
+  it('adds proficiency twice for charisma skills with expertise', () => {
     const stats = createPlayerStats({
-      level: 5,
-      automation: { primalKnowledge: [], passives: [] },
-      skillProficiencies: ['Athletics'],
-      expertise: [],
-      abilities: [
-        { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [{ name: 'Athletics', bonus: 8 }] },
-        { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [] },
-        { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
-        { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
-        { name: 'Wisdom', bonus: 3, save: 5, totalScore: 16, skills: [] },
-        { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [] },
-      ],
-    });
-    render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ wisCheckReplace: true }} />);
-    expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
-  });
-
-  it('handles wisCheckReplace with expertise for charisma skills', () => {
-    const stats = createPlayerStats({
-      level: 5,
-      automation: { primalKnowledge: [], passives: [] },
+      abilityOverrides: { Wisdom: { bonus: 2 } },
       skillProficiencies: ['Persuasion'],
       expertise: ['Persuasion'],
-      abilities: [
-        { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [] },
-        { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [] },
-        { name: 'Constitution', bonus: 1, save: 3, totalScore: 11, skills: [] },
-        { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [] },
-        { name: 'Wisdom', bonus: 2, save: 4, totalScore: 14, skills: [] },
-        { name: 'Charisma', bonus: 0, save: 2, totalScore: 10, skills: [{ name: 'Persuasion', bonus: 2 }] },
-      ],
     });
     render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ wisCheckReplace: true }} />);
+    // 2 (wis) + 3 (proficiency) + 3 (expertise) = +8.
     expect(screen.getByText('Persuasion (Expert) (+8)')).toBeInTheDocument();
+  });
+
+  it('leaves non-charisma skill bonuses untouched', () => {
+    render(<CharAbilities {...defaultProps} conditionEffects={{ wisCheckReplace: true }} />);
+    expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
+    expect(screen.getByText('Arcana (+2)')).toBeInTheDocument();
+  });
+
+  it('shows the raw charisma bonus when the flag is not set', () => {
+    render(<CharAbilities {...defaultProps} />);
+    expect(screen.getByText('Deception (+2)')).toBeInTheDocument();
   });
 });

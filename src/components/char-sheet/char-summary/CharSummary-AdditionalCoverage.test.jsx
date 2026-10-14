@@ -1,27 +1,24 @@
+// @improved-by-ai
 //
-// Quality improvements:
-//   - Consolidated 3 describe blocks into 1 (reduces duplication, improves readability)
-//   - Removed window.location.hostname mutation (global state pollution risk)
-//   - Added missing mocks: DiceRollContext, logService, buffToggle
-//   - Added @testing-library/jest-dom import (explicit dependency)
-//   - Added negative tests: no climb/swim when undefined/null, no stormborn when inactive
-//   - Added edge cases: zero speeds, multiple stormborn damage types, salmon aspect override
-//   - Fixed getRuntimeValue mock usage (use vi.mocked() consistently)
-//   - Added test for swimSpeed === 0 (falsy but valid)
-//   - Removed redundant mocks (CreatureBadge, ConditionEffectBadges not needed for these assertions)
-//   - Added Dexterity ability to mockPlayerStats (referenced by charSummaryCalc.js)
-//   - Improved test descriptions with clearer intent
+// Lane: speed overrides derived from activeBuffs/playerStats priority chains
+// (deriveAspectSpeeds + aquatic_adaptation) and Stormborn resistances gated on
+// wrathOfTheSeaActive (computeResistances). Stormborn is covered ONLY here.
 //
-// Cleanup (2026-08-18):
-//   - Removed 5 redundant negative tests: climbSpeed undefined/null/0 and swimSpeed undefined/null/0
-//     All test JavaScript truthiness (falsy → no render) which is implementation detail, not behavior.
-//     Coverage for base speed rendering is provided by CharSummary-SpeedCalculations.test.jsx.
-//   - Removed 2 duplicate climb/swim "present" tests covered by CharSummary-SpeedCalculations.test.jsx.
-//   - Removed 2 duplicate aquatic_adaptation tests covered by CharSummary-SpeedCalculations.test.jsx.
-//   - Consolidated 3 stormborn negative tests (false/undefined/no-entry) into 1 parameterized test.
-//   - Removed unused Popup, AllySelectionModal, TrackedResourceInput, sanitize mocks (not exercised).
-//   - Removed unused logService, auraOfLifeHandler, circleOfPowerHandler, deathWardHandler mocks.
-//   - Reduced file from 330 lines / 16 tests to 127 lines / 6 tests.
+// Cleanup (2026-08-19):
+//   - Restored climb/swim-from-playerStats and Salmon swim tests: SpeedCalculations
+//     delegated them here ("fully duplicated in AdditionalCoverage") while this file
+//     had removed them pointing back at SpeedCalculations — a circular delegation gap
+//     leaving those branches covered nowhere.
+//   - Added Panther-climb-scaling test (climb = totalSpeed + buffSpeedBonus via
+//     speed_boost) — the arithmetic on charSummaryCalc.js:265 was untested.
+//   - Stormborn positives: exact Resistances-line content assertions replace loose
+//     /Cold/ regex; also pins the Wrath of the Sea badge rendered from the same
+//     wrathOfTheSeaActive gate. Negatives assert the whole line/badge is absent.
+//   - Stormborn positives consolidated into one parameterized it.each (same code path).
+//   - Imports shared mockPlayerStats/mockCampaignName (removed 30-line local duplicate);
+//     tests add per-test overrides via spread.
+//   - Single module-level beforeEach replaces three identical blocks; removed redundant
+//     per-describe getActiveBuffs.mockReturnValue([]) where the default applies.
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -29,6 +26,7 @@ import '@testing-library/jest-dom';
 import CharSummary from './CharSummary.jsx';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { mockPlayerStats, mockCampaignName } from './CharSummary.test-mocks.test.jsx';
 
 vi.mock('./CharGold.jsx', () => ({ default: () => <div data-testid="char-gold">Gold</div> }));
 vi.mock('./CharHitPoints.jsx', () => ({ default: () => <div data-testid="char-hp">HP</div> }));
@@ -91,135 +89,97 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(() => ({ creatures: [] })),
 }));
 
-const mockCampaignName = 'test-campaign';
+beforeEach(() => {
+    vi.resetAllMocks();
+    getActiveBuffs.mockReturnValue([]);
+});
 
-const mockPlayerStats = {
-    name: 'Thorin',
-    xp: 2300,
-    xpMode: 'milestone',
-    race: { name: 'Dwarf', type: 'Hill Dwarf', subrace: { name: 'Hill Dwarf', speed: 25 } },
-    class: { name: 'Cleric', subclass: { name: 'War', type: 'Choice' }, major: { name: 'Cleric' } },
-    level: 5,
-    alignment: 'Lawful Good',
-    proficiency: 3,
-    initiative: 2,
-    initiativeAdvantage: false,
-    abilities: [
-        { name: 'Wisdom', bonus: 3 },
-        { name: 'Strength', bonus: 2 },
-        { name: 'Dexterity', bonus: 2 },
-    ],
-    armorClass: 18,
-    armorClassFormula: '16 + 2 (shield)',
-    hitPoints: 45,
-    inventory: { equipped: ['Scale Mail', 'Shield'] },
-    equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }, { name: 'Shield', type: 'Shield' }],
-    background: 'Soldier',
-    immunities: [],
-    resistances: [],
-    vulnerabilities: [],
-    senses: [],
-    proficiencies: [],
-    languages: [],
-    automation: { passives: [], actions: [] },
-    passives: [],
-    exhaustionLevel: 0,
-};
+function renderSummary(stats) {
+    return render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+}
 
 // ---------------------------------------------------------------------------
-// Climb speed — buff override (base speed covered by CharSummary-SpeedCalculations.test.jsx)
+// Movement speed overrides — priority chains in deriveAspectSpeeds and the
+// aquatic_adaptation buff handler (buff wins over playerStats, Panther/Salmon
+// climb/swim scale with buffed speed).
 // ---------------------------------------------------------------------------
-describe('CharSummary - Climb Speed (buff override)', () => {
-    beforeEach(() => {
-        vi.resetAllMocks();
-        getActiveBuffs.mockReturnValue([]);
+describe('CharSummary - climb/swim speed overrides', () => {
+    it('shows climb speed from playerStats when no buffs override it', () => {
+        renderSummary({ ...mockPlayerStats, climbSpeed: 40 });
+        expect(screen.getByText(/climb 40 ft\./)).toBeInTheDocument();
     });
 
-    it('renders climb speed from Aspect of the Wilds (Panther) overriding playerStats', () => {
+    it('shows swim speed from playerStats when no buffs override it', () => {
+        renderSummary({ ...mockPlayerStats, swimSpeed: 40 });
+        expect(screen.getByText(/swim 40 ft\./)).toBeInTheDocument();
+    });
+
+    it('Aspect of the Wilds (Panther) climb uses base speed, overriding playerStats.climbSpeed', () => {
         getActiveBuffs.mockReturnValue([{ name: 'Aspect of the Wilds', effect: 'climb_speed_aspect', optionName: 'Panther' }]);
-        const stats = { ...mockPlayerStats, climbSpeed: 40 };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/climb 25 ft/)).toBeInTheDocument();
-        expect(screen.queryByText(/climb 40 ft/)).not.toBeInTheDocument();
-    });
-});
-
-// ---------------------------------------------------------------------------
-// Swim speed — aquatic_adaptation override (base speed covered by CharSummary-SpeedCalculations.test.jsx)
-// ---------------------------------------------------------------------------
-describe('CharSummary - Swim Speed (buff override)', () => {
-    beforeEach(() => {
-        vi.resetAllMocks();
-        getActiveBuffs.mockReturnValue([]);
+        renderSummary({ ...mockPlayerStats, climbSpeed: 40 });
+        expect(screen.getByText(/climb 25 ft\./)).toBeInTheDocument();
+        expect(screen.queryByText(/climb 40 ft\./)).not.toBeInTheDocument();
     });
 
-    it('aquatic_adaptation sets swimSpeed to 2x base speed even when playerStats.swimSpeed is set', () => {
+    it('Aspect of the Wilds (Panther) climb scales with speed buffs (base + 10)', () => {
+        getActiveBuffs.mockReturnValue([
+            { name: 'Aspect of the Wilds', effect: 'climb_speed_aspect', optionName: 'Panther' },
+            { name: 'Longstrider', effect: 'speed_boost', speedBonus: 10 },
+        ]);
+        renderSummary({ ...mockPlayerStats, climbSpeed: 40 });
+        expect(screen.getByText(/climb 35 ft\./)).toBeInTheDocument();
+        expect(screen.queryByText(/climb 25 ft\./)).not.toBeInTheDocument();
+    });
+
+    it('Aspect of the Wilds (Salmon) grants swim equal to base speed and no climb', () => {
+        getActiveBuffs.mockReturnValue([{ name: 'Aspect of the Wilds', effect: 'climb_speed_aspect', optionName: 'Salmon' }]);
+        renderSummary(mockPlayerStats);
+        expect(screen.getByText(/swim 25 ft\./)).toBeInTheDocument();
+        expect(screen.queryByText(/climb/)).not.toBeInTheDocument();
+    });
+
+    it('aquatic_adaptation swim is 2x base speed, overriding playerStats.swimSpeed', () => {
         getActiveBuffs.mockReturnValue([{ effect: 'aquatic_adaptation' }]);
-        const stats = { ...mockPlayerStats, swimSpeed: 40 };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/swim 50 ft/)).toBeInTheDocument();
+        renderSummary({ ...mockPlayerStats, swimSpeed: 40 });
+        expect(screen.getByText(/swim 50 ft\./)).toBeInTheDocument();
+        expect(screen.queryByText(/swim 40 ft\./)).not.toBeInTheDocument();
     });
 });
 
 // ---------------------------------------------------------------------------
-// Stormborn resistances — conditional rendering based on wrathOfTheSeaActive
+// Stormborn resistances — only surfaced while wrathOfTheSeaActive is set in
+// the runtime store (computeResistances gate).
 // ---------------------------------------------------------------------------
 describe('CharSummary - Stormborn Resistances', () => {
-    beforeEach(() => {
-        vi.resetAllMocks();
-        getActiveBuffs.mockReturnValue([]);
-    });
+    function mockWrathOfTheSea(active) {
+        vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+            key === 'wrathOfTheSeaActive' ? active : null);
+    }
 
-    it('renders stormborn resistances when wrathOfTheSeaActive and passives contain stormborn', () => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === 'wrathOfTheSeaActive') return true;
-            return null;
-        });
-        const stats = {
+    function statsWithStormborn(damageTypes) {
+        return {
             ...mockPlayerStats,
             automation: {
                 ...mockPlayerStats.automation,
-                passives: [{ type: 'resistance', name: 'Stormborn', damageTypes: ['cold'] }],
+                passives: [{ type: 'resistance', name: 'Stormborn', damageTypes }],
             },
         };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/Cold/)).toBeInTheDocument();
-    });
-
-    it('renders multiple stormborn damage types when wrathOfTheSeaActive', () => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === 'wrathOfTheSeaActive') return true;
-            return null;
-        });
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ type: 'resistance', name: 'Stormborn', damageTypes: ['cold', 'lightning'] }],
-            },
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/Cold/)).toBeInTheDocument();
-        expect(screen.getByText(/Lightning/)).toBeInTheDocument();
-    });
+    }
 
     it.each([
-        [false, 'false'],
-        [undefined, 'undefined'],
-        [null, 'null'],
-    ])('does not render stormborn resistances when wrathOfTheSeaActive is %s', (_value, _label) => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === 'wrathOfTheSeaActive') return _value;
-            return null;
-        });
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ type: 'resistance', name: 'Stormborn', damageTypes: ['cold'] }],
-            },
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.queryByText(/Cold/)).not.toBeInTheDocument();
+        [['cold'], 'Resistances: Cold'],
+        [['cold', 'lightning'], 'Resistances: Cold, Lightning'],
+    ])('renders Stormborn damage types and Wrath of the Sea badge while active (%#)', async (damageTypes, expectedLine) => {
+        mockWrathOfTheSea(true);
+        renderSummary(statsWithStormborn(damageTypes));
+        expect(screen.getByText('Resistances:').closest('div')).toHaveTextContent(expectedLine);
+        expect(screen.getByText('Wrath of the Sea')).toBeInTheDocument();
+    });
+
+    it.each([false, null, undefined])('hides the Resistances line and Wrath of the Sea badge when wrathOfTheSeaActive is %s', (active) => {
+        mockWrathOfTheSea(active);
+        renderSummary(statsWithStormborn(['cold']));
+        expect(screen.queryByText('Resistances:')).not.toBeInTheDocument();
+        expect(screen.queryByText('Wrath of the Sea')).not.toBeInTheDocument();
     });
 });

@@ -1,19 +1,37 @@
+// @improved-by-ai
 //
-// Quality improvements:
-//   - Removed window.location.hostname = 'localhost' (5×) — global state mutation, not needed
-//   - Replaced nextElementSibling + textContent with getByText regex — tests behavior, not DOM structure
-//   - Fixed broken aquatic_affinity override test — mock setup now actually produces "swim 50 ft"
-//   - Reduced over-mocking — removed unused mocks (getRuntimeValue, getRules, attackCalc, etc.)
-//   - Added edge-case tests — missing passive, both armor+shield, invalid bonusExpression
-//   - Improved test naming — each name clearly states the behavior being verified
-//   - Removed redundant beforeEach duplication — shared beforeEach across describe blocks
+// Coverage ownership (CharSummary family delegation): automation/passive movement
+// effects of computeCharSummaryContext — the ONLY owner in the family of all four
+// lanes (verified by grep over all CharSummary-* siblings):
+//   - passive speed_bonus + speed_increase passives (charSummaryCalc.js passiveSpeedContribution):
+//     no_heavy_armor / no_armor_no_shield conditions, default & explicit bonusExpression,
+//     stacking, type/effect/condition guards, NaN guard, armorClassFormula fallback
+//   - acrobatic_movement suffix (applyMovementPassives automation-passives lane)
+//   - elemental_attunement_movement (applyMovementPassives TOP-LEVEL passives lane)
+//   - aquatic_affinity swim grant + non-override of buff-set swim speeds
 //
-// Cleanup (2026-08-18):
-//   - Removed 2 "no passive" negative tests — both assert default behavior (base speed shown when
-//     passive array is empty), which is already covered by the shared mockPlayerStats (passives: []).
-//     These tests verify the absence of a feature rather than the presence of correct behavior,
-//     adding zero confidence while increasing maintenance burden.
-//   - Reduced file from 279 lines / 13 tests to 246 lines / 11 tests.
+// NOT owned here (delegated — do not re-add):
+//   - Buff-driven speed (haste/speed_boost/large_form), exhaustion & condition speed,
+//     fly-condition rendering → CharSummary-SpeedCalculations.test.jsx
+//   - Barbarian/Monk unarmored movement, Circle Forms AC → CharSummary-Movement.test.jsx
+//   - Climb/swim stat overrides, Salmon/Panther aspects, stormborn → CharSummary-AdditionalCoverage.test.jsx
+//
+// Quality improvements over previous revision (11 tests → 16 tests / 22 runs):
+//   - Speed assertions now scope to the Speed-row span (speedSpan helper, family
+//     convention from CharSummary-Movement) and pin the FULL span text — the old
+//     page-wide /25 ft/ regex passed even if armor gating leaked "swim" or the
+//     bonus rendered anywhere else on the sheet.
+//   - Added guard-branch coverage that previously let broken code pass silently:
+//     wrong passive type, unknown effect, conditionless speed_bonus, malformed
+//     bonusExpression (exposed a real NaN defect — fixed in charSummaryCalc.js),
+//     stacking accumulation loop, and the armorClassFormula heavy-armor fallback.
+//   - Pinned the automation-passives vs top-level-passives list split:
+//     elemental_attunement_movement reads playerStats.passives while every other
+//     movement passive reads automation.passives — an easy wiring regression.
+//   - Single module-level beforeEach replaces four identical blocks; stats() /
+//     speedBonusPassive() fixture helpers remove 6 duplicated 8-line fixture objects.
+//   - Removed ShortRestModal and useActionPopup mocks: never mounted/triggered by
+//     these render-only tests (over-mocking noise).
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -30,7 +48,6 @@ vi.mock('../../common/AvatarImage.jsx', () => ({ default: () => <div data-testid
 vi.mock('../../common/AvatarModal.jsx', () => ({ default: () => null }));
 vi.mock('../LongRestButton.jsx', () => ({ default: () => <div data-testid="long-rest-btn">Long Rest</div> }));
 vi.mock('../ShortRestButton.jsx', () => ({ default: () => <div data-testid="short-rest-btn">Short Rest</div> }));
-vi.mock('../ShortRestModal.jsx', () => ({ default: () => <div data-testid="short-rest-modal">Short Rest Modal</div> }));
 vi.mock('./CharConditions.jsx', () => ({ default: () => <div data-testid="char-conditions">Conditions</div> }));
 
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
@@ -48,10 +65,6 @@ vi.mock('../../../hooks/runtime/useSyncedState.js', () => ({
     useSyncedState: vi.fn((_name, _key, defaultValue) => [defaultValue, vi.fn()]),
 }));
 
-vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
-    showBackgroundPopup: vi.fn(),
-}));
-
 vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
     default: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn(), rollInitiative: vi.fn() })),
 }));
@@ -64,199 +77,192 @@ vi.mock('../../../services/combat/buffs/buffService.js', () => ({
     getActiveBuffs: vi.fn(() => []),
 }));
 
+beforeEach(() => {
+    vi.clearAllMocks();
+    getActiveBuffs.mockReturnValue([]);
+});
+
+// Fixture builder: base stats with automation passives swapped in.
+const stats = (passives, overrides = {}) => ({
+    ...mockPlayerStats,
+    automation: { ...mockPlayerStats.automation, passives },
+    ...overrides,
+});
+
+const speedBonusPassive = (condition, bonusExpression = '10') =>
+    ({ type: 'passive_buff', effect: 'speed_bonus', condition, bonusExpression });
+
+// exhaustionLevel is a required numeric input to applySpeedConditions — omitting it NaNs the total.
+const renderSummary = (playerStats) =>
+    render(<CharSummary playerStats={playerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+
+// The Speed row renders as <b>Speed: </b><span>{total} ft.{suffixes}</span> —
+// asserting the full span text pins totals AND the presence/order of suffixes.
+const speedSpan = () => screen.getByText(/^\d+ ft\./);
+
 // ---------------------------------------------------------------------------
 // speed_bonus passive — no_heavy_armor condition
 // ---------------------------------------------------------------------------
-describe('speed_bonus with no_heavy_armor condition', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getActiveBuffs.mockReturnValue([]);
+describe('speed_bonus passive — no_heavy_armor condition', () => {
+    it('adds the bonus when equipped armor is not heavy', () => {
+        renderSummary(stats([speedBonusPassive('no_heavy_armor')]));
+        expect(speedSpan()).toHaveTextContent(/^35 ft\.$/);
     });
 
-    it('adds speed bonus when character is not wearing heavy armor', () => {
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '10', condition: 'no_heavy_armor' }],
-            },
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/35 ft/)).toBeInTheDocument();
-    });
-
-    it('does not add speed bonus when character is wearing heavy armor', () => {
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '10', condition: 'no_heavy_armor' }],
-            },
+    it('suppresses the bonus when heavy armor is equipped', () => {
+        const playerStats = stats([speedBonusPassive('no_heavy_armor')], {
             inventory: { equipped: ['Plate'] },
             equipment: [{ name: 'Plate', armor_category: 'Heavy' }],
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/25 ft/)).toBeInTheDocument();
+        });
+        renderSummary(playerStats);
+        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
     });
 
+    it('detects heavy armor via armorClassFormula when no equipment list exists', () => {
+        const playerStats = stats([speedBonusPassive('no_heavy_armor')], {
+            equipment: undefined,
+            armorClassFormula: '16 + 2 (Heavy)',
+        });
+        renderSummary(playerStats);
+        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
+    });
 });
 
 // ---------------------------------------------------------------------------
 // speed_bonus passive — no_armor_no_shield condition
 // ---------------------------------------------------------------------------
-describe('speed_bonus with no_armor_no_shield condition', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getActiveBuffs.mockReturnValue([]);
-    });
-
-    it('adds speed bonus when character has no armor or shield equipped', () => {
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '10', condition: 'no_armor_no_shield' }],
-            },
+describe('speed_bonus passive — no_armor_no_shield condition', () => {
+    it('adds the bonus when nothing protective is equipped', () => {
+        const playerStats = stats([speedBonusPassive('no_armor_no_shield')], {
             inventory: { equipped: [] },
             equipment: [],
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/35 ft/)).toBeInTheDocument();
+        });
+        renderSummary(playerStats);
+        expect(speedSpan()).toHaveTextContent(/^35 ft\.$/);
     });
 
-    it('does not add speed bonus when armor is equipped', () => {
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '10', condition: 'no_armor_no_shield' }],
-            },
-            inventory: { equipped: ['Scale Mail'] },
-            equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }],
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/25 ft/)).toBeInTheDocument();
+    it.each([
+        ['armor', ['Scale Mail'], [{ name: 'Scale Mail', equipment_category: 'Armor' }]],
+        ['shield alone', ['Shield'], [{ name: 'Shield', type: 'Shield' }]],
+        ['both armor and shield', ['Scale Mail', 'Shield'], [{ name: 'Scale Mail', equipment_category: 'Armor' }, { name: 'Shield', type: 'Shield' }]],
+    ])('suppresses the bonus when %s is equipped', (_label, equipped, equipment) => {
+        const playerStats = stats([speedBonusPassive('no_armor_no_shield')], {
+            inventory: { equipped },
+            equipment,
+        });
+        renderSummary(playerStats);
+        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
     });
 
-    it('does not add speed bonus when shield is equipped without armor', () => {
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ type: 'passive_buff', effect: 'speed_bonus', bonusExpression: '10', condition: 'no_armor_no_shield' }],
-            },
-            inventory: { equipped: ['Shield'] },
-            equipment: [{ name: 'Shield', type: 'Shield' }],
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/25 ft/)).toBeInTheDocument();
+    it('uses the parsed bonusExpression instead of the +10 default', () => {
+        const playerStats = stats([speedBonusPassive('no_armor_no_shield', '15')], {
+            inventory: { equipped: [] },
+            equipment: [],
+        });
+        renderSummary(playerStats);
+        expect(speedSpan()).toHaveTextContent(/^40 ft\.$/);
     });
 });
 
 // ---------------------------------------------------------------------------
-// acrobatic_movement passive — conditional rendering
+// speed_bonus / speed_increase guards and stacking
 // ---------------------------------------------------------------------------
-describe('acrobatic_movement passive rendering', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getActiveBuffs.mockReturnValue([]);
+describe('passive speed bonus guards', () => {
+    it.each([
+        ['a non-passive_buff type', { type: 'action_cost', effect: 'speed_bonus', condition: 'no_armor_no_shield' }],
+        ['an unrecognized effect', { type: 'passive_buff', effect: 'darkvision_bonus', condition: 'no_armor_no_shield' }],
+        ['no condition at all', { type: 'passive_buff', effect: 'speed_bonus' }],
+    ])('contributes nothing for %s', (_label, passive) => {
+        const playerStats = stats([passive], { inventory: { equipped: [] }, equipment: [] });
+        renderSummary(playerStats);
+        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
     });
 
-    it('displays acrobatic movement text when no armor or shield is equipped', () => {
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ effect: 'acrobatic_movement' }],
-            },
+    it('treats a malformed speed_bonus bonusExpression as zero instead of rendering NaN', () => {
+        const playerStats = stats([speedBonusPassive('no_armor_no_shield', 'fast')], {
             inventory: { equipped: [] },
             equipment: [],
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/acrobatic movement/)).toBeInTheDocument();
+        });
+        renderSummary(playerStats);
+        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
     });
 
-    it('omits acrobatic movement text when armor is equipped', () => {
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ effect: 'acrobatic_movement' }],
-            },
-            inventory: { equipped: ['Scale Mail'] },
-            equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }],
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.queryByText(/acrobatic movement/)).not.toBeInTheDocument();
+    it('stacks bonuses from multiple qualifying passives', () => {
+        const playerStats = stats([
+            speedBonusPassive('no_armor_no_shield'),
+            { type: 'passive_buff', effect: 'speed_increase', bonusExpression: '5' },
+        ], { inventory: { equipped: [] }, equipment: [] });
+        renderSummary(playerStats);
+        expect(speedSpan()).toHaveTextContent(/^40 ft\.$/);
     });
 
-    it('omits acrobatic movement text when shield is equipped without armor', () => {
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ effect: 'acrobatic_movement' }],
-            },
-            inventory: { equipped: ['Shield'] },
-            equipment: [{ name: 'Shield', type: 'Shield' }],
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.queryByText(/acrobatic movement/)).not.toBeInTheDocument();
+    it('applies speed_increase unconditionally with its parsed bonus', () => {
+        renderSummary(stats([{ type: 'passive_buff', effect: 'speed_increase', bonusExpression: '5' }]));
+        expect(speedSpan()).toHaveTextContent(/^30 ft\.$/);
+    });
+
+    it('treats a malformed speed_increase bonusExpression as zero', () => {
+        renderSummary(stats([{ type: 'passive_buff', effect: 'speed_increase', bonusExpression: 'five' }]));
+        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
     });
 });
 
 // ---------------------------------------------------------------------------
-// elemental_attunement_movement passive — fly and swim speed
+// acrobatic_movement passive — conditional suffix on the speed row
+// ---------------------------------------------------------------------------
+describe('acrobatic_movement passive', () => {
+    it('appends the acrobatic movement suffix while unarmored and unshielded', () => {
+        const playerStats = stats([{ effect: 'acrobatic_movement' }], {
+            inventory: { equipped: [] },
+            equipment: [],
+        });
+        renderSummary(playerStats);
+        expect(speedSpan()).toHaveTextContent(/^25 ft\., acrobatic movement$/);
+    });
+
+    it.each([
+        ['armor', ['Scale Mail'], [{ name: 'Scale Mail', equipment_category: 'Armor' }]],
+        ['shield alone', ['Shield'], [{ name: 'Shield', type: 'Shield' }]],
+    ])('omits the suffix when %s is equipped', (_label, equipped, equipment) => {
+        const playerStats = stats([{ effect: 'acrobatic_movement' }], {
+            inventory: { equipped },
+            equipment,
+        });
+        renderSummary(playerStats);
+        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// elemental_attunement_movement passive — top-level passives lane
 // ---------------------------------------------------------------------------
 describe('elemental_attunement_movement passive', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getActiveBuffs.mockReturnValue([]);
-    });
-
-    it('sets fly and swim speed when passive is present', () => {
-        const stats = {
+    it('grants fly and swim speeds mirroring walk speed', () => {
+        renderSummary({
             ...mockPlayerStats,
             passives: [{ effect: 'elemental_attunement_movement' }],
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/fly 25 ft/)).toBeInTheDocument();
-        expect(screen.getByText(/swim 25 ft/)).toBeInTheDocument();
+        });
+        expect(speedSpan()).toHaveTextContent(/^25 ft\., swim 25 ft\., fly 25 ft\.\s*$/);
     });
 
+    it('is only read from top-level passives — automation.passives does not grant it', () => {
+        renderSummary(stats([{ effect: 'elemental_attunement_movement' }]));
+        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
+    });
 });
 
 // ---------------------------------------------------------------------------
-// aquatic_affinity passive — swim speed
+// aquatic_affinity passive — swim speed grant
 // ---------------------------------------------------------------------------
 describe('aquatic_affinity passive', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getActiveBuffs.mockReturnValue([]);
+    it('grants swim speed equal to walk speed when no swim speed exists', () => {
+        renderSummary(stats([{ effect: 'aquatic_affinity' }]));
+        expect(speedSpan()).toHaveTextContent(/^25 ft\., swim 25 ft\.$/);
     });
 
-    it('adds swim speed when passive is present and no swim speed exists', () => {
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ effect: 'aquatic_affinity' }],
-            },
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/swim 25 ft/)).toBeInTheDocument();
-    });
-
-    it('does not override swim speed already set by aquatic_adaptation buff', () => {
+    it('does not override swim speed already set by the aquatic_adaptation buff', () => {
         getActiveBuffs.mockReturnValue([{ effect: 'aquatic_adaptation' }]);
-        const stats = {
-            ...mockPlayerStats,
-            automation: {
-                ...mockPlayerStats.automation,
-                passives: [{ effect: 'aquatic_affinity' }],
-            },
-        };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/swim 50 ft/)).toBeInTheDocument();
+        renderSummary(stats([{ effect: 'aquatic_affinity' }]));
+        expect(speedSpan()).toHaveTextContent(/^25 ft\., swim 50 ft\.$/);
     });
 });

@@ -1,10 +1,7 @@
+// @improved-by-ai
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
-import { isFreeCastAuthorized } from '../../../services/rules/spells/spellPreparationService.js';
-import { getConsumedMaterial } from '../../../services/rules/spells/materialComponents.js';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
@@ -26,213 +23,133 @@ vi.mock('../../../services/rules/spells/materialComponents.js', () => ({
   hasMaterial: vi.fn(() => true),
 }));
 
-const baseMockPlayerStats = {
-  name: 'Elara',
-  level: 5,
-  class: { name: 'Sorcerer', major: { name: 'Sorcerer' } },
-  abilities: [{ name: 'Charisma', bonus: 3 }],
-  proficiency: 3,
-  spellAbilities: {
-    spell_slots_level_1: 4,
-    spell_slots_level_2: 3,
-    spell_slots_level_3: 2,
-    spells: [],
-  },
-  automation: { passives: [], actions: [] },
-};
+const IMPROVED_ILLUSIONS_BANNER = 'No Verbal components (Improved Illusions)';
+const PSYCHIC_SPELLS_BANNER = 'No Verbal or Somatic components (Psychic Spells)';
 
-const mockCampaignName = 'test-campaign';
-
-const baseMockSpell = {
-  name: 'Magic Missile',
-  level: 1,
-  description: 'Three darts of force strike a creature.',
-  casting_time: '1 action',
-  range: '120 feet',
-  duration: 'Instantaneous',
-  damage: {
-    damage_at_slot_level: {
-      '1': '3d4+1',
-      '2': '4d4+1',
-      '3': '5d4+1',
-    },
-  },
-  school: 'Evocation',
-};
-
-const renderPopup = (
-  spell = baseMockSpell,
-  playerStats = baseMockPlayerStats,
-  campaignName = mockCampaignName,
-  extraProps = {}
-) =>
-  render(
-    <SpellDetailPopup
-      spell={spell}
-      playerStats={playerStats}
-      campaignName={campaignName}
-      onClose={vi.fn()}
-      {...extraProps}
-    />
-  );
-
-describe('SpellDetailPopup - Improved Illusions feature', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(getRuntimeValue).mockReturnValue(null);
-    vi.mocked(getActiveBuffs).mockReturnValue([]);
-    vi.mocked(isFreeCastAuthorized).mockReturnValue(false);
-    vi.mocked(getConsumedMaterial).mockReturnValue(null);
-  });
-
-  const warlockWithImprovedIllusions = {
-    ...baseMockPlayerStats,
-    class: { name: 'Warlock', major: { name: 'Warlock' } },
-    automation: {
-      passives: [{ type: 'improved_illusions' }],
-      actions: [],
-    },
-  };
-
-  const illusionSpell = {
-    ...baseMockSpell,
+// Per-test fixture factories — each call returns a fresh object.
+function makeSpell(overrides = {}) {
+  return {
     name: 'Disguise Self',
     level: 1,
     school: 'Illusion',
+    description: 'You use magical trickery to change your appearance.',
+    casting_time: '1 action',
+    range: 'Self',
+    duration: '1 hour',
+    ...overrides,
   };
+}
 
-  describe('Improved Illusions banner display', () => {
-    it('shows the banner for warlock with improved illusions casting an illusion spell', () => {
-      renderPopup(illusionSpell, warlockWithImprovedIllusions, mockCampaignName);
-      expect(screen.getByText('No Verbal components (Improved Illusions)')).toBeInTheDocument();
-    });
+// Improved Illusions is a 2024 Illusionist (Wizard) subclass feature, so the
+// baseline caster is a wizard — the popup's banner is deliberately class-agnostic
+// and keyed only on the passive + spell school.
+function makeIllusionistStats(passives = [{ type: 'improved_illusions' }]) {
+  return {
+    name: 'Elara',
+    level: 5,
+    class: { name: 'Wizard', major: { name: 'Wizard' } },
+    abilities: [{ name: 'Intelligence', bonus: 3 }],
+    proficiency: 3,
+    spellAbilities: {
+      spell_slots_level_1: 4,
+      spell_slots_level_2: 3,
+      spell_slots_level_3: 2,
+      spells: [],
+    },
+    automation: { passives, actions: [] },
+  };
+}
 
-    it('does not show the banner when warlock lacks the improved illusions passive', () => {
-      const warlockNoPassive = {
-        ...baseMockPlayerStats,
-        class: { name: 'Warlock', major: { name: 'Warlock' } },
-        automation: { passives: [], actions: [] },
-      };
+function renderPopup(spell, playerStats) {
+  return render(
+    <SpellDetailPopup
+      spell={spell}
+      playerStats={playerStats}
+      campaignName="test-campaign"
+      onClose={vi.fn()}
+      onCast={vi.fn()}
+    />
+  );
+}
 
-      renderPopup(illusionSpell, warlockNoPassive, mockCampaignName);
-      expect(screen.queryByText('No Verbal components (Improved Illusions)')).not.toBeInTheDocument();
-    });
+describe('SpellDetailPopup - Improved Illusions banner', () => {
+  it('shows the banner when the caster has the passive and the spell school is Illusion', () => {
+    renderPopup(makeSpell(), makeIllusionistStats());
 
-    it('does not show the banner for non-warlock class casting an illusion spell', () => {
-      renderPopup(illusionSpell, baseMockPlayerStats, mockCampaignName);
-      expect(screen.queryByText('No Verbal components (Improved Illusions)')).not.toBeInTheDocument();
-    });
-
-    it('does not show the banner for non-illusion spell school', () => {
-      const evocationSpell = {
-        ...baseMockSpell,
-        name: 'Magic Missile',
-        level: 1,
-        school: 'Evocation',
-      };
-
-      renderPopup(evocationSpell, warlockWithImprovedIllusions, mockCampaignName);
-      expect(screen.queryByText('No Verbal components (Improved Illusions)')).not.toBeInTheDocument();
-    });
-
-    it('does not show the banner when school is null, undefined, or empty string', () => {
-      const warlockStats = warlockWithImprovedIllusions;
-      const cases = [
-        { name: 'null', school: null },
-        { name: 'undefined', school: undefined },
-        { name: 'empty string', school: '' },
-      ];
-
-      for (const { school } of cases) {
-        const spell = {
-          ...baseMockSpell,
-          name: 'Magic Missile',
-          level: 1,
-          school,
-        };
-
-        renderPopup(spell, warlockStats, mockCampaignName);
-        expect(screen.queryByText('No Verbal components (Improved Illusions)')).not.toBeInTheDocument();
-      }
-    });
-
-    it('shows the banner for illusion school with lowercase casing (case-insensitive match)', () => {
-      const lowercaseIllusionSpell = {
-        ...baseMockSpell,
-        name: 'Disguise Self',
-        level: 1,
-        school: 'illusion',
-      };
-
-      renderPopup(lowercaseIllusionSpell, warlockWithImprovedIllusions, mockCampaignName);
-      expect(screen.getByText('No Verbal components (Improved Illusions)')).toBeInTheDocument();
-    });
+    expect(screen.getByText(IMPROVED_ILLUSIONS_BANNER)).toBeInTheDocument();
   });
 
-  describe('Both Psychic Spells and Improved Illusions banners', () => {
-    it('shows both banners when warlock has both passives and casts an illusion spell', () => {
-      const warlockStats = {
-        ...baseMockPlayerStats,
-        class: { name: 'Warlock', major: { name: 'Warlock' } },
-        automation: {
-          passives: [
-            { type: 'psychic_spells' },
-            { type: 'improved_illusions' },
-          ],
-          actions: [],
-        },
-      };
+  it('does not show the banner when the caster lacks the improved_illusions passive', () => {
+    renderPopup(makeSpell(), makeIllusionistStats([]));
 
-      renderPopup(illusionSpell, warlockStats, mockCampaignName);
-      expect(screen.getByText('No Verbal or Somatic components (Psychic Spells)')).toBeInTheDocument();
-      expect(screen.getByText('No Verbal components (Improved Illusions)')).toBeInTheDocument();
-    });
+    expect(screen.queryByText(IMPROVED_ILLUSIONS_BANNER)).not.toBeInTheDocument();
+  });
 
-    it('shows only psychic spells banner for enchantment spell with psychic spells but no improved illusions', () => {
-      const warlockStats = {
-        ...baseMockPlayerStats,
-        class: { name: 'Warlock', major: { name: 'Warlock' } },
-        automation: {
-          passives: [{ type: 'psychic_spells' }],
-          actions: [],
-        },
-      };
+  it('shows the banner regardless of character class — keyed on the passive, not Warlock', () => {
+    const warlockWithPassive = {
+      ...makeIllusionistStats(),
+      class: { name: 'Warlock', major: { name: 'Warlock' } },
+    };
 
-      const enchantmentSpell = {
-        ...baseMockSpell,
-        name: 'Bane',
-        level: 1,
-        school: 'Enchantment',
-      };
+    renderPopup(makeSpell(), warlockWithPassive);
 
-      renderPopup(enchantmentSpell, warlockStats, mockCampaignName);
-      expect(screen.getByText('No Verbal or Somatic components (Psychic Spells)')).toBeInTheDocument();
-      expect(screen.queryByText('No Verbal components (Improved Illusions)')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText(IMPROVED_ILLUSIONS_BANNER)).toBeInTheDocument();
+  });
 
-    it('shows only psychic spells banner for enchantment spell with both passives', () => {
-      const warlockStats = {
-        ...baseMockPlayerStats,
-        class: { name: 'Warlock', major: { name: 'Warlock' } },
-        automation: {
-          passives: [
-            { type: 'psychic_spells' },
-            { type: 'improved_illusions' },
-          ],
-          actions: [],
-        },
-      };
+  it.each(['Evocation', 'Necromancy', 'Abjuration'])(
+    'does not show the banner for a %s spell even with the passive',
+    (school) => {
+      renderPopup(makeSpell({ name: 'Magic Missile', school }), makeIllusionistStats());
 
-      const enchantmentSpell = {
-        ...baseMockSpell,
-        name: 'Bane',
-        level: 1,
-        school: 'Enchantment',
-      };
+      expect(screen.queryByText(IMPROVED_ILLUSIONS_BANNER)).not.toBeInTheDocument();
+    }
+  );
 
-      renderPopup(enchantmentSpell, warlockStats, mockCampaignName);
-      expect(screen.getByText('No Verbal or Somatic components (Psychic Spells)')).toBeInTheDocument();
-      expect(screen.queryByText('No Verbal components (Improved Illusions)')).not.toBeInTheDocument();
-    });
+  it.each([
+    { label: 'null', school: null },
+    { label: 'undefined', school: undefined },
+    { label: 'an empty string', school: '' },
+  ])('does not show the banner when spell.school is $label', ({ school }) => {
+    renderPopup(makeSpell({ school }), makeIllusionistStats());
+
+    expect(screen.queryByText(IMPROVED_ILLUSIONS_BANNER)).not.toBeInTheDocument();
+  });
+
+  it('matches the Illusion school case-insensitively', () => {
+    renderPopup(makeSpell({ school: 'illusion' }), makeIllusionistStats());
+
+    expect(screen.getByText(IMPROVED_ILLUSIONS_BANNER)).toBeInTheDocument();
+  });
+});
+
+describe('SpellDetailPopup - Improved Illusions alongside Psychic Spells', () => {
+  // Psychic Spells is a Warlock feature and additionally requires the class,
+  // so these interplay cases use a warlock holding both passives.
+  function makeWarlockWithBothPassives() {
+    return {
+      ...makeIllusionistStats([
+        { type: 'psychic_spells' },
+        { type: 'improved_illusions' },
+      ]),
+      class: { name: 'Warlock', major: { name: 'Warlock' } },
+      abilities: [{ name: 'Charisma', bonus: 3 }],
+    };
+  }
+
+  it('shows both banners for an Illusion spell with both passives', () => {
+    renderPopup(makeSpell(), makeWarlockWithBothPassives());
+
+    expect(screen.getByText(PSYCHIC_SPELLS_BANNER)).toBeInTheDocument();
+    expect(screen.getByText(IMPROVED_ILLUSIONS_BANNER)).toBeInTheDocument();
+  });
+
+  it('shows only the Psychic Spells banner for an Enchantment spell with both passives', () => {
+    renderPopup(
+      makeSpell({ name: 'Bane', school: 'Enchantment' }),
+      makeWarlockWithBothPassives()
+    );
+
+    expect(screen.getByText(PSYCHIC_SPELLS_BANNER)).toBeInTheDocument();
+    expect(screen.queryByText(IMPROVED_ILLUSIONS_BANNER)).not.toBeInTheDocument();
   });
 });

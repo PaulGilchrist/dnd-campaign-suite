@@ -1,15 +1,36 @@
+// @improved-by-ai
+/**
+ * CharSpells rendering tests: how a spell row READS — effect labels, level,
+ * duration/time/notes formatting, the prepared cell, popup-open behaviour on
+ * overlay clicks, and the abilities summary values.
+ *
+ * Deliberately NOT re-tested here (covered by sibling suites):
+ * - table headers, sorting, prepared-checkbox toggling, 2024 wizard gating,
+ *   empty-list hiding → CharSpells.Table.test.jsx
+ * - attack-header roll seam, prepared filter toggle → CharSpells.Interactions.test.jsx
+ * - cast routing, metamagic / target-selection / restoration popups
+ *   → CharSpells.Popups.*.test.jsx and CharSpells.getTargetInfo.*.test.jsx
+ *
+ * Notes vs the previous version:
+ * - The old vi.mock('../common/Popup.jsx') pointed at a path that does not
+ *   exist (the real overlay lives in src/components/common/popup.jsx), so it
+ *   never took effect — the overlay-click test always exercised the real
+ *   Popup. That dead mock is removed; everything else mocks less.
+ * - Cell assertions now locate the named column via its columnheader instead
+ *   of scanning all td text with toContain(''), so an empty cell in the WRONG
+ *   column can no longer pass the test.
+ */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpells from './CharSpells.jsx';
-import * as helpers from './CharSpells.test-utils.js';
+import { mockPlayerStats, mockPlayerStats2024 } from './CharSpells.test-utils.js';
+import { isSpellBreakerBonusActionSpell } from '../../../services/ui/spellSectionUtils.js';
 
-const { useSpellMetamagicFlow } = vi.hoisted(() => ({
-  useSpellMetamagicFlow: vi.fn(() => ({
-    gateMetamagic: vi.fn(),
-    buildUpcastLevels: vi.fn(() => []),
-  })),
-}));
+const CAMPAIGN = 'test-campaign';
 
+// --- seams: deterministic, inert scaffolding for a pure rendering test ---
+// The roll/cast hooks never fire here (no cast clicks in this suite); they
+// are stubbed only to keep dice/network code out of the render path.
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn(() => []),
   getRuntimeValue: vi.fn(() => null),
@@ -17,7 +38,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
-  default: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn() })),
+  default: vi.fn(),
 }));
 
 vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
@@ -30,76 +51,34 @@ vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
   })),
 }));
 
-vi.mock('../../../hooks/combat/DiceRollContext.js', () => ({
-  useDiceRollPopup: vi.fn(() => ({ setPopupHtml: vi.fn() })),
+vi.mock('../../../hooks/combat/useSpellMetamagicFlow.js', () => ({
+  useSpellMetamagicFlow: vi.fn(() => ({})),
 }));
 
-vi.mock('../../../hooks/combat/useSpellCastExecutor.js', () => ({
-  useSpellCastExecutor: vi.fn(() => ({ castAction: vi.fn() })),
-}));
-
-vi.mock('../../../hooks/combat/useSpellPositionResolver.js', () => ({
-  useSpellPositionResolver: vi.fn(() => ({
-    resolvePositions: vi.fn(() => Promise.resolve()),
-    cachedPosRef: { current: null },
-  })),
-}));
-
-vi.mock('../../../hooks/combat/useDiceRoll.js', () => ({
-  useDiceRoll: vi.fn(() => ({
-    popupHtml: null,
-    setPopupHtml: vi.fn(),
-    rollAttack: vi.fn(),
-    rollDamage: vi.fn(),
-  })),
-}));
-
-vi.mock('../../../hooks/combat/useMetamagic.js', () => ({
-  getCurrentSorceryPoints: vi.fn(() => 3),
-  getMaxSorceryPoints: vi.fn(() => 6),
-  spendSorceryPoints: vi.fn(),
-}));
-
-vi.mock('../../../hooks/combat/useSpellMetamagicFlow.js', () => ({ useSpellMetamagicFlow }));
-
+// buildUpcastLevels must be callable: the open SpellDetailPopup receives it.
 vi.mock('../../../hooks/combat/useSpellUpcastFlow.js', () => ({
   useSpellUpcastFlow: vi.fn(() => ({
     pendingUpcast: null,
     buildUpcastLevels: vi.fn(() => []),
-    gateUpcast: vi.fn(() => false),
-    handleUpcastConfirm: vi.fn(),
-    handleUpcastCancel: vi.fn(),
-    getCantripAutoLevel: vi.fn(() => null),
   })),
-}));
-
-vi.mock('../../../services/dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(() => ({ total: 8, rolls: [4, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 16, rolls: [4, 4, 4, 4], modifier: 0 })),
-  rollExpressionMaximized: vi.fn(() => ({ total: 24, rolls: [6, 6, 6, 6], modifier: 0 })),
-}));
-
-vi.mock('../../../services/ui/sanitize.js', () => ({
-  sanitizeHtml: vi.fn((html) => html),
 }));
 
 vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn().mockResolvedValue(null),
   getTargetFromAttacker: vi.fn(() => null),
+  getAttackerTargetName: vi.fn(() => null),
 }));
 
 vi.mock('../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({ creatures: [] })),
 }));
 
-vi.mock('../../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue({ players: [], placedItems: [] }),
-}));
-
 vi.mock('../../../services/rules/combat/rangeValidation.js', () => ({
   getNearestPlacedItem: vi.fn(() => null),
+  rangeToFeet: vi.fn(() => null),
 }));
 
+// No spells are routed out of this section, and no Spell Breaker remap.
 vi.mock('../../../services/ui/spellSectionUtils.js', () => ({
   getExcludedSpellNames: vi.fn(() => new Set()),
   isSpellBreakerBonusActionSpell: vi.fn(() => false),
@@ -109,24 +88,7 @@ vi.mock('../../../services/combat/buffs/buffService.js', () => ({
   isInnateSorceryActive: vi.fn(() => false),
 }));
 
-vi.mock('../../../services/ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
-  applyDamageToTarget: vi.fn(() => ({ finalDamage: 0 })),
-}));
-
-vi.mock('../../../services/automation/handlers/spells/shapechangeService.js', () => ({
-  confirmShapechangeTransform: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
-  prepareSpellCast: vi.fn().mockResolvedValue(undefined),
-  isFreeCastAuthorized: vi.fn(() => false),
-  isWizardRitualAdeptSpell: vi.fn(() => false),
-}));
-
+// --- child components with their own suites: replace with inert stubs ---
 vi.mock('./SpellDetailPopup.jsx', () => ({
   default: function SpellDetailPopup({ spell }) {
     return <div data-testid="spell-detail-popup">{spell?.name}</div>;
@@ -139,485 +101,383 @@ vi.mock('./CharSpellSlots.jsx', () => ({
   },
 }));
 
-vi.mock('./CharSpellSlotLevel.jsx', () => ({
-  default: function CharSpellSlotLevel() {
-    return <div data-testid="char-spell-slot-level">SlotLevel</div>;
-  },
-}));
-
 vi.mock('../popups/MetamagicPopup.jsx', () => ({
   default: function MetamagicPopup() {
-    return <div data-testid="metamagic-popup">Metamagic</div>;
+    return <div data-testid="metamagic-popup" />;
   },
 }));
 
 vi.mock('../popups/MultiTargetPopup.jsx', () => ({
   default: function MultiTargetPopup() {
-    return <div data-testid="multi-target-popup">MultiTarget</div>;
+    return <div data-testid="multi-target-popup" />;
   },
 }));
 
 vi.mock('../popups/MultiTargetCountPopup.jsx', () => ({
   default: function MultiTargetCountPopup() {
-    return <div data-testid="aid-target-popup">Aid</div>;
+    return <div data-testid="aid-target-popup" />;
   },
 }));
 
 vi.mock('../popups/TargetWithCheckboxesPopup.jsx', () => ({
   default: function TargetWithCheckboxesPopup() {
-    return <div data-testid="greater-restoration-popup">GreaterRestoration</div>;
+    return <div data-testid="greater-restoration-popup" />;
   },
 }));
 
 vi.mock('../popups/SingleTargetPopup.jsx', () => ({
   default: function SingleTargetPopup() {
-    return <div data-testid="mage-armor-popup">MageArmor</div>;
+    return <div data-testid="mage-armor-popup" />;
   },
 }));
 
 vi.mock('../popups/TargetWithTypePopup.jsx', () => ({
   default: function TargetWithTypePopup() {
-    return <div data-testid="protection-from-energy-popup">ProtectionFromEnergy</div>;
+    return <div data-testid="protection-from-energy-popup" />;
   },
 }));
 
 vi.mock('../popups/MagicMissileTargetPopup.jsx', () => ({
   default: function MagicMissileTargetPopup() {
-    return <div data-testid="magic-missile-popup">MagicMissile</div>;
+    return <div data-testid="magic-missile-popup" />;
   },
 }));
 
 vi.mock('./UpcastPopup.jsx', () => ({
   default: function UpcastPopup() {
-    return <div data-testid="upcast-popup">Upcast</div>;
+    return <div data-testid="upcast-popup" />;
   },
 }));
 
-vi.mock('../DiceRollResult.jsx', () => ({
-  default: function DiceRollResult() {
-    return <div data-testid="dice-roll-result">DiceRollResult</div>;
-  },
-}));
+// NOTE: ../common/Popup.jsx is intentionally NOT mocked. The detail popup is
+// wrapped by the REAL overlay (src/components/common/popup.jsx) so the
+// overlay-click behaviour below tests production wiring.
 
-vi.mock('../common/Popup.jsx', () => ({
-  default: function Popup({ children }) {
-    return <div data-testid="popup">{children}</div>;
-  },
-}));
-
-vi.mock('../popups/TruePolymorphPathModal.jsx', () => ({
-  default: function TruePolymorphPathModal() {
-    return <div data-testid="true-polymorph-path-modal">TruePolymorphPath</div>;
-  },
-}));
-
-vi.mock('../modals/shared/SecondaryTargetModal.jsx', () => ({
-  default: function SecondaryTargetModal() {
-    return <div data-testid="secondary-target-modal">SecondaryTarget</div>;
-  },
-}));
-
-vi.mock('../modals/shared/CreatureSelectionModal.jsx', () => ({
-  default: function CreatureSelectionModal() {
-    return <div data-testid="creature-selection-modal">CreatureSelection</div>;
-  },
-}));
-
-vi.mock('../modals/SingleResistanceSelectionModal.jsx', () => ({
-  default: function SingleResistanceSelectionModal() {
-    return <div data-testid="single-resistance-selection-modal">SingleResistance</div>;
-  },
-}));
-
-vi.mock('../modals/HexAbilityModal.jsx', () => ({
-  default: function HexAbilityModal() {
-    return <div data-testid="hex-ability-modal">HexAbility</div>;
-  },
-}));
-
-const basePlayerStats = helpers.mockPlayerStats;
-const baseProps = { playerStats: basePlayerStats, campaignName: 'test' };
-
-function renderWithProps(props) {
-  return render(<CharSpells {...baseProps} {...props} />);
-}
-
-// Helper to create a minimal stats object with a single spell, replacing the default spells list.
-function statsWithSpell(spell) {
+// --- fixtures ---
+function makeSpell(overrides = {}) {
   return {
-    ...basePlayerStats,
-    spellAbilities: {
-      ...basePlayerStats.spellAbilities,
-      spells: [spell],
-    },
+    name: 'Test Spell',
+    level: 1,
+    casting_time: '1 action',
+    range: 'Self',
+    duration: 'Instantaneous',
+    components: ['V'],
+    prepared: 'Always',
+    ...overrides,
   };
 }
 
-describe('CharSpells - Rendering Edge Cases', () => {
+function renderWithSpells(spells, { stats: statsOverrides = {}, props = {} } = {}) {
+  const playerStats = {
+    ...mockPlayerStats,
+    ...statsOverrides,
+    spellAbilities: { ...mockPlayerStats.spellAbilities, spells },
+  };
+  return render(
+    <CharSpells
+      playerStats={playerStats}
+      campaignName={CAMPAIGN}
+      handleTogglePreparedSpells={vi.fn()}
+      {...props}
+    />
+  );
+}
+
+/** Render one spell and return the text of the given named column. */
+function cellText(spell, header, statsOverrides = {}) {
+  renderWithSpells([spell], { stats: statsOverrides });
+  return readCell(spell.name, header);
+}
+
+function readCell(spellName, header) {
+  const headers = screen.getAllByRole('columnheader').map((th) => th.textContent.trim());
+  const idx = headers.indexOf(header);
+  expect(idx, `column "${header}" should exist`).toBeGreaterThan(-1);
+  const row = screen.getAllByRole('row').find((r) => r.cells[0]?.textContent.trim() === spellName);
+  expect(row, `row for "${spellName}" should exist`).toBeTruthy();
+  return row.cells[idx].textContent;
+}
+
+/** Render one spell and return its <td> for the given named column. */
+function cellElement(spell, header) {
+  renderWithSpells([spell]);
+  const headers = screen.getAllByRole('columnheader').map((th) => th.textContent.trim());
+  const row = screen.getAllByRole('row').find((r) => r.cells[0]?.textContent.trim() === spell.name);
+  return row.cells[headers.indexOf(header)];
+}
+
+describe('CharSpells - spell row rendering', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks does not reset implementations; restore the Spell Breaker
+    // stub's default in case a test overrode it.
+    isSpellBreakerBonusActionSpell.mockImplementation(() => false);
   });
 
-  describe('spell effect rendering', () => {
-    it('renders damage with DEX half save DC', () => {
-      const spell = {
-        name: 'Cone of Cold',
-        level: 2,
-        casting_time: '1 turn',
-        range: 'Self',
-        duration: 'Instantaneous',
-        components: ['V', 'S', 'M'],
+  describe('effect column', () => {
+    it.each`
+      dc_success   | dcType   | expected
+      ${'half'}    | ${'DEX'} | ${'3d8 Cold (DEX half)'}
+      ${'negates'} | ${'CON'} | ${'1d6 Cold (CON negates)'}
+    `('shows damage with save as "$expected" (save succeeds: $dc_success)', ({ dc_success, dcType, expected }) => {
+      const spell = makeSpell({
         damage: {
-          damage_at_slot_level: { '2': '3d8' },
+          damage_at_slot_level: { '2': dc_success === 'half' ? '3d8' : '1d6' },
           damage_type: 'Cold',
         },
-        dc: { dc_type: 'DEX', dc_success: 'half' },
-        prepared: 'Prepared',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      expect(screen.getByText('3d8 Cold (DEX half)')).toBeInTheDocument();
+        dc: { dc_type: dcType, dc_success },
+      });
+      expect(cellText(spell, 'Effect')).toBe(expected);
     });
 
-    it('renders damage with CON negates save DC', () => {
-      const spell = {
-        name: 'Frostbite',
-        level: 0,
-        casting_time: '1 turn',
-        range: '60 feet',
-        duration: 'Instantaneous',
-        components: ['V', 'S'],
-        damage: {
-          damage_at_slot_level: { '1': '1d6' },
-          damage_type: 'Cold',
-        },
-        dc: { dc_type: 'CON', dc_success: 'negates' },
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      expect(screen.getByText('1d6 Cold (CON negates)')).toBeInTheDocument();
-    });
-
-    it('renders damage from damage_at_character_level when damage_at_slot_level is absent', () => {
-      const spell = {
-        name: 'Character Level Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: '60 feet',
-        duration: 'Instantaneous',
-        components: ['V'],
+    it('falls back to damage_at_character_level when damage_at_slot_level is absent', () => {
+      const spell = makeSpell({
         damage: {
           damage_at_character_level: { '1': '3d6' },
           damage_type: 'Thunder',
         },
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      expect(screen.getByText('3d6 Thunder')).toBeInTheDocument();
+      });
+      expect(cellText(spell, 'Effect')).toBe('3d6 Thunder');
     });
 
-    it('renders Utility when spell has no damage and no DC', () => {
-      const spell = {
-        name: 'Comprehend Languages',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        duration: '1 hour',
-        components: ['S'],
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      expect(screen.getByText('Utility')).toBeInTheDocument();
+    it('uses damage_at_character_level when damage_at_slot_level is an empty map', () => {
+      const spell = makeSpell({
+        damage: {
+          damage_at_slot_level: {},
+          damage_at_character_level: { '1': '2d6' },
+          damage_type: 'Necrotic',
+        },
+      });
+      expect(cellText(spell, 'Effect')).toBe('2d6 Necrotic');
     });
 
-    it('renders Utility when damage property is null or empty object', () => {
-      const spell = {
-        name: 'Null Damage Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        duration: 'Instantaneous',
-        components: ['V'],
-        damage: null,
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      expect(screen.getByText('Utility')).toBeInTheDocument();
+    it.each([undefined, null, {}])('shows Utility when damage is %s', (damage) => {
+      expect(cellText(makeSpell({ damage }), 'Effect')).toBe('Utility');
     });
 
-    it('renders cantrip damage using highest level at or below player level', () => {
-      const cantrip = {
+    it.each`
+      level | expected
+      ${1}  | ${'1d10 Fire'}
+      ${5}  | ${'2d10 Fire'}
+      ${11} | ${'3d10 Fire'}
+      ${17} | ${'4d10 Fire'}
+    `('scales cantrip damage at character level $level to $expected', ({ level, expected }) => {
+      const cantrip = makeSpell({
         name: 'Fire Bolt',
         level: 0,
-        casting_time: '1 turn',
-        range: '120 feet',
-        duration: 'Instantaneous',
-        components: ['V', 'S'],
         damage: {
-          damage_at_slot_level: { '1': '1d10', '5': '2d10', '11': '3d10' },
+          damage_at_slot_level: { '1': '1d10', '5': '2d10', '11': '3d10', '17': '4d10' },
           damage_type: 'Fire',
         },
-        prepared: 'Always',
-      };
-      const stats = {
-        ...basePlayerStats,
-        level: 5,
-        spellAbilities: { ...basePlayerStats.spellAbilities, spells: [cantrip] },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      expect(screen.getByText('2d10 Fire')).toBeInTheDocument();
+      });
+      expect(cellText(cantrip, 'Effect', { level })).toBe(expected);
     });
 
-    it('falls back to first damage key when player level is below all cantrip damage keys', () => {
-      const cantrip = {
+    it('falls back to the lowest authored level when the character is below every damage tier', () => {
+      const cantrip = makeSpell({
         name: 'Custom Cantrip',
         level: 0,
-        casting_time: '1 turn',
-        range: 'Self',
-        duration: 'Instantaneous',
-        components: ['V'],
         damage: {
           damage_at_slot_level: { '5': '2d10', '11': '3d10' },
           damage_type: 'Lightning',
         },
-        prepared: 'Always',
-      };
-      const stats = {
-        ...basePlayerStats,
-        level: 0,
-        spellAbilities: { ...basePlayerStats.spellAbilities, spells: [cantrip] },
-      };
-      render(<CharSpells playerStats={stats} campaignName="test" />);
-      expect(screen.getByText('2d10 Lightning')).toBeInTheDocument();
+      });
+      expect(cellText(cantrip, 'Effect', { level: 0 })).toBe('2d10 Lightning');
+    });
+
+    it('shows a Circle of the Land fixed-level spell at its stamped level, not the first damage tier (CLA-050)', () => {
+      const spell = makeSpell({
+        name: 'Spike Growth',
+        level: 3,
+        _circleOfTheLandFixedLevel: 3,
+        damage: {
+          damage_at_slot_level: { '1': '2d8', '3': '3d8' },
+          damage_type: 'Piercing',
+        },
+      });
+      expect(cellText(spell, 'Effect', { level: 10 })).toBe('3d8 Piercing');
+    });
+
+    it('shows an unstamped spell at its first authored damage tier', () => {
+      const spell = makeSpell({
+        name: 'Spike Growth',
+        level: 3,
+        damage: {
+          damage_at_slot_level: { '1': '2d8', '3': '3d8' },
+          damage_type: 'Piercing',
+        },
+      });
+      expect(cellText(spell, 'Effect', { level: 10 })).toBe('2d8 Piercing');
     });
 
     it.each`
-      dc_success    | expectedOutput
-      ${'half'}     | ${'WIS half'}
-      ${'negates'}  | ${'WIS negates'}
-    `('renders DC-only effect (no damage) with $dc_success success', ({ dc_success, expectedOutput }) => {
-      const spell = {
-        name: 'DC Effect Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: '60 feet',
-        duration: '1 minute',
-        components: ['V'],
-        dc: { dc_type: 'WIS', dc_success },
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      expect(screen.getByText(expectedOutput)).toBeInTheDocument();
-    });
-  });
-
-  describe('duration formatting', () => {
-    it.each`
-      durationInput                         | expectedOutput
-      ${'1 minute'}                         | ${'1 min'}
-      ${'10 minutes'}                       | ${'10 mins'}
-      ${'up to 1 hour'}                     | ${'1 hour'}
-      ${'Instantaneous'}                    | ${'Instant'}
-      ${'Concentration, up to 10 minutes'}  | ${'Concentration, 10 mins'}
-      ${'1 hour'}                           | ${'1 hour'}
-    `('formats duration "$durationInput" as "$expectedOutput"', ({ durationInput, expectedOutput }) => {
-      const spell = {
-        name: 'Duration Test Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        duration: durationInput,
-        components: ['V'],
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      expect(screen.getByText(expectedOutput)).toBeInTheDocument();
-    });
-
-    it('renders empty cell when duration property is missing or null', () => {
-      const spell = {
-        name: 'No Duration Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        duration: null,
-        components: ['V'],
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      const table = screen.getByRole('table');
-      const allCellTexts = Array.from(table.querySelectorAll('tbody td')).map(td => td.textContent.trim());
-      expect(allCellTexts).toContain('');
-    });
-  });
-
-  describe('casting time formatting', () => {
-    it('abbreviates "1 action" to "1  A" (double space)', async () => {
-      const spell = {
-        name: 'Casting Time Test Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        duration: 'Instantaneous',
-        components: ['V'],
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      const table = await screen.findByRole('table');
-      const row = Array.from(table.querySelectorAll('tbody tr')).find(r => r.textContent.includes('Casting Time Test Spell'));
-      const cells = Array.from(row.querySelectorAll('td'));
-      expect(cells[3].textContent).toBe('1  A');
-    });
-
-    it('abbreviates "1 bonus action" to "1 BA"', async () => {
-      const spell = {
-        name: 'Bonus Action Test',
-        level: 1,
-        casting_time: '1 bonus action',
-        range: 'Self',
-        duration: 'Instantaneous',
-        components: ['V'],
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      expect(await screen.findByText('1 BA')).toBeInTheDocument();
-    });
-
-    it('abbreviates "1 reaction" to "1 Reaction"', async () => {
-      const spell = {
-        name: 'Reaction Test',
-        level: 1,
-        casting_time: '1 reaction',
-        range: 'Self',
-        duration: 'Instantaneous',
-        components: ['V'],
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      expect(await screen.findByText('1 Reaction')).toBeInTheDocument();
-    });
-
-    it('renders empty cell when casting_time is missing or null', () => {
-      const spell = {
-        name: 'No Casting Time Spell',
-        level: 1,
-        casting_time: null,
-        range: 'Self',
-        duration: 'Instantaneous',
-        components: ['V'],
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      const table = screen.getByRole('table');
-      const allCellTexts = Array.from(table.querySelectorAll('tbody td')).map(td => td.textContent.trim());
-      expect(allCellTexts).toContain('');
-    });
-  });
-
-  describe('notes formatting', () => {
-    it.each`
-      components                        | expectedNotes
-      ${['V', 'S', 'M']}                | ${'V/S/M'}
-      ${['V', 'S']}                     | ${'V/S'}
-      ${['V', 'M']}                     | ${'V/M'}
-      ${['V', 'Concentration']}         | ${'V/Con'}
-      ${['S', 'M', 'Concentration']}    | ${'S/M/Con'}
-    `('formats components $components as notes "$expectedNotes"', ({ components, expectedNotes }) => {
-      const spell = {
-        name: 'Notes Test Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        duration: 'Instantaneous',
-        components,
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      expect(screen.getByText(expectedNotes)).toBeInTheDocument();
+      className | level | expected
+      ${'Ranger'} | ${20} | ${'1d10 Piercing'}
+      ${'Ranger'} | ${19} | ${'1d6 Piercing'}
+      ${'Rogue'}  | ${20} | ${'1d6 Piercing'}
+    `("shows Hunter's Mark as $expected for a level $level $className", ({ className, level, expected }) => {
+      const spell = makeSpell({
+        name: "Hunter's Mark",
+        damage: { damage_at_slot_level: { '1': '1d6' }, damage_type: 'Piercing' },
+      });
+      expect(cellText(spell, 'Effect', { level, class: { name: className } })).toBe(expected);
     });
 
     it.each`
-      components
-      ${[]}
-      ${null}
-      ${undefined}
-    `('renders empty notes cell for components: $components', ({ components }) => {
-      const spell = {
-        name: 'Empty Components Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        duration: 'Instantaneous',
-        components,
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      const table = screen.getByRole('table');
-      const allCellTexts = Array.from(table.querySelectorAll('tbody td')).map(td => td.textContent.trim());
-      expect(allCellTexts).toContain('');
+      dc_success   | expected
+      ${'half'}    | ${'WIS half'}
+      ${'negates'} | ${'WIS negates'}
+      ${'none'}    | ${'WIS'}
+    `('shows DC-only effect as "$expected" (no damage)', ({ dc_success, expected }) => {
+      const spell = makeSpell({ dc: { dc_type: 'WIS', dc_success } });
+      expect(cellText(spell, 'Effect')).toBe(expected);
     });
   });
 
-  describe('spell row prepared logic', () => {
-    it('renders checkbox for spells with empty prepared string', () => {
-      const spell = {
-        name: 'Empty Prepared Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        duration: 'Instantaneous',
-        components: ['V'],
-        prepared: '',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      const checkboxes = screen.getAllByRole('checkbox');
-      expect(checkboxes).toHaveLength(1);
-    });
-
-    it('does not render checkbox for spells with "Always" prepared value', () => {
-      const spell = {
-        name: 'Always Prepared Spell',
-        level: 1,
-        casting_time: '1 action',
-        range: 'Self',
-        duration: 'Instantaneous',
-        components: ['V'],
-        prepared: 'Always',
-      };
-      render(<CharSpells playerStats={statsWithSpell(spell)} campaignName="test" />);
-      const checkboxes = screen.queryAllByRole('checkbox');
-      expect(checkboxes).toHaveLength(0);
+  describe('level column', () => {
+    it('shows "Cantrip" for level 0 and the numeric level otherwise', () => {
+      renderWithSpells([
+        makeSpell({ name: 'Light', level: 0 }),
+        makeSpell({ name: 'Detect Magic', level: 1 }),
+      ]);
+      expect(readCell('Light', 'Level')).toBe('Cantrip');
+      expect(readCell('Detect Magic', 'Level')).toBe('1');
     });
   });
 
-  describe('spell popup close', () => {
-    it('does not close the spell detail popup when the popup overlay is clicked', () => {
-      renderWithProps({});
-      const lightCell = screen.getByText('Light');
-      fireEvent.click(lightCell);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+  describe('duration column', () => {
+    it.each`
+      duration                             | expected
+      ${'1 minute'}                        | ${'1 min'}
+      ${'10 minutes'}                      | ${'10 mins'}
+      ${'up to 1 hour'}                    | ${'1 hour'}
+      ${'1 hour'}                          | ${'1 hour'}
+      ${'Instantaneous'}                   | ${'Instant'}
+      ${'Concentration, up to 10 minutes'} | ${'Concentration, 10 mins'}
+      ${'Concentration, up to 1 hour'}   | ${'Concentration, 1 hour'}
+    `('formats duration "$duration" as "$expected"', ({ duration, expected }) => {
+      expect(cellText(makeSpell({ duration }), 'Duration')).toBe(expected);
+    });
 
-      const popupOverlay = screen.getByTestId('popup-overlay');
-      fireEvent.click(popupOverlay);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+    it.each([null, undefined])('leaves the duration cell empty when duration is %s', (duration) => {
+      expect(cellText(makeSpell({ duration }), 'Duration')).toBe('');
     });
   });
 
-  describe('spell abilities section info', () => {
-    it('renders cantrips_known count', () => {
-      renderWithProps({});
-      expect(screen.getByText('Cantrips Known:')).toBeInTheDocument();
+  describe('time column', () => {
+    it.each`
+      casting_time     | pattern
+      ${'1 action'}     | ${/^1\s+A$/}
+      ${'1 bonus action'} | ${/^1\s+BA$/}
+      ${'1 reaction'}   | ${/^1\s+Reaction$/}
+      ${'1 minute'}     | ${/^1\s+min$/}
+      ${'10 minutes'}   | ${/^10\s+min$/}
+      ${'1 turn'}       | ${/^1\s+turn$/}
+    `('abbreviates casting time "$casting_time" to $pattern', ({ casting_time, pattern }) => {
+      expect(cellText(makeSpell({ casting_time }), 'Time')).toMatch(pattern);
     });
 
-    it('renders prepared_spells info for 5e', () => {
-      renderWithProps({});
-      expect(screen.getByText(/Prepared Spells:/)).toBeInTheDocument();
-      expect(screen.getByText(/Max Prepared:/)).toBeInTheDocument();
+    it('routes Spell Breaker spells through the bonus-action remap in the time column (CLA-322)', () => {
+      // The remap replaces the whole casting_time with 'bonus action', which
+      // formats to 'BA' (the '1 ' prefix is dropped by current production
+      // formatting — tolerated by the optional group so a cosmetic fix there
+      // will not break this wiring test).
+      isSpellBreakerBonusActionSpell.mockImplementation((_stats, name) => name === 'Dispel Magic');
+      const spell = makeSpell({ name: 'Dispel Magic', casting_time: '1 action' });
+      expect(cellText(spell, 'Time')).toMatch(/^(1\s+)?BA$/);
+      isSpellBreakerBonusActionSpell.mockImplementation(() => false);
     });
 
-    it('does not render prepared_spells info for 2024 non-wizard', () => {
-      renderWithProps({ playerStats: helpers.mockPlayerStats2024 });
+    it.each([null, undefined])('leaves the time cell empty when casting_time is %s', (casting_time) => {
+      expect(cellText(makeSpell({ casting_time }), 'Time')).toBe('');
+    });
+  });
+
+  describe('notes column', () => {
+    it.each`
+      components                      | expected
+      ${['V', 'S', 'M']}            | ${'V/S/M'}
+      ${['V', 'S']}                 | ${'V/S'}
+      ${['V', 'M']}                 | ${'V/M'}
+      ${['V', 'Concentration']}     | ${'V/Con'}
+      ${['S', 'M', 'Concentration']} | ${'S/M/Con'}
+    `('formats components $components as "$expected"', ({ components, expected }) => {
+      expect(cellText(makeSpell({ components }), 'Notes')).toBe(expected);
+    });
+
+    it.each([[], null, undefined])('leaves the notes cell empty when components is %s', (components) => {
+      expect(cellText(makeSpell({ components }), 'Notes')).toBe('');
+    });
+  });
+
+  describe('prepared column', () => {
+    it('renders an unchecked checkbox for an unprepared spell (prepared: "")', () => {
+      const cell = cellElement(makeSpell({ prepared: '' }), 'Prepared');
+      const checkbox = cell.querySelector('input[type="checkbox"]');
+      expect(checkbox).toBeInTheDocument();
+      expect(checkbox).not.toBeChecked();
+      expect(screen.queryAllByRole('checkbox')).toHaveLength(1);
+    });
+
+    it.each(['Always', 'Innate', 'Ritual Only'])('shows the text "%s" without a checkbox', (prepared) => {
+      expect(cellText(makeSpell({ prepared }), 'Prepared')).toBe(prepared);
+      expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    });
+  });
+
+  describe('spell detail popup', () => {
+    it('keeps the detail popup open when the overlay backdrop is clicked', () => {
+      renderWithSpells([makeSpell({ name: 'Light' })]);
+
+      fireEvent.click(screen.getByText('Light'));
+      expect(screen.getByTestId('spell-detail-popup')).toHaveTextContent('Light');
+
+      // The detail popup deliberately hides its own close button; clicking
+      // the backdrop of the REAL overlay must not dismiss the spell detail.
+      fireEvent.click(screen.getByTestId('popup-overlay'));
+      expect(screen.getByTestId('spell-detail-popup')).toHaveTextContent('Light');
+    });
+  });
+
+  describe('spell abilities summary', () => {
+    it('shows cantrip, prepared, and max-prepared counts from spellAbilities', () => {
+      renderWithSpells([makeSpell()]);
+      const summary = screen.getByText('Cantrips Known:').parentElement;
+      expect(summary).toHaveTextContent(/Cantrips Known:\s*3/);
+      expect(summary).toHaveTextContent(/Prepared Spells:\s*5/);
+      expect(summary).toHaveTextContent(/Max Prepared:\s*5/);
+    });
+
+    it('shows "All" for prepared counts when they are not tracked', () => {
+      render(<CharSpells
+        playerStats={{
+          ...mockPlayerStats,
+          spellAbilities: {
+            toHit: 5,
+            modifier: 3,
+            saveDc: 13,
+            cantrips_known: 2,
+            spells: [makeSpell()],
+          },
+        }}
+        campaignName={CAMPAIGN}
+        handleTogglePreparedSpells={vi.fn()}
+      />);
+      const summary = screen.getByText('Cantrips Known:').parentElement;
+      expect(summary).toHaveTextContent(/Cantrips Known:\s*2/);
+      expect(summary).toHaveTextContent(/Prepared Spells:\s*All/);
+      expect(summary).toHaveTextContent(/Max Prepared:\s*All/);
+    });
+
+    it('omits the prepared counts for 2024 non-wizards but keeps cantrips known', () => {
+      render(<CharSpells
+        playerStats={mockPlayerStats2024}
+        campaignName={CAMPAIGN}
+        handleTogglePreparedSpells={vi.fn()}
+      />);
       expect(screen.queryByText(/Prepared Spells:/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Max Prepared:/)).not.toBeInTheDocument();
+      expect(screen.getByText('Cantrips Known:').parentElement).toHaveTextContent(/Cantrips Known:\s*3/);
     });
   });
 });

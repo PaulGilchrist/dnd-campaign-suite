@@ -1,25 +1,30 @@
+// @improved-by-ai
 //
-// Quality improvements:
-//   - Removed window.location.hostname assignment (unnecessary — isLocalhost
-//     is only used for GM-only UI features, not speed calc or initiative event)
-//   - Replaced nextElementSibling + textContent with screen.getByText assertions
-//     (tests rendered output, not DOM structure)
-//   - Added @testing-library/jest-dom import (required for toBeInTheDocument)
-//   - Reduced excessive cleanup meta-commentary
+// CharSummary window event handlers + prop-sync effect.
 //
-// Cleanup (2026-08-18):
-//   - Removed 4 redundant speed calculation tests (haste doubling, monk unarmored
-//     movement +/− armor/shield). All covered by CharSummary-SpeedCalculations.test.jsx
-//     and CharSummary-BuffEffects.test.jsx with parameterized it.each coverage.
-//   - Kept initiative-rolled event test — unique behavioral coverage not present
-//     in any other test file.
-//   - Reduced file from 185 lines / 5 tests to 134 lines / 1 test.
+// Coverage ownership (CharSummary family delegation):
+//   OWNED HERE (unique behavioral coverage — no sibling covers these):
+//   - 'initiative-rolled' event → clears wild magic surge effects (real DOM
+//     removal + synced setter invoked with null) and listener teardown on unmount
+//   - 'open-short-rest' event → opens the Short Rest modal (CLA-226; dispatched
+//     by CharSpecialActions' "memorize_spell" automation row)
+//   - XP subtitle reflects playerStats.xp prop changes via the sync effect
+//
+// NOT owned here (delegated — do not re-add):
+//   - Surge badge rendering, "Tamed" text, duration tooltips → CharSummary-WildMagic.test.jsx
+//   - Short rest modal close flow / short rest button click → CharSummary-Prerequisites.test.jsx
+//   - XP modal preview calculations, Bait and Switch badge → CharSummary-XPModes.test.jsx
+//   - Initiative roll display / click-to-roll → CharSummary-Ally-Initiative.test.jsx
+//   - Speed calculation recipes → CharSummary-SpeedCalculations.test.jsx (and siblings)
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import '@testing-library/jest-dom';
 import CharSummary from './CharSummary.jsx';
-import { useSyncedState } from '../../../hooks/runtime/useSyncedState.js';
+
+// Shared harness so the useSyncedState mock can seed per-test state and
+// record every synced write — tests then assert on real DOM behavior,
+// not just mock call bookkeeping.
+const harness = vi.hoisted(() => ({ seed: {}, syncedCalls: [] }));
 
 vi.mock('./CharGold.jsx', () => ({ default: () => <div data-testid="char-gold">Gold</div> }));
 vi.mock('./CharHitPoints.jsx', () => ({ default: () => <div data-testid="char-hp">HP</div> }));
@@ -29,6 +34,8 @@ vi.mock('../../common/AvatarImage.jsx', () => ({ default: () => <div data-testid
 vi.mock('../../common/AvatarModal.jsx', () => ({ default: () => null }));
 vi.mock('../LongRestButton.jsx', () => ({ default: () => <div data-testid="long-rest-btn">Long Rest</div> }));
 vi.mock('../ShortRestButton.jsx', () => ({ default: () => <div data-testid="short-rest-btn">Short Rest</div> }));
+// Renders a marker only when CharSummary actually mounts it, so tests can
+// observe showShortRest state transitions.
 vi.mock('../ShortRestModal.jsx', () => ({ default: () => <div data-testid="short-rest-modal">Short Rest Modal</div> }));
 vi.mock('./CharConditions.jsx', () => ({ default: () => <div data-testid="char-conditions">Conditions</div> }));
 
@@ -38,14 +45,29 @@ vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
-    useRuntimeValue: vi.fn((_name, _key, _campaign) => null),
-    getRuntimeValue: vi.fn(),
+    useRuntimeValue: vi.fn(() => null),
+    getRuntimeValue: vi.fn(() => undefined),
     getStore: vi.fn(() => new Map()),
 }));
 
-vi.mock('../../../hooks/runtime/useSyncedState.js', () => ({
-    useSyncedState: vi.fn((_name, _key, defaultValue) => [defaultValue, vi.fn()]),
-}));
+// State-backed useSyncedState: seeded per-test via harness.seed, writes
+// recorded in harness.syncedCalls AND applied to real React state so the
+// UI updates — tests verify behavior, not just setter calls.
+vi.mock('../../../hooks/runtime/useSyncedState.js', async () => {
+    const React = await import('react');
+    return {
+        useSyncedState: (name, key, defaultValue) => {
+            const initial = key in harness.seed ? harness.seed[key] : defaultValue;
+            const [value, setValue] = React.useState(initial);
+            const keyRef = React.useRef(key);
+            const setter = React.useCallback((newValue) => {
+                harness.syncedCalls.push({ key: keyRef.current, value: newValue });
+                setValue(newValue);
+            }, []);
+            return [value, setter];
+        },
+    };
+});
 
 vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
     showBackgroundPopup: vi.fn(),
@@ -74,59 +96,134 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(() => ({ creatures: [] })),
 }));
 
-const mockPlayerStats = {
-    name: 'Thorin',
-    xp: 2300,
-    xpMode: 'milestone',
-    race: { name: 'Dwarf', type: 'Hill Dwarf', subrace: { name: 'Hill Dwarf', speed: 25 } },
-    class: { name: 'Cleric', subclass: { name: 'War', type: 'Choice' }, major: { name: 'Cleric' } },
-    level: 5,
-    alignment: 'Lawful Good',
-    proficiency: 3,
-    initiative: 2,
-    initiativeAdvantage: false,
-    abilities: [{ name: 'Wisdom', bonus: 3 }, { name: 'Strength', bonus: 2 }],
-    armorClass: 18,
-    armorClassFormula: '16 + 2 (shield)',
-    hitPoints: 45,
-    inventory: { equipped: ['Scale Mail', 'Shield'] },
-    equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }, { name: 'Shield', type: 'Shield' }],
-    background: 'Soldier',
-    immunities: [],
-    resistances: [],
-    vulnerabilities: [],
-    senses: [],
-    proficiencies: [],
-    languages: [],
-    automation: { passives: [], actions: [] },
-    passives: [],
-    exhaustionLevel: 0,
-};
+const CAMPAIGN = 'test-campaign';
 
-const mockCampaignName = 'test-campaign';
+// Per-test fixture factory: override only what a test cares about.
+function makePlayerStats(overrides = {}) {
+    return {
+        name: 'Thorin',
+        xp: 2300,
+        xpMode: 'milestone',
+        race: { name: 'Dwarf', type: 'Hill Dwarf', subrace: { name: 'Hill Dwarf', speed: 25 } },
+        class: { name: 'Cleric', subclass: { name: 'War', type: 'Choice' }, major: { name: 'Cleric' } },
+        level: 5,
+        alignment: 'Lawful Good',
+        proficiency: 3,
+        initiative: 2,
+        initiativeAdvantage: false,
+        abilities: [{ name: 'Wisdom', bonus: 3 }, { name: 'Strength', bonus: 2 }],
+        armorClass: 18,
+        armorClassFormula: '16 + 2 (shield)',
+        hitPoints: 45,
+        inventory: { equipped: ['Scale Mail', 'Shield'] },
+        equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }, { name: 'Shield', type: 'Shield' }],
+        background: 'Soldier',
+        immunities: [],
+        resistances: [],
+        vulnerabilities: [],
+        senses: [],
+        proficiencies: [],
+        languages: [],
+        automation: { passives: [], actions: [] },
+        passives: [],
+        exhaustionLevel: 0,
+        ...overrides,
+    };
+}
+
+const renderSummary = (overrides = {}) =>
+    render(<CharSummary playerStats={makePlayerStats(overrides)} campaignName={CAMPAIGN} exhaustionLevel={0} />);
+
+beforeEach(() => {
+    harness.seed = {};
+    harness.syncedCalls.length = 0;
+});
 
 // ---------------------------------------------------------------------------
-// useEffect for initiative-rolled event — clears wild magic surge effects
+// 'initiative-rolled' event → clears wild magic surge effects
 // ---------------------------------------------------------------------------
 describe('CharSummary - Initiative Rolled Event', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
+    it('removes the surge badge from the UI and syncs null when initiative-rolled fires', () => {
+        harness.seed.wildMagicSurgeEffects = [{ timestamp: 1000, roll: 5, effect: 'Fireball' }];
+        renderSummary();
 
-    it('clears surge effects when initiative-rolled event fires', () => {
-        const surgeSetter = vi.fn();
-        vi.mocked(useSyncedState).mockImplementation((_name, key, defaultValue) => {
-            if (key === 'wildMagicSurgeEffects') {
-                return [[{ timestamp: 1000, roll: 5, effect: 'Fireball' }], surgeSetter];
-            }
-            return [defaultValue, vi.fn()];
-        });
-
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
         expect(screen.getByText(/Surge Effects:/)).toBeInTheDocument();
 
-        const event = new Event('initiative-rolled');
-        window.dispatchEvent(event);
-        expect(surgeSetter).toHaveBeenCalledWith(null);
+        act(() => {
+            window.dispatchEvent(new Event('initiative-rolled'));
+        });
+
+        // Real DOM effect: the badge is gone, not just the setter nudged.
+        expect(screen.queryByText(/Surge Effects:/)).not.toBeInTheDocument();
+        // Server-first contract: the clear is written through the synced setter.
+        expect(harness.syncedCalls).toEqual([{ key: 'wildMagicSurgeEffects', value: null }]);
+    });
+
+    it('does not open the short rest modal on initiative-rolled', () => {
+        renderSummary();
+
+        act(() => {
+            window.dispatchEvent(new Event('initiative-rolled'));
+        });
+
+        expect(screen.queryByTestId('short-rest-modal')).not.toBeInTheDocument();
+    });
+
+    it('removes the initiative-rolled listener on unmount', () => {
+        harness.seed.wildMagicSurgeEffects = [{ timestamp: 1000, roll: 5, effect: 'Fireball' }];
+        const { unmount } = renderSummary();
+
+        unmount();
+
+        act(() => {
+            window.dispatchEvent(new Event('initiative-rolled'));
+        });
+
+        // A leaked listener would record a write after unmount.
+        expect(harness.syncedCalls).toHaveLength(0);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// 'open-short-rest' event → opens the Short Rest modal (CLA-226)
+// ---------------------------------------------------------------------------
+describe('CharSummary - Open Short Rest Event', () => {
+    it('opens the short rest modal when open-short-rest fires', () => {
+        renderSummary();
+
+        expect(screen.queryByTestId('short-rest-modal')).not.toBeInTheDocument();
+
+        act(() => {
+            window.dispatchEvent(new CustomEvent('open-short-rest'));
+        });
+
+        expect(screen.getByTestId('short-rest-modal')).toBeInTheDocument();
+    });
+
+    it('stays closed after unmount when open-short-rest fires', () => {
+        const { unmount } = renderSummary();
+        unmount();
+
+        expect(() => {
+            act(() => {
+                window.dispatchEvent(new CustomEvent('open-short-rest'));
+            });
+        }).not.toThrow();
+        expect(screen.queryByTestId('short-rest-modal')).not.toBeInTheDocument();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// XP prop-sync effect
+// ---------------------------------------------------------------------------
+describe('CharSummary - XP Prop Sync', () => {
+    it('updates the XP subtitle when playerStats.xp changes', () => {
+        const { rerender } = renderSummary({ xpMode: 'experience', xp: 1000 });
+
+        expect(screen.getByText(/1,000 XP/)).toBeInTheDocument();
+
+        rerender(<CharSummary playerStats={makePlayerStats({ xpMode: 'experience', xp: 1500 })} campaignName={CAMPAIGN} exhaustionLevel={0} />);
+
+        expect(screen.getByText(/1,500 XP/)).toBeInTheDocument();
     });
 });

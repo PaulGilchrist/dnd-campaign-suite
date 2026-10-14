@@ -95,6 +95,9 @@ function passiveSpeedContribution(playerStats, passive, hasArmorOrShield) {
     if (passive.type !== 'passive_buff') return 0
     if (passive.effect === 'speed_bonus') {
         const bonus = passive.bonusExpression ? parseInt(passive.bonusExpression, 10) : 10
+        // Guard like speed_increase below: a malformed expression must never
+        // leak NaN into the displayed speed (found via PassiveEffects tests).
+        if (isNaN(bonus)) return 0
         if (passive.condition === 'no_heavy_armor') return isWearingHeavyArmor(playerStats) ? 0 : bonus
         if (passive.condition === 'no_armor_no_shield') return hasArmorOrShield ? 0 : bonus
         return 0

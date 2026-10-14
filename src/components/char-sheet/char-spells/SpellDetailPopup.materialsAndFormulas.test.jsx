@@ -1,7 +1,20 @@
+// @improved-by-ai
+/**
+ * SpellDetailPopup — consumed-material row and MOD resolution in the upcast selector.
+ *
+ * materialComponents.js is intentionally NOT mocked here: it is a pure registry +
+ * backpack lookup whose unit behavior is already covered by
+ * src/services/rules/spells/materialComponents.test.js. Running it REAL lets these
+ * tests pin the popup's actual contract (a registry spell arms the Material row;
+ * the exact backpack name clears the "(not found in backpack)" warning) instead of
+ * only proving the component echoes whatever a mock returned.
+ *
+ * Selector visibility, radio enabling, and selection state are covered by the
+ * sibling SpellDetailPopup.rendering / .psionicCanCast / .freeCast test files.
+ */
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
-import { getConsumedMaterial, hasMaterial } from '../../../services/rules/spells/materialComponents.js';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
@@ -17,15 +30,9 @@ vi.mock('../../../services/ui/sanitize.js', () => ({
   sanitizeHtml: (html) => html,
 }));
 
-vi.mock('../../../services/rules/spells/materialComponents.js', () => ({
-  getConsumedMaterial: vi.fn(),
-  hasMaterial: vi.fn(() => false),
-}));
+const CAMPAIGN = 'test-campaign';
 
-const mockCampaignName = 'test-campaign';
-const mockOnClose = vi.fn();
-
-const createPlayerStats = (overrides = {}) => ({
+const createPlayerStats = ({ spellAbilities, ...rest } = {}) => ({
   name: 'Elara',
   level: 5,
   class: { name: 'Sorcerer', major: { name: 'Sorcerer' } },
@@ -36,10 +43,10 @@ const createPlayerStats = (overrides = {}) => ({
     spell_slots_level_2: 3,
     spell_slots_level_3: 2,
     spells: [],
-    ...overrides.spellAbilities,
+    ...(spellAbilities || {}),
   },
   automation: { passives: [], actions: [] },
-  ...overrides,
+  ...rest,
 });
 
 const createSpell = (overrides = {}) => ({
@@ -49,126 +56,135 @@ const createSpell = (overrides = {}) => ({
   casting_time: '1 action',
   range: '120 feet',
   duration: 'Instantaneous',
-  damage: {
-    damage_at_slot_level: {
-      '1': '3d4+1',
-      '2': '4d4+1',
-      '3': '5d4+1',
-    },
-  },
   school: 'Evocation',
   ...overrides,
 });
 
-const renderPopup = (spell, playerStats, campaignName, extraProps = {}) =>
+// Revivify is in the real MATERIAL_REGISTRY: Diamond (300 gp), spell-consumed.
+const createRevivify = () =>
+  createSpell({
+    name: 'Revivify',
+    level: 3,
+    description: 'You touch a living creature that has died.',
+    damage: undefined,
+  });
+
+/** Build the popup's upcast rows from the spell's own damage ladder (single source). */
+const upcastLevelsFrom = (spell, availableSlots = 4) =>
+  Object.entries(spell.damage.damage_at_slot_level).map(([level, formula]) => ({
+    level: Number(level),
+    formula,
+    availableSlots,
+  }));
+
+const renderPopup = (spell, playerStats, extraProps = {}) =>
   render(
     <SpellDetailPopup
       spell={spell}
       playerStats={playerStats}
-      campaignName={campaignName}
-      onClose={mockOnClose}
+      campaignName={CAMPAIGN}
+      onClose={vi.fn()}
       {...extraProps}
-    />
+    />,
   );
 
+const renderUpcast = (ladder, statsOverrides = {}) => {
+  const spell = createSpell({ damage: { damage_at_slot_level: ladder } });
+  renderPopup(spell, createPlayerStats(statsOverrides), { upcastLevels: upcastLevelsFrom(spell) });
+};
+
 describe('SpellDetailPopup', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  describe('Consumed material row', () => {
+    it('shows the consumed material with a missing-backpack warning when the player lacks it', () => {
+      renderPopup(createRevivify(), createPlayerStats());
 
-  describe('Material components display', () => {
-    it('renders material section with missing indicator when spell has consumed materials and player lacks them', () => {
-      vi.mocked(getConsumedMaterial).mockReturnValue({
-        itemName: 'Drop of Blood, Piece of Flesh, Pinch of Bone Dust',
-        required: 'a drop of blood, a piece of flesh, and a pinch of bone dust',
-      });
-
-      renderPopup(createSpell(), createPlayerStats(), mockCampaignName);
-
-      expect(screen.getByText(/Material:/)).toBeInTheDocument();
-      expect(screen.getByText(/Drop of Blood/)).toBeInTheDocument();
-      expect(screen.getByText(/a drop of blood, a piece of flesh, and a pinch of bone dust/)).toBeInTheDocument();
+      expect(screen.getByText('Material:')).toBeInTheDocument();
+      expect(screen.getByText(/Diamond \(300 gp\)/)).toBeInTheDocument();
+      expect(screen.getByText(/diamond worth 300\+ GP/)).toBeInTheDocument();
       expect(screen.getByText('(not found in backpack)')).toBeInTheDocument();
     });
 
-    it('hides missing indicator when player has the exact material in backpack', () => {
-      vi.mocked(getConsumedMaterial).mockReturnValue({
-        itemName: 'Diamond (300 gp)',
-        required: 'a diamond worth 300+ GP',
-      });
-      vi.mocked(hasMaterial).mockReturnValue(true);
+    it('shows the material row without the warning when the exact item is in the backpack', () => {
+      const stats = createPlayerStats({ inventory: { backpack: ['Diamond (300 gp)'] } });
 
-      renderPopup(createSpell(), createPlayerStats(), mockCampaignName);
+      renderPopup(createRevivify(), stats);
 
-      expect(screen.getByText(/Material:/)).toBeInTheDocument();
       expect(screen.getByText(/Diamond \(300 gp\)/)).toBeInTheDocument();
-      expect(screen.queryByText('(not found in backpack)')).not.toBeInTheDocument();
+      expect(screen.queryByText(/not found in backpack/)).not.toBeInTheDocument();
     });
 
-    it('does not render material section when spell has no consumed materials', () => {
-      vi.mocked(getConsumedMaterial).mockReturnValue(null);
+    it('keeps the warning when the backpack holds a similar but differently named item', () => {
+      const stats = createPlayerStats({ inventory: { backpack: [{ name: 'Diamond (1,000 gp)' }] } });
 
-      renderPopup(createSpell(), createPlayerStats(), mockCampaignName);
+      renderPopup(createRevivify(), stats);
+
+      expect(screen.getByText(/Diamond \(300 gp\)/)).toBeInTheDocument();
+      expect(screen.getByText('(not found in backpack)')).toBeInTheDocument();
+    });
+
+    it('renders no material row for a spell with no consumed material', () => {
+      renderPopup(createSpell(), createPlayerStats());
 
       expect(screen.queryByText(/Material:/)).not.toBeInTheDocument();
     });
   });
 
-  describe('Upcast formula resolution', () => {
+  describe('Upcast formula MOD resolution', () => {
     it.each([
-      { modifier: 3, expected1: '1d8+3', expected2: '2d8+3', label: 'positive modifier' },
-      { modifier: undefined, expected1: '1d8+0', expected2: '2d8+0', label: 'undefined defaults to 0' },
-      { modifier: -1, expected1: '1d8+-1', expected2: '2d8+-1', label: 'negative modifier' },
-    ])('replaces MOD with $label ($modifier)', ({ modifier, expected1, expected2 }) => {
-      const stats = createPlayerStats({ spellAbilities: { modifier } });
-      const spell = createSpell({
-        damage: { damage_at_slot_level: { '1': '1d8+MOD', '2': '2d8+MOD' } },
-      });
-      const upcastLevels = [
-        { level: 1, formula: '1d8+MOD', availableSlots: 4 },
-        { level: 2, formula: '2d8+MOD', availableSlots: 3 },
-      ];
+      { label: 'positive modifier', modifier: 3, resolved: ['1d8+3', '2d8+3'] },
+      { label: 'zero modifier', modifier: 0, resolved: ['1d8+0', '2d8+0'] },
+      { label: 'negative modifier', modifier: -1, resolved: ['1d8+-1', '2d8+-1'] },
+      { label: 'missing modifier (defaults to 0)', modifier: undefined, resolved: ['1d8+0', '2d8+0'] },
+    ])('replaces MOD with the $label in every upcast row', ({ modifier, resolved }) => {
+      renderUpcast({ '1': '1d8+MOD', '2': '2d8+MOD' }, { spellAbilities: { modifier } });
 
-      renderPopup(spell, stats, mockCampaignName, { upcastLevels });
-
-      expect(screen.getByText(expected1)).toBeInTheDocument();
-      expect(screen.getByText(expected2)).toBeInTheDocument();
+      resolved.forEach((text) => expect(screen.getByText(text)).toBeInTheDocument());
+      // The formula belongs to its own level row, and no raw placeholder leaks.
+      expect(screen.getByText(resolved[0]).closest('label')).toHaveTextContent('Level 1');
       expect(screen.queryByText(/MOD/)).not.toBeInTheDocument();
     });
 
-    it('handles MOD appearing multiple times in the same formula', () => {
-      const stats = createPlayerStats({ spellAbilities: { modifier: 2 } });
-      const spell = createSpell({
-        damage: { damage_at_slot_level: { '1': '2d6+MOD+MOD', '2': '3d6+MOD+MOD' } },
-      });
-      const upcastLevels = [
-        { level: 1, formula: '2d6+MOD+MOD', availableSlots: 4 },
-        { level: 2, formula: '3d6+MOD+MOD', availableSlots: 3 },
-      ];
-
-      renderPopup(spell, stats, mockCampaignName, { upcastLevels });
+    it('replaces every MOD occurrence within a single formula', () => {
+      renderUpcast({ '1': '2d6+MOD+MOD', '2': '3d6+MOD+MOD' }, { spellAbilities: { modifier: 2 } });
 
       expect(screen.getByText('2d6+2+2')).toBeInTheDocument();
       expect(screen.getByText('3d6+2+2')).toBeInTheDocument();
       expect(screen.queryByText(/MOD/)).not.toBeInTheDocument();
     });
 
-    it('handles MOD at the start of a formula', () => {
-      const stats = createPlayerStats({ spellAbilities: { modifier: 5 } });
-      const spell = createSpell({
-        damage: { damage_at_slot_level: { '1': 'MOD+2d6', '2': 'MOD+3d6' } },
-      });
-      const upcastLevels = [
-        { level: 1, formula: 'MOD+2d6', availableSlots: 4 },
-        { level: 2, formula: 'MOD+3d6', availableSlots: 3 },
-      ];
-
-      renderPopup(spell, stats, mockCampaignName, { upcastLevels });
+    it('replaces MOD at the start of a formula', () => {
+      renderUpcast({ '1': 'MOD+2d6', '2': 'MOD+3d6' }, { spellAbilities: { modifier: 5 } });
 
       expect(screen.getByText('5+2d6')).toBeInTheDocument();
       expect(screen.getByText('5+3d6')).toBeInTheDocument();
       expect(screen.queryByText(/MOD/)).not.toBeInTheDocument();
     });
 
+    it('resolves MOD surrounded by spaces without collapsing the formula layout', () => {
+      renderUpcast({ '1': '1d8 + MOD', '2': '2d8 + MOD' }, { spellAbilities: { modifier: 3 } });
+
+      expect(screen.getByText('1d8 + 3')).toBeInTheDocument();
+      expect(screen.getByText('2d8 + 3')).toBeInTheDocument();
+      expect(screen.queryByText(/MOD/)).not.toBeInTheDocument();
+    });
+
+    it('leaves formulas without MOD untouched', () => {
+      renderUpcast({ '1': '3d4+1', '2': '4d4+1' }, { spellAbilities: { modifier: 3 } });
+
+      expect(screen.getByText('3d4+1')).toBeInTheDocument();
+      expect(screen.getByText('4d4+1')).toBeInTheDocument();
+    });
+
+    it('defaults MOD to 0 when the character has no spellAbilities at all', () => {
+      const stats = createPlayerStats();
+      delete stats.spellAbilities;
+      const spell = createSpell({ damage: { damage_at_slot_level: { '1': '1d8+MOD', '2': '2d8+MOD' } } });
+
+      renderPopup(spell, stats, { upcastLevels: upcastLevelsFrom(spell) });
+
+      expect(screen.getByText('1d8+0')).toBeInTheDocument();
+      expect(screen.getByText('2d8+0')).toBeInTheDocument();
+      expect(screen.queryByText(/MOD/)).not.toBeInTheDocument();
+    });
   });
 });

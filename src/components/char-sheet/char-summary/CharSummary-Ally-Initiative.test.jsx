@@ -1,43 +1,40 @@
+// @improved-by-ai
 //
-// Cleanup (2026-08-18):
-//   - Reduced excessive mocks from 20+ to 11 — only mock what the tested code paths actually use.
-//     Removed mocks for: AvatarImage, Popup, rulesFactory (both entries), attackCalc, logService,
-//     buffToggle, unbreakableMajesty, auraOfLifeHandler, circleOfPowerHandler, deathWardHandler.
-//     These subcomponents are mocked away and never exercised by the ally modal or initiative tests.
-//   - Rewrote initiative handler test to be less brittle:
-//     - Removed closure-captured `capturedArgs` (implementation detail).
-//     - Replaced post-hoc `capturedArgs` assertions with direct mock call argument assertions.
-//     - Used shared mutable object pattern so the spy is available before the mock factory runs.
-//   - Consolidated ally modal test: kept the parameterized it.each for combatSummary vs characters
-//     fallback (unique behavioral coverage not present in any other test file).
-//   - Removed redundant getCombatSummary assertion (the modal rendering already proves it was called
-//     since the mock is configured to return specific creatures that appear in the DOM).
+// Cleanup (2026-10-14):
+//   - Imports shared mockPlayerStats/mockCampaignName from CharSummary.test-mocks.test.jsx
+//     instead of duplicating the fixture object.
+//   - Unmocked DiceRollContext (it is a trivial React context) — the tests now render
+//     through the real Provider, removing a layer of over-mocking.
+//   - Ally modal "priority" case now actually proves precedence: both a combat summary
+//     AND a characters prop are supplied, and names exclusive to characters are asserted
+//     NOT to appear in the modal.
+//   - Added happy-path confirm test (persist selectedAllies via setRuntimeValue +
+//     campaign log entry via addEntry + modal closes). Error path stays in
+//     CharSummary-Remaining.test.jsx; cancel stays in CharSummary-Prerequisites.test.jsx.
+//   - Added exhaustion initiative-penalty test (effectiveInitiative = initiative - 2×level,
+//     incl. negative sign formatting) — not covered by any sibling.
+//   - Initiative click targets the value inside the 'Initiative:' row instead of a bare
+//     /\+2/ regex; clearer it.each case names replace positional %s labels.
+//   - Assert modal is absent before the badge click (negative path).
 //
-// Before: 4 tests / 254 lines / 20+ mocks
-// After:  4 tests / ~190 lines / 11 mocks
+// Before: 4 tests / 229 lines / 14 mocks (2 unnecessary)
+// After:  6 tests / ~200 lines / 12 mocks
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import '@testing-library/jest-dom';
 import CharSummary from './CharSummary.jsx';
-import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 import { DiceRollContext } from '../../../hooks/combat/DiceRollContext.js';
+import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
+import { addEntry } from '../../../services/ui/logService.js';
+import { mockPlayerStats, mockCampaignName } from './CharSummary.test-mocks.test.jsx';
 
 // ---------------------------------------------------------------------------
-// Shared mutable object for useLoggedDiceRoll mock.
-// Created at module scope so it exists before vi.mock factory runs
-// (vi.mock is hoisted but factory execution is deferred until import).
+// Mocks — only what the ally-modal and initiative code paths touch.
 // ---------------------------------------------------------------------------
-const rollInitiativeSpy = vi.fn();
-const sharedDiceRollResult = {
-    popupHtml: null,
-    setPopupHtml: vi.fn(),
-    rollInitiative: rollInitiativeSpy,
-};
+const rollInitiative = vi.fn();
 
-// ---------------------------------------------------------------------------
-// Mocks — only what the two test scenarios actually exercise.
-// ---------------------------------------------------------------------------
 vi.mock('./CharGold.jsx', () => ({ default: () => <div data-testid="char-gold">Gold</div> }));
 vi.mock('./CharHitPoints.jsx', () => ({ default: () => <div data-testid="char-hhp">HP</div> }));
 vi.mock('./CharClassFeatures.jsx', () => ({ default: () => <div data-testid="char-class-features">Class Features</div> }));
@@ -48,14 +45,16 @@ vi.mock('../ShortRestButton.jsx', () => ({ default: () => <div data-testid="shor
 vi.mock('../ShortRestModal.jsx', () => ({ default: () => <div data-testid="short-rest-modal">Short Rest Modal</div> }));
 vi.mock('./CharConditions.jsx', () => ({ default: () => <div data-testid="char-conditions">Conditions</div> }));
 vi.mock('./TrackedResourceInput.jsx', () => ({ default: () => <div data-testid="tracked-resource-input">Tracked Resource</div> }));
+
+// AllySelectionModal stand-in: lists the creatures it receives so tests can
+// verify which data source populated it, and exposes confirm/cancel actions.
 vi.mock('../../common/AllySelectionModal.jsx', () => ({
-    default: vi.fn(({ onConfirm, onCancel, creatures, currentAllies }) => (
-        <div>
+    default: vi.fn(({ onConfirm, onCancel, creatures }) => (
+        <div data-testid="ally-selection-modal">
             <span data-testid="ally-modal-title">Select Allies</span>
-            <button data-testid="ally-select-all" onClick={() => onConfirm(creatures?.map(c => c.name) || [])}>Select All</button>
-            <button data-testid="ally-confirm" onClick={() => onConfirm(currentAllies || ['Thorin'])}>Confirm</button>
+            <button data-testid="ally-select-all" onClick={() => onConfirm((creatures || []).map(c => c.name))}>Select All</button>
             <button data-testid="ally-cancel" onClick={onCancel}>Cancel</button>
-            {creatures?.map(c => (
+            {(creatures || []).map(c => (
                 <span key={c.name} data-testid={`creature-${c.name}`}>{c.name}</span>
             ))}
         </div>
@@ -74,25 +73,15 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../../hooks/runtime/useSyncedState.js', () => ({
-    useSyncedState: vi.fn(() => [null, vi.fn()]),
+    useSyncedState: vi.fn((_name, _key, defaultValue) => [defaultValue, vi.fn()]),
 }));
 
 vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
     showBackgroundPopup: vi.fn(),
 }));
 
-vi.mock('../../../hooks/combat/DiceRollContext.js', () => {
-    const DiceRollContext = {
-        Provider: ({ children }) => <>{children}</>,
-    };
-    return {
-        DiceRollContext,
-        useDiceRollPopup: vi.fn(() => ({ setPopupHtml: vi.fn() })),
-    };
-});
-
 vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
-    default: vi.fn(() => sharedDiceRollResult),
+    default: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn(), rollInitiative })),
 }));
 
 vi.mock('../../../services/combat/buffs/buffService.js', () => ({
@@ -103,127 +92,146 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(() => ({ creatures: [] })),
 }));
 
-// ---------------------------------------------------------------------------
-// Shared test fixtures
-// ---------------------------------------------------------------------------
-const mockPlayerStats = {
-    name: 'Thorin',
-    xp: 2300,
-    xpMode: 'milestone',
-    race: { name: 'Dwarf', type: 'Hill Dwarf', subrace: { name: 'Hill Dwarf', speed: 25 } },
-    class: { name: 'Cleric', subclass: { name: 'War', type: 'Choice' }, major: { name: 'Cleric' } },
-    level: 5,
-    alignment: 'Lawful Good',
-    proficiency: 3,
-    initiative: 2,
-    initiativeAdvantage: false,
-    abilities: [{ name: 'Wisdom', bonus: 3 }, { name: 'Strength', bonus: 2 }],
-    armorClass: 18,
-    armorClassFormula: '16 + 2 (shield)',
-    hitPoints: 45,
-    inventory: { equipped: ['Scale Mail', 'Shield'] },
-    equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }, { name: 'Shield', type: 'Shield' }],
-    background: 'Soldier',
-    immunities: [],
-    resistances: [],
-    vulnerabilities: [],
-    senses: [],
-    proficiencies: [],
-    languages: [],
-    automation: { passives: [], actions: [] },
-    passives: [],
-    exhaustionLevel: 0,
-};
-
-const mockCampaignName = 'test-campaign';
-
-const wrapper = ({ children }) => (
-    <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
-        {children}
-    </DiceRollContext.Provider>
-);
+vi.mock('../../../services/ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
+}));
 
 // ---------------------------------------------------------------------------
-// Ally modal — verifies creature data source (combat summary vs characters
-// prop) is used to populate the modal.
+// Render helper — wraps in the real DiceRollContext and applies common props.
 // ---------------------------------------------------------------------------
-describe('CharSummary - Ally Modal', () => {
+function renderSummary(props = {}) {
+    const setPopupHtml = vi.fn();
+    render(
+        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml }}>
+            <CharSummary
+                playerStats={mockPlayerStats}
+                campaignName={mockCampaignName}
+                exhaustionLevel={0}
+                {...props}
+            />
+        </DiceRollContext.Provider>
+    );
+    return { setPopupHtml };
+}
+
+function openAllyModal() {
+    fireEvent.click(screen.getByText(/Allies \(1\)/));
+    return screen.getByTestId('ally-selection-modal');
+}
+
+// ---------------------------------------------------------------------------
+// Ally modal — which data source populates the creature list.
+// Cancel behavior: CharSummary-Prerequisites.test.jsx
+// Confirm error path: CharSummary-Remaining.test.jsx
+// ---------------------------------------------------------------------------
+describe('CharSummary - Ally Modal data source', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getActiveBuffs.mockReturnValue([]);
+        getCombatSummary.mockReturnValue({ creatures: [] });
     });
 
     it.each([
-        [
-            { creatures: [
+        {
+            label: 'combat summary (taking precedence over the characters prop)',
+            summaryCreatures: [
                 { name: 'Ally1', type: 'player', currentHp: 30, maxHp: 45 },
                 { name: 'Ally2', type: 'enemy', currentHp: 10, maxHp: 20 },
-            ] },
-            null,
-            'combatSummary creatures',
-        ],
-        [
-            { creatures: null },
-            [
+            ],
+            characters: [{ name: 'NotInCombat', type: 'player' }],
+            expectedNames: ['Ally1', 'Ally2'],
+            unexpectedNames: ['NotInCombat'],
+        },
+        {
+            label: 'characters prop fallback when the combat summary has no creatures',
+            summaryCreatures: null,
+            characters: [
                 { name: 'Character1', type: 'player' },
                 { name: 'Character2', type: 'npc' },
             ],
-            'characters fallback',
-        ],
-    ])('opens ally modal and populates creatures from %s', ({ creatures }, characters) => {
-        vi.mocked(getCombatSummary).mockReturnValue({ creatures });
+            expectedNames: ['Character1', 'Character2'],
+            unexpectedNames: [],
+        },
+    ])('populates the ally modal from $label', ({ summaryCreatures, characters, expectedNames, unexpectedNames }) => {
+        getCombatSummary.mockReturnValue({ creatures: summaryCreatures });
+        renderSummary({ characters });
 
-        const renderProps = {
-            playerStats: mockPlayerStats,
-            campaignName: mockCampaignName,
-            exhaustionLevel: 0,
-        };
-        if (characters) {
-            renderProps.characters = characters;
+        // Modal must not be present until the allies badge is clicked.
+        expect(screen.queryByTestId('ally-selection-modal')).not.toBeInTheDocument();
+
+        openAllyModal();
+
+        for (const name of expectedNames) {
+            expect(screen.getByTestId(`creature-${name}`)).toBeInTheDocument();
         }
-
-        render(<CharSummary {...renderProps} />, { wrapper });
-
-        const allyBadge = screen.getByText(/Allies/);
-        fireEvent.click(allyBadge);
-
-        expect(screen.getByTestId('ally-modal-title')).toBeInTheDocument();
-
-        if (creatures) {
-            for (const creature of creatures) {
-                expect(screen.getByTestId(`creature-${creature.name}`)).toBeInTheDocument();
-            }
-        } else {
-            for (const character of characters) {
-                expect(screen.getByText(character.name)).toBeInTheDocument();
-            }
+        for (const name of unexpectedNames) {
+            expect(screen.queryByTestId(`creature-${name}`)).not.toBeInTheDocument();
         }
+    });
+
+    it('persists the confirmed selection and logs it to the campaign', async () => {
+        getCombatSummary.mockReturnValue({
+            creatures: [
+                { name: 'Ally1', type: 'player', currentHp: 30, maxHp: 45 },
+                { name: 'Ally2', type: 'enemy', currentHp: 10, maxHp: 20 },
+            ],
+        });
+        renderSummary({ characters: [] });
+        openAllyModal();
+
+        fireEvent.click(screen.getByTestId('ally-select-all'));
+
+        // Server-first: selection is written to the runtime store...
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            mockPlayerStats.name, 'selectedAllies', ['Ally1', 'Ally2'], mockCampaignName
+        );
+        // ...and every automation logs to the campaign log.
+        expect(addEntry).toHaveBeenCalledWith(
+            mockCampaignName,
+            expect.objectContaining({
+                characterName: mockPlayerStats.name,
+                abilityName: 'Ally Selection',
+                description: 'Thorin selected allies: Ally1, Ally2',
+            })
+        );
+        // Modal closes immediately on confirm.
+        expect(screen.queryByTestId('ally-selection-modal')).not.toBeInTheDocument();
+
+        // Let the confirm handler's awaited addEntry settle.
+        await Promise.resolve();
     });
 });
 
 // ---------------------------------------------------------------------------
-// Initiative handler — verifies rollInitiative is called with correct args.
-// Uses shared mutable object pattern so the spy is available before render.
+// Initiative — clicking the Initiative value rolls through the engine with
+// the effective modifier (initiative − 2 × exhaustionLevel) and forces
+// advantage only when the character has advantage.
 // ---------------------------------------------------------------------------
 describe('CharSummary - Initiative', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getActiveBuffs.mockReturnValue([]);
     });
 
     it.each([
-        [false, undefined, 'no advantage'],
-        [true, { forcedMode: 'advantage' }, 'with advantage'],
-    ])('calls rollInitiative with effective initiative when clicked (%s)', (initiativeAdvantage, expectedOpts) => {
-        vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] });
+        { label: 'no advantage', initiativeAdvantage: false, expectedOpts: undefined },
+        { label: 'advantage', initiativeAdvantage: true, expectedOpts: { forcedMode: 'advantage' } },
+    ])('rolls initiative with $label', ({ initiativeAdvantage, expectedOpts }) => {
+        renderSummary({ playerStats: { ...mockPlayerStats, initiativeAdvantage } });
 
-        const stats = { ...mockPlayerStats, initiativeAdvantage };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        fireEvent.click(screen.getByText('+2'));
 
-        const initiativeEl = screen.getByText(/\+2/);
-        fireEvent.click(initiativeEl);
+        expect(rollInitiative).toHaveBeenCalledTimes(1);
+        expect(rollInitiative).toHaveBeenCalledWith(2, expectedOpts);
+    });
 
-        expect(rollInitiativeSpy).toHaveBeenCalledTimes(1);
-        expect(rollInitiativeSpy).toHaveBeenCalledWith(2, expectedOpts);
+    it('applies the -2 per level exhaustion penalty, including negative modifiers', () => {
+        renderSummary({
+            playerStats: { ...mockPlayerStats, initiative: 1 },
+            exhaustionLevel: 1,
+        });
+
+        // -1 renders with an explicit minus sign and is the click target.
+        fireEvent.click(screen.getByText('-1'));
+
+        expect(rollInitiative).toHaveBeenCalledWith(-1, undefined);
     });
 });

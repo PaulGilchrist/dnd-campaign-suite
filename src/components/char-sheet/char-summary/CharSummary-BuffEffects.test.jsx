@@ -1,28 +1,35 @@
+// @improved-by-ai
 //
-// Improved: parameterized AC buff tests, removed redundant imports,
-// added negative-path and multi-buff coverage, uses shared mock data.
+// Coverage ownership (per family delegation): AC buff ATTRIBUTION BADGES —
+// the text, .aura-source marker, and tooltip of each buff-driven indicator in
+// the Armor Class row (CharSummary.jsx AC_BADGE_SPECS).
 //
-// Issues fixed:
-//   - Added missing '@testing-library/jest-dom' import for toBeInTheDocument()
-//   - Removed redundant 'getRuntimeValue' import (was imported but only used via mocked module)
-//   - Removed window.location.hostname mutation (global state modification)
-//   - Uses shared mock data from CharSummary.test-mocks.test.jsx
-//   - Consolidated 5 individual tests → 1 parameterized test (it.each)
-//   - Added negative-path test (no buff indicators when no buffs active)
-//   - Added multi-buff test (multiple AC buffs active simultaneously)
-//   - Added Defensive Duelist test (bonus not previously tested)
+// NOT owned here (delegated — do not re-add):
+//   - AC total NUMBER arithmetic → CharSummary-BadgesAndAC.test.jsx
+//   - Cover badges → CharSummary-Cover.test.jsx
+//   - Bait and Switch badge → CharSummary-XPModes.test.jsx
+//   - Aura resistance asterisk markers → CharSummary-AuraAndInitiative.test.jsx
+//   - Resistance rows from buffs → CharSummary-BuffResistances.test.jsx
 //
-// Cleanup (2026-08-18):
-//   - Absorbed all coverage from deleted CharSummary-Branches.test.jsx (4 redundant tests).
-//     Defensive duelist (+acBonus) and tremorsense badge positive/negative paths all covered
-//     by this file's parameterized it.each + comprehensive negative test.
-//
-// Cleanup (2026-08-18b):
-//   - Replaced brittle negative-path test (5 specific string absence assertions) with single
-//     structural assertion: query all `.aura-source` elements. Robust against text format changes.
-//   - Removed redundant multi-buff test (haste + shield_of_faith). Both buffs individually
-//     covered by it.each; rendering is trivial string concatenation — no logic to exercise.
-//   - Reduced file from 147 lines / 8 tests (9 iterations) to 130 lines / 7 tests (8 iterations).
+// Quality improvements over previous revision (7 tests / 8 runs → 4 tests / 10 runs):
+//   - Each positive test now asserts the badge is a .aura-source span inside
+//     the Armor Class row AND carries its attribution tooltip (title) — the
+//     tooltip is the whole point of the indicator ("which buff raised my AC?"),
+//     and was previously untested. Text-only assertions passed even if the
+//     text were rendered by the wrong element without attribution.
+//   - Fixed ugly it.each names (%s on objects → $effect interpolation).
+//   - Added Haste + Mage Armor stacking: both fragments render inside the
+//     single combined badge span (previously untested union branch of the
+//     haste-mage-armor spec).
+//   - Added Defensive Duelist guard negative: a buff with no acBonus must not
+//     render a badge or fabricate a +0 bonus (charSummaryCalc guard path).
+//   - Added unknown-buff negative: non-AC effects must not leak into the AC row.
+//   - Added multi-buff coexistence test asserting the full badge SET structurally
+//     (guards AC_BADGE_SPECS map against suppressive regressions), not just
+//     individual texts.
+//   - Negative paths scoped to the Armor Class row instead of the whole
+//     document, so unrelated .aura-source markers elsewhere can't break them.
+//   - renderSummary helper matches sibling convention.
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -98,38 +105,95 @@ vi.mock('../../../services/combat/auras/unbreakableMajesty.js', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// AC bonus buff indicators — parameterized across all tested buff types
+// Helpers — the AC row is <div class="clickable"><b>Armor Class: </b>{value}{badges}</div>
 // ---------------------------------------------------------------------------
-describe('CharSummary - AC Bonus Buff Indicators', () => {
+const renderSummary = (buffs = []) => {
+    getActiveBuffs.mockReturnValue(buffs);
+    render(
+        <CharSummary
+            playerStats={mockPlayerStats}
+            campaignName={mockCampaignName}
+            exhaustionLevel={0}
+        />
+    );
+};
+
+const armorClassRow = () => screen.getByText(/^Armor Class:/).parentElement;
+
+// ---------------------------------------------------------------------------
+// Positive path — each buff renders an attributed .aura-source badge in the
+// AC row with its exact label and attribution tooltip.
+// mockPlayerStats has Dex +2 (drives the mage-armor formula text).
+// ---------------------------------------------------------------------------
+describe('CharSummary - AC buff attribution badges', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getActiveBuffs.mockReturnValue([]);
     });
 
     it.each([
-        [{ effect: 'haste' }, /\+2 from Haste/],
-        [{ effect: 'shield' }, /\+5 from Shield/],
-        [{ effect: 'shield_of_faith' }, /\+2 from Shield of Faith/],
-        [{ effect: 'barkskin' }, /AC 17 from Barkskin/],
-        [{ effect: 'defensive_duelist', acBonus: 3 }, /\+3 from Defensive Duelist/],
-    ])('renders "%s" buff indicator', (buff, expectedText) => {
-        getActiveBuffs.mockReturnValue([buff]);
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(expectedText)).toBeInTheDocument();
+        { effect: 'haste', expectedText: '(+2 from Haste)', expectedTitle: undefined },
+        { effect: 'shield', expectedText: '(+5 from Shield)', expectedTitle: 'From Shield' },
+        { effect: 'shield_of_faith', expectedText: '(+2 from Shield of Faith)', expectedTitle: 'From Shield of Faith' },
+        { effect: 'barkskin', expectedText: '(AC 17 from Barkskin)', expectedTitle: 'From Barkskin' },
+        { effect: 'defensive_duelist', acBonus: 3, expectedText: '(+3 from Defensive Duelist)', expectedTitle: 'From Defensive Duelist' },
+        { effect: 'mage_armor', baseAc: 13, expectedText: '(13 + 2 Dex)', expectedTitle: 'From Mage Armor (13 + 2 Dex)' },
+    ])('attributes the AC buff "$effect" with badge $expectedText', ({ effect, acBonus, baseAc, expectedText, expectedTitle }) => {
+        renderSummary([{ effect, ...(acBonus !== undefined ? { acBonus } : {}), ...(baseAc !== undefined ? { baseAc } : {}) }]);
+        const badge = screen.getByText(expectedText);
+        expect(badge).toBeInTheDocument();
+        expect(badge).toHaveClass('aura-source');
+        expect(armorClassRow()).toContainElement(badge);
+        if (expectedTitle) {
+            expect(badge).toHaveAttribute('title', expectedTitle);
+        }
     });
 
-    it('renders mage armor AC formula when mage_armor buff is active', () => {
-        getActiveBuffs.mockReturnValue([{ effect: 'mage_armor', baseAc: 13 }]);
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/\(13 \+ 2 Dex\)/)).toBeInTheDocument();
+    it('renders Haste and Mage Armor fragments inside one combined badge when both are active', () => {
+        renderSummary([{ effect: 'haste' }, { effect: 'mage_armor', baseAc: 13 }]);
+        const badge = screen.getByTitle('From Mage Armor (13 + 2 Dex)');
+        expect(badge).toHaveClass('aura-source');
+        expect(badge.textContent).toContain('(+2 from Haste)');
+        expect(badge.textContent).toContain('(13 + 2 Dex)');
     });
 
-    // ---------------------------------------------------------------------------
-    // Negative path — no buff indicators when no buffs active
-    // ---------------------------------------------------------------------------
-    it('does not show any AC buff indicators when no buffs are active', () => {
+    it('renders every active AC buff badge side by side', () => {
+        renderSummary([
+            { effect: 'haste' },
+            { effect: 'shield' },
+            { effect: 'shield_of_faith' },
+            { effect: 'defensive_duelist', acBonus: 3 },
+        ]);
+        expect(screen.getByText('(+2 from Haste)')).toBeInTheDocument();
+        expect(screen.getByText('(+5 from Shield)')).toBeInTheDocument();
+        expect(screen.getByText('(+2 from Shield of Faith)')).toBeInTheDocument();
+        expect(screen.getByText('(+3 from Defensive Duelist)')).toBeInTheDocument();
+        expect(armorClassRow().querySelectorAll('.aura-source')).toHaveLength(4);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Negative paths — nothing attributed when nothing should be.
+// ---------------------------------------------------------------------------
+describe('CharSummary - AC buff badges absent', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
         getActiveBuffs.mockReturnValue([]);
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(document.querySelectorAll('.aura-source').length).toBe(0);
+    });
+
+    it('renders no AC attribution badges when no buffs are active', () => {
+        renderSummary();
+        expect(armorClassRow().querySelectorAll('.aura-source')).toHaveLength(0);
+    });
+
+    it('does not render a Defensive Duelist badge when the buff carries no acBonus', () => {
+        renderSummary([{ effect: 'defensive_duelist' }]);
+        expect(armorClassRow().querySelectorAll('.aura-source')).toHaveLength(0);
+        expect(armorClassRow()).not.toHaveTextContent(/Defensive Duelist/);
+    });
+
+    it('does not attribute AC to unrelated active buffs', () => {
+        renderSummary([{ effect: 'water_breathing' }]);
+        expect(armorClassRow().querySelectorAll('.aura-source')).toHaveLength(0);
     });
 });

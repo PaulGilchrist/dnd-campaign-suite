@@ -1,45 +1,35 @@
+// @improved-by-ai
 //
-// Quality improvements:
-//   - Consolidated window.location.hostname setup into single beforeEach/afterEach
-//   - Replaced checkboxLabel.querySelector('input[type="checkbox"]') with screen.getByRole
-//   - Removed expect(stats.xpMode).toBe() — tests internal state mutation, not behavior
-//   - Removed mockPlayerStats.xpMode mutation in beforeEach (shared object mutation = flaky)
-//   - Added test for invalid delta (non-numeric) on apply button
-//   - Added test verifying displayXp UI updates after apply
-//   - Replaced .toBeInTheDocument() with direct toBe() for simpler assertions
-//   - Fixed bait-and-switch tests: values come from getRuntimeValue (via computeCharSummaryContext), not useRuntimeValue
-//   - Improved test naming to describe observable behavior, not implementation
+// CharSummary XP modes + Bait and Switch AC badge.
 //
-// Cleanup (2026-08-18):
-//   - Removed "XP Modal mode toggle and info text" describe block (3 tests):
-//     * "toggles milestone checkbox and calls setRuntimeValue for xpMode" — asserts
-//       setRuntimeValue was called (internal state mutation, not observable behavior).
-//     * "hides/shows info text" — trivial JavaScript truthiness conditional rendering
-//       (isInXpMode ? show : hide). Zero unique behavioral coverage.
-//   - Removed "displayXp useEffect" describe block (2 tests):
-//     * "updates displayXp when playerStats.xp changes" — tests React useState state
-//       sync via rerender. This is a React internals test, not business logic.
-//     * "defaults displayXp to 0" — same issue; trivial default value handling.
-//   - Removed "XP Modal apply" describe block (3 tests):
-//     * "updates XP via setRuntimeValue" — asserts setRuntimeValue call args (internal).
-//     * "does not update XP with non-numeric" — asserts setRuntimeValue was NOT called
-//       (internal state, not observable behavior).
-//     * "closes modal with empty delta" — tests modal visibility (structural change
-//       brittle), not behavioral coverage. The modal close is a side effect of the
-//       handleXpSave early return, which is implementation detail.
-//   - Kept "XP Modal preview calculation" (4 tests) — observable UI behavior (preview
-//     text rendering with positive/negative/clamped/non-numeric deltas).
-//   - Kept "Bait and Switch AC bonus display" (2 tests) — unique behavioral coverage
-//     not present in any other test file.
-//   - Removed setRuntimeValue import (no longer used after cleanup).
-//   - Removed unused Popup and AllySelectionModal mocks.
-//   - Reduced file from 285 lines / 15 tests to 127 lines / 6 tests.
+// Coverage ownership (CharSummary family delegation):
+//   OWNED HERE (unique behavioral coverage — no sibling covers these):
+//   - XP modal open → preview calculation (positive / negative / clamped /
+//     non-numeric deltas)
+//   - XP modal Apply → displayed XP updates, clamped to 0, and the write
+//     reaches the runtime store (server-first: other players see it)
+//   - XP modal Apply-with-empty-delta and Cancel → modal closes, XP and
+//     runtime store untouched
+//   - Milestone checkbox → subtitle switches between "(N XP)" and
+//     "(milestone)", persisted via the runtime store
+//   - Bait and Switch AC badge rendering and its contribution to the AC total
+//
+// NOT owned here (delegated — do not re-add):
+//   - XP subtitle rerender on playerStats.xp prop change, window events
+//     → CharSummary-EventHandlers.test.jsx
+//   - "(milestone)" subtitle row content → CharSummary-Display.test.jsx
+//   - Other AC badges / AC totals → CharSummary-BadgesAndAC.test.jsx
+//   - Surge badges → CharSummary-WildMagic.test.jsx
+//
+// Notes on what used to live here and stays removed:
+//   - displayXp useState sync and "hides/shows info text" tests — React
+//     internals trivia, zero business-logic value.
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
-import { useRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { mockPlayerStats, mockCampaignName } from './CharSummary.test-mocks.test.jsx';
 
 vi.mock('./CharGold.jsx', () => ({ default: () => <div data-testid="char-gold">Gold</div> }));
@@ -128,7 +118,40 @@ vi.mock('../../../services/automation/handlers/buffs/deathWardHandler.js', () =>
 }));
 
 // ---------------------------------------------------------------------------
-// Shared setup — window.location.hostname for isLocalhost gating
+// Helpers
+// ---------------------------------------------------------------------------
+
+// XP-mode fixture with a fresh per-test object (the milestone toggle mutates
+// playerStats.xpMode in place, so the shared mock must never be handed in).
+const xpStats = (xp = 2300) => ({ ...mockPlayerStats, xp, xpMode: 'experience' });
+
+function renderSummary(stats) {
+    return render(
+        <CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />
+    );
+}
+
+// Opens the XP modal via the clickable XP suffix in the subtitle and
+// returns the delta input (role: spinbutton, labelled "Add or subtract XP:").
+function openXpModal(stats = xpStats()) {
+    renderSummary(stats);
+    const suffix = stats.xpMode === 'experience' ? /\d XP\)/ : /\(milestone\)/;
+    fireEvent.click(screen.getByText(suffix));
+    return screen.getByRole('spinbutton', { name: /add or subtract xp/i });
+}
+
+function typeDelta(input, value) {
+    fireEvent.change(input, { target: { value } });
+}
+
+function clickButton(name) {
+    fireEvent.click(screen.getByRole('button', { name }));
+}
+
+const armorClassLine = () => screen.getByText('Armor Class:', { selector: 'b' }).parentElement;
+
+// ---------------------------------------------------------------------------
+// Setup — pin hostname; all runtime reads default to null
 // ---------------------------------------------------------------------------
 beforeEach(() => {
     vi.clearAllMocks();
@@ -139,75 +162,119 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    window.location.hostname = '';
+    window.location.hostname = 'localhost';
 });
 
 // ---------------------------------------------------------------------------
-// XP Modal — preview calculation
+// XP Modal — open, preview, apply, cancel, mode toggle
 // ---------------------------------------------------------------------------
-describe('XP Modal preview calculation', () => {
-    it('displays preview with positive delta', () => {
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        const milestoneText = screen.getByText(/milestone/);
-        fireEvent.click(milestoneText);
-        const input = screen.getByPlaceholderText('+100 or -50');
-        fireEvent.change(input, { target: { value: '100' } });
-        expect(screen.getByText(/2,400 XP/)).toBeVisible();
+describe('XP Modal', () => {
+    it('opens from the clickable XP suffix showing the current XP with no preview yet', () => {
+        openXpModal(xpStats());
+        expect(screen.getByText('Current: 2,300 XP')).toBeInTheDocument();
+        expect(screen.queryByText(/→/)).not.toBeInTheDocument();
     });
 
-    it('displays preview with negative delta', () => {
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        const milestoneText = screen.getByText(/milestone/);
-        fireEvent.click(milestoneText);
-        const input = screen.getByPlaceholderText('+100 or -50');
-        fireEvent.change(input, { target: { value: '-50' } });
-        expect(screen.getByText(/2,250 XP/)).toBeVisible();
+    it.each([
+        { label: 'positive', delta: '100', expected: '→ 2,400 XP' },
+        { label: 'negative', delta: '-50', expected: '→ 2,250 XP' },
+        { label: 'clamped to zero', delta: '-999', xp: 10, expected: '→ 0 XP' },
+    ])('previews the new total for a $label delta', ({ delta, xp, expected }) => {
+        const input = openXpModal(xpStats(xp));
+        typeDelta(input, delta);
+        expect(screen.getByText(expected)).toBeVisible();
     });
 
-    it('clamps preview to minimum of 0 XP', () => {
-        const stats = { ...mockPlayerStats, xp: 10, xpMode: 'experience' };
-        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        const xpText = screen.getByText(/10 XP/);
-        fireEvent.click(xpText);
-        const input = screen.getByPlaceholderText('+100 or -50');
-        fireEvent.change(input, { target: { value: '-999' } });
-        expect(screen.getByText(/→ 0 XP/)).toBeVisible();
+    // jsdom sanitizes a type=number input to '' when a non-numeric value is
+    // set, so both entry states must keep the preview arrow hidden.
+    it.each([
+        { label: 'non-numeric', delta: 'abc' },
+        { label: 'empty', delta: '' },
+    ])('hides the preview arrow when the delta is $label', ({ delta }) => {
+        const input = openXpModal(xpStats());
+        typeDelta(input, '+100');
+        typeDelta(input, delta);
+        expect(screen.getByText('Current: 2,300 XP')).toBeInTheDocument();
+        expect(screen.queryByText(/→/)).not.toBeInTheDocument();
     });
 
-    it('hides preview when delta is non-numeric', () => {
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        const milestoneText = screen.getByText(/milestone/);
-        fireEvent.click(milestoneText);
-        const input = screen.getByPlaceholderText('+100 or -50');
-        fireEvent.change(input, { target: { value: 'abc' } });
-        expect(screen.queryByText(/2,400 XP/)).not.toBeInTheDocument();
+    it.each([
+        { delta: '100', expected: 2400 },
+        { delta: '-250', expected: 2050 },
+        { delta: '-99999', expected: 0 },
+    ])('apply of delta $delta updates the displayed XP and persists the clamped total', ({ delta, expected }) => {
+        const input = openXpModal(xpStats());
+        typeDelta(input, delta);
+        clickButton('Apply');
+
+        expect(screen.getByText(`(${expected.toLocaleString()} XP)`)).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+        // Server-first: the persisted write is the cross-player behavior.
+        expect(setRuntimeValue).toHaveBeenCalledWith('Thorin', 'xp', expected, mockCampaignName);
+    });
+
+    it.each([
+        { label: 'applying with an empty delta', action: () => clickButton('Apply') },
+        { label: 'cancelling', action: () => clickButton('Cancel') },
+    ])('leaves XP and the runtime store untouched when $label', ({ action }) => {
+        openXpModal(xpStats());
+        action();
+
+        expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument();
+        expect(screen.getByText('(2,300 XP)')).toBeInTheDocument();
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('Thorin', 'xp', expect.anything(), mockCampaignName);
+    });
+
+    it.each([
+        { from: 'experience', to: 'milestone', suffix: '(milestone)' },
+        { from: 'milestone', to: 'experience', suffix: '(2,300 XP)' },
+    ])('toggling the Milestone checkbox switches the subtitle to $suffix and persists the mode', ({ from, to, suffix }) => {
+        openXpModal({ ...mockPlayerStats, xpMode: from });
+        fireEvent.click(screen.getByRole('checkbox', { name: /milestone leveling/i }));
+
+        expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument();
+        expect(screen.getByText(suffix)).toBeInTheDocument();
+        expect(setRuntimeValue).toHaveBeenCalledWith('Thorin', 'xpMode', to, mockCampaignName);
     });
 });
 
 // ---------------------------------------------------------------------------
-// Bait and Switch AC Bonus — runtime values (via getRuntimeValue)
+// Bait and Switch AC badge — sourced from runtime values (charSummaryCalc
+// reads them through the mocked getRuntimeValue)
 // ---------------------------------------------------------------------------
 describe('Bait and Switch AC bonus display', () => {
     it.each([
-        [3, 'Bait and Switch', /\+3 from Bait and Switch/],
-        [5, 'Trickster', /\+5 from Trickster/],
-    ])('shows AC bonus with value %i from %s', (bonus, source, expectedText) => {
+        { bonus: 3, source: 'Bait and Switch', ac: 21 },
+        { bonus: 5, source: 'Trickster', ac: 23 },
+        // No stored source → badge falls back to the generic label.
+        { bonus: 2, source: null, ac: 20 },
+    ])('adds +$bonus to AC attributing to $source', ({ bonus, source, ac }) => {
         vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
             if (key === 'baitAndSwitchActive') return true;
             if (key === 'baitAndSwitchBonus') return bonus;
             if (key === 'baitAndSwitchSource') return source;
             return null;
         });
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(expectedText)).toBeVisible();
+        renderSummary(mockPlayerStats);
+
+        const acLine = armorClassLine();
+        expect(screen.getByText(new RegExp(`\\+${bonus} from ${source || 'Bait and Switch'}`))).toBeVisible();
+        // The badge is not decorative — the bonus is included in the AC total.
+        expect(acLine).toHaveTextContent(`Armor Class: ${ac}`);
     });
 
-    it('does not show bait and switch when active is false', () => {
+    it.each([
+        { label: 'inactive', active: false, bonus: 3 },
+        { label: 'active but no bonus stored', active: true, bonus: 0 },
+    ])('shows no badge when bait and switch is $label', ({ active, bonus }) => {
         vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-            if (key === 'baitAndSwitchActive') return false;
+            if (key === 'baitAndSwitchActive') return active;
+            if (key === 'baitAndSwitchBonus') return bonus;
             return null;
         });
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.queryByText(/Bait and Switch/)).not.toBeInTheDocument();
+        renderSummary(mockPlayerStats);
+
+        expect(screen.queryByText(/from Bait and Switch/)).not.toBeInTheDocument();
+        expect(armorClassLine()).toHaveTextContent('Armor Class: 18');
     });
 });

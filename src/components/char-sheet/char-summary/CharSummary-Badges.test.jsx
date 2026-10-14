@@ -1,8 +1,47 @@
+// @improved-by-ai
+//
+// Coverage ownership: the two SUMMARY_BADGE_SPECS badges driven by runtime combat state
+// that no other CharSummary-* sibling asserts:
+//   - Starry Form constellation badge (starryFormBadge reads activeBuffs runtime value;
+//     this is the ONLY file asserting the `Starry Form - <constellation>` label)
+//   - Nature's Sanctuary info badge (computeSanctuaryInfo creatures loop; the ONLY file
+//     asserting the plain 'Sanctuary' summary-badge label)
+//
+// NOT owned here (delegated to siblings — do not re-add):
+//   - AC badges / acPenalty paths → CharSummary-BadgesAndAC.test.jsx
+//   - Haste / Shield / Barkskin AC buff badges → CharSummary-BuffEffects.test.jsx
+//   - Starry Form *resistance row* (getActiveBuffs → Resistances line,
+//     a different code path) and Aura of Life / Heroes' Feast badges → CharSummary-BuffResistances.test.jsx
+//   - Cover badges incl. "+2 Cover: Nature's Sanctuary" (computed from `characters` prop,
+//     which this file never passes) → CharSummary-Cover.test.jsx
+//   - Wrath of the Sea badge → CharSummary-AdditionalCoverage.test.jsx
+//
+// Quality improvements over previous revision:
+//   - Uses shared mockPlayerStats/mockCampaignName from CharSummary.test-mocks.test.jsx
+//     (removed a 28-line duplicate fixture).
+//   - Deterministic beforeEach: clearAllMocks() keeps mock implementations, so the
+//     previous revision leaked each test's mockImplementation/getCombatSummary return
+//     value into later tests. beforeEach now re-pins inert defaults; tests opt in
+//     via the mockRuntime() helper fixture.
+//   - Added '@testing-library/jest-dom' import (family convention).
+//   - Removed window.location.hostname mutation (jsdom URL is already localhost).
+//   - Starry Form badge assertions now verify the semantic badge class and that the
+//     tooltip carries the constellation and its constellation-specific benefit
+//     (previous tests matched the label text only — any element with that text passed).
+//   - Added "other buff carries a constellation" negative (guards the name-match rule).
+//   - Sanctuary tests scope the query to the exact 'Sanctuary' badge label (previous
+//     /Sanctuary/ regex would also match cover-badge text) and verify tooltip
+//     attribution (protector druid + resistance), including the 'None' default.
+//   - Added negative paths for computeSanctuaryInfo loop guards: inactive sanctuary,
+//     player not in creatures list, non-player caster (previous file had zero).
+
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import '@testing-library/jest-dom';
 import CharSummary from './CharSummary.jsx';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
+import { mockPlayerStats, mockCampaignName } from './CharSummary.test-mocks.test.jsx';
 
 vi.mock('./CharGold.jsx', () => ({ default: () => <div data-testid="char-gold">Gold</div> }));
 vi.mock('./CharHitPoints.jsx', () => ({ default: () => <div data-testid="char-hp">HP</div> }));
@@ -42,6 +81,7 @@ vi.mock('../../../services/combat/buffs/buffService.js', () => ({
     getActiveBuffs: vi.fn(() => []),
 }));
 
+// Rules/attack stubs are required transitively by charSummaryCalc during render.
 vi.mock('../../../services/rules/rulesFactory.js', () => ({
     default: {
         getRules: vi.fn(() => ({ classRules: { getUnarmoredMovementIncrease: vi.fn(() => 0) } })),
@@ -85,98 +125,105 @@ vi.mock('../../../services/automation/handlers/buffs/deathWardHandler.js', () =>
     handle: vi.fn(),
 }));
 
-const mockPlayerStats = {
-    name: 'Thorin',
-    xp: 2300,
-    xpMode: 'milestone',
-    race: { name: 'Dwarf', type: 'Hill Dwarf', subrace: { name: 'Hill Dwarf', speed: 25 } },
-    class: { name: 'Cleric', subclass: { name: 'War', type: 'Choice' }, major: { name: 'Cleric' } },
-    level: 5,
-    alignment: 'Lawful Good',
-    proficiency: 3,
-    initiative: 2,
-    initiativeAdvantage: false,
-    abilities: [{ name: 'Wisdom', bonus: 3 }, { name: 'Strength', bonus: 2 }],
-    armorClass: 18,
-    armorClassFormula: '16 + 2 (shield)',
-    hitPoints: 45,
-    inventory: { equipped: ['Scale Mail', 'Shield'] },
-    equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }, { name: 'Shield', type: 'Shield' }],
-    background: 'Soldier',
-    immunities: [],
-    resistances: [],
-    vulnerabilities: [],
-    senses: [],
-    proficiencies: [],
-    languages: [],
-    automation: { passives: [], actions: [] },
-    passives: [],
-    exhaustionLevel: 0,
-};
+beforeEach(() => {
+    vi.clearAllMocks();
+    // clearAllMocks preserves implementations — re-pin inert defaults so
+    // per-test overrides never leak across cases.
+    vi.mocked(getRuntimeValue).mockReturnValue(null);
+    vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] });
+});
 
-const mockCampaignName = 'test-campaign';
+/** Route getRuntimeValue lookups through a `${name}.${key}` → value fixture. */
+function mockRuntime(lookups = {}) {
+    vi.mocked(getRuntimeValue).mockImplementation((name, key) => lookups[`${name}.${key}`] ?? null);
+}
 
-describe('CharSummary - Starry Form Constellation Badge', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        window.location.hostname = 'localhost';
+function renderSummary() {
+    render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+}
+
+// ---------------------------------------------------------------------------
+// Starry Form constellation badge (activeBuffs runtime value → SUMMARY_BADGE_SPECS)
+// ---------------------------------------------------------------------------
+describe('CharSummary — Starry Form constellation badge', () => {
+    it.each([
+        ['Archer', 'Luminous Arrow'],
+        ['Chalice', 'Healing spells'],
+        ['Dragon', 'Concentration checks'],
+    ])('renders buff badge for the %s constellation with its benefit in the tooltip', (constellation, expectedBenefit) => {
+        mockRuntime({ 'Thorin.activeBuffs': [{ name: 'Starry Form', constellation }] });
+
+        renderSummary();
+
+        const badge = screen.getByText(`Starry Form - ${constellation}`);
+        expect(badge).toBeInTheDocument();
+        expect(badge).toHaveClass('creature-badge', 'effect-buff');
+        expect(badge).toHaveAttribute('title', expect.stringContaining(constellation));
+        expect(badge).toHaveAttribute('title', expect.stringContaining(expectedBenefit));
     });
 
-    it.each`
-        constellation   | expectedLabel
-        ${'Archer'}     | ${'Starry Form - Archer'}
-        ${'Chalice'}    | ${'Starry Form - Chalice'}
-    `('renders Starry Form badge with $constellation constellation', ({ constellation, expectedLabel }) => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-            if (key === 'activeBuffs') {
-                return [{ name: 'Starry Form', constellation }];
-            }
-            return null;
-        });
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(expectedLabel)).toBeInTheDocument();
-    });
+    it.each([
+        ['buff has no constellation', [{ name: 'Starry Form' }]],
+        ['a different buff carries the constellation', [{ name: 'Haste', constellation: 'Archer' }]],
+        ['no active buffs', []],
+    ])('does not render the badge when %s', (_description, activeBuffs) => {
+        mockRuntime({ 'Thorin.activeBuffs': activeBuffs });
 
-    it.each`
-        activeBuffs               | description
-        $[{ name: 'Starry Form' }] | 'no constellation on buff'
-        $[]                       | 'no active buffs'
-    `('does not render Starry Form badge when $description', ({ activeBuffs }) => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-            if (key === 'activeBuffs') {
-                return activeBuffs;
-            }
-            return null;
-        });
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.queryByText(/Starry Form/)).not.toBeInTheDocument();
+        renderSummary();
+
+        expect(screen.queryAllByText(/Starry Form/)).toHaveLength(0);
     });
 });
 
 // ---------------------------------------------------------------------------
-// Sanctuary info badge from creatures loop (sanctuaryInfoChar useMemo)
-// Consolidated from CharSummary-ExtraCoverage.test.jsx.
+// Nature's Sanctuary info badge (computeSanctuaryInfo creatures loop)
 // ---------------------------------------------------------------------------
-describe('CharSummary - Sanctuary Info Badge from Creatures Loop', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        window.location.hostname = 'localhost';
-    });
-
-    it('renders Sanctuary badge when another player druid has sanctuary on the player', () => {
+describe('CharSummary — Nature\'s Sanctuary info badge', () => {
+    function mockDruidSanctuary({ active = true, creatures = ['Thorin'], resistance = 'Cold' } = {}) {
         vi.mocked(getCombatSummary).mockReturnValue({
             creatures: [
                 { name: 'Druid1', type: 'player' },
                 { name: 'Thorin', type: 'player' },
             ],
         });
-        vi.mocked(getRuntimeValue).mockImplementation((name, key, _campaign) => {
-            if (name === 'Druid1' && key === 'naturesSanctuaryActive') return true;
-            if (name === 'Druid1' && key === 'naturesSanctuaryCreatures') return ['Thorin'];
-            if (name === 'Druid1' && key === 'naturesSanctuaryResistance') return 'Cold';
-            return null;
+        mockRuntime({
+            'Druid1.naturesSanctuaryActive': active,
+            'Druid1.naturesSanctuaryCreatures': creatures,
+            'Druid1.naturesSanctuaryResistance': resistance,
         });
-        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByText(/Sanctuary/)).toBeInTheDocument();
+    }
+
+    it.each`
+        resistance      | expectedTooltipFragment
+        ${'Cold'}       | ${'Cold resistance'}
+        ${null}         | ${'None resistance'}
+    `('attributes protection to the druid and $expectedTooltipFragment in the tooltip', ({ resistance, expectedTooltipFragment }) => {
+        mockDruidSanctuary({ resistance });
+
+        renderSummary();
+
+        const badge = screen.getByText('Sanctuary');
+        expect(badge).toBeInTheDocument();
+        expect(badge).toHaveClass('creature-badge', 'effect-buff');
+        expect(badge).toHaveAttribute('title', expect.stringContaining('Protected by Druid1'));
+        expect(badge).toHaveAttribute('title', expect.stringContaining(expectedTooltipFragment));
+    });
+
+    it.each([
+        ['sanctuary is inactive', () => mockDruidSanctuary({ active: false })],
+        ['player is not in the sanctuary creatures list', () => mockDruidSanctuary({ creatures: ['SomeoneElse'] })],
+        ['the sanctuary caster is not a player', () => {
+            vi.mocked(getCombatSummary).mockReturnValue({ creatures: [{ name: 'Druid1', type: 'monster' }] });
+            mockRuntime({
+                'Druid1.naturesSanctuaryActive': true,
+                'Druid1.naturesSanctuaryCreatures': ['Thorin'],
+            });
+        }],
+    ])('does not render the Sanctuary badge when %s', (_description, setup) => {
+        setup();
+
+        renderSummary();
+
+        expect(screen.queryByText('Sanctuary')).not.toBeInTheDocument();
     });
 });

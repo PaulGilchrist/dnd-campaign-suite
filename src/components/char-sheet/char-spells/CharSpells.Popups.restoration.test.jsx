@@ -1,509 +1,433 @@
+// @improved-by-ai
+/**
+ * CharSpells — Restoration spell popups (Greater Restoration / Lesser Restoration).
+ *
+ * Covers the two-step restoration flow CharSpells wires through TargetSpellPopups:
+ * target picker → live detection of removable effects/conditions from the runtime
+ * store and combat summary → confirm payload, skip, and no-effects paths.
+ *
+ * SecondaryTargetModal is stubbed with a faithful minimal contract (radio row
+ * selects, confirm button dispatches `onTargetSelected(selected)`, Skip closes)
+ * so tests exercise real user behavior via accessible roles without reaching
+ * into modal internals (map distance badges, styling). Other CharSpells
+ * behaviors are covered by the sibling CharSpells.*.test.jsx files.
+ */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharSpells from './CharSpells.jsx';
 import { mockPlayerStats } from './CharSpells.test-utils.js';
+import CharSpells from './CharSpells.jsx';
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  useRuntimeValue: vi.fn(() => []),
-  getRuntimeValue: vi.fn(() => null),
-  setRuntimeValue: vi.fn(),
-}));
-
-vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
-  default: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn() })),
-}));
-
-let mockDiceRoll = { rollAttack: vi.fn(), rollDamage: vi.fn(), autoDamageRoll: null };
-
-vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
-  default: vi.fn((name, campaignName, options) => {
-    mockDiceRoll.autoDamageRoll = options?.autoDamageRoll;
-    return {
-      popupHtml: null,
-      setPopupHtml: vi.fn(),
-      rollAttack: mockDiceRoll.rollAttack,
-      rollDamage: mockDiceRoll.rollDamage,
-      quickRollPlayerSave: vi.fn(),
-    };
-  }),
-}));
-
-vi.mock('../../../hooks/combat/DiceRollContext.js', () => ({
-  useDiceRollPopup: vi.fn(() => ({ setPopupHtml: vi.fn() })),
-}));
-
-vi.mock('../../../hooks/combat/useSpellMetamagicFlow.js', () => ({
-  useSpellMetamagicFlow: vi.fn(),
-}));
-
-vi.mock('../../../hooks/combat/useSpellUpcastFlow.js', () => ({
-  useSpellUpcastFlow: vi.fn(),
-}));
-
-vi.mock('../../../hooks/combat/useSpellCastExecutor.js', () => ({
-  useSpellCastExecutor: vi.fn(() => ({ castAction: vi.fn() })),
-}));
-
-vi.mock('../../../hooks/combat/useSpellPositionResolver.js', () => ({
-  useSpellPositionResolver: vi.fn(() => ({
-    resolvePositions: vi.fn(() => Promise.resolve()),
-    cachedPosRef: { current: null },
-  })),
-}));
-
-vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => Promise.resolve(null)),
-  getTargetFromAttacker: vi.fn(() => null),
-}));
-
-vi.mock('../../../services/encounters/combatData.js', () => ({
-  getCombatSummary: vi.fn(() => ({ creatures: [] })),
-}));
-
-vi.mock('../../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue({ players: [], placedItems: [] }),
-}));
-
-vi.mock('../../../services/rules/combat/rangeValidation.js', () => ({
-  getNearestPlacedItem: vi.fn(() => null),
-}));
-
-vi.mock('../../../services/ui/dataLoader.js', () => ({
-  loadMonsters: vi.fn(),
-}));
-
-vi.mock('../../../services/combat/buffs/buffService.js', () => ({
-  isInnateSorceryActive: vi.fn(() => false),
-}));
-
-vi.mock('../../../services/automation/handlers/spells/shapechangeService.js', () => ({
-  confirmShapechangeTransform: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
-  prepareSpellCast: vi.fn().mockResolvedValue(undefined),
-  isFreeCastAuthorized: vi.fn(() => false),
-  isWizardRitualAdeptSpell: vi.fn(() => false),
-}));
-
-vi.mock('../useAttackDamageResolution.js', () => ({
-  normalizeAutoDamage: vi.fn(() => ({ attack: { name: 'Fire Bolt' }, ctx: { targetName: 'Orc' } })),
-  resolveAttackDamageStandalone: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('./CharSpellSlots.jsx', () => ({
-  default: function CharSpellSlots() {
-    return <div data-testid="char-spell-slots">Spell Slots</div>;
-  },
-}));
-
-vi.mock('./SpellDetailPopup.jsx', () => ({
-  default: function SpellDetailPopup({ spell, onCast }) {
-    return (
-      <div data-testid="spell-detail-popup">
-        <span>{spell?.name}</span>
-        <button data-testid="cast-spell-button" onClick={() => onCast(spell, {})}>Cast</button>
-      </div>
-    );
-  },
-}));
-
-vi.mock('../popups/MetamagicPopup.jsx', () => ({
-  default: function MetamagicPopup({ spell, playerStats, onConfirm, onSkip }) {
-    return (
-      <div data-testid="metamagic-popup">
-        <span>{spell?.name}</span>
-        <span data-testid="metamagic-sp">{playerStats?._metamagicCurrentSP}</span>
-        <button data-testid="metamagic-confirm" onClick={onConfirm}>confirm</button>
-        <button data-testid="metamagic-skip" onClick={onSkip}>skip</button>
-      </div>
-    );
-  },
-}));
-
-vi.mock('../popups/MultiTargetPopup.jsx', () => ({
-  default: function MultiTargetPopup({ spell, creatureTargets, onConfirm, onSkip }) {
-    return (
-      <div data-testid="multi-target-popup">
-        <span>{spell?.name}</span>
-        <button data-testid="mt-confirm" onClick={() => onConfirm({ targets: creatureTargets })}>confirm</button>
-        <button data-testid="mt-skip" onClick={onSkip}>skip</button>
-      </div>
-    );
-  },
-}));
-
-vi.mock('../popups/MagicMissileTargetPopup.jsx', () => ({
-  default: function MagicMissileTargetPopup({ spell, totalMissiles, currentTargetName, creatureTargets, onConfirm, onSkip }) {
-    return (
-      <div data-testid="magic-missile-popup">
-        <span>{spell?.name}</span>
-        <span data-testid="mm-total">{totalMissiles}</span>
-        <span data-testid="mm-current-target">{currentTargetName}</span>
-        <button data-testid="mm-confirm" onClick={() => onConfirm({ targets: creatureTargets })}>confirm</button>
-        <button data-testid="mm-skip" onClick={onSkip}>skip</button>
-      </div>
-    );
-  },
-}));
-
-vi.mock('./UpcastPopup.jsx', () => ({
-  default: function UpcastPopup({ spell }) {
-    return <div data-testid="upcast-popup">{spell?.name}</div>;
-  },
-}));
-
-vi.mock('../modals/shared/SecondaryTargetModal.jsx', () => ({
-  default: function SecondaryTargetModal({ title, targets, onTargetSelected, onSkip, hideConfirm, description }) {
-    return (
-      <div data-testid="secondary-target-modal" data-title={title} data-hideconfirm={String(Boolean(hideConfirm))}>
-        <span>{title}</span>
-        <span data-testid="stm-description">{description}</span>
-        <button data-testid="stm-skip" onClick={() => onSkip?.()}>skip</button>
-        {targets?.map(t => (
-          <button key={t.value || t.name} data-testid={`stm-${t.value || t.name}`} onClick={() => onTargetSelected?.(t.value || t.name)}>
-            {t.label || t.name}
-          </button>
-        ))}
-        {!hideConfirm && targets?.length > 0 && (
-          <button data-testid="stm-confirm" onClick={() => onTargetSelected?.(targets[0].value || targets[0].name)}>confirm</button>
-        )}
-      </div>
-    );
-  },
-}));
-
-import { useSpellMetamagicFlow } from '../../../hooks/combat/useSpellMetamagicFlow.js';
-import { useSpellUpcastFlow } from '../../../hooks/combat/useSpellUpcastFlow.js';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { isInnateSorceryActive } from '../../../services/combat/buffs/buffService.js';
-import { getTargetFromAttacker } from '../../../services/rules/combat/damageUtils.js';
-import { getCombatSummary } from '../../../services/encounters/combatData.js';
-import { normalizeAutoDamage, resolveAttackDamageStandalone } from '../useAttackDamageResolution.js';
-
-const PENDING_KEYS = [
-  'Metamagic', 'MultiTarget', 'HeroesFeast', 'GreaterRestoration', 'LesserRestoration',
-  'MageArmor', 'Bane', 'Bless', 'FaerieFire', 'HolyAura', 'BeaconOfHope', 'Slow', 'Haste',
-  'EnhanceAbility', 'Barkskin', 'Invisibility', 'GreaterInvisibility', 'FeignDeath', 'Heal',
-  'ProtectionFromEvilAndGood', 'ProtectionFromPoison', 'StoneSkin', 'ProtectionFromEnergy',
-  'Resistance', 'RemoveCurse', 'MagicMissile', 'PassWithoutTrace', 'Globe', 'Forcecage',
-  'AntimagicField', 'Regenerate', 'HealingWord', 'CureWounds', 'StinkingCloud', 'Web',
-  'AnimalFriendship', 'AuraOfLife', 'AuraOfPurity', 'CircleOfPower', 'Compulsion',
-  'AuraOfVitality', 'Foresight', 'Longstrider', 'SpareTheDying', 'Confusion', 'DeathWard',
-  'Heroism', 'Revivify', 'Sanctuary', 'SleetStorm', 'Shapechange',
-];
-
-function createFlow(overrides = {}) {
-  const flow = { gateMetamagic: vi.fn(), handleConfirm: vi.fn(), handleSkip: vi.fn() };
-  for (const key of PENDING_KEYS) {
-    flow[`pending${key}`] = null;
-    flow[`handle${key}Confirm`] = vi.fn();
-    flow[`handle${key}Skip`] = vi.fn();
-  }
-  flow.enhanceAbilityStage = null;
-  flow.protectionFromEnergyStage = null;
-  flow.resistanceStage = null;
-  flow.handleEnhanceAbilityAbilitySelect = vi.fn();
-  flow.handleProtectionFromEnergyTargetSelect = vi.fn();
-  flow.handleProtectionFromEnergyTypeSelect = vi.fn();
-  flow.handleResistanceTargetSelect = vi.fn();
-  flow.handleResistanceTypeSelect = vi.fn();
-  flow.handleResistanceSkip = vi.fn();
-  flow.handleGreaterRestorationNoEffects = vi.fn();
-  flow.pendingHoldMonster = null; flow.handleHoldMonsterConfirm = vi.fn(); flow.handleHoldMonsterSkip = vi.fn();
-  flow.pendingHoldPerson = null; flow.handleHoldPersonConfirm = vi.fn(); flow.handleHoldPersonSkip = vi.fn();
-  flow.pendingPolymorph = null; flow.handlePolymorphConfirm = vi.fn(); flow.handlePolymorphSkip = vi.fn();
-  flow.pendingAnimalShapes = null; flow.handleAnimalShapesTargetConfirm = vi.fn(); flow.handleAnimalShapesSkip = vi.fn();
-  flow.pendingTruePolymorph = null; flow.handleTruePolymorphPathSelect = vi.fn(); flow.handleTruePolymorphTargetConfirm = vi.fn(); flow.handleTruePolymorphSkip = vi.fn();
-  flow.pendingCharmPerson = null; flow.handleCharmPersonConfirm = vi.fn(); flow.handleCharmPersonSkip = vi.fn();
-  flow.pendingCharmMonster = null; flow.handleCharmMonsterConfirm = vi.fn(); flow.handleCharmMonsterSkip = vi.fn();
-  flow.pendingBanishment = null; flow.handleBanishmentConfirm = vi.fn(); flow.handleBanishmentSkip = vi.fn();
-  flow.pendingPrismaticSpray = null; flow.handlePrismaticSprayConfirm = vi.fn(); flow.handlePrismaticSpraySkip = vi.fn();
-  return { ...flow, ...overrides };
-}
-
+// Flow hook return values are plain closures over these per-test stubs, so no
+// resetAllMocks games are needed to keep them stable across tests.
 let flow;
 let upcastFlow;
 
-function renderWithProps(props = {}) {
-  return render(<CharSpells
-    playerStats={mockPlayerStats}
-    campaignName="test-campaign"
-    {...props}
-  />);
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+  useRuntimeValue: () => [],
+  getRuntimeValue: vi.fn(() => null),
+  setRuntimeValue: () => {},
+}));
+
+vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
+  default: () => ({}),
+}));
+
+vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  default: () => ({ rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn() }),
+}));
+
+vi.mock('../../../hooks/combat/DiceRollContext.js', () => ({
+  useDiceRollPopup: () => ({ setPopupHtml: vi.fn() }),
+}));
+
+vi.mock('../../../hooks/combat/useSpellMetamagicFlow.js', () => ({
+  useSpellMetamagicFlow: () => flow,
+}));
+
+vi.mock('../../../hooks/combat/useSpellUpcastFlow.js', () => ({
+  useSpellUpcastFlow: () => upcastFlow,
+}));
+
+vi.mock('../../../hooks/combat/useSpellCastExecutor.js', () => ({
+  useSpellCastExecutor: () => ({ castAction: vi.fn() }),
+}));
+
+vi.mock('../../../hooks/combat/useSpellPositionResolver.js', () => ({
+  useSpellPositionResolver: () => ({
+    resolvePositions: () => Promise.resolve(),
+    cachedPosRef: { current: null },
+  }),
+}));
+
+vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
+  getCombatContext: () => Promise.resolve(null),
+  getTargetFromAttacker: () => null,
+  getAttackerTargetName: () => null,
+}));
+
+vi.mock('../../../services/encounters/combatData.js', () => ({
+  getCombatSummary: vi.fn(() => Promise.resolve({ creatures: [] })),
+}));
+
+vi.mock('../../../services/maps/mapsService.js', () => ({
+  loadMapData: () => Promise.resolve({ players: [], placedItems: [] }),
+}));
+
+vi.mock('../../../services/rules/combat/rangeValidation.js', () => ({
+  getNearestPlacedItem: () => null,
+}));
+
+vi.mock('../../../services/ui/dataLoader.js', () => ({
+  loadMonsters: () => Promise.resolve([]),
+}));
+
+vi.mock('../../../services/combat/buffs/buffService.js', () => ({
+  isInnateSorceryActive: () => false,
+}));
+
+vi.mock('../../../services/automation/handlers/spells/shapechangeService.js', () => ({
+  confirmShapechangeTransform: () => Promise.resolve(),
+}));
+
+vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
+  prepareSpellCast: () => Promise.resolve(),
+  isFreeCastAuthorized: () => false,
+  isWizardRitualAdeptSpell: () => false,
+}));
+
+vi.mock('../useAttackDamageResolution.js', () => ({
+  normalizeAutoDamage: vi.fn(),
+  resolveAttackDamageStandalone: () => Promise.resolve(),
+}));
+
+// Sub-components unrelated to the restoration stage — inert so they can neither
+// fail nor pollute the queries these tests make.
+vi.mock('./CharSpellSlots.jsx', () => ({ default: () => null }));
+vi.mock('./SpellDetailPopup.jsx', () => ({ default: () => null }));
+vi.mock('./UpcastPopup.jsx', () => ({ default: () => null }));
+vi.mock('../popups/MetamagicPopup.jsx', () => ({ default: () => null }));
+vi.mock('../popups/MultiTargetPopup.jsx', () => ({ default: () => null }));
+vi.mock('../popups/MagicMissileTargetPopup.jsx', () => ({ default: () => null }));
+
+// Faithful minimal stub of SecondaryTargetModal: mirrors the real modal's user
+// contract — radio rows select, the confirm button dispatches the selection
+// (label via `value` for option targets, `name` for creature targets), and
+// `hideConfirm` with no targets suppresses the confirm button.
+vi.mock('../modals/shared/SecondaryTargetModal.jsx', async () => {
+  const { useState } = await import('react');
+  return {
+    default: function SecondaryTargetModalStub({ title, targets, onTargetSelected, onSkip, description, confirmLabel, hideConfirm }) {
+      const [selected, setSelected] = useState(null);
+      const keyOf = (t) => ('value' in t ? t.value : t.name);
+      return (
+        <div role="dialog" aria-label={title}>
+          {description && <p dangerouslySetInnerHTML={{ __html: description }} />}
+          {targets.map((t) => (
+            <label key={keyOf(t)}>
+              <input
+                type="radio"
+                name="secondary-target-option"
+                checked={selected === keyOf(t)}
+                onChange={() => setSelected(keyOf(t))}
+              />
+              {'value' in t ? t.label : t.name}
+            </label>
+          ))}
+          {(!hideConfirm || targets.length > 0) && (
+            <button type="button" disabled={!selected || targets.length === 0} onClick={() => onTargetSelected?.(selected)}>
+              {confirmLabel || 'Attack'}
+            </button>
+          )}
+          <button type="button" onClick={() => onSkip?.()}>Skip</button>
+        </div>
+      );
+    },
+  };
+});
+
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getCombatSummary } from '../../../services/encounters/combatData.js';
+
+// ── Per-test fixtures / helpers ───────────────────────────────────────────
+
+const CAMPAIGN = 'test-campaign';
+
+// Every popup in CharSpells is guarded by its own `pending*` truthiness check,
+// so only the restoration fields (plus the metamagic gate) need to exist here.
+function createRestorationFlowStub() {
+  return {
+    gateMetamagic: vi.fn(),
+    pendingGreaterRestoration: null,
+    handleGreaterRestorationConfirm: vi.fn(),
+    handleGreaterRestorationSkip: vi.fn(),
+    handleGreaterRestorationNoEffects: vi.fn(),
+    pendingLesserRestoration: null,
+    handleLesserRestorationConfirm: vi.fn(),
+    handleLesserRestorationSkip: vi.fn(),
+  };
+}
+
+function castGreaterRestoration(creatureTargets = ['Orc'], range = '60 feet') {
+  flow.pendingGreaterRestoration = { creatureTargets, range };
+}
+
+function castLesserRestoration(creatureTargets = ['Orc'], range = '30 feet') {
+  flow.pendingLesserRestoration = { creatureTargets, range };
+}
+
+/** What the runtime store reports for the targeted creature during effect detection. */
+function targetRuntimeState(state = {}) {
+  vi.mocked(getRuntimeValue).mockImplementation((name, key) => state[key] ?? null);
+}
+
+/** Combat summary reporting the given condition keys against the target creature. */
+function combatSummaryConditions(targetName, ...conditionKeys) {
+  vi.mocked(getCombatSummary).mockResolvedValue({
+    creatures: [{ name: targetName, conditions: conditionKeys.map((key) => ({ key })) }],
+  });
+}
+
+function renderCharSpells() {
+  return render(<CharSpells playerStats={mockPlayerStats} campaignName={CAMPAIGN} />);
+}
+
+/** Real modal contract: pick a radio row, then press the stage's confirm button. */
+function choose(optionName, confirmLabel) {
+  fireEvent.click(screen.getByRole('radio', { name: optionName }));
+  fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+}
+
+function clickSkip() {
+  fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
 }
 
 describe('CharSpells - Restoration Spells', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.resetAllMocks();
-    flow = createFlow();
+    flow = createRestorationFlowStub();
     upcastFlow = {
       pendingUpcast: null,
-      buildUpcastLevels: vi.fn(() => []),
-      gateUpcast: vi.fn(() => false),
+      buildUpcastLevels: () => [],
       handleUpcastConfirm: vi.fn(),
       handleUpcastCancel: vi.fn(),
-      getCantripAutoLevel: vi.fn(() => null),
     };
-    mockDiceRoll = { rollAttack: vi.fn(), rollDamage: vi.fn(), autoDamageRoll: null };
-    vi.mocked(useSpellMetamagicFlow).mockReturnValue(flow);
-    vi.mocked(useSpellUpcastFlow).mockReturnValue(upcastFlow);
-    vi.mocked(getRuntimeValue).mockReturnValue(null);
-    vi.mocked(isInnateSorceryActive).mockReturnValue(false);
-    vi.mocked(getTargetFromAttacker).mockReturnValue(null);
-    vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] });
-    vi.mocked(normalizeAutoDamage).mockReturnValue({ attack: { name: 'Fire Bolt' }, ctx: { targetName: 'Orc' } });
-    vi.mocked(resolveAttackDamageStandalone).mockResolvedValue(undefined);
+    targetRuntimeState();
+    vi.mocked(getCombatSummary).mockResolvedValue({ creatures: [] });
   });
 
   describe('Greater Restoration', () => {
-    it('renders target selection modal with creature buttons and skip', () => {
-      flow.pendingGreaterRestoration = { creatureTargets: ['Orc', 'Goblin'], range: '60 feet' };
-      renderWithProps();
+    it('asks for a target, listing creatures in range with confirm disabled until one is picked', () => {
+      castGreaterRestoration(['Orc', 'Goblin']);
+      renderCharSpells();
 
-      expect(screen.getByTestId('secondary-target-modal')).toBeInTheDocument();
-      expect(screen.getByText('Greater Restoration')).toBeInTheDocument();
-      expect(screen.getByText('Orc')).toBeInTheDocument();
-      expect(screen.getByText('Goblin')).toBeInTheDocument();
-      expect(screen.getByTestId('stm-skip')).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Greater Restoration' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Orc' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Goblin' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Greater Restoration' })).toHaveTextContent(/within 60 feet/i);
+      expect(screen.getByRole('button', { name: 'Cast Greater Restoration' })).toBeDisabled();
+      expect(flow.handleGreaterRestorationConfirm).not.toHaveBeenCalled();
     });
 
-    it('invokes the confirm handler with target name and condition selection when a condition is chosen', async () => {
-      flow.pendingGreaterRestoration = { creatureTargets: ['Orc'], range: '60 feet' };
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'activeConditions') return ['Charmed'];
-        if (key === 'exhaustionLevel') return 2;
-        if (key === 'activeBuffs') return [{ type: 'cursed' }];
-        if (key === 'abilityReductions') return { str: 1 };
-        if (key === 'hpMaxReduction') return 5;
-        return null;
+    it('lists every removable effect detected on the chosen target', async () => {
+      castGreaterRestoration();
+      targetRuntimeState({
+        activeConditions: ['Charmed'],
+        exhaustionLevel: 2,
+        activeBuffs: [{ type: 'cursed', name: 'Armor of Invulnerability' }],
+        abilityReductions: { str: 1 },
+        hpMaxReduction: 5,
       });
-      renderWithProps();
+      renderCharSpells();
 
-      fireEvent.click(screen.getByText('Orc'));
+      choose('Orc', 'Cast Greater Restoration');
 
-      await waitFor(() => {
-        expect(screen.getByTestId('stm-condition:charmed')).toBeInTheDocument();
-      });
-      expect(screen.getByTestId('stm-exhaustion')).toBeInTheDocument();
-      expect(screen.getByTestId('stm-curse')).toBeInTheDocument();
-      expect(screen.getByTestId('stm-ability_reduction')).toBeInTheDocument();
-      expect(screen.getByTestId('stm-hp_max_reduction')).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole('radio', { name: 'Charmed condition' })).toBeInTheDocument());
+      expect(screen.getByRole('radio', { name: 'Exhaustion level (current: 2)' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Curse (including attunement to cursed magic item)' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Ability score reduction' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Hit Point maximum reduction' })).toBeInTheDocument();
+    });
 
-      fireEvent.click(screen.getByTestId('stm-condition:charmed'));
+    it('confirms the chosen condition effect with its target', async () => {
+      castGreaterRestoration();
+      targetRuntimeState({ activeConditions: ['Charmed'] });
+      renderCharSpells();
+
+      choose('Orc', 'Cast Greater Restoration');
+      await waitFor(() => expect(screen.getByRole('radio', { name: 'Charmed condition' })).toBeInTheDocument());
+      choose('Charmed condition', 'Remove Effect');
+
       expect(flow.handleGreaterRestorationConfirm).toHaveBeenCalledWith({
         targetName: 'Orc',
         selections: [{ type: 'condition', condition: 'charmed' }],
       });
     });
 
-    it('invokes the confirm handler with target name and effect selection when a non-condition effect is chosen', async () => {
-      flow.pendingGreaterRestoration = { creatureTargets: ['Orc'], range: '60 feet' };
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'exhaustionLevel') return 3;
-        return null;
-      });
-      renderWithProps();
+    it('confirms exhaustion removal with a plain effect selection', async () => {
+      castGreaterRestoration();
+      targetRuntimeState({ exhaustionLevel: 3 });
+      renderCharSpells();
 
-      fireEvent.click(screen.getByText('Orc'));
+      choose('Orc', 'Cast Greater Restoration');
+      await waitFor(() => expect(screen.getByRole('radio', { name: 'Exhaustion level (current: 3)' })).toBeInTheDocument());
+      choose('Exhaustion level (current: 3)', 'Remove Effect');
 
-      await waitFor(() => {
-        expect(screen.getByTestId('stm-exhaustion')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByTestId('stm-exhaustion'));
       expect(flow.handleGreaterRestorationConfirm).toHaveBeenCalledWith({
         targetName: 'Orc',
         selections: [{ type: 'exhaustion' }],
       });
     });
 
-    it('invokes the skip handler when skip is clicked on the effect selection modal', async () => {
-      flow.pendingGreaterRestoration = { creatureTargets: ['Orc'], range: '60 feet' };
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'activeConditions') return ['Charmed'];
-        return null;
-      });
-      renderWithProps();
+    it('merges conditions from the runtime store and combat summary without duplicates', async () => {
+      castGreaterRestoration();
+      targetRuntimeState({ activeConditions: ['CHARMED', 'petrified'] });
+      combatSummaryConditions('Orc', 'charmed');
+      renderCharSpells();
 
-      fireEvent.click(screen.getByText('Orc'));
+      choose('Orc', 'Cast Greater Restoration');
 
-      await waitFor(() => {
-        expect(screen.getByTestId('stm-condition:charmed')).toBeInTheDocument();
-      });
-
-      flow.handleGreaterRestorationSkip();
-      expect(flow.handleGreaterRestorationSkip).toHaveBeenCalled();
+      await waitFor(() => expect(screen.getAllByRole('radio', { name: 'Charmed condition' })).toHaveLength(1));
+      expect(screen.getByRole('radio', { name: 'Petrified condition' })).toBeInTheDocument();
     });
 
-    it('invokes the no-effects handler when skip is clicked and no effects are found', async () => {
-      flow.pendingGreaterRestoration = { creatureTargets: ['Orc'], range: '60 feet' };
-      renderWithProps();
+    it('detects a curse from buff entries flagged by type or cursed property, listed once', async () => {
+      castGreaterRestoration();
+      targetRuntimeState({ activeBuffs: [{ type: 'cursed' }, { cursed: true }] });
+      renderCharSpells();
 
-      fireEvent.click(screen.getByText('Orc'));
+      choose('Orc', 'Cast Greater Restoration');
 
-      await waitFor(() => {
-        expect(screen.getByText('No removable effects found on Orc.')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByTestId('stm-skip'));
-      expect(flow.handleGreaterRestorationNoEffects).toHaveBeenCalled();
+      await waitFor(() => expect(screen.getAllByRole('radio', { name: /^Curse/ })).toHaveLength(1));
     });
 
-    it('deduplicates conditions from runtime and combat summary, showing exactly one option', async () => {
-      flow.pendingGreaterRestoration = { creatureTargets: ['Orc'], range: '60 feet' };
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'activeConditions') return ['CHARMED', 'petrified'];
-        return null;
-      });
-      vi.mocked(getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Orc', conditions: [{ key: 'charmed' }] }],
-      });
-      renderWithProps();
-      fireEvent.click(screen.getByText('Orc'));
+    it('cancels the cast when skipped at the target step', () => {
+      castGreaterRestoration();
+      renderCharSpells();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('stm-condition:charmed')).toBeInTheDocument();
-        expect(screen.getByTestId('stm-condition:petrified')).toBeInTheDocument();
-        expect(screen.queryAllByTestId('stm-condition:charmed').length).toBe(1);
-      });
+      clickSkip();
+
+      expect(flow.handleGreaterRestorationSkip).toHaveBeenCalledTimes(1);
+      expect(flow.handleGreaterRestorationConfirm).not.toHaveBeenCalled();
     });
 
-    it('detects curse from activeBuffs with type or cursed property', async () => {
-      flow.pendingGreaterRestoration = { creatureTargets: ['Orc'], range: '60 feet' };
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ type: 'cursed', name: 'Armor of Invulnerability' }, { cursed: true }];
-        return null;
-      });
-      renderWithProps();
-      fireEvent.click(screen.getByText('Orc'));
+    it('returns to the target step when skipped at the effect step, without casting', async () => {
+      castGreaterRestoration();
+      targetRuntimeState({ activeConditions: ['Charmed'] });
+      renderCharSpells();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('stm-curse')).toBeInTheDocument();
-      });
+      choose('Orc', 'Cast Greater Restoration');
+      await waitFor(() => expect(screen.getByRole('radio', { name: 'Charmed condition' })).toBeInTheDocument());
+      clickSkip();
+
+      expect(screen.getByRole('radio', { name: 'Orc' })).toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: 'Charmed condition' })).not.toBeInTheDocument();
+      expect(flow.handleGreaterRestorationConfirm).not.toHaveBeenCalled();
     });
 
-    it('detects ability score reduction, HP maximum reduction, and exhaustion level', async () => {
-      flow.pendingGreaterRestoration = { creatureTargets: ['Orc'], range: '60 feet' };
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'abilityReductions') return { str: 3, dex: 2 };
-        if (key === 'hpMaxReduction') return 10;
-        if (key === 'exhaustionLevel') return 3;
-        return null;
-      });
-      renderWithProps();
-      fireEvent.click(screen.getByText('Orc'));
+    it('reports no removable effects and routes dismissal to the no-effects handler', async () => {
+      castGreaterRestoration();
+      renderCharSpells();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('stm-ability_reduction')).toBeInTheDocument();
-        expect(screen.getByTestId('stm-hp_max_reduction')).toBeInTheDocument();
-        expect(screen.getByTestId('stm-exhaustion')).toBeInTheDocument();
-      });
+      choose('Orc', 'Cast Greater Restoration');
+
+      await waitFor(() => expect(screen.getByText(/No removable effects found on Orc/i)).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'Remove Effect' })).not.toBeInTheDocument();
+
+      clickSkip();
+
+      expect(flow.handleGreaterRestorationNoEffects).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('Lesser Restoration', () => {
-    it('renders target selection modal with creature buttons and skip', () => {
-      flow.pendingLesserRestoration = { creatureTargets: ['Orc'], range: '30 feet' };
-      renderWithProps();
+    it('asks for a target, listing creatures in range with confirm disabled until one is picked', () => {
+      castLesserRestoration(['Orc', 'Goblin']);
+      renderCharSpells();
 
-      expect(screen.getByTestId('secondary-target-modal')).toBeInTheDocument();
-      expect(screen.getByText('Lesser Restoration')).toBeInTheDocument();
-      expect(screen.getByText('Orc')).toBeInTheDocument();
-      expect(screen.getByTestId('stm-skip')).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Lesser Restoration' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Orc' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Goblin' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Lesser Restoration' })).toHaveTextContent(/within 30 feet/i);
+      expect(screen.getByRole('button', { name: 'Cast Lesser Restoration' })).toBeDisabled();
+      expect(flow.handleLesserRestorationConfirm).not.toHaveBeenCalled();
     });
 
-    it('invokes the confirm handler with target name and condition when a condition is chosen', async () => {
-      flow.pendingLesserRestoration = { creatureTargets: ['Orc'], range: '30 feet' };
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'activeConditions') return ['Blinded'];
-        return null;
-      });
-      renderWithProps();
-      fireEvent.click(screen.getByText('Orc'));
+    it('offers only the four removable conditions, deduplicated across runtime and combat summary', async () => {
+      castLesserRestoration();
+      targetRuntimeState({ activeConditions: ['Blinded', 'DEAFENED', 'Charmed', 'Petrified'] });
+      combatSummaryConditions('Orc', 'blinded', 'poisoned');
+      renderCharSpells();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('stm-condition:blinded')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('stm-condition:blinded'));
+      choose('Orc', 'Cast Lesser Restoration');
+
+      await waitFor(() => expect(screen.getAllByRole('radio', { name: 'Blinded condition' })).toHaveLength(1));
+      expect(screen.getAllByRole('radio', { name: 'Deafened condition' })).toHaveLength(1);
+      expect(screen.getByRole('radio', { name: 'Poisoned condition' })).toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: 'Charmed condition' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: 'Petrified condition' })).not.toBeInTheDocument();
+    });
+
+    it('confirms the chosen condition on the chosen target', async () => {
+      castLesserRestoration();
+      targetRuntimeState({ activeConditions: ['Blinded'] });
+      renderCharSpells();
+
+      choose('Orc', 'Cast Lesser Restoration');
+      await waitFor(() => expect(screen.getByRole('radio', { name: 'Blinded condition' })).toBeInTheDocument());
+      choose('Blinded condition', 'Remove Condition');
+
       expect(flow.handleLesserRestorationConfirm).toHaveBeenCalledWith({ targetName: 'Orc', condition: 'blinded' });
     });
 
-    it('invokes the skip handler when skip is clicked on the condition selection modal', async () => {
-      flow.pendingLesserRestoration = { creatureTargets: ['Orc'], range: '30 feet' };
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'activeConditions') return ['Blinded'];
-        return null;
-      });
-      renderWithProps();
-      fireEvent.click(screen.getByText('Orc'));
+    it('cancels the cast when skipped at the target step', () => {
+      castLesserRestoration();
+      renderCharSpells();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('stm-condition:blinded')).toBeInTheDocument();
-      });
+      clickSkip();
 
-      flow.handleLesserRestorationSkip();
-      expect(flow.handleLesserRestorationSkip).toHaveBeenCalled();
+      expect(flow.handleLesserRestorationSkip).toHaveBeenCalledTimes(1);
+      expect(flow.handleLesserRestorationConfirm).not.toHaveBeenCalled();
     });
 
-    it('invokes the skip handler (no conditions) when skip is clicked and no conditions are found', async () => {
-      flow.pendingLesserRestoration = { creatureTargets: ['Orc'], range: '30 feet' };
-      renderWithProps();
-      fireEvent.click(screen.getByText('Orc'));
+    it('returns to the target step when skipped at the condition step, without casting', async () => {
+      castLesserRestoration();
+      targetRuntimeState({ activeConditions: ['Blinded'] });
+      renderCharSpells();
 
-      await waitFor(() => {
-        expect(screen.getByText('No removable conditions found on Orc.')).toBeInTheDocument();
-      });
+      choose('Orc', 'Cast Lesser Restoration');
+      await waitFor(() => expect(screen.getByRole('radio', { name: 'Blinded condition' })).toBeInTheDocument());
+      clickSkip();
 
-      fireEvent.click(screen.getByTestId('stm-skip'));
-      expect(flow.handleLesserRestorationSkip).toHaveBeenCalled();
+      expect(screen.getByRole('radio', { name: 'Orc' })).toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: 'Blinded condition' })).not.toBeInTheDocument();
+      expect(flow.handleLesserRestorationConfirm).not.toHaveBeenCalled();
     });
 
-    it('filters to allowed conditions only (blinded, deafened, paralyzed, poisoned)', async () => {
-      flow.pendingLesserRestoration = { creatureTargets: ['Orc'], range: '30 feet' };
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'activeConditions') return ['Blinded', 'Charmed', 'Poisoned', 'Petrified'];
-        return null;
-      });
-      renderWithProps();
-      fireEvent.click(screen.getByText('Orc'));
+    it('reports no removable conditions and routes dismissal to the skip handler', async () => {
+      castLesserRestoration();
+      renderCharSpells();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('stm-condition:blinded')).toBeInTheDocument();
-        expect(screen.getByTestId('stm-condition:poisoned')).toBeInTheDocument();
-        expect(screen.queryByTestId('stm-condition:charmed')).not.toBeInTheDocument();
-        expect(screen.queryByTestId('stm-condition:petrified')).not.toBeInTheDocument();
-      });
+      choose('Orc', 'Cast Lesser Restoration');
+
+      await waitFor(() => expect(screen.getByText(/No removable conditions found on Orc/i)).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'Remove Condition' })).not.toBeInTheDocument();
+
+      clickSkip();
+
+      expect(flow.handleLesserRestorationSkip).toHaveBeenCalledTimes(1);
     });
 
-    it('deduplicates conditions from runtime and combat summary, showing exactly one option', async () => {
-      flow.pendingLesserRestoration = { creatureTargets: ['Orc'], range: '30 feet' };
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'activeConditions') return ['DEAFENED'];
-        return null;
-      });
-      vi.mocked(getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Orc', conditions: [{ key: 'deafened' }] }],
-      });
-      renderWithProps();
-      fireEvent.click(screen.getByText('Orc'));
+    it('still offers runtime conditions when the combat summary lookup fails', async () => {
+      castLesserRestoration();
+      targetRuntimeState({ activeConditions: ['Poisoned'] });
+      vi.mocked(getCombatSummary).mockRejectedValue(new Error('combat summary unavailable'));
+      renderCharSpells();
 
-      await waitFor(() => {
-        const deafenedOptions = screen.queryAllByTestId('stm-condition:deafened');
-        expect(deafenedOptions.length).toBe(1);
-      });
-    });
+      choose('Orc', 'Cast Lesser Restoration');
+      await waitFor(() => expect(screen.getByRole('radio', { name: 'Poisoned condition' })).toBeInTheDocument());
+      choose('Poisoned condition', 'Remove Condition');
 
-    it('handles combat summary lookup failure gracefully by showing no conditions message', async () => {
-      flow.pendingLesserRestoration = { creatureTargets: ['Orc'], range: '30 feet' };
-      vi.mocked(getCombatSummary).mockRejectedValue(new Error('boom'));
-      renderWithProps();
-      fireEvent.click(screen.getByText('Orc'));
-
-      await waitFor(() => {
-        expect(screen.getByText('No removable conditions found on Orc.')).toBeInTheDocument();
-      });
+      expect(flow.handleLesserRestorationConfirm).toHaveBeenCalledWith({ targetName: 'Orc', condition: 'poisoned' });
     });
   });
 });
