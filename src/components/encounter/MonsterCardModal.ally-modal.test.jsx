@@ -217,21 +217,24 @@ describe('MonsterCardModal - ally modal interactions', () => {
     const allyBadge = screen.getByTitle('Manage allies');
     fireEvent.click(allyBadge);
 
-    // Select at least one ally via checkbox
+    // The modal pre-selects currentAllies (default = [monsterName], per
+    // resolveCurrentAllies), so the first row (Goblin) is already checked.
+    // Click an UNchecked row (Player A) to ADD an ally — clicking the
+    // pre-checked Goblin would deselect it and disable confirm with 0 left.
     const checkboxes = container.querySelectorAll('input[type="checkbox"]');
     expect(checkboxes.length).toBeGreaterThan(0);
-    fireEvent.click(checkboxes[0]);
+    fireEvent.click(checkboxes[1]);
 
     // Click the confirm button
     const confirmBtn = screen.getByRole('button', { name: /confirm/i });
-    expect(confirmBtn).toBeInTheDocument();
+    expect(confirmBtn).toBeEnabled();
     fireEvent.click(confirmBtn);
 
     await waitFor(() => {
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Goblin',
         'selectedAllies',
-        expect.any(Array),
+        ['Goblin', 'Player A'],
         'test-campaign'
       );
     });
