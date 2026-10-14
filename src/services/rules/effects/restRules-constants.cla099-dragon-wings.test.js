@@ -1,4 +1,3 @@
-// @improved-by-ai
 // BUG CLA-099 / CLA-130 rule lock: the once-per-Long-Rest uses counter and
 // active stamp must live in LONG_REST_RESOURCES or the use dies permanently
 // once the rounds clock or a retract drops the buff that carried the gate.

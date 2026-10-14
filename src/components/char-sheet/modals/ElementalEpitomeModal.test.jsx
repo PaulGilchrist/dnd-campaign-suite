@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ElementalEpitomeModal from './ElementalEpitomeModal.jsx';

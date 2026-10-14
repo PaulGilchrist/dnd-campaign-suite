@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1561: Swarm of Lemures "Vile Slime" — inert prose Bloodied variant
 // fixed on monsters.json swarm-of-lemures actions[1] via conditional_damage
 // riding the live MA-0007 GM-adjudication seam (buildChargeBonusOffer arms on

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // ── automationInfoBuilder.fixtures.test.js ───────────────────────────
 // Tests for automationInfoBuilder.test-utils.js — the utility functions
 // that support the handler tests.

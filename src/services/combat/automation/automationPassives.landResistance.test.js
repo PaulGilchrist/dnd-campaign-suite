@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-237 regression: getDamageResistances (applyDamage fallback merge) must
 // resolve land_resistance from the runtime _circleOfTheLandType key.
 import { describe, it, expect, vi, beforeEach } from 'vitest'

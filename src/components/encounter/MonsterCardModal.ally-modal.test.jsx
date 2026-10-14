@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Cleanup applied (redundant test removal):
 //
 //   Removed 2 redundant tests:

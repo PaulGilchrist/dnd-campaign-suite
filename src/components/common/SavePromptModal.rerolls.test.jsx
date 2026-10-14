@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // SavePromptModal — rerolls
 // Tests behavioral outcomes of all reroll features: Fanatical Focus, Disciplined Survivor,
 // Guarded Mind, and Living Legend. Verifies button visibility conditions, reroll execution,
@@ -18,7 +16,6 @@
 //   - Removed redundant assertions where behavioral outcome already covers the check
 //   - Strengthened assertions to verify setRuntimeValue calls with correct campaign parameter
 //
-// Cleanup (@cleaned-by-ai):
 //   - Consolidated Fanatical Focus "not raging" + "before rolled" into single parameterized test
 //   - Consolidated Fanatical Focus "not shown after used" + "not shown again" into single test
 //   - Removed redundant Disciplined Survivor "not shown when zero" (covered by negative pattern)

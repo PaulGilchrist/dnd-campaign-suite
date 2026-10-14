@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import * as utils from './MonsterCardModal.test-utils.js';
 

@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-336 regression: getDamageResistances must resolve the Stormborn
 // type:'resistance' passive LIVE, gated on the wrathOfTheSeaActive runtime key.
 import { describe, it, expect, vi, beforeEach } from 'vitest'

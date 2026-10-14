@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-320: popup must mirror the authoritative miss→hit conversion folded with
 // the Homing Strikes psionic die — flipped HIT line, homing add line, and a
 // working Done button so damage rolls/applies.

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Cleanup (2026-08-18):
 //   - Reduced from 16 tests to 5 tests (69% reduction).

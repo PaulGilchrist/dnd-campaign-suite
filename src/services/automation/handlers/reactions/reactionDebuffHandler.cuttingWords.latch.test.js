@@ -1,4 +1,3 @@
-// @cleaned-by-ai
 // CLA-071: Cutting Words re-fires unlimited on one resolved attack (no Reaction latch).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './reactionDebuffHandler.js';

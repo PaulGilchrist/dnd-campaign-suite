@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
@@ -88,7 +87,6 @@ describe('CharAbilities condition effects on rendering', () => {
     mockStore.clear();
   });
 
-  // @cleaned-by-ai
   describe('auto fail saves', () => {
     it('shows AUTO FAIL for save when ability is in autoFailSaves', () => {
       render(<CharAbilities {...defaultProps} conditionEffects={{ autoFailSaves: ['str'] }} />);
@@ -96,7 +94,6 @@ describe('CharAbilities condition effects on rendering', () => {
     });
   });
 
-  // @cleaned-by-ai
   describe('save advantage', () => {
     it('shows (Adv) suffix when saveAdvantageCount is set', () => {
       const { container } = render(<CharAbilities {...defaultProps} conditionEffects={{ saveAdvantageCount: 2 }} />);
@@ -112,7 +109,6 @@ describe('CharAbilities condition effects on rendering', () => {
     });
   });
 
-  // @cleaned-by-ai
   describe('exhaustion penalty', () => {
     it('reduces ability bonuses and save values by exhaustion penalty amount', () => {
       const stats = createPlayerStats();
@@ -126,7 +122,6 @@ describe('CharAbilities condition effects on rendering', () => {
     });
   });
 
-  // @cleaned-by-ai
   describe('condition effects on skills', () => {
     it('adds passWithoutTraceBonus to Stealth skill only', () => {
       const stats = createPlayerStats({
@@ -144,7 +139,6 @@ describe('CharAbilities condition effects on rendering', () => {
     });
   });
 
-  // @cleaned-by-ai
   describe('jack of all trades', () => {
     it('adds half proficiency to non-proficient skill bonuses', () => {
       const stats = createPlayerStats({
@@ -170,7 +164,6 @@ describe('CharAbilities condition effects on rendering', () => {
     });
   });
 
-  // @cleaned-by-ai
   describe('isRaging interactions', () => {
     it('uses primal knowledge skills to override skill bonus when raging', () => {
       const stats = createPlayerStats({
@@ -209,7 +202,6 @@ describe('CharAbilities condition effects on rendering', () => {
     });
   });
 
-  // @cleaned-by-ai
   describe('cosmic omen effect', () => {
     it('does not include cosmic omen bonus in displayed ability check values', () => {
       const stats = createPlayerStats();

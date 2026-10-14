@@ -1,4 +1,3 @@
-// @improved-by-ai
 // FT-047 regression locks:
 // (a) feat ASI double-count — rules.js must reconcile stored featIncrease
 //     idempotently (max of stored vs computed), never accumulate on top of

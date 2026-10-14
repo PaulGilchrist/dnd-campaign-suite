@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, applyMasteryEffect, MASTERY_EFFECTS } from './weaponMasteryHandler.js';

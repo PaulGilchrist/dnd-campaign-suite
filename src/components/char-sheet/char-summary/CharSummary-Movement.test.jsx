@@ -1,8 +1,5 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Quality improvements applied:
-//   - Added @improved-by-ai marker
 //   - Added missing mocks: logService, buffToggle, unbreakableMajesty, auraOfLifeHandler,
 //     circleOfPowerHandler, deathWardHandler, combatData (getCombatSummary)
 //   - Added negative test: non-Barbarian class with armor should NOT show unarmored movement

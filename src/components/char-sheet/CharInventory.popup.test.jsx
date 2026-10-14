@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createRenderComponent } from './charInventory.test-utils.jsx';
 

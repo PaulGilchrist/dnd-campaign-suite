@@ -1,4 +1,3 @@
-// @improved-by-ai
 // FT-009 regression: Boon Of Energy Resistance (2024 Epic Boon).
 // The Energy Resistances chooser stamps the runtime key
 // `_Energy_Resistances_chosenTypes` (producer = boonOfEnergyResistanceHandler,

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed tests:
 //   "does not show delete button when encounters list is empty" — tests mock
 //     component conditional rendering (EncounterModal.jsx DOM), not the

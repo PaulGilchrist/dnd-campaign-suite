@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1564: Swarm of Quippers Bites — conditional_damage:{dice:"2d6",damage_type:"piercing",
 // condition:"half HP or fewer"} authored on monsters.json swarm-of-quippers actions[0] so the
 // HIT popup offers the "or 7 (2d6) piercing damage if the swarm has half of its hit points or

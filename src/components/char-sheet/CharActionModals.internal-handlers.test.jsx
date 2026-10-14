@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests for helper functions and internal handlers in CharActionModals.
 //
 // This file focuses on the render-path behavior of internal helper functions
@@ -13,7 +11,6 @@
 // CharActionModals.handlers2.test.jsx.
 // Modal closing behavior is covered in CharActionModals.modal-closes.test.jsx.
 //
-// @cleaned-by-ai: Removed 7 redundant/low-value tests:
 // - Duplicate invokeDuplicity modal rendering test (covered in inline-modals.test.jsx)
 // - 3 "without crashing" tests (structural, covered in rendering.test.jsx)
 // - 3 overlapping healing illusion rendering tests (consolidated into 1)

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Threat-field form behavior while editing an existing settlement.
 // Intentionally NOT duplicated here (covered in sibling files):
 //   - size change auto-populates population/description/atmosphere/government/threat

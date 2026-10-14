@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createEffectAdderHandlers } from './createEffectAdderHandlers.js';
 import * as conditionSaveService from '../../services/combat/conditions/conditionSaveService.js';

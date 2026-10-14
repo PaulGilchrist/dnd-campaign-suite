@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests for handler callbacks in CharActionModals.jsx.
 //
 // Covers: Starry Chalice handler invocation, Divine Intervention cast handler,

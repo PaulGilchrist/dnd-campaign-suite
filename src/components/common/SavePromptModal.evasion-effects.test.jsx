@@ -1,9 +1,6 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // SavePromptModal — Evasion Effects (Beacon of Hope, Cosmic Omen, Disadvantage, Force Roll)
 // Tests behavioral outcomes of evasion effects on save resolution.
 //
-// Cleanup (@cleaned-by-ai):
 //   - Removed "dispatches save-result custom event with evasion details" — duplicate of actions.test.jsx
 //   - Removed "applies disadvantage for DEX saves when target is charmed" — duplicate of rolling.test.jsx
 //   - Removed "applies disadvantage for DEX saves when target has Otto's Irresistible Dance" — duplicate of rolling.test.jsx

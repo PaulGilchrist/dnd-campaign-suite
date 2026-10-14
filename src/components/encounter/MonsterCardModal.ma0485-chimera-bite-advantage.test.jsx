@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-0485: Chimera Bite advantage-damage variant — conditional_damage authored on
 // monsters.json actions[1] (MA-0007 seam) so the HIT popup offers the
 // "or 18 (4d6 + 4) Piercing if Advantage" variant. Locks: data shape mirrors the

@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import FontOfMagicModal from './FontOfMagicModal.jsx';
@@ -453,7 +452,6 @@ describe('FontOfMagicModal', () => {
     expect(mockOnClose).not.toHaveBeenCalled();
   });
 
-  // @cleaned-by-ai
   // Removed: "calls onClose when Apply is clicked" — redundant with "calls setRuntimeBatch with correct data when Apply is clicked (slot-to-SP)" which already exercises the full Apply flow including onClose.
 
   // ── Cancel / Escape ──
@@ -516,7 +514,6 @@ describe('FontOfMagicModal', () => {
     rows.forEach(row => expect(row.textContent).toContain('0 / 0'));
   });
 
-  // @cleaned-by-ai
   // Removed: "computes finalSP correctly when converting slots to SP only" — redundant with "calculates SP gained per level and total across levels" which already validates the SP gained column and total (which directly determines finalSP via finalSP = currentSP + totalSPGained).
 
   // ── netSPChange computation ──

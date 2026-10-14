@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import EncounterBuilder from './EncounterBuilder.jsx';
@@ -353,7 +352,6 @@ const mockCampaignName = 'test-campaign';
 /*  Tests                                                             */
 /* ------------------------------------------------------------------ */
 
-// @cleaned-by-ai
 describe('EncounterBuilder rendering', () => {
   beforeEach(() => {
     vi.clearAllMocks();

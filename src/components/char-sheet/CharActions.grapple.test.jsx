@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Cleanup: Removed redundant "renders Grapple as clickable" test (covered by baseActions.test.jsx).
 // Consolidated "grapple fails" and "grapple tie" into single parameterized test (same failure path).
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';

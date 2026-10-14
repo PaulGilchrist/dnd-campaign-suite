@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed 6 tests:
 //   - wizard hat icon (brittle: asserts internal Font Awesome class)
 //   - options using cls.index as key (tests React key via DOM — impossible)

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // HexMap integration tests: rendering, toolbar wiring, panel/overlay visibility,
 // SVG pointer interaction, background-click state cleanup, and POI drag-and-drop.
 // Travel-tool/advance behavior lives in HexMap.travel.test.jsx and event-handler

@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-320 Homing Strikes (Soulknife Soul Blades lv9) resolution gates:
 // miss→hit conversion spends the die and flips hit; natural 1 never converts;
 // still-miss spends nothing and stamps the attempt.

@@ -1,4 +1,3 @@
-// @improved-by-ai
 // BUG CLA-096 lock: turn-start Incapacitated clause for Draconic Flight
 // (Wrath of the Sea / Cloak of Shadows verified lane shape).
 import { describe, it, expect, vi, beforeEach } from 'vitest';

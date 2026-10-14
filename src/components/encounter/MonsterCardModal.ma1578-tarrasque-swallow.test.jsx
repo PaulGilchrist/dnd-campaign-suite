@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1578: Tarrasque "Swallow" (save, DC 20 Constitution) — FAIL: the fail face paid
 // NOTHING (no 8d6+6 Bludgeoning), the popup showed "DC Unknown", and no conditions landed.
 // The dice lived ONLY in save_effect prose and every structured key was absent, so

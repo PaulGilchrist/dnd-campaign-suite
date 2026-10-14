@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { handle, activateBulwarkOfForce } from './bulwarkOfForceHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as expirations from '../../../rules/effects/expirations.js';

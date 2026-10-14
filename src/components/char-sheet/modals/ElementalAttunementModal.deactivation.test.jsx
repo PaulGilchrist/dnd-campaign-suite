@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-113 regression: Attunement deactivation clear-list. When the results
 // Close commits the attunement expiry clock, the effect list must ALSO drop the
 // Elemental Epitome runtime footprint (CLA-110/CLA-113 render-only family):

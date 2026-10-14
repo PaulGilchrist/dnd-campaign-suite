@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Context menu integration tests for the Map component.
 // These tests verify end-to-end flows that are difficult to unit-test in isolation:

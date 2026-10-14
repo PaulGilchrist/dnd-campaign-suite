@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1363: Quaggoth Claw Bloodied variant — unpicked-Done leg at the REAL popup
 // seam (AttackResultPopup → dice-roll-done event). The HIT popup shows BOTH the
 // Bloodied offer buttons (MA-0007 seam) and the auto-damage Done; pressing Done

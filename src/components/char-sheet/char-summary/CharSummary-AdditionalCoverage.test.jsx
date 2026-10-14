@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Quality improvements:
 //   - Consolidated 3 describe blocks into 1 (reduces duplication, improves readability)

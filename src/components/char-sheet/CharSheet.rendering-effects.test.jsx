@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Cleaned: removed 10 redundant tests from 16 total.
 // Removed 3 shield buff tests (shieldAcBonus, magicMissileImmune,

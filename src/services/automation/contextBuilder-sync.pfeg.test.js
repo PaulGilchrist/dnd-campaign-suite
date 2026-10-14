@@ -1,4 +1,3 @@
-// @improved-by-ai
 // SP-094: attacker-type gate must resolve combatSummary monsterType (not 'npc').
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';

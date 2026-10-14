@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Removed redundant tests:
 //   DELETE: "should NOT reset player runtime values when there is no round increment" (prev L187)

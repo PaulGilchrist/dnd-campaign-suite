@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import AvatarModal from './AvatarModal.jsx';

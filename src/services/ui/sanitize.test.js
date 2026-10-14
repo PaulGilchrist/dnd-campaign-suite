@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import { sanitizeHtml, renderMarkdown, renderMarkdownInline } from './sanitize.js';
 

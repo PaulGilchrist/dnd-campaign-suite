@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // CLA-037: Bewitching Magic is an unlimited free Misty Step rider. These tests
 // flip the old pins that bound it to the Steps of the Fey uses counter
 // (_Steps_of_the_Fey_freeCastCount) — the handler must never read or write it.

@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-013: 2014 Archdruid (lv20 Druid, rules "5e") gets unlimited Wild Shape
 // uses; the 2024 lv20 capstone stays finite (wild_shape: 4).
 import { describe, it, expect } from 'vitest';

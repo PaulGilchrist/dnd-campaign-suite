@@ -1,14 +1,7 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 
 import { normalizeCurrency } from './lootGenerator.js';
 
-// @cleaned-by-ai
 // Edge-case rounding tests not in lootGenerator.test.js.
 // Removed: normalizeCurrency(-5.25) exact duplicate of main file line 56.
 // Removed: formatCurrencyString missing properties / large values / singular-plural

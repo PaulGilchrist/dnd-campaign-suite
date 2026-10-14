@@ -1,10 +1,7 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // SavePromptModal — Rolling Mechanics
 // Tests behavioral outcomes of the d20 rolling system: disadvantage, advantage,
 // normal rolls, and save resolution with different bonus sources.
 //
-// Cleanup (@cleaned-by-ai):
 //   - Removed "rolls two d20s and takes the minimum for DEX saves when target is charmed"
 //     (fully covered by evasion-effects.test.jsx "applies disadvantage for DEX saves when target is charmed")
 //   - Removed "rolls two d20s and takes the minimum for DEX saves when target has Otto's Irresistible Dance"

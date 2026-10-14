@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-0467 regression: Celestial Spirit (Defender) Healing Touch — self-initiated
 // touch heal reaction (2024 PHB: reaction, touch, target regains 2d8+spell level).
 // No attack-event gate (unlike parry/counterspell): GM-click fires the touch,

@@ -1,12 +1,9 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import VitalityOfTheTreeModal from './VitalityOfTheTreeModal.jsx';
 
 // ── Minimal mock — only renders structure, no selection logic.
 //     Selection behavior is fully covered by CreatureSelectionModal.test.jsx.
-//     @cleaned-by-ai: replaced full behavioral mock with structural stub
 
 vi.mock('./shared/CreatureSelectionModal.jsx', () => ({
   default: vi.fn((props) => {

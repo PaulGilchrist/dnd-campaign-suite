@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Consolidated (redundant negative tests merged into parameterized tests):
 //
 //   Bulwark of Force: 3 tests → 2 tests

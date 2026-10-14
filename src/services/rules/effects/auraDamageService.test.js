@@ -1,4 +1,3 @@
-// @improved-by-ai
 // Regression tests for BUG CLA-170: Holy Nimbus radiant turn-start damage must
 // persist to the combat summary cache + server and re-apply on every round,
 // without mutating the live React state object in place (which React cannot detect).

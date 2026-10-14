@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import * as baseCombatActions from './baseCombatActions.js';
 import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from './baseCombatActions.js';

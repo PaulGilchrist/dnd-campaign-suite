@@ -1,4 +1,3 @@
-// @improved-by-ai
 // BUG CLA-099: uses economy, SP restore/refusal lanes, rounds clock, retract.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, isActive } from './dragonWingsHandler.js';

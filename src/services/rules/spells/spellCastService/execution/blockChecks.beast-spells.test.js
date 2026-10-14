@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-404: Beast Spells (Druid lv18 passive) — Wild Shape blanket block bypass
 // in Beast form, except spells with a costly or consumed Material component.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

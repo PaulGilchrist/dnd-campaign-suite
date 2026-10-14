@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import AvatarImage from './AvatarImage.jsx';
@@ -36,7 +35,6 @@ describe('AvatarImage', () => {
       expect(screen.getByText('T')).toBeInTheDocument();
     });
 
-    // @cleaned-by-ai
     it('renders "?" for falsy names (empty, null, undefined)', () => {
       const { container: c1 } = render(<AvatarImage name="" />);
       expect(c1.querySelector('span')).toHaveTextContent('?');
@@ -118,7 +116,6 @@ describe('AvatarImage', () => {
       expect(screen.queryByRole('button')).not.toBeInTheDocument();
     });
 
-    // @cleaned-by-ai
     it('sets role="button" and tabIndex=0 when onClick is provided, omits them otherwise', () => {
       const onClick = vi.fn();
       const { container: withClick } = render(<AvatarImage name="Test" imagePath="/avatar.png" onClick={onClick} />);
@@ -132,7 +129,6 @@ describe('AvatarImage', () => {
       expect(wrapperWithout).not.toHaveAttribute('tabindex');
     });
 
-    // @cleaned-by-ai
     it('applies cursor pointer style when onClick is provided, omits it otherwise', () => {
       const { container: withClick } = render(<AvatarImage name="Test" imagePath="/avatar.png" onClick={() => {}} />);
       const wrapperWith = withClick.querySelector('.avatar-wrapper');

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Handler callback tests for healing-related modals in CharActionModals.
 //
 // Tests verify that when a user interacts with a healing modal's confirm
@@ -8,7 +6,6 @@
 // Skip behavior for these modals is covered in
 // CharActionModals.mass-healing-skips.test.jsx.
 //
-// @cleaned-by-ai: Consolidated 5 nearly-identical tests (one per modal)
 // into a single parameterized test. Each test followed the same pattern:
 // create vi.fn() handler → render CharActionModals → click test ID →
 // expect handler(['Target1']). The only differences were modal key,

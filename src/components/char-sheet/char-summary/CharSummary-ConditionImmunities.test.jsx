@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Cleanup (2026-08-18):
 //   - Removed 4 redundant tests that add no unique behavioral coverage:

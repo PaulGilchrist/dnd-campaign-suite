@@ -1,4 +1,3 @@
-// @improved-by-ai
 // Regression tests for CLA-188: Cunning Strike pipeline pause must resume on modal close
 // and apply weapon + Sneak Attack damage (minus dice spent on Cunning Strike options).
 import { describe, it, expect, vi, beforeEach } from 'vitest';

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import useNpcImageCache from './useNpcImageCache.js';

@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-0809: Giant Goat Ram — hit_conditions:["prone"] + conditional_damage
 // authored on monsters.json actions[0] (MA-0010 prone family + MA-0007 charge-bonus
 // seam) so the HIT popup offers the "extra 2d4 Bludgeoning" charge rider and the

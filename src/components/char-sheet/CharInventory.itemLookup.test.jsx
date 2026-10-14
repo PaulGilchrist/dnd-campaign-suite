@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // CharInventory item lookup tests
 //
 // Tests in this file cover unique lookup normalization edge cases:

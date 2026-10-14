@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests for createBaseProps — the shared test fixture used by all CharActionModals test files.
 // Verifies the fixture's contract: default values, override behavior, isolation guarantees.
 //

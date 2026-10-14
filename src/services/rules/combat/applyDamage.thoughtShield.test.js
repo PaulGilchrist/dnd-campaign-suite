@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 // CLA-361: Thought Shield handler tests. The old version of this file locked in the
 // fake-write defect (mutating the fetched combatSummary copy with no persistence).
 // These tests now require the reflect to flow through applyDamageToTarget (the

@@ -1,9 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
 import { handle, applyTelekineticLeap } from './telekineticLeapHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 

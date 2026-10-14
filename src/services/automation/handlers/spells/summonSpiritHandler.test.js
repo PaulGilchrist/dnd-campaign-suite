@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { handle, confirmSummonSpirit, resolveMonsterActions, resolveMonsterReactions, resolveCreateThrallRiderHit } from './summonSpiritHandler.js';
 import summonFeySpells from '../../../../../public/data/2024/spells.json' with { type: 'json' };
 import summonFeyMonsters from '../../../../../public/data/monsters.json' with { type: 'json' };

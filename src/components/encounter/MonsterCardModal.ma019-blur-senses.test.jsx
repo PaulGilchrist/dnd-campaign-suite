@@ -1,4 +1,3 @@
-// @improved-by-ai
 // SP-019 Blur (2024) — monster attacker lane: the target-side compute used by
 // combineAttackModes must receive the ATTACKER's senses so a Blindsight/Truesight
 // attacker is immune to the Blur defender-disadvantage, while an ordinary attacker

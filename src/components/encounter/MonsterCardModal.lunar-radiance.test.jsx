@@ -1,4 +1,3 @@
-// @improved-by-ai
 // Regression tests for CLA-184 Improved Circle Forms (Lunar Radiance):
 // Moon druid wild shape attacks must offer a per-hit Normal-vs-Radiant
 // damage type choice instead of a forced Radiant conversion.

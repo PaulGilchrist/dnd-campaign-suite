@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Consolidated 13 tests → 7 tests. Removed redundancies and brittle assertions.
 //
 // Consolidations:

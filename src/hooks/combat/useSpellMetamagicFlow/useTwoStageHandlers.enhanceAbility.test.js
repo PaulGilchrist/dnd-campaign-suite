@@ -1,4 +1,3 @@
-// @improved-by-ai
 // SP-039: handleEnhanceAbilityConfirm previously called applyEnhanceAbilityEffect
 // with 6 POSITIONAL args against an object-destructure handler signature
 // (enhanceAbilityHandler.applyEnhanceAbility({action, playerStats, campaignName,

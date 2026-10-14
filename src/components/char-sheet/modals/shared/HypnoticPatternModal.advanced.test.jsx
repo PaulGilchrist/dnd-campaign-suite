@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import HypnoticPatternModal from './HypnoticPatternModal.jsx';

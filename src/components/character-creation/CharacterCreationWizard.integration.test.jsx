@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed 8 tests redundant with child component unit tests and submission.test.jsx:
 //   - 2x header title tests -> WizardHeader.test.jsx (3 tests)
 //   - progress bar rendering -> WizardProgressBar.test.jsx (10 tests)

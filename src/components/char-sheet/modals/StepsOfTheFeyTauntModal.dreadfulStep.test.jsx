@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Redundant tests removed (2):
 //   - "renders the dreadful description with damage and save info" → already
 //     covered in render.test.jsx:100 (initial step option descriptions include

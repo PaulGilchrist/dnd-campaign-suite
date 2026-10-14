@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Quality improvements:
 //   - Consolidated window.location.hostname setup into single beforeEach/afterEach

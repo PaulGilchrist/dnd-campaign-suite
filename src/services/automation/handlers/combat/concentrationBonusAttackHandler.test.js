@@ -3,7 +3,6 @@
 // (refuse + log, spend nothing when absent), latch once per turn, arm the current target,
 // roll a real weapon attack through applyDamageToTarget, log attack/damage/hp_change +
 // ability_use, stamp lastAttack, and refuse re-clicks the same round.
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({

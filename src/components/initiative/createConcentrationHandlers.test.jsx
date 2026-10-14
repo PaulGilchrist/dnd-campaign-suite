@@ -9,8 +9,6 @@ import {
 } from '../../services/combat/concentration/concentrationService.js';
 import { logConcentrationSave } from '../../services/encounters/combatLoggingService.js';
 
-// @improved-by-ai
-// @cleaned-by-ai
 
 vi.mock('../../services/ui/storage.js', () => ({
     default: {

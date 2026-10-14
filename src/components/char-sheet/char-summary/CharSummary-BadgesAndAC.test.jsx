@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Improved: fixed global state mutation, added jest-dom import,
 // uses shared mock data, improved test naming with named parameters,

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // CharInventory equipment data edge cases
 //
 // Tests in this file cover behavior NOT already verified in other CharInventory test files:

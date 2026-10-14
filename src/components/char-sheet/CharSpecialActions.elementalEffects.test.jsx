@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import './CharSpecialActions.modalMocks.jsx';
@@ -168,7 +166,6 @@ describe('CharSpecialActions - Stride of the Elements', () => {
       expect(popupCall).toContain('+10 Speed');
     });
 
-    // @cleaned-by-ai
     // "does not trigger action when cannotAct is true" removed: redundant with
     // modals.test.jsx which has a parametrized cannotAct guard test covering
     // all interactive automation types. No behavioral gap.

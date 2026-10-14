@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Redundant tests removed: 6 tests covering skip button rendering,
 // Misty Step skip button text (mode/title variants), and skip/overlay
 // transitions to result view were already covered in render.test.jsx and

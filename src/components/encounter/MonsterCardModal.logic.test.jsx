@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed redundant test: "renders the (Incapacitated) label and no attack dice link
 // when the attacker cannot act" — covered by interaction.test.jsx
 // ("does not render attack links when the attacker has an incapacitating condition"),

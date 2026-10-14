@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MN-012: attack-rider superiority die must LAND in damage when the maneuver is
 // used from the pending-prompt path ("Combat Superiority — Use Maneuver"), which
 // has no pipeline consumer for the die value.

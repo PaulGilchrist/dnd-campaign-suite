@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect } from 'vitest';
 
 import { applySpeedIncreasePassives, resolveHalfSpeedFeet } from './speedUtils.js';

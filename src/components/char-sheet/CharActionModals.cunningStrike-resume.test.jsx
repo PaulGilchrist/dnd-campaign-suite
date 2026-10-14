@@ -1,4 +1,3 @@
-// @improved-by-ai
 // Regression tests for CLA-188: closing the Cunning Strike rider modal in
 // CharActionModals must resume the paused attack damage pipeline.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // CLEANING SUMMARY:
 //
@@ -61,7 +59,6 @@ function createPlayerStats(overrides = {}) {
   return { ...basePlayerStats, ...overrides };
 }
 
-// @cleaned-by-ai: FeatureChoiceModal early return test removed — fully covered by
 // CharSpecialActions.featureChoice.test.jsx (open modal, skip/close, handler calls,
 // runtime state for defensive_tactics/hunter_prey/damage_bonus). No behavioral gap.
 
@@ -87,7 +84,6 @@ describe('CharSpecialActions - useEffect cancelled guard', () => {
   });
 });
 
-// @cleaned-by-ai: Bolstering Performance and Encouraging Song early return tests
 // consolidated from 2 near-identical tests into 1 parameterized test. Both tested
 // the same pattern: executeHandler returns popup → no creature-selection-modal.
 // Parameterized data table covers both automation types.
@@ -128,7 +124,6 @@ describe('CharSpecialActions - Modal handler early return (no creature selection
   });
 });
 
-// @cleaned-by-ai: Action filtering tests kept — most comprehensive dedup/cross-list
 // coverage in the test suite. Tests cover all four action lists (actions,
 // bonusActions, reactions, characterAdvancement), unique action preservation,
 // and specialActions deduplication. Critical behavioral coverage.
@@ -228,6 +223,5 @@ describe('CharSpecialActions - Action filtering', () => {
   });
 });
 
-// @cleaned-by-ai: MoonlightStepFallback onClose test removed — fully covered by
 // CharSpecialActions.combatHandlers.test.jsx (renders modal, clicks No, asserts
 // modal closed). Same behavior tested with same assertions. No behavioral gap.

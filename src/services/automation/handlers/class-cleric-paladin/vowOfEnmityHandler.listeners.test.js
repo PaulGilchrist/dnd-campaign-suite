@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handle, applyTargetChoice } from './vowOfEnmityHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';

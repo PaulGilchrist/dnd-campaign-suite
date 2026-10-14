@@ -1,5 +1,3 @@
-// @cleaned-by-ai
-// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import UpcastPopup from './UpcastPopup.jsx';

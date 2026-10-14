@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-336 Stormborn (Circle of the Sea lv10) regression tests.
 // Locks down: while wrathOfTheSeaActive is TRUE the damage pipeline halves
 // Cold/Lightning/Thunder LIVE (via live getDamageResistances); Bludgeoning is

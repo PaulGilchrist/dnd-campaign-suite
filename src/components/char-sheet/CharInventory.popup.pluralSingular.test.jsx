@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // CharInventory popup plural/singular edge cases
 //
 // Tests removed as duplicates already covered in:

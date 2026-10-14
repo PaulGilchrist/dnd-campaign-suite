@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-147: Frenzy must roll exactly ONE rage_damage_d6 group on the triggering
 // hit. contextBuilder-sync no longer bakes the rider into autoDamageFormula —
 // attackRollBonuses.applyFrenzyBonuses is the single owner of roll + application

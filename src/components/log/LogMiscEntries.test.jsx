@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { screen } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {

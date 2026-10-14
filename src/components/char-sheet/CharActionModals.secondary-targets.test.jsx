@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests for secondary target modal handler callbacks in CharActionModals.
 // Tests verify that the correct handler is invoked with the expected arguments
 // when a user selects a target or skips the modal.
@@ -11,21 +9,17 @@
 // This file focuses on single-target secondary modal confirmations and the
 // Bastion of Law handler routing.
 //
-// @cleaned-by-ai: Removed 14 unused vi.mock declarations (HealingPoolModal,
 // HandOfHealingModal, FontOfMagicModal, ResourcePoolModal, WildCompanionModal,
 // SetConditionModal, EyebiteEffectModal, AttackRiderModal, OpenHandTechniqueModal,
 // WeaponMasteryModal, WeaponMasteryChoiceModal, WeaponKindMasteryModal,
 // CombatStanceModal, TeleportModal, HealingIllusionModal, CreatureSelectionModal).
 //
-// @cleaned-by-ai: Consolidated 2 redundant Trickster Blessing confirm tests
 // (target-click vs confirm-button, both invoke the same handler with the same
 // argument via the same mock) into a single test.
 //
-// @cleaned-by-ai: Removed 2 "renders the correct modal title" rendering tests
 // (Trickster Blessing, Bardic Inspiration) — these assert text content rather
 // than behavioral coverage; rendering is covered in CharActionModals.rendering.test.jsx.
 //
-// @cleaned-by-ai: Consolidated 5 nearly-identical "closes modal on skip" tests
 // (Rally, Bulwark, Corona, Radiance, Mantle) into a single parameterized test
 // following the same pattern as CharActionModals.mass-healing-skips.test.jsx.
 

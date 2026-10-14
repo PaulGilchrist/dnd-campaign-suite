@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import QuiveringPalmModal from './QuiveringPalmModal.jsx';

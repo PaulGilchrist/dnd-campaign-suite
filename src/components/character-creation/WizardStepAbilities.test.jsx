@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed 3 redundant/low-value tests:
 //   - "should show points remaining in description" → covered by header test (asserts step-description text)
 //   - "should display point cost for each ability score" → low value, only asserts "Cost: 0" ×6 with no variation

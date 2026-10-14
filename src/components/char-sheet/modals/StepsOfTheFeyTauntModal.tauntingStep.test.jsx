@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // All 11 tests removed as redundant — identical coverage exists in
 // integration.test.jsx which tests the same cross-step transitions,
 // skip flows, and confirm flows (save listeners, logging, count decrement)

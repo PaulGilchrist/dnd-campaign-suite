@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests for modal rendering and close behavior in CharActionModals.jsx.
 //
 // Scope — only behaviors NOT covered elsewhere:

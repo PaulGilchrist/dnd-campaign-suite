@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-239: Necrotic Shroud regression — CHA DC ability + non-CD features skip Channel Divinity gate
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

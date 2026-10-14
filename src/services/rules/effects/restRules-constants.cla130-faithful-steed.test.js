@@ -1,4 +1,3 @@
-// @improved-by-ai
 // BUG CLA-130 rule lock: `_Faithful_Steed_freeCastCount` (2024 Paladin lv5
 // Faithful Steed — classes.json free_spell uses:1 recharge:"long_rest") is
 // spent to 0 by spellPreparationService.adjustRechargeCounter. Without a

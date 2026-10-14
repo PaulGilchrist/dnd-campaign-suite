@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getAllyList, setAllyList } from './useAllySelection.js';
 import * as useRuntimeState from './runtime/useRuntimeState.js';

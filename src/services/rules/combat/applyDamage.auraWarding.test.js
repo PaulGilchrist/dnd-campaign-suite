@@ -1,4 +1,3 @@
-// @improved-by-ai
 // Regression tests for CLA-022: Aura of Warding resistances must be applied
 // during damage calculation (not just displayed in the UI).
 import { describe, it, expect, vi, beforeEach } from 'vitest';

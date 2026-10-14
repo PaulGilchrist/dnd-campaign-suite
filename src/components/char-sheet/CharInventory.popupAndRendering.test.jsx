@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // CharInventory popup content and rendering
 //
 // Tests removed as duplicates already covered in:

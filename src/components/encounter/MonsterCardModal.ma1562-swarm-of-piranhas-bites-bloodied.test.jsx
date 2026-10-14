@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1562: Swarm of Piranhas "Bites" — inert prose Bloodied variant
 // fixed on monsters.json swarm-of-piranhas actions[0] via conditional_damage
 // riding the live MA-0007 GM-adjudication seam (buildChargeBonusOffer arms on

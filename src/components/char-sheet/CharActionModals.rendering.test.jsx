@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Rendering tests for CharActionModals.jsx
 //
 // Scope — behaviors unique to this file after cleanup:

@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { clearRuntimeState, setRuntimeValue as setRuntimeProp, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import { toggleBuff, getActiveBuffs, isBuffActive, hasBuffEffect } from './buffToggle.js';

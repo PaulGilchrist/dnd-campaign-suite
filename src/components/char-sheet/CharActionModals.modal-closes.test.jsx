@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests for modal close handlers in CharActionModals.jsx:
 // - attackRiderModal close (dispatches events)
 // - openHandFromFlurry close (calls handler + dispatches events)

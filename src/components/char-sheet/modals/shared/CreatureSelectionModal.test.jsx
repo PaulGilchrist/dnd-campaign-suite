@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -225,7 +223,6 @@ describe('CreatureSelectionModal', () => {
       render(<CreatureSelectionModal {...makeProps({ metamagicHeighten: true, setHeightenTarget: mockSetHeightenTarget })} />);
       const radios = document.querySelectorAll('input[name="heightenTarget"]');
       expect(radios).toHaveLength(3);
-      // @cleaned-by-ai: inline style assertion removed — brittle to CSS changes; radio count suffices
     });
 
     it('does not render Heighten radio buttons when metamagicHeighten is false', () => {
@@ -528,7 +525,6 @@ describe('CreatureSelectionModal', () => {
     });
 
     it('does not call onSkip when clicking inside the modal body', () => {
-      // @cleaned-by-ai: "modal content" and "modal body" tests consolidated — both assert the same stopPropagation behavior
       render(<CreatureSelectionModal {...makeProps()} />);
       fireEvent.click(document.querySelector('.sp-body'));
       expect(mockOnSkip).not.toHaveBeenCalled();

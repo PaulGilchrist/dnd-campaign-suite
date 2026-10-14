@@ -1,9 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
 import { handle } from './shadowyDodgeHandler.js';
 import * as damageRollback from '../../common/damageRollback.js';
 import * as logService from '../../../ui/logService.js';

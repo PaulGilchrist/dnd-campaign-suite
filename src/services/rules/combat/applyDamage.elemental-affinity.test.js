@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-110 regression: Elemental Affinity (2024 Draconic Sorcery lv6).
 // The chosen-type chooser stamps the runtime key `_Elemental_Affinity_chosenType`
 // (producer = elementalAffinityHandler, via choiceStorage name "Elemental

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import HpBar from './HpBar.jsx';

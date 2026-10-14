@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import './CharSpecialActions.modalMocks.jsx';
@@ -374,7 +372,6 @@ describe('CharSpecialActions - Portent Die Choice', () => {
   });
 });
 
-// @cleaned-by-ai
 // Stride of the Elements, Elemental Epitome, and cannotAct guard tests
 // removed: fully covered by elementalEffects.test.jsx (more thorough assertions)
 // and modals.test.jsx (parametrized cannotAct test). No behavioral gap.

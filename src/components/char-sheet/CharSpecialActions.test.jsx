@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import './CharSpecialActions.modalMocks.jsx';
@@ -63,7 +61,6 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
       expect(screen.getByText('An unnamed special action')).toBeInTheDocument();
     });
 
-    // @cleaned-by-ai: "deduplicates special actions with duplicate names" removed — fully covered by action filtering tests in CharSpecialActions.uncovered.edge-cases.test.jsx (dedup + cross-list filtering across all action lists)
   });
 
   describe('fighting styles', () => {
@@ -92,7 +89,6 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
     });
   });
 
-  // @cleaned-by-ai: "filters out actions in other lists" removed — fully covered by CharSpecialActions.uncovered.edge-cases.test.jsx action filtering tests (dedup, cross-list dedup for actions/bonusActions/reactions/characterAdvancement, unique action preservation)
 
   describe('ruleset filtering', () => {
     it('filters out featuresToIgnore and keeps other features for 5e ruleset', () => {

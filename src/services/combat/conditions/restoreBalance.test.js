@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import { collectSaveModifiers } from '../automation/automationModifiers.js';
 import { collectAutomationFromFeatures } from '../automation/automationCollector.js';

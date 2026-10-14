@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests for modal close handlers in CharActionModals.jsx that are NOT covered
 // by modal-closes.test.jsx, modal-closes-2.test.jsx, or other test files.
 //

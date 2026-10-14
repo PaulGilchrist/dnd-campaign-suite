@@ -1,4 +1,3 @@
-// @improved-by-ai
 // BUG CLA-096 / CLA-130 rule lock: the once-per-Long-Rest latch must live in
 // LONG_REST_RESOURCES or the use dies permanently once expiry/retract drops
 // the buff that previously carried the gate.

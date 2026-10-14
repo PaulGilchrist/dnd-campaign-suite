@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Comprehensive rendering tests for modals and inline overlays not covered
 // in CharActionModals.rendering.test.jsx or the other dedicated test files.
 //

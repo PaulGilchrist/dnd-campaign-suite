@@ -1,4 +1,3 @@
-// @improved-by-ai
 // BUG CLA-096 locks: activation registers the 10-minute rounds clock + LR use
 // flag + logs; re-click while used-and-active RETRACTS (no refusal); used-and-
 // inactive refuses (with log); the verified no-flag buff-active refusal stays

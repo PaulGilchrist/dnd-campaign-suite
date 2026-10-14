@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSseEventHandler } from './sseHandlers.js';
 import * as combatData from '../../services/encounters/combatData.js';

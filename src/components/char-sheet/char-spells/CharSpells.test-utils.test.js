@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import * as helpers from './CharSpells.test-utils.js';
 

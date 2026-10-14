@@ -4,7 +4,6 @@
 // counters `_Shadow_Arts_<Spell>_freeCastCount`, null = fresh/available, 0 = spent
 // until the next Long Rest (reset lives in restRules-longRest.js). No spell slot is
 // ever consulted or consumed for these casts.
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => {

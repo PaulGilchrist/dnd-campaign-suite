@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharConditions from './CharConditions.jsx';
@@ -288,7 +287,6 @@ describe('CharConditions condition saves', () => {
     });
   });
 
-// @cleaned-by-ai
 // Consolidated: Removed 3 redundant describe blocks (save bonus/label, aura bonus display,
 // condition without meta dc) — all assertions duplicated in CharConditions.logging.test.jsx.
 // Retained: advantage trigger tests (most comprehensive parametrization across suite) and

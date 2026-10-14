@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Removed 13 redundant/brittle/low-value tests:
 //

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Side-effect behavioral tests for CharActionModals internal handlers.
 //
 // Scope — tests the observable side effects of two async handlers defined

@@ -1,4 +1,3 @@
-// @improved-by-ai
 // Regression tests for CLA-188: Cunning Strike rider pause + once-per-turn tracking.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

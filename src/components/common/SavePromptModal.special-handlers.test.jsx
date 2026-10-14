@@ -1,5 +1,3 @@
-  // @improved-by-ai
-  // @cleaned-by-ai
   // SavePromptModal — Special Handlers (Bane on attacker, HP restoration, CombatSummary, Storage)
   //
   // Cleanup: Consolidated 2 redundant lastAttack storage tests into 1:

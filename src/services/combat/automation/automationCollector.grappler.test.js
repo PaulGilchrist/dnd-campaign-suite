@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

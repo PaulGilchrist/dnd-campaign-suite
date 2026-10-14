@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Cleaned: removed 8 redundant/brittle tests from 20 total.
 // - createMockStore: consolidated duplicate type checks (store1+store2 both

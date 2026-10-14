@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed 7 tests (redundant or low-value):
 //   - "computes correct progress for different step counts" → redundant with "computes linear progress" (same formula, different constants)
 //   - "renders 0% for the first step of a 12-step wizard" → redundant with "computes linear progress" (0% for step 1 already tested)

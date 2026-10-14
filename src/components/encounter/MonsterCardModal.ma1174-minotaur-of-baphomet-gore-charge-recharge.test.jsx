@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1174: Minotaur of Baphomet Gore — two DATA defects on monsters.json actions[1]:
 // (1) charge clause ("moved 10+ feet straight toward") live-unarmed — no conditional_damage
 //     authored so buildChargeBonusOffer (MA-0007 seam, MA-1160 additive convention) never

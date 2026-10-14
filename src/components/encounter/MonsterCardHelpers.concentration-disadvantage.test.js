@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseConcentrationDisadvantageClause, extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
 
-// @improved-by-ai
 
 const ADULT_CLOUD = '22 (4d10) Poison damage, and the target has Disadvantage on saving throws to maintain Concentration until the end of its next turn';
 const ANCIENT_CLOUD = 'Failure: 33 (6d10) Poison damage, and the target has Disadvantage on saving throws to maintain Concentration until the end of its next turn. Failure or Success: The dragon can\'t take this action again until the start of its next turn.';

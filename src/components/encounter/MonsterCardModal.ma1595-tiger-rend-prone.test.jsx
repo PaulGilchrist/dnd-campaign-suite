@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1595: Tiger "Rend" — prose carries "If the target is a Large or smaller
 // creature, it has the Prone condition" but the row shipped WITHOUT
 // hit_conditions, so buildHitConditionClause returned null and the rider was

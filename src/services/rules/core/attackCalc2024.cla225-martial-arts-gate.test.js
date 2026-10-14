@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-225: 2024 Martial Arts canonical gate (public/data/2024/classes.json lv1):
 // "You can roll 1d6 in place of the normal damage of your Unarmed Strike or
 // Monk weapons... Benefits while unarmed or wielding only Monk weapons and

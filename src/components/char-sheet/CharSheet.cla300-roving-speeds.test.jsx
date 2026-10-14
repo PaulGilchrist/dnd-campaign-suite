@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-300 regression: Roving climb/swim must equal the rules-layer folded
 // Speed (stats.speed), not folded Speed + 10 (double-count fingerprint).
 import { render, screen, waitFor } from '@testing-library/react';

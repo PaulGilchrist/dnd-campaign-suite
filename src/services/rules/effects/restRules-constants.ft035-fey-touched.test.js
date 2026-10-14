@@ -1,4 +1,3 @@
-// @improved-by-ai
 // BUG FT-035(b) rule lock: Fey Touched free-cast latches are written by FEATURE name
 // (spellPreparationService), NOT by the formData key: the chosen-spell spell row spends
 // the shared `_Fey_Magic_freeCastCount` (rules.js addFeyTouchedFreeCast uses:1

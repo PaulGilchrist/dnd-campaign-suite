@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed redundant tests that duplicate interactions.test.jsx and remaining.test.jsx:
 //   "selects a monster when its checkbox is clicked" — duplicate of interactions.test.jsx
 //     "toggles a monster on when checkbox is clicked" (identical setup, same assertions).

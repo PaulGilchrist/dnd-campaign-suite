@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1555 grant leg: Swarm of Crawling Claws "Swarm of Grasping Hands" prone rider.
 // hit_conditions:["prone"] (authored with the conditional_damage fix) arms
 // buildHitConditionClause → handlePlainDamage.maybeApplyHitClause → applyHitClauseConditions

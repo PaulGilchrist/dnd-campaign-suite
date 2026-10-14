@@ -1,4 +1,3 @@
-// @improved-by-ai
 // FT-105 regression: the Charger (Improved Dash) speed_boost stamp written by
 // buffHandler.handleDashSpeedBonus (CLA-067 shape) must fold into the
 // displayed Speed via charSummaryCalc's buffEffectHandlers ['speed_boost'].

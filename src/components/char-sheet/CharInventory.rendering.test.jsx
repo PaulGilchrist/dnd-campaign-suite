@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests removed as duplicates already covered in:
 //   CharInventory.edgeCases.test.jsx - null/undefined array handling in renderItems (same guard path)
 //   CharInventory.popup.test.jsx - desc array joining with <br/><br/> (same popup flow)

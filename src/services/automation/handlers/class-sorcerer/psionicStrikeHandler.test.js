@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './psionicStrikeHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';

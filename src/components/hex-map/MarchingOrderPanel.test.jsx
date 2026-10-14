@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';

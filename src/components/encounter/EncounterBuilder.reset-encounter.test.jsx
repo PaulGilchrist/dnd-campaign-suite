@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import EncounterBuilder from './EncounterBuilder.jsx';
@@ -511,7 +510,6 @@ describe('EncounterBuilder - handleReset', () => {
     expect(crMax.value).toBe('');
   });
 
-  // @cleaned-by-ai
   // Consolidated tests 1-4 (title, monsters, search, description reset) into one
   // comprehensive reset test. These previously each followed the identical pattern:
   // load encounter -> modify one field -> reset -> verify that field cleared.

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests for helper modals in CharActionModals (target selection, confirm modals).
 //
 // Scope:

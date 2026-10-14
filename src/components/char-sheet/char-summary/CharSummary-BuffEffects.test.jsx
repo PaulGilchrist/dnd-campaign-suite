@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Improved: parameterized AC buff tests, removed redundant imports,
 // added negative-path and multi-buff coverage, uses shared mock data.

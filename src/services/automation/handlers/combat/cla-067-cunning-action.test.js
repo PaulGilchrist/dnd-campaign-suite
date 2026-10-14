@@ -1,4 +1,3 @@
-// @cleaned-by-ai
 // CLA-067: Cunning Action verification for 2024 Rogue
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-320: auto_effect psychic_teleportation had NO dispatch (returned null,
 // pool untouched) — executeHandler must route it by effect to its handler.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

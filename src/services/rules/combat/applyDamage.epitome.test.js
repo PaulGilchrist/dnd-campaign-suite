@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-113 regression: Elemental Epitome (2024 Warrior of the Elements lv17).
 // elementalEpitomeHandler.applyResistanceChoice stamps activeBuffs with
 // {name:'Elemental Epitome', effect:'epitome_resistance', damageType:<type>} and

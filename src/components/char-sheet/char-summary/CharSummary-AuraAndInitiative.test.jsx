@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Cleaned: Removed low-value and redundant tests:
 //   - Consolidated null/undefined auraComboEffects "does not crash" tests into single test

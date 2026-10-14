@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TARGET_EFFECT_DEFINITIONS, getEffectDefinition, registerTargetEffect, getActiveTargetEffect, abilitySaveDisadvantageActive } from './targetEffectDefinitions.js';
 

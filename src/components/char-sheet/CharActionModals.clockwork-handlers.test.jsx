@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Handler callback tests for clockwork/other choice modals in CharActionModals.
 // Covers: Clockwork Cavalcade choice routing, handler callbacks, and edge cases.
 // Rendering is covered in CharActionModals.rendering.test.jsx;

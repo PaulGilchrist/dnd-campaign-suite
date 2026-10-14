@@ -6,7 +6,6 @@
 // class-wide spellCastingAbility stays Intelligence (JSON is ground truth), and the
 // spells must survive the "no spell slots at this level" filter even when the
 // Barbarian slot table has no slot at that spell level (lv10 → lv5 spell).
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSpellAbilities } from './spellCalc2024.js';
 

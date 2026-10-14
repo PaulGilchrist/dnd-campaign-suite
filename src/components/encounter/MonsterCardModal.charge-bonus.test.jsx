@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-0007: Aarakocra Skirmisher Talons charge-damage clause (monsters.json
 // conditional_damage) — GM-adjudication offer on the monster attack HIT popup.
 // Locks: offer metadata forwarded to rollAttack, grant rolls 3d4+2 with its own

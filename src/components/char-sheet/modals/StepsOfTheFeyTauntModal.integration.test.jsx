@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Redundant tests removed: 17 tests covering result view transitions, header
 // rendering, result descriptions, overlay interactions, custom titles,
 // skip button labels, multi-target save listeners, no-uses selection blocking,

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed: "renders the section header" (subsumed by incapacitated test)
 // Removed: "renders attack names from playerStats.attacks" (subset of "renders multiple attacks")
 // Removed: "renders base actions list after fetch completes" (specific case of "renders actions returned from actions.json")

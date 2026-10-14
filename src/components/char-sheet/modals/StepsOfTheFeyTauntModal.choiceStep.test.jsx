@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // All 9 tests in this file were redundant duplicates of tests in the
 // step-specific test files (refreshingStep, tauntingStep, disappearingStep,
 // dreadfulStep) and the integration test file. Each transition, cancel, skip,

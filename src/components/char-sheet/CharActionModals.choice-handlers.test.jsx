@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Handler callback tests for choice/modals in CharActionModals
 // Tests verify that clicking modal buttons invokes the correct handler
 // callbacks with the expected arguments, and that setModalState clears

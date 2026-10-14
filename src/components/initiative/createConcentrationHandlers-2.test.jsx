@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createConcentrationHandlers } from './createConcentrationHandlers.js';
 
-// @improved-by-ai
-// @cleaned-by-ai
 vi.mock('../../services/ui/storage.js', () => ({
     default: {
         get: vi.fn(),

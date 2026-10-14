@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 
 import { readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';

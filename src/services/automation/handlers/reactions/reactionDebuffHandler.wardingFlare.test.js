@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-383 regression locks: Warding Flare must write te disadvantage_next_attack
 // (te-producer model, mirrors verified Vicious Mockery/Sap/Tumble) instead of the
 // old post-roll second-d20 simulation, refuse without spending once reacted this

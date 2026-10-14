@@ -3,7 +3,6 @@
 // cunningStrike) pass { consumeAttackTe:false } so they never erase the te that the
 // same attack's tacticalMaster step has just stamped — that self-erase was why
 // advantage was never produced.
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';

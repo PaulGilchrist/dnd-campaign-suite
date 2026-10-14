@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-124/CLA-125: shared evasion eligibility helper — mirror of
 // resolveSaveEvasion (saveProcessing.js:332): own evasion gated on
 // NOT Incapacitated + dcSuccess 'half' + save-type match; shared

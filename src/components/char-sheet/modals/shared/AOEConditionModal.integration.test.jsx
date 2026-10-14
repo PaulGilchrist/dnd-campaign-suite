@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Removed redundant tests (covered by other AOEConditionModal test files):
 //   - "skip button" (×2) → covered in AOEConditionModal.test.jsx "initial render" (skip button rendering)

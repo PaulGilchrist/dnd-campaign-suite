@@ -2,7 +2,6 @@
 // feature's shadow_arts automation to a passive info (freeCastSpells/usesMax/recharge/
 // saveAbility forwarded) mirroring the phantasmal_creatures builder, and routeAutomation
 // must collect it into passives (never an interactive specialAction row).
-// @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import { buildAttackInfo } from './automationInfoBuilder.js';
 import { routeAutomation } from './automationRouter.js';

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Modal action mechanics only: loading/empty states, modal open/close, generate
 // button state, and delete button conditional visibility. Intentionally NOT
 // duplicated here (covered in sibling files):

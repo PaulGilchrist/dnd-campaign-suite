@@ -1,10 +1,7 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SearingVengeanceModal from './SearingVengeanceModal';
 
-// @cleaned-by-ai: Mock CreatureSelectionModal to test prop passthrough
 // without coupling to its internal DOM structure.
 vi.mock('./shared/CreatureSelectionModal.jsx', () => ({
   default: vi.fn(({ title, icon, targets, description, note, confirmLabel, confirmIcon: _, onConfirm, onSkip }) => (

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Cleanup (2026-08-18):
 //   - Consolidated Fiendish Resilience: 3 tests → 2 via it.each parameterization.

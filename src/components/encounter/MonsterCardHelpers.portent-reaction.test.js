@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-0544 regression: Cyclops Oracle Portent — d20-replacement pool reaction
 // (advisory-pool floor). GM-click arms the pool roll: chip renders via the
 // GATED_MONSTER_REACTIONS `portent` entry, resolver rolls 1d20, stores the

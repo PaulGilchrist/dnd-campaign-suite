@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-321: SaveAttackAoeModal must enforce the Soulstitch Spells stamp on the live sheet AoE path.
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

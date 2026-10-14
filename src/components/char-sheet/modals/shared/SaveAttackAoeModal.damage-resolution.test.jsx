@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -397,7 +395,6 @@ describe('SaveAttackAoeModal - Damage resolution', () => {
       expect(playerCalls[0][1].saveResult).toBe('success');
     });
 
-    // @cleaned-by-ai
   });
 
   // ── CLA-109: Eldritch Strike disadvantage_on_next_save regression ──

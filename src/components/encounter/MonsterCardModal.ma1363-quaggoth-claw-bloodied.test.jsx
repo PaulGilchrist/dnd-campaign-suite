@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1363: Quaggoth Claw — conditional_damage:{dice:"2d6",damage_type:"Slashing",
 // condition:"bloodied"} authored on monsters.json actions[1] so the HIT popup offers
 // the "or 13 (3d6 + 3) Slashing if Bloodied" variant via the live MA-0007 GM-

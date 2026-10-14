@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Cleanup: Removed low-value buff dedup test (redundant with success path). Consolidated 3 brittle conditionEffects forcedMode tests into 1 parameterized test. Pass Without Trace bonus test kept separate (tests bonus calculation, not forcedMode).
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

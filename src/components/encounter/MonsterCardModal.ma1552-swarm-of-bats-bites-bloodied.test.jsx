@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1552: Swarm of Bats Bites — conditional_damage:{dice:"1d4",damage_type:"Piercing",
 // condition:"Bloodied"} authored on monsters.json swarm-of-bats actions[0] so the HIT popup
 // offers the "or 2 (1d4) Piercing damage if the swarm is Bloodied" variant via the live

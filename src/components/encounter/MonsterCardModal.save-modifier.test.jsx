@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Cleanup applied (redundant / brittle / low-value removal):
 //
 //   Consolidated 6 positive/negative modifier pairs → 4 parameterized tests:

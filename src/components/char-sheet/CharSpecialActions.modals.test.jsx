@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpecialActions from './CharSpecialActions.jsx';
@@ -700,7 +698,6 @@ describe('CharSpecialActions - Modal Rendering', () => {
     );
   });
 
-  // @cleaned-by-ai
   // popup result handling tests removed: covered by modalsInline.test.jsx (popup display + fallback name)
   // and automationClickHandlers.test.jsx (popup with fallback name). No behavioral gap.
   //

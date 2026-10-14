@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-0325: Azer Warhammer two-handed variant — GM-adjudicated damage-dice
 // CHOICE on the monster attack HIT popup (MA-0007 offer-on-result shape,
 // monsters.json damage_dice_two_handed). ALTERNATIVE primary dice, offered on

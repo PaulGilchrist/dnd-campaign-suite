@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { handle, isPassWithoutTraceActive } from './passWithoutTraceHandler.js'
 import { toggleBuff } from '../../common/buffToggle.js'
 import { addExpiration } from '../../../rules/effects/expirations.js'

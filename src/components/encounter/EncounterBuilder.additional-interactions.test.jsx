@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // All tests in this file were redundant with interactions.test.jsx, remaining.test.jsx,
 // and panel-interactions.test.jsx.  The inline mock replicas (~300 lines) that mirror
 // real component DOM structure made every test brittle — structural changes in the real

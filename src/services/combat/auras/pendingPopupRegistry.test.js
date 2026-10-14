@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 
 import { registerPendingPopupSetter, getPendingPopupSetter } from './pendingPopupRegistry.js';

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // SavePromptModal — test-utils exported utility verification
 // Tests the createMockSubscriber factory and fixture functions.
 // These utilities are shared across all SavePromptModal test files.

@@ -1,4 +1,3 @@
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeMovementManeuver } from './combatSuperiorityHandler.js';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';

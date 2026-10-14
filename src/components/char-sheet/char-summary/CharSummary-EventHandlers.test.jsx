@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Quality improvements:
 //   - Removed window.location.hostname assignment (unnecessary — isLocalhost

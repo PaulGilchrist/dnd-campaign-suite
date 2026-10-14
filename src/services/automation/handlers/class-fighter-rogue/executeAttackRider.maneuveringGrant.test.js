@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { applyManeuveringAllyGrant } from './executeAttackRider.js';
 import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';

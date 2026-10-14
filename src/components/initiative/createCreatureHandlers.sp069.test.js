@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createCreatureHandlers } from './createCreatureHandlers.js';
 import { breakHypnoticPatternOnDamage } from '../../services/rules/features/hypnoticPatternService.js';

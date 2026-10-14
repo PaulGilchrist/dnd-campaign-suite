@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Cleanup (2026-08-18):
 //   - Consolidated 8 single-buff tests → 1 parameterized it.each test.

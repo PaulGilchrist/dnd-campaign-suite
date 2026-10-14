@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-237 regression: Nature's Ward (2024 Druid, Circle of the Land lv10)
 // resistance ignored on the PC save-damage prompt lane. Persisted combatSummary
 // player entries are minimal stubs (CLA-119 family — no automation/computedStats),

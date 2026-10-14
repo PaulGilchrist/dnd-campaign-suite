@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Handler callback tests for CharActionModals — modal button → handler wiring.
 //
 // Scope — unique behaviors tested here:

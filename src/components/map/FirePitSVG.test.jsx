@@ -1,4 +1,3 @@
-// @improved-by-ai
 import React from 'react';
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
@@ -126,4 +125,3 @@ describe('FirePitSVG', () => {
   });
 });
 
-// @cleaned-by-ai

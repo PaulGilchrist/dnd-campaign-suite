@@ -5,7 +5,6 @@
 // channel the advantage-rig te stamps); a normal-mode hit pays primary-only
 // with an honest `secondary_damage_skipped` log. Legacy always-roll rows
 // (condition null/absent) stay byte-identical — rider rolls on every hit.
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({

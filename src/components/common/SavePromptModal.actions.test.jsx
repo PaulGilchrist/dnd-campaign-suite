@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // SavePromptModal — actions
 // Tests behavioral outcomes of save prompt interactions: dismissal, rolling,
 // event dispatching, prompt queuing, clearing, and storage behavior.
@@ -16,7 +14,6 @@
 //   - Added test for handleEvent ignoring events from other campaigns
 //   - Removed redundant assertions where behavioral outcome already covers the check
 //
-// Cleanup (@cleaned-by-ai):
 //   - Removed "advances to next prompt when Done is clicked with single prompt" (lines 190-219)
 //     Duplicate of "shows second prompt after first is rolled and Done is clicked" (lines 221-260)
 //     which covers the same Done-click behavior with stronger queue assertions

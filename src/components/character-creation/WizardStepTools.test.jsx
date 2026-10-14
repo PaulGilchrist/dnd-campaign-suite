@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed 6 redundant/low-value tests:
 //   - "should hide rules info when toolLimits is null" + "should hide rules info when toolLimits is an empty object"
 //     -> consolidated into "should hide rules info when toolLimits is falsy or empty" (single test, both cases)

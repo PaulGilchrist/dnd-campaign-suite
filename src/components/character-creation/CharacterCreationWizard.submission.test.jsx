@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed 5 tests:
 //   - "passes the character ruleset to validateStep" (2024) + "passes the character ruleset to validateStep for 5e" -> consolidated into "passes the character ruleset to validateStep"
 //   - "uses 'Save Changes' button text when isEditing is true" -> button label is WizardFooter concern (covered in WizardFooter.test.jsx)

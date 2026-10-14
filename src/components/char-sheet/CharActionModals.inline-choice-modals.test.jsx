@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests for inline choice modals (Sweeping Attack, Bait and Switch, Commander's Strike)
 // that render SecondaryTargetModal. Each test verifies the behavioral contract:
 // correct title/description rendering and handler invocation on target selection.

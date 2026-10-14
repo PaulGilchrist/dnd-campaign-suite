@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Cleanup (2026-08-18):
 //   - Consolidated 2 inspiration toggle tests into 1 parameterized it.each test.

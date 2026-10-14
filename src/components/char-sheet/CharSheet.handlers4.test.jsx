@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Behavioral tests for CharSheet handler functions (handlePuncture,
 // handleSavageAttacker, handleTacticalMind, handleDarkOnesLuck,

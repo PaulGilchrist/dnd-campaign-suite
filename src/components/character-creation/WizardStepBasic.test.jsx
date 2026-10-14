@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed 2 tests:
 //   - "should render an empty alignment select when fetch fails" → redundant with error-logging test (same failure path)
 //   - "should do nothing when no file is selected" → low-value negative assertion for trivial guard

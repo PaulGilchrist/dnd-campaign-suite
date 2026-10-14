@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Cleanup applied (redundant / brittle / low-value removal):
 //
 //   Removed 1 redundant integration test:

@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Generate-settlement behavior only. Intentionally NOT duplicated here
 // (covered in sibling files):
 //   - generate button disabled / "Generating…" label / re-enabled on success

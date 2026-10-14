@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1676: Warhorse Hooves — one-field DATA fix: conditional_damage
 // {dice:"2d4", damage_type:"Bludgeoning"} authored on monsters.json actions[0]
 // (MA-0007 charge-bonus seam, MA-0885 goat Ram byte-shape with MA-0809/MA-0805

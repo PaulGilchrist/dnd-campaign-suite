@@ -1,9 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 import * as raceRulesModule from './index.js';
 import rules5e from './5e.js';

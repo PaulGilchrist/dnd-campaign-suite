@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-0516 regression: Construct Spirit (Clay) Berserk Lashing — reactive
 // attack reaction (2024 PHB: takes damage from a creature → Slam attack vs
 // THAT creature, half-speed move alternative GM-advisory). Gate is the

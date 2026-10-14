@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-305 regression: generic self_healing expression branch must heal rollTotal+bonus,
 // must not consume a use when no HP is actually gained, and must refuse at 0 HP.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

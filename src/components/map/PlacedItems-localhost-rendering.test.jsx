@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Localhost-specific rendering tests.
 //
 // Structural + event handler + fog + visibility tests are covered in:

@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { rollConcentrationSave, breakConcentration, computeConcentrationDc } from './concentrationRules.js'
 import { rollD20 } from '../../dice/diceRoller.js'

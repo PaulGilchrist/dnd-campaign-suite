@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1577: Tarrasque "Frightful Presence" (aoe-save, DC 17 Wisdom, frightened) —
 // FAIL(a): DC/save/Frightened grant was LIVE honest but the EOT repeat-save and the
 // 24h success-immunity were prose-only. DATA fix: the row gains structured

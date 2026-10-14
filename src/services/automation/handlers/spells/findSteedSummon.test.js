@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-130 bug(b) lock: Find Steed must route through the data-driven
 // summon_spirit lane (CLA-127 Primal Companion / SP-015 summon_spirit picker
 // template) so a cast produces a combatant tracker card + a `summons` log row

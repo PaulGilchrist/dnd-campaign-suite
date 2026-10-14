@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Cleanup: Consolidated 2 redundant Cloak of Shadows skip tests into 1 parameterized test (same behavior, different action names).
 // Rewrote 2024 no-FP message test to assert key text content instead of brittle exact HTML string.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';

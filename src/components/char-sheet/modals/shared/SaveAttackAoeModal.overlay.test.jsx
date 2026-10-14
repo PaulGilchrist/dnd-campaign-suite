@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -259,6 +258,5 @@ describe('SaveAttackAoeModal - Overlay targeting path', () => {
       expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
     });
 
-    // @cleaned-by-ai
   });
 });

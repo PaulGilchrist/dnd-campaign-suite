@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Cleanup:
 //   - Removed "renders single surge effect without duration" — redundant with multi-item test

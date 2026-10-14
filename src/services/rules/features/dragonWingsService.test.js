@@ -1,4 +1,3 @@
-// @improved-by-ai
 // BUG CLA-099: shared retirement seam + duration formatting for Dragon Wings.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1554: Swarm of Centipedes Bites — conditional_damage:{dice:"2d4",damage_type:"piercing",
 // condition:"half HP or fewer"} authored on monsters.json swarm-of-centipedes actions[0] so the
 // HIT popup offers the "or 5 (2d4) piercing damage if the swarm has half of its hit points or

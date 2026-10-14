@@ -6,7 +6,6 @@
 // 'Always' + _shadowArtsFreeCast + spellCastingAbility WIS, surviving the slot-level
 // filter with no slots at all. saveDc must come from Wisdom (8 + 4 + PB6 = 18),
 // never the DC 10 fallback (CLA-277 family).
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSpellAbilities } from './spellCalc2024.js';
 

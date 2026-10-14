@@ -1,9 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest'
 import { computeFeatRangeEffects, matchesExtraReachCondition, resolveMeleeReachBonus } from './featRangeService.js'
 import { computeRangeEffect } from '../rules/combat/rangeValidation.js'

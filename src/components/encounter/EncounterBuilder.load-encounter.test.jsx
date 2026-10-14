@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed:
 //   "sets encounter title with formatEncounterName formatting" — redundant
 //     with "loads encounter data and sets title, description, and selected

@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { triggerPassWithoutTraceSpell, applyPassWithoutTraceEffect } from './passWithoutTraceService.js'
 import { executeHandler } from '../../automation/index.js'
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'

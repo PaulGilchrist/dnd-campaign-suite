@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // CharInventory edge cases and special scenarios
 //
 // This file contains truly unique edge case tests not covered by other CharInventory test files:

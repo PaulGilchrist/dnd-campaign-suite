@@ -1,9 +1,6 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect } from 'vitest';
 
 describe('SaveAttackAoeModal', () => {
-  // @cleaned-by-ai: All tests removed — fully covered by the specialized files:
   //   - SaveAttackAoeModal.creature-selection.test.jsx  (rendering, selection, metamagic)
   //   - SaveAttackAoeModal.overlay.test.jsx             (overlay targeting path)
   //   - SaveAttackAoeModal.damage-resolution.test.jsx   (NPC/player damage resolution)

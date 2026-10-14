@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpecialActions from './CharSpecialActions.jsx';
@@ -538,11 +536,9 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
       });
     });
 
-    // @cleaned-by-ai: Moonlight Step "cannotAct" test removed — doesn't actually test the guard (just asserts modal isn't open before interaction); cannotAct guard covered by modals.test.jsx parametrized tests
   });
 
   describe('Portent Modal', () => {
-    // @cleaned-by-ai: "renders inline Portent modal" test removed — covered by parametrized modal rendering tests in modals.test.jsx
 
     it('shows the original roll calculation in the Portent modal', async () => {
       executeHandler.mockResolvedValue({
@@ -571,7 +567,6 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
       });
     });
 
-    // @cleaned-by-ai: Portent "shows cancel button" test removed — structural detail, covered by other cancel/close tests across suite
 
     it('applies portent choice when a die is selected', async () => {
       executeHandler.mockResolvedValue({
@@ -606,7 +601,6 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
     });
   });
 
-  // @cleaned-by-ai: MultiResistance Selection test removed — fully covered by parametrized modal rendering tests in modals.test.jsx
 
   describe('Celestial Resilience', () => {
     it('renders CreatureSelectionModal for celestialResilience with correct labels', async () => {
@@ -639,11 +633,9 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
       });
     });
 
-    // @cleaned-by-ai: Celestial Resilience "closes when skip" test removed — redundant with handlers.test.jsx skip/close patterns
   });
 
   describe('Fiendish Resilience', () => {
-    // @cleaned-by-ai: "renders SingleResistanceSelectionModal" test removed — covered by parametrized modal rendering tests in modals.test.jsx
 
     it('closes fiendish resilience modal when onClose is called', async () => {
       executeHandler.mockResolvedValue({
@@ -694,7 +686,6 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
       });
     });
 
-    // @cleaned-by-ai: Feature Choice Modal "closes when cancel" test removed — redundant with other cancel/close tests across suite
   });
 
   describe('Aspect of the Wilds Modal', () => {
@@ -747,8 +738,6 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
       expect(capturedPopup).toContain('Owl');
     });
 
-    // @cleaned-by-ai: Aspect of the Wilds "closes aspect modal when cancel" test removed — covered by handlers.test.jsx
-    // @cleaned-by-ai: Aspect of the Wilds "shows popup when already used this rest" test removed — overly implementation-specific (directly manipulates mockRuntimeStore instead of going through useRuntimeValue)
   });
 
   describe('Replenishing Meal Modal', () => {
@@ -905,7 +894,6 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
   });
 
   describe('Bolstering Performance Modal', () => {
-    // @cleaned-by-ai: "renders CreatureSelectionModal" test removed — mocks wrong code path (component uses confirmBolsteringPerformance callback, not direct modal from executeHandler); correct test in handlers.test.jsx
 
     it('closes bolstering performance modal when skip is clicked', async () => {
       executeHandler.mockResolvedValue({
@@ -972,7 +960,6 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
       });
     });
 
-    // @cleaned-by-ai: Encouraging Song "closes when skip" test removed — overlaps with handlers.test.jsx skip test
   });
 
   describe('executeHandler null/undefined handling', () => {

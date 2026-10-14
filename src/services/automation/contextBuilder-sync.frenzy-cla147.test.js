@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-147: contextBuilder-sync must contribute NO frenzy dice to autoDamageFormula.
 // Pre-fix it baked 'rage_damage_d6' (' plus 4d6') into the display formula, which
 // diceRoller rolled as part of the base damage — while the attack pipeline's

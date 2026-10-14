@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-339: Stroke of Luck (Rogue lv20) — offer must be gated to FAILED d20 tests only.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';

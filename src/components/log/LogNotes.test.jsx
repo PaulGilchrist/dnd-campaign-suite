@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { beforeEach } from 'vitest';
 import { q, setup, beforeEachSetup, mockAddEntry } from './log-test-utils.jsx';

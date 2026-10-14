@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import { getAbilities, getHitPoints, getCarryingCapacity } from './abilityCalc2024.js';
 

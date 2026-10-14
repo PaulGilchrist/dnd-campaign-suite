@@ -1,4 +1,3 @@
-// @improved-by-ai
 // SP-024: Color Spray (2024, save_only) — Blinded condition never expired.
 // Pins the fail-grant expiry clock: ONE addExpiration per failing target
 // ({rounds:1, expireOnCreatureName: caster} — CLA-045 end-of-next-turn convention),

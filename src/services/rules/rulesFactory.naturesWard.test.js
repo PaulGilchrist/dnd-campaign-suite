@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-237 regression: Nature's Ward land resistance must resolve from the
 // runtime _circleOfTheLandType key (not just classData.major/subclass type),
 // so every getPlayerStats caller — including App computedCharacters feeding

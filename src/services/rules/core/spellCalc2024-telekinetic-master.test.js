@@ -6,7 +6,6 @@
 // the free_spell/always_prepared branches stamp _telekineticMasterFreeCast, and the
 // filter exempts it (CLA-234/_ritualOnly carry pattern) so Telekinesis surfaces castable
 // slot-free with Intelligence as the casting ability + saveDc 17 (8 + INT 3 + PB 6).
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSpellAbilities } from './spellCalc2024.js';
 

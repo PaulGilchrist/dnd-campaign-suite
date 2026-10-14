@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-268: the Psychic Spells damage-type swap must be OPT-IN — it fires only when
 // the cast-time checkbox flag (_psychicSpellsOverride / usePsychicDamage) is truthy.
 import { describe, it, expect, vi, beforeEach } from 'vitest'

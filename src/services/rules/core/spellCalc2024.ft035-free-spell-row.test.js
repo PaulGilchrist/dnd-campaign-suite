@@ -1,4 +1,3 @@
-// @improved-by-ai
 // BUG FT-035(a) lock: a feat's free_spell automation MUST surface its fixed spells as
 // castable sheet rows on ANY holder. Fey Touched's feats.json automation
 // `spell:["Misty Step"]` (lv2 in the 2024 DB) was collected into automation.actions but

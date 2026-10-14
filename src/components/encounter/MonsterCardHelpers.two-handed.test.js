@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-0636: Drider Longsword advertised versatile two-handed 1d10+3 variant
 // (monsters.json damage_dice_two_handed) — MA-0325 template one-field data
 // fix. Locks: drider actions[2] authors the variant alongside the primary;

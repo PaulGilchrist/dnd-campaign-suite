@@ -1,4 +1,3 @@
-// @improved-by-ai
 // BUG CLA-096 lock: the rounds-clock expiry must actually log (previously the
 // fly buff was purged in silence unless the target happened to be incapacitated).
 import { describe, it, expect, vi, beforeEach } from 'vitest';

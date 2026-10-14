@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Cleaned: removed 25 redundant tests from 43 total.
 // Removed 12 "does nothing when playerStats is null" tests (defensive

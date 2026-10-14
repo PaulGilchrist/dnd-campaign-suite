@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests for inline choice modals in CharActionModals.jsx:
 // - divineFuryChoice inline modal
 // - damageTypeChoice inline modal (generic + enhancedUnarmed dispatching)

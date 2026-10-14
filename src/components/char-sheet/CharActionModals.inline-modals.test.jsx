@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Additional tests for inline modal rendering paths in CharActionModals.jsx.
 // Covers BastionOfLaw, moonlightStepFallback, attackRiderOptions, naturesSanctuary,
 // inspiringSmite, and clockworkCavalcade modals.

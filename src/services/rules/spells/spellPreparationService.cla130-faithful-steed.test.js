@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-130 free-badge semantics: the Faithful Steed latch
 // `_Faithful_Steed_freeCastCount` gates the "Free Cast — no spell slot
 // consumed" authorization in SpellDetailPopup via isFreeCastAuthorized →

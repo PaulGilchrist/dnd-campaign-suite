@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-124 + CLA-125 (twins): Evasion on the caster-AoE prompt lane must fold
 // 0-on-success / floor-half-on-failure for Monk (2024 lv7+) and Rogue lv14+
 // holders. The lane previously read combatSummary player STUBS' computedStats

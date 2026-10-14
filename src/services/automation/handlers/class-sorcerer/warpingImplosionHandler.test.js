@@ -1,9 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
 // CLA-384: the confirm leg was unreachable dead code — locked contract is now
 // resource spend (uses OR 5 SP restore) + teleport te marker + refusal logs.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

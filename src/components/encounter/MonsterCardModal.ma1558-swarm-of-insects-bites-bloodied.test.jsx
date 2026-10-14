@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1558: Swarm of Insects "Bites" — inert prose Bloodied variant
 // fixed on monsters.json actions[0] via conditional_damage riding the live
 // MA-0007 GM-adjudication seam (buildChargeBonusOffer arms on cd?.dice).

@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-277: shockwave CON save must use the Monk's Focus save DC (8 + WIS + PB),
 // built data-driven via saveDc:'ability' + saveAbility:'WIS' in classes.json.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

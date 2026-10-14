@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1569: Swarm of Stirges "Swarm of Proboscises" — three inert prose riders fixed on
 // monsters.json actions[0]: (1) Bloodied 8 (1d10 + 3) Piercing variant rides the live
 // MA-0007/MA-1363 GM-adjudication seam via conditional_damage (buildChargeBonusOffer arms

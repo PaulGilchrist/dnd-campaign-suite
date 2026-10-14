@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed: test that asserted internal implementation (rollExpression/addEntry calls) — covered by useSimpleDamageRoll unit tests
 // Rewrote: popup-clearing test to assert observable state transitions instead of fragile call ordering
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';

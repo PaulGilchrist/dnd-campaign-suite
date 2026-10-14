@@ -1,11 +1,8 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // SavePromptModal — rendering
 // Tests the visual rendering of the save prompt modal: overlay visibility,
 // prompt display content (target, ability, DC, disadvantage, source, evasion notes),
 // and edge cases for character array types.
 //
-// Quality improvements (@improved-by-ai):
 //   - Added vi.clearAllMocks() to beforeEach for test isolation
 //   - Removed tests fully duplicated in other test files:
 //     * "shows result failure message" → covered in rolling.test.jsx
@@ -21,7 +18,6 @@
 //   - Added missing assertion: verify overlay element class presence
 //   - Added edge case: verify modal renders with string characters in array
 //
-// Cleanup (@cleaned-by-ai):
 //   - Removed "shows result failure message when save fails" — duplicate of rolling.test.jsx and actions.test.jsx roll+result flows
 //   - Removed "shows result total and breakdown after rolling a save" — duplicate of actions.test.jsx "sends save result via sendSaveResult when dismissing after a roll"
 //   - Removed "shows queue count in header when multiple prompts exist" — duplicate of actions.test.jsx "shows queue count and advances to second prompt when multiple prompts exist"

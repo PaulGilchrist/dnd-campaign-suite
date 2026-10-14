@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai: Most of the original 437-line test suite was redundant with
 //   CreatureSelectionModal.test.jsx (598 lines). MantleOfInspirationModal is a
 //   26-line thin wrapper — testing its rendered output was re-testing the
 //   underlying component. The remaining tests verify the wrapper's specific

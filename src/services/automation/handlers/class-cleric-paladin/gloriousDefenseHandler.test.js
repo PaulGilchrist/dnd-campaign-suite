@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, hasGloriousDefenseActive } from './gloriousDefenseHandler.js';
 import * as damageRollback from '../../common/damageRollback.js';

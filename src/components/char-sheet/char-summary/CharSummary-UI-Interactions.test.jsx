@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Quality improvements:
 //   - Added missing mock for useDiceRollPopup (component calls it, was crashing)

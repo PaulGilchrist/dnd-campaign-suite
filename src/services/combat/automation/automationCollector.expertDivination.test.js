@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect } from 'vitest'
 import { collectAutomationFromFeatures } from './automationCollector.js'
 import { buildAttackInfo } from './automationInfoBuilder.js'

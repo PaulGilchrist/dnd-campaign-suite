@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Row-level CRUD is covered in Settlements.serviceNPCRumor.test.jsx (new modal)
 // and Settlements.modalActions.test.jsx (edit modal open/close + prefilled data).
 // This file retains only the unique behavioral gap: draft-discard semantics

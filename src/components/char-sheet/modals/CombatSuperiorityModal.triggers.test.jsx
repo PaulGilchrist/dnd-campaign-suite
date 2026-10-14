@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CombatSuperiorityModal from './CombatSuperiorityModal.jsx';
@@ -212,7 +210,6 @@ describe('CombatSuperiorityModal - MN-014 trigger-contextual labels', () => {
 // ── Prompt mode with attackContext / skillContext ──
 
 describe('CombatSuperiorityModal - prompt mode', () => {
-  // @cleaned-by-ai REMOVE: First two renders assert header text ("Choose Maneuver"/"Use Maneuver") which is cosmetic UI text already covered by edge-cases.test.jsx "prompt mode headers" describe block (lines 241-283). Header text assertions are brittle — they break on wording changes but don't verify behavioral filtering logic. The third render (skillContext filtering, lines 420-431) has value and is kept in the skillContext test below.
   it('renders correct header in selection vs use mode with attackContext', () => {
     renderModalDirect({
       payload: {
@@ -263,7 +260,6 @@ describe('CombatSuperiorityModal - prompt mode', () => {
     expect(maneuverNotInList('Ranged Strike')).toBe(true);
   });
 
-  // @cleaned-by-ai REMOVE: Redundant with the melee_weapon_attack_hit melee test above (lines 160-180). Both verify the same trigger-filtering logic — melee_weapon_attack_hit includes melee/unarmed but excludes ranged. The melee test already covers the melee path; adding a separate ranged test only verifies the same filter function with a different weaponType parameter, providing no additional behavioral confidence. Consolidate into a single parameterized test if needed.
   it('filters by melee_weapon_attack_hit trigger for ranged weapons', () => {
     renderModalDirect({
       payload: {
@@ -347,7 +343,6 @@ describe('CombatSuperiorityModal - prompt mode', () => {
     expect(maneuverNotInList('Trip Attack')).toBe(true);
   });
 
-  // @cleaned-by-ai REMOVE: Structural duplicate of melee_attack_miss (lines 242-263). Both use identical it.each pattern with ['melee weapon', ...] and ['unarmed strike', ...] variants, asserting the same two-expect structure. The melee_attack_miss test already validates the melee+unarmed parameterization pattern. Keeping all three (melee_attack_miss, melee_damage_taken, melee_attack_straight_line) adds little value — they test the same filter function shape with different trigger strings. Consolidate into a single parameterized test over trigger types.
   it.each([
     ['melee weapon', { weaponType: 'melee', targetName: 'TestChar' }, 'Dodge Maneuver'],
     ['unarmed strike', { weaponType: null, isUnarmedStrike: true, targetName: 'TestChar' }, 'Unarmed Dodge'],
@@ -371,7 +366,6 @@ describe('CombatSuperiorityModal - prompt mode', () => {
     expect(maneuverNotInList('Trip Attack')).toBe(true);
   });
 
-  // @cleaned-by-ai REMOVE: Structural duplicate of melee_attack_miss and melee_damage_taken tests above. Same it.each pattern, same two-expect structure, same melee+unarmed parameterization. All three tests (melee_attack_miss, melee_damage_taken, melee_attack_straight_line) verify the same filter-function shape. Consolidate into a single parameterized test over trigger types.
   it.each([
     ['melee weapon', { weaponType: 'melee', attackerName: 'TestChar' }, 'Flank Maneuver'],
     ['unarmed strike', { weaponType: null, isUnarmedStrike: true, attackerName: 'TestChar' }, 'Unarmed Flank'],
@@ -477,7 +471,6 @@ describe('CombatSuperiorityModal - prompt mode', () => {
     expect(maneuverNotInList('Trip Attack')).toBe(true);
   });
 
-  // @cleaned-by-ai KEEP (but consolidate): The first two renders (header checks with skillContext) duplicate the header assertions from the attackContext test above (line 132) — both check "Choose Maneuver" and "Use Maneuver" headers. The third render (skillContext with no-trigger maneuver filtering, lines 420-431) provides unique behavioral coverage. Consider rewriting as: one render asserting skillContext triggers promptMode, one render asserting maneuver filtering with skillContext.
   it('treats skillContext same as attackContext for isPromptMode', () => {
     renderModalDirect({
       payload: {
@@ -706,7 +699,6 @@ describe('CombatSuperiorityModal - onReopenSelection', () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  // @cleaned-by-ai REMOVE: Duplicate of edge-cases.test.jsx "onReopenSelection error handling" describe block (lines 528-551). Both test that console.error is called with the same error message format when onReopenSelection rejects. The edge-cases test has the same setup and assertion. Keep the edge-cases version; remove this one.
   it('logs error and does not throw when onReopenSelection rejects', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
     const onReopenSelection = vi.fn().mockRejectedValue(new Error('fail'));
@@ -734,7 +726,6 @@ describe('CombatSuperiorityModal - onReopenSelection', () => {
 
 // ── handleUseManeuver error path ──
 
-// @cleaned-by-ai REMOVE: Duplicate of edge-cases.test.jsx "use maneuver error path" describe block (lines 498-523). Both test that console.error is called with '[CombatSuperiorityModal] Use maneuver failed:' and that the "Done" button is not shown when onConfirm rejects. The edge-cases test covers the same behavior with identical assertions. Keep the edge-cases version; remove this entire describe block.
 describe('CombatSuperiorityModal - handleUseManeuver error', () => {
   it('logs error, does not set applied state, and does not show result when onConfirm rejects', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
@@ -763,7 +754,6 @@ describe('CombatSuperiorityModal - handleUseManeuver error', () => {
   });
 });
 
-// @cleaned-by-ai REMOVE: Duplicate of edge-cases.test.jsx. Selection mode description rendering is covered by edge-cases.test.jsx "selection mode descriptions" (lines 556-570). Use mode description rendering is covered by edge-cases.test.jsx "maneuver descriptions in use mode" (lines 204-235). This test provides no unique behavioral coverage — it only asserts that description text appears in the DOM, which is already tested in the edge-cases file.
 // ── Maneuver description rendering ──
 
 describe('CombatSuperiorityModal - maneuver descriptions', () => {

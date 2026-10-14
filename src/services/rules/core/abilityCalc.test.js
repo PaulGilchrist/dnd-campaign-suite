@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import { getAbilities, getHitPoints, getCarryingCapacity } from './abilityCalc.js';
 import * as raceRules from '../../character/race-rules/index.js';

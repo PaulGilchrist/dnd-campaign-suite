@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests for skip handlers in HealingModals.jsx (rendered through CharActionModals):
 // - MassHealModal onSkip
 // - MassCureWoundsModal onSkip
@@ -10,13 +8,11 @@
 // - ClockworkCavalcadeDispelModal onSkip
 // - NaturesSanctuaryCreaturesModal onSkip
 //
-// @cleaned-by-ai: Removed 8 redundant "does not call confirm handler on skip" tests.
 // These negative assertions verified that clicking a skip button doesn't invoke the
 // confirm handler — basic UI behavior with no unique behavioral coverage. Each modal
 // pair (close + negative assertion) was consolidated into a single parameterized test
 // that asserts the observable behavior: skip sets modalState to null.
 //
-// @cleaned-by-ai: Consolidated 8 nearly-identical "closes modal on skip" tests
 // into a single parameterized test. Each test followed the same pattern:
 // render CharActionModals → click skip test ID → expect setModalState called with
 // { [modalKey]: null }. The only differences were modalKey, modalData, handlerProp,

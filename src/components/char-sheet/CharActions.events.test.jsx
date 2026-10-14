@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Consolidated 6 identical modal-show passthrough tests → 1 parameterized test
 // Consolidated 4 healing-popup tests → 2 parameterized tests
 // Consolidated 2 damage-popup tests → 1 parameterized test

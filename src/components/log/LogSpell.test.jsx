@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { screen, cleanup } from '@testing-library/react';
 import { beforeEach } from 'vitest';
 import { spell, q, setup, beforeEachSetup } from './log-test-utils.jsx';

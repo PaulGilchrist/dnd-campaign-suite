@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Consolidated (redundant positive/negative test pairs merged into parameterized tests):
 //
 //   getDamageTypesForAction: 2 tests → 1 test

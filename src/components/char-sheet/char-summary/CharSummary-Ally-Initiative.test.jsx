@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // Cleanup (2026-08-18):
 //   - Reduced excessive mocks from 20+ to 11 — only mock what the tested code paths actually use.

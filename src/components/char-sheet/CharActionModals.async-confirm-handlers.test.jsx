@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests for async confirm handlers with setPopupHtml in CharActionModals.jsx.
 //
 // Covers: successful payload paths for all async confirm handlers.
@@ -7,7 +5,6 @@
 // CharActionModals.handler-callbacks.test.jsx. Modal rendering is tested in
 // CharActionModals.rendering.test.jsx.
 //
-// @cleaned-by-ai: Removed 6 redundant null/undefined tests already covered in
 // handler-callbacks.test.jsx. Consolidated AnimateDead/CreateUndead/SummonSpirit
 // into a single parameterized describe block. Removed brittle "does not call
 // setPopupHtml when result is undefined" tests that assert internal wiring

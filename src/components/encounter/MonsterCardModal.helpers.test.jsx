@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Behavioral tests for the condition-effect badge rendering in the monster card.
 //
 // Coverage audit against ALL other MonsterCardModal test files (before adding any test):

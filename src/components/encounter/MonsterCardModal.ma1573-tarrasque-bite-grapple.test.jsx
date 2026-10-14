@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1573: Tarrasque "Bite" — inert prose grapple rider fixed on monsters.json Bite row:
 // (1) hit_conditions:["grappled","restrained"] + escape_dc:20 ride the LIVE MA-0909/MA-0930
 // hit-clause lane (buildHitConditionClause → applyHitClauseConditions, handlePlainDamage.js:553;

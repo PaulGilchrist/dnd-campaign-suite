@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Removed 11 redundant tests covered by sibling files:
 //
 //   Ability modifier tests (3)

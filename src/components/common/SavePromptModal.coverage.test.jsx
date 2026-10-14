@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // SavePromptModal — Additional coverage for evasion overlay and prompt queue advancement
 // These tests provide deeper coverage of edge cases already tested in other files.
 //
@@ -12,7 +10,6 @@
 //   - Fixed evasion overlay tests to verify exact DOM state changes
 //   - Removed redundant mocking in beforeEach for circleOfPowerHandler
 //
-// Cleanup (@cleaned-by-ai):
 //   - Removed duplicate Guarded Mind reroll test (covered by rerolls.test.jsx "overrides failed save to success when Guarded Mind is used")
 //   - Removed duplicate Disciplined Survivor reroll test (covered by rerolls.test.jsx "rerolls save and decrements focus points when Disciplined Survivor is used")
 

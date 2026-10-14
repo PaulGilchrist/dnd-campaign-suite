@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 // ── diverse.test.js ──────────────────────────────────────────────────
 // Tests for diverse.js — behavior-first, minimal over-mocking
 //

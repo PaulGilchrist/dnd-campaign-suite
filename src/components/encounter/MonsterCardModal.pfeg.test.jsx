@@ -1,4 +1,3 @@
-// @improved-by-ai
 // SP-094: monster-attack attacker-type lookup must resolve the real monsterType
 // (EB combatSummary monsters carry type:'npc' with the real D&D type in monsterType).
 import { render, fireEvent } from '@testing-library/react';

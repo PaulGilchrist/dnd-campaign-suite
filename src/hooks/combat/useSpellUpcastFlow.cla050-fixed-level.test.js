@@ -2,7 +2,6 @@
 // classes.json level — the upcast ladder must offer exactly that one level (no
 // free lv1→9 range) for rows stamped _circleOfTheLandFixedLevel. Untouched rows
 // keep the canonical full damage/heal ladder.
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useSpellUpcastFlow } from './useSpellUpcastFlow.js';

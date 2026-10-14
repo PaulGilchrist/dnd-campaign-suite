@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSpellAbilities } from './spellCalc2024.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -533,7 +528,6 @@ describe('spellCalc2024-automation', () => {
   });
 
   describe('spell thief - stolen spell castability (CLA-325)', () => {
-    // @improved-by-ai
     function stubStolenList(stolenList, casterBlockList) {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
         if (key === '_spellThiefStolenList') return stolenList;

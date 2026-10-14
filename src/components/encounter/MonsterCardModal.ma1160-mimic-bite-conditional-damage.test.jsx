@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1160: Mimic Bite grapple-double conditional damage — conditional_damage authored
 // on monsters.json actions[0] (MA-0007 seam, ADDITIVE convention: the resolver applies
 // base "Done" + its own clause roll, so the clause is authored as the DELTA dice).

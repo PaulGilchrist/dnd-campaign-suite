@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-364 BUG-C: handlePlayerSaveDamage hardcoded isTranceOfOrderActive:false,
 // so a Trance of Order holder's save-prompt rolls never got the d20-floor-10
 // leg. These tests pin the seam to the real runtime flag and to the real

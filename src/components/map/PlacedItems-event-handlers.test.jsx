@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Event handler behavioral tests.
 //
 // These tests verify behavior through the mock functions that the component

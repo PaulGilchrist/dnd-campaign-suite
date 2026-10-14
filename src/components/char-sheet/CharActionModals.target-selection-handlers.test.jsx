@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Handler callback tests for target selection modals in CharActionModals.
 //
 // This file tests the handler callback wiring between CharActionModals and
@@ -13,7 +11,6 @@
 // Multi-target confirmations (Bulwark, Radiance, Mantle) are covered in
 // CharActionModals.secondary-targets.test.jsx.
 //
-// @cleaned-by-ai: Removed 6 tests and ~40 unused mocks.
 // - 3 skip tests only asserted handler() with no arguments (Celestial Resilience,
 //   Zealous Presence, Flurry of Blows) — low behavioral granularity, basic UI wiring.
 // - 3 DestructiveStrideTargetModal rendering tests — structural DOM assertions,

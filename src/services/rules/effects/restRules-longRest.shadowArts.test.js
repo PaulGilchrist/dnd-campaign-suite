@@ -3,7 +3,6 @@
 // freeCastSpells entry when the Warrior of Shadow finishes a Long Rest (mirrors the
 // verified CLA-252 Phantasmal Creatures reset shape). Characters without the
 // shadow_arts passive never touch these keys.
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { applyLongRest } from './restRules.js'
 

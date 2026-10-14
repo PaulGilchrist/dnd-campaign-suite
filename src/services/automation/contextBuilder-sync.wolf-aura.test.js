@@ -1,4 +1,3 @@
-// @improved-by-ai
 // CLA-283: async aura utils MUST be awaited at gridless sync consumers —
 // non-awaited reads of .advantage/.disadvantage off a Promise were always undefined.
 import { describe, it, expect, vi, beforeEach } from 'vitest';

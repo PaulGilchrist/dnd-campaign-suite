@@ -6,7 +6,6 @@
 // survive the spells-DB detail remap in finalizeSpellRows via
 // _circleOfTheLandFixedLevel so display, slot cost and damage formula all
 // resolve at the stamped level (Fire Bolt is a level 3 row, not a Cantrip).
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSpellAbilities } from './spellCalc2024.js';
 

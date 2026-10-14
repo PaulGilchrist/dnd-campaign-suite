@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContext } from './contextBuilder.js';
 import { getCombatContext, getTargetFromAttacker } from '../rules/combat/damageUtils.js';

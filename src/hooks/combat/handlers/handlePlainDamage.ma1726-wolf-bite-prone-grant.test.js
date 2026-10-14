@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1726 grant leg: Wolf "Bite" prone rider. One-field DATA fix
 // hit_conditions:["prone"] (MA-1723 winter-wolf Bite / MA-1534 Boulder /
 // MA-1541 Thunderbolt lane) arms buildHitConditionClause → handlePlainDamage.

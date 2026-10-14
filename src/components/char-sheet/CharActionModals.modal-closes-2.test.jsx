@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Tests for modal close handlers in CharActionModals.jsx:
 // - shieldBashModal close handler (close/dispatch events)
 // - quiveringPalmModal close handler (close/dispatch events)

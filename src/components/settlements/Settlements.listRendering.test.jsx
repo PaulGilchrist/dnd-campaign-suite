@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // List rendering details only: size badges, population, service counts, tags,
 // and description previews. Intentionally NOT duplicated here (covered in
 // sibling files):

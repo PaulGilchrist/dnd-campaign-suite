@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createNpcClickHandler } from './createNpcClickHandler.js';
 import { loadMonsters, fetchRaceData } from '../../services/ui/dataLoader.js';

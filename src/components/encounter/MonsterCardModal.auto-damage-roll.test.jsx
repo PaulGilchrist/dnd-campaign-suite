@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Consolidated (redundant / brittle / low-value removal):
 //
 //   autoDamageRoll triggered via attack: 3 tests → 1 test (it.each)

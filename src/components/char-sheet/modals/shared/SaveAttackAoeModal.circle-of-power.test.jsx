@@ -1,4 +1,3 @@
-// @improved-by-ai
 // SP-023: Circle of Power must zero half-damage save damage on a successful
 // save at the SaveAttackAoeModal chooser adjudication seam, and the prompt
 // logs must carry advantage fidelity (distinct rawRolls + mode) instead of

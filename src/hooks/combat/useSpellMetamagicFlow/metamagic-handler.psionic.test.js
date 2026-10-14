@@ -1,4 +1,3 @@
-// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useMetamagicHandler } from './useMetamagicHandler.js';
 import { spendSorceryPoints, getMaxSorceryPoints, logMetamagicUse } from '../useMetamagic.js';

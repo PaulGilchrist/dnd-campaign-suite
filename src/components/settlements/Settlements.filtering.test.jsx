@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 // Filtering behavior only. Intentionally NOT duplicated here (covered in
 // sibling files):
 //   - size filter buttons render / active-state CSS toggle

@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getSpellAbilities } from './spellCalc.js';
 import { getStore, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';

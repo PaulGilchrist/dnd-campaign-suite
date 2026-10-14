@@ -1,8 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
-// @cleaned-by-ai
-// @improved-by-ai
-// @cleaned-by-ai
 import { describe, it, expect } from 'vitest'
 import { classFeatureHandlers } from './class-feature-handlers.js'
 import { BASE_STATS, makeFeature } from '../automationInfoBuilder.test-utils.js'

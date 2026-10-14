@@ -1,4 +1,3 @@
-// @improved-by-ai
 // MA-1610: Triceratops Gore — one-field DATA fix: conditional_damage
 // {dice:"2d8",damage_type:"Piercing",condition:"moved 20+ feet straight
 // toward the target immediately before the hit"} authored on monsters.json

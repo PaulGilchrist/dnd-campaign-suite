@@ -1,5 +1,3 @@
-// @improved-by-ai
-// @cleaned-by-ai
 //
 // All behavioral tests removed — redundant with other AOEConditionModal test files:
 //   - save bonus edge cases (×3) → covered in AOEConditionModal.test.jsx "edge cases"
