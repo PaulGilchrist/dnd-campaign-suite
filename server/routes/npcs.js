@@ -10,11 +10,41 @@ const broadcastNPCsList = (action, campaign, payload = {}) => {
   publish(`npcs-list-${campaign}`, { action, ...payload }, campaign);
 };
 
+// Owner invariant: npcs.json is reserved for CUSTOM NPCs — pre-made monsters
+// come from the Encounter Builder and pull real stats from monsters.json.
+// Saving a bestiary name here creates shadow entries whose placeholder stats
+// override the real stat block when the GM clicks the tracker avatar.
+let bestiaryNames = null;
+function isBestiaryMonsterName(name) {
+  if (!bestiaryNames) {
+    const monstersPath = path.join(process.cwd(), 'public', 'data', 'monsters.json');
+    try {
+      const raw = JSON.parse(fs.readFileSync(monstersPath, 'utf-8'));
+      const list = Array.isArray(raw) ? raw : (raw.monsters || []);
+      bestiaryNames = new Set(list.map(m => String(m?.name || '').toLowerCase()).filter(Boolean));
+    } catch (error) {
+      console.error('Error loading monsters.json for NPC name guard:', error);
+      return false; // monsters.json unreadable — never block legitimate NPC saves
+    }
+  }
+  return bestiaryNames.has(String(name || '').trim().toLowerCase());
+}
+
+function bestiaryNameError(name) {
+  return `"${name}" is a published monster — monsters join through the Encounter Builder with their real stat block. NPCs are for custom characters with their own name.`;
+}
+
 const baseRouter = createJsonEntityRouter('npcs', {
   idField: 'name',
   pluralDisplayName: 'NPCs',
   singularDisplayName: 'NPC',
   broadcast: broadcastNPCsList,
+  validateList: (entities) => {
+    for (const npc of entities || []) {
+      if (isBestiaryMonsterName(npc?.name)) return bestiaryNameError(npc.name);
+    }
+    return null;
+  },
   onDelete: (npc) => {
     if (npc.imagePath) {
       deleteCharacterImage(npc.imagePath);
@@ -75,6 +105,11 @@ baseRouter.put('/api/campaigns/:campaign/npcs/:npcName', asyncHandler((req, res)
     );
     if (nameCollision) {
       return res.status(400).json({ error: 'An NPC with that name already exists' });
+    }
+
+    // Owner invariant (see isBestiaryMonsterName above): no bestiary monsters in npcs.json.
+    if (isBestiaryMonsterName(newName)) {
+      return res.status(400).json({ error: bestiaryNameError(newName) });
     }
 
     handleImageChange(campaign, updatedNpc, existingNpc, existingNpc?.imagePath);
