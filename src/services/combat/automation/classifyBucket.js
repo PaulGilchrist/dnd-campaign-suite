@@ -56,6 +56,19 @@ const CASTING_BUCKET = {
     passive: 'passive',
 }
 
+// Leading-form resolution for compound casting times the normalizer passes
+// through ('1 bonus action (ritual)', '1 reaction, when targeted'…).
+function castingBucketByLeadingForm(ct) {
+    if (CASTING_BUCKET[ct]) return CASTING_BUCKET[ct]
+    // §18 D3 audit BUGFIX: the leading-form promise existed for bonus ONLY —
+    // compound reaction casts ('1 reaction, when targeted' — counterspell/
+    // hellish rebuke shapes) silently defaulted to 'action' and would have
+    // charged an Action slot under enforcement.
+    if (/^1?\s*bonus action/i.test(ct)) return 'bonusAction'
+    if (/^1?\s*reaction/i.test(ct)) return 'reaction'
+    return 'action'
+}
+
 export function classifyBucket(subject) {
     if (!subject || typeof subject !== 'object') return 'action'
     const auto = (subject.automation && typeof subject.automation === 'object') ? subject.automation : subject
@@ -68,14 +81,5 @@ export function classifyBucket(subject) {
     const byAction = ACTION_BUCKET[String(auto.action || '').toLowerCase()]
     if (byAction) return byAction
     const ct = normalizeCastingTime(auto.casting_time || auto.castTime || subject.casting_time || '')
-    if (CASTING_BUCKET[ct]) return CASTING_BUCKET[ct]
-    // Compounds the normalizer passes through ('1 bonus action (ritual)',
-    // '1 reaction, when targeted'…) still classify by their leading form.
-    // §18 D3 audit BUGFIX: the leading-form promise existed for bonus ONLY —
-    // compound reaction casts ('1 reaction, when targeted' — counterspell/
-    // hellish rebuke shapes) silently defaulted to 'action' and would have
-    // charged an Action slot under enforcement.
-    if (/^1?\s*bonus action/i.test(String(ct))) return 'bonusAction'
-    if (/^1?\s*reaction/i.test(String(ct))) return 'reaction'
-    return 'action'
+    return castingBucketByLeadingForm(ct)
 }

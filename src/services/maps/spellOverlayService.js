@@ -3,6 +3,7 @@ import { hitTestOverlay } from '../../models/SpellOverlay.js';
 import { bresenham } from './lineOfSight.js';
 import { loadMapData } from './mapsService.js';
 import { computeEffectiveWalls } from './effectiveWalls.js';
+import { getCombatSummary } from '../encounters/combatData.js';
 
 const FEET_PER_CELL = 5;
 
@@ -32,8 +33,8 @@ export function getActiveMapName() {
 
 export async function getCurrentOverlayTarget(campaignName, attackerName) {
     if (!attackerName) return null;
-    // Lazy: combatData transitively loads the automation registry — only needed when overlay-targeting.
-    const { getCombatSummary } = await import('../encounters/combatData.js');
+    // combatData is already in the main chunk (statically imported app-wide),
+    // so a static import here is byte-cheap and keeps bundling honest.
     const targetName = getCombatSummary(campaignName)?.creatures?.find(c => c.name === attackerName)?.targetName;
     const id = overlayTargetId(targetName);
     if (!id) return null;

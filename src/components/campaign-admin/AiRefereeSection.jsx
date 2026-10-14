@@ -114,6 +114,17 @@ function AiAskConsole({ campaignName, characters, aiConfig, enforcement }) {
     )
 }
 
+// One-line prose description of a ruling (kept out of JSX so the card's
+// branch count stays under the lint complexity cap).
+function describeRuling(ruling) {
+    return [
+        ruling.text || ruling.expression || ruling.actionName || ruling.effect || '',
+        ruling.targetName ? ` → ${ruling.targetName}` : '',
+        ruling.type === 'dice' && ruling.mode && ruling.mode !== 'normal' ? ` (${ruling.mode})` : '',
+        ruling.type === 'hp_change' && ruling.amount !== undefined ? ` (${ruling.amount > 0 ? '+' : ''}${ruling.amount} HP)` : '',
+    ].join('')
+}
+
 function AiProposalCard({ ruling, onConfirm, onDismiss }) {
     // §10.4 override: the referee may edit the proposed HP delta before it
     // touches the sheet — AI proposes, the HUMAN disposes.
@@ -132,12 +143,7 @@ function AiProposalCard({ ruling, onConfirm, onDismiss }) {
                 <b>AI proposes: {ruling.type}</b>
                 {typeof ruling.confidence === 'number' && <em className="ai-confidence">confidence {(ruling.confidence * 100).toFixed(0)}%</em>}
             </div>
-            <p className="ai-proposal-body">
-                {ruling.text || ruling.expression || ruling.actionName || ruling.effect || ''}
-                {ruling.targetName ? ` → ${ruling.targetName}` : ''}
-                {ruling.type === 'dice' && ruling.mode && ruling.mode !== 'normal' ? ` (${ruling.mode})` : ''}
-                {ruling.type === 'hp_change' && ruling.amount !== undefined ? ` (${ruling.amount > 0 ? '+' : ''}${ruling.amount} HP)` : ''}
-            </p>
+            <p className="ai-proposal-body">{describeRuling(ruling)}</p>
             {ruling.explanation && <p className="ai-proposal-why">{ruling.explanation}</p>}
             {ruling.type === 'hp_change' && (
                 <label className="ai-override-row">

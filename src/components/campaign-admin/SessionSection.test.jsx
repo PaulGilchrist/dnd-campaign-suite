@@ -1,7 +1,7 @@
 // P4-a (§10.1/§10.4): session console — pills reflect phase, clicks move it
 // with audit, ledger filters enforcement/AI rows, empty state stays honest.
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, fireEvent, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 
 const synced = {};

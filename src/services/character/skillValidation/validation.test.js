@@ -2,12 +2,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { validateSkills } from './validation.js';
 
-vi.mock('./index.js', () => ({
+vi.mock('./limits.js', () => ({
   getSkillLimits: vi.fn(),
+}));
+vi.mock('./expertise.js', () => ({
   getExpertiseLimits: vi.fn(),
 }));
 
-import { getSkillLimits, getExpertiseLimits } from './index.js';
+import { getSkillLimits } from './limits.js';
+import { getExpertiseLimits } from './expertise.js';
 
 const SIX = ['Arcana', 'History', 'Investigation', 'Medicine', 'Nature', 'Religion'];
 

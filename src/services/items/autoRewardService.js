@@ -19,6 +19,17 @@ import { resolveEnforcement } from '../combat/canTakeAction.js';
 import { generateLootFromCombatSummary } from './lootGenerator.js';
 import * as logService from '../ui/logService.js';
 
+// Kills-only honesty: a Clear after a RETREAT must not pay out. Only
+// NPCs on 0 HP count toward loot + XP; the loot generator receives just
+// the fallen roster.
+function isDefeatedNpc(c) {
+    return c.type === 'npc' && Number(c.currentHp ?? c.maxHp ?? 1) <= 0;
+}
+
+function pluralize(count, word) {
+    return `${count} ${word}${count === 1 ? '' : 's'}`;
+}
+
 /**
  * @returns {Promise<{awarded:boolean, reason?:string, xpPerChar?:number}>}
  */
@@ -27,10 +38,7 @@ export async function autoAwardCombatRewards({ campaignName, combatSummary, char
     const flags = resolveEnforcement(getRuntimeValue('campaign', 'enforcement', campaignName));
     if (!flags.autoRewards) return { awarded: false, reason: 'autoRewards off' };
 
-    // Kills-only honesty: a Clear after a RETREAT must not pay out. Only
-    // NPCs on 0 HP count toward loot + XP; the loot generator receives just
-    // the fallen roster.
-    const defeated = (combatSummary.creatures || []).filter((c) => c.type === 'npc' && Number(c.currentHp ?? c.maxHp ?? 1) <= 0);
+    const defeated = (combatSummary.creatures || []).filter(isDefeatedNpc);
     if (defeated.length === 0) return { awarded: false, reason: 'no defeated npcs on the tracker' };
     const closingRoster = { ...combatSummary, creatures: defeated };
 
@@ -68,8 +76,8 @@ export async function autoAwardCombatRewards({ campaignName, combatSummary, char
     await logService.addEntry(campaignName, {
         type: 'automation',
         automationType: 'auto_rewards_awarded',
-        description: `Auto-rewards at combat close: ${xpPerChar} XP each to ${characters.length} character${characters.length === 1 ? '' : 's'}`
-            + ` (encounter ${loot.totalEncounterXp} XP, ${lootItems.length} loot item${lootItems.length === 1 ? '' : 's'}).`,
+        description: `Auto-rewards at combat close: ${xpPerChar} XP each to ${pluralize(characters.length, 'character')}`
+            + ` (encounter ${loot.totalEncounterXp} XP, ${pluralize(lootItems.length, 'loot item')}).`,
     }).catch((e) => { console.error('[autoRewards] audit failed:', e); });
 
     return { awarded: true, xpPerChar };

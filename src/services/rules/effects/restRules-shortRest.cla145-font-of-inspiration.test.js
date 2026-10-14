@@ -35,6 +35,10 @@ vi.mock('../../../services/combat/concentration/concentrationService.js', () => 
 
 vi.mock('../../../services/automation/handlers/class-warlock/celestialResilienceHandler.js', () => ({
   grantCelestialResilience: vi.fn(() => null),
+  // automation/index.js imports handle + confirm/skip statically — mock full surface
+  handle: vi.fn(() => null),
+  confirmCelestialResilience: vi.fn(() => null),
+  skipCelestialResilience: vi.fn(() => null),
 }))
 
 vi.mock('../features/invisibilityService.js', () => ({

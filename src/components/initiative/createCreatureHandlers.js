@@ -8,6 +8,7 @@ import { autoAwardCombatRewards } from '../../services/items/autoRewardService.j
 import { maybeGrantThiefsReflexesSecondTurn } from '../../services/combat/thiefsReflexesService.js'
 import { vanishSummonAtZeroHp } from '../../services/combat/summons/summonedCreatureService.js'
 import { breakHypnoticPatternOnDamage } from '../../services/rules/features/hypnoticPatternService.js'
+import { sweepNewCombatClocks } from '../../services/rules/effects/zoneDurationClock.js'
 
 /**
  * Creates creature operation handlers for the initiative component.
@@ -86,8 +87,7 @@ export function createCreatureHandlers({
             }
             // no-timers T4: Clear restarts combat — combat-scoped effects of
             // the old combat end here too (enforcement off ⇒ zero writes).
-            import('../../services/rules/effects/zoneDurationClock.js')
-                .then((m) => m.sweepNewCombatClocks(campaignName))
+            sweepNewCombatClocks(campaignName)
                 .catch((e) => { console.error('[handleClear:new-combat-sweep]', e) })
             // L5 §10.3: with enforcement.autoRewards on, the closed encounter
             // awards loot + split XP through normal character management.

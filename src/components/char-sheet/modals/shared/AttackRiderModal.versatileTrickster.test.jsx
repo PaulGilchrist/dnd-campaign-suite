@@ -6,6 +6,8 @@ import AttackRiderModal from './AttackRiderModal.jsx';
 
 vi.mock('../../../../services/automation/handlers/combat/attackRiderHandler.js', () => ({
   applyRiderOption: vi.fn(),
+  // automation/index.js imports handle statically — mock full surface
+  handle: vi.fn(),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({

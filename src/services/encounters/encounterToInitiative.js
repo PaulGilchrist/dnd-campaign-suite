@@ -6,6 +6,7 @@ import { addEntry } from '../ui/logService.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { loadCombatSummary } from './combatData.js';
 import { resolveMonsterIRV } from '../npcs/monsterIrvUtils.js';
+import { sweepNewCombatClocks } from '../rules/effects/zoneDurationClock.js';
 
 export function getMonsterSaveBonuses(monster) {
   const map = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
@@ -129,9 +130,8 @@ export async function loadEncounterToInitiative(selectedMonsters, characters, ca
 
     // no-timers plan T4: a new initiative roll IS a new combat — every
     // combat-scoped effect of the previous combat ends here (enforcement
-    // off ⇒ zero writes). Dynamic import keeps this module graph light.
-    await import('../rules/effects/zoneDurationClock.js')
-        .then((m) => m.sweepNewCombatClocks(campaignName))
+    // off ⇒ zero writes).
+    await sweepNewCombatClocks(campaignName)
         .catch((e) => { console.error('[loadEncounterToInitiative:new-combat-sweep]', e); });
 
     const firstName = creatures[0]?.name;
@@ -176,8 +176,7 @@ export async function addMonstersToInitiative(selectedMonsters, characters, camp
         combatSummary = { round: 1, creatures: [] };
         // no-timers T4: no prior initiative = new combat — sweep stale
         // combat-scoped clocks any earlier encounter left behind.
-        await import('../rules/effects/zoneDurationClock.js')
-            .then((m) => m.sweepNewCombatClocks(campaignName))
+        await sweepNewCombatClocks(campaignName)
             .catch((e) => { console.error('[addMonstersToInitiative:new-combat-sweep]', e); });
     }
 

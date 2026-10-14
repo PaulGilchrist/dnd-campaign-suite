@@ -1,5 +1,7 @@
 import { fetchClassData, fetchRaceData, fetchBackgroundData } from '../../ui/dataLoader.js';
 import { parseSkillProficiencies } from './parse-skills.js';
+import { getSkillLimits } from './limits.js';
+import { getExpertiseLimits } from './expertise.js';
 
 /**
  * Validates skill selections and returns warnings (not blocking errors)
@@ -8,8 +10,6 @@ import { parseSkillProficiencies } from './parse-skills.js';
  * @returns {Promise<Array<{message: string, type: 'warning'|'info'}>>}
  */
 export async function validateSkills(formData, allFeats) {
-  const { getSkillLimits, getExpertiseLimits } = await import('./index.js');
-
   const warnings = [];
   const selectedSkills = formData.skillProficiencies || [];
   const expertSkills = formData.expertSkills || [];

@@ -74,7 +74,7 @@ export default function useTravelManagement({
     } else if (mode === MODES.INACTIVE) {
       setSessionPhase({ campaignName, phase: 'exploration', changedBy: 'travel management', reason: 'travel ended' }).catch((e) => { console.error('[useTravelManagement] session phase exploration failed:', e); });
     }
-  }, [campaignName]);
+  }, [campaignName, _setTravelModeRaw]);
   const [travelPace, setTravelPace] = useSyncedState('campaign', 'travel-pace', init.travelPace, campaignName);
   const [destination, setDestination] = useSyncedState('campaign', 'travel-destination', init.destination, campaignName);
   const [path, setPath] = useSyncedState('campaign', 'travel-path', init.path, campaignName);

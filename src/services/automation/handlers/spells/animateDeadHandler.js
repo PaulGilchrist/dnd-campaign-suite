@@ -101,6 +101,22 @@ function pluralCountLabel(count, singular) {
     return count > 0 ? `${count} ${singular}${count > 1 ? 's' : ''}` : '';
 }
 
+// Summoned creatures share the caster's initiative when they have one;
+// otherwise roll fresh with the caster's initiative bonus.
+function resolveCasterInitiative(casterCreature) {
+    const stated = casterCreature?.initiative;
+    if (stated !== '' && stated !== undefined) {
+        const parsed = parseInt(stated, 10) || 0;
+        if (parsed) return parsed;
+    }
+    return Math.floor(Math.random() * 20) + 1 + (casterCreature?.initiativeBonus || 0);
+}
+
+function byInitiativeDesc(a, b) {
+    const val = (c) => (c.initiative === '' || c.initiative === undefined ? 0 : parseInt(c.initiative, 10));
+    return val(b) - val(a);
+}
+
 export async function confirmAnimateDead(action, playerStats, campaignName, { zombieCount, skeletonCount }) {
     const slotLevel = getSlotLevel(action);
     const maxTargets = getMaxTargets(slotLevel);
@@ -117,13 +133,7 @@ export async function confirmAnimateDead(action, playerStats, campaignName, { zo
     }
 
     const casterCreature = combatSummary.creatures.find(c => c.name === casterName);
-    let initiativeValue = 0;
-    if (casterCreature?.initiative !== '' && casterCreature?.initiative !== undefined) {
-        initiativeValue = parseInt(casterCreature.initiative, 10) || 0;
-    }
-
-    const casterInitBonus = casterCreature?.initiativeBonus || 0;
-    initiativeValue = initiativeValue || (Math.floor(Math.random() * 20) + 1 + casterInitBonus);
+    const initiativeValue = resolveCasterInitiative(casterCreature);
 
     const skeletonMonster = await loadMonsterData('skeleton');
     if (!skeletonMonster) {
@@ -141,11 +151,7 @@ export async function confirmAnimateDead(action, playerStats, campaignName, { zo
     summonSwarm({ combatSummary, summonedMarkers, creatureNames, baseName: 'Skeleton', monster: skeletonMonster, initiativeValue, count: skeletonCount, casterName });
     summonSwarm({ combatSummary, summonedMarkers, creatureNames, baseName: 'Zombie', monster: zombieMonster, initiativeValue, count: zombieCount, casterName });
 
-    combatSummary.creatures.sort((a, b) => {
-        const aInit = a.initiative === '' || a.initiative === undefined ? 0 : parseInt(a.initiative, 10);
-        const bInit = b.initiative === '' || b.initiative === undefined ? 0 : parseInt(b.initiative, 10);
-        return bInit - aInit;
-    });
+    combatSummary.creatures.sort(byInitiativeDesc);
 
     const targetEffects = [...getTargetEffects(), ...summonedMarkers];
 

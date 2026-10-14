@@ -10,6 +10,7 @@ import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpSer
 import { endInvisibility, endGreaterInvisibility } from '../features/invisibilityService.js'
 import { clearHuntersMarkConcentration } from './restRules.js'
 import { getShortRestResources, computeShortRestHpNewCurrent, spellSlotLevels } from './restRules-constants.js'
+import { sweepRestClocks } from './zoneDurationClock.js'
 import { getCelestialResilienceSelfTempHp } from './restRules-celestialResilience.js'
 import { computeSuperiorityDiceMax } from '../trackedResources.js'
 
@@ -426,10 +427,7 @@ export async function applyShortRest(playerStats, campaignName, options = {}) {
   const name = playerStats.name
   // no-timers plan T4: a rest is one of the three boundaries where
   // combat-scoped effects end (new initiative roll / short rest / long rest).
-  // Dynamic import keeps rest's module graph light (zoneDurationClock pulls
-  // the expiration/clear-handler tree; nothing there belongs in rest boot).
-  await import('./zoneDurationClock.js')
-    .then((m) => m.sweepRestClocks(campaignName, 'short'))
+  await sweepRestClocks(campaignName, 'short')
     .catch((e) => { console.error('[applyShortRest:combat-scoped-sweep]', e); });
   const storedHp = getRuntimeValue(name, 'currentHitPoints')
   const currentHp = computeShortRestHpNewCurrent(storedHp, playerStats.hitPoints, 0)

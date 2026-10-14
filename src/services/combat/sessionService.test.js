@@ -1,6 +1,6 @@
 // P4-a (§10.1): session state machine — action-driven phase moves, same-phase
 // silence, invalid-phase refusal, unset ⇒ exploration default (byte parity).
-import { readSessionPhase, setSessionPhase, SESSION_PHASES } from './sessionService.js';
+import { readSessionPhase, setSessionPhase } from './sessionService.js';
 
 const store = {};
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({

@@ -30,15 +30,9 @@ import { addEntry } from '../ui/logService.js';
  * per Accept click, the human gesture that arms it.
  * @returns {Promise<{started:boolean, reason?:string}>}
  */
-export async function autoStartEncounterFromEvent({ campaignName, event, characters = [] }) {
-    if (!campaignName || !event) return { started: false, reason: 'no campaign/event' };
-    const flags = resolveEnforcement(getRuntimeValue('campaign', 'enforcement', campaignName));
-    if (!flags.autoEncounters) return { started: false, reason: 'autoEncounters off' };
-    const groups = event.encounter?.monsters;
-    if (!Array.isArray(groups) || groups.length === 0) return { started: false, reason: 'event has no encounter roster' };
-
-    // Hydrate index → full monster stat blocks (loadEncounterToInitiative
-    // needs AC/HP/init/save bonuses). Unknown indexes are skipped loudly.
+// Hydrate index → full monster stat blocks (loadEncounterToInitiative
+// needs AC/HP/init/save bonuses). Unknown indexes are skipped loudly.
+async function hydrateRoster(groups) {
     const monsters = await loadMonsters();
     const selected = [];
     for (const g of groups) {
@@ -49,6 +43,17 @@ export async function autoStartEncounterFromEvent({ campaignName, event, charact
         }
         selected.push({ ...def, qty: g.qty || 1 });
     }
+    return selected;
+}
+
+export async function autoStartEncounterFromEvent({ campaignName, event, characters = [] }) {
+    if (!campaignName || !event) return { started: false, reason: 'no campaign/event' };
+    const flags = resolveEnforcement(getRuntimeValue('campaign', 'enforcement', campaignName));
+    if (!flags.autoEncounters) return { started: false, reason: 'autoEncounters off' };
+    const groups = event.encounter?.monsters;
+    if (!Array.isArray(groups) || groups.length === 0) return { started: false, reason: 'event has no encounter roster' };
+
+    const selected = await hydrateRoster(groups);
     if (selected.length === 0) return { started: false, reason: 'no hydratable monsters' };
 
     const { combatSummary } = await loadEncounterToInitiative(selected, characters, campaignName);

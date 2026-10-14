@@ -10,6 +10,7 @@ import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpSer
 import { endInvisibility, endGreaterInvisibility } from '../features/invisibilityService.js'
 import { clearHuntersMarkConcentration } from './restRules.js'
 import { getLongRestResources, spellSlotLevels, getLevelAfterLongRest } from './restRules-constants.js'
+import { sweepRestClocks } from './zoneDurationClock.js'
 import { getCelestialResilienceSelfTempHp } from './restRules-celestialResilience.js'
 
 // Campaign targetEffect keys cleared on long rest, in original evaluation order.
@@ -594,9 +595,7 @@ export async function applyLongRest(playerStats, campaignName) {
 
   // no-timers plan T4: long rest ends every combat-scoped effect (§: rests
   // are explicit player actions — one of the three turn-based boundaries).
-  // Dynamic import keeps rest's module graph light.
-  await import('./zoneDurationClock.js')
-    .then((m) => m.sweepRestClocks(campaignName, 'long'))
+  await sweepRestClocks(campaignName, 'long')
     .catch((e) => { console.error('[applyLongRest:combat-scoped-sweep]', e); });
 
   const charData = buildLongRestCharData(playerStats)

@@ -60,33 +60,46 @@ function validateEnforcement(value) {
     return { ok: true };
 }
 
+const TURN_STATE_NUMBER_FIELDS = ['actionsUsed', 'bonusActionsUsed', 'reactionsUsed', 'movementUsedFeet'];
+
+function validateTurnStateEntry(creatureName, entry) {
+    for (const field of TURN_STATE_NUMBER_FIELDS) {
+        if (!nonNegNumber(entry[field])) {
+            return { ok: false, reason: `turnState.${creatureName}.${field} must be a non-negative number` };
+        }
+        const cap = SANITY_CAPS[field];
+        if (cap !== undefined && entry[field] > cap) {
+            return { ok: false, reason: `turnState.${creatureName}.${field} exceeds sanity cap ${cap}` };
+        }
+    }
+    if (entry.movementUsedFeet > 1000) {
+        return { ok: false, reason: `turnState.${creatureName}.movementUsedFeet exceeds sanity cap 1000` };
+    }
+    if (typeof entry.hasMoved !== 'boolean' || typeof entry.turnActive !== 'boolean') {
+        return { ok: false, reason: `turnState.${creatureName}.hasMoved/turnActive must be boolean` };
+    }
+    return validateTurnStateOptionalProps(creatureName, entry);
+}
+
+// Optional §18 props — absent is fine, present must be well-formed.
+function validateTurnStateOptionalProps(creatureName, entry) {
+    // §18 D1: feature-granted reaction caps — 1..3 integers only.
+    if (entry.reactionCap !== undefined && (!Number.isInteger(entry.reactionCap) || entry.reactionCap < 1 || entry.reactionCap > 3)) {
+        return { ok: false, reason: `turnState.${creatureName}.reactionCap must be an integer 1..3` };
+    }
+    // §18 D2: companion ownership links — a non-empty string naming the owner.
+    if (entry.companionOf !== undefined && entry.companionOf !== null && (typeof entry.companionOf !== 'string' || entry.companionOf.trim() === '')) {
+        return { ok: false, reason: `turnState.${creatureName}.companionOf must be null or a non-empty string` };
+    }
+    return { ok: true };
+}
+
 function validateTurnState(value) {
     if (!isPlainObject(value)) return { ok: false, reason: 'turnState must be an object keyed by creature name' };
     for (const [creatureName, entry] of Object.entries(value)) {
         if (!isPlainObject(entry)) return { ok: false, reason: `turnState.${creatureName} must be an object` };
-        for (const field of ['actionsUsed', 'bonusActionsUsed', 'reactionsUsed', 'movementUsedFeet']) {
-            if (!nonNegNumber(entry[field])) {
-                return { ok: false, reason: `turnState.${creatureName}.${field} must be a non-negative number` };
-            }
-            const cap = SANITY_CAPS[field];
-            if (cap !== undefined && entry[field] > cap) {
-                return { ok: false, reason: `turnState.${creatureName}.${field} exceeds sanity cap ${cap}` };
-            }
-        }
-        if (entry.movementUsedFeet > 1000) {
-            return { ok: false, reason: `turnState.${creatureName}.movementUsedFeet exceeds sanity cap 1000` };
-        }
-        if (typeof entry.hasMoved !== 'boolean' || typeof entry.turnActive !== 'boolean') {
-            return { ok: false, reason: `turnState.${creatureName}.hasMoved/turnActive must be boolean` };
-        }
-        // §18 D1: feature-granted reaction caps — 1..3 integers only.
-        if (entry.reactionCap !== undefined && (!Number.isInteger(entry.reactionCap) || entry.reactionCap < 1 || entry.reactionCap > 3)) {
-            return { ok: false, reason: `turnState.${creatureName}.reactionCap must be an integer 1..3` };
-        }
-        // §18 D2: companion ownership links — a non-empty string naming the owner.
-        if (entry.companionOf !== undefined && entry.companionOf !== null && (typeof entry.companionOf !== 'string' || entry.companionOf.trim() === '')) {
-            return { ok: false, reason: `turnState.${creatureName}.companionOf must be null or a non-empty string` };
-        }
+        const result = validateTurnStateEntry(creatureName, entry);
+        if (!result.ok) return result;
     }
     return { ok: true };
 }
