@@ -24,6 +24,8 @@ describe('NPCListItem', () => {
     attitude: '',
     tags: '',
     armorClass: undefined,
+    hitPoints: null,
+    actions: [],
   };
 
   const renderListItem = (npcProps = {}, extraProps = {}) => {
@@ -79,34 +81,55 @@ describe('NPCListItem', () => {
     });
   });
 
-  // ── Stat Block Badge and Initiative Button ────────────────────────
-  // Both the stat block badge and initiative button are controlled by
-  // the same npcHasStatBlock(npc) guard. Testing them together avoids
-  // duplicating the same condition checks.
+  // ── Stat Block Badge, Attack Warning, and Initiative Button ──────
+  // The badge and the button's enabled state are both controlled by
+  // the same npcHasStatBlock(npc) guard (numeric AC + positive HP).
 
   describe('Stat block badge and initiative button', () => {
-    it('does not render badge or button when npc has no stat block', () => {
+    const ready = { armorClass: 15, hitPoints: '30', actions: [{ name: 'Mace', attack_bonus: '+4' }] };
+
+    it('renders the button disabled with a hint when the NPC lacks combat stats', () => {
       renderListItem();
       expect(screen.queryByTitle('Has stat block')).not.toBeInTheDocument();
-      expect(screen.queryByTitle(/Add.*to Initiative/)).not.toBeInTheDocument();
+      const button = screen.getByRole('button', { name: /Add.*to Initiative/ });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute('title', expect.stringContaining('Fill in Gandalf'));
+      expect(button.getAttribute('title')).toMatch(/AC and HP/);
     });
 
-    it('renders badge and button when armorClass is numeric', () => {
-      renderListItem({ armorClass: 15 });
+    it('renders badge and enabled button when AC and HP are filled in', () => {
+      renderListItem(ready);
       expect(screen.getByTitle('Has stat block')).toBeInTheDocument();
-      expect(screen.getByTitle('Add Gandalf to Initiative')).toBeInTheDocument();
+      expect(screen.getByTitle('Add Gandalf to Initiative')).toBeEnabled();
     });
 
-    it('does not render badge or button for non-numeric armorClass', () => {
-      renderListItem({ armorClass: '15' });
+    it('does not enable the button for non-numeric armorClass', () => {
+      renderListItem({ armorClass: '15', hitPoints: '30' });
       expect(screen.queryByTitle('Has stat block')).not.toBeInTheDocument();
-      expect(screen.queryByTitle(/Add.*to Initiative/)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Add.*to Initiative/ })).toBeDisabled();
+    });
+
+    it('does not enable the button when HP is missing or zero', () => {
+      for (const hp of [null, '', 0]) {
+        const { unmount } = renderListItem({ armorClass: 15, hitPoints: hp });
+        expect(screen.getByRole('button', { name: /Add.*to Initiative/ })).toBeDisabled();
+        unmount();
+      }
+    });
+
+    it('warns with a no-attacks badge when stats are ready but no usable attack exists', () => {
+      const { unmount } = renderListItem({ armorClass: 15, hitPoints: '30', actions: [] });
+      expect(screen.getByTitle(/Unarmed Strike/)).toHaveTextContent('No attacks');
+
+      unmount();
+      renderListItem(ready);
+      expect(screen.queryByText('No attacks')).not.toBeInTheDocument();
     });
 
     it('calls onAddToInitiative with the npc when clicked', () => {
-      renderListItem({ armorClass: 15 });
+      renderListItem(ready);
       fireEvent.click(screen.getByTitle('Add Gandalf to Initiative'));
-      expect(mockOnAddToInitiative).toHaveBeenCalledWith({ ...baseNPC, armorClass: 15 });
+      expect(mockOnAddToInitiative).toHaveBeenCalledWith({ ...baseNPC, ...ready });
     });
   });
 

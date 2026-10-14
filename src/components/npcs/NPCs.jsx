@@ -22,6 +22,8 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   } = useCrudList(npcs, ['name', 'race', 'classRole', 'tags']);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
+  const [modalInitialTab, setModalInitialTab] = useState('roleplay');
+  const [modalKey, setModalKey] = useState(0);
 
   useEffect(() => {
     if (campaignName) {
@@ -40,22 +42,28 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
 
   const handleNewNPC = () => {
     setError(null);
+    setModalInitialTab('roleplay');
     openNew(getDefaultFormData());
   };
 
   const handleGenerateNPC = async () => {
     const generated = await generateNPC(npcs);
     setError(null);
+    setModalInitialTab('roleplay');
     openNew(getDefaultFormData(generated));
   };
 
-  const handleEditNPC = (npc) => {
+  const handleEditNPC = (npc, tab = 'roleplay') => {
     setError(null);
+    setModalInitialTab(tab);
     openEdit(npc);
     setFormData(getDefaultFormData(npc));
   };
 
-  const handleCloseModal = closeModal;
+  const handleCloseModal = () => {
+    setError(null);
+    closeModal();
+  };
 
   // Duplicate-name guard (mirrors MapsManager.handleCreate)
   const hasDuplicateName = () => npcs.some(n =>
@@ -98,7 +106,16 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   };
 
   const handleAddToInitiative = async (npc) => {
-    await addNPCToInitiative(campaignName, npc, onViewInitiative);
+    try {
+      const status = await addNPCToInitiative(campaignName, npc, onViewInitiative);
+      if (status === 'needs-weapon') {
+        setError(`${npc.name} was not added — give them at least one weapon in the Stats tab.`);
+        handleEditNPC(npc, 'stats');
+      }
+    } catch (err) {
+      console.error('Failed to add NPC to initiative:', err);
+      setError(err.message || 'Failed to add NPC to initiative');
+    }
   };
 
   const handleSaveAndAddToInitiative = async () => {
@@ -119,8 +136,16 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
         imagePath: savedNpc.imagePath || snapshot.image || '',
       };
       setError(null);
+      await loadNPCsList();
+      const status = await addNPCToInitiative(campaignName, npcForInitiative, onViewInitiative);
+      if (status === 'needs-weapon') {
+        setError(`${npcForInitiative.name} was saved but not added — give them at least one weapon in the Stats tab, then save again.`);
+        // Modal stays open; bump the key so it remounts showing the Stats tab.
+        setModalInitialTab('stats');
+        setModalKey(k => k + 1);
+        return;
+      }
       handleCloseModal();
-      await addNPCToInitiative(campaignName, npcForInitiative, onViewInitiative);
     } catch (err) {
       console.error('Failed to save NPC:', err);
       setError(err.message || 'Failed to save NPC');
@@ -169,6 +194,10 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
         )}
       </div>
 
+      {!loading && error && !modalOpen && (
+        <div className="npcs-form-error">{error}</div>
+      )}
+
       {loading && (
         <div className="ct-empty-state">
           <i className="fa-solid fa-spinner fa-spin" /> Loading NPCs…
@@ -207,10 +236,12 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
 
       {modalOpen && formData && (
         <NPCFormModal
+          key={modalKey}
           formData={formData}
           setFormData={setFormData}
           editingNPC={editingNPC}
           campaignName={campaignName}
+          initialTab={modalInitialTab}
           saving={saving}
           deleting={deleting}
           error={error}

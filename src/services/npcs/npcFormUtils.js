@@ -32,7 +32,7 @@ export function getDefaultFormData(overrides = {}) {
     image: '',
     imageName: '',
     imagePath: '',
-    armorClass: 10,
+    armorClass: null,
     hitPoints: '',
     hitDice: '',
     initiativeBonus: '',
@@ -52,12 +52,21 @@ export function getDefaultFormData(overrides = {}) {
 
 export function cleanNPCData(data) {
   const cleaned = { ...data };
-  if (cleaned.armorClass === null || cleaned.armorClass === undefined || cleaned.armorClass === '') {
-    cleaned.armorClass = 10;
+  // AC stays null until the GM fills in real combat stats — a defaulted 10
+  // would make every NPC look combat-ready and let them enter initiative.
+  if (cleaned.armorClass === '' || cleaned.armorClass === undefined) {
+    cleaned.armorClass = null;
+  } else if (typeof cleaned.armorClass === 'string') {
+    const parsed = parseInt(cleaned.armorClass, 10);
+    if (Number.isNaN(parsed)) {
+      console.error(`[AC] NPC "${cleaned.name}" has invalid AC: ${cleaned.armorClass}. Leaving AC blank.`);
+      cleaned.armorClass = null;
+    } else {
+      cleaned.armorClass = parsed;
+    }
   }
-  if (typeof cleaned.armorClass !== 'number' || Number.isNaN(cleaned.armorClass)) {
-    console.error(`[AC] NPC "${cleaned.name}" has invalid AC: ${cleaned.armorClass}. Defaulting to 10.`);
-    cleaned.armorClass = 10;
+  if (cleaned.hitPoints === '') {
+    cleaned.hitPoints = null;
   }
   return cleaned;
 }

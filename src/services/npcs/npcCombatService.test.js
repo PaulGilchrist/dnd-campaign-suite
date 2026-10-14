@@ -3,9 +3,9 @@
 // @cleaned-by-ai
 // @improved-by-ai
 // @cleaned-by-ai
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { npcHasStatBlock } from '../encounters/npcStatBlockUtils.js';
+import { npcHasStatBlock, npcHasAttacks } from '../encounters/npcStatBlockUtils.js';
 import { rollD20 } from '../dice/diceRoller.js';
 import { loadCombatSummary } from '../encounters/combatData.js';
 import storage from '../ui/storage.js';
@@ -13,6 +13,7 @@ import { addNPCToInitiative } from './npcCombatService.js';
 
 vi.mock('../encounters/npcStatBlockUtils.js', () => ({
   npcHasStatBlock: vi.fn(),
+  npcHasAttacks: vi.fn(),
 }));
 
 vi.mock('../dice/diceRoller.js', () => ({
@@ -33,31 +34,73 @@ vi.mock('../ui/utils.js', () => ({
 
 const CAMPAIGN = 'testCampaign';
 const defaultNPC = () => ({ name: 'Goblin', armorClass: 12, hitPoints: 7 });
+const withAttack = (npc) => ({
+  ...npc,
+  actions: [{ name: 'Scimitar', attack_bonus: '+4', damage_dice_primary: '1d6', damage_type_primary: 'slashing' }],
+});
 
 describe('npcCombatService - addNPCToInitiative', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     npcHasStatBlock.mockReturnValue(true);
+    npcHasAttacks.mockReturnValue(true);
     rollD20.mockReturnValue(15);
     loadCombatSummary.mockResolvedValue(null);
     storage.set.mockImplementation(() => Promise.resolve());
     global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
+    // Default: GM declines the weapon prompt and lets the NPC join anyway.
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
   });
 
-  describe('early return when NPC lacks stat block', () => {
-    it('returns undefined without loading combat or persisting', async () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('hard gate: combat stats required', () => {
+    it('throws without loading combat or persisting when the NPC lacks AC and HP', async () => {
       npcHasStatBlock.mockReturnValue(false);
-      const result = await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      expect(result).toBeUndefined();
+      await expect(addNPCToInitiative(CAMPAIGN, defaultNPC())).rejects.toThrow(/needs AC and HP/);
       expect(loadCombatSummary).not.toHaveBeenCalled();
       expect(storage.set).not.toHaveBeenCalled();
     });
 
-    it('does not invoke onViewInitiative callback on early return', async () => {
+    it('does not invoke onViewInitiative when the NPC lacks a stat block', async () => {
       npcHasStatBlock.mockReturnValue(false);
       const callback = vi.fn();
-      await addNPCToInitiative(CAMPAIGN, defaultNPC(), callback);
+      await expect(addNPCToInitiative(CAMPAIGN, defaultNPC(), callback)).rejects.toThrow();
       expect(callback).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('weapon prompt when the NPC has no attacks', () => {
+    it('asks for a weapon when the NPC has no usable attacks', async () => {
+      npcHasAttacks.mockReturnValue(false);
+      await addNPCToInitiative(CAMPAIGN, defaultNPC());
+      expect(window.confirm).toHaveBeenCalledTimes(1);
+      expect(window.confirm.mock.calls[0][0]).toMatch(/no weapons or attacks/i);
+    });
+
+    it('returns needs-weapon without persisting when the GM opts to provide a weapon', async () => {
+      npcHasAttacks.mockReturnValue(false);
+      window.confirm.mockReturnValue(true);
+      const callback = vi.fn();
+      const result = await addNPCToInitiative(CAMPAIGN, defaultNPC(), callback);
+      expect(result).toBe('needs-weapon');
+      expect(storage.set).not.toHaveBeenCalled();
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('adds the NPC anyway when the GM cancels the prompt (unarmed strike fallback)', async () => {
+      npcHasAttacks.mockReturnValue(false);
+      const result = await addNPCToInitiative(CAMPAIGN, defaultNPC());
+      expect(result).toBe('added');
+      expect(storage.set).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not prompt when the NPC has a usable attack', async () => {
+      const result = await addNPCToInitiative(CAMPAIGN, withAttack(defaultNPC()));
+      expect(result).toBe('added');
+      expect(window.confirm).not.toHaveBeenCalled();
     });
   });
 
@@ -79,11 +122,11 @@ describe('npcCombatService - addNPCToInitiative', () => {
   });
 
   describe('duplicate NPC check', () => {
-    it('returns early without persisting when NPC already exists as npc type', async () => {
+    it('returns already without persisting when NPC already exists as npc type', async () => {
       loadCombatSummary.mockResolvedValue({ round: 1, creatures: [{ type: 'npc', name: 'Goblin' }] });
       const callback = vi.fn();
       const result = await addNPCToInitiative(CAMPAIGN, defaultNPC(), callback);
-      expect(result).toBeUndefined();
+      expect(result).toBe('already');
       expect(callback).toHaveBeenCalledTimes(1);
       expect(storage.set).not.toHaveBeenCalled();
     });
@@ -148,30 +191,24 @@ describe('npcCombatService - addNPCToInitiative', () => {
       expect(creature.imagePath).toBe('');
     });
 
-    it('defaults AC to 10 and logs error when armorClass is not a number', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      await addNPCToInitiative(CAMPAIGN, { name: 'Goblin', armorClass: null });
+    it('copies AC straight from the NPC — no silent 10 default', async () => {
+      await addNPCToInitiative(CAMPAIGN, { name: 'Goblin', armorClass: 15, hitPoints: 7 });
       const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.ac).toBe(10);
-      expect(consoleSpy).toHaveBeenCalledWith('[AC] NPC "Goblin" has no AC defined. Defaulting to 10.');
-      consoleSpy.mockRestore();
+      expect(creature.ac).toBe(15);
     });
 
-    it('defaults maxHp and currentHp to 10 when hitPoints is missing, 0, NaN, or falsy', async () => {
-      const invalidValues = [undefined, 0, NaN];
-      for (const hp of invalidValues) {
-        await addNPCToInitiative(CAMPAIGN, { name: 'Goblin', armorClass: 12, hitPoints: hp });
-        const creature = storage.set.mock.calls[0][1].creatures[0];
-        expect(creature.maxHp).toBe(10);
-        expect(creature.currentHp).toBe(10);
-      }
-    });
-
-    it('uses hitPoints when it is a valid number', async () => {
+    it('copies HP straight from the NPC — no silent 10 default', async () => {
       await addNPCToInitiative(CAMPAIGN, { name: 'Goblin', armorClass: 12, hitPoints: 25 });
       const creature = storage.set.mock.calls[0][1].creatures[0];
       expect(creature.maxHp).toBe(25);
       expect(creature.currentHp).toBe(25);
+    });
+
+    it('accepts string HP (the form stores text), coercing once', async () => {
+      await addNPCToInitiative(CAMPAIGN, { name: 'Goblin', armorClass: 12, hitPoints: '18' });
+      const creature = storage.set.mock.calls[0][1].creatures[0];
+      expect(creature.maxHp).toBe(18);
+      expect(creature.currentHp).toBe(18);
     });
 
     it('carries over damageResistances and damageImmunities from NPC', async () => {
@@ -273,7 +310,7 @@ describe('npcCombatService - addNPCToInitiative', () => {
         Promise.reject(new Error('network error')).catch(() => {})
       );
 
-      await expect(addNPCToInitiative(CAMPAIGN, defaultNPC())).resolves.toBeUndefined();
+      await expect(addNPCToInitiative(CAMPAIGN, defaultNPC())).resolves.toBe('added');
       expect(storage.set).toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();

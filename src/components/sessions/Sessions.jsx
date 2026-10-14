@@ -198,8 +198,12 @@ function Sessions({ campaignName, characters = [], isLocalhost: _isLocalhost, on
         showToast(`${value} set as active map`);
       } else if (type === 'npcs') {
         const npc = await findNpc(value) || { name: value };
-        await addNPCToInitiative(campaignName, npc, onViewInitiative);
-        showToast(`${value} added to initiative`);
+        const status = await addNPCToInitiative(campaignName, npc, onViewInitiative);
+        if (status === 'needs-weapon') {
+          showToast(`${value} was not added — give them at least one weapon on the NPCs page`);
+        } else {
+          showToast(`${value} added to initiative`);
+        }
       }
     } catch (err) {
       console.error('Failed to run session quick action:', err);

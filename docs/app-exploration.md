@@ -64,9 +64,10 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 - **View state**: `npcs`
 - **Features**: NPC management, New NPC form, Generate NPC
 - **Form fields**: Name (required), Race, Class/Role, Attitude (dropdown), Appearance, Personality, Goals, Secrets, Notes, Tags
-- **Buttons**: New NPC, Generate NPC, Add to Initiative (per NPC), Edit NPC, Delete NPC
+- **Buttons**: New NPC, Generate NPC, Add to Initiative (per NPC; disabled until AC and HP are filled in), Edit NPC, Delete NPC
 - **Validation**: Whitespace-only names keep Save disabled; duplicate names rejected (case-insensitive, self-edit exempt)
-- **Identifiers**: `textbox:has-text("Name *")`, `button:has-text("Generate NPC")`, `button:has-text("Add to Initiative")`, rows `li[aria-label="Edit NPC: <Name>"]` (the `li` itself is role=button), inner init button `.npcs-init-btn`
+- **Combat-readiness gate**: "+ Add to Initiative" is disabled without numeric AC + positive HP; with stats but no usable attack the row shows a "No attacks" badge and adding asks for a weapon first (Cancel joins anyway with an Unarmed Strike fallback)
+- **Identifiers**: `textbox:has-text("Name *")`, `button:has-text("Generate NPC")`, `button:has-text("Add to Initiative")`, rows `li[aria-label="Edit NPC: <Name>"]` (the `li` itself is role=button), inner init button `.npcs-init-btn` (may be `disabled`)
 
 ### 9. Notes
 - **View state**: `notes`

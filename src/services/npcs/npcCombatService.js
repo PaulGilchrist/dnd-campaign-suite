@@ -1,11 +1,15 @@
-import { npcHasStatBlock } from '../encounters/npcStatBlockUtils.js';
+import { npcHasStatBlock, npcHasAttacks } from '../encounters/npcStatBlockUtils.js';
 import { rollD20 } from '../dice/diceRoller.js';
 import { loadCombatSummary } from '../encounters/combatData.js';
 import utils from '../ui/utils.js';
 import storage from '../ui/storage.js';
 
+// Returns 'added' | 'already' | 'needs-weapon'. Throws if the NPC lacks the
+// combat stats (AC + HP) the tracker needs to run them.
 export async function addNPCToInitiative(campaignName, npc, onViewInitiative) {
-  if (!npcHasStatBlock(npc)) return;
+  if (!npcHasStatBlock(npc)) {
+    throw new Error(`"${npc?.name}" needs AC and HP filled in (Stats tab) before joining initiative.`);
+  }
 
   const initBonus = parseInt(npc.initiativeBonus) || 0;
   let combatSummary = await loadCombatSummary(campaignName);
@@ -18,7 +22,15 @@ export async function addNPCToInitiative(campaignName, npc, onViewInitiative) {
   );
   if (alreadyAdded) {
     if (onViewInitiative) onViewInitiative();
-    return;
+    return 'already';
+  }
+
+  if (!npcHasAttacks(npc)) {
+    const provideWeapon = window.confirm(
+      `${npc.name} has no weapons or attacks. Give them at least one weapon before adding them to initiative?\n\n` +
+      'Choose Cancel to add them anyway — they will fight with an Unarmed Strike.'
+    );
+    if (provideWeapon) return 'needs-weapon';
   }
 
   const roll = rollD20();
@@ -30,16 +42,14 @@ export async function addNPCToInitiative(campaignName, npc, onViewInitiative) {
     monsterType: npc.type,
     initiative: String(total),
     targetName: null,
-    ac: typeof npc.armorClass === 'number'
-      ? npc.armorClass
-      : (console.error(`[AC] NPC "${npc.name}" has no AC defined. Defaulting to 10.`), 10),
+    ac: npc.armorClass,
     resistances: npc.damageResistances || [],
     immunities: npc.damageImmunities || [],
     concentration: null,
     imagePath: npc.imagePath || npc.image || '',
     initiativeBonus: initBonus,
-    maxHp: Number(npc.hitPoints) || 10,
-    currentHp: Number(npc.hitPoints) || 10,
+    maxHp: Number(npc.hitPoints),
+    currentHp: Number(npc.hitPoints),
     saveBonuses: {},
   });
 
@@ -50,6 +60,7 @@ export async function addNPCToInitiative(campaignName, npc, onViewInitiative) {
   logInitiativeRoll(campaignName, npc.name, roll, initBonus);
 
   if (onViewInitiative) onViewInitiative();
+  return 'added';
 }
 
 function logInitiativeRoll(campaignName, characterName, roll, initBonus) {

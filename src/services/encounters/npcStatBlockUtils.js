@@ -8,7 +8,35 @@ export function findNPCByName(npcName, npcs) {
 }
 
 export function npcHasStatBlock(npc) {
-  return npc && typeof npc.armorClass === 'number';
+  if (!npc) return false;
+  // Combat-ready means the tracker can actually run them: numeric AC and positive HP.
+  return typeof npc.armorClass === 'number' && Number.isFinite(npc.armorClass)
+    && Number.isFinite(Number(npc.hitPoints))
+    && Number(npc.hitPoints) > 0;
+}
+
+// An attack is an action the NPC can actually swing with: a name plus an
+// attack bonus or damage dice. Used to prompt for a weapon before initiative.
+export function npcHasAttacks(npc) {
+  return (npc?.actions || []).some(a =>
+    a?.name?.trim()
+    && (String(a.attack_bonus ?? '').trim() !== '' || String(a.damage_dice_primary ?? '').trim() !== '')
+  );
+}
+
+// Guaranteed fallback so an NPC in combat always has something to do.
+export function defaultUnarmedStrike(npc) {
+  const strMod = calculateAbilityModifier(npc?.abilityScores?.str ?? 10);
+  const fmt = n => `${n >= 0 ? '+' : ''}${n}`;
+  return {
+    name: 'Unarmed Strike',
+    attack_bonus: fmt(strMod),
+    damage_dice_primary: String(Math.max(1 + strMod, 1)),
+    damage_type_primary: 'bludgeoning',
+    damage_dice_secondary: '',
+    damage_type_secondary: '',
+    description: 'Fallback attack — add a real weapon in the NPC Stats tab to replace it.'
+  };
 }
 
 export function calculateAbilityModifier(score) {
@@ -74,7 +102,8 @@ function buildDefenseFields(npc) {
 function buildActionFields(npc) {
   return {
     traits: npc.traits || [],
-    actions: npc.actions || [],
+    // Never let an NPC enter the combat card with nothing to do.
+    actions: (npc.actions || []).length ? npc.actions : [defaultUnarmedStrike(npc)],
     reactions: npc.reactions || [],
     legendary_actions: [],
     lair_actions: null,

@@ -66,6 +66,9 @@ function NPCStatBlockForm({ formData, setFormData }) {
   return (
     <>
       <h4 className="npcs-section-title">Combat Stats</h4>
+      <div className="npcs-stats-hint text-muted">
+        AC and HP are required before this NPC can join initiative — include at least one weapon attack so they can act in combat.
+      </div>
       <div className="npcs-stats-grid">
         <div className="npcs-stat-field">
           <label>AC</label>

@@ -66,6 +66,7 @@ function NPCFormModal({
   setFormData,
   editingNPC,
   campaignName,
+  initialTab = 'roleplay',
   saving,
   deleting,
   error,
@@ -75,7 +76,7 @@ function NPCFormModal({
   onDelete,
   onSaveAndAddToInitiative,
 }) {
-  const [activeTab, setActiveTab] = useState('roleplay');
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [showNpcAvatarModal, setShowNpcAvatarModal] = useState(false);
 
   const handleImageUpload = (e) => {

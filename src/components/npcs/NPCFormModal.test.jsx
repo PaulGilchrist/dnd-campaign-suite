@@ -259,6 +259,8 @@ describe('NPCFormModal', () => {
     it.each([
       ['no armorClass', { armorClass: undefined }],
       ['non-numeric armorClass', { armorClass: '15' }],
+      ['empty hitPoints', { hitPoints: '' }],
+      ['zero hitPoints', { hitPoints: 0 }],
     ])('does not render when the NPC lacks a valid stat block (%s)', (_label, overrides) => {
       renderModal({ formData: { ...defaultFormData, ...overrides } });
       expect(screen.queryByRole('button', { name: /Save & Add to Initiative/ })).not.toBeInTheDocument();

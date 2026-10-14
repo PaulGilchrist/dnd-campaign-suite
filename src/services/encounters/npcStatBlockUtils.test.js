@@ -7,8 +7,10 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   findNPCByName,
   npcHasStatBlock,
+  npcHasAttacks,
   calculateAbilityModifier,
   npcToMonsterFormat,
+  defaultUnarmedStrike,
 } from './npcStatBlockUtils.js';
 
 // ---- Helper fixtures ----
@@ -46,17 +48,47 @@ function makeNPC(overrides = {}) {
 // npcHasStatBlock
 // ===================================================================
 describe('npcHasStatBlock', () => {
-  it('returns true for numeric armorClass including zero and negatives', () => {
-    expect(npcHasStatBlock({ armorClass: 15 })).toBe(true);
-    expect(npcHasStatBlock({ armorClass: 0 })).toBe(true);
-    expect(npcHasStatBlock({ armorClass: -5 })).toBe(true);
+  it('returns true only when both numeric AC and positive HP are filled in', () => {
+    expect(npcHasStatBlock({ armorClass: 15, hitPoints: 20 })).toBe(true);
+    expect(npcHasStatBlock({ armorClass: 0, hitPoints: '7' })).toBe(true);
+    expect(npcHasStatBlock({ armorClass: -5, hitPoints: 1 })).toBe(true);
   });
 
-  it('returns false for non-numeric armorClass types', () => {
-    expect(npcHasStatBlock({ armorClass: '15' })).toBe(false);
-    expect(npcHasStatBlock({ armorClass: undefined })).toBe(false);
-    expect(npcHasStatBlock({ armorClass: null })).toBe(false);
+  it('returns false when HP is missing, zero, negative, or unparseable', () => {
+    expect(npcHasStatBlock({ armorClass: 15 })).toBe(false);
+    expect(npcHasStatBlock({ armorClass: 15, hitPoints: null })).toBe(false);
+    expect(npcHasStatBlock({ armorClass: 15, hitPoints: '' })).toBe(false);
+    expect(npcHasStatBlock({ armorClass: 15, hitPoints: 0 })).toBe(false);
+    expect(npcHasStatBlock({ armorClass: 15, hitPoints: -3 })).toBe(false);
+    expect(npcHasStatBlock({ armorClass: 15, hitPoints: '6d8+2' })).toBe(false);
+  });
+
+  it('returns false for missing or non-numeric armorClass', () => {
+    expect(npcHasStatBlock({ armorClass: '15', hitPoints: 20 })).toBe(false);
+    expect(npcHasStatBlock({ hitPoints: 20 })).toBe(false);
+    expect(npcHasStatBlock({ armorClass: null, hitPoints: 20 })).toBe(false);
     expect(npcHasStatBlock({})).toBe(false);
+    expect(npcHasStatBlock(null)).toBe(false);
+  });
+});
+
+// ===================================================================
+// npcHasAttacks
+// ===================================================================
+describe('npcHasAttacks', () => {
+  it('returns true for actions with an attack bonus or damage dice', () => {
+    expect(npcHasAttacks({ actions: [{ name: 'Longsword', attack_bonus: '+5', damage_dice_primary: '1d8' }] })).toBe(true);
+    expect(npcHasAttacks({ actions: [{ name: 'Bite', attack_bonus: '+0' }] })).toBe(true);
+    expect(npcHasAttacks({ actions: [{ name: 'Breath', damage_dice_primary: '2d6' }] })).toBe(true);
+  });
+
+  it('returns false when no action is a usable attack', () => {
+    expect(npcHasAttacks({})).toBe(false);
+    expect(npcHasAttacks({ actions: [] })).toBe(false);
+    expect(npcHasAttacks({ actions: [{ name: 'Shout' }] })).toBe(false);
+    expect(npcHasAttacks({ actions: [{ name: 'Stare', attack_bonus: '' }] })).toBe(false);
+    expect(npcHasAttacks({ actions: [{ attack_bonus: '+3' }] })).toBe(false);
+    expect(npcHasAttacks({ actions: [{ name: 'Rearrange', attack_bonus: '', damage_dice_primary: '' }] })).toBe(false);
   });
 });
 
@@ -286,6 +318,36 @@ describe('npcToMonsterFormat', () => {
     expect(monster.traits).toEqual([{ name: 'Keen Sense' }]);
     expect(monster.actions).toEqual([{ name: 'Slash' }]);
     expect(monster.reactions).toEqual([{ name: 'Opportunity Attack' }]);
+  });
+
+  // --- Unarmed strike fallback ---
+  it('substitutes an Unarmed Strike when the NPC has no actions', () => {
+    const monster = npcToMonsterFormat(makeNPC({ actions: [] }));
+    expect(monster.actions).toHaveLength(1);
+    expect(monster.actions[0].name).toBe('Unarmed Strike');
+    // str 16 → +3 to hit, 1 + 3 = 4 bludgeoning
+    expect(monster.actions[0].attack_bonus).toBe('+3');
+    expect(monster.actions[0].damage_dice_primary).toBe('4');
+    expect(monster.actions[0].damage_type_primary).toBe('bludgeoning');
+  });
+
+  it('scales the Unarmed Strike from the STR modifier, minimum 1 damage', () => {
+    const weak = npcToMonsterFormat(makeNPC({ actions: [], abilityScores: { str: 6, dex: 10, con: 10, int: 10, wis: 10, cha: 10 } }));
+    expect(weak.actions[0].attack_bonus).toBe('-2');
+    expect(weak.actions[0].damage_dice_primary).toBe('1');
+
+    const mighty = npcToMonsterFormat(makeNPC({ actions: [], abilityScores: { str: 20, dex: 10, con: 10, int: 10, wis: 10, cha: 10 } }));
+    expect(mighty.actions[0].attack_bonus).toBe('+5');
+    expect(mighty.actions[0].damage_dice_primary).toBe('6');
+  });
+
+  it('defaultUnarmedStrike defaults to a +0, 1-damage strike for a statless NPC', () => {
+    expect(defaultUnarmedStrike(null)).toMatchObject({
+      name: 'Unarmed Strike',
+      attack_bonus: '+0',
+      damage_dice_primary: '1',
+      damage_type_primary: 'bludgeoning',
+    });
   });
 
   // --- HP, hit dice, speed ---

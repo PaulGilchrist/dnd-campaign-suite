@@ -372,5 +372,21 @@ describe('NPCs', () => {
         defaultProps.onViewInitiative
       );
     });
+
+    it('shows an inline error when the NPC is blocked for missing combat stats', async () => {
+      mockAddNPCToInitiative.mockRejectedValue(new Error('"Goblin" needs AC and HP filled in (Stats tab) before joining initiative.'));
+      renderNPCs();
+      fireEvent.click(screen.getByTestId('init-btn-Goblin'));
+      await waitFor(() => expect(screen.getByText(/needs AC and HP/)).toBeInTheDocument());
+      expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
+    });
+
+    it('opens the NPC editor when the GM opts to provide a weapon', async () => {
+      mockAddNPCToInitiative.mockResolvedValue('needs-weapon');
+      renderNPCs();
+      fireEvent.click(screen.getByTestId('init-btn-Goblin'));
+      await waitFor(() => expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument());
+      expect(screen.getByTestId('modal-editing-npc')).toHaveTextContent('Goblin');
+    });
   });
 });

@@ -71,7 +71,7 @@ describe('npcFormUtils', () => {
         image: '',
         imageName: '',
         imagePath: '',
-        armorClass: 10,
+        armorClass: null,
         hitPoints: '',
         hitDice: '',
         initiativeBonus: '',
@@ -128,31 +128,29 @@ describe('npcFormUtils', () => {
       expect(cleaned.name).toBe('Grog');
     });
 
-    it('defaults AC to 10 for null, undefined, and empty string without logging', () => {
+    it('leaves AC blank (null) for null, undefined, and empty string without logging', () => {
       const silentValues = [null, undefined, ''];
       const consoleSpy = vi.spyOn(console, 'error');
 
       for (const v of silentValues) {
         const cleaned = cleanNPCData({ name: 'Grog', armorClass: v });
-        expect(cleaned.armorClass).toBe(10);
+        expect(cleaned.armorClass).toBeNull();
       }
 
       expect(consoleSpy).not.toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
 
-    it('defaults AC to 10 for non-number types and logs an error', () => {
-      const noisyValues = ['16', true, NaN];
-      const consoleSpy = vi.spyOn(console, 'error');
-      const expectedCalls = noisyValues.map(
-        (v) => '[AC] NPC "Grog" has invalid AC: ' + v + '. Defaulting to 10.',
-      );
+    it('parses numeric AC strings and logs+blanks unparseable ones', () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      for (let i = 0; i < noisyValues.length; i++) {
-        const cleaned = cleanNPCData({ name: 'Grog', armorClass: noisyValues[i] });
-        expect(cleaned.armorClass).toBe(10);
-        expect(consoleSpy).toHaveBeenCalledWith(expectedCalls[i]);
-      }
+      expect(cleanNPCData({ name: 'Grog', armorClass: '16' }).armorClass).toBe(16);
+      expect(consoleSpy).not.toHaveBeenCalled();
+
+      expect(cleanNPCData({ name: 'Grog', armorClass: 'bad' }).armorClass).toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[AC] NPC "Grog" has invalid AC: bad. Leaving AC blank.'
+      );
 
       consoleSpy.mockRestore();
     });
@@ -166,17 +164,22 @@ describe('npcFormUtils', () => {
       const data = { name: 'Grog', armorClass: null };
       const cleaned = cleanNPCData(data);
       expect(data.armorClass).toBe(null);
-      expect(cleaned.armorClass).toBe(10);
+      expect(cleaned.armorClass).toBe(null);
     });
 
     it('logs error with "undefined" name when name is missing', () => {
       const consoleSpy = vi.spyOn(console, 'error');
       const cleaned = cleanNPCData({ armorClass: 'bad' });
-      expect(cleaned.armorClass).toBe(10);
+      expect(cleaned.armorClass).toBeNull();
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[AC] NPC "undefined" has invalid AC: bad. Defaulting to 10.',
+        '[AC] NPC "undefined" has invalid AC: bad. Leaving AC blank.'
       );
       consoleSpy.mockRestore();
+    });
+
+    it('normalizes empty hitPoints to null', () => {
+      expect(cleanNPCData({ name: 'Grog', hitPoints: '' }).hitPoints).toBeNull();
+      expect(cleanNPCData({ name: 'Grog', hitPoints: '20' }).hitPoints).toBe('20');
     });
   });
 

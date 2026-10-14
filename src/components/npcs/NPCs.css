@@ -104,6 +104,36 @@
   border-color: var(--color-link);
 }
 
+.npcs-init-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.npcs-init-btn:disabled:hover {
+  background: var(--background-color-surface);
+  color: var(--color-link);
+  border-color: var(--border-color);
+}
+
+/* Warning when an NPC has stats but no weapon attacks */
+.npcs-no-attack-badge {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #4a3200;
+  color: #f0c674;
+  border: 1px solid #8b6914;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.npcs-stats-hint {
+  font-size: 0.78rem;
+  margin: 4px 0 10px;
+}
+
 /* Wider modal for stats */
 .npcs-modal {
   max-width: 640px;
