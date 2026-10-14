@@ -53,8 +53,6 @@ vi.mock('../utils/imageUtils.js', () => ({
 // Import AFTER mocks so the real route code runs against the mocked fs.
 import npcs from './npcs.js';
 
-const GM = { 'X-Client-Id': '11111111-1111-4111-8111-111111111111' };
-
 function createTestApp() {
     const app = express();
     app.use(express.json());
@@ -74,7 +72,7 @@ beforeEach(() => {
 describe('npcs — bestiary-name guard (monsters never live in npcs.json)', () => {
     it('rejects saving a bestiary monster as an NPC (PUT) with a plain-English refusal', async () => {
         const app = createTestApp();
-        const res = await request(app).put(`/api/campaigns/${MOCK_CAMPAIGN}/npcs/Goblin`).set(GM)
+        const res = await request(app).put(`/api/campaigns/${MOCK_CAMPAIGN}/npcs/Goblin`)
             .send({ name: 'Goblin', armorClass: 10, abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, actions: [] });
         expect(res.status).toBe(400);
         expect(res.body.error).toMatch(/published monster/i);
@@ -85,7 +83,7 @@ describe('npcs — bestiary-name guard (monsters never live in npcs.json)', () =
 
     it('rejects a bulk save (POST) that smuggles any bestiary monster in', async () => {
         const app = createTestApp();
-        const res = await request(app).post(`/api/campaigns/${MOCK_CAMPAIGN}/npcs`).set(GM)
+        const res = await request(app).post(`/api/campaigns/${MOCK_CAMPAIGN}/npcs`)
             .send({ npcs: [{ name: 'Brix the Tinker', armorClass: 11 }, { name: 'Zombie', armorClass: 8 }] });
         expect(res.status).toBe(400);
         expect(res.body.error).toMatch(/Zombie/i);
@@ -93,7 +91,7 @@ describe('npcs — bestiary-name guard (monsters never live in npcs.json)', () =
 
     it('still accepts a genuinely custom NPC', async () => {
         const app = createTestApp();
-        const res = await request(app).put(`/api/campaigns/${MOCK_CAMPAIGN}/npcs/Gob Ironwhistle`).set(GM)
+        const res = await request(app).put(`/api/campaigns/${MOCK_CAMPAIGN}/npcs/Gob Ironwhistle`)
             .send({ name: 'Gob Ironwhistle', armorClass: 12 });
         expect(res.status).toBe(200);
         const saved = JSON.parse(FILE_SYSTEM.get(MOCK_NPCS_PATH));

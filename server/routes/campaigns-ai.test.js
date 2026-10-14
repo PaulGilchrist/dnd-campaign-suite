@@ -100,7 +100,7 @@ describe('POST /ai/referee', () => {
     });
 });
 
-describe('referee authority (§12)', () => {
+describe('GM (localhost) authority (§12)', () => {
     // trust-proxy makes req.hostname follow the Host header so the
     // hostname-based LAN guard is exercisable from supertest loopback.
     function proxyApp() {
@@ -120,16 +120,15 @@ describe('referee authority (§12)', () => {
         expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('non-localhost WITH the referee clientId ⇒ allowed', async () => {
+    it('non-localhost with any client id header ⇒ still 403 (no delegable referee)', async () => {
         setStore(CFG);
-        characterChangeData.get('test-campaign').referee = { name: 'Ref', clientId: 'referee-abc' };
         stubModel(VALID);
         const res = await request(proxyApp())
             .post('/api/campaigns/test-campaign/ai/referee')
             .set('Host', '203.0.113.7')
             .set('X-Client-Id', 'referee-abc')
             .send({ action: 'I cast shield' });
-        expect(res.status).toBe(200);
-        expect(res.body.ok).toBe(true);
+        expect(res.status).toBe(403);
+        expect(addEntry).not.toHaveBeenCalled();
     });
 });

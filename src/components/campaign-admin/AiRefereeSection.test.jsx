@@ -10,10 +10,6 @@ vi.mock('../../hooks/runtime/useSyncedState.js', () => ({
         return [synced[prop], (v) => { synced[prop] = v; }];
     },
 }));
-vi.mock('../../services/ui/clientId.js', () => ({
-    getClientId: () => 'cid-test-1',
-    withClientId: (h = {}) => ({ ...h, 'X-Client-Id': 'cid-test-1' }),
-}));
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(),

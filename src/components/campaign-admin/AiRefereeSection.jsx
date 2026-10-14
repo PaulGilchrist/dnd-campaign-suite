@@ -1,6 +1,6 @@
 /**
  * L5-005 §9.2 — AI Referee console (Admin view, localhost-only surface,
- * lives beside Enforcement & Referee).
+ * lives beside Enforcement).
  *
  * suggest mode (default): the referee describes a player's action, the AI
  * proposes a validated ruling, and NOTHING happens until Confirm is clicked
@@ -12,7 +12,6 @@
  */
 import React from 'react'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
-import { withClientId } from '../../services/ui/clientId.js'
 import { ENFORCEMENT_DEFAULTS } from '../../services/combat/canTakeAction.js'
 import { getAiStatus, askAiReferee } from '../../services/ai/aiClient.js'
 import { applyRuling, isAtomicRuling } from '../../services/ai/applyRuling.js'
@@ -23,7 +22,7 @@ import './AiRefereeSection.css'
 async function postAiConfig(campaignName, value) {
     const res = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/aiConfig`, {
         method: 'POST',
-        headers: withClientId({ 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value }),
     })
     const data = await res.json().catch(() => ({}))

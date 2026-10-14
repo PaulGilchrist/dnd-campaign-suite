@@ -387,8 +387,8 @@ function CampaignAdmin({ campaignName, onBack, theme, toggleTheme, onRenameCampa
 
             <AppearanceSection theme={theme} toggleTheme={toggleTheme} />
 
-            {/* L5-001: enforcement master switch + referee claim (default OFF ⇒ L1–4 as-is). */}
-            <EnforcementSection campaignName={campaignName} characters={characters} />
+            {/* L5-001: enforcement master switch + sub-flags (default OFF ⇒ L1–4 as-is). */}
+            <EnforcementSection campaignName={campaignName} />
 
             {/* L5 Phase 4 §10: session state machine console + enforcement/AI audit ledger. */}
             <SessionSection campaignName={campaignName} />

@@ -10,7 +10,6 @@
  */
 import React from 'react'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
-import { getClientId } from '../../services/ui/clientId.js'
 import { SESSION_PHASES, setSessionPhase, readSessionPhase } from '../../services/combat/sessionService.js'
 import './SessionSection.css'
 
@@ -68,7 +67,7 @@ export default function SessionSection({ campaignName }) {
             catch (e) { console.error(`[SessionSection] takeover read ${key} failed:`, e); return null }
         }
         const post = async (key, value) => {
-            try { await fetch(url(key), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Client-Id': getClientId() }, body: JSON.stringify({ value }) }) }
+            try { await fetch(url(key), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value }) }) }
             catch (e) { console.error(`[SessionSection] takeover ${key} failed:`, e) }
         }
         const enforcement = await get('enforcement')

@@ -1,14 +1,15 @@
 /**
- * L5-001 — Referee / Enforcement section (Admin view, localhost-only surface).
+ * L5-001 — Enforcement section (Admin view, localhost-only surface).
  *
- * Master enforcement switch + the Phase 0/1 sub-flags, and referee assignment
- * (this browser claims the referee role with its durable client id, §6.8).
+ * Master enforcement switch + the Phase 0/1 sub-flags. The localhost client
+ * IS the GM/referee — authority is hostname-derived, full stop (plan §12,
+ * simplified 2026-10-13: the assignable referee role was removed; there is
+ * no delegation channel, so no referee key/client-id plumbing exists).
  * All writes flow through useSyncedState → the server-validated chokepoint
  * (server/validation/keyValidators.js). Default OFF ⇒ Levels 1–4 unchanged.
  */
 import React from 'react'
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js'
-import { getClientId } from '../../services/ui/clientId.js'
 import { ENFORCEMENT_DEFAULTS } from '../../services/combat/canTakeAction.js'
 import './EnforcementSection.css'
 
@@ -26,19 +27,16 @@ const FLAGS = [
     { key: 'opportunityAttacks', label: 'Opportunity attacks', hint: 'Leaving a hostile creature\u2019s reach spends their reaction and prompts you to resolve the attack on their sheet.' },
 ]
 
-export default function EnforcementSection({ campaignName, characters = [] }) {
+export default function EnforcementSection({ campaignName }) {
     const [enforcement, setEnforcement] = useSyncedState('campaign', 'enforcement', { ...ENFORCEMENT_DEFAULTS }, campaignName)
-    const [referee, setReferee] = useSyncedState('campaign', 'referee', null, campaignName)
-    const [claimName, setClaimName] = React.useState(characters[0]?.name || '')
 
     const flags = { ...ENFORCEMENT_DEFAULTS, ...(enforcement || {}) }
-    const clientId = getClientId()
 
     const setFlag = (key, value) => setEnforcement({ ...flags, [key]: value })
 
     return (
         <div className="admin-section enforcement-section">
-            <h3><i className="fas fa-gavel"></i> Enforcement &amp; Referee</h3>
+            <h3><i className="fas fa-gavel"></i> Enforcement</h3>
             <div className="enforcement-master">
                 <label className="enforcement-toggle">
                     <input
@@ -66,38 +64,6 @@ export default function EnforcementSection({ campaignName, characters = [] }) {
                     </label>
                 ))}
             </fieldset>
-
-            <div className="enforcement-referee">
-                <h4>Referee</h4>
-                {referee ? (
-                    <p>
-                        Referee: <b>{referee.name}</b>
-                        {referee.clientId === clientId && <span className="enforcement-referee-self"> (this browser)</span>}
-                        {' — '}
-                        <button className="ct-btn" onClick={() => setReferee(null)}>Release</button>
-                    </p>
-                ) : (
-                    <p className="enforcement-hint">
-                        No referee assigned — this browser (GM/localhost) holds authority by default.
-                    </p>
-                )}
-                {!referee || referee.clientId !== clientId ? (
-                    <label className="enforcement-claim">
-                        <span>Claim referee for this browser as:</span>
-                        <select value={claimName} onChange={(e) => setClaimName(e.target.value)}>
-                            {characters.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                        </select>
-                        <button
-                            className="ct-btn ct-btn-primary"
-                            disabled={!claimName}
-                            onClick={() => setReferee({ name: claimName, clientId })}
-                        >
-                            <i className="fas fa-user-shield"></i> Claim Referee
-                        </button>
-                    </label>
-                ) : null}
-                <p className="enforcement-client-id">Client id: <code>{clientId}</code></p>
-            </div>
         </div>
     )
 }

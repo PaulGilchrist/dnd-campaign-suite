@@ -36,11 +36,11 @@ export const CAMPAIGN_KEYS = new Set([
     'travel-rerollsRemaining',
     'travel-horseback',
     'music',
-    // Level 5 (L5-001): enforcement foundation — off-by-default flags, referee
-    // assignment {name, clientId}, and the per-creature turn economy
-    // (see src/services/combat/turnState.js + canTakeAction.js).
+    // Level 5 (L5-001): enforcement foundation — off-by-default flags and the
+    // per-creature turn economy (see src/services/combat/turnState.js +
+    // canTakeAction.js). (The assignable 'referee' key was removed
+    // 2026-10-13 — localhost hosting means the GM machine is the referee.)
     'enforcement',
-    'referee',
     'turnState',
     // L5 §7.5 'turnTimer' REMOVED (no-timers plan T1): real-time countdowns
     // are banned — the game advances only on player/GM action (AGENTS.md).

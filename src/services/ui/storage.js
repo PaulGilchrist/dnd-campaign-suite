@@ -1,5 +1,4 @@
 import utils from './utils.js'
-import { withClientId } from './clientId.js'
 
 // Sequential write queue for combatSummary to prevent race conditions
 // when multiple applyDamageToTarget calls fire storage.set in quick succession.
@@ -47,7 +46,7 @@ const storage = {
                 return fetch(fullUrl, {
                     method: 'POST',
                     mode: 'cors',
-                    headers: withClientId({ 'Content-Type': 'application/json' }),
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ value })
                 }).catch((e) => { console.error("[storage:error]", e); });
             });
@@ -57,7 +56,7 @@ const storage = {
         return fetch(fullUrl, {
             method: 'POST',
             mode: 'cors',
-            headers: withClientId({ 'Content-Type': 'application/json' }),
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ value })
           }).catch((e) => { console.error("[storage:error]", e); });
       },

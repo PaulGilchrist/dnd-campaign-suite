@@ -8,7 +8,8 @@
  *
  * Off-switches: enforcement off ⇒ every function is a zero-write no-op —
  * the L1–4 guarantee. actionEconomy gates slot charges; movementBudget
- * gates movement charges; enforcement.referee/off-mode refunds allowed.
+ * gates movement charges; off-mode refunds allowed at the modal-cancel /
+ * GM-correction seams (turnState.js un-charge, L5-002).
  */
 import { cloneDeep } from 'lodash'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'

@@ -21,7 +21,8 @@
  *   { configured, mode, endpoint, model, reachable?, models? } for the
  *   (future) Referee console and the health check in server.js.
  *
- * Authority (§12): localhost or the assigned referee clientId only.
+ * Authority (§12): localhost (the GM) only — the assignable referee role
+ * was removed 2026-10-13; the machine hosting the app IS the referee.
  * With aiConfig unset/off these endpoints answer 403 — every non-AI
  * campaign is byte-identical to Levels 1–4 (zero new traffic).
  */
@@ -35,12 +36,10 @@ const WORLD_KINDS = new Set(['recap', 'rumor', 'npc_dialogue', 'quest_draft', 'e
 
 const router = express.Router();
 
-// §12 authority: AI surfaces are referee surfaces.
-function isReferee(req) {
-    if (req.hostname === 'localhost' || req.hostname === '127.0.0.1') return true;
-    const referee = (characterChangeData.get(req.params.campaign) || {}).referee;
-    const clientId = req.header('x-client-id');
-    return !!(referee && typeof referee === 'object' && clientId && clientId === referee.clientId);
+// §12 authority: AI surfaces are GM surfaces — localhost only (the assignable
+// referee role was removed 2026-10-13; the GM machine is always localhost).
+function isGM(req) {
+    return req.hostname === 'localhost' || req.hostname === '127.0.0.1';
 }
 
 router.get('/api/campaigns/:campaign/ai/status', async (req, res) => {
@@ -72,8 +71,8 @@ router.post('/api/campaigns/:campaign/ai/referee', async (req, res) => {
         if (!aiConfigLive(cfg)) {
             return res.status(403).json({ error: 'AI referee is not enabled for this campaign' });
         }
-        if (!isReferee(req)) {
-            return res.status(403).json({ error: 'only the referee (or localhost) may request AI rulings' });
+        if (!isGM(req)) {
+            return res.status(403).json({ error: 'only localhost (the GM) may request AI rulings' });
         }
         const action = typeof req.body?.action === 'string' ? req.body.action.trim().slice(0, 2000) : '';
         if (!action) {
@@ -97,8 +96,8 @@ router.post('/api/campaigns/:campaign/ai/director', async (req, res) => {
         if (!aiConfigLive(cfg)) {
             return res.status(403).json({ error: 'AI is not enabled for this campaign' });
         }
-        if (!isReferee(req)) {
-            return res.status(403).json({ error: 'only the referee (or localhost) may direct NPCs with AI' });
+        if (!isGM(req)) {
+            return res.status(403).json({ error: 'only localhost (the GM) may direct NPCs with AI' });
         }
         const creatureName = typeof req.body?.creatureName === 'string' ? req.body.creatureName.trim().slice(0, 120) : '';
         if (!creatureName) {
@@ -132,8 +131,8 @@ router.post('/api/campaigns/:campaign/ai/world', async (req, res) => {
         if (!aiConfigLive(cfg)) {
             return res.status(403).json({ error: 'AI is not enabled for this campaign' });
         }
-        if (!isReferee(req)) {
-            return res.status(403).json({ error: 'only the referee (or localhost) may ask the AI world keeper' });
+        if (!isGM(req)) {
+            return res.status(403).json({ error: 'only localhost (the GM) may ask the AI world keeper' });
         }
         const kind = String(req.body?.kind || '');
         if (!WORLD_KINDS.has(kind)) {

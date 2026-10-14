@@ -60,14 +60,6 @@ function validateEnforcement(value) {
     return { ok: true };
 }
 
-function validateReferee(value) {
-    if (value === null) return { ok: true }; // null ⇒ unassigned (defaults to localhost authority)
-    if (!isPlainObject(value)) return { ok: false, reason: 'referee must be null or { name, clientId }' };
-    if (typeof value.name !== 'string' || value.name.trim() === '') return { ok: false, reason: 'referee.name must be a non-empty string' };
-    if (typeof value.clientId !== 'string' || value.clientId.trim() === '') return { ok: false, reason: 'referee.clientId must be a non-empty string' };
-    return { ok: true };
-}
-
 function validateTurnState(value) {
     if (!isPlainObject(value)) return { ok: false, reason: 'turnState must be an object keyed by creature name' };
     for (const [creatureName, entry] of Object.entries(value)) {
@@ -106,26 +98,25 @@ function validateTurnState(value) {
  */
 
 /**
- * Authority check for enforcement/referee writes (D2/D4): while enforcement is
- * engaged these may only come from the referee client (X-Client-Id header) or
- * localhost. With enforcement off the surface stays exactly as open as today.
- * `engaged` may be overridden by the caller (e.g. aiConfig engages on its own
- * mode, not the enforcement master).
+ * Authority check for enforcement-scoped writes (D2): while enforcement is
+ * engaged these may only come from localhost — the GM machine. There is no
+ * assignable referee (removed 2026-10-13: the app runs on the GM's computer,
+ * so localhost IS the referee; delegation via client ids was never wired to
+ * a pairing mechanism). With enforcement off the surface stays exactly as
+ * open as today. `engaged` may be overridden by the caller (e.g. aiConfig
+ * engages on its own mode, not the enforcement master).
  */
 function validateAuthority(key, ctx, engaged) {
     const { req, current } = ctx;
     const enforcement = (current || {}).enforcement;
-    const referee = (current || {}).referee;
     const live = engaged !== undefined ? engaged
         : isPlainObject(enforcement) && enforcement.mode === 'on';
     if (!live) return { ok: true };
     const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
     if (isLocalhost) return { ok: true };
-    const clientId = req.header('x-client-id');
-    if (isPlainObject(referee) && clientId && clientId === referee.clientId) return { ok: true };
     return {
         ok: false,
-        reason: `only the referee (or localhost) may change ${key} while it is engaged`,
+        reason: `only localhost (the GM) may change ${key} while it is engaged`,
     };
 }
 
@@ -240,12 +231,11 @@ function chain(...validators) {
 
 export const keyValidators = {
     enforcement: chain(validateEnforcement, (v, ctx) => validateAuthority('enforcement', ctx)),
-    referee: chain(validateReferee, (v, ctx) => validateAuthority('referee', ctx)),
     turnState: validateTurnState,
     // L5 Phase 4 (§10.1): session orchestration truth — shape only, phase
     // enum pinned; unset ⇒ 'exploration' (today's implicit default).
     sessionState: validateSessionState,
-    // AI config engages referee authority on its OWN mode (§12), not the
+    // AI config engages GM authority on its OWN mode (§12), not the
     // enforcement master — and engaging counts: a WRITE that turns the AI on
     // is itself an act of authority, so an AI-off campaign cannot be
     // silently autopiloted by a random client.

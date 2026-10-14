@@ -108,10 +108,9 @@ describe('L5-001 change-data validation chokepoint', () => {
         });
     });
 
-    describe('referee authority while enforcement is ON', () => {
+    describe('localhost (GM) authority while enforcement is ON', () => {
         beforeEach(() => {
             characterChangeData.get('test-campaign').enforcement = VALID_ENFORCEMENT;
-            characterChangeData.get('test-campaign').referee = { name: 'Rakan', clientId: 'cid-ref-1' };
         });
 
         it('non-localhost anonymous write ⇒ 400 + denied SSE event', async () => {
@@ -120,7 +119,7 @@ describe('L5-001 change-data validation chokepoint', () => {
                 .set('Host', '10.0.0.5')
                 .send({ value: { mode: 'off' } });
             expect(res.status).toBe(400);
-            expect(res.body.error).toMatch(/referee/);
+            expect(res.body.error).toMatch(/localhost \(the GM\)/);
             expect(characterChangeData.get('test-campaign').enforcement.mode).toBe('on'); // unchanged
             expect(publish).toHaveBeenCalledWith(
                 'denied-test-campaign-enforcement',
@@ -129,29 +128,22 @@ describe('L5-001 change-data validation chokepoint', () => {
             );
         });
 
-        it('referee client id ⇒ allowed', async () => {
+        it('non-localhost with any client id header ⇒ still denied (no delegable referee)', async () => {
             const res = await request(createTestApp())
                 .post('/api/campaigns/test-campaign/enforcement')
                 .set('Host', '10.0.0.5')
                 .set('X-Client-Id', 'cid-ref-1')
                 .send({ value: { mode: 'off' } });
+            expect(res.status).toBe(400);
+            expect(characterChangeData.get('test-campaign').enforcement.mode).toBe('on'); // unchanged
+        });
+
+        it('localhost retains authority to disengage enforcement', async () => {
+            const res = await request(createTestApp())
+                .post('/api/campaigns/test-campaign/enforcement')
+                .send({ value: { mode: 'off' } });
             expect(res.status).toBe(200);
             expect(characterChangeData.get('test-campaign').enforcement.mode).toBe('off');
-        });
-
-        it('localhost always retains authority', async () => {
-            const res = await request(createTestApp())
-                .post('/api/campaigns/test-campaign/referee')
-                .send({ value: null });
-            expect(res.status).toBe(200);
-            expect(characterChangeData.get('test-campaign').referee).toBeNull();
-        });
-
-        it('referee key still shape-checked', async () => {
-            const res = await request(createTestApp())
-                .post('/api/campaigns/test-campaign/referee')
-                .send({ value: { name: '', clientId: 'x' } });
-            expect(res.status).toBe(400);
         });
     });
 
@@ -212,15 +204,15 @@ describe('L5-001 change-data validation chokepoint', () => {
             expect(res.status).toBe(400);
         });
 
-        it('engaged aiConfig change by referee clientId ⇒ allowed', async () => {
-            characterChangeData.get('test-campaign').referee = { name: 'Ref', clientId: 'ref-1' };
+        it('engaged aiConfig change from a non-localhost client ⇒ denied even with a client id header', async () => {
             characterChangeData.get('test-campaign').aiConfig = LOCAL;
             const res = await request(proxyApp())
                 .post('/api/campaigns/test-campaign/aiConfig')
                 .set('Host', '203.0.113.7')
                 .set('X-Client-Id', 'ref-1')
                 .send({ value: { ...LOCAL, mode: 'autopilot' } });
-            expect(res.status).toBe(200);
+            expect(res.status).toBe(400);
+            expect(characterChangeData.get('test-campaign').aiConfig.mode).toBe('suggest'); // unchanged
         });
     });
 });
@@ -312,7 +304,6 @@ describe('P4-a sessionState validation (§10.1)', () => {
 describe('P4-b enforcement.autoEncounters flag (§10.2)', () => {
     const post = (enforcement) => request(createTestApp())
         .post('/api/campaigns/test-campaign/enforcement')
-        .set('X-Client-Id', 'cid-hoster')
         .send({ value: enforcement });
 
     it('accepts autoEncounters with the same honesty contract as the other flags', async () => {
@@ -328,7 +319,6 @@ describe('P4-c enforcement.autoRewards flag (§10.3)', () => {
     it('accepts autoRewards; refuses junk', async () => {
         const post = (enforcement) => request(createTestApp())
             .post('/api/campaigns/test-campaign/enforcement')
-            .set('X-Client-Id', 'cid-hoster')
             .send({ value: enforcement });
         expect((await post({ mode: 'off', autoRewards: true })).status).toBe(200);
         expect((await post({ mode: 'off', autoRewards: 'free xp' })).status).toBe(400);
@@ -378,7 +368,6 @@ describe('P4-d denial persistence (§10.4)', () => {
 describe('D1/D2 turnState extensions (§18)', () => {
     const post = (entry) => request(createTestApp())
         .post('/api/campaigns/test-campaign/turnState')
-        .set('X-Client-Id', 'cid-hoster')
         .send({ value: { Rakan: { ...VALID_TURN_STATE.Rakan, ...entry } } });
 
     it('accepts feature-granted reaction caps and companion ownership', async () => {

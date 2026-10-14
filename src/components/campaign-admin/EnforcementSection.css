@@ -33,20 +33,3 @@
     opacity: 0.75;
     margin: 4px 0;
 }
-
-.enforcement-referee {
-    margin-top: 12px;
-}
-
-.enforcement-claim {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin: 8px 0;
-}
-
-.enforcement-client-id {
-    opacity: 0.6;
-    font-size: 0.8em;
-}
