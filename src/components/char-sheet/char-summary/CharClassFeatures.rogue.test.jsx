@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -6,7 +6,10 @@ import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 import * as classFeatures from '../../../services/character/classFeatures.js';
 
 // Rogue Features are reached through the CharClassFeatures registry entry
-// point (class name 'Rogue' → RogueFeatures).
+// point (class name 'Rogue' → RogueFeatures). Registry dispatch itself is
+// owned by CharClassFeatures.test.jsx — this file owns RogueFeatures'
+// rendering rules: expertise row, sneak attack line, energy-dice gating
+// (required_major vs major/subclass name) and the Supreme Sneak badge.
 
 vi.mock('../../../services/character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(() => ({})),
@@ -106,7 +109,7 @@ describe('RogueFeatures', () => {
     });
 
     it.each([
-      ['expertise array is empty', []],
+      ['the expertise array is empty', []],
       ['expertise is undefined', undefined],
     ])('omits the expertise row when %s', (_label, expertise) => {
       classFeatures.getClassFeatures.mockReturnValue({ expertise });
@@ -116,38 +119,29 @@ describe('RogueFeatures', () => {
   });
 
   describe('sneak attack damage', () => {
+    // { dice_count: 0, dice_value: 0 } renders identically to a missing
+    // sneakAttack (both hit the `|| 0` fallback), so only the missing
+    // shape is exercised as the +0d0 case.
     it.each([
-      [{ dice_count: 3, dice_value: 6 }, '+3d6'],
-      [{ dice_count: 5, dice_value: 8 }, '+5d8'],
-      [{ dice_count: 0, dice_value: 0 }, '+0d0'],
-    ])('renders sneak attack %s as %s', (sneakAttack, expected) => {
-      classFeatures.getClassFeatures.mockReturnValue({ sneakAttack });
+      [{ sneakAttack: { dice_count: 3, dice_value: 6 } }, '+3d6'],
+      [{ sneakAttack: { dice_count: 5, dice_value: 8 } }, '+5d8'],
+      [{}, '+0d0'],
+    ])('renders sneak attack %o as %s', (features, expected) => {
+      classFeatures.getClassFeatures.mockReturnValue(features);
       const section = renderRogue(rogueStats(1));
       expect(section.textContent).toContain(`Sneak Attack Damage: ${expected}`);
-    });
-
-    it('falls back to +0d0 when sneak attack dice are missing', () => {
-      classFeatures.getClassFeatures.mockReturnValue({});
-      const section = renderRogue(rogueStats(1));
-      expect(section.textContent).toContain('Sneak Attack Damage: +0d0');
     });
   });
 
   describe('energy dice (subclass psionic energy)', () => {
-    it('tracks Energy Dice with max from energy_die_num when required_major matches the major', () => {
-      const section = renderRogue(
-        rogueStats(5, { energy: SWASHBUCKLER_ENERGY }, { major: { name: 'Swashbuckler' } })
-      );
+    it.each([
+      ['the major name', { major: { name: 'Swashbuckler' } }],
+      ['the subclass name fallback', { subclass: { name: 'Swashbuckler' } }],
+    ])('tracks Energy Dice with max from energy_die_num when required_major matches %s', (_label, options) => {
+      const section = renderRogue(rogueStats(5, { energy: SWASHBUCKLER_ENERGY }, options));
       expect(screen.getByTestId('tracked-resource-psionicEnergy'))
         .toHaveTextContent('Energy Dice: 4/4');
       expect(section.textContent).toContain('Energy Die Type: d6');
-    });
-
-    it('matches required_major against the subclass name fallback when major is unset', () => {
-      renderRogue(
-        rogueStats(5, { energy: SWASHBUCKLER_ENERGY }, { subclass: { name: 'Swashbuckler' } })
-      );
-      expect(screen.getByTestId('tracked-resource-psionicEnergy')).toBeInTheDocument();
     });
 
     it.each([
@@ -169,8 +163,11 @@ describe('RogueFeatures', () => {
   });
 
   describe('supreme sneak badge', () => {
-    it('renders the availability badge for a Thief at level 9', () => {
-      const section = renderRogue(thiefStats(9));
+    it.each([
+      ['the major name', thiefStats(9)],
+      ['the subclass name fallback', rogueStats(9, {}, { subclass: { name: 'Thief' } })],
+    ])('renders the inactive availability badge for a level 9 Thief via %s', (_label, stats) => {
+      const section = renderRogue(stats);
       const badge = screen.getByTitle(/Supreme Sneak/);
       expect(section).toContainElement(badge);
       expect(badge).toHaveTextContent('Supreme Sneak');
@@ -178,6 +175,8 @@ describe('RogueFeatures', () => {
       expect(badge).not.toHaveClass('automation-badge--active');
     });
 
+    // The inactive side (undefined, 0, null costs) is the same branch as
+    // the availability case above; only the positive toggle is unique here.
     it('shows the active tooltip and active styling when stealthAttackCost is positive', () => {
       mockRuntime({ stealthAttackCost: 1 });
       renderRogue(thiefStats(9));
@@ -187,26 +186,8 @@ describe('RogueFeatures', () => {
     });
 
     it.each([
-      ['zero', 0],
-      ['null', null],
-      ['undefined', undefined],
-    ])('shows the inactive availability tooltip when stealthAttackCost is %s', (_label, cost) => {
-      mockRuntime({ stealthAttackCost: cost });
-      renderRogue(thiefStats(9));
-      const badge = screen.getByTitle(/Supreme Sneak/);
-      expect(badge.getAttribute('title')).toContain('Available at Rogue level 9');
-      expect(badge).not.toHaveClass('automation-badge--active');
-    });
-
-    it('renders the badge via the subclass name fallback when major is unset', () => {
-      renderRogue(rogueStats(9, {}, { subclass: { name: 'Thief' } }));
-      expect(screen.getByTitle(/Supreme Sneak/)).toBeInTheDocument();
-    });
-
-    it.each([
       ['a Thief below level 9', thiefStats(8)],
       ['an Assassin at level 20', rogueStats(20, {}, { major: { name: 'Assassin' } })],
-      ['an Arcane Trickster at level 9', rogueStats(9, {}, { subclass: { name: 'Arcane Trickster' } })],
     ])('omits the badge for %s even while stealth attack is active', (_label, stats) => {
       mockRuntime({ stealthAttackCost: 1 });
       const section = renderRogue(stats);

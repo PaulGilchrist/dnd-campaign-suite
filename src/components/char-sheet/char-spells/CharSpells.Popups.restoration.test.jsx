@@ -1,18 +1,20 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * CharSpells — Restoration spell popups (Greater Restoration / Lesser Restoration).
  *
  * Covers the two-step restoration flow CharSpells wires through TargetSpellPopups:
  * target picker → live detection of removable effects/conditions from the runtime
- * store and combat summary → confirm payload, skip, and no-effects paths.
+ * store and combat summary (dedup, case-insensitive merge, ruleset filtering) →
+ * confirm payload shapes, stage skips, and no-effects paths.
  *
  * SecondaryTargetModal is stubbed with a faithful minimal contract (radio row
  * selects, confirm button dispatches `onTargetSelected(selected)`, Skip closes)
  * so tests exercise real user behavior via accessible roles without reaching
  * into modal internals (map distance badges, styling). Other CharSpells
- * behaviors are covered by the sibling CharSpells.*.test.jsx files.
+ * behaviors are covered by the sibling CharSpells.*.test.jsx files; handler
+ * internals are covered by the useSpellMetamagicFlow.* hook tests.
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockPlayerStats } from './CharSpells.test-utils.js';
 import CharSpells from './CharSpells.jsx';
@@ -216,98 +218,73 @@ describe('CharSpells - Restoration Spells', () => {
   });
 
   describe('Greater Restoration', () => {
-    it('asks for a target, listing creatures in range with confirm disabled until one is picked', () => {
+    it('lists creatures in range with confirm disabled until one is picked, and Skip cancels the cast', () => {
       castGreaterRestoration(['Orc', 'Goblin']);
       renderCharSpells();
 
-      expect(screen.getByRole('dialog', { name: 'Greater Restoration' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Greater Restoration' })).toHaveTextContent(/within 60 feet/i);
       expect(screen.getByRole('radio', { name: 'Orc' })).toBeInTheDocument();
       expect(screen.getByRole('radio', { name: 'Goblin' })).toBeInTheDocument();
-      expect(screen.getByRole('dialog', { name: 'Greater Restoration' })).toHaveTextContent(/within 60 feet/i);
       expect(screen.getByRole('button', { name: 'Cast Greater Restoration' })).toBeDisabled();
+
+      clickSkip();
+
+      expect(flow.handleGreaterRestorationSkip).toHaveBeenCalledTimes(1);
       expect(flow.handleGreaterRestorationConfirm).not.toHaveBeenCalled();
     });
 
-    it('lists every removable effect detected on the chosen target', async () => {
+    it('detects every removable effect once, merging runtime store and combat summary case-insensitively', async () => {
       castGreaterRestoration();
       targetRuntimeState({
-        activeConditions: ['Charmed'],
+        activeConditions: ['CHARMED', 'petrified', 'frightened'],
         exhaustionLevel: 2,
-        activeBuffs: [{ type: 'cursed', name: 'Armor of Invulnerability' }],
+        activeBuffs: [{ type: 'cursed', name: 'Armor of Invulnerability' }, { cursed: true }],
         abilityReductions: { str: 1 },
         hpMaxReduction: 5,
       });
+      combatSummaryConditions('Orc', 'charmed');
       renderCharSpells();
 
       choose('Orc', 'Cast Greater Restoration');
 
-      await waitFor(() => expect(screen.getByRole('radio', { name: 'Charmed condition' })).toBeInTheDocument());
+      // The effect stage names the target it detected effects for.
+      await expect(screen.findByText(/Choose one effect to remove from Orc/i)).resolves.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Charmed condition' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Petrified condition' })).toBeInTheDocument();
       expect(screen.getByRole('radio', { name: 'Exhaustion level (current: 2)' })).toBeInTheDocument();
-      expect(screen.getByRole('radio', { name: 'Curse (including attunement to cursed magic item)' })).toBeInTheDocument();
+      expect(screen.getAllByRole('radio', { name: 'Curse (including attunement to cursed magic item)' })).toHaveLength(1);
       expect(screen.getByRole('radio', { name: 'Ability score reduction' })).toBeInTheDocument();
       expect(screen.getByRole('radio', { name: 'Hit Point maximum reduction' })).toBeInTheDocument();
+      // Only Greater Restoration's removable set is offered — other conditions stay out.
+      expect(screen.queryByRole('radio', { name: /Frightened/i })).not.toBeInTheDocument();
     });
 
-    it('confirms the chosen condition effect with its target', async () => {
+    it('confirms the chosen effect with the right selection payload and returns to the target step', async () => {
       castGreaterRestoration();
-      targetRuntimeState({ activeConditions: ['Charmed'] });
+      targetRuntimeState({ activeConditions: ['Charmed'], exhaustionLevel: 3 });
       renderCharSpells();
 
       choose('Orc', 'Cast Greater Restoration');
-      await waitFor(() => expect(screen.getByRole('radio', { name: 'Charmed condition' })).toBeInTheDocument());
+      await screen.findByRole('radio', { name: 'Charmed condition' });
       choose('Charmed condition', 'Remove Effect');
 
       expect(flow.handleGreaterRestorationConfirm).toHaveBeenCalledWith({
         targetName: 'Orc',
         selections: [{ type: 'condition', condition: 'charmed' }],
       });
-    });
+      // Confirming closes the effect stage back to the target step.
+      expect(screen.queryByRole('radio', { name: 'Charmed condition' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Cast Greater Restoration' })).toBeInTheDocument();
 
-    it('confirms exhaustion removal with a plain effect selection', async () => {
-      castGreaterRestoration();
-      targetRuntimeState({ exhaustionLevel: 3 });
-      renderCharSpells();
-
+      // Second pass proves the detail-free exhaustion shape.
       choose('Orc', 'Cast Greater Restoration');
-      await waitFor(() => expect(screen.getByRole('radio', { name: 'Exhaustion level (current: 3)' })).toBeInTheDocument());
+      await screen.findByRole('radio', { name: 'Exhaustion level (current: 3)' });
       choose('Exhaustion level (current: 3)', 'Remove Effect');
 
-      expect(flow.handleGreaterRestorationConfirm).toHaveBeenCalledWith({
+      expect(flow.handleGreaterRestorationConfirm).toHaveBeenLastCalledWith({
         targetName: 'Orc',
         selections: [{ type: 'exhaustion' }],
       });
-    });
-
-    it('merges conditions from the runtime store and combat summary without duplicates', async () => {
-      castGreaterRestoration();
-      targetRuntimeState({ activeConditions: ['CHARMED', 'petrified'] });
-      combatSummaryConditions('Orc', 'charmed');
-      renderCharSpells();
-
-      choose('Orc', 'Cast Greater Restoration');
-
-      await waitFor(() => expect(screen.getAllByRole('radio', { name: 'Charmed condition' })).toHaveLength(1));
-      expect(screen.getByRole('radio', { name: 'Petrified condition' })).toBeInTheDocument();
-    });
-
-    it('detects a curse from buff entries flagged by type or cursed property, listed once', async () => {
-      castGreaterRestoration();
-      targetRuntimeState({ activeBuffs: [{ type: 'cursed' }, { cursed: true }] });
-      renderCharSpells();
-
-      choose('Orc', 'Cast Greater Restoration');
-
-      await waitFor(() => expect(screen.getAllByRole('radio', { name: /^Curse/ })).toHaveLength(1));
-    });
-
-    it('cancels the cast when skipped at the target step', () => {
-      castGreaterRestoration();
-      renderCharSpells();
-
-      clickSkip();
-
-      expect(flow.handleGreaterRestorationSkip).toHaveBeenCalledTimes(1);
-      expect(flow.handleGreaterRestorationConfirm).not.toHaveBeenCalled();
     });
 
     it('returns to the target step when skipped at the effect step, without casting', async () => {
@@ -316,12 +293,13 @@ describe('CharSpells - Restoration Spells', () => {
       renderCharSpells();
 
       choose('Orc', 'Cast Greater Restoration');
-      await waitFor(() => expect(screen.getByRole('radio', { name: 'Charmed condition' })).toBeInTheDocument());
+      await screen.findByRole('radio', { name: 'Charmed condition' });
       clickSkip();
 
       expect(screen.getByRole('radio', { name: 'Orc' })).toBeInTheDocument();
       expect(screen.queryByRole('radio', { name: 'Charmed condition' })).not.toBeInTheDocument();
       expect(flow.handleGreaterRestorationConfirm).not.toHaveBeenCalled();
+      expect(flow.handleGreaterRestorationSkip).not.toHaveBeenCalled();
     });
 
     it('reports no removable effects and routes dismissal to the no-effects handler', async () => {
@@ -330,7 +308,7 @@ describe('CharSpells - Restoration Spells', () => {
 
       choose('Orc', 'Cast Greater Restoration');
 
-      await waitFor(() => expect(screen.getByText(/No removable effects found on Orc/i)).toBeInTheDocument());
+      await expect(screen.findByText(/No removable effects found on Orc/i)).resolves.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Remove Effect' })).not.toBeInTheDocument();
 
       clickSkip();
@@ -340,53 +318,41 @@ describe('CharSpells - Restoration Spells', () => {
   });
 
   describe('Lesser Restoration', () => {
-    it('asks for a target, listing creatures in range with confirm disabled until one is picked', () => {
+    it('lists creatures in range with confirm disabled until one is picked, and Skip cancels the cast', () => {
       castLesserRestoration(['Orc', 'Goblin']);
       renderCharSpells();
 
-      expect(screen.getByRole('dialog', { name: 'Lesser Restoration' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Lesser Restoration' })).toHaveTextContent(/within 30 feet/i);
       expect(screen.getByRole('radio', { name: 'Orc' })).toBeInTheDocument();
       expect(screen.getByRole('radio', { name: 'Goblin' })).toBeInTheDocument();
-      expect(screen.getByRole('dialog', { name: 'Lesser Restoration' })).toHaveTextContent(/within 30 feet/i);
       expect(screen.getByRole('button', { name: 'Cast Lesser Restoration' })).toBeDisabled();
-      expect(flow.handleLesserRestorationConfirm).not.toHaveBeenCalled();
-    });
-
-    it('offers only the four removable conditions, deduplicated across runtime and combat summary', async () => {
-      castLesserRestoration();
-      targetRuntimeState({ activeConditions: ['Blinded', 'DEAFENED', 'Charmed', 'Petrified'] });
-      combatSummaryConditions('Orc', 'blinded', 'poisoned');
-      renderCharSpells();
-
-      choose('Orc', 'Cast Lesser Restoration');
-
-      await waitFor(() => expect(screen.getAllByRole('radio', { name: 'Blinded condition' })).toHaveLength(1));
-      expect(screen.getAllByRole('radio', { name: 'Deafened condition' })).toHaveLength(1);
-      expect(screen.getByRole('radio', { name: 'Poisoned condition' })).toBeInTheDocument();
-      expect(screen.queryByRole('radio', { name: 'Charmed condition' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('radio', { name: 'Petrified condition' })).not.toBeInTheDocument();
-    });
-
-    it('confirms the chosen condition on the chosen target', async () => {
-      castLesserRestoration();
-      targetRuntimeState({ activeConditions: ['Blinded'] });
-      renderCharSpells();
-
-      choose('Orc', 'Cast Lesser Restoration');
-      await waitFor(() => expect(screen.getByRole('radio', { name: 'Blinded condition' })).toBeInTheDocument());
-      choose('Blinded condition', 'Remove Condition');
-
-      expect(flow.handleLesserRestorationConfirm).toHaveBeenCalledWith({ targetName: 'Orc', condition: 'blinded' });
-    });
-
-    it('cancels the cast when skipped at the target step', () => {
-      castLesserRestoration();
-      renderCharSpells();
 
       clickSkip();
 
       expect(flow.handleLesserRestorationSkip).toHaveBeenCalledTimes(1);
       expect(flow.handleLesserRestorationConfirm).not.toHaveBeenCalled();
+    });
+
+    it('offers only the four removable conditions, deduplicated, and confirms the chosen one', async () => {
+      castLesserRestoration();
+      targetRuntimeState({ activeConditions: ['Blinded', 'DEAFENED', 'Paralyzed', 'Charmed', 'Petrified'] });
+      combatSummaryConditions('Orc', 'blinded', 'poisoned');
+      renderCharSpells();
+
+      choose('Orc', 'Cast Lesser Restoration');
+
+      await expect(screen.findByText(/Choose one condition to remove from Orc/i)).resolves.toBeInTheDocument();
+      expect(screen.getAllByRole('radio', { name: 'Blinded condition' })).toHaveLength(1);
+      expect(screen.getAllByRole('radio', { name: 'Deafened condition' })).toHaveLength(1);
+      expect(screen.getByRole('radio', { name: 'Paralyzed condition' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Poisoned condition' })).toBeInTheDocument();
+      // Conditions beyond Lesser Restoration's scope stay out.
+      expect(screen.queryByRole('radio', { name: 'Charmed condition' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: 'Petrified condition' })).not.toBeInTheDocument();
+
+      choose('Blinded condition', 'Remove Condition');
+
+      expect(flow.handleLesserRestorationConfirm).toHaveBeenCalledWith({ targetName: 'Orc', condition: 'blinded' });
     });
 
     it('returns to the target step when skipped at the condition step, without casting', async () => {
@@ -395,7 +361,7 @@ describe('CharSpells - Restoration Spells', () => {
       renderCharSpells();
 
       choose('Orc', 'Cast Lesser Restoration');
-      await waitFor(() => expect(screen.getByRole('radio', { name: 'Blinded condition' })).toBeInTheDocument());
+      await screen.findByRole('radio', { name: 'Blinded condition' });
       clickSkip();
 
       expect(screen.getByRole('radio', { name: 'Orc' })).toBeInTheDocument();
@@ -409,7 +375,7 @@ describe('CharSpells - Restoration Spells', () => {
 
       choose('Orc', 'Cast Lesser Restoration');
 
-      await waitFor(() => expect(screen.getByText(/No removable conditions found on Orc/i)).toBeInTheDocument());
+      await expect(screen.findByText(/No removable conditions found on Orc/i)).resolves.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Remove Condition' })).not.toBeInTheDocument();
 
       clickSkip();
@@ -424,7 +390,7 @@ describe('CharSpells - Restoration Spells', () => {
       renderCharSpells();
 
       choose('Orc', 'Cast Lesser Restoration');
-      await waitFor(() => expect(screen.getByRole('radio', { name: 'Poisoned condition' })).toBeInTheDocument());
+      await screen.findByRole('radio', { name: 'Poisoned condition' });
       choose('Poisoned condition', 'Remove Condition');
 
       expect(flow.handleLesserRestorationConfirm).toHaveBeenCalledWith({ targetName: 'Orc', condition: 'poisoned' });

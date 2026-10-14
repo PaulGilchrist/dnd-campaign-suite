@@ -1,79 +1,50 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import PlayerContextMenu from './PlayerContextMenu';
 
-const mockGridCenterX = (gx) => gx * 40 + 20;
-const mockGridCenterY = (gy) => gy * 40 + 20;
-
-const createMocks = () => ({
-    handleRemovePlayer: vi.fn(),
-    setSelectedPlayer: vi.fn(),
-});
-
+const gridCenterX = (gx) => gx * 40 + 20;
+const gridCenterY = (gy) => gy * 40 + 20;
 const defaultPlayer = { id: 'player-1', gridX: 1, gridY: 2 };
 
-const defaultProps = (player = defaultPlayer) => ({
-    selectedPlayer: player,
-    gridCenterX: mockGridCenterX,
-    gridCenterY: mockGridCenterY,
+const defaultProps = (overrides = {}) => ({
+    selectedPlayer: defaultPlayer,
+    gridCenterX,
+    gridCenterY,
+    handleRemovePlayer: vi.fn(),
+    setSelectedPlayer: vi.fn(),
+    ...overrides,
 });
 
-// ── Rendering ────────────────────────────────────────────────────
-
-describe('PlayerContextMenu rendering', () => {
+describe('PlayerContextMenu', () => {
     it('renders nothing when selectedPlayer is falsy', () => {
         const { container } = render(
-            <PlayerContextMenu
-                selectedPlayer={null}
-                gridCenterX={mockGridCenterX}
-                gridCenterY={mockGridCenterY}
-                handleRemovePlayer={vi.fn()}
-                setSelectedPlayer={vi.fn()}
-            />
+            <PlayerContextMenu {...defaultProps({ selectedPlayer: null })} />
         );
         expect(container.innerHTML).toBe('');
     });
 
-    it('renders the menu with remove option and close button when player is selected', () => {
-        const mocks = createMocks();
-        render(
-            <PlayerContextMenu
-                {...defaultProps()}
-                handleRemovePlayer={mocks.handleRemovePlayer}
-                setSelectedPlayer={mocks.setSelectedPlayer}
-            />
-        );
+    it('renders remove option and close button, positioned near the player', () => {
+        const { container } = render(<PlayerContextMenu {...defaultProps()} />);
         expect(screen.getByText('Remove from Map')).toBeInTheDocument();
         expect(screen.getByText('✕')).toBeInTheDocument();
+        const rect = container.querySelector('.item-context-menu rect');
+        expect(rect).toBeInTheDocument();
+        expect(rect.getAttribute('x')).toBe(String(gridCenterX(defaultPlayer.gridX) + 10));
+        expect(rect.getAttribute('y')).toBe(String(gridCenterY(defaultPlayer.gridY) + 10));
     });
-});
 
-// ── Event handlers ───────────────────────────────────────────────
-
-describe('PlayerContextMenu event handlers', () => {
     it('calls handleRemovePlayer with the player id when "Remove from Map" is clicked', () => {
-        const mocks = createMocks();
-        render(
-            <PlayerContextMenu
-                {...defaultProps()}
-                handleRemovePlayer={mocks.handleRemovePlayer}
-                setSelectedPlayer={mocks.setSelectedPlayer}
-            />
-        );
+        const handleRemovePlayer = vi.fn();
+        render(<PlayerContextMenu {...defaultProps({ handleRemovePlayer })} />);
         fireEvent.click(screen.getByText('Remove from Map'));
-        expect(mocks.handleRemovePlayer).toHaveBeenCalledWith('player-1');
+        expect(handleRemovePlayer).toHaveBeenCalledWith('player-1');
     });
 
     it('calls setSelectedPlayer with null when close (✕) is clicked', () => {
-        const mocks = createMocks();
-        render(
-            <PlayerContextMenu
-                {...defaultProps()}
-                handleRemovePlayer={mocks.handleRemovePlayer}
-                setSelectedPlayer={mocks.setSelectedPlayer}
-            />
-        );
+        const setSelectedPlayer = vi.fn();
+        render(<PlayerContextMenu {...defaultProps({ setSelectedPlayer })} />);
         fireEvent.click(screen.getByText('✕'));
-        expect(mocks.setSelectedPlayer).toHaveBeenCalledWith(null);
+        expect(setSelectedPlayer).toHaveBeenCalledWith(null);
     });
 });

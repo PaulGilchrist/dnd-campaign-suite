@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 // L5-005 §9.2 — AI referee console (component lane only): visibility gating,
 // suggest confirm gate, autopilot auto-apply scope, §10.4 proposal override,
 // config save/refuse notices, and campaign-scoped requests.
@@ -41,7 +41,11 @@ const DICE = { type: 'dice', expression: '1d20+5', explanation: 'swing', confide
 
 const res = (body, ok = true, status = ok ? 200 : 500) => ({ ok, status, json: async () => body });
 
-/** Stub transport for the section's endpoints; returns the fetch mock for payload assertions. */
+/**
+ * Stub transport for the section's endpoints; returns the fetch mock for
+ * payload assertions. The `save` object is read at call time, so tests may
+ * flip `save.ok` mid-test to simulate a refused re-save.
+ */
 function stubFetch({ referee = { ok: true, ruling: DICE }, refereeStatus = 200, save = { ok: true } } = {}) {
     const fetchMock = vi.fn(async (url) => {
         const u = String(url);
@@ -57,17 +61,20 @@ function stubFetch({ referee = { ok: true, ruling: DICE }, refereeStatus = 200, 
 }
 
 const askButton = () => screen.getByRole('button', { name: /Ask AI referee|AI thinking/ });
+const confirmButton = () => screen.getByRole('button', { name: /Confirm & Apply/ });
+const saveButton = () => screen.getByRole('button', { name: /Save AI config/ });
 
-/** Type an action and hit Ask; returns the fetch mock's POST body to /ai/referee. */
+/** Type an action and hit Ask. */
 function askAbout(text) {
     fireEvent.change(screen.getByPlaceholderText(/Describe what a player does/), { target: { value: text } });
     fireEvent.click(askButton());
 }
 
+/** POSTs to the referee endpoint as { url, body } for scope/payload assertions. */
 function refereePosts(fetchMock) {
     return fetchMock.mock.calls
         .filter(([url, opts]) => String(url).endsWith('/ai/referee') && opts?.method === 'POST')
-        .map(([, opts]) => JSON.parse(opts.body));
+        .map(([url, opts]) => ({ url, body: JSON.parse(opts.body) }));
 }
 
 const auditEntries = () => addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ai_ruling_applied');
@@ -80,18 +87,17 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('AiRefereeSection — gating (L1–4 parity)', () => {
-    it('aiConfig unset ⇒ honest badge, no console, no referee traffic', async () => {
+    it('aiConfig unset OR mode off ⇒ honest badge, no console, zero referee traffic', async () => {
         const fetchMock = stubFetch();
-        render(<AiRefereeSection campaignName={CN} characters={characters} />);
+        // unset: badge says not configured, nothing to ask with
+        const first = render(<AiRefereeSection campaignName={CN} characters={characters} />);
         await waitFor(() => expect(screen.getByText(/not configured/)).toBeInTheDocument());
         expect(screen.queryByPlaceholderText(/Describe what a player does/)).toBeNull();
         expect(screen.queryByRole('button', { name: /Ask AI referee/ })).toBeNull();
-        expect(refereePosts(fetchMock)).toHaveLength(0);
-    });
+        first.unmount();
 
-    it('aiConfig present but mode off ⇒ console stays hidden', async () => {
+        // configured but off: badge is honest about the mode, console stays hidden
         synced.aiConfig = { ...CONFIGURED, mode: 'off' };
-        const fetchMock = stubFetch();
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
         await waitFor(() => expect(screen.getByText(/· off/)).toBeInTheDocument()); // let the status fetch settle
         expect(screen.queryByPlaceholderText(/Describe what a player does/)).toBeNull();
@@ -112,27 +118,25 @@ describe('AiRefereeSection — gating (L1–4 parity)', () => {
         expect(refereePosts(fetchMock)).toHaveLength(0); // nothing sent until clicked
     });
 
-    it('server-refused config shows the honest reason and posts to this campaign', async () => {
-        const fetchMock = stubFetch({ save: { ok: false, reason: 'aiConfig.endpoint must be a LOCAL http(s) URL (D3)' } });
+    it('saving posts to this campaign — success stays quiet, refusal shows the server’s reason', async () => {
+        const save = { ok: true };
+        const fetchMock = stubFetch({ save });
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
         fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'suggest' } });
-        fireEvent.click(screen.getByRole('button', { name: /Save AI config/ }));
-        await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('LOCAL http(s)'));
-        const [url, opts] = fetchMock.mock.calls.find(([u]) => String(u).endsWith('/aiConfig'));
-        expect(url).toContain(`/campaigns/${CN}/`);
-        expect(JSON.parse(opts.body).value).toMatchObject({ mode: 'suggest' });
-    });
+        fireEvent.click(saveButton());
 
-    it('saving config posts the chosen values and leaves no error showing', async () => {
-        const fetchMock = stubFetch();
-        render(<AiRefereeSection campaignName={CN} characters={characters} />);
-        fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'suggest' } });
-        fireEvent.click(screen.getByRole('button', { name: /Save AI config/ }));
         await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-        const [url, opts] = fetchMock.mock.calls.find(([u]) => String(u).endsWith('/aiConfig'));
-        expect(url).toContain(`/campaigns/${CN}/`);
-        expect(JSON.parse(opts.body).value).toMatchObject({ mode: 'suggest', provider: 'openai' });
+        const posts = fetchMock.mock.calls.filter(([u]) => String(u).endsWith('/aiConfig'));
+        expect(posts).toHaveLength(1);
+        expect(posts[0][0]).toContain(`/campaigns/${CN}/`);
+        expect(JSON.parse(posts[0][1].body).value).toMatchObject({ mode: 'suggest', provider: 'openai' });
         expect(screen.queryByRole('alert')).toBeNull();
+
+        // server refuses the next save: the honest reason surfaces, no silent fallback
+        save.ok = false;
+        save.reason = 'aiConfig.endpoint must be a LOCAL http(s) URL (D3)';
+        fireEvent.click(saveButton());
+        await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('LOCAL http(s)'));
     });
 });
 
@@ -144,13 +148,17 @@ describe('AiRefereeSection — suggest mode: AI proposes, human disposes', () =>
         askAbout('I swing my sword at the goblin');
 
         await waitFor(() => expect(screen.getByText(/AI proposes: dice/)).toBeInTheDocument());
-        expect(refereePosts(fetchMock)).toEqual([{ action: 'I swing my sword at the goblin', characterName: 'Rakan' }]);
+        expect(refereePosts(fetchMock)).toEqual([{
+            url: expect.stringContaining(`/campaigns/${CN}/ai/referee`),
+            body: { action: 'I swing my sword at the goblin', characterName: 'Rakan' },
+        }]);
+        expect(screen.queryByLabelText('Override HP amount')).toBeNull(); // engine dice stay engine dice
         // the gate: engine untouched, no audit, nothing marked applied
         expect(rollExpression).not.toHaveBeenCalled();
         expect(auditEntries()).toHaveLength(0);
         expect(screen.queryByText(/Applied:/)).toBeNull();
 
-        fireEvent.click(screen.getByRole('button', { name: /Confirm & Apply/ }));
+        fireEvent.click(confirmButton());
         await waitFor(() => expect(screen.getByText(/Applied:.*→ 9/)).toBeInTheDocument());
         expect(rollExpression).toHaveBeenCalledWith('1d20+5');
         expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'roll', total: 9 }));
@@ -189,6 +197,7 @@ describe('AiRefereeSection — autopilot scope', () => {
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
         askAbout('I cast magic missile');
         await waitFor(() => expect(screen.getByText(/Applied:.*→ 9/)).toBeInTheDocument());
+        expect(screen.queryByRole('button', { name: /Confirm & Apply/ })).toBeNull(); // auto, no click awaited
         expect(rollExpression).toHaveBeenCalledWith('1d20+5');
         expect(auditEntries()).toHaveLength(1);
     });
@@ -199,7 +208,7 @@ describe('AiRefereeSection — autopilot scope', () => {
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
         askAbout('the dragon breathes');
         await waitFor(() => expect(screen.getByText(/AI proposes: automation/)).toBeInTheDocument());
-        expect(screen.getByRole('button', { name: /Confirm & Apply/ })).toBeInTheDocument(); // referee may still approve
+        expect(confirmButton()).toBeInTheDocument(); // referee may still approve
         expect(screen.queryByText(/Applied:/)).toBeNull();
         expect(rollExpression).not.toHaveBeenCalled();
         expect(auditEntries()).toHaveLength(0);
@@ -219,47 +228,28 @@ describe('AiRefereeSection — autopilot scope', () => {
 
 // §10.4 — referee override on a proposal before it touches the sheet.
 describe('AiRefereeSection — proposal override (§10.4)', () => {
-    function withRuntimeHp(who, hp) {
-        getRuntimeValue.mockImplementation((w, key) => (w === who && key === 'currentHitPoints' ? hp : null));
-    }
-
-    it('hp_change: the edited amount is what applies, and the audit records the override', async () => {
-        withRuntimeHp('Rakan', 20);
+    it('hp_change untouched applies the AI’s amount unflagged; an edited override applies the human’s amount and records it', async () => {
+        getRuntimeValue.mockImplementation((who, key) => (who === 'Rakan' && key === 'currentHitPoints' ? 20 : null));
         synced.aiConfig = CONFIGURED;
         stubFetch({ referee: { ok: true, ruling: { type: 'hp_change', targetName: 'Rakan', amount: -7, explanation: 'claws rake Rakan' } } });
         render(<AiRefereeSection campaignName={CN} characters={characters} />);
+
+        // cycle 1 — accepted as proposed: original amount, no override flag
         askAbout('the claw hits');
-        await waitFor(() => expect(screen.getByText(/AI proposes: hp_change/)).toBeInTheDocument());
-
-        const override = screen.getByLabelText('Override HP amount');
-        expect(override).toHaveValue(-7); // prefilled with the AI's proposal
-        fireEvent.change(override, { target: { value: '-3' } });
-        fireEvent.click(screen.getByRole('button', { name: /Confirm & Apply/ }));
-
-        await waitFor(() => expect(screen.getByText(/Applied: Rakan: 20 → 17 HP/)).toBeInTheDocument());
-        expect(setRuntimeValue).toHaveBeenCalledWith('Rakan', 'currentHitPoints', 17, CN);
-        expect(auditEntries().at(-1).ruling).toMatchObject({ type: 'hp_change', amount: -3, overridden: true });
-    });
-
-    it('hp_change left untouched applies the original amount with no override flag', async () => {
-        withRuntimeHp('Rakan', 20);
-        synced.aiConfig = CONFIGURED;
-        stubFetch({ referee: { ok: true, ruling: { type: 'hp_change', targetName: 'Rakan', amount: -7 } } });
-        render(<AiRefereeSection campaignName={CN} characters={characters} />);
-        askAbout('the claw hits');
-        await waitFor(() => expect(screen.getByLabelText('Override HP amount')).toHaveValue(-7));
-        fireEvent.click(screen.getByRole('button', { name: /Confirm & Apply/ }));
+        const override = () => screen.getByLabelText('Override HP amount');
+        await waitFor(() => expect(override()).toHaveValue(-7)); // prefilled with the AI's proposal
+        fireEvent.click(confirmButton());
         await waitFor(() => expect(screen.getByText(/Applied: Rakan: 20 → 13 HP/)).toBeInTheDocument());
         expect(auditEntries().at(-1).ruling).toMatchObject({ type: 'hp_change', amount: -7 });
         expect(auditEntries().at(-1).ruling.overridden).toBeUndefined();
-    });
 
-    it('dice proposals show NO override box — engine dice stay engine dice', async () => {
-        synced.aiConfig = CONFIGURED;
-        stubFetch();
-        render(<AiRefereeSection campaignName={CN} characters={characters} />);
-        askAbout('I swing');
-        await waitFor(() => expect(screen.getByText(/AI proposes: dice/)).toBeInTheDocument());
-        expect(screen.queryByLabelText('Override HP amount')).toBeNull();
+        // cycle 2 — referee edits: the edited amount is what lands, and the audit records it
+        askAbout('the claw hits again');
+        await waitFor(() => expect(override()).toHaveValue(-7));
+        fireEvent.change(override(), { target: { value: '-3' } });
+        fireEvent.click(confirmButton());
+        await waitFor(() => expect(screen.getByText(/Applied: Rakan: 20 → 17 HP/)).toBeInTheDocument());
+        expect(setRuntimeValue).toHaveBeenCalledWith('Rakan', 'currentHitPoints', 17, CN);
+        expect(auditEntries().at(-1).ruling).toMatchObject({ type: 'hp_change', amount: -3, overridden: true });
     });
 });

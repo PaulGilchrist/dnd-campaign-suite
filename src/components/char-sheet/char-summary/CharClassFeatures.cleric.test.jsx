@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -7,6 +7,8 @@ import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 
 // Cleric Features are reached through the CharClassFeatures registry entry
 // point (class name 'Cleric' → ClericFeatures, region testid 'char-class-cleric').
+// Row content for other classes and the registry dispatch itself are covered
+// by CharClassFeatures.*.test.jsx siblings; this file owns the Cleric rows.
 
 vi.mock('../../../services/character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(),
@@ -74,86 +76,59 @@ describe('ClericFeatures', () => {
     runtimeState.useRuntimeValue.mockReturnValue([]);
   });
 
-  describe('class features wiring', () => {
-    it('reads class features for the exact playerStats object it was given', () => {
-      const stats = clericStats(5);
-      renderCleric(stats);
-      expect(classFeatures.getClassFeatures).toHaveBeenCalledWith(stats);
-    });
+  it.each([
+    [2, '2/2'],
+    [0, '0/0'],
+    [undefined, '0/0'],
+  ])('renders Channel Divinity %s from the service and receives the exact playerStats (missing falls back to 0)', (max, expectedText) => {
+    mockClericFeatures({ maxChannelDivinity: max });
+    const stats = clericStats(2);
+    renderCleric(stats);
+    expect(classFeatures.getClassFeatures).toHaveBeenCalledWith(stats);
+    expect(screen.getByTestId('tracked-resource-channelDivinityCharges'))
+      .toHaveTextContent(`Channel Divinity Charges: ${expectedText}`);
   });
 
-  describe('channel divinity charges', () => {
-    it.each([
-      [2, 2],
-      [3, 3],
-      [0, 0],
-    ])('renders %i charges from maxChannelDivinity', (_charges, expected) => {
-      mockClericFeatures({ maxChannelDivinity: expected });
-      renderCleric(clericStats(2));
-      expect(screen.getByTestId('tracked-resource-channelDivinityCharges'))
-        .toHaveTextContent(`Channel Divinity Charges: ${expected}/${expected}`);
-    });
-
-    it('falls back to 0 charges when maxChannelDivinity is missing', () => {
-      mockClericFeatures({ maxChannelDivinity: undefined });
-      renderCleric(clericStats(1));
-      expect(screen.getByTestId('tracked-resource-channelDivinityCharges'))
-        .toHaveTextContent('Channel Divinity Charges: 0/0');
-    });
-  });
-
-  describe('destroy undead CR', () => {
-    it.each([5, 0, 0.5])('renders the Challenge Rating %p straight from the service', (cr) => {
-      mockClericFeatures({ destroyUndeadCR: cr });
-      const section = renderCleric(clericStats(1));
+  it.each([
+    [0, true],
+    [0.5, true],
+    [5, true],
+    [null, false],
+  ])('renders the Destroy Undead row for CR %p, and omits it entirely when the rating is null (row shown: %s)', (cr, shown) => {
+    mockClericFeatures({ destroyUndeadCR: cr });
+    const section = renderCleric(clericStats(1));
+    if (shown) {
       expect(section.textContent).toContain(`Destroy Undead Challenge Rating: ${cr}`);
-    });
-
-    it('omits the row when destroyUndeadCR is null', () => {
-      mockClericFeatures({ destroyUndeadCR: null });
-      const section = renderCleric(clericStats(1));
+    } else {
       expect(section.textContent).not.toContain('Destroy Undead');
-    });
+    }
   });
 
-  describe('preserve life pool', () => {
-    it.each([
-      ['major.name', { major: { name: 'Life Domain' } }, 1, 5],
-      ['major.name', { major: { name: 'Life Domain' } }, 5, 25],
-      ['subclass.name', { subclass: { name: 'Life Domain' } }, 10, 50],
-    ])('renders 5 × level max (level %i) when Life Domain is detected via %s', (_via, classData, level, expectedMax) => {
-      renderCleric(clericStats(level, { class: clericClass(classData) }));
-      expect(screen.getByTestId('tracked-resource-preserveLifePool'))
-        .toHaveTextContent(`Preserve Life Pool: ${expectedMax}/${expectedMax}`);
-    });
-
-    it.each([
-      ['no subclass has been chosen', {}],
-      ['a non-Life subclass is chosen', { subclass: { name: 'War Domain' } }],
-    ])('omits the pool when %s', (_label, classData) => {
-      const section = renderCleric(clericStats(5, { class: clericClass(classData) }));
-      expect(screen.queryByTestId('tracked-resource-preserveLifePool')).not.toBeInTheDocument();
+  it.each([
+    ['major', { major: { name: 'Life Domain' } }, 5, '25/25'],
+    ['subclass', { subclass: { name: 'Life Domain' } }, 1, '5/5'],
+    ['no subclass chosen', {}, 5, null],
+    ['a non-Life subclass', { subclass: { name: 'War Domain' } }, 5, null],
+  ])('renders the Preserve Life pool at 5 × level (via %s) only for Life Domain', (_via, classData, level, expectedText) => {
+    const section = renderCleric(clericStats(level, { class: clericClass(classData) }));
+    const pool = screen.queryByTestId('tracked-resource-preserveLifePool');
+    if (expectedText) {
+      expect(pool).toHaveTextContent(`Preserve Life Pool: ${expectedText}`);
+    } else {
+      expect(pool).not.toBeInTheDocument();
       expect(section.textContent).not.toContain('Preserve Life');
-    });
+    }
   });
 
-  describe('warding flare uses', () => {
-    it.each([
-      [3, 3],
-      [10, 10],
-      [0, 1],
-      [-2, 1],
-    ])('with Wisdom modifier %i shows max %i uses (never below 1)', (wisBonus, expectedMax) => {
-      const stats = clericStats(1, { abilities: [{ name: 'Wisdom', bonus: wisBonus }] });
-      renderCleric(stats);
-      expect(screen.getByTestId('tracked-resource-wardingflareUses'))
-        .toHaveTextContent(`Warding Flare Uses: ${expectedMax}/${expectedMax}`);
-    });
-
-    it('shows 1 use when the Wisdom ability is missing entirely', () => {
-      renderCleric(clericStats(1, { abilities: [] }));
-      expect(screen.getByTestId('tracked-resource-wardingflareUses'))
-        .toHaveTextContent('Warding Flare Uses: 1/1');
-    });
+  it.each([
+    [3, '3/3'],
+    [0, '1/1'],
+    [-2, '1/1'],
+    [undefined, '1/1'],
+  ])('caps Warding Flare uses at max(1, Wisdom modifier %s)', (wisBonus, expectedText) => {
+    const abilities = wisBonus === undefined ? [] : [{ name: 'Wisdom', bonus: wisBonus }];
+    renderCleric(clericStats(1, { abilities }));
+    expect(screen.getByTestId('tracked-resource-wardingflareUses'))
+      .toHaveTextContent(`Warding Flare Uses: ${expectedText}`);
   });
 });

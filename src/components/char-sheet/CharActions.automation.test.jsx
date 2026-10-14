@@ -1,8 +1,17 @@
+// @maintained-by-ai
+// Consolidated: "calls executeHandler when action has automation" + "does not call executeHandler
+// for plain actions" → 1 click-path test (asserts dispatch args and inert plain row).
+// Removed: "feature detail popup for actions with details but no automation" — duplicated,
+// stronger, in CharActions.automationHandler.test.jsx ("calls buildFeatureDetailHtml when
+// action has details"). cannotAct guard also lives there.
+// Strengthened: Metamagic display test now asserts the rendered ruleset description, not just
+// the render; setModalState-wrapper test now verifies the onSpellModalStateChange prop actually
+// receives modal-show events (it previously asserted only that the prop was defined).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 import CharActions from './CharActions.jsx';
 import { executeHandler } from '../../services/automation/index.js';
-import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js';
+import { getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
 
 // --- Mocks ---
 
@@ -243,10 +252,7 @@ const basePlayerStats = {
   attacks: [
     { name: 'Longsword', type: 'Action', hitBonus: 7, range: '5ft', damage: '1d8+4', damageType: 'Slashing' },
   ],
-  actions: [
-    { name: 'Reckless Attack', automation: { type: 'buff', effect: 'advantage_attacks' } },
-    { name: 'Second Wind', automation: { type: 'healing_roll', formula: '1d10' } },
-  ],
+  actions: [],
   specialActions: [],
   class: { name: 'Fighter', class_levels: [{ level: 5, focus_points: 2 }] },
   feats: [],
@@ -270,86 +276,84 @@ const baseProps = {
   spellModalState: {},
 };
 
+function statsWithActions(actions) {
+  return { ...basePlayerStats, actions };
+}
+
+async function clickAction(getByText, name) {
+  const actionLink = getByText(`${name}:`);
+  await act(async () => {
+    await fireEvent.click(actionLink);
+  });
+}
+
 // --- Tests ---
 
-describe('CharActions - handleAutomationAction', () => {
+describe('CharActions - feature action rows', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     _syncedStore.clear();
     setupFetchMock();
   });
 
-  it('calls executeHandler when action has automation and cannotAct is false', async () => {
-    const { getByText } = render(<CharActions {...baseProps} />);
+  it('clicking an automation action dispatches executeHandler with it, while a plain action stays inert', async () => {
+    const stats = statsWithActions([
+      { name: 'Reckless Attack', automation: { type: 'buff', effect: 'advantage_attacks' } },
+      { name: 'Plain Action', description: 'No automation here' },
+    ]);
+    const { getByText } = render(<CharActions {...baseProps} playerStats={stats} />);
     await waitFor(() => {
       expect(getByText('Reckless Attack:')).toBeInTheDocument();
-    });
-    const actionLink = getByText('Reckless Attack:');
-    await act(async () => {
-      await fireEvent.click(actionLink);
-    });
-    expect(executeHandler).toHaveBeenCalled();
-  });
-
-  it('does not call executeHandler when action has no automation metadata', async () => {
-    const stats = {
-      ...basePlayerStats,
-      actions: [{ name: 'Plain Action', description: 'No automation here' }],
-    };
-    const { getByText } = render(<CharActions {...baseProps} playerStats={stats} />);
-    await waitFor(() => {
       expect(getByText('Plain Action:')).toBeInTheDocument();
     });
-    const actionLink = getByText('Plain Action:');
-    await act(async () => {
-      await fireEvent.click(actionLink);
-    });
-    expect(executeHandler).not.toHaveBeenCalled();
+
+    await clickAction(getByText, 'Reckless Attack');
+
+    expect(executeHandler).toHaveBeenCalledTimes(1);
+    expect(executeHandler).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Reckless Attack', automation: expect.objectContaining({ type: 'buff' }) }),
+      stats,
+      'test-campaign',
+      null,
+      [],
+    );
+
+    // Row without automation must never reach the automation engine.
+    await clickAction(getByText, 'Plain Action');
+    expect(executeHandler).toHaveBeenCalledTimes(1);
   });
 
-  it('displays empowered spell name for Metamagic with spell_modifier type', async () => {
-    const getEmpoweredSpellDescription = (await import('../../services/rules/spells/empoweredSpellService.js')).getEmpoweredSpellDescription;
-    const stats = {
-      ...basePlayerStats,
-      actions: [{ name: 'Metamagic', automation: { type: 'spell_modifier' }, description: 'Modify spell' }],
-    };
-    const { getByText } = render(<CharActions {...baseProps} playerStats={stats} />);
+  it('renders a spell_modifier Metamagic row as Empowered Spell with its ruleset description', async () => {
+    getEmpoweredSpellDescription.mockReturnValue('Reroll damage dice.');
+    const stats = statsWithActions([
+      { name: 'Metamagic', automation: { type: 'spell_modifier' }, description: 'Modify spell' },
+    ]);
+    const { getByText, queryByText } = render(<CharActions {...baseProps} playerStats={stats} />);
     await waitFor(() => {
       expect(getByText('Empowered Spell:')).toBeInTheDocument();
     });
-    expect(getEmpoweredSpellDescription).toHaveBeenCalledWith(stats.actions[0], stats.rules);
+
+    // The row is renamed AND its description comes from the ruleset-aware service,
+    // routed with the character's ruleset ('5e').
+    expect(getByText('Reroll damage dice.')).toBeInTheDocument();
+    expect(queryByText(/Modify spell/)).not.toBeInTheDocument();
+    expect(getEmpoweredSpellDescription).toHaveBeenCalledWith(stats.actions[0], '5e');
   });
 
-  it('renders feature detail popup when action has details but no automation', async () => {
-    const stats = {
-      ...basePlayerStats,
-      actions: [{ name: 'Tactical Genius', details: 'Tactical details', description: 'A smart move' }],
-    };
-    const { getByText } = render(<CharActions {...baseProps} playerStats={stats} />);
-    await waitFor(() => {
-      expect(getByText('Tactical Genius:')).toBeInTheDocument();
-    });
-    const actionLink = getByText('Tactical Genius:');
-    await act(async () => {
-      await fireEvent.click(actionLink);
-    });
-    expect(buildFeatureDetailHtml).toHaveBeenCalledWith(stats.actions[0]);
-  });
-});
-
-describe('CharActions - setModalState wrapper', () => {
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    _syncedStore.clear();
-    setupFetchMock();
-  });
-
-  it('calls onSpellModalStateChange when modal state changes', async () => {
+  it('syncs modal-show events to the parent via onSpellModalStateChange', async () => {
     const onSpellModalStateChange = vi.fn();
-    const { getByText } = render(<CharActions {...baseProps} onSpellModalStateChange={onSpellModalStateChange} />);
-    await waitFor(() => {
-      expect(getByText('Actions')).toBeInTheDocument();
+    render(<CharActions {...baseProps} onSpellModalStateChange={onSpellModalStateChange} />);
+    await act(async () => { await Promise.resolve(); }); // flush mount effects (listener registration)
+
+    const detail = { attackName: 'War Cry', rallyAmount: 5 };
+    act(() => {
+      window.dispatchEvent(new CustomEvent('rally-choice-modal-show', { detail }));
     });
-    expect(onSpellModalStateChange).toBeDefined();
+
+    await waitFor(() => {
+      expect(onSpellModalStateChange).toHaveBeenCalledWith(
+        expect.objectContaining({ rallyChoiceModal: detail })
+      );
+    });
   });
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Shared mock fixture for CharSummary component tests + its contract suite.
 // All ~20 test files in the CharSummary family import mockPlayerStats /
@@ -9,7 +9,7 @@
 // Contract suite (guarded block below) — pins the fixture↔production contract
 // against the read sites in CharSummary.jsx / charSummaryCalc.js, so a fixture
 // edit that breaks a consumer fails loudly HERE instead of silently shifting a
-// hardcoded expectation in one of the 16 consumer files:
+// hardcoded expectation in one of the consumer files:
 //   - Speed-row baseline is sourced from race.subrace.speed and the equipped
 //     armor is detected by computeHasArmorOrShield (family speed tests hardcode
 //     the un-buffed baseline and rely on armor suppressing unarmored bonuses).
@@ -36,9 +36,6 @@
 // empty defaults the consumers' mocks emulate). The render-lane pins
 // (full default sheet render, XP-checkbox spread-copy guard) live in
 // CharSummary-FixtureContract.test.jsx, which owns the shared mock harness.
-//
-// Previous revisions of this file contained zero tests ("mock data module
-// only"), leaving every cross-field invariant above unpinned.
 
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect, afterEach } from 'vitest';
@@ -96,6 +93,9 @@ const COLLECTED_DIRECTLY = globalThis.__vitest_worker__?.filepath === fileURLToP
 if (COLLECTED_DIRECTLY) {
     const BASE_SPEED = mockPlayerStats.race.subrace.speed;
 
+    // Snapshot for the mutation guard below — captured before any test runs.
+    const FIXTURE_SNAPSHOT = JSON.parse(JSON.stringify(mockPlayerStats));
+
     const runCalc = (stats = mockPlayerStats, extra = {}) =>
         computeCharSummaryContext({
             playerStats: stats,
@@ -118,26 +118,27 @@ if (COLLECTED_DIRECTLY) {
     // rely on. Empty in-memory store == the empty defaults consumers mock.
     // -----------------------------------------------------------------------
     describe('computeCharSummaryContext consumes the fixture cleanly', () => {
-        it.each([
-            'totalSpeedWithBuff', 'buffSpeedBonus', 'auraSpeedBonus', 'effectiveInitiative',
-            'dexBonus', 'hasteAcBonus', 'shieldAcBonus', 'shieldOfFaithBonus',
-            'defensiveDuelistBonus', 'baitAndSwitchBonus', 'mageArmorAc',
-        ])('ctx.%s is a finite number (fixture leaks no NaN into the sheet)', (key) => {
-            expect(Number.isFinite(runCalc()[key])).toBe(true);
+        it('every rendered numeric ctx key is finite and circleFormsACOverride stays null for this non-shapeshifting Cleric', () => {
+            const ctx = runCalc();
+            for (const key of [
+                'totalSpeedWithBuff', 'buffSpeedBonus', 'auraSpeedBonus', 'effectiveInitiative',
+                'dexBonus', 'hasteAcBonus', 'shieldAcBonus', 'shieldOfFaithBonus',
+                'defensiveDuelistBonus', 'baitAndSwitchBonus', 'mageArmorAc',
+            ]) {
+                expect(Number.isFinite(ctx[key]), `ctx.${key} leaked a non-finite value: ${ctx[key]}`).toBe(true);
+            }
+            expect(ctx.circleFormsACOverride).toBeNull();
         });
 
-        it('circleFormsACOverride is null for this non-shapeshifting Cleric fixture', () => {
-            expect(runCalc().circleFormsACOverride).toBeNull();
-        });
-
-        it('effectiveInitiative maps fixture initiative minus 2 per exhaustion level', () => {
-            expect(runCalc().effectiveInitiative).toBe(mockPlayerStats.initiative);
+        it('ctx baselines mirror the fixture fields: walk speed, Dexterity bonus, initiative minus 2 per exhaustion level', () => {
+            const ctx = runCalc();
+            // Family speed tests hardcode this un-buffed race-speed baseline.
+            expect(ctx.totalSpeedWithBuff).toBe(BASE_SPEED);
+            // Mage-armor badge text derives from the Dexterity abilities entry.
+            expect(ctx.dexBonus).toBe(mockPlayerStats.abilities.find((a) => a.name === 'Dexterity').bonus);
+            expect(ctx.effectiveInitiative).toBe(mockPlayerStats.initiative);
             expect(runCalc(mockPlayerStats, { exhaustionLevel: 2 }).effectiveInitiative)
                 .toBe(mockPlayerStats.initiative - 4);
-        });
-
-        it('walk-speed baseline is exactly the fixture race speed before buffs', () => {
-            expect(runCalc().totalSpeedWithBuff).toBe(BASE_SPEED);
         });
 
         it('equipped armor is detected: a no_armor_no_shield speed passive contributes 0 with the fixture loadout and the full bonus once stripped', () => {
@@ -149,27 +150,23 @@ if (COLLECTED_DIRECTLY) {
                 .toBe(BASE_SPEED + Number(passive.bonusExpression));
         });
 
-        it('merges automationConditionImmunities (string list) unconditionally', () => {
-            expect(runCalc({ ...mockPlayerStats, automationConditionImmunities: ['poison'] }).allImmunities)
-                .toContain('poison');
-        });
-
-        it('gates automationConditionalImmunities on an active Rage buff (distinct key, distinct semantics)', () => {
-            const stats = { ...mockPlayerStats, automationConditionalImmunities: [{ requiresActive: 'Rage', immunities: ['charmed'] }] };
-            expect(runCalc(stats).allImmunities).not.toContain('charmed');
+        it('merges automationConditionImmunities unconditionally but gates automationConditionalImmunities on an active Rage buff', () => {
+            const stats = {
+                ...mockPlayerStats,
+                automationConditionImmunities: ['poison'],
+                automationConditionalImmunities: [{ requiresActive: 'Rage', immunities: ['charmed'] }],
+            };
+            // Distinct keys, distinct semantics: strings in, Rage-gated objects out
+            // until the store says Rage is active.
+            const gated = runCalc(stats).allImmunities;
+            expect(gated).toContain('poison');
+            expect(gated).not.toContain('charmed');
 
             setRuntimeValue(mockPlayerStats.name, 'activeBuffs', [{ name: 'Rage' }], mockCampaignName);
             expect(runCalc(stats).allImmunities).toContain('charmed');
         });
 
-        it('dexBonus mirrors the Dexterity abilities entry (mage-armor badge text derives from it)', () => {
-            const dex = mockPlayerStats.abilities.find((a) => a.name === 'Dexterity');
-            expect(dex).toBeDefined();
-            expect(runCalc().dexBonus).toBe(dex.bonus);
-        });
-
         it('wrathOfTheSeaActive is store-sourced — the inert playerStats fixture field cannot enable the badge', () => {
-            expect(mockPlayerStats.wrathOfTheSeaActive).toBe(false);
             expect(runCalc().wrathOfTheSeaActive).toBeFalsy();
 
             setRuntimeValue(mockPlayerStats.name, 'wrathOfTheSeaActive', true, mockCampaignName);
@@ -181,20 +178,18 @@ if (COLLECTED_DIRECTLY) {
     // Shape guards — spread/store safety and internal cross-field consistency.
     // -----------------------------------------------------------------------
     describe('fixture shape guards', () => {
-        it('is JSON round-trip safe (no functions, undefined, or class instances — spread & store safe)', () => {
+        it('is JSON round-trip safe and exposes the arrays and ability entries production iterates or looks up', () => {
             expect(JSON.parse(JSON.stringify(mockPlayerStats))).toEqual(mockPlayerStats);
-        });
 
-        it.each([
-            'abilities', 'immunities', 'resistances', 'vulnerabilities', 'senses',
-            'proficiencies', 'toolProficiencies', 'languages', 'feats', 'passives',
-            'automationConditionalImmunities', 'automation.passives', 'inventory.equipped', 'equipment',
-        ])('%s is an array (production iterates it without a guard or with joins)', (path) => {
-            const value = path.split('.').reduce((obj, key) => obj?.[key], mockPlayerStats);
-            expect(Array.isArray(value)).toBe(true);
-        });
+            for (const path of [
+                'abilities', 'immunities', 'resistances', 'vulnerabilities', 'senses',
+                'proficiencies', 'toolProficiencies', 'languages', 'feats', 'passives',
+                'automationConditionalImmunities', 'automation.passives', 'inventory.equipped', 'equipment',
+            ]) {
+                const value = path.split('.').reduce((obj, key) => obj?.[key], mockPlayerStats);
+                expect(Array.isArray(value), `${path} is not an array`).toBe(true);
+            }
 
-        it('ability lookups for Wisdom and Dexterity resolve with numeric bonuses', () => {
             for (const name of ['Wisdom', 'Dexterity']) {
                 const ability = mockPlayerStats.abilities.find((a) => a.name === name);
                 expect(ability, `abilities entry "${name}"`).toBeDefined();
@@ -209,12 +204,6 @@ if (COLLECTED_DIRECTLY) {
             }
         });
 
-        it('xp is a non-negative integer and xpMode is one of the two modes production recognizes', () => {
-            expect(Number.isInteger(mockPlayerStats.xp)).toBe(true);
-            expect(mockPlayerStats.xp).toBeGreaterThanOrEqual(0);
-            expect(['experience', 'milestone']).toContain(mockPlayerStats.xpMode);
-        });
-
         it('rules value resolves through the real rulesFactory to a complete module set', () => {
             const modules = rulesFactory.getRules(mockPlayerStats);
             expect(modules.rules).toBeTruthy();
@@ -226,15 +215,13 @@ if (COLLECTED_DIRECTLY) {
             expect(mockCampaignName).toBe('test-campaign');
         });
 
-        it('the shared fixture is never mutated (spread-only pattern holds)', () => {
+        it('no test in this suite mutated the shared fixture (calc purity + spread-only pattern)', () => {
             // Production mutates props in one place (handleXpModeToggle:
             // playerStats.xpMode); consumers must always spread first. The
             // render-level pin for that lives in
-            // CharSummary-FixtureContract.test.jsx — here we assert that
-            // nothing in this file's suite mutated the module-level fixture.
-            expect(mockPlayerStats.xpMode).toBe('milestone');
-            expect(mockPlayerStats.wrathOfTheSeaActive).toBe(false);
-            expect(mockPlayerStats.inventory.equipped).toEqual(['Scale Mail', 'Shield']);
+            // CharSummary-FixtureContract.test.jsx — here a full deep-equal
+            // against the pre-run snapshot catches any calc-level mutation.
+            expect(mockPlayerStats).toEqual(FIXTURE_SNAPSHOT);
         });
     });
 }

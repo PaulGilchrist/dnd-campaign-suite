@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 // CLA-279: single-target save spells consume the Radiant Soul once-per-turn flag
 // at save-damage application time when the formula carries the execution-owned adder.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -77,50 +78,65 @@ import { applyDamageToTarget, rollSaveForCreature } from '../../../services/rule
 import { createNpcSaveDamageHandler } from './handleNpcSaveDamage.js';
 
 describe('handleNpcSaveDamage — CLA-279 Radiant Soul consumption', () => {
-    const deps = {
-        characterName: 'HexWarlock',
-        campaignName: 'test-campaign',
-        characters: [
-            { name: 'HexWarlock' },
-            { name: 'Goblin', computedStats: { saveBonuses: { dex: -1 }, evasionEffects: [] } },
-        ],
-        setPopupHtml: vi.fn(),
-        logEntry: vi.fn(),
-    };
-
     const combatSummary = {
         creatures: [{ name: 'Goblin', type: 'npc', currentHp: 13, maxHp: 13 }],
     };
 
+    const makeDeps = (characterName = 'HexWarlock') => ({
+        characterName,
+        campaignName: 'test-campaign',
+        characters: [
+            { name: characterName },
+            { name: 'Goblin', computedStats: { saveBonuses: { dex: -1 }, evasionEffects: [] } },
+        ],
+        setPopupHtml: vi.fn(),
+        logEntry: vi.fn(),
+    });
+
+    const saveEvent = (formula, context = {}) => ({
+        name: 'Hellish Rebuke',
+        formula,
+        total: 13,
+        rolls: [6, 4, 3],
+        modifier: 3,
+        context: { targetName: 'Goblin', saveDc: 16, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', attackerName: 'HexWarlock', ...context },
+        adjustedTotal: 13,
+        combatSummary,
+    });
+
+    // Radiant Soul flag writes only (lastAttack / targetEffects stamps excluded).
+    const radiantWrites = () => setRuntimeValue.mock.calls.filter(([, key]) => String(key).startsWith('_radiantSoul_'));
+
     beforeEach(() => {
         vi.clearAllMocks();
         rollExpression.mockReturnValue({ total: 13, rolls: [6, 4, 3], modifier: 3 });
-        getRuntimeValue.mockReset().mockReturnValue(null);
-        setRuntimeValue.mockClear();
+        getRuntimeValue.mockReturnValue(null);
         rollSaveForCreature.mockReturnValue({ roll: 3, total: 2, bonus: -1, success: false, rawRolls: [3] });
         applyDamageToTarget.mockResolvedValue({ finalDamage: 13, newHp: 0, damageReduced: false });
     });
 
     it('writes the once-per-turn flag when the save-damage formula carries [Radiant Soul]', async () => {
-        const fn = createNpcSaveDamageHandler(deps);
-        await fn({ name: 'Hellish Rebuke', formula: '2d6 + 3 [Radiant Soul]', total: 13, rolls: [6, 4, 3], modifier: 3, context: { targetName: 'Goblin', saveDc: 16, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', attackerName: 'HexWarlock' }, adjustedTotal: 13, combatSummary: combatSummary });
+        await createNpcSaveDamageHandler(makeDeps())(saveEvent('2d6 + 3 [Radiant Soul]'));
 
-        expect(setRuntimeValue).toHaveBeenCalledWith('HexWarlock', '_radiantSoul_HexWarlock_oncePerTurn', true, 'test-campaign');
+        expect(radiantWrites()).toEqual([['HexWarlock', '_radiantSoul_HexWarlock_oncePerTurn', true, 'test-campaign']]);
+    });
+
+    it('sanitizes spaces in the character name when building the flag key', async () => {
+        await createNpcSaveDamageHandler(makeDeps('Hex Warlock'))(saveEvent('2d6 + 3 [Radiant Soul]', { attackerName: 'Hex Warlock' }));
+
+        expect(radiantWrites()).toEqual([['Hex Warlock', '_radiantSoul_Hex_Warlock_oncePerTurn', true, 'test-campaign']]);
     });
 
     it('does NOT write the flag when formula has no [Radiant Soul] marker', async () => {
-        const fn = createNpcSaveDamageHandler(deps);
-        rollExpression.mockReturnValue({ total: 10, rolls: [6, 4], modifier: 0 });
-        await fn({ name: 'Hellish Rebuke', formula: '2d6', total: 10, rolls: [6, 4], modifier: 0, context: { targetName: 'Goblin', saveDc: 16, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', attackerName: 'HexWarlock' }, adjustedTotal: 10, combatSummary: combatSummary });
+        await createNpcSaveDamageHandler(makeDeps())(saveEvent('2d6'));
 
-        expect(setRuntimeValue).not.toHaveBeenCalledWith('HexWarlock', '_radiantSoul_HexWarlock_oncePerTurn', true, 'test-campaign');
+        expect(radiantWrites()).toEqual([]);
     });
 
     it('does NOT consume when no damage is applied', async () => {
         applyDamageToTarget.mockResolvedValue({ finalDamage: 0, newHp: 13, damageReduced: false });
-        const fn = createNpcSaveDamageHandler(deps);
-        await fn({ name: 'Hellish Rebuke', formula: '2d6 + 3 [Radiant Soul]', total: 13, rolls: [6, 4, 3], modifier: 3, context: { targetName: 'Goblin', saveDc: 16, saveType: 'DEX', dcSuccess: 'none', damageType: 'Fire', attackerName: 'HexWarlock' }, adjustedTotal: 13, combatSummary: combatSummary });
+        await createNpcSaveDamageHandler(makeDeps())(saveEvent('2d6 + 3 [Radiant Soul]', { dcSuccess: 'none' }));
 
-        expect(setRuntimeValue).not.toHaveBeenCalledWith('HexWarlock', '_radiantSoul_HexWarlock_oncePerTurn', true, 'test-campaign');
+        expect(radiantWrites()).toEqual([]);
     });
 });

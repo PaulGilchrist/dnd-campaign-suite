@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 // §9.4 — world keeper console (component lane only): the request carries the
 // referee's kind/focus, the card's exit is chosen by proposal kind, nothing
 // writes until the referee acts, and every failure stays honest.
@@ -26,41 +26,35 @@ const needsHuman = { kind: 'needs_human', text: 'AI world keeper unavailable —
 const generateBtn = () => screen.getByRole('button', { name: /Generate|Writing…/ });
 const focusBox = () => screen.getByPlaceholderText(/optional focus/);
 
-/** Pick a kind (and optionally a focus), then hit Generate. */
-function askFor({ kind, focus } = {}) {
-    if (kind) fireEvent.change(screen.getByRole('combobox'), { target: { value: kind } });
-    if (focus !== undefined) fireEvent.change(focusBox(), { target: { value: focus } });
-    fireEvent.click(generateBtn());
-}
-
 beforeEach(() => {
     vi.clearAllMocks(); // clears stale mockResolvedValue from prior tests
     applyWorldProposal.mockResolvedValue({ applied: true, detail: 'logged.' });
 });
 
 describe('AiWorldConsole — the request carries the referee’s intent', () => {
-    it('defaults: recap with no focus sends kind=recap, focus=null', async () => {
+    it('sends focus=null when no usable focus is given — empty or whitespace-only', async () => {
         askWorldKeeper.mockResolvedValue({ ok: true, proposal: recap });
         render(<AiWorldConsole campaignName={CN} />);
-        fireEvent.click(generateBtn());
-        await waitFor(() => expect(askWorldKeeper).toHaveBeenCalledWith({ campaignName: CN, kind: 'recap', focus: null }));
+        fireEvent.click(generateBtn()); // untouched input
+        await waitFor(() => expect(askWorldKeeper).toHaveBeenCalledTimes(1));
+        expect(askWorldKeeper).toHaveBeenCalledWith({ campaignName: CN, kind: 'recap', focus: null });
+
+        fireEvent.change(focusBox(), { target: { value: '   ' } });
+        fireEvent.click(generateBtn()); // trimmed to nothing — never blank noise
+        await waitFor(() => expect(askWorldKeeper).toHaveBeenCalledTimes(2));
+        expect(askWorldKeeper).toHaveBeenNthCalledWith(2, { campaignName: CN, kind: 'recap', focus: null });
     });
 
     it('selected kind and typed focus are forwarded verbatim', async () => {
         askWorldKeeper.mockResolvedValue({ ok: true, proposal: { kind: 'rumor', text: 'Coin glints below.' } });
         render(<AiWorldConsole campaignName={CN} />);
-        askFor({ kind: 'rumor', focus: 'the faction tension in Bravor' });
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: 'rumor' } });
+        fireEvent.change(focusBox(), { target: { value: 'the faction tension in Bravor' } });
+        fireEvent.click(generateBtn());
         await waitFor(() => expect(askWorldKeeper).toHaveBeenCalledWith({
             campaignName: CN, kind: 'rumor', focus: 'the faction tension in Bravor',
         }));
         await waitFor(() => expect(screen.getByText('Coin glints below.')).toBeInTheDocument());
-    });
-
-    it('whitespace-only focus still sends null, not blank noise', async () => {
-        askWorldKeeper.mockResolvedValue({ ok: true, proposal: recap });
-        render(<AiWorldConsole campaignName={CN} />);
-        askFor({ focus: '   ' });
-        await waitFor(() => expect(askWorldKeeper).toHaveBeenCalledWith({ campaignName: CN, kind: 'recap', focus: null }));
     });
 
     it('while writing, Generate is disabled — repeat clicks never queue a second ask', async () => {
@@ -110,25 +104,18 @@ describe('AiWorldConsole — the card waits; kind chooses the exit', () => {
         await waitFor(() => expect(applyWorldProposal).toHaveBeenCalledWith({ campaignName: CN, proposal: questDraft }));
     });
 
-    it('npc_dialogue card prefixes the speaker and omits confidence when unknown', async () => {
+    it('npc_dialogue prefixes the speaker, omits confidence when unknown; dismiss discards without applying', async () => {
         askWorldKeeper.mockResolvedValue({ ok: true, proposal: { kind: 'npc_dialogue', npcName: 'Mira', text: 'Trouble follows you.' } });
         render(<AiWorldConsole campaignName={CN} />);
         fireEvent.click(generateBtn());
 
         await waitFor(() => expect(screen.getByText('Mira: Trouble follows you.')).toBeInTheDocument());
         expect(screen.queryByText(/confidence/)).toBeNull();
-    });
-
-    it('dismiss discards the card without applying or announcing an outcome', async () => {
-        askWorldKeeper.mockResolvedValue({ ok: true, proposal: { kind: 'rumor', text: 'Coin glints below.' } });
-        render(<AiWorldConsole campaignName={CN} />);
-        fireEvent.click(generateBtn());
-        await waitFor(() => expect(screen.getByText('Coin glints below.')).toBeInTheDocument());
 
         fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
-        await waitFor(() => expect(screen.queryByText('Coin glints below.')).toBeNull());
-        expect(applyWorldProposal).not.toHaveBeenCalled();
-        expect(screen.queryByRole('status')).toBeNull();
+        await waitFor(() => expect(screen.queryByText('Mira: Trouble follows you.')).toBeNull());
+        expect(applyWorldProposal).not.toHaveBeenCalled(); // an applyable card dismissed stays unapplied
+        expect(screen.queryByRole('status')).toBeNull(); // dismissing is not an outcome
     });
 
     it('needs_human is surfaced for the GM with no apply route — only dismissal', async () => {
@@ -154,7 +141,7 @@ describe('AiWorldConsole — failures stay honest', () => {
 
         await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Not applied: AI backend exploded'));
         expect(screen.queryByRole('button', { name: 'Log it' })).toBeNull();
-        expect(screen.queryByText('Dismiss')).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull(); // no card offered
         expect(applyWorldProposal).not.toHaveBeenCalled();
         expect(generateBtn()).toBeEnabled(); // referee may retry
     });
@@ -166,7 +153,8 @@ describe('AiWorldConsole — failures stay honest', () => {
 
         await waitFor(() => expect(screen.getByRole('status').textContent).toContain('AI request failed'));
         expect(generateBtn()).toBeEnabled(); // never stranded mid-spin
-        expect(screen.queryByText('Dismiss')).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull();
+        expect(applyWorldProposal).not.toHaveBeenCalled();
     });
 
     it('a refused apply says Not applied and clears the card', async () => {

@@ -1,3 +1,9 @@
+// @maintained-by-ai: 2026-10-14
+// NPCs container contracts: list load/empty/loading, search, create/generate/
+// edit/delete flows, saveNPC rename args, and the add-to-initiative seam
+// (args, blocked-stats error, needs-weapon editor). SSE sync, duplicate-name
+// guard, form shell, row rendering, and stat-block forms live in the
+// sibling test files.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import NPCs from './NPCs';
@@ -9,20 +15,19 @@ vi.mock('../../hooks/useEntityManagement.js', () => ({
 }));
 
 vi.mock('./NPCListItem.jsx', () => ({
-  default: vi.fn(({ npc, onEdit, onAddToInitiative }) => (
+  default: ({ npc, onEdit, onAddToInitiative }) => (
     <li data-testid={`npc-list-item-${npc.name}`}>
       <span>{npc.name}</span>
       <button data-testid={`edit-btn-${npc.name}`} onClick={() => onEdit(npc)}>Edit</button>
       <button data-testid={`init-btn-${npc.name}`} onClick={() => onAddToInitiative(npc)}>Add to Initiative</button>
     </li>
-  )),
+  ),
 }));
 
 vi.mock('./NPCFormModal.jsx', () => ({
-  default: ({ formData, setFormData, onClose, onSave, onDelete, onSaveAndAddToInitiative, disabled, editingNPC, saving }) => (
+  default: ({ formData, setFormData, onClose, onSave, onDelete, onSaveAndAddToInitiative, disabled, editingNPC }) => (
     <div data-testid="npc-form-modal">
       <div data-testid="modal-editing-npc">{editingNPC?.name || 'none'}</div>
-      <div data-testid="modal-saving">{String(!!saving)}</div>
       <input
         data-testid="npc-name-input"
         value={formData?.name || ''}
@@ -32,11 +37,7 @@ vi.mock('./NPCFormModal.jsx', () => ({
       <button onClick={onSave} disabled={disabled}>Save</button>
       {editingNPC && <button onClick={onDelete}>Delete</button>}
       {onSaveAndAddToInitiative && (
-        <button
-          data-testid="save-add-init-btn"
-          onClick={onSaveAndAddToInitiative}
-          disabled={disabled}
-        >
+        <button data-testid="save-add-init-btn" onClick={onSaveAndAddToInitiative} disabled={disabled}>
           Save &amp; Add to Initiative
         </button>
       )}
@@ -46,7 +47,6 @@ vi.mock('./NPCFormModal.jsx', () => ({
 
 const mockGetDefaultFormData = vi.fn();
 const mockCleanNPCData = vi.fn();
-
 vi.mock('../../services/npcs/npcFormUtils.js', () => ({
   getDefaultFormData: (...args) => mockGetDefaultFormData(...args),
   cleanNPCData: (...args) => mockCleanNPCData(...args),
@@ -63,6 +63,8 @@ vi.mock('../../services/npcs/npcGenerator.js', () => ({
 }));
 
 const mockSaveNPC = vi.fn();
+// loadNPCs/saveNPCs/deleteNPC only need to exist so NPCs.jsx's imports
+// resolve — the list hook and delete action they feed are fully mocked.
 vi.mock('../../services/npcs/npcsService.js', () => ({
   loadNPCs: vi.fn(),
   saveNPC: (...args) => mockSaveNPC(...args),
@@ -81,38 +83,41 @@ const defaultNPCs = [
   { name: 'Wizard', race: 'Humanoid', classRole: 'Caster', tags: 'boss' },
 ];
 
-function createManagementReturn(items = defaultNPCs, overrides = {}) {
-  return {
-    items,
-    loading: false,
-    loadItems: vi.fn(),
-    saveItems: vi.fn(),
-    deleteItem: vi.fn(),
-    ...overrides,
-  };
-}
+// The container only consumes formData.name (disabled-guard, and passthrough
+// into cleanNPCData); the real getDefaultFormData merges overrides over an
+// empty draft, which the mock mirrors.
+const emptyForm = { name: '' };
 
 function renderNPCs(npcs = defaultNPCs, managementOverrides = {}, propsOverride = {}) {
-  mockUseNPCsManagement.mockReturnValue(createManagementReturn(npcs, managementOverrides));
-  return {
-    ...render(<NPCs {...defaultProps} {...propsOverride} />),
+  const management = {
+    items: npcs,
+    loading: false,
+    loadItems: vi.fn(),
+    deleteItem: vi.fn(),
+    ...managementOverrides,
   };
+  mockUseNPCsManagement.mockReturnValue(management);
+  return { ...render(<NPCs {...defaultProps} {...propsOverride} />), management };
+}
+
+function clickNewNPC() {
+  fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
+}
+
+async function clickSave() {
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(mockSaveNPC).toHaveBeenCalledTimes(1));
+}
+
+function clickDeleteOn(name = 'Goblin') {
+  fireEvent.click(screen.getByTestId(`edit-btn-${name}`));
+  fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 }
 
 describe('NPCs', () => {
-  const defaultFormData = {
-    name: '', race: '', classRole: '', appearance: '', personality: '',
-    goals: '', secrets: '', notes: '', tags: '', attitude: 'neutral',
-    image: '', imageName: '', imagePath: '', armorClass: 10, hitPoints: '',
-    hitDice: '', initiativeBonus: '', speed: { walk: '30 ft.' },
-    abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-    savingThrowBonuses: {}, skillBonuses: {}, damageResistances: [],
-    damageImmunities: [], conditionImmunities: [], actions: [], traits: '', reactions: '',
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetDefaultFormData.mockReturnValue({ ...defaultFormData });
+    mockGetDefaultFormData.mockImplementation((overrides = {}) => ({ ...emptyForm, ...overrides }));
     mockCleanNPCData.mockImplementation((data) => ({ ...data, cleaned: true }));
     mockAddNPCToInitiative.mockResolvedValue(undefined);
     mockGenerateNPC.mockResolvedValue({ name: 'Generated NPC', race: 'Humanoid' });
@@ -126,49 +131,30 @@ describe('NPCs', () => {
   // ── Initial Render ────────────────────────────────────────────────
 
   describe('Initial render', () => {
-    it('renders the back button and calls onBack when clicked', () => {
+    it('renders Back, New NPC, Generate NPC, and the search input; Back fires onBack', () => {
       renderNPCs();
+      expect(screen.getByRole('button', { name: /New NPC/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Generate NPC/i })).toBeInTheDocument();
+      expect(screen.getByLabelText('Search NPCs')).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: /Back/i }));
       expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
     });
 
-    it('renders the New NPC and Generate NPC buttons', () => {
-      renderNPCs();
-      expect(screen.getByRole('button', { name: /New NPC/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Generate NPC/i })).toBeInTheDocument();
-    });
+    it('loads NPCs on mount and again when campaignName changes', () => {
+      const { management, rerender } = renderNPCs(defaultNPCs, {}, { campaignName: 'first-campaign' });
+      expect(management.loadItems).toHaveBeenCalledTimes(1);
 
-    it('renders the search input', () => {
-      renderNPCs();
-      expect(screen.getByLabelText('Search NPCs')).toBeInTheDocument();
-    });
-
-    it('loads NPCs on mount when a campaignName is provided', () => {
-      const management = createManagementReturn(defaultNPCs);
-      mockUseNPCsManagement.mockReturnValue(management);
-      render(<NPCs {...defaultProps} />);
+      management.loadItems.mockClear();
+      rerender(<NPCs {...defaultProps} campaignName="second-campaign" />);
       expect(management.loadItems).toHaveBeenCalledTimes(1);
     });
 
     it('does not load NPCs when no campaignName is provided', () => {
-      const management = createManagementReturn(defaultNPCs);
-      mockUseNPCsManagement.mockReturnValue(management);
-      render(<NPCs {...defaultProps} campaignName="" />);
+      const { management } = renderNPCs(defaultNPCs, {}, { campaignName: '' });
       expect(management.loadItems).not.toHaveBeenCalled();
     });
 
-    it('reloads NPCs when campaignName changes', () => {
-      const management = createManagementReturn(defaultNPCs);
-      mockUseNPCsManagement.mockReturnValue(management);
-      render(<NPCs {...defaultProps} campaignName="first-campaign" />);
-      expect(management.loadItems).toHaveBeenCalledTimes(1);
-
-      management.loadItems.mockClear();
-      render(<NPCs {...defaultProps} campaignName="second-campaign" />);
-      expect(management.loadItems).toHaveBeenCalledTimes(1);
-    });
-
-    it('renders a list item for each loaded NPC', () => {
+    it('renders one row per loaded NPC', () => {
       renderNPCs();
       expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
       expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
@@ -180,8 +166,7 @@ describe('NPCs', () => {
     });
 
     it('renders the loading state while loading is true', () => {
-      mockUseNPCsManagement.mockReturnValue(createManagementReturn(defaultNPCs, { loading: true }));
-      render(<NPCs {...defaultProps} />);
+      renderNPCs(defaultNPCs, { loading: true });
       expect(screen.getByText(/Loading NPCs/i)).toBeInTheDocument();
     });
   });
@@ -207,18 +192,17 @@ describe('NPCs', () => {
     });
   });
 
-  // ── New NPC Flow ──────────────────────────────────────────────────
+  // ── New / Generate NPC Flow ───────────────────────────────────────
 
   describe('New NPC flow', () => {
-    it('opens the modal with empty editing state and default form data', () => {
+    it('opens the modal with default form data and no NPC being edited', () => {
       renderNPCs();
-      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
-      expect(mockGetDefaultFormData).toHaveBeenCalled();
-      expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      clickNewNPC();
+      expect(mockGetDefaultFormData).toHaveBeenCalledWith();
+      expect(screen.getByTestId('modal-editing-npc')).toHaveTextContent('none');
+      expect(screen.getByTestId('npc-name-input')).toHaveValue('');
     });
   });
-
-  // ── Generate NPC Flow ─────────────────────────────────────────────
 
   describe('Generate NPC flow', () => {
     it('generates from the existing NPC list and opens the modal with the generated data', async () => {
@@ -226,72 +210,41 @@ describe('NPCs', () => {
       fireEvent.click(screen.getByRole('button', { name: /Generate NPC/i }));
       await waitFor(() => expect(mockGenerateNPC).toHaveBeenCalledWith(defaultNPCs));
       expect(mockGetDefaultFormData).toHaveBeenCalledWith({ name: 'Generated NPC', race: 'Humanoid' });
-      expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
-    });
-  });
-
-  // ── Edit NPC Flow ─────────────────────────────────────────────────
-
-  describe('Edit NPC flow', () => {
-    it('opens the modal with the clicked NPC set as the item being edited', () => {
-      renderNPCs();
-      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
-      expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      expect(screen.getByTestId('npc-name-input')).toHaveValue('Generated NPC');
     });
   });
 
   // ── Save Flow ─────────────────────────────────────────────────────
 
   describe('Save flow', () => {
-    it('saves the cleaned form data with the campaign name', async () => {
-      renderNPCs();
-      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
-      await waitFor(() => expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument());
+    it('saves cleaned form data with the campaign name, reloads the list, and closes the modal', async () => {
+      const { management } = renderNPCs();
+      clickNewNPC();
       fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Test NPC' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      await waitFor(() => expect(mockSaveNPC).toHaveBeenCalledTimes(1));
+      await clickSave();
       expect(mockSaveNPC.mock.calls[0][0]).toBe('test-campaign');
       expect(mockSaveNPC.mock.calls[0][1]).toMatchObject({ name: 'Test NPC', cleaned: true });
       expect(mockSaveNPC.mock.calls[0][2]).toBeUndefined();
-    });
-
-    it('reloads the NPC list and closes the modal after a successful save', async () => {
-      const management = createManagementReturn(defaultNPCs);
-      mockUseNPCsManagement.mockReturnValue(management);
-      render(<NPCs {...defaultProps} />);
-      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
-      await waitFor(() => expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument());
-      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Test NPC' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
       await waitFor(() => expect(management.loadItems).toHaveBeenCalledTimes(2));
       await waitFor(() => expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument());
     });
 
-    it('passes the original NPC name so edits rename instead of duplicating', async () => {
+    it('binds the clicked NPC to the modal and passes its original name so edits rename instead of duplicating', async () => {
       renderNPCs();
       fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
-      await waitFor(() => expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument());
-      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Goblin' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      await waitFor(() => expect(mockSaveNPC).toHaveBeenCalledTimes(1));
+      expect(screen.getByTestId('modal-editing-npc')).toHaveTextContent('Goblin');
+      // getDefaultFormData(npc) prefills the draft with the edited NPC's name.
+      expect(screen.getByTestId('npc-name-input')).toHaveValue('Goblin');
+      await clickSave();
       expect(mockSaveNPC.mock.calls[0][2]).toBe('Goblin');
     });
 
-  });
-
-  // ── Save Failure ──────────────────────────────────────────────────
-
-  describe('Save failure', () => {
     it('keeps the modal open and does not reload the list when save fails', async () => {
       mockSaveNPC.mockRejectedValueOnce(new Error('Save failed'));
-      const management = createManagementReturn(defaultNPCs);
-      mockUseNPCsManagement.mockReturnValue(management);
-      render(<NPCs {...defaultProps} />);
-      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
-      await waitFor(() => expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument());
+      const { management } = renderNPCs();
+      clickNewNPC();
       fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Test NPC' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      await waitFor(() => expect(mockSaveNPC).toHaveBeenCalledTimes(1));
+      await clickSave();
       expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
       expect(management.loadItems).toHaveBeenCalledTimes(1);
     });
@@ -301,50 +254,38 @@ describe('NPCs', () => {
 
   describe('Delete flow', () => {
     it('deletes the NPC and closes the modal when the confirmation is accepted', async () => {
-      const deleteItem = vi.fn().mockResolvedValue(undefined);
-      mockUseNPCsManagement.mockReturnValue(createManagementReturn(defaultNPCs, { deleteItem }));
-      render(<NPCs {...defaultProps} />);
+      const { management } = renderNPCs();
       vi.spyOn(window, 'confirm').mockReturnValue(true);
-      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
-      await waitFor(() => expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument());
-      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-      await waitFor(() => expect(deleteItem).toHaveBeenCalledWith('Goblin'));
+      clickDeleteOn();
+      await waitFor(() => expect(management.deleteItem).toHaveBeenCalledWith('Goblin'));
       await waitFor(() => expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument());
     });
 
     it('does not delete the NPC when the confirmation is cancelled', async () => {
-      const deleteItem = vi.fn().mockResolvedValue(undefined);
-      mockUseNPCsManagement.mockReturnValue(createManagementReturn(defaultNPCs, { deleteItem }));
-      render(<NPCs {...defaultProps} />);
+      const { management } = renderNPCs();
       vi.spyOn(window, 'confirm').mockReturnValue(false);
-      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
-      await waitFor(() => expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument());
-      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-      expect(deleteItem).not.toHaveBeenCalled();
+      clickDeleteOn();
+      expect(management.deleteItem).not.toHaveBeenCalled();
+      expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
     });
 
     it('keeps the modal open when the delete fails', async () => {
       const deleteItem = vi.fn().mockRejectedValue(new Error('Delete failed'));
-      mockUseNPCsManagement.mockReturnValue(createManagementReturn(defaultNPCs, { deleteItem }));
-      render(<NPCs {...defaultProps} />);
+      const { management } = renderNPCs(defaultNPCs, { deleteItem });
       vi.spyOn(window, 'confirm').mockReturnValue(true);
-      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
-      await waitFor(() => expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument());
-      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-      await waitFor(() => expect(deleteItem).toHaveBeenCalledWith('Goblin'));
+      clickDeleteOn();
+      await waitFor(() => expect(management.deleteItem).toHaveBeenCalledWith('Goblin'));
       expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
     });
   });
 
-  // ── Save and Add to Initiative ────────────────────────────────────
+  // ── Add to Initiative ─────────────────────────────────────────────
 
   describe('Save and add to initiative', () => {
     it('saves the NPC and adds the saved result to initiative', async () => {
       mockSaveNPC.mockResolvedValue({ success: true, npc: { name: 'Goblin', armorClass: 15 } });
       renderNPCs();
       fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
-      await waitFor(() => expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument());
-      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Goblin' } });
       fireEvent.click(screen.getByTestId('save-add-init-btn'));
       await waitFor(() => expect(mockSaveNPC).toHaveBeenCalledTimes(1));
       await waitFor(() => expect(mockAddNPCToInitiative).toHaveBeenCalledTimes(1));
@@ -356,8 +297,6 @@ describe('NPCs', () => {
       await waitFor(() => expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument());
     });
   });
-
-  // ── Add to Initiative from List ───────────────────────────────────
 
   describe('Add to initiative from the list', () => {
     it('adds the clicked NPC to initiative with the campaign and navigation callback', async () => {

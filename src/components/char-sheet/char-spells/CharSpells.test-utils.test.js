@@ -1,152 +1,88 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * Contract tests for the shared CharSpells test fixtures.
  *
- * These fixtures feed render/interaction tests across this folder
- * (CharSpells.Rendering.test.jsx, CharSpells.Table.test.jsx,
- * CharSpells.Popups.*.test.jsx, ...). Rather than restate every fixture
- * literal — which passes even when production breaks — these tests pin the
- * shapes and scenario properties that production code actually reads, so a
- * renamed, removed, or reshaped field fails here with a clear message
- * instead of producing a confusing failure in some consumer test.
+ * The suites in this folder (CharSpells.Rendering/Table/Interactions/
+ * Popups.*) spread these fixtures and assert exact rendered values —
+ * summary counts, ruleset branches, and the 'Light' cell the cast-flow
+ * suite clicks. These tests pin those consumed values here so fixture
+ * drift fails with a clear "which field" message instead of a confusing
+ * failure inside some consumer suite.
  *
- * Production readers:
- * - CharSpells.jsx:179  is2024 = playerStats.rules === '2024'
- * - CharSpells.jsx:151  isWizard = playerStats.class?.name === 'Wizard'
- * - CharSpells.jsx:120  grayed rows = is2024 && isWizard && !isPrepared && !spell.ritual
- * - CharSpells.jsx:87   prepared column renders a checkbox only for '' | 'Prepared'
- * - CharSpells.jsx:77-80 summary reads cantrips_known / prepared_spells / maxPreparedSpells
- * - CharSpells.jsx:96-108 header reads spellAbilities toHit / modifier / saveDc
- * - CharSpells.jsx:39   effect cell looks up damage.damage_at_slot_level[String(spell.level)]
- * - CharSpellSlots.jsx:16 slots read spellAbilities[`spell_slots_level_${level}`]
- * - CharSpellSlotLevel.jsx:13 playerStats.name is the runtime-store key
+ * Only fixtures with live consumers are pinned:
+ * - mockPlayerStats     → Rendering, Table, Interactions, Popups.*, getTargetInfo
+ * - mockPlayerStats2024 → Rendering (2024 prepared-column suppression)
+ * mockPlayerStats2024Wizard and the vi.fn() gate mocks have no consumers
+ * (suites mock their own gates and wizard overrides), so they are not
+ * contracted here. CharSpellSlots is stubbed in every consumer suite, so
+ * spell_slots_level_* keys are not pinned either.
  */
 import { describe, it, expect } from 'vitest';
-import * as helpers from './CharSpells.test-utils.js';
-
-const NUMERIC_SUMMARY_KEYS = [
-  'toHit',
-  'modifier',
-  'saveDc',
-  'cantrips_known',
-  'prepared_spells',
-  'maxPreparedSpells',
-];
+import { mockPlayerStats, mockPlayerStats2024 } from './CharSpells.test-utils.js';
 
 // Values CharSpells.jsx:87/116 recognizes; anything else renders as a raw
 // text cell and silently skips the prepared/grayed-out logic.
 const VALID_PREPARED_VALUES = ['Prepared', 'Always', ''];
 
 const fixtures = [
-  ['mockPlayerStats', helpers.mockPlayerStats],
-  ['mockPlayerStats2024', helpers.mockPlayerStats2024],
-  ['mockPlayerStats2024Wizard', helpers.mockPlayerStats2024Wizard],
+  // is2024 mirrors CharSpells.jsx:179 — the branch each fixture drives.
+  { label: 'mockPlayerStats', stats: mockPlayerStats, is2024: false },
+  { label: 'mockPlayerStats2024', stats: mockPlayerStats2024, is2024: true },
 ];
 
-describe.each(fixtures)('%s contract', (_label, stats) => {
-  it('provides player-level fields production reads', () => {
-    // name is the runtime-store key used by slot tracking — must be non-empty.
-    expect(stats.name.trim()).not.toBe('');
-    expect(typeof stats.rules).toBe('string');
-    expect(stats.spellAbilities).toBeTypeOf('object');
-  });
+describe.each(fixtures)('$label contract', ({ stats, is2024 }) => {
+  it('provides the player-level values consumer suites assert against', () => {
+    // name is the runtime-store key used across the popups/getTargetInfo suites.
+    expect(stats.name.trim(), 'name').not.toBe('');
+    expect(stats.rules === '2024', 'ruleset branch (CharSpells.jsx:179)').toBe(is2024);
 
-  it('provides numeric spellAbilities summary and header values', () => {
-    for (const key of NUMERIC_SUMMARY_KEYS) {
-      expect(stats.spellAbilities[key], `spellAbilities.${key}`).toEqual(
-        expect.any(Number),
-      );
+    expect(stats.spellAbilities).toBeTypeOf('object');
+    // Header row renders these numerics (toHit/saveDc are read dynamically).
+    for (const key of ['toHit', 'modifier', 'saveDc']) {
+      expect(stats.spellAbilities[key], `spellAbilities.${key}`).toEqual(expect.any(Number));
     }
+    // Exact counts Rendering.test.jsx asserts as rendered summary text.
+    expect(stats.spellAbilities.cantrips_known, 'cantrips_known').toBe(3);
+    expect(stats.spellAbilities.prepared_spells, 'prepared_spells').toBe(5);
+    expect(stats.spellAbilities.maxPreparedSpells, 'maxPreparedSpells').toBe(5);
   });
 
   it('provides spell rows with the cell fields CharSpells renders', () => {
-    expect(stats.spellAbilities.spells.length).toBeGreaterThan(0);
-    for (const spell of stats.spellAbilities.spells) {
-      expect(spell.name).toEqual(expect.any(String));
-      expect(spell.level).toEqual(expect.any(Number));
-      expect(spell.casting_time).toEqual(expect.any(String));
-      expect(spell.range).toEqual(expect.any(String));
-      expect(spell.duration).toEqual(expect.any(String));
-      expect(Array.isArray(spell.components)).toBe(true);
+    const spells = stats.spellAbilities.spells;
+    expect(spells.length, 'spell rows').toBeGreaterThan(0);
+
+    const names = spells.map((s) => s.name.trim());
+    // Rows are keyed and queried by name (getByRole('cell', {name})).
+    expect(new Set(names).size, 'spell row names must be unique').toBe(names.length);
+
+    for (const spell of spells) {
+      expect(spell.name.trim(), 'spell.name').not.toBe('');
+      expect(spell.level, `${spell.name}.level`).toEqual(expect.any(Number));
+      expect(spell.casting_time, `${spell.name}.casting_time`).toEqual(expect.any(String));
+      expect(spell.range, `${spell.name}.range`).toEqual(expect.any(String));
+      expect(spell.duration, `${spell.name}.duration`).toEqual(expect.any(String));
+      expect(Array.isArray(spell.components), `${spell.name}.components`).toBe(true);
       for (const component of spell.components) {
-        expect(component).toMatch(/^[VSM]$/);
+        expect(component, `${spell.name} component`).toMatch(/^[VSM]$/);
       }
-      expect(VALID_PREPARED_VALUES).toContain(spell.prepared);
+      expect(VALID_PREPARED_VALUES, `${spell.name}.prepared`).toContain(spell.prepared);
+      if (spell.damage) {
+        // Drift here degrades the effect cell to 'Utility' silently
+        // (computeSpellEffectLabel): pin type + self-consistent level key.
+        expect(spell.damage.damage_type, `${spell.name}.damage.damage_type`).toEqual(
+          expect.any(String),
+        );
+        expect(
+          spell.damage.damage_at_slot_level[String(spell.level)],
+          `${spell.name} damage_at_slot_level at its own level`,
+        ).toEqual(expect.any(String));
+      }
     }
-  });
 
-  it('keys damage by the spell level the effect cell looks up', () => {
-    const damageable = stats.spellAbilities.spells.filter((s) => s.damage);
-    for (const spell of damageable) {
-      expect(spell.damage.damage_type).toEqual(expect.any(String));
-      expect(spell.damage.damage_at_slot_level).toEqual(
-        expect.objectContaining({ [String(spell.level)]: expect.any(String) }),
-      );
-    }
-  });
-});
-
-describe('fixture scenario separation', () => {
-  it('drives both sides of the is2024 ruleset branch', () => {
-    // Mirrors CharSpells.jsx: const is2024 = playerStats.rules === '2024'.
-    expect(helpers.mockPlayerStats.rules === '2024').toBe(false);
-    expect(helpers.mockPlayerStats2024.rules === '2024').toBe(true);
-    expect(helpers.mockPlayerStats2024Wizard.rules === '2024').toBe(true);
-  });
-
-  it('is the wizard fixture the only one entering wizard-only branches', () => {
-    // Mirrors CharSpells.jsx: const isWizard = playerStats.class?.name === 'Wizard'.
-    const isWizard = (stats) => stats.class?.name === 'Wizard';
-    expect(isWizard(helpers.mockPlayerStats2024Wizard)).toBe(true);
-    expect(isWizard(helpers.mockPlayerStats)).toBe(false);
-    expect(isWizard(helpers.mockPlayerStats2024)).toBe(false);
-  });
-
-  it('wizard fixture exercises both unprepared row branches', () => {
-    // CharSpells.jsx:116-120: unprepared non-ritual spells render grayed
-    // and non-castable; unprepared rituals stay castable via Ritual Adept.
-    const unprepared = helpers.mockPlayerStats2024Wizard.spellAbilities.spells.filter(
-      (s) => s.prepared !== 'Always' && s.prepared !== 'Prepared',
-    );
-    const grayed = unprepared.filter((s) => !s.ritual).map((s) => s.name);
-    const ritualCastable = unprepared.filter((s) => s.ritual).map((s) => s.name);
-    expect(grayed).toContain('Shield');
-    expect(ritualCastable).toContain('Detect Magic');
-  });
-
-  it('generic 5e and 2024 fixtures share an identical spell table', () => {
-    // CharSpells.Rendering.test.jsx renders mockPlayerStats2024 and expects
-    // the same table as the 5e mock; drift here breaks that parity check.
-    expect(helpers.mockPlayerStats2024.spellAbilities.spells).toEqual(
-      helpers.mockPlayerStats.spellAbilities.spells,
-    );
-  });
-});
-
-describe('mock gate defaults', () => {
-  it('gates default to permissive no-op values until a consumer overrides them', () => {
-    // Consumers wire these into vi.mock factories; these defaults are the
-    // contract for callers that do not stub a return value.
-    expect(helpers.mockGateUpcast()).toBe(false);
-    expect(helpers.mockGetCantripAutoLevel()).toBe(null);
-    expect(helpers.mockGateMetamagic()).toBeUndefined();
-    expect(helpers.mockHandleTogglePreparedSpells()).toBeUndefined();
-  });
-
-  it('mockReset restores the documented default implementations on shared mocks', () => {
-    // The mocks are module-level singletons shared across every consumer in
-    // a file — overrides must be restorable without re-importing.
-    const { mockGateUpcast, mockGetCantripAutoLevel } = helpers;
-    try {
-      mockGateUpcast.mockReturnValue(true);
-      mockGetCantripAutoLevel.mockReturnValue(3);
-      expect(mockGateUpcast()).toBe(true);
-      expect(mockGetCantripAutoLevel()).toBe(3);
-    } finally {
-      mockGateUpcast.mockReset();
-      mockGetCantripAutoLevel.mockReset();
-    }
-    expect(mockGateUpcast()).toBe(false);
-    expect(mockGetCantripAutoLevel()).toBe(null);
+    // Popups.spellCast.test.jsx clicks the 'Light' cell and casts it as a
+    // level-0 cantrip through the metamagic gate.
+    const light = spells.find((s) => s.name === 'Light');
+    expect(light, "'Light' row required by the cast-flow suite").toBeTruthy();
+    expect(light.level, 'Light must stay a cantrip').toBe(0);
   });
 });

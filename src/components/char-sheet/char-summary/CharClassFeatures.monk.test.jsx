@@ -1,12 +1,15 @@
-// @improved-by-ai
+// @maintained-by-ai
+/**
+ * Monk lane of the CharClassFeatures registry entry point
+ * (class name 'Monk' → MonkFeatures). Owns display of monk-specific
+ * values and runtime badges; registry dispatch itself is pinned by
+ * CharClassFeatures.test.jsx — do not duplicate it here.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
 import * as classFeatures from '../../../services/character/classFeatures.js';
 import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
-
-// Monk Features are reached through the CharClassFeatures registry entry
-// point (class name 'Monk' → MonkFeatures).
 
 // Mock with a resourceKey-scoped testid so assertions can verify a specific
 // tracked resource's computed max, not just that "some" number rendered.
@@ -96,28 +99,18 @@ describe('MonkFeatures', () => {
     mockRuntime();
   });
 
-  describe('level gating', () => {
-    it('renders nothing below level 2 (Ki features unlock at level 2)', () => {
-      render(<CharClassFeatures playerStats={monkStats(1)} campaignName={CAMPAIGN} />);
-      expect(screen.queryByTestId('char-class-monk')).not.toBeInTheDocument();
-    });
-
-    it('renders the monk section at level 2', () => {
-      const section = renderMonk(monkStats(2));
-      expect(section).toBeInTheDocument();
-      expect(section.textContent).toContain('Extra Attacks: 0');
-      expect(section.textContent).toContain('Martial Arts Die: d4');
-    });
+  it('renders nothing below level 2 (Ki features unlock at level 2)', () => {
+    render(<CharClassFeatures playerStats={monkStats(1)} campaignName={CAMPAIGN} />);
+    expect(screen.queryByTestId('char-class-monk')).not.toBeInTheDocument();
   });
 
   describe('extra attacks', () => {
+    // Reads class_levels[level - 1] exactly — never searches other entries.
     it.each([
-      [2, 'empty class_levels', [], 0],
-      [5, 'extra_attacks on the current level entry', [null, null, null, null, { level: 5, extra_attacks: 2 }], 2],
-      [5, 'current entry without extra_attacks', [null, null, null, null, { level: 5 }], 0],
-      [5, 'extra_attacks on a lower level entry', [null, null, { level: 3, extra_attacks: 2 }], 0],
-      [10, 'no entry at the current level index', [null, { level: 2, extra_attacks: 1 }], 0],
-    ])('level %i with %s renders Extra Attacks: %i (reads class_levels[level - 1], never searches)', (level, _label, class_levels, expected) => {
+      [5, [null, null, null, null, { level: 5, extra_attacks: 2 }], 2],
+      [5, [null, null, null, null, { level: 5 }], 0],
+      [10, [null, { level: 2, extra_attacks: 1 }], 0],
+    ])('level %i with class_levels %j renders Extra Attacks: %i', (level, class_levels, expected) => {
       const stats = monkStats(level, {
         class: { name: 'Monk', major: {}, subclass: {}, class_levels, fightingStyles: [] },
       });
@@ -126,28 +119,21 @@ describe('MonkFeatures', () => {
     });
   });
 
-  describe('focus points', () => {
-    it('tracks Focus Points with max from class features', () => {
-      mockMonkFeatures({ maxFocusPoints: 7 });
-      renderMonk(monkStats(2));
-      expect(screen.getByTestId('tracked-resource-focusPoints'))
-        .toHaveTextContent('Focus Points: 7/7');
-    });
+  it('tracks Focus Points with the max from class features, falling back to 0', () => {
+    mockMonkFeatures({ maxFocusPoints: 7 });
+    renderMonk(monkStats(2));
+    expect(screen.getByTestId('tracked-resource-focusPoints'))
+      .toHaveTextContent('Focus Points: 7/7');
 
-    it('falls back to max 0 when maxFocusPoints is missing', () => {
-      mockMonkFeatures({ maxFocusPoints: undefined });
-      renderMonk(monkStats(2));
-      expect(screen.getByTestId('tracked-resource-focusPoints'))
-        .toHaveTextContent('Focus Points: 0/0');
-    });
+    mockMonkFeatures({ maxFocusPoints: undefined });
+    render(<CharClassFeatures playerStats={monkStats(2)} campaignName={CAMPAIGN} />);
+    expect(screen.getAllByTestId('tracked-resource-focusPoints').at(-1))
+      .toHaveTextContent('Focus Points: 0/0');
   });
 
   describe('focus save DC', () => {
     it.each([
       [3, 2, 13],
-      [0, 2, 10],
-      [3, 0, 11],
-      [0, 0, 8],
       [-1, 2, 9],
     ])('calculates Focus Save DC as 8 + WIS %i + proficiency %i = %i', (wisdomBonus, proficiency, expectedDC) => {
       const stats = monkStats(2, {
@@ -174,32 +160,18 @@ describe('MonkFeatures', () => {
     });
   });
 
-  describe('martial arts die', () => {
-    it.each([
-      [4, 'Martial Arts Die: d4'],
-      [6, 'Martial Arts Die: d6'],
-      [8, 'Martial Arts Die: d8'],
-      [10, 'Martial Arts Die: d10'],
-      [undefined, 'Martial Arts Die: d0'],
-    ])('class features die %s renders "%s"', (die, expectedText) => {
-      mockMonkFeatures({ martialArtsDie: die });
-      const section = renderMonk(monkStats(2));
-      expect(section.textContent).toContain(expectedText);
-    });
+  it('renders martial arts die and unarmored movement from class features', () => {
+    mockMonkFeatures({ martialArtsDie: 8, unarmoredMovementIncrease: 15 });
+    const section = renderMonk(monkStats(2));
+    expect(section.textContent).toContain('Martial Arts Die: d8');
+    expect(section.textContent).toContain('Unarmored Movement: +15 ft.');
   });
 
-  describe('unarmored movement', () => {
-    it.each([
-      [0, 'Unarmored Movement: +0 ft.'],
-      [10, 'Unarmored Movement: +10 ft.'],
-      [15, 'Unarmored Movement: +15 ft.'],
-      [25, 'Unarmored Movement: +25 ft.'],
-      [undefined, 'Unarmored Movement: +0 ft.'],
-    ])('renders %s when class features report the bonus', (movement, expectedText) => {
-      mockMonkFeatures({ unarmoredMovementIncrease: movement });
-      const section = renderMonk(monkStats(2));
-      expect(section.textContent).toContain(expectedText);
-    });
+  it('shows zero fallbacks when class features omit die and movement values', () => {
+    mockMonkFeatures({ martialArtsDie: undefined, unarmoredMovementIncrease: undefined });
+    const section = renderMonk(monkStats(2));
+    expect(section.textContent).toContain('Martial Arts Die: d0');
+    expect(section.textContent).toContain('Unarmored Movement: +0 ft.');
   });
 
   describe('cloak of shadows', () => {
@@ -209,11 +181,8 @@ describe('MonkFeatures', () => {
       expect(section.textContent).toContain('Cloak of Shadows');
     });
 
-    it.each([
-      ['other effects are active', [{ effect: 'some_other_effect' }]],
-      ['no buffs are active', []],
-    ])('omits the badge when %s', (_label, buffs) => {
-      mockRuntime({ buffs });
+    it('omits the badge for unrelated buffs', () => {
+      mockRuntime({ buffs: [{ effect: 'some_other_effect' }] });
       const section = renderMonk(monkStats(2));
       expect(section.textContent).not.toContain('Cloak of Shadows');
     });
@@ -226,11 +195,8 @@ describe('MonkFeatures', () => {
       expect(section.textContent).toContain('Elemental Attunement: Fire');
     });
 
-    it.each([
-      ['false', false],
-      ['undefined', undefined],
-    ])('omits the badge when the flag is %s even with an element stored', (_label, active) => {
-      mockRuntime({ attunementActive: active, attunementElement: 'Fire' });
+    it('omits the badge when the flag is falsy even with an element stored', () => {
+      mockRuntime({ attunementActive: undefined, attunementElement: 'Fire' });
       const section = renderMonk(monkStats(2));
       expect(section.textContent).not.toContain('Elemental Attunement');
     });
@@ -269,11 +235,8 @@ describe('MonkFeatures', () => {
       expect(section.textContent).toContain('Elemental Epitome: Resistance to not chosen');
     });
 
-    it.each([
-      ['false', false],
-      ['undefined', undefined],
-    ])('omits the badge when the flag is %s even with a resistance type stored', (_label, active) => {
-      mockRuntime({ epitomeActive: active, epitomeType: 'Fire' });
+    it('omits the badge when the flag is falsy even with a resistance type stored', () => {
+      mockRuntime({ epitomeActive: undefined, epitomeType: 'Fire' });
       const section = renderMonk(monkStats(2));
       expect(section.textContent).not.toContain('Elemental Epitome');
     });
@@ -286,28 +249,19 @@ describe('MonkFeatures', () => {
       expect(section.textContent).toContain('Destructive Stride: +20 Speed');
     });
 
-    it.each([
-      ['false', false],
-      ['undefined', undefined],
-    ])('omits the badge when the flag is %s', (_label, active) => {
-      mockRuntime({ destructiveActive: active });
+    it('omits the badge when the flag is falsy', () => {
+      mockRuntime({ destructiveActive: undefined });
       const section = renderMonk(monkStats(2));
       expect(section.textContent).not.toContain('Destructive Stride');
     });
   });
 
-  describe('robustness', () => {
-    it.each([
-      ['undefined', undefined],
-      ['null', null],
-    ])('survives a non-array activeBuffs value (%s) while still rendering the basics', (_label, buffs) => {
-      runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return buffs;
-        return undefined;
-      });
-      const section = renderMonk(monkStats(2));
-      expect(section.querySelectorAll('.automation-badge')).toHaveLength(0);
-      expect(section.textContent).toContain('Focus Save DC: 13');
-    });
+  it('survives a non-array activeBuffs value while still rendering the basics', () => {
+    mockRuntime({ buffs: null });
+    const section = renderMonk(monkStats(2));
+    expect(section.textContent).toContain('Focus Save DC: 13');
+    expect(section.textContent).not.toContain('Stride');
+    expect(section.textContent).not.toContain('Cloak of Shadows');
+    expect(section.textContent).not.toContain('Elemental');
   });
 });

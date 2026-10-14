@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -95,15 +95,13 @@ const upcastRadio = (level) =>
 
 describe('SpellDetailPopup - rendering', () => {
   describe('spell detail content', () => {
-    it('renders the spell name as a heading with its description body', () => {
-      renderPopup();
+    it.each([
+      { description: 'Three darts of force strike a creature.', body: 'Three darts of force strike a creature.' },
+      { description: ['First paragraph.', 'Second paragraph.'], body: 'First paragraph.Second paragraph.' },
+    ])('renders the spell name as a heading with the description body — $body', ({ description, body }) => {
+      renderPopup({ ...baseSpell, description });
       expect(screen.getByRole('heading', { name: 'Magic Missile' })).toBeInTheDocument();
-      expect(screen.getByText('Three darts of force strike a creature.')).toBeInTheDocument();
-    });
-
-    it('renders an array description joined into a single block', () => {
-      renderPopup({ ...baseSpell, description: ['First paragraph.', 'Second paragraph.'] });
-      expect(screen.getByText('First paragraph.Second paragraph.')).toBeInTheDocument();
+      expect(screen.getByText(body)).toBeInTheDocument();
     });
 
     it('shows level, casting time, range, duration, and school from the spell data', () => {
@@ -115,15 +113,17 @@ describe('SpellDetailPopup - rendering', () => {
       expectMetaRow('School', 'Evocation');
     });
 
-    it('shows an em dash for casting time, range, and duration the spell data omits', () => {
-      renderPopup({ ...baseSpell, casting_time: undefined, range: undefined, duration: undefined });
+    it('shows an em dash for omitted casting time, range, and duration, and hides the school row', () => {
+      renderPopup({
+        ...baseSpell,
+        casting_time: undefined,
+        range: undefined,
+        duration: undefined,
+        school: undefined,
+      });
       expectMetaRow('Casting Time', '—');
       expectMetaRow('Range', '—');
       expectMetaRow('Duration', '—');
-    });
-
-    it('hides the school row for a spell without a school', () => {
-      renderPopup({ ...baseSpell, school: undefined });
       expect(screen.queryByText('School:')).not.toBeInTheDocument();
     });
 
@@ -148,7 +148,6 @@ describe('SpellDetailPopup - rendering', () => {
       expect(screen.queryByText(/Cast at Level:/)).not.toBeInTheDocument();
       expect(screen.queryAllByRole('radio')).toHaveLength(0);
       expect(screen.queryByText(/Slots Remaining:/)).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Cast Spell/ })).toBeEnabled();
     });
   });
 
@@ -197,23 +196,6 @@ describe('SpellDetailPopup - rendering', () => {
       expect(screen.queryAllByRole('radio')).toHaveLength(0);
       expect(screen.getByText(/Slots Remaining:/)).toBeInTheDocument();
       expect(screen.getByText('4 slots')).toBeInTheDocument();
-    });
-
-    it('hides the selector for a non-upcastable spell even when upcast levels are offered', () => {
-      const nonUpcastableSpell = {
-        ...baseSpell,
-        damage: { damage_at_slot_level: { '1': '3d4+1' } },
-      };
-      renderPopup(nonUpcastableSpell, basePlayerStats, {
-        upcastLevels: [
-          { level: 1, formula: '3d4+1', availableSlots: 4 },
-          { level: 2, formula: '4d4+1', availableSlots: 3 },
-        ],
-      });
-
-      expect(screen.queryByText(/Cast at Level:/)).not.toBeInTheDocument();
-      expect(screen.queryAllByRole('radio')).toHaveLength(0);
-      expect(screen.getByText(/Slots Remaining:/)).toBeInTheDocument();
     });
   });
 

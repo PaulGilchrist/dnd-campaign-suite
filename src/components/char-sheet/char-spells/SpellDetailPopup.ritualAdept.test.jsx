@@ -1,19 +1,24 @@
-// @improved-by-ai
+// @maintained-by-ai
 // CLA-299 regression: SpellDetailPopup Ritual Adept channel (2024 Wizard lv1).
 // Eligibility runs through the REAL isWizardRitualAdeptSpell service — only the
 // runtime store and the sanitizer are mocked, so class/ruleset/spellbook/ritual-tag
-// gating stays honest in these assertions:
-//   - unprepared spellbook ritual  → auto ritual-only cast: banner pair, slotless at
-//     zero slots, NO payment checkbox (RAW: unprepared = ritual-only), ritualCast:true
-//   - prepared spellbook ritual    → explicit "Cast as Ritual" opt-in; ticked pays no
-//     slot and confirms in the banner; unticked keeps the slot payment byte-identical
-//   - upcast selected              → channel revoked (rituals cast at their base level)
-//   - non-Wizard / 5e / non-ritual / spell not in the spellbook → neither affordance,
-//     and zero slots still shows the honest "No spell slots available" denial
+// gating stays honest here. The service's own guard branches are covered by
+// spellPreparationService.ritualAdept.test.js; this file proves the popup's wiring:
+//   - unprepared spellbook ritual → auto ritual-only cast: banner pair, slotless at
+//     zero slots, NO payment checkbox, ritualCast:true payload (RAW: unprepared =
+//     ritual-only), and the popup pays nothing (server-first)
+//   - prepared spellbook ritual   → explicit "Cast as Ritual" opt-in: unticked pays
+//     the slot byte-identically; ticking arms the banner and pays nothing
+//   - ticking at zero slots       → unlocks the otherwise-denied cast
+//   - prepared:'Always'           → counts as prepared (opt-in checkbox, never auto)
+//   - upcast selected             → channel revoked (rituals cast at their base level)
+//   - service denies (5e wizard)  → neither affordance, honest slot denial at zero
 // Covered elsewhere and deliberately NOT duplicated here:
 //   - Rage blocking this channel ......... SpellDetailPopup.rageRestriction.test.jsx
 //   - FT-068 Quick Ritual checkbox ....... SpellDetailPopup.quickRitual.test.jsx
 //   - CLA-234 Nature Speaker _ritualOnly . SpellDetailPopup.ritualCast.test.jsx
+//   - Service guard branches (non-Wizard, missing ritual tag, spell absent from the
+//     spellbook, missing spellAbilities) ... spellPreparationService.ritualAdept.test.js
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -90,13 +95,6 @@ const renderPopup = ({ spell, playerStats, extraProps = {} } = {}) => {
   return onCast;
 };
 
-// Neither the auto banner pair nor the opt-in checkbox — the channel is absent.
-const expectNoRitualAdeptAffordance = () => {
-  expect(screen.queryByText(AUTO_BANNER)).not.toBeInTheDocument();
-  expect(screen.queryByText(BOOK_NOTE)).not.toBeInTheDocument();
-  expect(screen.queryByRole('checkbox', { name: /Cast as Ritual/ })).not.toBeInTheDocument();
-};
-
 describe('SpellDetailPopup — CLA-299 Ritual Adept channel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -104,173 +102,123 @@ describe('SpellDetailPopup — CLA-299 Ritual Adept channel', () => {
     vi.mocked(useRuntimeValue).mockReturnValue(null);
   });
 
-  describe('unprepared spellbook ritual (auto ritual-only)', () => {
-    it('auto-casts slotless at zero slots: banner pair, no slot warning, no payment checkbox', () => {
-      renderPopup({ spell: makeSpell() });
+  it('unprepared spellbook ritual auto-casts slotless: banner pair, no checkbox, pays nothing', () => {
+    const onCast = renderPopup({ spell: makeSpell() });
 
-      expect(screen.getByText(AUTO_BANNER)).toBeInTheDocument();
-      expect(screen.getByText(BOOK_NOTE)).toBeInTheDocument();
-      // Ritual-only channel — the popup must not offer a slot-payment alternative,
-      // and the classic Free Cast / no-slots lines must not leak in.
-      expect(screen.queryByRole('checkbox', { name: /Cast as Ritual/ })).not.toBeInTheDocument();
-      expect(screen.queryByText(FREE_CAST_TEXT)).not.toBeInTheDocument();
-      expect(screen.queryByText(NO_SLOTS_TEXT)).not.toBeInTheDocument();
-      expect(castButton()).toBeEnabled();
-    });
+    // Auto ritual-only channel: banner pair confirms, and the popup must not offer a
+    // slot-payment alternative — the classic Free Cast / no-slots lines must not leak in.
+    expect(screen.getByText(AUTO_BANNER)).toBeInTheDocument();
+    expect(screen.getByText(BOOK_NOTE)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /Cast as Ritual/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(FREE_CAST_TEXT)).not.toBeInTheDocument();
+    expect(screen.queryByText(NO_SLOTS_TEXT)).not.toBeInTheDocument();
+    expect(castButton()).toBeEnabled();
 
-    it('carries ritualCast:true and freeCastAuthorized:true, and pays nothing from the popup', () => {
-      const onCast = renderPopup({ spell: makeSpell() });
-
-      fireEvent.click(castButton());
-      expect(onCast).toHaveBeenCalledTimes(1);
-      const payload = onCast.mock.calls[0][0];
-      expect(payload.name).toBe('Identify');
-      expect(payload.isUpcast).toBe(false);
-      expect(payload.ritualCast).toBe(true);
-      expect(payload.freeCastAuthorized).toBe(true);
-      // Server-first: the popup only arms and reports — slot consumption happens
-      // downstream in prepareSpellCast, never from this component.
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
+    fireEvent.click(castButton());
+    expect(onCast).toHaveBeenCalledTimes(1);
+    const payload = onCast.mock.calls[0][0];
+    expect(payload.name).toBe('Identify');
+    expect(payload.isUpcast).toBe(false);
+    expect(payload.ritualCast).toBe(true);
+    expect(payload.freeCastAuthorized).toBe(true);
+    // Server-first: the popup only arms and reports — slot consumption happens
+    // downstream in prepareSpellCast, never from this component.
+    expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  describe('prepared spellbook ritual (opt-in checkbox)', () => {
-    it('offers an unticked Cast as Ritual checkbox; ticking arms the slotless banner', () => {
-      const spell = makeSpell({ prepared: 'Prepared' });
-      const onCast = renderPopup({ spell, playerStats: makeWizardStats({ lv1: 3, spells: [spell] }) });
+  it('prepared spellbook ritual pays its slot until the Cast as Ritual checkbox is ticked', () => {
+    const spell = makeSpell({ prepared: 'Prepared' });
+    const onCast = renderPopup({ spell, playerStats: makeWizardStats({ lv1: 3, spells: [spell] }) });
 
-      const checkbox = ritualCheckbox();
-      expect(checkbox).not.toBeChecked();
-      expect(screen.queryByText(TICK_BANNER)).not.toBeInTheDocument();
+    // Opt-in state: unticked checkbox, slot payment intact, no slotless banners.
+    expect(ritualCheckbox()).not.toBeChecked();
+    expect(screen.getByText(/Slots Remaining:/)).toBeInTheDocument();
+    expect(screen.queryByText(AUTO_BANNER)).not.toBeInTheDocument();
+    expect(screen.queryByText(TICK_BANNER)).not.toBeInTheDocument();
 
-      fireEvent.click(checkbox);
-      expect(ritualCheckbox()).toBeChecked();
-      expect(screen.getByText(TICK_BANNER)).toBeInTheDocument();
+    fireEvent.click(castButton());
+    const paid = onCast.mock.calls[0][0];
+    expect(paid.ritualCast).toBe(false);
+    expect(paid.freeCastAuthorized).toBe(false);
 
-      fireEvent.click(castButton());
-      expect(onCast).toHaveBeenCalledTimes(1);
-      expect(onCast.mock.calls[0][0].ritualCast).toBe(true);
-    });
+    // Ticked: the channel arms and the same button now casts slotless.
+    fireEvent.click(ritualCheckbox());
+    expect(ritualCheckbox()).toBeChecked();
+    expect(screen.getByText(TICK_BANNER)).toBeInTheDocument();
 
-    it('unticked cast pays the slot: ritualCast:false, freeCastAuthorized:false, Slots Remaining shown', () => {
-      const spell = makeSpell({ prepared: 'Prepared' });
-      const onCast = renderPopup({ spell, playerStats: makeWizardStats({ lv1: 3, spells: [spell] }) });
-
-      fireEvent.click(castButton());
-      expect(onCast).toHaveBeenCalledTimes(1);
-      const payload = onCast.mock.calls[0][0];
-      expect(payload.ritualCast).toBe(false);
-      expect(payload.freeCastAuthorized).toBe(false);
-      expect(screen.getByText(/Slots Remaining:/)).toBeInTheDocument();
-      expect(screen.queryByText(AUTO_BANNER)).not.toBeInTheDocument();
-      expect(screen.queryByText(TICK_BANNER)).not.toBeInTheDocument();
-    });
-
-    it('denies the unticked cast at zero slots with the honest no-slots warning', () => {
-      renderPopup({ spell: makeSpell({ prepared: 'Prepared' }) });
-
-      expect(ritualCheckbox()).not.toBeChecked();
-      expect(screen.getByText(NO_SLOTS_TEXT)).toBeInTheDocument();
-      expect(castButton()).toBeDisabled();
-    });
-
-    it('ticking the checkbox at zero slots enables the cast and arms the slotless banner', () => {
-      const onCast = renderPopup({ spell: makeSpell({ prepared: 'Prepared' }) });
-
-      fireEvent.click(ritualCheckbox());
-      expect(ritualCheckbox()).toBeChecked();
-      expect(castButton()).toBeEnabled();
-      expect(screen.queryByText(NO_SLOTS_TEXT)).not.toBeInTheDocument();
-      expect(screen.getByText(TICK_BANNER)).toBeInTheDocument();
-
-      fireEvent.click(castButton());
-      expect(onCast).toHaveBeenCalledTimes(1);
-      expect(onCast.mock.calls[0][0].ritualCast).toBe(true);
-    });
-
-    it('"Always" prepared counts as prepared — opt-in checkbox, no auto banner', () => {
-      renderPopup({ spell: makeSpell({ prepared: 'Always' }), playerStats: makeWizardStats({ lv1: 1 }) });
-
-      expect(ritualCheckbox()).not.toBeChecked();
-      expect(screen.queryByText(AUTO_BANNER)).not.toBeInTheDocument();
-      expect(screen.queryByText(BOOK_NOTE)).not.toBeInTheDocument();
-    });
+    fireEvent.click(castButton());
+    expect(onCast).toHaveBeenCalledTimes(2);
+    expect(onCast.mock.calls[1][0].ritualCast).toBe(true);
   });
 
-  describe('upcast revokes the channel (rituals cast at base level)', () => {
-    it('selecting a higher level drops the auto banner and pays the slot', () => {
-      const spell = makeSpell({ damage: { damage_at_slot_level: { '1': '2d6', '2': '3d6' } } });
-      const onCast = renderPopup({
-        spell,
-        playerStats: makeWizardStats({ lv1: 1, spells: [spell] }),
-        extraProps: {
-          upcastLevels: [
-            { level: 1, formula: '2d6', availableSlots: 1 },
-            { level: 2, formula: '3d6', availableSlots: 1 },
-          ],
-        },
-      });
+  it('ticking the checkbox at zero slots replaces the honest denial with a slotless cast', () => {
+    const spell = makeSpell({ prepared: 'Prepared' });
+    const onCast = renderPopup({ spell });
 
-      // Base level is the default selection — ritual channel armed.
-      expect(screen.getByText(AUTO_BANNER)).toBeInTheDocument();
+    expect(ritualCheckbox()).not.toBeChecked();
+    expect(screen.getByText(NO_SLOTS_TEXT)).toBeInTheDocument();
+    expect(castButton()).toBeDisabled();
 
-      fireEvent.click(screen.getByRole('radio', { name: /Level 2/ }));
-      expect(screen.queryByText(AUTO_BANNER)).not.toBeInTheDocument();
-      expect(screen.queryByText(BOOK_NOTE)).not.toBeInTheDocument();
+    fireEvent.click(ritualCheckbox());
+    expect(ritualCheckbox()).toBeChecked();
+    expect(castButton()).toBeEnabled();
+    expect(screen.queryByText(NO_SLOTS_TEXT)).not.toBeInTheDocument();
+    expect(screen.getByText(TICK_BANNER)).toBeInTheDocument();
 
-      fireEvent.click(castButton());
-      expect(onCast).toHaveBeenCalledTimes(1);
-      const payload = onCast.mock.calls[0][0];
-      expect(payload.isUpcast).toBe(true);
-      expect(payload.upcastLevel).toBe(2);
-      expect(payload.ritualCast).toBe(false);
-      expect(payload.freeCastAuthorized).toBe(false);
-    });
+    fireEvent.click(castButton());
+    expect(onCast).toHaveBeenCalledTimes(1);
+    expect(onCast.mock.calls[0][0].ritualCast).toBe(true);
   });
 
-  describe('eligibility negatives — neither affordance', () => {
-    it('offers nothing to a non-Wizard class (2024 Warlock)', () => {
-      renderPopup({
-        spell: makeSpell(),
-        playerStats: {
-          ...makeWizardStats(),
-          class: { name: 'Warlock', spell_casting_ability: 'Charisma' },
-        },
-      });
+  it('"Always" prepared counts as prepared — opt-in checkbox, never the auto banner', () => {
+    renderPopup({ spell: makeSpell({ prepared: 'Always' }), playerStats: makeWizardStats({ lv1: 1 }) });
 
-      expectNoRitualAdeptAffordance();
+    expect(ritualCheckbox()).not.toBeChecked();
+    expect(screen.queryByText(AUTO_BANNER)).not.toBeInTheDocument();
+    expect(screen.queryByText(BOOK_NOTE)).not.toBeInTheDocument();
+  });
+
+  it('selecting a higher slot level revokes the channel and pays the upcast slot', () => {
+    const spell = makeSpell({ damage: { damage_at_slot_level: { '1': '2d6', '2': '3d6' } } });
+    const onCast = renderPopup({
+      spell,
+      playerStats: makeWizardStats({ lv1: 1, spells: [spell] }),
+      extraProps: {
+        upcastLevels: [
+          { level: 1, formula: '2d6', availableSlots: 1 },
+          { level: 2, formula: '3d6', availableSlots: 1 },
+        ],
+      },
     });
 
-    it('offers nothing to a 5e wizard and still demands honest slot payment at zero slots', () => {
-      const spell = makeSpell({ prepared: 'Prepared' });
-      renderPopup({ spell, playerStats: { ...makeWizardStats({ spells: [spell] }), rules: '5e' } });
+    // Base level is the default selection — ritual channel armed.
+    expect(screen.getByText(AUTO_BANNER)).toBeInTheDocument();
 
-      expectNoRitualAdeptAffordance();
-      // Prepared-only RAW for 5e: no free-cast channel leaks into the legacy ruleset.
-      expect(screen.getByText(NO_SLOTS_TEXT)).toBeInTheDocument();
-      expect(castButton()).toBeDisabled();
-    });
+    fireEvent.click(screen.getByRole('radio', { name: /Level 2/ }));
+    expect(screen.queryByText(AUTO_BANNER)).not.toBeInTheDocument();
+    expect(screen.queryByText(BOOK_NOTE)).not.toBeInTheDocument();
 
-    it('offers nothing for a spellbook spell without the ritual tag', () => {
-      const spell = makeSpell({ name: 'Burning Hands', ritual: false, casting_time: '1 action', school: 'Evocation' });
-      renderPopup({ spell, playerStats: makeWizardStats({ spells: [spell] }) });
+    fireEvent.click(castButton());
+    expect(onCast).toHaveBeenCalledTimes(1);
+    const payload = onCast.mock.calls[0][0];
+    expect(payload.isUpcast).toBe(true);
+    expect(payload.upcastLevel).toBe(2);
+    expect(payload.ritualCast).toBe(false);
+    expect(payload.freeCastAuthorized).toBe(false);
+  });
 
-      expectNoRitualAdeptAffordance();
-      expect(screen.getByText(NO_SLOTS_TEXT)).toBeInTheDocument();
-      expect(castButton()).toBeDisabled();
-    });
+  it('denies honestly when the service says no — 5e wizard sees neither affordance', () => {
+    // One representative ineligible path through the popup wiring; every service guard
+    // branch (class, ruleset, ritual tag, spellbook membership) has its own coverage
+    // in spellPreparationService.ritualAdept.test.js.
+    const spell = makeSpell({ prepared: 'Prepared' });
+    renderPopup({ spell, playerStats: { ...makeWizardStats({ spells: [spell] }), rules: '5e' } });
 
-    it('offers nothing for a ritual spell that is NOT in the wizard spellbook', () => {
-      // Popup opened for a ritual spell the book does not carry — no grant, no free cast.
-      const bookOnly = makeSpell({ name: 'Identify' });
-      renderPopup({
-        spell: makeSpell({ name: 'Gentle Repose' }),
-        playerStats: makeWizardStats({ spells: [bookOnly] }),
-      });
-
-      expectNoRitualAdeptAffordance();
-      expect(screen.getByText(NO_SLOTS_TEXT)).toBeInTheDocument();
-      expect(castButton()).toBeDisabled();
-    });
+    expect(screen.queryByRole('checkbox', { name: /Cast as Ritual/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(AUTO_BANNER)).not.toBeInTheDocument();
+    expect(screen.queryByText(BOOK_NOTE)).not.toBeInTheDocument();
+    // Prepared-only RAW for 5e: no free-cast channel leaks into the legacy ruleset.
+    expect(screen.getByText(NO_SLOTS_TEXT)).toBeInTheDocument();
+    expect(castButton()).toBeDisabled();
   });
 });

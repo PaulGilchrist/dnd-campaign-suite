@@ -1,11 +1,16 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Coverage ownership: the two SUMMARY_BADGE_SPECS badges driven by runtime combat state
 // that no other CharSummary-* sibling asserts:
 //   - Starry Form constellation badge (starryFormBadge reads activeBuffs runtime value;
-//     this is the ONLY file asserting the `Starry Form - <constellation>` label)
+//     this is the ONLY file asserting the `Starry Form - <constellation>` label and the
+//     per-constellation tooltip benefit ternary). Default-off render (null activeBuffs)
+//     is pinned by CharSummary-FixtureContract.test.jsx — negatives here cover the
+//     name-match and constellation-presence guards only.
 //   - Nature's Sanctuary info badge (computeSanctuaryInfo creatures loop; the ONLY file
-//     asserting the plain 'Sanctuary' summary-badge label)
+//     asserting the plain 'Sanctuary' summary-badge label). Each negative below guards
+//     one distinct continue-clause of the loop: non-player caster, inactive sanctuary,
+//     player missing from the creatures list.
 //
 // NOT owned here (delegated to siblings — do not re-add):
 //   - AC badges / acPenalty paths → CharSummary-BadgesAndAC.test.jsx
@@ -15,25 +20,6 @@
 //   - Cover badges incl. "+2 Cover: Nature's Sanctuary" (computed from `characters` prop,
 //     which this file never passes) → CharSummary-Cover.test.jsx
 //   - Wrath of the Sea badge → CharSummary-AdditionalCoverage.test.jsx
-//
-// Quality improvements over previous revision:
-//   - Uses shared mockPlayerStats/mockCampaignName from CharSummary.test-mocks.test.jsx
-//     (removed a 28-line duplicate fixture).
-//   - Deterministic beforeEach: clearAllMocks() keeps mock implementations, so the
-//     previous revision leaked each test's mockImplementation/getCombatSummary return
-//     value into later tests. beforeEach now re-pins inert defaults; tests opt in
-//     via the mockRuntime() helper fixture.
-//   - Added '@testing-library/jest-dom' import (family convention).
-//   - Removed window.location.hostname mutation (jsdom URL is already localhost).
-//   - Starry Form badge assertions now verify the semantic badge class and that the
-//     tooltip carries the constellation and its constellation-specific benefit
-//     (previous tests matched the label text only — any element with that text passed).
-//   - Added "other buff carries a constellation" negative (guards the name-match rule).
-//   - Sanctuary tests scope the query to the exact 'Sanctuary' badge label (previous
-//     /Sanctuary/ regex would also match cover-badge text) and verify tooltip
-//     attribution (protector druid + resistance), including the 'None' default.
-//   - Added negative paths for computeSanctuaryInfo loop guards: inactive sanctuary,
-//     player not in creatures list, non-player caster (previous file had zero).
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -162,10 +148,11 @@ describe('CharSummary — Starry Form constellation badge', () => {
         expect(badge).toHaveAttribute('title', expect.stringContaining(expectedBenefit));
     });
 
+    // Default-off render (null activeBuffs) is pinned by CharSummary-FixtureContract;
+    // these two guard the distinct clauses of `find(b => b.name === 'Starry Form' && b.constellation)`.
     it.each([
         ['buff has no constellation', [{ name: 'Starry Form' }]],
         ['a different buff carries the constellation', [{ name: 'Haste', constellation: 'Archer' }]],
-        ['no active buffs', []],
     ])('does not render the badge when %s', (_description, activeBuffs) => {
         mockRuntime({ 'Thorin.activeBuffs': activeBuffs });
 

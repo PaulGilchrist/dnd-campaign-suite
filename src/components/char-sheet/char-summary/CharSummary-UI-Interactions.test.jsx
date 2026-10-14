@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Coverage ownership (CharSummary family delegation): popup CLICK wiring —
 // user clicks in the summary that open detail popups. OWNED HERE (unique):
@@ -16,7 +16,11 @@
 //   - Ally modal confirm/cancel, short-rest button, window events
 //     → CharSummary-Ally-Initiative / -Prerequisites / -EventHandlers.test.jsx
 //
-// Improvements (2026-10-14): 1 test → 4 runs
+// Improvements (2026-10-14): 4 runs → 3 runs
+//   - it.each trimmed: the { rules: '5e' } explicit case was redundant with the
+//     '2024' passthrough case (same code path — value forwarded verbatim) and
+//     with the `rules || '5e'` fallback case. Kept the two that pin distinct
+//     branches: a real passthrough (2024) and the default fallback (absent→5e).
 //   - Unmocked DiceRollContext (trivial React context — Prerequisites/
 //     Ally-Initiative precedent): tests render through the real Provider with a
 //     setPopupHtml spy, so the popup callback is proven wired through real
@@ -108,7 +112,6 @@ function renderSummary(statsOverride = {}) {
 // ---------------------------------------------------------------------------
 describe('CharSummary - Background Popup', () => {
     it.each([
-        ['5e rules are passed through', { rules: '5e' }, '5e'],
         ['2024 rules are passed through', { rules: '2024' }, '2024'],
         ['rules default to 5e when absent', { rules: undefined }, '5e'],
     ])('%s', (_case, statsOverride, expectedRules) => {

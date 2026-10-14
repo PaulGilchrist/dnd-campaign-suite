@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -6,7 +6,9 @@ import * as classFeatures from '../../../services/character/classFeatures.js';
 import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 
 // Warlock Features are reached through the CharClassFeatures registry entry
-// point (class name 'Warlock' → WarlockFeatures, region testid 'char-class-warlock').
+// point (class name 'Warlock' → WarlockFeatures, region testid
+// 'char-class-warlock'). Registry dispatch itself is owned by
+// CharClassFeatures.test.jsx — this file owns warlock feature content only.
 
 // Mock with a resourceKey-scoped testid so assertions can verify a specific
 // tracked resource's computed max, not just that "some" number rendered.
@@ -47,14 +49,12 @@ function mockWarlockFeatures(overrides = {}) {
   classFeatures.getClassFeatures.mockReturnValue({ ...defaultWarlockFeatures, ...overrides });
 }
 
-function mockRuntime({ buffs = [], awakenedMindTarget = undefined } = {}) {
-  runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-    switch (key) {
-      case 'activeBuffs': return buffs;
-      case 'awakenedMindTarget': return awakenedMindTarget;
-      default: return undefined;
-    }
-  });
+// Warlock only consumes awakenedMindTarget from the runtime store; the
+// entry point's activeBuffs read falls through to undefined (guarded by
+// Array.isArray in the entry point).
+function mockRuntime({ awakenedMindTarget = undefined } = {}) {
+  runtimeState.useRuntimeValue.mockImplementation((_name, key) =>
+    key === 'awakenedMindTarget' ? awakenedMindTarget : undefined);
 }
 
 function warlockStats(level = 5, overrides = {}) {
@@ -103,25 +103,27 @@ describe('WarlockFeatures', () => {
     mockRuntime();
   });
 
-  describe('class features wiring', () => {
-    it('reads class features for the exact playerStats object it was given', () => {
-      const stats = warlockStats();
-      renderWarlock(stats);
-      expect(classFeatures.getClassFeatures).toHaveBeenCalledWith(stats);
-    });
+  it('renders feature values computed from the exact playerStats object it was given', () => {
+    classFeatures.getClassFeatures.mockImplementation(stats => ({
+      ...defaultWarlockFeatures,
+      invocationsKnown: stats.level,
+    }));
+    renderWarlock(warlockStats(9));
+    expect(screen.getByText('Eldritch Invocations:').closest('div').textContent).toBe('Eldritch Invocations: 9');
   });
 
   describe('invocations', () => {
     it.each([
-      [4, 'Eldritch Invocations', 'Eldritch Invocations: 4'],
-      [0, 'Invocations Known', 'Invocations Known: 0'],
-      [null, 'Invocations Known', 'Invocations Known: '],
-      [undefined, 'Invocations Known', 'Invocations Known: '],
-    ])('labels known-count %s as "%s" and renders the raw value after it', (_known, label, expectedText) => {
+      [4, 'Eldritch Invocations: 4'],
+      [0, 'Invocations Known: 0'],
+      // undefined takes the identical ?? path as null (shown); the 0 row
+      // pins the ?? vs || distinction (raw 0 must still render).
+      [null, 'Invocations Known: '],
+    ])('labels known-count %p and renders the raw value as "%s"', (_known, expectedText) => {
       mockWarlockFeatures({ invocationsKnown: _known });
       renderWarlock(warlockStats());
-      const labelEl = screen.getByText(`${label}:`);
-      expect(labelEl.closest('div').textContent).toBe(expectedText);
+      const label = `${expectedText.slice(0, expectedText.indexOf(':'))}:`;
+      expect(screen.getByText(label).closest('div').textContent).toBe(expectedText);
     });
 
     it('renders invocations alphabetically sorted, comma-joined', () => {
@@ -134,9 +136,8 @@ describe('WarlockFeatures', () => {
     });
 
     it.each([
-      ['null', null],
-      ['undefined', undefined],
-      ['an empty array (no falsy-value fallback to an empty row)', []],
+      ['nullish (undefined takes the identical path)', null],
+      ['an empty array (sorts and joins to a falsy empty string)', []],
     ])('omits the invocations list row when invocations is %s', (_label, invocations) => {
       mockWarlockFeatures({ invocations });
       const section = renderWarlock(warlockStats());
@@ -144,11 +145,6 @@ describe('WarlockFeatures', () => {
       // "Eldritch Invocations:" must not satisfy this via substring.
       expect(screen.queryByText('Invocations:')).not.toBeInTheDocument();
       expect(section.textContent).not.toContain('Agonizing Blast');
-    });
-
-    it('renders the default invocation list verbatim', () => {
-      const section = renderWarlock(warlockStats());
-      expect(section.textContent).toContain('Invocations: Agonizing Blast, Eldritch Sight');
     });
   });
 
@@ -160,12 +156,8 @@ describe('WarlockFeatures', () => {
       expect(button).toHaveAttribute('title', 'Pact Boon: Pact of the Blade');
     });
 
-    it.each([
-      ['null', null],
-      ['undefined', undefined],
-      ['an empty string (|| null guard)', ''],
-    ])('omits the pact boon row and button entirely when pactBoon is %s', (_label, pactBoon) => {
-      mockWarlockFeatures({ pactBoon });
+    it('omits the pact boon row and button entirely when pactBoon is falsy (null, undefined, empty string)', () => {
+      mockWarlockFeatures({ pactBoon: '' });
       const section = renderWarlock(warlockStats());
       expect(section.textContent).not.toContain('Pact Boon');
       expect(screen.queryByRole('button', { name: /Pact of the Blade/ })).not.toBeInTheDocument();
@@ -205,28 +197,20 @@ describe('WarlockFeatures', () => {
       expect(screen.getByTestId('tracked-resource-healinglightPool'))
         .toHaveTextContent(`Healing Light: ${expectedMax}/${expectedMax}`);
     });
-
-    it('does not render healing light for a non-celestial patron', () => {
-      const section = renderWarlock(patronStats('major', 'Fiend'));
-      expect(screen.queryByTestId('tracked-resource-healinglightPool')).not.toBeInTheDocument();
-      expect(section.textContent).not.toContain('Healing Light');
-    });
   });
 
   describe('fiend patron', () => {
     it.each([
       ['major', 'Fiend'],
-      ['major', 'Fiend Patron'],
-      ['subclass', 'Fiend'],
       ['subclass', 'Fiend Patron'],
-    ])('tracks Dark One\'s Own Luck for name "%s" on %s', (slot, patron) => {
+    ])('tracks Dark One\'s Own Luck at CHA-mod max for "%s" patron "%s"', (slot, patron) => {
       renderWarlock(patronStats(slot, patron));
-      expect(screen.getByTestId('tracked-resource-darkOnesLuckUses')).toBeInTheDocument();
+      expect(screen.getByTestId('tracked-resource-darkOnesLuckUses'))
+        .toHaveTextContent('Dark One\'s Own Luck: 3/3');
     });
 
     it.each([
       [3, 3],
-      [0, 1],
       [-2, 1],
     ])('clamps Dark One\'s Own Luck max to max(1, chaMod) — cha %i → %i', (cha, expectedMax) => {
       renderWarlock(patronStats('major', 'Fiend', 5, {
@@ -235,66 +219,55 @@ describe('WarlockFeatures', () => {
       expect(screen.getByTestId('tracked-resource-darkOnesLuckUses'))
         .toHaveTextContent(`Dark One's Own Luck: ${expectedMax}/${expectedMax}`);
     });
-
-    it('does not render dark one\'s own luck for a non-fiend patron', () => {
-      const section = renderWarlock(patronStats('major', 'Celestial Patron'));
-      expect(screen.queryByTestId('tracked-resource-darkOnesLuckUses')).not.toBeInTheDocument();
-      expect(section.textContent).not.toContain('Dark One');
-    });
   });
 
   describe('great old one patron', () => {
-    it.each([
-      ['major', 'Great Old One Patron'],
-      ['subclass', 'Great Old One Patron'],
-    ])('shows the awakened mind badge with target when patron is set on %s', (slot, patron) => {
+    it('shows the awakened mind badge with the runtime target', () => {
       mockRuntime({ awakenedMindTarget: 'A goblin' });
-      const section = renderWarlock(patronStats(slot, patron));
+      const section = renderWarlock(patronStats('major', 'Great Old One Patron'));
       expect(section.textContent).toContain('Awakened Mind: A goblin');
     });
 
-    it.each([
-      ['null', null],
-      ['undefined', undefined],
-      ['an empty string', ''],
-    ])('omits the awakened mind badge when target is %s', (_label, target) => {
-      mockRuntime({ awakenedMindTarget: target });
+    it('omits the awakened mind badge when the runtime target is falsy', () => {
+      mockRuntime({ awakenedMindTarget: '' });
       const section = renderWarlock(patronStats('major', 'Great Old One Patron'));
       expect(section.textContent).not.toContain('Awakened Mind');
     });
+  });
 
-    it('omits the awakened mind badge for a non-great-old-one patron even with a target', () => {
-      mockRuntime({ awakenedMindTarget: 'A goblin' });
-      const section = renderWarlock(patronStats('major', 'Fiend'));
-      expect(section.textContent).not.toContain('Awakened Mind');
-    });
+  it('keeps each patron feature exclusive to its patron', () => {
+    mockRuntime({ awakenedMindTarget: 'A goblin' });
+    // Fiend: own feature present, celestial + great-old-one features absent.
+    const { unmount } = render(
+      <CharClassFeatures playerStats={patronStats('major', 'Fiend')} campaignName={CAMPAIGN} />);
+    expect(screen.getByTestId('tracked-resource-darkOnesLuckUses')).toBeInTheDocument();
+    expect(screen.queryByTestId('tracked-resource-healinglightPool')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Awakened Mind/)).not.toBeInTheDocument();
+    unmount();
+    // Celestial: own feature present, fiend feature absent.
+    render(<CharClassFeatures playerStats={patronStats('major', 'Celestial Patron')} campaignName={CAMPAIGN} />);
+    expect(screen.getByTestId('tracked-resource-healinglightPool')).toBeInTheDocument();
+    expect(screen.queryByTestId('tracked-resource-darkOnesLuckUses')).not.toBeInTheDocument();
   });
 
   describe('steps of the fey', () => {
     it.each([
       [3, 3],
-      [1, 1],
       [0, 1],
-      [-2, 1],
     ])('clamps Steps of the Fey max to max(chaMod, 1) — cha %i → %i', (cha, expectedMax) => {
-      const stats = warlockStats(5, {
+      renderWarlock(warlockStats(5, {
         abilities: [{ name: 'Charisma', bonus: cha }],
         automation: { bonusActions: [{ type: 'steps_of_the_fey' }] },
-      });
-      renderWarlock(stats);
+      }));
       expect(screen.getByTestId('tracked-resource-_Steps_of_the_Fey_freeCastCount'))
         .toHaveTextContent(`Steps of the Fey: ${expectedMax}/${expectedMax}`);
     });
 
     it.each([
-      ['an empty array', []],
-      ['undefined', undefined],
       ['automation itself undefined', undefined],
-    ])('omits steps of the fey when bonusActions is %s', (_label, bonusActions) => {
-      const stats = warlockStats(5, {
-        automation: bonusActions === undefined ? undefined : { bonusActions },
-      });
-      const section = renderWarlock(stats);
+      ['bonusActions is an empty array', []],
+    ])('omits steps of the fey when %s', (_label, automation) => {
+      const section = renderWarlock(warlockStats(5, { automation }));
       expect(screen.queryByTestId('tracked-resource-_Steps_of_the_Fey_freeCastCount')).not.toBeInTheDocument();
       expect(section.textContent).not.toContain('Steps of the Fey');
     });

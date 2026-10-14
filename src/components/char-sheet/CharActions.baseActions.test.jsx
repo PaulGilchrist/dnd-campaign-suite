@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Trimmed: single-item and two-item list cases (comma-joining proven by the full-list
+// exact-text case; the ['Dash','Dodge'] render is covered by CharActions.rendering.test.jsx).
+// Strengthened: one test now asserts the full clickable contract — the base-actions row
+// makes Hide, Dodge and Grapple clickable spans and every other action plain text
+// (covers the Grapple-clickable contract that CharActions.grapple.test.jsx defers to this file).
 import { render, screen, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
@@ -183,13 +189,14 @@ const basePlayerStats = {
   abilities: [{ name: 'STR', bonus: 3 }], proficiency: 3,
 };
 
-function createStats(overrides = {}) {
-  return { ...basePlayerStats, ...overrides };
+function renderWithActions(actions) {
+  mockRuntimeValuesForBaseActions();
+  globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve(actions) });
+  return act(async () => { render(<CharActions playerStats={basePlayerStats} />); });
 }
 
-function getBaseActionsText() {
-  const label = screen.getByText(/Base Actions:/);
-  return label.parentElement?.textContent || '';
+function getBaseActionsRow() {
+  return screen.getByText('Base Actions:').parentElement;
 }
 
 function mockRuntimeValuesForBaseActions() {
@@ -201,46 +208,26 @@ function mockRuntimeValuesForBaseActions() {
   });
 }
 
-describe('CharActions base actions rendering', () => {
+describe('CharActions base actions row', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
     _syncedStore.clear();
-    globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']) });
   });
 
-  describe('base actions list display', () => {
-    it.each([
-      { actions: ['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple'], expected: 'Base Actions: Hide, Dash, Disengage, Dodge, Grapple' },
-      { actions: ['Dash', 'Dodge'], expected: 'Base Actions: Dash, Dodge' },
-      { actions: ['Dash'], expected: 'Base Actions: Dash' },
-      { actions: [], expected: 'Base Actions: ' },
-    ])('renders $actions as "$expected"', async ({ actions, expected }) => {
-      mockRuntimeValuesForBaseActions();
-      globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve(actions) });
+  it.each([
+    { actions: ['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple'], expected: 'Base Actions: Hide, Dash, Disengage, Dodge, Grapple' },
+    { actions: [], expected: 'Base Actions: ' },
+  ])('renders the actions loaded from actions.json as "$expected"', async ({ actions, expected }) => {
+    await renderWithActions(actions);
 
-      const stats = createStats();
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-
-      const text = getBaseActionsText();
-      expect(text).toBe(expected);
-    });
+    expect(getBaseActionsRow().textContent).toBe(expected);
   });
 
-  describe('special base action rendering', () => {
-    it('renders non-special actions as plain text without base-action-clickable class', async () => {
-      mockRuntimeValuesForBaseActions();
-      globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve(['Dash', 'Disengage']) });
+  it('makes Hide, Dodge and Grapple clickable and leaves all other actions as plain text', async () => {
+    await renderWithActions(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']);
 
-      const stats = createStats();
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-
-      const dashEl = screen.getByText(/Dash/);
-      const disengageEl = screen.getByText(/Disengage/);
-      expect(dashEl).not.toHaveClass('base-action-clickable');
-      expect(disengageEl).not.toHaveClass('base-action-clickable');
-    });
+    const clickableNames = Array.from(getBaseActionsRow().querySelectorAll('.base-action-clickable')).map((el) => el.textContent);
+    expect(clickableNames).toEqual(['Hide', 'Dodge', 'Grapple']);
   });
 });

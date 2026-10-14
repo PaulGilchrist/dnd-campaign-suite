@@ -1,6 +1,22 @@
+// @maintained-by-ai: 2026-10-14
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import NPCStatBlockForm from './NPCStatBlockForm';
+
+const EMPTY_ACTION = {
+  name: '', attack_bonus: '', damage_dice_primary: '', damage_type_primary: '',
+  damage_dice_secondary: '', damage_type_secondary: '', description: '',
+};
+
+const SHORTBOW = {
+  name: 'Shortbow', attack_bonus: '+4', damage_dice_primary: '1d6+2', damage_type_primary: 'piercing',
+  damage_dice_secondary: '', damage_type_secondary: '', description: '',
+};
+
+const LONGSWORD = {
+  name: 'Longsword', attack_bonus: '+5', damage_dice_primary: '1d8+3', damage_type_primary: 'slashing',
+  damage_dice_secondary: '', damage_type_secondary: '', description: 'Melee Weapon Attack.',
+};
 
 function createFormData(overrides = {}) {
   return {
@@ -18,9 +34,7 @@ function createFormData(overrides = {}) {
     damageResistances: ['fire'],
     damageImmunities: [],
     conditionImmunities: ['charmed'],
-    actions: [
-      { name: 'Longsword', attack_bonus: '+5', damage_dice_primary: '1d8+3', damage_type_primary: 'slashing', damage_dice_secondary: '', damage_type_secondary: '', description: 'Melee Weapon Attack.' },
-    ],
+    actions: [LONGSWORD],
     traits: 'Darkvision.',
     reactions: 'Reaction text.',
     ...overrides,
@@ -40,20 +54,12 @@ function setup(formData = createFormData()) {
   return { ...utils, setFormData, getState: () => state };
 }
 
-function getAbilityInputs(container) {
-  return within(container.querySelector('.npcs-abilities-grid')).getAllByRole('spinbutton');
+function abilitiesGrid(container) {
+  return within(container.querySelector('.npcs-abilities-grid'));
 }
 
-function getSaveInputs(container) {
-  return within(container.querySelector('.npcs-abilities-grid')).getAllByTitle('Saving throw bonus');
-}
-
-function getSkillNameInputs(container) {
-  return within(container.querySelector('.npcs-skills-section')).getAllByPlaceholderText('Skill name');
-}
-
-function getSkillBonusInputs(container) {
-  return within(container.querySelector('.npcs-skills-section')).getAllByPlaceholderText('+0');
+function skillsSection(container) {
+  return within(container.querySelector('.npcs-skills-section'));
 }
 
 function getInitiativeInput() {
@@ -62,37 +68,27 @@ function getInitiativeInput() {
 
 describe('NPCStatBlockForm interactions', () => {
   describe('combat stat fields', () => {
-    it('updates AC when a new number is entered', () => {
+    it('parses AC as a number and stores null when cleared', () => {
       const { getState } = setup();
-      fireEvent.change(screen.getByPlaceholderText('10'), { target: { value: '18' } });
+      const ac = screen.getByPlaceholderText('10');
+      fireEvent.change(ac, { target: { value: '18' } });
       expect(getState().armorClass).toBe(18);
-    });
-
-    it('sets AC to null when the AC input is cleared', () => {
-      const { getState } = setup();
-      fireEvent.change(screen.getByPlaceholderText('10'), { target: { value: '' } });
+      fireEvent.change(ac, { target: { value: '' } });
       expect(getState().armorClass).toBeNull();
     });
 
-    it('updates HP when the text input changes', () => {
+    it('passes HP and Hit Dice through as raw strings, including empty', () => {
       const { getState } = setup();
-      fireEvent.change(screen.getByPlaceholderText('e.g., 45'), { target: { value: '100' } });
+      const hp = screen.getByPlaceholderText('e.g., 45');
+      fireEvent.change(hp, { target: { value: '100' } });
+      fireEvent.change(screen.getByPlaceholderText('e.g., 6d8'), { target: { value: '10d10' } });
       expect(getState().hitPoints).toBe('100');
-    });
-
-    it('clears HP to an empty string when the input is cleared', () => {
-      const { getState } = setup();
-      fireEvent.change(screen.getByPlaceholderText('e.g., 45'), { target: { value: '' } });
+      expect(getState().hitDice).toBe('10d10');
+      fireEvent.change(hp, { target: { value: '' } });
       expect(getState().hitPoints).toBe('');
     });
 
-    it('updates Hit Dice when the text input changes', () => {
-      const { getState } = setup();
-      fireEvent.change(screen.getByPlaceholderText('e.g., 6d8'), { target: { value: '10d10' } });
-      expect(getState().hitDice).toBe('10d10');
-    });
-
-    it('updates Initiative Bonus as a string', () => {
+    it('keeps initiative bonus as a string even on a number input', () => {
       const { getState } = setup();
       fireEvent.change(getInitiativeInput(), { target: { value: '5' } });
       expect(getState().initiativeBonus).toBe('5');
@@ -103,9 +99,7 @@ describe('NPCStatBlockForm interactions', () => {
     it('retains non-walk speeds when walk is edited', () => {
       const { getState } = setup(createFormData({ speed: { walk: '30 ft.', climb: '15 ft.' } }));
       fireEvent.change(screen.getByPlaceholderText('30 ft.'), { target: { value: '40 ft.' } });
-      const speed = getState().speed;
-      expect(speed.walk).toBe('40 ft.');
-      expect(speed.climb).toBe('15 ft.');
+      expect(getState().speed).toEqual({ walk: '40 ft.', climb: '15 ft.' });
     });
 
     it('creates a speed object when none exists yet', () => {
@@ -116,21 +110,16 @@ describe('NPCStatBlockForm interactions', () => {
   });
 
   describe('ability scores', () => {
-    it('updates multiple scores while preserving the rest', () => {
+    it('updates scores as integers, preserving the rest, and defaults invalid input to 0', () => {
       const { container, getState } = setup();
-      const abilityInputs = getAbilityInputs(container);
+      const abilityInputs = abilitiesGrid(container).getAllByRole('spinbutton');
       fireEvent.change(abilityInputs[0], { target: { value: '18' } });
       fireEvent.change(abilityInputs[2], { target: { value: '20' } });
-      const scores = getState().abilityScores;
+      let scores = getState().abilityScores;
       expect(scores.str).toBe(18);
       expect(scores.con).toBe(20);
       expect(scores.dex).toBe(14);
       expect(scores.int).toBe(8);
-    });
-
-    it('defaults to 0 for empty or non-numeric ability score inputs', () => {
-      const { container, getState } = setup();
-      const abilityInputs = getAbilityInputs(container);
       for (const value of ['', 'abc']) {
         fireEvent.change(abilityInputs[0], { target: { value } });
         expect(getState().abilityScores.str).toBe(0);
@@ -141,7 +130,7 @@ describe('NPCStatBlockForm interactions', () => {
   describe('saving throw bonuses', () => {
     it('updates existing bonuses and adds new ones without affecting the rest', () => {
       const { container, getState } = setup();
-      const saveInputs = getSaveInputs(container);
+      const saveInputs = abilitiesGrid(container).getAllByTitle('Saving throw bonus');
       fireEvent.change(saveInputs[0], { target: { value: '+6' } });
       fireEvent.change(saveInputs[1], { target: { value: '+8' } });
       fireEvent.change(saveInputs[4], { target: { value: '+1' } });
@@ -154,51 +143,36 @@ describe('NPCStatBlockForm interactions', () => {
   });
 
   describe('skill bonuses', () => {
-    it('adds a new skill via the Add Skill button', () => {
-      const { getState } = setup();
+    it('adds a blank skill, edits a bonus, and removes a skill', () => {
+      const { container, getState } = setup();
       fireEvent.click(screen.getByRole('button', { name: /Add Skill/i }));
       expect(getState().skillBonuses['']).toBe('');
-    });
-
-    it('removes a skill via its remove button', () => {
-      const { getState } = setup();
+      fireEvent.change(skillsSection(container).getAllByPlaceholderText('+0')[0], { target: { value: '+7' } });
+      expect(getState().skillBonuses.perception).toBe('+7');
       fireEvent.click(screen.getAllByRole('button', { name: /Remove skill/i })[0]);
       const bonuses = getState().skillBonuses;
       expect(bonuses.perception).toBeUndefined();
       expect(bonuses.stealth).toBe('+5');
+      expect(bonuses['']).toBe('');
     });
 
-    it('renames a skill by editing its name input', () => {
+    it('renames a skill by moving its bonus to the new key', () => {
       const { container, getState } = setup();
-      fireEvent.change(getSkillNameInputs(container)[0], { target: { value: 'investigation' } });
+      fireEvent.change(skillsSection(container).getAllByPlaceholderText('Skill name')[0], { target: { value: 'investigation' } });
       const bonuses = getState().skillBonuses;
       expect(bonuses.investigation).toBe('+3');
       expect(bonuses.perception).toBeUndefined();
       expect(bonuses.stealth).toBe('+5');
     });
-
-    it('updates a skill bonus value', () => {
-      const { container, getState } = setup();
-      fireEvent.change(getSkillBonusInputs(container)[0], { target: { value: '+7' } });
-      expect(getState().skillBonuses.perception).toBe('+7');
-    });
   });
 
   describe('defense fields', () => {
-    it('parses comma-separated values ignoring surrounding whitespace', () => {
+    it('parses comma-separated lists into trimmed, non-empty arrays', () => {
       const { getState } = setup();
-      fireEvent.change(screen.getByPlaceholderText('fire, cold, poison'), { target: { value: '  fire  ,  cold  ,  lightning  ' } });
-      expect(getState().damageResistances).toEqual(['fire', 'cold', 'lightning']);
-    });
-
-    it('filters empty entries from comma-separated input', () => {
-      const { getState } = setup();
-      fireEvent.change(screen.getByPlaceholderText('fire, cold, poison'), { target: { value: 'fire,,poison,  ' } });
-      expect(getState().damageResistances).toEqual(['fire', 'poison']);
-    });
-
-    it('clears condition immunities when the input is emptied', () => {
-      const { getState } = setup();
+      fireEvent.change(screen.getByPlaceholderText('fire, cold, poison'), { target: { value: '  fire  ,, cold ,  ' } });
+      expect(getState().damageResistances).toEqual(['fire', 'cold']);
+      fireEvent.change(screen.getByPlaceholderText('necrotic, psychic'), { target: { value: 'necrotic , psychic' } });
+      expect(getState().damageImmunities).toEqual(['necrotic', 'psychic']);
       fireEvent.change(screen.getByPlaceholderText('charmed, frightened'), { target: { value: '' } });
       expect(getState().conditionImmunities).toEqual([]);
     });
@@ -208,32 +182,9 @@ describe('NPCStatBlockForm interactions', () => {
     it('adds a new empty action via the Add Action button', () => {
       const { getState } = setup();
       fireEvent.click(screen.getByRole('button', { name: /Add Action/i }));
-      expect(getState().actions).toHaveLength(2);
-      expect(getState().actions[1]).toEqual({
-        name: '', attack_bonus: '', damage_dice_primary: '', damage_type_primary: '',
-        damage_dice_secondary: '', damage_type_secondary: '', description: '',
-      });
-    });
-
-    it('removes an action via its remove button', () => {
-      const { getState } = setup();
-      fireEvent.click(screen.getByRole('button', { name: /Remove action/i }));
-      expect(getState().actions).toEqual([]);
-    });
-
-    it('removes the correct action when multiple exist', () => {
-      const { getState } = setup(createFormData({
-        actions: [
-          { name: 'Longsword', attack_bonus: '+5', damage_dice_primary: '1d8+3', damage_type_primary: 'slashing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
-          { name: 'Shortbow', attack_bonus: '+4', damage_dice_primary: '1d6+2', damage_type_primary: 'piercing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
-        ],
-      }));
-      const removeButtons = screen.getAllByRole('button', { name: /Remove action/i });
-      expect(removeButtons).toHaveLength(2);
-      fireEvent.click(removeButtons[0]);
       const actions = getState().actions;
-      expect(actions).toHaveLength(1);
-      expect(actions[0].name).toBe('Shortbow');
+      expect(actions).toHaveLength(2);
+      expect(actions[1]).toEqual(EMPTY_ACTION);
     });
 
     it('updates every field of an existing action', () => {
@@ -256,29 +207,25 @@ describe('NPCStatBlockForm interactions', () => {
       });
     });
 
-    it('updates only the targeted action when multiple exist', () => {
-      const { getState } = setup(createFormData({
-        actions: [
-          { name: 'Longsword', attack_bonus: '+5', damage_dice_primary: '1d8+3', damage_type_primary: 'slashing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
-          { name: 'Shortbow', attack_bonus: '+4', damage_dice_primary: '1d6+2', damage_type_primary: 'piercing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
-        ],
-      }));
+    it('edits and removes only the targeted action when multiple exist', () => {
+      const { getState } = setup(createFormData({ actions: [LONGSWORD, SHORTBOW] }));
       fireEvent.change(screen.getAllByPlaceholderText('Action name')[0], { target: { value: 'Mace' } });
-      const actions = getState().actions;
+      let actions = getState().actions;
       expect(actions[0].name).toBe('Mace');
-      expect(actions[0].attack_bonus).toBe('+5');
-      expect(actions[1]).toEqual({
-        name: 'Shortbow', attack_bonus: '+4', damage_dice_primary: '1d6+2', damage_type_primary: 'piercing', damage_dice_secondary: '', damage_type_secondary: '', description: '',
-      });
+      expect(actions[1]).toEqual(SHORTBOW);
+      fireEvent.click(screen.getAllByRole('button', { name: /Remove action/i })[0]);
+      actions = getState().actions;
+      expect(actions).toEqual([SHORTBOW]);
     });
   });
 
   describe('traits and reactions', () => {
-    it('updates the traits textarea', () => {
+    it('updates the traits and reactions textareas', () => {
       const { getState } = setup();
       fireEvent.change(screen.getByPlaceholderText('Special traits (one per line or markdown)'), { target: { value: 'New traits text' } });
+      fireEvent.change(screen.getByPlaceholderText('Reactions (one per line or markdown)'), { target: { value: 'New reactions text' } });
       expect(getState().traits).toBe('New traits text');
+      expect(getState().reactions).toBe('New reactions text');
     });
-
   });
 });

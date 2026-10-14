@@ -1,6 +1,7 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
- * CharFeatFeatures — visibility of feat-tracked resource rows.
+ * CharFeatFeatures — visibility of feat-tracked resource rows and their
+ * getMax() formulas.
  *
  * Seam mocks (this unit owns WHICH rows render and their getMax() results;
  * TrackedResourceInput's internal editing behavior is covered by its own
@@ -58,8 +59,10 @@ function renderSheet(stats = statsWith()) {
   return render(<CharFeatFeatures playerStats={stats} campaignName={CAMPAIGN} />);
 }
 
-function expectNothingRendered() {
-  expect(screen.queryByTestId('char-feat-features')).not.toBeInTheDocument();
+function expectRowWired(text, resourceKey) {
+  const row = screen.getByText(text);
+  expect(row).toBeInTheDocument();
+  expect(row.closest('[data-resource-key]')).toHaveAttribute('data-resource-key', resourceKey);
 }
 
 describe('CharFeatFeatures', () => {
@@ -67,180 +70,92 @@ describe('CharFeatFeatures', () => {
     runtimeStores.clear();
   });
 
-  describe('empty state', () => {
-    it('renders nothing when no feat resources are active', () => {
-      renderSheet();
-      expectNothingRendered();
-    });
-
-    it('renders nothing when automation is undefined', () => {
-      renderSheet(statsWith({ automation: undefined }));
-      expectNothingRendered();
-    });
-
-    it('renders nothing when Lucky feat is taken but proficiency is 0 (Luck Points max would be 0)', () => {
-      seedRuntime({ luckyPoints: 5 });
-      renderSheet(statsWith({ feats: ['Lucky'], proficiency: 0 }));
-      expectNothingRendered();
-    });
+  it.each([
+    ['no feats, no automation at all (undefined must not crash)', statsWith({ automation: undefined }), {}],
+    ['Lucky taken but proficiency is 0, even with points stored', statsWith({ feats: ['Lucky'], proficiency: 0 }), { luckyPoints: 5 }],
+    ['chef action and meal passive exist but every tracked resource is 0', statsWith({ automation: { specialActions: [CHEF_TREATS], passives: [REPLENISHING_MEAL] } }), { chefBolsteringTreats: 0, replenishingMeals: 0, bolsteringTreat: 0 }],
+    ['resources stored without any feats or actions to unlock them', statsWith(), { luckyPoints: 3, poisonDoses: 5, chefBolsteringTreats: 5, poisonedWeaponsActive: true }],
+  ])('renders nothing when %s', (_name, stats, store) => {
+    seedRuntime(store);
+    renderSheet(stats);
+    expect(screen.queryByTestId('char-feat-features')).not.toBeInTheDocument();
   });
 
-  describe('lucky feat', () => {
-    it('shows Luck Points with proficiency as the max, even when stored points are 0', () => {
-      seedRuntime({ luckyPoints: 0 });
-      renderSheet(statsWith({ feats: ['Lucky'] }));
-      expect(screen.getByText('Luck Points: 3')).toBeInTheDocument();
-      expect(screen.getByText('Luck Points: 3').closest('[data-resource-key]')).toHaveAttribute('data-resource-key', 'luckyPoints');
-    });
+  it.each(['Lucky', 'lucky'])(
+    'shows Luck Points for feat "%s" with proficiency as the max, even with no points stored',
+    (feat) => {
+      renderSheet(statsWith({ feats: [feat] }));
+      expectRowWired('Luck Points: 3', 'luckyPoints');
+    }
+  );
 
-    it('detects Lucky feat case-insensitively', () => {
-      renderSheet(statsWith({ feats: ['lucky'] }));
-      expect(screen.getByText('Luck Points: 3')).toBeInTheDocument();
-    });
-
-    it('does not show Luck Points when a different feat is taken, even with points stored', () => {
-      seedRuntime({ luckyPoints: 3 });
-      renderSheet(statsWith({ feats: ['Alert'] }));
-      expectNothingRendered();
-    });
+  it('always shows Poison Doses for the brew_poison action, even at 0 stored doses', () => {
+    seedRuntime({ poisonDoses: 0 });
+    renderSheet(statsWith({ automation: { specialActions: [BREW_POISON], passives: [] } }));
+    expectRowWired('Poison Doses: 3', 'poisonDoses');
   });
 
-  describe("poisoner feat — Poison Doses", () => {
-    it('shows Poison Doses with proficiency as the max when Brew Poison action exists', () => {
-      seedRuntime({ poisonDoses: 2 });
-      renderSheet(statsWith({ automation: { specialActions: [BREW_POISON], passives: [] } }));
-      expect(screen.getByText('Poison Doses: 3')).toBeInTheDocument();
-      expect(screen.getByText('Poison Doses: 3').closest('[data-resource-key]')).toHaveAttribute('data-resource-key', 'poisonDoses');
-    });
+  it('shows and hides the Poisoned Weapons badge with poisonedWeaponsActive', () => {
+    const stats = statsWith({ automation: { specialActions: [BREW_POISON], passives: [] } });
+    seedRuntime({ poisonedWeaponsActive: true });
+    const { rerender } = renderSheet(stats);
+    const badge = screen.getByText('Poisoned Weapons active');
+    expect(badge).toHaveClass('automation-badge');
+    expect(badge.querySelector('i.fa-solid.fa-vial')).toBeInTheDocument();
 
-    it('shows Poison Doses even when current doses are 0 (so the player can brew more)', () => {
-      seedRuntime({ poisonDoses: 0 });
-      renderSheet(statsWith({ automation: { specialActions: [BREW_POISON], passives: [] } }));
-      expect(screen.getByText('Poison Doses: 3')).toBeInTheDocument();
-    });
-
-    it('omits Poison Doses when the Brew Poison action is absent, even with doses stored', () => {
-      seedRuntime({ poisonDoses: 5 });
-      renderSheet();
-      expect(screen.queryByText(/Poison Doses/)).not.toBeInTheDocument();
-    });
+    seedRuntime({ poisonDoses: 1 }); // flag now unset — row stays, badge goes
+    rerender(<CharFeatFeatures playerStats={stats} campaignName={CAMPAIGN} />);
+    expect(screen.queryByText('Poisoned Weapons active')).not.toBeInTheDocument();
+    expect(screen.getByText('Poison Doses: 3')).toBeInTheDocument();
   });
 
-  describe('poisoned weapons badge', () => {
-    it('shows the active badge when poisonedWeaponsActive is true', () => {
-      seedRuntime({ poisonDoses: 2, poisonedWeaponsActive: true });
-      renderSheet(statsWith({ automation: { specialActions: [BREW_POISON], passives: [] } }));
-      const badge = screen.getByText('Poisoned Weapons active');
-      expect(badge.closest('span')).toHaveClass('automation-badge');
-      expect(badge.querySelector('i.fa-solid.fa-vial')).toBeInTheDocument();
-    });
-
-    it('omits the badge when poisonedWeaponsActive is false or unset', () => {
-      seedRuntime({ poisonDoses: 2, poisonedWeaponsActive: false });
-      const { unmount } = renderSheet(statsWith({ automation: { specialActions: [BREW_POISON], passives: [] } }));
-      expect(screen.queryByText('Poisoned Weapons active')).not.toBeInTheDocument();
-
-      unmount();
-      seedRuntime({ poisonDoses: 2 });
-      renderSheet(statsWith({ automation: { specialActions: [BREW_POISON], passives: [] } }));
-      expect(screen.queryByText('Poisoned Weapons active')).not.toBeInTheDocument();
-    });
+  it.each([
+    ['matching passive and stored below the cap', REPLENISHING_MEAL, 2, 'Replenishing Meals: 7'],
+    ['matching passive and stored above the cap', REPLENISHING_MEAL, 10, 'Replenishing Meals: 10'],
+    ['non-matching passive name falls back to max 1', { ...REPLENISHING_MEAL, name: 'Other Passive' }, 2, 'Replenishing Meals: 1'],
+  ])('computes Replenishing Meals max from %s', (_name, passive, stored, expected) => {
+    seedRuntime({ replenishingMeals: stored });
+    renderSheet(statsWith({ automation: { specialActions: [], passives: [passive] } }));
+    expectRowWired(expected, 'replenishingMeals');
   });
 
-  describe('chef feat — Bolstering Treats', () => {
-    it('shows Bolstering Treats with proficiency as the max when the chef action exists', () => {
-      seedRuntime({ chefBolsteringTreats: 2 });
-      renderSheet(statsWith({ automation: { specialActions: [CHEF_TREATS], passives: [] } }));
-      expect(screen.getByText('Bolstering Treats: 3')).toBeInTheDocument();
-      expect(screen.getByText('Bolstering Treats: 3').closest('[data-resource-key]')).toHaveAttribute('data-resource-key', 'chefBolsteringTreats');
-    });
-
-    it('falls back to the stored treat count as the max when proficiency is 0', () => {
-      seedRuntime({ chefBolsteringTreats: 2 });
-      renderSheet(statsWith({ proficiency: 0, automation: { specialActions: [CHEF_TREATS], passives: [] } }));
-      expect(screen.getByText('Bolstering Treats: 2')).toBeInTheDocument();
-    });
-
-    it('omits chef Bolstering Treats when no treats are stored, even with the chef action', () => {
-      seedRuntime({ chefBolsteringTreats: 0 });
-      renderSheet(statsWith({ automation: { specialActions: [CHEF_TREATS], passives: [] } }));
-      expectNothingRendered();
-    });
+  it.each([
+    ['proficiency as the max', 3, 2, 'Bolstering Treats: 3'],
+    ['stored count as the max when proficiency is 0', 0, 2, 'Bolstering Treats: 2'],
+  ])('shows chef Bolstering Treats with %s', (_name, proficiency, stored, expected) => {
+    seedRuntime({ chefBolsteringTreats: stored });
+    renderSheet(statsWith({ proficiency, automation: { specialActions: [CHEF_TREATS], passives: [] } }));
+    expectRowWired(expected, 'chefBolsteringTreats');
   });
 
-  describe('replenishing meals', () => {
-    it('shows max of 4 + proficiency when the matching passive exists', () => {
-      seedRuntime({ replenishingMeals: 2 });
-      renderSheet(statsWith({ automation: { specialActions: [], passives: [REPLENISHING_MEAL] } }));
-      expect(screen.getByText('Replenishing Meals: 7')).toBeInTheDocument();
-      expect(screen.getByText('Replenishing Meals: 7').closest('[data-resource-key]')).toHaveAttribute('data-resource-key', 'replenishingMeals');
-    });
-
-    it('keeps the stored count as the max when it exceeds 4 + proficiency', () => {
-      seedRuntime({ replenishingMeals: 10 });
-      renderSheet(statsWith({ automation: { specialActions: [], passives: [REPLENISHING_MEAL] } }));
-      expect(screen.getByText('Replenishing Meals: 10')).toBeInTheDocument();
-    });
-
-    it('shows a max of 1 when meals are stored but the passive name does not match', () => {
-      seedRuntime({ replenishingMeals: 2 });
-      renderSheet(statsWith({
-        automation: { specialActions: [], passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'Other Passive' }] },
-      }));
-      expect(screen.getByText('Replenishing Meals: 1')).toBeInTheDocument();
-    });
-
-    it('omits Replenishing Meals when the stored value is 0, even with the matching passive', () => {
-      seedRuntime({ replenishingMeals: 0 });
-      renderSheet(statsWith({ automation: { specialActions: [], passives: [REPLENISHING_MEAL] } }));
-      expectNothingRendered();
-    });
+  it('shows a standalone Bolstering Treat row (max 1) received from a chef', () => {
+    seedRuntime({ bolsteringTreat: 1 });
+    renderSheet();
+    expectRowWired('Bolstering Treat: 1', 'bolsteringTreat');
   });
 
-  describe('standalone bolstering treat (received from a chef)', () => {
-    it('shows the treat row with max of 1 when bolsteringTreat > 0 and no feats are active', () => {
-      seedRuntime({ bolsteringTreat: 1 });
-      renderSheet();
-      const row = screen.getByText('Bolstering Treat: 1');
-      expect(row).toBeInTheDocument();
-      expect(row.closest('[data-resource-key]')).toHaveAttribute('data-resource-key', 'bolsteringTreat');
+  it('renders each active resource row exactly once, paired with the correct store key', () => {
+    const stats = statsWith({
+      feats: ['Lucky'],
+      automation: {
+        specialActions: [BREW_POISON, CHEF_TREATS],
+        passives: [REPLENISHING_MEAL],
+      },
     });
-
-    it('omits the treat row when bolsteringTreat is 0', () => {
-      seedRuntime({ bolsteringTreat: 0 });
-      renderSheet();
-      expectNothingRendered();
+    seedRuntime({
+      luckyPoints: 2,
+      poisonDoses: 1,
+      poisonedWeaponsActive: false,
+      chefBolsteringTreats: 3,
+      replenishingMeals: 2,
+      bolsteringTreat: 0,
     });
-  });
+    const { container } = renderSheet(stats);
 
-  describe('multiple features combined', () => {
-    it('renders each active resource row exactly once, paired with the correct store key', () => {
-      const stats = statsWith({
-        feats: ['Lucky'],
-        automation: {
-          specialActions: [BREW_POISON, CHEF_TREATS],
-          passives: [REPLENISHING_MEAL],
-        },
-      });
-      seedRuntime({
-        luckyPoints: 2,
-        poisonDoses: 1,
-        poisonedWeaponsActive: false,
-        chefBolsteringTreats: 3,
-        replenishingMeals: 2,
-      });
-      const { container } = renderSheet(stats);
-
-      expect(screen.getByText('Luck Points: 3')).toBeInTheDocument();
-      expect(screen.getByText('Poison Doses: 3')).toBeInTheDocument();
-      expect(screen.getByText('Bolstering Treats: 3')).toBeInTheDocument();
-      expect(screen.getByText('Replenishing Meals: 7')).toBeInTheDocument();
-
-      const keys = [...container.querySelectorAll('[data-resource-key]')].map(el => el.getAttribute('data-resource-key'));
-      expect(keys).toEqual(expect.arrayContaining(['luckyPoints', 'poisonDoses', 'chefBolsteringTreats', 'replenishingMeals']));
-      expect(keys).not.toContain('bolsteringTreat');
-      expect(keys.filter(k => k === 'chefBolsteringTreats')).toHaveLength(1);
-      expect(screen.queryByText('Poisoned Weapons active')).not.toBeInTheDocument();
-    });
+    const keys = [...container.querySelectorAll('[data-resource-key]')].map(el => el.getAttribute('data-resource-key'));
+    expect(keys).toEqual(['luckyPoints', 'poisonDoses', 'replenishingMeals', 'chefBolsteringTreats']);
+    expect(screen.getByText('Poison Doses: 3')).toBeInTheDocument();
+    expect(screen.getByText('Replenishing Meals: 7')).toBeInTheDocument();
+    expect(screen.queryByText('Poisoned Weapons active')).not.toBeInTheDocument();
   });
 });

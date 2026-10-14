@@ -1,26 +1,33 @@
-// Live-sync tests: the NPCs management list must re-fetch when an
-// npcs-list SSE event arrives (another GM tab created/deleted an NPC),
-// while an open edit form's draft must never be squashed.
+// @maintained-by-ai: 2026-10-14
+// Live-sync contract for the NPCs manager: every npcs-list-<campaign> SSE
+// event (per server/routes/npcs.js: created/updated/deleted/replaced) must
+// re-fetch and re-render the list, events for other keys are ignored, and
+// re-fetches are skipped while the edit modal is open so a draft in progress
+// is never disturbed. Connects through the ONE shared SSE client
+// (subscribeToSSE), never a raw EventSource.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import NPCs from './NPCs';
 
 let capturedHandler = null;
 let unsubscribeCalls = 0;
+const mockSubscribe = vi.fn((_campaignName, handler) => {
+  capturedHandler = handler;
+  return () => {
+    capturedHandler = null;
+    unsubscribeCalls += 1;
+  };
+});
 
 vi.mock('../../services/ui/sseClient.js', () => ({
-  subscribeToSSE: vi.fn((campaignName, handler) => {
-    capturedHandler = handler;
-    return () => {
-      capturedHandler = null;
-      unsubscribeCalls += 1;
-    };
-  }),
+  subscribeToSSE: (...args) => mockSubscribe(...args),
 }));
 
 let loadCallCount = 0;
 let npcsFixture = [{ name: 'Bardima', race: 'Half-Elf' }];
 
+// loadNPCs drives every list assertion here; the save/stub exports only need
+// to exist so NPCs.jsx's imports resolve against this module mock.
 vi.mock('../../services/npcs/npcsService.js', () => ({
   loadNPCs: vi.fn(async () => {
     loadCallCount += 1;
@@ -32,12 +39,12 @@ vi.mock('../../services/npcs/npcsService.js', () => ({
 }));
 
 vi.mock('./NPCListItem.jsx', () => ({
-  default: vi.fn(({ npc, onEdit }) => (
+  default: ({ npc, onEdit }) => (
     <li aria-label={`Edit NPC: ${npc.name}`}>
       <span>{npc.name}</span>
       <button onClick={() => onEdit(npc)}>Edit</button>
     </li>
-  )),
+  ),
 }));
 
 vi.mock('./NPCFormModal.jsx', () => ({
@@ -61,91 +68,76 @@ vi.mock('../../services/npcs/npcGenerator.js', () => ({
   generateNPC: vi.fn(async () => ({})),
 }));
 
+const renderNPCs = () =>
+  render(<NPCs campaignName="test-campaign" onBack={vi.fn()} onViewInitiative={vi.fn()} />);
+
 describe('NPCs live SSE sync', () => {
   beforeEach(() => {
+    mockSubscribe.mockClear();
     capturedHandler = null;
     unsubscribeCalls = 0;
     loadCallCount = 0;
     npcsFixture = [{ name: 'Bardima', race: 'Half-Elf' }];
   });
 
-  const renderNPCs = () =>
-    render(<NPCs campaignName="test-campaign" onBack={vi.fn()} onViewInitiative={vi.fn()} />);
-
-  it('subscribes via the shared SSE client on mount', async () => {
+  it('subscribes through the shared SSE client on mount and unsubscribes on unmount', () => {
     const { unmount } = renderNPCs();
-    await waitFor(() => expect(screen.getByText('Bardima')).toBeInTheDocument());
-    expect(capturedHandler).toBeTypeOf('function');
+    expect(mockSubscribe).toHaveBeenCalledTimes(1);
+    expect(mockSubscribe).toHaveBeenCalledWith('test-campaign', expect.any(Function));
 
     unmount();
     expect(unsubscribeCalls).toBe(1);
     expect(capturedHandler).toBeNull();
   });
 
-  it('re-fetches and shows a new NPC when npcs-list event arrives', async () => {
-    renderNPCs();
-    await waitFor(() => expect(screen.getByText('Bardima')).toBeInTheDocument());
+  it('re-fetches on npcs-list events for this campaign, surfacing created and deleted NPCs', async () => {
+    const { findByText } = renderNPCs();
+    await findByText('Bardima');
     expect(loadCallCount).toBe(1);
 
-    npcsFixture = [
-      { name: 'Bardima', race: 'Half-Elf' },
-      { name: 'QA Sync NPC A', race: 'Human' },
-    ];
+    npcsFixture = [...npcsFixture, { name: 'QA Sync NPC A', race: 'Human' }];
     capturedHandler({ key: 'npcs-list-test-campaign', data: { action: 'created', name: 'QA Sync NPC A' } });
-
-    await waitFor(() =>
-      expect(screen.getByLabelText('Edit NPC: QA Sync NPC A')).toBeInTheDocument()
-    );
+    await findByText('QA Sync NPC A');
     expect(loadCallCount).toBe(2);
-  });
-
-  it('removes a deleted NPC from the list when npcs-list event arrives', async () => {
-    renderNPCs();
-    await waitFor(() => expect(screen.getByText('Bardima')).toBeInTheDocument());
 
     npcsFixture = [];
     capturedHandler({ key: 'npcs-list-test-campaign', data: { action: 'deleted', name: 'Bardima' } });
-
     await waitFor(() =>
       expect(screen.queryByLabelText('Edit NPC: Bardima')).not.toBeInTheDocument()
     );
+    expect(loadCallCount).toBe(3);
   });
 
-  it('ignores SSE events from other keys/campaigns', async () => {
+  it('ignores SSE events from other keys/campaigns', () => {
     renderNPCs();
-    await waitFor(() => expect(screen.getByText('Bardima')).toBeInTheDocument());
-    expect(loadCallCount).toBe(1);
+    expect(capturedHandler).toBeTypeOf('function');
 
     capturedHandler({ key: 'npcs-list-other-campaign', data: { action: 'created' } });
     capturedHandler({ key: 'maps-list-test-campaign', data: { action: 'created' } });
+    capturedHandler(null);
 
     expect(loadCallCount).toBe(1);
   });
 
-  it('does not squash an open edit form draft when an SSE event arrives', async () => {
+  it('skips re-fetches while the edit form is open, then applies the next event after closing', async () => {
     renderNPCs();
-    await waitFor(() => expect(screen.getByText('Bardima')).toBeInTheDocument());
+    await screen.findByText('Bardima');
 
     fireEvent.click(screen.getByText('Edit'));
     const nameInput = await screen.findByTestId('npc-name-input');
     fireEvent.change(nameInput, { target: { value: 'Draft Name Mid-Edit' } });
-    expect(nameInput.value).toBe('Draft Name Mid-Edit');
 
-    npcsFixture = [
-      { name: 'Bardima', race: 'Half-Elf' },
-      { name: 'QA Sync NPC A', race: 'Human' },
-    ];
+    npcsFixture = [...npcsFixture, { name: 'QA Sync NPC A', race: 'Human' }];
     capturedHandler({ key: 'npcs-list-test-campaign', data: { action: 'created', name: 'QA Sync NPC A' } });
 
     expect(nameInput.value).toBe('Draft Name Mid-Edit');
-    const refetchesBeforeClose = loadCallCount;
+    expect(loadCallCount).toBe(1);
 
     fireEvent.click(screen.getByText('Cancel'));
     capturedHandler({ key: 'npcs-list-test-campaign', data: { action: 'created', name: 'QA Sync NPC A' } });
 
-    await waitFor(() =>
-      expect(screen.getByLabelText('Edit NPC: QA Sync NPC A')).toBeInTheDocument()
-    );
-    expect(loadCallCount).toBeGreaterThan(refetchesBeforeClose);
+    await screen.findByLabelText('Edit NPC: QA Sync NPC A');
+    expect(loadCallCount).toBe(2);
+    expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
   });
 });

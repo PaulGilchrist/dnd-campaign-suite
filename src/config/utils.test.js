@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai: 2026-10-14
 // Unit tests for the character-creation validation utils (src/config/utils.js).
 //
 // Seam policy:
@@ -32,7 +32,8 @@ const DEFAULT_POINT_BUY_COSTS = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7,
 // from "returned the fallback" — a pass-through that silently never happened.
 const POINT_BUY_COSTS_FROM_RULES = { ...DEFAULT_POINT_BUY_COSTS, 16: 11 };
 
-// Only the fields utils.js actually reads from rules-validation.json.
+// Only the fields utils.js actually reads from rules-validation.json
+// (matches the shape of public/data/2024/rules-validation.json per ruleset).
 const MOCK_VALIDATION_RULES = {
   level_range: { min: 1, max: 20 },
   point_buy: {
@@ -68,13 +69,16 @@ const stepContext = (overrides = {}) => ({
 });
 
 describe('character-creation/utils', () => {
+  beforeEach(() => {
+    vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
   describe('getPointBuyCosts', () => {
     it('resolves the costs carried by the loaded rules for the requested ruleset', async () => {
-      vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
       const costs = await utils.getPointBuyCosts('2024');
       expect(dataLoader.loadValidationRules).toHaveBeenCalledWith('2024');
       // Distinct from DEFAULT_POINT_BUY_COSTS (has the extra 16 tier), so this
@@ -84,25 +88,24 @@ describe('character-creation/utils', () => {
 
     it('falls back to the standard costs when rules are empty or lack point_buy.costs', async () => {
       for (const rules of [{}, { point_buy: {} }, { point_buy: { costs: null } }]) {
-        vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(rules);
+        dataLoader.loadValidationRules.mockResolvedValueOnce(rules);
         await expect(utils.getPointBuyCosts('5e')).resolves.toEqual(DEFAULT_POINT_BUY_COSTS);
-        vi.restoreAllMocks();
       }
     });
   });
 
   describe('getPointBuyCostsSync', () => {
     it('returns the cached costs verbatim, querying the requested ruleset', () => {
-      const cached = vi.spyOn(dataLoader, 'getCachedPointBuyCosts').mockReturnValue({ 8: 0, 9: 2, 10: 4 });
-      expect(utils.getPointBuyCostsSync('2024')).toEqual({ 8: 0, 9: 2, 10: 4 });
-      expect(cached).toHaveBeenCalledWith('2024');
+      const cached = { 8: 0, 9: 2, 10: 4 };
+      const cachedSpy = vi.spyOn(dataLoader, 'getCachedPointBuyCosts').mockReturnValue(cached);
+      expect(utils.getPointBuyCostsSync('2024')).toEqual(cached);
+      expect(cachedSpy).toHaveBeenCalledWith('2024');
     });
 
     it('falls back to the standard costs while the cache is unpopulated (null or undefined)', () => {
-      vi.spyOn(dataLoader, 'getCachedPointBuyCosts').mockReturnValue(null);
+      const cachedSpy = vi.spyOn(dataLoader, 'getCachedPointBuyCosts').mockReturnValue(null);
       expect(utils.getPointBuyCostsSync('5e')).toEqual(DEFAULT_POINT_BUY_COSTS);
-
-      dataLoader.getCachedPointBuyCosts.mockReturnValue(undefined);
+      cachedSpy.mockReturnValue(undefined);
       expect(utils.getPointBuyCostsSync('5e')).toEqual(DEFAULT_POINT_BUY_COSTS);
     });
   });
@@ -117,11 +120,13 @@ describe('character-creation/utils', () => {
       expertSkills: [],
     };
 
-    it('accepts a complete form with no existing-name collisions', () => {
+    it('accepts a complete form, and accepts a null/undefined form (nothing to validate yet)', () => {
       expect(utils.validateFinalFormData(COMPLETE_FORM_DATA)).toEqual({});
+      expect(utils.validateFinalFormData(null)).toEqual({});
+      expect(utils.validateFinalFormData(undefined)).toEqual({});
     });
 
-    it('reports exactly the required name/level/alignment/race/class/expertSkills fields when the form is empty', () => {
+    it('reports exactly the required name/level/alignment/race/class/expertSkills fields when the form is empty, treating whitespace-only strings as missing', () => {
       // Contract pinned as a literal set: REQUIRED_FIELDS minus the three
       // explicitly-skipped fields. Pinning it here (rather than re-deriving the
       // exclusion list from REQUIRED_FIELDS) means a shared drift between the
@@ -134,53 +139,34 @@ describe('character-creation/utils', () => {
         class: 'class is required',
         expertSkills: 'expertSkills is required',
       });
+      expect(utils.validateFinalFormData({ ...COMPLETE_FORM_DATA, name: '   ' }))
+        .toEqual({ name: 'name is required' });
     });
 
     it('never flags the deliberately-skipped fields abilities, inventory or skillProficiencies', () => {
       const form = { ...COMPLETE_FORM_DATA, abilities: undefined, inventory: undefined, skillProficiencies: undefined };
       expect(utils.validateFinalFormData(form)).toEqual({});
     });
-
-    it('rejects a missing or whitespace-only name as required', () => {
-      for (const name of [undefined, null, '', '   ']) {
-        expect(utils.validateFinalFormData({ ...COMPLETE_FORM_DATA, name })).toEqual({ name: 'name is required' });
-      }
-    });
-
-    it('accepts a null or undefined form (nothing to validate yet)', () => {
-      expect(utils.validateFinalFormData(null)).toEqual({});
-      expect(utils.validateFinalFormData(undefined)).toEqual({});
-    });
   });
 
   describe('validateLevel', () => {
-    beforeEach(() => {
-      vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
-    });
-
-    it('accepts levels inside the range, including numeric strings from text inputs', async () => {
+    it('accepts levels inside the range (numeric strings from text inputs included) and rejects missing, zero, and out-of-range levels', async () => {
       for (const level of [1, 10, 20, '1', '10', '20']) {
         await expect(utils.validateLevel(level, '5e')).resolves.toEqual({});
       }
-    });
-
-    it('rejects missing, zero, and out-of-range levels with the range message', async () => {
       for (const level of [null, undefined, '', NaN, false, 0, -1, 21, '0', '25']) {
         await expect(utils.validateLevel(level, '5e')).resolves.toEqual({ level: LEVEL_1_20_ERROR });
       }
     });
 
-    it('respects a custom min/max from the validation rules', async () => {
+    it('respects a custom min/max from the rules, falling back to 1-20 when level_range is omitted', async () => {
       dataLoader.loadValidationRules.mockResolvedValue({ level_range: { min: 1, max: 10 } });
       await expect(utils.validateLevel(1, '5e')).resolves.toEqual({});
       await expect(utils.validateLevel(10, '5e')).resolves.toEqual({});
       await expect(utils.validateLevel(11, '5e')).resolves.toEqual({ level: 'Level must be between 1 and 10' });
       await expect(utils.validateLevel(0, '5e')).resolves.toEqual({ level: 'Level must be between 1 and 10' });
-    });
 
-    it('falls back to a 1-20 range when the rules omit level_range', async () => {
       dataLoader.loadValidationRules.mockResolvedValue({});
-      await expect(utils.validateLevel(1, '5e')).resolves.toEqual({});
       await expect(utils.validateLevel(20, '5e')).resolves.toEqual({});
       await expect(utils.validateLevel(21, '5e')).resolves.toEqual({ level: LEVEL_1_20_ERROR });
       await expect(utils.validateLevel(0, '5e')).resolves.toEqual({ level: LEVEL_1_20_ERROR });
@@ -188,29 +174,23 @@ describe('character-creation/utils', () => {
   });
 
   describe('validateAbility', () => {
-    beforeEach(() => {
-      vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
-    });
-
-    it('accepts base scores at and within the point-buy boundaries (8-15)', async () => {
-      for (const baseScore of [8, 10, 15]) {
-        await expect(utils.validateAbility(ability({ baseScore }), 0, '5e', 1)).resolves.toEqual({});
+    it('gates base scores at the point-buy boundaries, naming the violated limit', async () => {
+      for (const [baseScore, expected] of [
+        [8, {}],
+        [10, {}],
+        [15, {}],
+        [7, { baseScore: MIN_BASE_ERROR }],
+        [16, { baseScore: MAX_BASE_ERROR }],
+      ]) {
+        await expect(utils.validateAbility(ability({ baseScore }), 0, '5e', 1)).resolves.toEqual(expected);
       }
     });
 
-    it('flags base scores just outside the boundaries, naming the violated limit', async () => {
-      await expect(utils.validateAbility(ability({ baseScore: 7 }), 0, '5e', 1)).resolves.toEqual({ baseScore: MIN_BASE_ERROR });
-      await expect(utils.validateAbility(ability({ baseScore: 16 }), 0, '5e', 1)).resolves.toEqual({ baseScore: MAX_BASE_ERROR });
-    });
-
-    it('flags totals above the level-1 cap regardless of which increase source pushed it over', async () => {
+    it('caps totals at 20 below level 20 and 24 at level 20, whichever increase source pushed it over', async () => {
       for (const source of ['featIncrease', 'backgroundIncrease', 'miscIncrease']) {
         await expect(utils.validateAbility(ability({ baseScore: 15, [source]: 6 }), 0, '5e', 1))
           .resolves.toEqual({ totalScore: TOTAL_20_ERROR });
       }
-    });
-
-    it('applies the higher cap of 24 only at level 20', async () => {
       await expect(utils.validateAbility(ability({ baseScore: 15, featIncrease: 6 }), 0, '5e', 19))
         .resolves.toEqual({ totalScore: TOTAL_20_ERROR });
       await expect(utils.validateAbility(ability({ baseScore: 15, featIncrease: 9 }), 0, '5e', 20)).resolves.toEqual({});
@@ -218,16 +198,13 @@ describe('character-creation/utils', () => {
         .resolves.toEqual({ totalScore: 'Total score (base + improvements + misc) cannot exceed 24' });
     });
 
-    it('flags negative miscIncrease (numeric or string) and accepts zero miscIncrease', async () => {
+    it('flags negative miscIncrease (numeric or string), coerces numeric strings, and treats unparseable values as safe defaults', async () => {
       for (const miscIncrease of [-1, '-2']) {
         await expect(utils.validateAbility(ability({ miscIncrease }), 0, '5e', 1)).resolves.toEqual({ miscIncrease: MISC_ERROR });
       }
       for (const miscIncrease of [0, '0']) {
         await expect(utils.validateAbility(ability({ miscIncrease }), 0, '5e', 1)).resolves.toEqual({});
       }
-    });
-
-    it('treats numeric strings as numbers and unparseable values as safe defaults', async () => {
       await expect(utils.validateAbility(ability({ baseScore: '10', featIncrease: '2' }), 0, '5e', 1)).resolves.toEqual({});
       // Unparseable everything → score falls back to the minimum legal 8/0/0/0.
       await expect(utils.validateAbility({
@@ -238,7 +215,7 @@ describe('character-creation/utils', () => {
       }, 0, '5e', 1)).resolves.toEqual({});
     });
 
-    it('honors custom point-buy limits and a custom level-20 cap from the rules', async () => {
+    it('honors custom point-buy limits and a custom level-20 cap, falling back to the standard 8/15/20 limits when rules omit them', async () => {
       dataLoader.loadValidationRules.mockResolvedValue({
         point_buy: { min_base_score: 10, max_base_score: 14, max_total_score: 18 },
         ability_score_max: { level_20: 27 },
@@ -252,9 +229,7 @@ describe('character-creation/utils', () => {
       await expect(utils.validateAbility(ability({ baseScore: 14, featIncrease: 13 }), 0, '5e', 20)).resolves.toEqual({});
       await expect(utils.validateAbility(ability({ baseScore: 14, featIncrease: 14 }), 0, '5e', 20))
         .resolves.toEqual({ totalScore: 'Total score (base + improvements + misc) cannot exceed 27' });
-    });
 
-    it('falls back to the standard 8/15/20 limits when rules omit the point buy config', async () => {
       dataLoader.loadValidationRules.mockResolvedValue({});
       await expect(utils.validateAbility(ability({ baseScore: 7 }), 0, '5e', 1)).resolves.toEqual({ baseScore: MIN_BASE_ERROR });
       await expect(utils.validateAbility(ability({ baseScore: 16 }), 0, '5e', 1)).resolves.toEqual({ baseScore: MAX_BASE_ERROR });
@@ -265,124 +240,94 @@ describe('character-creation/utils', () => {
   });
 
   describe('validateStep', () => {
-    beforeEach(() => {
-      vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
-    });
+    const validBasics = { name: 'Test', level: 1, alignment: 'Good' };
 
-    describe('Step 2: Basic Information', () => {
-      const validFormData = { name: 'Test', level: 1, alignment: 'Good' };
-
-      it('accepts valid basics', async () => {
-        await expect(utils.validateStep(2, validFormData, stepContext())).resolves.toEqual({});
-      });
-
-      it('bubbles up the shared level validator on invalid levels', async () => {
-        await expect(utils.validateStep(2, { ...validFormData, level: 0 }, stepContext()))
+    it('step 2 accepts valid basics and bubbles up the shared level validator on invalid levels', async () => {
+      await expect(utils.validateStep(2, validBasics, stepContext())).resolves.toEqual({});
+      for (const level of [0, 21]) {
+        await expect(utils.validateStep(2, { ...validBasics, level }, stepContext()))
           .resolves.toEqual({ level: LEVEL_1_20_ERROR });
-        await expect(utils.validateStep(2, { ...validFormData, level: 21 }, stepContext()))
-          .resolves.toEqual({ level: LEVEL_1_20_ERROR });
-      });
-
-      it('flags a missing name and missing alignment together, and a whitespace name alone', async () => {
-        await expect(utils.validateStep(2, { level: 1 }, stepContext())).resolves.toEqual({
-          name: NAME_REQUIRED_STEP,
-          alignment: 'Alignment is required',
-        });
-        await expect(utils.validateStep(2, { ...validFormData, name: '   ' }, stepContext()))
-          .resolves.toEqual({ name: NAME_REQUIRED_STEP });
-      });
+      }
     });
 
-    describe('Step 3: Race', () => {
-      it('requires a race with a name, works without a context object, and accepts a valid race', async () => {
-        await expect(utils.validateStep(3, {}, stepContext())).resolves.toEqual({ race: 'Race is required' });
-        await expect(utils.validateStep(3, { race: {} }, stepContext())).resolves.toEqual({ race: 'Race is required' });
-        await expect(utils.validateStep(3, { race: { name: 'Human' } }, stepContext())).resolves.toEqual({});
-        await expect(utils.validateStep(3, { race: { name: 'Human' } })).resolves.toEqual({});
+    it('step 2 flags a missing or whitespace-only name and a missing alignment', async () => {
+      await expect(utils.validateStep(2, { level: 1 }, stepContext())).resolves.toEqual({
+        name: NAME_REQUIRED_STEP,
+        alignment: 'Alignment is required',
       });
+      await expect(utils.validateStep(2, { ...validBasics, name: '   ' }, stepContext()))
+        .resolves.toEqual({ name: NAME_REQUIRED_STEP });
     });
 
-    describe('Step 4: Subrace', () => {
-      const racesWithSubraces = [{ name: 'Elf', subraces: [{ name: 'High Elf' }, { name: 'Wood Elf' }] }];
+    // Steps 3/6 and 4/7 share the same require-a-named-entity shape; tabled once.
+    const parentNameCases = [
+      {
+        step: 3, key: 'race', error: 'Race is required', named: { name: 'Elf' },
+        context: stepContext({ racesData: [{ name: 'Elf', subraces: [{ name: 'High Elf' }] }] }),
+      },
+      {
+        step: 6, key: 'class', error: 'Class is required', named: { name: 'Fighter' },
+        context: stepContext({ classSubtypes: [{ className: 'Fighter', subtypes: [{ name: 'Champion' }] }] }),
+      },
+    ];
 
-      it('requires a subrace when the selected race offers one', async () => {
-        await expect(utils.validateStep(4, { race: { name: 'Elf' } }, stepContext({ racesData: racesWithSubraces })))
-          .resolves.toEqual({ subrace: 'Subrace is required' });
-      });
+    it('steps 3/6 require only a named race/class — an available subrace/subclass is never demanded at this step', async () => {
+      for (const { step, key, error, named, context } of parentNameCases) {
+        await expect(utils.validateStep(step, {}, context)).resolves.toEqual({ [key]: error });
+        await expect(utils.validateStep(step, { [key]: {} }, context)).resolves.toEqual({ [key]: error });
+        await expect(utils.validateStep(step, { [key]: named }, context)).resolves.toEqual({});
+        await expect(utils.validateStep(step, { [key]: named })).resolves.toEqual({});
+      }
+    });
 
-      it('skips the subrace requirement once selected, when the race offers none, is unknown, or no race is selected', async () => {
-        await expect(utils.validateStep(4, { race: { name: 'Elf', subrace: { name: 'High Elf' } } }, stepContext({ racesData: racesWithSubraces })))
-          .resolves.toEqual({});
-        const contexts = [
-          stepContext({ racesData: [{ name: 'Human', subraces: [] }] }),
-          stepContext({ racesData: [] }),
-        ];
+    const childChoiceCases = [
+      {
+        step: 4, parentKey: 'race', childKey: 'subrace', error: 'Subrace is required',
+        parent: { name: 'Elf' }, child: { name: 'High Elf' },
+        withChildren: [{ name: 'Elf', subraces: [{ name: 'High Elf' }, { name: 'Wood Elf' }] }],
+        ctxKey: 'racesData',
+      },
+      {
+        step: 7, parentKey: 'class', childKey: 'subclass', error: 'Subclass is required',
+        parent: { name: 'Fighter' }, child: { name: 'Champion' },
+        withChildren: [{ className: 'Fighter', subtypes: [{ name: 'Champion' }, { name: 'Battle Master' }] }],
+        ctxKey: 'classSubtypes',
+      },
+    ];
+
+    it('steps 4/7 require a subrace/subclass when the selected parent offers one', async () => {
+      for (const { step, parentKey, childKey, error, parent, withChildren, ctxKey } of childChoiceCases) {
+        await expect(utils.validateStep(step, { [parentKey]: parent }, stepContext({ [ctxKey]: withChildren })))
+          .resolves.toEqual({ [childKey]: error });
+      }
+    });
+
+    it('steps 4/7 skip the requirement once selected, when the parent offers none, is unknown, or is absent', async () => {
+      for (const { step, parentKey, childKey, parent, child, withChildren, ctxKey } of childChoiceCases) {
         const forms = [
-          { race: { name: 'Elf', subrace: { name: 'High Elf' } } },
-          { race: { name: 'Human' } },
-          { race: {} },
-          { race: { name: 'Gnome' } },
+          { [parentKey]: { ...parent, [childKey]: child } }, // selected
+          { [parentKey]: {} },                                 // parent offers none / absent
+          { [parentKey]: { name: 'Gnome' } },               // unknown parent
         ];
-        for (const form of forms) {
-          for (const context of contexts) {
-            await expect(utils.validateStep(4, form, context)).resolves.toEqual({});
+        for (const context of [stepContext({ [ctxKey]: withChildren }), stepContext({ [ctxKey]: [] })]) {
+          for (const form of forms) {
+            await expect(utils.validateStep(step, form, context)).resolves.toEqual({});
           }
         }
-      });
+      }
     });
 
-    describe('Step 5: Background', () => {
-      const validFormData = { name: 'Test', level: 1, alignment: 'Good' };
-
-      it('requires a background only for the 2024 ruleset', async () => {
-        await expect(utils.validateStep(5, validFormData, stepContext({ ruleset: '2024' })))
-          .resolves.toEqual({ background: 'Background is required' });
-        await expect(utils.validateStep(5, validFormData, stepContext({ ruleset: '5e' }))).resolves.toEqual({});
-        await expect(utils.validateStep(5, { ...validFormData, background: 'Soldier' }, stepContext({ ruleset: '2024' })))
-          .resolves.toEqual({});
-      });
+    it('step 5 requires a background only for the 2024 ruleset', async () => {
+      await expect(utils.validateStep(5, validBasics, stepContext({ ruleset: '2024' })))
+        .resolves.toEqual({ background: 'Background is required' });
+      await expect(utils.validateStep(5, validBasics, stepContext({ ruleset: '5e' }))).resolves.toEqual({});
+      await expect(utils.validateStep(5, { ...validBasics, background: 'Soldier' }, stepContext({ ruleset: '2024' })))
+        .resolves.toEqual({});
     });
 
-    describe('Step 6: Class', () => {
-      it('requires a class with a name but never demands a subclass at this step', async () => {
-        await expect(utils.validateStep(6, {}, stepContext())).resolves.toEqual({ class: 'Class is required' });
-        await expect(utils.validateStep(6, { class: {} }, stepContext())).resolves.toEqual({ class: 'Class is required' });
-        await expect(utils.validateStep(6, { class: { name: 'Fighter' } }, stepContext({
-          classSubtypes: [{ className: 'Fighter', subtypes: [{ name: 'Champion' }] }],
-        }))).resolves.toEqual({});
-      });
-    });
-
-    describe('Step 7: Subclass', () => {
-      const classSubtypesWithSubclasses = [{ className: 'Fighter', subtypes: [{ name: 'Champion' }, { name: 'Battle Master' }] }];
-
-      it('requires a subclass when the selected class offers one', async () => {
-        await expect(utils.validateStep(7, { class: { name: 'Fighter' } }, stepContext({ classSubtypes: classSubtypesWithSubclasses })))
-          .resolves.toEqual({ subclass: 'Subclass is required' });
-      });
-
-      it('skips the subclass requirement once selected, when the class offers none, is unknown, or no class is selected', async () => {
-        await expect(utils.validateStep(7, { class: { name: 'Fighter', subclass: { name: 'Champion' } } }, stepContext({ classSubtypes: classSubtypesWithSubclasses })))
-          .resolves.toEqual({});
-        const contexts = [
-          stepContext({ classSubtypes: [{ className: 'Fighter', subtypes: [] }] }),
-          stepContext({ classSubtypes: [] }),
-        ];
-        const forms = [
-          { class: { name: 'Fighter', subclass: { name: 'Champion' } } },
-          { class: {} },
-          { class: { name: 'Rogue' } },
-        ];
-        for (const form of forms) {
-          for (const context of contexts) {
-            await expect(utils.validateStep(7, form, context)).resolves.toEqual({});
-          }
-        }
-      });
-    });
-
-    describe('Step 9: Abilities (FT-001 total cap)', () => {
-      const abilities2024 = [
+    it('step 9 (FT-001) delegates to validateAbilityTotals under an index-keyed error', async () => {
+      // Wisdom 18 + 2 feat + 1 background = 21 at index 4, cap 20 below level 20.
+      const abilities = [
         ability({ name: 'Strength', baseScore: 8 }),
         ability({ name: 'Dexterity', baseScore: 14 }),
         ability({ name: 'Constitution', baseScore: 14 }),
@@ -390,34 +335,18 @@ describe('character-creation/utils', () => {
         ability({ name: 'Wisdom', baseScore: 18, featIncrease: 2, backgroundIncrease: 1 }),
         ability({ name: 'Charisma', baseScore: 16, backgroundIncrease: 1 }),
       ];
-      const step9Form = (abilities) => ({ level: 8, rules: '2024', abilities });
-
-      it('blocks an over-cap allocation under an index-keyed error', async () => {
-        // Wisdom 18 + 2 feat + 1 background = 21 at index 4, cap 20 below level 20.
-        await expect(utils.validateStep(9, step9Form(abilities2024), stepContext({ ruleset: '2024' })))
-          .resolves.toEqual({ ability_4_totalScore: 'Wisdom total 21 exceeds the maximum of 20' });
-      });
-
-      it('accepts a legal allocation exactly at the cap', async () => {
-        const legal = abilities2024.map(a => (a.name === 'Wisdom' ? { ...a, featIncrease: 1 } : a));
-        await expect(utils.validateStep(9, step9Form(legal), stepContext({ ruleset: '2024' }))).resolves.toEqual({});
-      });
+      await expect(utils.validateStep(9, { level: 8, rules: '2024', abilities }, stepContext({ ruleset: '2024' })))
+        .resolves.toEqual({ ability_4_totalScore: 'Wisdom total 21 exceeds the maximum of 20' });
     });
 
-    describe('steps without a registered validator', () => {
-      it('accepts unrecognized step numbers (nothing to validate)', async () => {
-        for (const step of [undefined, 0, 1, 8, 99]) {
-          await expect(utils.validateStep(step, {}, stepContext())).resolves.toEqual({});
-        }
-      });
+    it('accepts unrecognized step numbers (nothing to validate)', async () => {
+      for (const step of [undefined, 0, 1, 8, 99]) {
+        await expect(utils.validateStep(step, {}, stepContext())).resolves.toEqual({});
+      }
     });
   });
 
   describe('validateAbilityTotals', () => {
-    beforeEach(() => {
-      vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
-    });
-
     const wisdom18 = ability({ name: 'Wisdom', baseScore: 18 });
     const wisdom21 = { ...wisdom18, featIncrease: 2, backgroundIncrease: 1 }; // 18 + 2 + 1 = 21
 
@@ -451,6 +380,7 @@ describe('character-creation/utils', () => {
     });
 
     it('honors a 2024 Epic Boon cap only while it is selected (string or object entry)', async () => {
+      // Shape matches public/data/2024/feats.json (ability_score_increase.max_value).
       const boon = { name: 'Boon Of Fortitude', ability_score_increase: { max_value: 30 } };
       const formData = { level: 20, rules: '2024', abilities: [{ ...wisdom21, featIncrease: 11 }], feats: ['Boon Of Fortitude'] }; // 18 + 11 + 1 = 30 = cap
       await expect(utils.validateAbilityTotals(formData, { allFeats: [boon] })).resolves.toEqual({});
@@ -478,25 +408,21 @@ describe('character-creation/utils', () => {
 
   describe('validateAbilityTotals with racial bonuses (computeRaceBuffs seam)', () => {
     beforeEach(() => {
-      vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
       computeRaceBuffs.mockReset().mockReturnValue({ abilityScoreIncreases: [] });
     });
 
     const dwarf = { name: 'Hill Dwarf' };
     const wisdom18 = ability({ name: 'Wisdom', baseScore: 18 });
+    const formData = { level: 4, rules: '5e', race: dwarf, abilities: [wisdom18] };
 
-    it('adds 5e racial bonuses into the gated total', async () => {
-      computeRaceBuffs.mockReturnValue({ abilityScoreIncreases: [{ name: 'Wisdom', amount: 3 }] });
-      const formData = { level: 4, rules: '5e', race: dwarf, abilities: [wisdom18] }; // 18 + 3 = 21 > 20
-      await expect(utils.validateAbilityTotals(formData, { racesData: [dwarf], ruleset: '5e' }))
-        .resolves.toEqual({ ability_0_totalScore: 'Wisdom total 21 exceeds the maximum of 20' });
-      expect(computeRaceBuffs).toHaveBeenCalled();
-    });
-
-    it('accepts a total that reaches the cap only thanks to the racial bonus', async () => {
+    it('folds 5e racial bonuses into the gated total (at-cap accepted, over-cap flagged)', async () => {
       computeRaceBuffs.mockReturnValue({ abilityScoreIncreases: [{ name: 'Wisdom', amount: 2 }] });
-      const formData = { level: 4, rules: '5e', race: dwarf, abilities: [wisdom18] }; // 18 + 2 = 20 = cap
-      await expect(utils.validateAbilityTotals(formData, { racesData: [dwarf], ruleset: '5e' })).resolves.toEqual({});
+      await expect(utils.validateAbilityTotals(formData, { racesData: [dwarf], ruleset: '5e' })).resolves.toEqual({}); // 18 + 2 = 20 = cap
+
+      computeRaceBuffs.mockReturnValue({ abilityScoreIncreases: [{ name: 'Wisdom', amount: 3 }] });
+      await expect(utils.validateAbilityTotals(formData, { racesData: [dwarf], ruleset: '5e' }))
+        .resolves.toEqual({ ability_0_totalScore: 'Wisdom total 21 exceeds the maximum of 20' }); // 18 + 3 = 21 > 20
+      expect(computeRaceBuffs).toHaveBeenCalled();
     });
 
     it('stacks subrace increases on top of race increases', async () => {
@@ -504,19 +430,18 @@ describe('character-creation/utils', () => {
       computeRaceBuffs
         .mockReturnValueOnce({ abilityScoreIncreases: [{ name: 'Wisdom', amount: 2 }] })
         .mockReturnValueOnce({ abilityScoreIncreases: [{ name: 'Wisdom', amount: 1 }] });
-      const formData = { level: 4, rules: '5e', race: elf, abilities: [wisdom18] }; // 18 + 2 + 1 = 21
-      await expect(utils.validateAbilityTotals(formData, {
+      await expect(utils.validateAbilityTotals({ level: 4, rules: '5e', race: elf, abilities: [wisdom18] }, {
         racesData: [{ name: 'Elf', subraces: [{ name: 'High Elf' }] }],
         ruleset: '5e',
-      })).resolves.toEqual({ ability_0_totalScore: 'Wisdom total 21 exceeds the maximum of 20' });
+      })).resolves.toEqual({ ability_0_totalScore: 'Wisdom total 21 exceeds the maximum of 20' }); // 18 + 2 + 1 = 21
       expect(computeRaceBuffs).toHaveBeenCalledTimes(2);
     });
 
     it('ignores racial bonuses for 2024, unknown races, and no race selected — never consulting the races service', async () => {
       computeRaceBuffs.mockReturnValue({ abilityScoreIncreases: [{ name: 'Wisdom', amount: 5 }] });
-      await expect(utils.validateAbilityTotals({ level: 4, rules: '2024', race: dwarf, abilities: [wisdom18] },
+      await expect(utils.validateAbilityTotals({ ...formData, rules: '2024' },
         { racesData: [dwarf], ruleset: '2024' })).resolves.toEqual({});
-      await expect(utils.validateAbilityTotals({ level: 4, rules: '5e', race: { name: 'Gnome' }, abilities: [wisdom18] },
+      await expect(utils.validateAbilityTotals({ ...formData, race: { name: 'Gnome' } },
         { racesData: [dwarf], ruleset: '5e' })).resolves.toEqual({});
       await expect(utils.validateAbilityTotals({ level: 4, rules: '5e', abilities: [wisdom18] },
         { racesData: [dwarf], ruleset: '5e' })).resolves.toEqual({});

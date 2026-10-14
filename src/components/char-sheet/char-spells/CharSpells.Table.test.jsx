@@ -1,12 +1,14 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
- * CharSpells table suite: column structure per ruleset, the prepared-checkbox
- * seam (rendered state + toggle notification), header-driven sorting, and the
+ * CharSpells table suite: column structure per ruleset (headers, prepared
+ * column presence, checkbox rows mapped to their spell), table hiding,
+ * the prepared-checkbox toggle notification, header-driven sorting, and the
  * 2024-wizard castability gating on spell-name clicks.
  *
  * Deliberately NOT re-tested here (covered by sibling suites):
  * - effect/duration/time/notes formatting, prepared-cell text variants,
- *   overlay backdrop behaviour, abilities summary values
+ *   detail-popup opening on a 5e name click + overlay backdrop behaviour,
+ *   abilities summary values
  *   → CharSpells.Rendering.test.jsx
  * - attack-header roll seam and the Prepared-header filter toggle
  *   → CharSpells.Interactions.test.jsx
@@ -15,19 +17,10 @@
  * - getExcludedSpellNames partition logic itself
  *   → CharActions.elderChampion.test.jsx
  *
- * Notes vs the previous version:
- * - Dead mocks removed: hooks/combat/useDiceRollPopup.js does not exist
- *   (the real hook lives in DiceRollContext.js with a safe default context),
- *   and ../common/Popup.jsx never matched the real lowercase popup.jsx.
- *   Child popup stubs are dropped too — every real popup is gated behind a
- *   pending* prop that is undefined here, so they render nothing.
- * - spellSectionUtils is now stubbed (like the sibling suites): table rows
- *   come EXACTLY from the fixtures, not from live section-routing fallout.
- *   The old tests silently dropped Fireball/Magic Missile from the table via
- *   the real getExcludedSpellNames, making row-count assertions misleading.
- * - Sort tests now use fixtures whose initial order differs from the sorted
- *   order and assert the FULL column order, so a no-op sort can no longer
- *   pass (the old level-sort clicked a table that already started "sorted").
+ * Mocking policy: the roll/cast hooks never fire here (no cast clicks in
+ * this suite); they are stubbed only to keep dice/network code out of the
+ * render path. spellSectionUtils is stubbed so table rows come EXACTLY from
+ * the fixtures, not from live section-routing fallout.
  */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -121,7 +114,11 @@ function makeSpell(overrides = {}) {
   };
 }
 
-/** The rows this section renders: one checkbox row, one text row, one cantrip. */
+/**
+ * The rows this section renders: one checkbox row (Prepared → checked),
+ * one checkbox row (unprepared → unchecked), and two text rows ('Always'
+ * renders as text, never a checkbox).
+ */
 function tableSpells() {
   return [
     makeSpell({ name: 'Fireball', level: 3, prepared: 'Prepared' }),
@@ -180,7 +177,9 @@ function rowFor(spellName) {
 function checkboxFor(spellName) {
   const idx = headerLabels().indexOf('Prepared');
   expect(idx, 'Prepared column should exist').toBeGreaterThan(-1);
-  return rowFor(spellName).cells[idx].querySelector('input[type="checkbox"]');
+  const box = rowFor(spellName).cells[idx].querySelector('input[type="checkbox"]');
+  expect(box, `checkbox for "${spellName}" should exist in its Prepared cell`).toBeTruthy();
+  return box;
 }
 
 describe('CharSpells - table structure', () => {
@@ -189,41 +188,36 @@ describe('CharSpells - table structure', () => {
   });
 
   it.each`
-    label                    | statsOverrides        | expectedPreparedChecked
-    ${'5e'}                  | ${{}}                 | ${[true, false]}
-    ${'2024 non-wizard'}    | ${NON_WIZARD_2024}    | ${[]}
-    ${'2024 wizard'}        | ${WIZARD_2024}        | ${[true, false]}
-  `('renders $label headers and prepared column exactly',
-    ({ statsOverrides, expectedPreparedChecked }) => {
-      renderTable(tableSpells(), statsOverrides);
+    label                 | statsOverrides     | showPrepared
+    ${'5e'}               | ${{}}              | ${true}
+    ${'2024 wizard'}     | ${WIZARD_2024}     | ${true}
+    ${'2024 non-wizard'} | ${NON_WIZARD_2024} | ${false}
+  `('renders $label headers and prepared column exactly', ({ statsOverrides, showPrepared }) => {
+    renderTable(tableSpells(), statsOverrides);
 
-      const hasPrepared = headerLabels().includes('Prepared');
-      expect(hasPrepared).toBe(expectedPreparedChecked.length > 0);
-      expect(headerLabels()).toEqual(expectedPreparedChecked.length
-        ? ['Spell', 'Level', 'Prepared', 'Time', 'Range', 'Effect', 'Duration', 'Notes']
-        : ['Spell', 'Level', 'Time', 'Range', 'Effect', 'Duration', 'Notes']);
+    expect(headerLabels()).toEqual(showPrepared
+      ? ['Spell', 'Level', 'Prepared', 'Time', 'Range', 'Effect', 'Duration', 'Notes']
+      : ['Spell', 'Level', 'Time', 'Range', 'Effect', 'Duration', 'Notes']);
 
-      const checkboxes = screen.queryAllByRole('checkbox');
-      expect(checkboxes).toHaveLength(expectedPreparedChecked.length);
-      checkboxes.forEach((box, i) => {
-        if (expectedPreparedChecked[i]) {
-          expect(box).toBeChecked();
-        } else {
-          expect(box).not.toBeChecked();
-        }
-      });
-    });
-
-  it('hides the table when the list has no spells', () => {
-    renderTable([]);
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    // Only 'Prepared'/'' rows get a checkbox, in their own row, checked
+    // from data; 'Always' rows render text instead (variants in Rendering).
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(showPrepared ? 2 : 0);
+    if (showPrepared) {
+      expect(checkboxFor('Fireball')).toBeChecked();
+      expect(checkboxFor('Shield')).not.toBeChecked();
+    }
   });
 
-  it('renders no table and no spell abilities when spellAbilities is missing', () => {
-    const stats = { ...mockPlayerStats, spellAbilities: undefined };
+  it.each`
+    label                        | stats                                            | showSummary
+    ${'the spell list is empty'}  | ${makeStats([])}                               | ${true}
+    ${'spellAbilities is missing'} | ${{ ...mockPlayerStats, spellAbilities: undefined }} | ${false}
+  `('renders no table when $label', ({ stats, showSummary }) => {
     renderCharSpells(stats);
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    expect(screen.queryByText('Cantrips Known:')).not.toBeInTheDocument();
+    // The whole spell block (summary included) vanishes without spellAbilities;
+    // an empty list hides only the table.
+    expect(!!screen.queryByText('Cantrips Known:')).toBe(showSummary);
   });
 });
 
@@ -232,17 +226,7 @@ describe('CharSpells - prepared checkbox seam', () => {
     vi.clearAllMocks();
   });
 
-  it('renders a checkbox per toggleable spell in its Prepared cell with checked state from data', () => {
-    renderTable([
-      makeSpell({ name: 'Fireball', prepared: 'Prepared' }),
-      makeSpell({ name: 'Shield', prepared: '' }),
-    ]);
-    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
-    expect(checkboxFor('Fireball')).toBeChecked();
-    expect(checkboxFor('Shield')).not.toBeChecked();
-  });
-
-  it('notifies the handler exactly once, with the spell name, when a checkbox is clicked', () => {
+  it('clicking a spell\'s checkbox notifies the handler exactly once with that spell name', () => {
     const { handleTogglePreparedSpells } = renderTable([
       makeSpell({ name: 'Fireball', prepared: 'Prepared' }),
       makeSpell({ name: 'Shield', prepared: '' }),
@@ -260,44 +244,25 @@ describe('CharSpells - header sorting', () => {
     vi.clearAllMocks();
   });
 
-  it('sorts rows alphabetically when the Spell header is clicked', () => {
-    renderTable([
-      makeSpell({ name: 'Spike Growth', level: 2 }),
-      makeSpell({ name: 'Acid Splash', level: 0 }),
-      makeSpell({ name: 'Blade Ward', level: 0 }),
-    ]);
-    // Fixture deliberately starts unsorted so a no-op click cannot pass.
-    expect(renderedSpellNames()).toEqual(['Spike Growth', 'Acid Splash', 'Blade Ward']);
+  it.each`
+    header     | spells                                                                                              | expected
+    ${'Spell'} | ${[makeSpell({ name: 'Spike Growth', level: 2 }), makeSpell({ name: 'Acid Splash', level: 0 }), makeSpell({ name: 'Blade Ward', level: 0 })]}             | ${['Acid Splash', 'Blade Ward', 'Spike Growth']}
+    ${'Level'} | ${[makeSpell({ name: 'Counterspell', level: 3 }), makeSpell({ name: 'Shield', level: 1 }), makeSpell({ name: 'Light', level: 0 }), makeSpell({ name: 'Bless', level: 1 })]} | ${['Light', 'Bless', 'Shield', 'Counterspell']}
+  `('sorts rows by $header (then name) when its header is clicked', ({ header, spells, expected }) => {
+    renderTable(spells);
+    // Fixtures deliberately start unsorted so a no-op click cannot pass.
+    const before = renderedSpellNames();
+    expect(before).not.toEqual(expected);
 
-    fireEvent.click(screen.getByRole('columnheader', { name: 'Spell' }));
+    fireEvent.click(screen.getByRole('columnheader', { name: header }));
 
-    expect(renderedSpellNames()).toEqual(['Acid Splash', 'Blade Ward', 'Spike Growth']);
-  });
-
-  it('sorts rows by level ascending, then by name, when the Level header is clicked', () => {
-    renderTable([
-      makeSpell({ name: 'Counterspell', level: 3 }),
-      makeSpell({ name: 'Shield', level: 1 }),
-      makeSpell({ name: 'Light', level: 0 }),
-      makeSpell({ name: 'Bless', level: 1 }),
-    ]);
-    expect(renderedSpellNames()).toEqual(['Counterspell', 'Shield', 'Light', 'Bless']);
-
-    fireEvent.click(screen.getByRole('columnheader', { name: 'Level' }));
-
-    expect(renderedSpellNames()).toEqual(['Light', 'Bless', 'Shield', 'Counterspell']);
+    expect(renderedSpellNames()).toEqual(expected);
   });
 });
 
-describe('CharSpells - spell detail popup gating', () => {
+describe('CharSpells - 2024 wizard castability gating', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it('opens the detail popup when a 5e spell name is clicked', () => {
-    renderTable(tableSpells());
-    fireEvent.click(screen.getByText('Fireball'));
-    expect(screen.getByTestId('spell-detail-popup')).toHaveTextContent('Fireball');
   });
 
   it.each`
@@ -305,7 +270,7 @@ describe('CharSpells - spell detail popup gating', () => {
     ${'Shield'}     | ${false} | ${false}
     ${'Detect Magic'} | ${true} | ${true}
     ${'Fireball'}   | ${false} | ${true}
-  `('2024 wizard: unprepared $spellName (ritual: $ritual) opens detail: $opens',
+  `('unprepared $spellName (ritual: $ritual) opens detail: $opens',
     ({ spellName, ritual, opens }) => {
       renderTable([
         makeSpell({ name: 'Fireball', level: 3, prepared: 'Prepared' }),

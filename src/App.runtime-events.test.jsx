@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * App-level contract for SSE runtime events and the character lifecycle.
  *
@@ -6,12 +6,13 @@
  *
  *  1. The SSE dispatch table (App.jsx → handleRuntimeEvent, captured from
  *     the mocked Subscriber): which event keys mutate what state.
- *     - `character-delete-*` removes a roster entry by its underscore-
- *       sanitized file name (roster only — server-first keeps any open
- *       sheet until the server publishes a new active character).
- *     - `character-<update>-*` replaces a roster entry by name and swaps
- *       the active sheet in place; `character-create-*` is ignored (the
- *       create flow refreshes the roster itself).
+ *     - `character-*` one test covers the whole row: update replaces a
+ *       roster entry by name and swaps the active sheet only when the
+ *       updated character is active; create is ignored (the create flow
+ *       refreshes the roster itself); delete (own describe, own roster)
+ *       removes a roster entry by its underscore-sanitized file name
+ *       (roster only — the open sheet stays until the server publishes a
+ *       new active character, and the API is never re-called).
  *     - `pipeline-<campaign>-<key>` mirrors into the runtime store with
  *       skipSync=true (the SSE echo must never re-POST to the server).
  *     - `change-<campaign>-<key>` routes campaign keys (isCampaignKey) to
@@ -19,10 +20,10 @@
  *       also skipSync=true; bardic-inspiration prompts gate other writes
  *       until cleared.
  *     - Malformed events (null key/data, foreign campaigns) are ignored.
- *  2. End-to-end character CRUD through the App shell: the landing after
- *     campaign selection, wizard create/edit/cancel, and confirmed delete —
- *     asserted as observable UI outcomes (roster + active sheet), with
- *     campaignService stubbed at the network boundary.
+ *  2. Character CRUD through the App shell: landing after campaign
+ *     selection, wizard cancel-then-create lifecycle, edit-wizard seeding,
+ *     and confirmed delete — asserted as observable UI outcomes (roster +
+ *     active sheet), with campaignService stubbed at the network boundary.
  *
  * Deliberately NOT re-tested here:
  *  - map-activate SSE auto-open → App.map-activate.test.jsx
@@ -30,8 +31,8 @@
  *  - waiting placeholder → App.map-unavailable.test.jsx
  *  - view/theme reset transitions → App.state-transitions.test.jsx
  *  - post-rollback carry-over → App.post-restore.test.jsx
- *  - confirm/cancel and service-call internals of delete/create/edit →
- *    useCharacterManagement.test.js and useCharacterWizard*.test.js
+ *  - wizard alert/refresh internals on failure → useCharacterWizard.test.js
+ *  - delete confirm/callback state → useCharacterManagement.test.js
  *  - HTTP semantics of campaignService → campaignService.test.js
  */
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
@@ -308,24 +309,14 @@ describe('App - Runtime Events & State Management', () => {
   });
 
   describe('Campaign selection landing', () => {
-    it('lands on the first character sheet and lists the whole roster', async () => {
+    it('lands on the first character sheet, lists the whole roster, and switches sheets on sidebar clicks', async () => {
       await renderInCampaign([...PARTY, { name: 'Gimli', level: 3 }]);
 
       expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();
       expect(screen.getByTestId('char-btn-Legolas')).toBeInTheDocument();
       expect(screen.getByTestId('char-btn-Gimli')).toBeInTheDocument();
       expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
-    });
-
-    it('auto-opens the creation wizard when the selected campaign has no characters', async () => {
-      await renderInCampaign([]);
-
-      expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
-      expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-    });
-
-    it('switches the active sheet when a different sidebar character is clicked', async () => {
-      await renderInCampaign([...PARTY, { name: 'Gimli', level: 3 }]);
+      expect(screen.getByTestId('character-level')).toHaveTextContent('1');
 
       fireEvent.click(screen.getByTestId('char-btn-Gimli'));
       await waitFor(() => {
@@ -338,16 +329,32 @@ describe('App - Runtime Events & State Management', () => {
         expect(screen.getByTestId('character-name')).toHaveTextContent('Legolas');
       });
     });
+
+    it('auto-opens the creation wizard when the selected campaign has no characters', async () => {
+      await renderInCampaign([]);
+
+      expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
+      expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+    });
   });
 
   describe('Character creation wizard', () => {
-    it('creates the character, closes the wizard, and refreshes the roster from the server', async () => {
+    it('cancels without creating, then creates on complete and refreshes the roster from the server', async () => {
       await renderInCampaign();
 
+      // Cancel closes the wizard and touches nothing.
       fireEvent.click(screen.getByTestId('add-character-btn'));
       await waitFor(() => {
         expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
       });
+
+      fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
+      });
+      expect(campaignService.createCharacter).not.toHaveBeenCalled();
+      expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();
+      expect(screen.getByTestId('char-btn-Legolas')).toBeInTheDocument();
 
       // Server-side truth for the roster refresh the create flow performs.
       const created = { name: 'New Character', level: 1 };
@@ -359,6 +366,11 @@ describe('App - Runtime Events & State Management', () => {
           return Promise.resolve(jsonResponse(created));
         }
         return Promise.resolve(jsonResponse({}));
+      });
+
+      fireEvent.click(screen.getByTestId('add-character-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
       });
 
       await act(async () => {
@@ -393,24 +405,6 @@ describe('App - Runtime Events & State Management', () => {
       expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('server offline'));
       expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
       expect(screen.queryByTestId('char-btn-New Character')).not.toBeInTheDocument();
-    });
-
-    it('cancels the wizard without creating anything', async () => {
-      await renderInCampaign();
-
-      fireEvent.click(screen.getByTestId('add-character-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
-      });
-
-      expect(campaignService.createCharacter).not.toHaveBeenCalled();
-      expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();
-      expect(screen.getByTestId('char-btn-Legolas')).toBeInTheDocument();
     });
   });
 
@@ -470,7 +464,7 @@ describe('App - Runtime Events & State Management', () => {
       await renderInCampaign();
     });
 
-    it('replaces a roster entry and swaps the active sheet on a character-update event', async () => {
+    it('character-update replaces a roster entry (swapping the active sheet only for the active character); character-create is ignored', async () => {
       await dispatch({
         key: 'character-update-test-campaign-Aragorn.json',
         data: { name: 'Aragorn', level: 5 },
@@ -479,43 +473,25 @@ describe('App - Runtime Events & State Management', () => {
       expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();
       expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
       expect(screen.getByTestId('character-level')).toHaveTextContent('5');
-    });
 
-    it('leaves the active sheet untouched when updating a different character', async () => {
+      // Updating a NON-active character must leave the open sheet untouched.
       await dispatch({
         key: 'character-update-test-campaign-Legolas.json',
         data: { name: 'Legolas', level: 9 },
       });
-      await flushEffects();
 
       expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
-      expect(screen.getByTestId('character-level')).toHaveTextContent('1');
-    });
+      expect(screen.getByTestId('character-level')).toHaveTextContent('5');
 
-    it('removes a character on a delete event echoed from another client, without re-calling the API', async () => {
-      await dispatch({
-        key: 'character-delete-test-campaign-Aragorn.json',
-        data: { file: 'Aragorn.json' },
-      });
-
-      expect(screen.queryByTestId('char-btn-Aragorn')).not.toBeInTheDocument();
-      expect(screen.getByTestId('char-btn-Legolas')).toBeInTheDocument();
-      // Remote deletes touch the roster only — a sheet another client still
-      // holds open stays rendered until the server publishes a new active
-      // character (the API was already called by the originating client).
-      expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
-      expect(campaignService.deleteCharacter).not.toHaveBeenCalled();
-    });
-
-    it('ignores character-create events — the roster is refreshed by the create flow itself', async () => {
+      // Creates are ignored — the create flow refreshes the roster itself.
       await dispatch({
         key: 'character-create-test-campaign-stranger.json',
         data: { name: 'Stranger', level: 1 },
       });
-      await flushEffects();
 
       expect(screen.queryByTestId('char-btn-Stranger')).not.toBeInTheDocument();
       expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();
+      expect(screen.getByTestId('char-btn-Legolas')).toBeInTheDocument();
     });
 
     it('mirrors pipeline events into the runtime store with skipSync (never re-posting the SSE echo)', async () => {
@@ -575,7 +551,6 @@ describe('App - Runtime Events & State Management', () => {
       getStore.mockImplementation(() => campaignStore);
 
       await dispatch(event);
-      await flushEffects();
 
       expect(writesFor('Aragorn')).toHaveLength(0);
       expect(writesFor('damage:rolled')).toHaveLength(0);
@@ -585,10 +560,13 @@ describe('App - Runtime Events & State Management', () => {
     });
   });
 
-  // Roster removal contract with a display name whose file name is sanitized
-  // differently (space → underscore). Own describe: renders its own roster.
-  describe('SSE character-delete file name matching', () => {
-    it('matches delete file names by underscore sanitization of the display name', async () => {
+  // Remote deletes (SSE echoes from another client) touch the roster only —
+  // a sheet another client still holds open stays rendered until the server
+  // publishes a new active character, and the API is never re-called here.
+  // Matches delete file names by underscore sanitization of the display name
+  // ("Sir Basil" → Sir_Basil.json). Own describe: renders its own roster.
+  describe('SSE character-delete events', () => {
+    it('removes the roster entry by sanitized file name without re-calling the API', async () => {
       await renderInCampaign([{ name: 'Sir Basil', level: 4 }, { name: 'Legolas', level: 2 }]);
 
       await dispatch({
@@ -598,6 +576,8 @@ describe('App - Runtime Events & State Management', () => {
 
       expect(screen.queryByTestId('char-btn-Sir Basil')).not.toBeInTheDocument();
       expect(screen.getByTestId('char-btn-Legolas')).toBeInTheDocument();
+      expect(screen.getByTestId('character-name')).toHaveTextContent('Sir Basil');
+      expect(campaignService.deleteCharacter).not.toHaveBeenCalled();
     });
   });
 });

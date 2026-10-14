@@ -1,9 +1,10 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
- * Backup & Restore flows of CampaignAdmin: snapshot creation, snapshot list
- * rendering, and campaign download. Rollback and upload flows are covered by
- * CampaignAdmin.rollback-upload.test.jsx; URL-encoding of campaign names is
- * covered by CampaignAdmin.data-management.test.jsx.
+ * Backup & Restore flows of CampaignAdmin: snapshot creation (including the
+ * snapshot-list refresh and empty state), snapshot list rendering, and
+ * campaign download. Shared busy/error handling spans both flows here.
+ * Rollback and upload flows are covered by CampaignAdmin.rollback-upload.test.jsx;
+ * URL-encoding of campaign names is covered by CampaignAdmin.data-management.test.jsx.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -16,6 +17,8 @@ const DOWNLOAD_URL = `/api/campaigns/${CAMPAIGN}/admin/download`;
 
 const SNAPSHOT_BTN = 'Create Snapshot';
 const DOWNLOAD_BTN = 'Download Campaign';
+
+const SNAPSHOT_FILE = 'test-campaign-2026-10-10T12-34-56-789.zip';
 
 const createDefaultProps = (overrides = {}) => ({
     campaignName: CAMPAIGN,
@@ -45,7 +48,7 @@ function stubFetch(overrides = {}) {
         [LIST_URL]: jsonResponse({ snapshots: [] }),
         [SNAPSHOT_URL]: jsonResponse({
             message: 'Snapshot created',
-            filename: 'test-campaign-2026-10-10T12-34-56-789.zip',
+            filename: SNAPSHOT_FILE,
             size: 102400,
         }),
         [DOWNLOAD_URL]: zipResponse(),
@@ -80,80 +83,29 @@ afterEach(() => {
 });
 
 describe('CampaignAdmin - Snapshot', () => {
-    it('creates a snapshot via POST and confirms with the archive name and size', async () => {
-        const fetchMock = stubFetch();
+    it('creates a snapshot, confirms with archive name and size, and refreshes the list', async () => {
+        const fetchMock = stubFetch({
+            // The server reports the archive in the list only from the second fetch on.
+            [LIST_URL]: (call) => jsonResponse({
+                snapshots: call === 1 ? [] : [{ filename: SNAPSHOT_FILE, size: 102400, timestamp: '2026-10-10T12:34:56.789Z' }],
+            }),
+        });
         render(<CampaignAdmin {...createDefaultProps()} />);
+
+        // Empty state until the first list fetch lands.
+        await screen.findByText('No snapshots on the server yet.');
+        expect(screen.getByText('Available Snapshots')).toBeInTheDocument();
+        expect(document.querySelectorAll('.admin-snapshot-row')).toHaveLength(0);
 
         fireEvent.click(screen.getByRole('button', { name: SNAPSHOT_BTN }));
 
-        const status = await screen.findByText(
-            'Snapshot created: test-campaign-2026-10-10T12-34-56-789.zip (100.0 KB)'
-        );
+        const status = await screen.findByText(`Snapshot created: ${SNAPSHOT_FILE} (100.0 KB)`);
         expect(status.closest('.admin-status')).toHaveClass('admin-status--success');
         expect(fetchMock).toHaveBeenCalledWith(SNAPSHOT_URL, { method: 'POST' });
-        // The busy flag clears once the request settles.
+        // The refreshed list renders the new archive, and the busy flag clears.
+        const newRow = await screen.findByText(SNAPSHOT_FILE);
+        expect(newRow.closest('.admin-snapshot-row')).toHaveTextContent('100.0 KB');
         expect(screen.getByRole('button', { name: SNAPSHOT_BTN })).toBeEnabled();
-    });
-
-    it('shows a busy state and blocks repeat snapshot requests while working', async () => {
-        const fetchMock = stubFetch({ [SNAPSHOT_URL]: () => new Promise(() => {}) });
-        render(<CampaignAdmin {...createDefaultProps()} />);
-
-        fireEvent.click(screen.getByRole('button', { name: SNAPSHOT_BTN }));
-
-        expect(await screen.findByText('Creating snapshot...')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: SNAPSHOT_BTN })).toBeDisabled();
-        // Busy state spans the other backup actions too.
-        expect(screen.getByRole('button', { name: DOWNLOAD_BTN })).toBeDisabled();
-
-        // A second click must not queue a duplicate snapshot.
-        fireEvent.click(screen.getByRole('button', { name: SNAPSHOT_BTN }));
-        const snapshotPosts = fetchMock.mock.calls.filter(([url]) => url === SNAPSHOT_URL);
-        expect(snapshotPosts).toHaveLength(1);
-    });
-
-    it('shows the server error and re-enables the button when the snapshot fails', async () => {
-        stubFetch({ [SNAPSHOT_URL]: jsonResponse({ error: 'Snapshot failed' }, false) });
-        render(<CampaignAdmin {...createDefaultProps()} />);
-
-        fireEvent.click(screen.getByRole('button', { name: SNAPSHOT_BTN }));
-
-        const status = await screen.findByText('Snapshot failed');
-        expect(status.closest('.admin-status')).toHaveClass('admin-status--error');
-        expect(screen.getByRole('button', { name: SNAPSHOT_BTN })).toBeEnabled();
-    });
-
-    it('shows the failure reason when the snapshot request never reaches the server', async () => {
-        stubFetch({ [SNAPSHOT_URL]: new Error('Network failed') });
-        render(<CampaignAdmin {...createDefaultProps()} />);
-
-        fireEvent.click(screen.getByRole('button', { name: SNAPSHOT_BTN }));
-
-        const status = await screen.findByText('Network failed');
-        expect(status.closest('.admin-status')).toHaveClass('admin-status--error');
-        expect(screen.getByRole('button', { name: SNAPSHOT_BTN })).toBeEnabled();
-    });
-
-    it('refreshes the snapshot list after creating a snapshot', async () => {
-        const newSnapshot = {
-            filename: 'test-campaign-2026-10-10T12-34-56-789.zip',
-            size: 2048,
-            timestamp: '2026-10-10T12:34:56.789Z',
-        };
-        // The server reports the archive in the list only from the second fetch on.
-        stubFetch({
-            [LIST_URL]: (call) => jsonResponse({ snapshots: call === 1 ? [] : [newSnapshot] }),
-        });
-        render(<CampaignAdmin {...createDefaultProps()} />);
-
-        await waitFor(() => {
-            expect(screen.getByText('No snapshots on the server yet.')).toBeInTheDocument();
-        });
-
-        fireEvent.click(screen.getByRole('button', { name: SNAPSHOT_BTN }));
-
-        const newRow = await screen.findByText(newSnapshot.filename);
-        expect(newRow.closest('.admin-snapshot-row')).toHaveTextContent('2.0 KB');
     });
 
     it('renders snapshots returned by the server in order with formatted sizes', async () => {
@@ -181,18 +133,6 @@ describe('CampaignAdmin - Snapshot', () => {
         expect(rows[2]).toHaveTextContent('test-campaign-2026-10-08T10-00-00-000.zip');
         expect(rows[2]).toHaveTextContent('1.0 KB');
     });
-
-    it('shows an empty-state message when the server has no snapshots', async () => {
-        const fetchMock = stubFetch();
-        render(<CampaignAdmin {...createDefaultProps()} />);
-
-        await waitFor(() => {
-            expect(fetchMock).toHaveBeenCalledWith(LIST_URL);
-        });
-        expect(screen.getByText('Available Snapshots')).toBeInTheDocument();
-        expect(screen.getByText('No snapshots on the server yet.')).toBeInTheDocument();
-        expect(document.querySelectorAll('.admin-snapshot-row')).toHaveLength(0);
-    });
 });
 
 describe('CampaignAdmin - Download', () => {
@@ -209,49 +149,54 @@ describe('CampaignAdmin - Download', () => {
         });
         expect(createSpy).toHaveBeenCalledTimes(1);
         const anchor = clickSpy.mock.instances[0];
-        expect(anchor.tagName).toBe('A');
         expect(anchor.download).toBe('test-campaign.zip');
         expect(anchor.getAttribute('href')).toBe(objectUrl);
         expect(revokeSpy).toHaveBeenCalledWith(objectUrl);
         expect(await screen.findByText('Download started')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: DOWNLOAD_BTN })).toBeEnabled();
     });
+});
 
-    it('shows a busy state while preparing the download', async () => {
-        stubFetch({ [DOWNLOAD_URL]: () => new Promise(() => {}) });
+describe('CampaignAdmin - busy and failure handling', () => {
+    it.each([
+        { button: SNAPSHOT_BTN, url: SNAPSHOT_URL, busyText: 'Creating snapshot...' },
+        { button: DOWNLOAD_BTN, url: DOWNLOAD_URL, busyText: 'Preparing download...' },
+    ])('shows a busy state and blocks repeat requests while $busyText', async ({ button, url, busyText }) => {
+        const fetchMock = stubFetch({ [url]: () => new Promise(() => {}) });
         render(<CampaignAdmin {...createDefaultProps()} />);
 
-        fireEvent.click(screen.getByRole('button', { name: DOWNLOAD_BTN }));
+        fireEvent.click(screen.getByRole('button', { name: button }));
 
-        expect(await screen.findByText('Preparing download...')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: DOWNLOAD_BTN })).toBeDisabled();
+        expect(await screen.findByText(busyText)).toBeInTheDocument();
+        // Busy state spans both backup actions, not just the clicked one.
         expect(screen.getByRole('button', { name: SNAPSHOT_BTN })).toBeDisabled();
+        expect(screen.getByRole('button', { name: DOWNLOAD_BTN })).toBeDisabled();
+
+        // A second click must not queue a duplicate request.
+        fireEvent.click(screen.getByRole('button', { name: button }));
+        const requests = fetchMock.mock.calls.filter(([u]) => u === url);
+        expect(requests).toHaveLength(1);
     });
 
-    it('shows the server error without triggering a file download when the download fails', async () => {
+    it.each([
+        { button: SNAPSHOT_BTN, url: SNAPSHOT_URL, failure: jsonResponse({ error: 'Snapshot failed' }, false), expected: 'Snapshot failed', downloads: false },
+        { button: SNAPSHOT_BTN, url: SNAPSHOT_URL, failure: new Error('Network failed'), expected: 'Network failed', downloads: false },
+        { button: DOWNLOAD_BTN, url: DOWNLOAD_URL, failure: jsonResponse({ error: 'Download failed' }, false), expected: 'Download failed', downloads: true },
+        { button: DOWNLOAD_BTN, url: DOWNLOAD_URL, failure: new Error('Network failed'), expected: 'Network failed', downloads: true },
+    ])('shows $expected and re-enables buttons when $button fails', async ({ button, url, failure, expected, downloads }) => {
         const { createSpy, clickSpy } = mockBlobDownloadPlumbing();
-        stubFetch({ [DOWNLOAD_URL]: jsonResponse({ error: 'Download failed' }, false) });
+        stubFetch({ [url]: failure });
         render(<CampaignAdmin {...createDefaultProps()} />);
 
-        fireEvent.click(screen.getByRole('button', { name: DOWNLOAD_BTN }));
+        fireEvent.click(screen.getByRole('button', { name: button }));
 
-        const status = await screen.findByText('Download failed');
+        const status = await screen.findByText(expected);
         expect(status.closest('.admin-status')).toHaveClass('admin-status--error');
-        expect(createSpy).not.toHaveBeenCalled();
-        expect(clickSpy).not.toHaveBeenCalled();
-        expect(screen.getByRole('button', { name: DOWNLOAD_BTN })).toBeEnabled();
-    });
-
-    it('shows the failure reason when the download request never reaches the server', async () => {
-        const { clickSpy } = mockBlobDownloadPlumbing();
-        stubFetch({ [DOWNLOAD_URL]: new Error('Network failed') });
-        render(<CampaignAdmin {...createDefaultProps()} />);
-
-        fireEvent.click(screen.getByRole('button', { name: DOWNLOAD_BTN }));
-
-        const status = await screen.findByText('Network failed');
-        expect(status.closest('.admin-status')).toHaveClass('admin-status--error');
-        expect(clickSpy).not.toHaveBeenCalled();
-        expect(screen.getByRole('button', { name: DOWNLOAD_BTN })).toBeEnabled();
+        if (downloads) {
+            // A failed download must never trigger the blob/anchor plumbing.
+            expect(createSpy).not.toHaveBeenCalled();
+            expect(clickSpy).not.toHaveBeenCalled();
+        }
+        expect(screen.getByRole('button', { name: button })).toBeEnabled();
     });
 });

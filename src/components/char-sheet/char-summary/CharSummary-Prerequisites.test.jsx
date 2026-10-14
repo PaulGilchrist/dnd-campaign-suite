@@ -1,11 +1,13 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Coverage ownership (CharSummary family delegation):
 //   OWNED HERE (per sibling delegation comments):
 //   - Feat popup content: showFeatDetailPopup rendering of prerequisites
-//     (level / ability_scores / proficiency, combinations, iteration),
-//     5e array desc, 2024 string description, benefits, and the
-//     "no desc → popup never opens" guard.
+//     (level / ability_scores / proficiency, including the multi-entry
+//     ability loop), all three description formats (5e array, 2024 string
+//     `description`, plain string `desc`), benefits (object + string entries,
+//     empty-array omission), and the "no desc/description → popup never
+//     opens" guard.
 //   - Short Rest modal open/close flow (delegated here by
 //     CharSummary-EventHandlers and CharSummary-Display): Close button
 //     dismisses without completing; Complete button dismisses AND fires the
@@ -22,35 +24,15 @@
 //   - Background popup → CharSummary-UI-Interactions.test.jsx
 //
 // Improvements (2026-10-14):
-//   - Removed the "Ally Modal Open Fallback Characters Map" describe — it
-//     merely asserted the modal opens (passes even if the fallback produced
-//     an empty list); CharSummary-Ally-Initiative proves the fallback with
-//     real creature-name assertions.
-//   - Removed the pair-combination prerequisite cases (level+ability,
-//     level+proficiency, ability+proficiency): the three single-facet cases
-//     plus the all-three case cover the same independent truthy branches.
-//   - Each it.each case now carries an explicit feat fixture instead of
-//     deriving the feat name from its prerequisites (`?.proficiency ? 'Heavy
-//     Armor' : 'Tough'` cleverness) — every popup is also asserted to carry
-//     the feat name and description.
-//   - Short rest mock splits Close (onClose only) from Complete (onComplete)
-//     so closing no longer silently triggers completion; added a Complete
-//     test asserting the parent onLongRest callback fires, and a Close test
-//     asserting it does NOT.
-//   - Added missing-description guard test, empty-benefits negative test,
-//     5e array-desc and 2024 string-description content cases.
-//   - Ally cancel now proves "cancel persists nothing": setRuntimeValue and
-//     addEntry must not have been called.
-//   - Copy-pasted 12-field stats overrides removed — every test renders
-//     through mockPlayerStats + spread.
-//   - Dropped unused mocks/imports (getActiveBuffs re-defaults, attackCalc
-//     duplicate is kept only where the module graph needs it — it does,
-//     charSummaryCalc imports it), the externalWrapper merge in the render
-//     helper (never used), and the redundant jest-dom import (setup.js
-//     registers it).
-//
-// Before: 14 tests / 345 lines
-// After:  16 tests / ~300 lines
+//   - Collapsed the feat-popup describe from 11 tests to 4: showFeatDetailPopup
+//     is a linear builder, so one rich feat (array desc + all three prereq
+//     facets + multi-entry ability loop + both benefit shapes) and two spare
+//     feats (string desc with sections absent; 2024 `description` fallback)
+//     exercise every branch, with the guard test pinning the never-opens
+//     path. Single-facet prereq cases, the separate null-prereqs /
+//     benefits / empty-benefits cases re-rendered the same popup path for
+//     marginal assertion gain.
+//   - Before: 16 tests → After: 9 tests.
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -187,135 +169,80 @@ function renderSummary(statsOverride = {}, props = {}) {
     return setPopupHtml;
 }
 
-function openFeatPopup(feat, statsOverride = {}) {
-    const setPopupHtml = renderSummary({ ...statsOverride, feats: [feat] });
+function openFeatPopup(feat) {
+    const setPopupHtml = renderSummary({ feats: [feat] });
     fireEvent.click(screen.getByRole('button', { name: 'Feats' }));
     return setPopupHtml;
 }
 
 // ---------------------------------------------------------------------------
-// Feat popup — prerequisites section
+// Feat popup — every branch of showFeatDetailPopup in one pass:
+// rich feat covers array-desc, all prerequisite facets (incl. the
+// multi-entry ability loop) and both benefit shapes; the spare feats cover
+// the plain-string and 2024-desc branches with sections absent.
 // ---------------------------------------------------------------------------
-describe('CharSummary - Feat Popup Prerequisites', () => {
+describe('CharSummary - Feat Popup', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
     it.each([
         {
-            label: 'a level requirement only',
-            feat: { name: 'Tough', desc: 'Extra hit points', prerequisites: { level: 9 } },
-            expected: ['Level 9'],
-            unexpected: ['or higher', 'Proficiency with'],
-        },
-        {
-            label: 'an ability score requirement only',
-            feat: { name: 'Alert', desc: 'Quick to react', prerequisites: { ability_scores: [{ name: 'STR', minimum: 13 }] } },
-            expected: ['STR 13 or higher'],
-            unexpected: ['Level ', 'Proficiency with'],
-        },
-        {
-            label: 'a proficiency requirement only',
-            feat: { name: 'Heavily Armored', desc: 'Can wear heavy armor', prerequisites: { proficiency: 'Heavy Armor' } },
-            expected: ['Proficiency with Heavy Armor'],
-            unexpected: ['Level ', 'or higher'],
-        },
-        {
-            label: 'all three prerequisite types',
+            label: 'every prerequisite facet, array desc, and both benefit shapes',
             feat: {
                 name: 'Grappler',
-                desc: 'You are a master of grappling',
+                desc: ['You are a master of grappling.', 'Extra array line.'],
                 prerequisites: {
                     level: 4,
-                    ability_scores: [{ name: 'DEX', minimum: 15 }],
+                    ability_scores: [
+                        { name: 'DEX', minimum: 15 },
+                        { name: 'STR', minimum: 13 },
+                    ],
                     proficiency: 'Martial Weapons',
                 },
+                benefits: [
+                    { description: 'Hit point maximum increases by 2 per level' },
+                    'No encumbrance penalty',
+                ],
             },
-            expected: ['Prerequisites:', 'Level 4', 'DEX 15 or higher', 'Proficiency with Martial Weapons'],
+            expected: [
+                '<b>Prerequisites:</b>',
+                'Level 4',
+                'DEX 15 or higher',
+                'STR 13 or higher',
+                'Proficiency with Martial Weapons',
+                '<b>Benefits:</b>',
+                '<li>Hit point maximum increases by 2 per level</li>',
+                '<li>No encumbrance penalty</li>',
+                'You are a master of grappling.',
+                'Extra array line.',
+            ],
             unexpected: [],
         },
         {
-            label: 'multiple ability score entries (each on its own line)',
-            feat: {
-                name: 'Metamagic Adept',
-                desc: 'You have learned some of a sorcerer\u2019s magic',
-                prerequisites: {
-                    ability_scores: [
-                        { name: 'INT', minimum: 13 },
-                        { name: 'WIS', minimum: 13 },
-                        { name: 'CHA', minimum: 13 },
-                    ],
-                },
-            },
-            expected: ['INT 13 or higher', 'WIS 13 or higher', 'CHA 13 or higher'],
-            unexpected: ['Level ', 'Proficiency with'],
+            label: 'a plain string desc omits both optional sections',
+            feat: { name: 'Tough', desc: 'Extra hit points', prerequisites: null },
+            expected: ['<b>Tough</b>', 'Extra hit points'],
+            unexpected: ['Prerequisites:', 'Benefits:', 'undefined'],
+        },
+        {
+            label: 'the 2024 string description field when desc is absent',
+            feat: { name: 'Alert', description: 'You gain a +5 bonus to initiative.', prerequisites: null },
+            expected: ['<b>Alert</b>', 'You gain a +5 bonus to initiative.'],
+            unexpected: ['Prerequisites:', 'Benefits:', 'undefined'],
         },
     ])('lists $label when the feat popup opens', ({ feat, expected, unexpected }) => {
         const setPopupHtml = openFeatPopup(feat);
 
         expect(setPopupHtml).toHaveBeenCalledTimes(1);
         const html = setPopupHtml.mock.calls[0][0];
-        expect(html).toContain('<b>Prerequisites:</b>');
         expect(html).toContain(feat.name);
-        expect(html).toContain(feat.desc);
         for (const text of expected) {
             expect(html).toContain(text);
         }
         for (const text of unexpected) {
             expect(html).not.toContain(text);
         }
-    });
-
-    it('omits the Prerequisites section entirely when prerequisites is null', () => {
-        const feat = { name: 'Tough', desc: 'Extra hit points', prerequisites: null };
-        const setPopupHtml = openFeatPopup(feat);
-
-        expect(setPopupHtml).toHaveBeenCalledTimes(1);
-        const html = setPopupHtml.mock.calls[0][0];
-        expect(html).toContain(feat.name);
-        expect(html).toContain(feat.desc);
-        expect(html).not.toContain('Prerequisites:');
-    });
-
-    it('renders 5e array descriptions entry by entry', () => {
-        const feat = {
-            name: 'Lucky',
-            desc: ['You have inexplicable luck.', 'You can reroll one roll.'],
-            prerequisites: null,
-        };
-        const html = openFeatPopup(feat).mock.calls[0][0];
-
-        expect(html).toContain(feat.desc[0]);
-        expect(html).toContain(feat.desc[1]);
-    });
-
-    it('renders the 2024 string description field when desc is absent', () => {
-        const feat = { name: 'Alert', description: 'You gain a +5 bonus to initiative.', prerequisites: null };
-        const html = openFeatPopup(feat).mock.calls[0][0];
-
-        expect(html).toContain('You gain a +5 bonus to initiative.');
-        expect(html).not.toContain('undefined');
-    });
-
-    it('renders benefits from both object and string entries', () => {
-        const feat = {
-            name: 'Tough',
-            desc: 'Extra hit points',
-            prerequisites: null,
-            benefits: [{ description: 'Hit point maximum increases by 2 per level' }, 'No encumbrance penalty'],
-        };
-        const html = openFeatPopup(feat).mock.calls[0][0];
-
-        expect(html).toContain('<b>Benefits:</b>');
-        expect(html).toContain('<li>Hit point maximum increases by 2 per level</li>');
-        expect(html).toContain('<li>No encumbrance penalty</li>');
-    });
-
-    it('omits the Benefits section for an empty benefits array', () => {
-        const feat = { name: 'Tough', desc: 'Extra hit points', prerequisites: null, benefits: [] };
-        const html = openFeatPopup(feat).mock.calls[0][0];
-
-        expect(html).not.toContain('Benefits:');
     });
 
     it('never opens the popup when the feat has no desc or description', () => {

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 // FT-068 regression: SpellDetailPopup Quick Ritual affordance for Ritual Master
 // feat-granted prepared ritual spells — the checkbox offers a regular-casting-time
 // slot-free cast, is disabled + warned once the once-per-long-rest counter
@@ -9,6 +9,8 @@
 //     ......... SpellDetailPopup.rageRestriction.test.jsx
 //   - Quick Ritual blocked while raging .... SpellDetailPopup.rageRestriction.test.jsx
 //   - CLA-299 Cast-as-Ritual channel ........ SpellDetailPopup.ritualAdept.test.jsx
+//   - counter write/reset + downstream payment ... service tests (spellPreparationService,
+//     restRules-longRest, featBuffService)
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -100,56 +102,42 @@ describe('SpellDetailPopup — FT-068 Quick Ritual', () => {
     expect(screen.queryByText(/Quick Ritual already used/)).not.toBeInTheDocument();
   });
 
-  it('sends quickRitual:true in the cast payload while the box is ticked', () => {
+  // Checkbox ↔ payload channel: payload is quickRitual:true only while ticked,
+  // whether the box was never touched or ticked-then-unticked again.
+  it.each([
+    { label: 'untouched', clicks: 0, expected: false },
+    { label: 'ticked', clicks: 1, expected: true },
+    { label: 'ticked then unticked', clicks: 2, expected: false },
+  ])('sends quickRitual:$expected in the cast payload when the box is $label', ({ clicks, expected }) => {
     const onCast = renderPopup({ spell: makeGrantedRitual() });
 
-    fireEvent.click(quickRitualCheckbox());
-    expect(quickRitualCheckbox()).toBeChecked();
+    for (let i = 0; i < clicks; i += 1) {
+      fireEvent.click(quickRitualCheckbox());
+    }
+    // UI state and payload must agree on whether the box is ticked.
+    expect(quickRitualCheckbox().checked).toBe(expected);
 
     fireEvent.click(castButton());
     expect(onCast).toHaveBeenCalledTimes(1);
-    expect(onCast.mock.calls[0][0].quickRitual).toBe(true);
+    expect(onCast.mock.calls[0][0].quickRitual).toBe(expected);
   });
 
-  it('reverts the payload to quickRitual:false when the ticked box is unticked again', () => {
-    const onCast = renderPopup({ spell: makeGrantedRitual() });
-
-    fireEvent.click(quickRitualCheckbox());
-    fireEvent.click(quickRitualCheckbox());
-    expect(quickRitualCheckbox()).not.toBeChecked();
-
-    fireEvent.click(castButton());
-    expect(onCast).toHaveBeenCalledTimes(1);
-    expect(onCast.mock.calls[0][0].quickRitual).toBe(false);
-  });
-
-  it('never sends quickRitual:true when the box is left untouched', () => {
-    const onCast = renderPopup({ spell: makeGrantedRitual() });
-
-    fireEvent.click(castButton());
-    expect(onCast).toHaveBeenCalledTimes(1);
-    expect(onCast.mock.calls[0][0].quickRitual).toBe(false);
-  });
-
-  it('disables the checkbox and warns once Quick Ritual is spent for the Long Rest', () => {
+  it('disables, warns, and refuses to arm Quick Ritual once spent for the Long Rest', () => {
     markQuickRitualSpent();
-    renderPopup({ spell: makeGrantedRitual() });
+    const onCast = renderPopup({ spell: makeGrantedRitual() });
 
     expect(quickRitualCheckbox()).toBeDisabled();
     expect(screen.getByText(/Quick Ritual already used/)).toBeInTheDocument();
     // Server-first contract: the spent state is subscribed from the canonical
-    // runtime key that restRules-longRest resets.
+    // runtime key that restRules-longRest resets, scoped to this campaign.
     expect(vi.mocked(useRuntimeValue)).toHaveBeenCalledWith(
       'HexWarlock',
       QUICK_RITUAL_USED_KEY,
       CAMPAIGN
     );
-  });
 
-  it('cannot arm a spent Quick Ritual — casts fall back to quickRitual:false with a paid slot', () => {
-    markQuickRitualSpent();
-    const onCast = renderPopup({ spell: makeGrantedRitual() });
-
+    // Clicking the disabled box cannot arm it — the cast falls back to
+    // quickRitual:false (paid slot).
     fireEvent.click(quickRitualCheckbox());
     expect(quickRitualCheckbox()).not.toBeChecked();
 
@@ -158,14 +146,12 @@ describe('SpellDetailPopup — FT-068 Quick Ritual', () => {
     expect(onCast.mock.calls[0][0].quickRitual).toBe(false);
   });
 
-  describe('affordance eligibility', () => {
-    it.each([
-      { label: 'an ungranted ritual spell', spell: makeGrantedRitual({ _ritualMasterRitual: undefined }) },
-      { label: 'a granted marker on a non-ritual spell', spell: makeGrantedRitual({ ritual: false }) },
-    ])('does not offer Quick Ritual for $label', ({ spell }) => {
-      renderPopup({ spell });
+  it.each([
+    { label: 'an ungranted ritual spell', spell: makeGrantedRitual({ _ritualMasterRitual: undefined }) },
+    { label: 'a granted marker on a non-ritual spell', spell: makeGrantedRitual({ ritual: false }) },
+  ])('does not offer Quick Ritual for $label', ({ spell }) => {
+    renderPopup({ spell });
 
-      expect(screen.queryByRole('checkbox', { name: /Quick Ritual/ })).not.toBeInTheDocument();
-    });
+    expect(screen.queryByRole('checkbox', { name: /Quick Ritual/ })).not.toBeInTheDocument();
   });
 });

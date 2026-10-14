@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Coverage ownership (CharSummary family delegation):
 //   This file is the ONLY owner of the AC-row cover badges — the
@@ -14,8 +14,10 @@
 // Strategy: getRuntimeValue is a NAME+KEY aware fake (mirrors the real store's
 // per-character namespaces) so a badge can only appear when the rules say it
 // should — from the right source character, only if that source actively
-// grants the effect and names the player as a beneficiary. Key-only mocks
-// (the previous approach) masked all identity and conjunction logic.
+// grants the effect and names the player as a beneficiary. Each table case
+// below pins one rule branch: the positive it.each proves each source can
+// grant its badge, the negative it.each proves each conjunction leg /
+// self-exclusion / null-characters guard suppresses it.
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -129,129 +131,112 @@ beforeEach(() => {
     getActiveBuffs.mockReturnValue([]);
 });
 
-describe('CharSummary cover badges — neutral state', () => {
-    it('renders the summary with no cover badges when nothing grants cover', () => {
-        renderSummary({ characters: [makeCharacter('Sister')] });
-
-        expect(screen.getByText('Thorin')).toBeInTheDocument();
-        expect(coverBadges()).toHaveLength(0);
-    });
-
-    it('renders the summary without cover badges when characters prop is null', () => {
-        renderSummary({ characters: null });
-
-        expect(screen.getByText('Thorin')).toBeInTheDocument();
-        expect(coverBadges()).toHaveLength(0);
-    });
-});
-
-describe('Smite of Protection cover badge', () => {
-    it('shows half-cover badge when an ally in Aura of Protection has the smite active', () => {
-        seedRuntime({ 'Sister.smiteOfProtectionActive': true });
-
-        renderSummary({ characters: [auraAlly('Sister')] });
-
-        const badge = screen.getByText('(+2 Cover: Smite of Protection)');
-        expect(badge).toHaveAttribute('title', expect.stringContaining('Half Cover from Smite of Protection'));
-    });
-
-    it('does NOT show the badge when the smiting ally lacks Aura of Protection', () => {
-        seedRuntime({ 'Sister.smiteOfProtectionActive': true });
-
-        renderSummary({ characters: [makeCharacter('Sister')] });
-
-        expect(coverBadges()).toHaveLength(0);
-    });
-
-    it('does NOT show the badge when no ally has the smite active', () => {
-        renderSummary({ characters: [auraAlly('Sister')] });
-
-        expect(coverBadges()).toHaveLength(0);
-    });
-});
-
-describe('Bulwark of Force cover badge', () => {
-    it('shows half-cover badge when an ally raised the bulwark and named the player as a target', () => {
-        seedRuntime({
+// One case per cover source: the minimum ally state that grants the badge.
+const COVERING_SOURCES = [
+    {
+        source: 'Smite of Protection',
+        characters: [auraAlly('Sister')],
+        seed: { 'Sister.smiteOfProtectionActive': true },
+    },
+    {
+        source: 'Bulwark of Force',
+        characters: [makeCharacter('Ally')],
+        seed: {
             'Ally.bulwarkOfForceActive': true,
             'Ally.bulwarkOfForceTargets': ['Thorin'],
-        });
+        },
+    },
+    {
+        source: "Nature's Sanctuary",
+        characters: [makeCharacter('Ally')],
+        seed: { 'Ally.naturesSanctuaryCreatures': ['Thorin'] },
+    },
+];
 
-        renderSummary({ characters: [makeCharacter('Ally')] });
+describe('CharSummary AC-row cover badges', () => {
+    it.each(COVERING_SOURCES)(
+        'shows exactly one (+2 Cover: $source) badge when an ally grants it to the player',
+        ({ source, characters, seed }) => {
+            seedRuntime(seed);
 
-        const badge = screen.getByText('(+2 Cover: Bulwark of Force)');
-        expect(badge).toHaveAttribute('title', expect.stringContaining('Half Cover from Bulwark of Force'));
-    });
+            renderSummary({ characters });
 
-    it('does NOT show the badge when the player is not in the bulwark target list', () => {
-        seedRuntime({
-            'Ally.bulwarkOfForceActive': true,
-            'Ally.bulwarkOfForceTargets': ['Merric'],
-        });
+            const badge = screen.getByText(`(+2 Cover: ${source})`);
+            expect(badge).toHaveAttribute('title', expect.stringContaining(`Half Cover from ${source}`));
+            expect(coverBadges()).toHaveLength(1);
+        }
+    );
 
-        renderSummary({ characters: [makeCharacter('Ally')] });
+    // Each case breaks exactly one rule leg: missing effect, missing aura
+    // conjunction, player not a named beneficiary, self-granted cover, or a
+    // missing characters prop. None of them may show any cover badge.
+    it.each([
+        {
+            case: 'nothing grants cover (inert ally)',
+            characters: [makeCharacter('Sister')],
+            seed: {},
+        },
+        {
+            case: 'characters prop is null',
+            characters: null,
+            seed: {},
+        },
+        {
+            case: 'smite is active but the ally lacks Aura of Protection',
+            characters: [makeCharacter('Sister')],
+            seed: { 'Sister.smiteOfProtectionActive': true },
+        },
+        {
+            case: 'ally has Aura of Protection but no smite active',
+            characters: [auraAlly('Sister')],
+            seed: {},
+        },
+        {
+            case: 'bulwark is active but names only another target',
+            characters: [makeCharacter('Ally')],
+            seed: {
+                'Ally.bulwarkOfForceActive': true,
+                'Ally.bulwarkOfForceTargets': ['Merric'],
+            },
+        },
+        {
+            case: 'the player raised the bulwark on themselves',
+            characters: [makeCharacter('Thorin')],
+            seed: {
+                'Thorin.bulwarkOfForceActive': true,
+                'Thorin.bulwarkOfForceTargets': ['Thorin'],
+            },
+        },
+        {
+            case: "sanctuary protects only other creatures",
+            characters: [makeCharacter('Ally')],
+            seed: { 'Ally.naturesSanctuaryCreatures': ['Merric'] },
+        },
+    ])('shows no cover badge when $case', ({ characters, seed }) => {
+        seedRuntime(seed);
 
+        renderSummary({ characters });
+
+        expect(screen.getByText('Thorin')).toBeInTheDocument();
         expect(coverBadges()).toHaveLength(0);
     });
 
-    it('does NOT show the badge when only the player themselves raised the bulwark', () => {
+    it('renders one badge per cover type when multiple sources grant cover at once', () => {
         seedRuntime({
-            'Thorin.bulwarkOfForceActive': true,
-            'Thorin.bulwarkOfForceTargets': ['Thorin'],
-        });
-
-        renderSummary({ characters: [makeCharacter('Thorin')] });
-
-        expect(coverBadges()).toHaveLength(0);
-    });
-});
-
-describe("Nature's Sanctuary cover badge", () => {
-    it('shows half-cover badge when an ally sanctuary names the player among its creatures', () => {
-        seedRuntime({ 'Ally.naturesSanctuaryCreatures': ['Thorin'] });
-
-        renderSummary({ characters: [makeCharacter('Ally')] });
-
-        const badge = screen.getByText("(+2 Cover: Nature's Sanctuary)");
-        expect(badge).toHaveAttribute('title', expect.stringContaining("Half Cover from Nature's Sanctuary"));
-    });
-
-    it('does NOT show the badge when the sanctuary protects only other creatures', () => {
-        seedRuntime({ 'Ally.naturesSanctuaryCreatures': ['Merric'] });
-
-        renderSummary({ characters: [makeCharacter('Ally')] });
-
-        expect(coverBadges()).toHaveLength(0);
-    });
-});
-
-describe('Multiple cover sources', () => {
-    it('renders exactly one badge per cover type even when two allies grant the same cover', () => {
-        seedRuntime({
+            'Sister.smiteOfProtectionActive': true,
+            // two allies grant the SAME cover type — must collapse to one badge
             'Ally.bulwarkOfForceActive': true,
             'Ally.bulwarkOfForceTargets': ['Thorin'],
             'Bram.bulwarkOfForceActive': true,
             'Bram.bulwarkOfForceTargets': ['Thorin'],
-        });
-
-        renderSummary({ characters: [makeCharacter('Ally'), makeCharacter('Bram')] });
-
-        expect(screen.getAllByText('(+2 Cover: Bulwark of Force)')).toHaveLength(1);
-    });
-
-    it('renders all three cover badges together when all three sources grant cover', () => {
-        seedRuntime({
-            'Sister.smiteOfProtectionActive': true,
-            'Ally.bulwarkOfForceActive': true,
-            'Ally.bulwarkOfForceTargets': ['Thorin'],
             'Ally.naturesSanctuaryCreatures': ['Thorin'],
         });
 
-        renderSummary({ characters: [auraAlly('Sister'), makeCharacter('Ally')] });
+        renderSummary({
+            characters: [auraAlly('Sister'), makeCharacter('Ally'), makeCharacter('Bram')],
+        });
 
+        expect(screen.getAllByText('(+2 Cover: Bulwark of Force)')).toHaveLength(1);
         expect(coverBadges()).toHaveLength(3);
-        expect(screen.getByText('(+2 Cover: Smite of Protection)'.replace('+', '+'))).toBeInTheDocument();
-        expect(screen.getByText('(+2 Cover: Bulwark of Force)'.replace('+', '+'))).toBeInTheDocument();
-        expect(screen.getByText("(+2 Cover: Nature's Sanctuary)")).toBeInTheDocument();
     });
 });

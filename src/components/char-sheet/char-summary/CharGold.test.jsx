@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharGold from './CharGold.jsx';
@@ -12,7 +12,7 @@ import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRunt
 
 const CAMPAIGN_NAME = 'test-campaign';
 
-// Per-test fixtures: spread overrides over a minimal default character.
+// Renders with a minimal default character; tests override only what they assert.
 function renderCharGold(playerStatsOverrides = {}) {
   return render(
     <CharGold
@@ -26,8 +26,16 @@ function getGoldLabel() {
   return screen.getByText('Gold:');
 }
 
-function openGoldEditor() {
+// Editor is HiddenInput: seeding, clamping, and blur commits are covered in
+// src/components/common/HiddenInput.test.jsx — these tests cover CharGold's
+// own wiring: store precedence, scoping, toggle, and save calls.
+function openGoldEditorByMouse() {
   fireEvent.click(getGoldLabel());
+  return screen.getByRole('spinbutton');
+}
+
+function openGoldEditorByKeyboard() {
+  fireEvent.keyDown(getGoldLabel(), { key: 'Enter' });
   return screen.getByRole('spinbutton');
 }
 
@@ -38,100 +46,48 @@ describe('CharGold', () => {
   });
 
   describe('value display', () => {
-    it('shows gold stored in the runtime store in preference to inventory.gold', () => {
-      useRuntimeValue.mockReturnValue(250);
+    it.each([
+      ['runtime store value over inventory.gold', 250, { gold: 500 }, '250'],
+      ['stored zero gold as a real value, not an inventory fallback', 0, { gold: 500 }, '0'],
+      ['inventory.gold when nothing is stored at runtime', null, { gold: 120 }, '120'],
+      ['zero when runtime value and inventory.gold are both missing', null, {}, '0'],
+    ])('shows %s', (_case, storedGold, inventory, expected) => {
+      useRuntimeValue.mockReturnValue(storedGold);
 
-      renderCharGold();
+      renderCharGold({ inventory });
 
-      expect(screen.getByText('250')).toBeInTheDocument();
-      expect(screen.queryByText('500')).not.toBeInTheDocument();
-    });
-
-    it('treats stored zero gold as a real value instead of falling back to inventory.gold', () => {
-      useRuntimeValue.mockReturnValue(0);
-
-      renderCharGold({ inventory: { gold: 500 } });
-
-      expect(screen.getByText('0')).toBeInTheDocument();
-      expect(screen.queryByText('500')).not.toBeInTheDocument();
-    });
-
-    it('falls back to inventory.gold when nothing is stored at runtime', () => {
-      renderCharGold({ inventory: { gold: 120 } });
-
-      expect(screen.getByText('120')).toBeInTheDocument();
-    });
-
-    it('falls back to 0 when runtime value and inventory.gold are both missing', () => {
-      renderCharGold({ inventory: {} });
-
-      expect(screen.getByText('0')).toBeInTheDocument();
-    });
-
-    it('reads gold from the runtime store scoped to the character and campaign', () => {
-      renderCharGold();
-
+      expect(screen.getByText(expected)).toBeInTheDocument();
       expect(useRuntimeValue).toHaveBeenCalledWith('Test Character', 'gold', CAMPAIGN_NAME);
     });
   });
 
   describe('editing gold', () => {
-    it('opens a numeric editor seeded with the current gold when the display is clicked', () => {
+    it.each([
+      ['a mouse click', openGoldEditorByMouse],
+      ['the Enter key', openGoldEditorByKeyboard],
+    ])('opens the editor seeded with the current gold on %s, and closes without saving when toggled again', (_case, openEditor) => {
       useRuntimeValue.mockReturnValue(250);
+      const { unmount } = renderCharGold();
 
-      renderCharGold();
-      const input = openGoldEditor();
+      expect(openEditor()).toHaveValue(250);
 
-      expect(input).toHaveValue(250);
+      fireEvent.click(getGoldLabel());
+
+      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      unmount();
     });
 
-    it('opens the editor when Enter is pressed on the gold display (keyboard access)', () => {
-      renderCharGold();
-
-      fireEvent.keyDown(getGoldLabel(), { key: 'Enter' });
-
-      expect(screen.getByRole('spinbutton')).toBeInTheDocument();
-    });
-
-    it('saves the new gold to the runtime store on Enter and closes the editor', () => {
-      renderCharGold();
-      const input = openGoldEditor();
+    it('saves the typed gold to the runtime store on Enter and closes the editor', () => {
+      const { unmount } = renderCharGold();
+      const input = openGoldEditorByMouse();
 
       fireEvent.change(input, { target: { value: '750' } });
       fireEvent.keyDown(input, { key: 'Enter' });
 
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'gold', 750, CAMPAIGN_NAME);
       expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
-    });
-
-    it('saves the new gold to the runtime store when the editor loses focus', () => {
-      renderCharGold();
-      const input = openGoldEditor();
-
-      fireEvent.change(input, { target: { value: '320' } });
-      fireEvent.blur(input);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'gold', 320, CAMPAIGN_NAME);
-    });
-
-    it('clamps negative input up to zero before saving', () => {
-      renderCharGold();
-      const input = openGoldEditor();
-
-      fireEvent.change(input, { target: { value: '-20' } });
-      fireEvent.keyDown(input, { key: 'Enter' });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'gold', 0, CAMPAIGN_NAME);
-    });
-
-    it('closes the editor without saving when the display is clicked again', () => {
-      renderCharGold();
-      expect(openGoldEditor()).toBeInTheDocument();
-
-      fireEvent.click(getGoldLabel());
-
-      expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
-      expect(setRuntimeValue).not.toHaveBeenCalled();
+      unmount();
     });
   });
 });

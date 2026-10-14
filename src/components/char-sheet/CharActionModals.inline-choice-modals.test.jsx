@@ -1,20 +1,20 @@
-// Tests for inline choice modals (Sweeping Attack, Bait and Switch, Commander's Strike)
-// that render SecondaryTargetModal. Each test verifies the behavioral contract:
-// correct title/description rendering and handler invocation on target selection.
+// @maintained-by-ai
+// Host-wiring tests for the three inline choice modals that flow through
+// CharActionModals → CharActionModals.SecondaryModals → SecondaryTargetModals →
+// SecondaryTargetModal: Sweeping Attack, Bait and Switch, Commander's Strike.
 //
-// Removed redundant tests:
-// - "modal not rendered when prop is null" (3 tests): same negation assertion
-//   pattern for each modal type; parameterized structure already guarantees
-//   conditional rendering — adds no behavioral confidence.
-// - "renders correct confirm label" (3 tests): cosmetic detail already covered
-//   by title/description rendering tests.
-// - "renders target options from modal data" (3 tests): covered by title test
-//   since target rendering is SecondaryTargetModal's responsibility.
-// - "calls handler with selected key on target label click" (3 tests):
-//   consolidated into "calls handler on interaction" which tests both the
-//   confirm button and target label click in a single parameterized test.
-// - "edge cases" (2 tests): empty targets and single target render with
-//   minimal behavioral value.
+// One consolidated test per modal covers the full behavioral contract of a
+// single mount: correct title/description/showSize metadata (the build() prop
+// mapping in SecondaryTargetModals.jsx), handler dispatch with the selected
+// key plus untouched modal state (target label and confirm button), and close
+// via setModalState on skip. Splitting these across three renders of the
+// same tree added count, not coverage.
+//
+// Not duplicated elsewhere:
+// - CharActions.events.test.jsx — event → modalState open only
+// - useCharActionsModalHandlers.combatSuperiority.test.js — handler internals / state clearing
+// - CharActionModals.secondary-targets.test.jsx — the OTHER SecondaryTargetModals entries
+// - SecondaryTargetModal's own rendering internals are its responsibility (hence the mock).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharActionModals from './CharActionModals.jsx';
@@ -39,9 +39,9 @@ vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Mock SecondaryTargetModal so we can verify its props and call its callbacks.
-// The real SecondaryTargetModal has internal useState logic; mocking it
-// isolates the CharActionModals rendering/behavior under test.
+// Mock SecondaryTargetModal to expose its received props and fire its callbacks —
+// isolates the host prop-mapping/dispatch under test from the modal's own
+// internal selection state machine (covered by its own tests).
 vi.mock('./modals/shared/SecondaryTargetModal.jsx', () => {
   const MockSecondaryTargetModal = ({
     title,
@@ -89,12 +89,10 @@ describe('CharActionModals inline choice modals', () => {
     vi.clearAllMocks();
   });
 
-  // Inline choice modals (Sweeping Attack, Bait and Switch, Commander's Strike)
-  // all render SecondaryTargetModal and pass the handler as onTargetSelected.
-  // These tests verify that selecting a target triggers the correct handler
-  // with the selected value and full modal data — the behavioral contract.
-  // Rendering details are SecondaryTargetModal's responsibility.
-
+  // Each case exercises one modalDefs entry in SecondaryTargetModals.jsx:
+  // its build() metadata, its dedicated confirm handler wiring (handlerProp),
+  // and its own setModalState close key. Target shapes vary deliberately:
+  // name-based (sweeping) vs value/label-based options (bait, commander).
   const inlineChoiceCases = [
     {
       name: 'Sweeping Attack Target',
@@ -106,8 +104,8 @@ describe('CharActionModals inline choice modals', () => {
       },
       handlerProp: 'handleSweepingAttackConfirm',
       selectedKey: 'Ogre',
-      confirmLabel: 'Apply Sweeping Attack',
       expectedTitle: 'Sweeping Attack',
+      // Interpolates primaryTarget and dieValue — pins the data flow, not just copy.
       expectedDescription: /Choose a creature within 5 feet of Goblin to take 10 damage:/,
       expectedShowSize: true,
     },
@@ -117,7 +115,6 @@ describe('CharActionModals inline choice modals', () => {
       modalData: { description: 'Test', options: [{ label: 'Player', value: 'player' }] },
       handlerProp: 'handleBaitAndSwitchChoiceConfirm',
       selectedKey: 'player',
-      confirmLabel: 'Apply AC Bonus',
       expectedTitle: 'Bait and Switch — AC Bonus',
       expectedDescription: 'Test',
       expectedShowSize: false,
@@ -128,7 +125,6 @@ describe('CharActionModals inline choice modals', () => {
       modalData: { description: 'Test', options: [{ label: 'Bard', value: 'bard' }] },
       handlerProp: 'handleCommanderStrikeChoiceConfirm',
       selectedKey: 'bard',
-      confirmLabel: "Grant Attack",
       expectedTitle: "Commander's Strike — Ally Attack",
       expectedDescription: 'Test',
       expectedShowSize: false,
@@ -145,55 +141,40 @@ describe('CharActionModals inline choice modals', () => {
     expectedDescription,
     expectedShowSize,
   } of inlineChoiceCases) {
-    describe(name, () => {
-      it('renders modal structure with correct title, description, and showSize', () => {
-        render(
-          <CharActionModals
-            {...createBaseProps()}
-            modalState={{ [modalProp]: modalData }}
-            setModalState={vi.fn()}
-          />
-        );
-        expect(screen.getByTestId('secondary-title').textContent).toBe(expectedTitle);
-        if (typeof expectedDescription === 'string') {
-          expect(screen.getByTestId('secondary-desc').textContent).toBe(expectedDescription);
-        } else {
-          expect(screen.getByTestId('secondary-desc').textContent).toMatch(expectedDescription);
-        }
-        if (expectedShowSize) {
-          expect(screen.getByTestId('secondary-show-size')).toBeInTheDocument();
-        } else {
-          expect(screen.queryByTestId('secondary-show-size')).not.toBeInTheDocument();
-        }
-      });
+    it(`${name}: renders metadata, dispatches selection, closes on skip`, () => {
+      const handler = vi.fn();
+      const setModalState = vi.fn();
+      render(
+        <CharActionModals
+          {...createBaseProps({ [handlerProp]: handler })}
+          modalState={{ [modalProp]: modalData }}
+          setModalState={setModalState}
+        />
+      );
 
-      it('calls handler on confirm button and target label interaction', () => {
-        const handler = vi.fn();
-        render(
-          <CharActionModals
-            {...createBaseProps({ [handlerProp]: handler })}
-            modalState={{ [modalProp]: modalData }}
-            setModalState={vi.fn()}
-          />
-        );
-        fireEvent.click(screen.getByTestId('secondary-confirm'));
-        expect(handler).toHaveBeenCalledWith(selectedKey, expect.objectContaining(modalData));
-        fireEvent.click(screen.getByTestId(`secondary-target-${selectedKey}`));
-        expect(handler).toHaveBeenCalledWith(selectedKey, expect.objectContaining(modalData));
-      });
+      // Metadata contract (build() prop mapping)
+      expect(screen.getByTestId('secondary-title').textContent).toBe(expectedTitle);
+      if (typeof expectedDescription === 'string') {
+        expect(screen.getByTestId('secondary-desc').textContent).toBe(expectedDescription);
+      } else {
+        expect(screen.getByTestId('secondary-desc').textContent).toMatch(expectedDescription);
+      }
+      if (expectedShowSize) {
+        expect(screen.getByTestId('secondary-show-size')).toBeInTheDocument();
+      } else {
+        expect(screen.queryByTestId('secondary-show-size')).not.toBeInTheDocument();
+      }
 
-      it('dismisses modal on skip', () => {
-        const setModalState = vi.fn();
-        render(
-          <CharActionModals
-            {...createBaseProps()}
-            modalState={{ [modalProp]: modalData }}
-            setModalState={setModalState}
-          />
-        );
-        fireEvent.click(screen.getByTestId('secondary-skip'));
-        expect(setModalState).toHaveBeenCalledWith({ [modalProp]: null });
-      });
+      // Selecting via target label and via confirm (first target) both dispatch
+      // the dedicated handler with the selected key and the untouched modal data.
+      fireEvent.click(screen.getByTestId(`secondary-target-${selectedKey}`));
+      fireEvent.click(screen.getByTestId('secondary-confirm'));
+      expect(handler).toHaveBeenCalledTimes(2);
+      expect(handler).toHaveBeenCalledWith(selectedKey, expect.objectContaining(modalData));
+
+      // Skip closes only this modal.
+      fireEvent.click(screen.getByTestId('secondary-skip'));
+      expect(setModalState).toHaveBeenCalledWith({ [modalProp]: null });
     });
   }
 });

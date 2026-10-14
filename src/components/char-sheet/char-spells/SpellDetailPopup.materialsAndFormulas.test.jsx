@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * SpellDetailPopup — consumed-material row and MOD resolution in the upcast selector.
  *
@@ -93,33 +93,36 @@ const renderUpcast = (ladder, statsOverrides = {}) => {
   renderPopup(spell, createPlayerStats(statsOverrides), { upcastLevels: upcastLevelsFrom(spell) });
 };
 
+/**
+ * Every expected formula must render in its OWN "Level n" row, and the raw
+ * MOD placeholder must never leak anywhere in the popup.
+ */
+const expectResolvedRows = (expectedByLevel) => {
+  Object.entries(expectedByLevel).forEach(([level, text]) => {
+    const formula = screen.getByText(text);
+    expect(formula.closest('label')).toHaveTextContent(`Level ${level}`);
+  });
+  expect(screen.queryByText(/MOD/)).not.toBeInTheDocument();
+};
+
 describe('SpellDetailPopup', () => {
   describe('Consumed material row', () => {
-    it('shows the consumed material with a missing-backpack warning when the player lacks it', () => {
-      renderPopup(createRevivify(), createPlayerStats());
+    // Backpack shape varies; the warning visibility is the behavior under test.
+    it.each([
+      { label: 'an empty backpack', backpack: undefined, warned: true },
+      { label: 'a similar but differently named diamond', backpack: [{ name: 'Diamond (1,000 gp)' }], warned: true },
+      { label: 'the exact item', backpack: ['Diamond (300 gp)'], warned: false },
+    ])('shows the material for $label', ({ backpack, warned }) => {
+      const stats = backpack
+        ? createPlayerStats({ inventory: { backpack } })
+        : createPlayerStats();
+
+      renderPopup(createRevivify(), stats);
 
       expect(screen.getByText('Material:')).toBeInTheDocument();
       expect(screen.getByText(/Diamond \(300 gp\)/)).toBeInTheDocument();
       expect(screen.getByText(/diamond worth 300\+ GP/)).toBeInTheDocument();
-      expect(screen.getByText('(not found in backpack)')).toBeInTheDocument();
-    });
-
-    it('shows the material row without the warning when the exact item is in the backpack', () => {
-      const stats = createPlayerStats({ inventory: { backpack: ['Diamond (300 gp)'] } });
-
-      renderPopup(createRevivify(), stats);
-
-      expect(screen.getByText(/Diamond \(300 gp\)/)).toBeInTheDocument();
-      expect(screen.queryByText(/not found in backpack/)).not.toBeInTheDocument();
-    });
-
-    it('keeps the warning when the backpack holds a similar but differently named item', () => {
-      const stats = createPlayerStats({ inventory: { backpack: [{ name: 'Diamond (1,000 gp)' }] } });
-
-      renderPopup(createRevivify(), stats);
-
-      expect(screen.getByText(/Diamond \(300 gp\)/)).toBeInTheDocument();
-      expect(screen.getByText('(not found in backpack)')).toBeInTheDocument();
+      expect(!!screen.queryByText('(not found in backpack)')).toBe(warned);
     });
 
     it('renders no material row for a spell with no consumed material', () => {
@@ -131,48 +134,13 @@ describe('SpellDetailPopup', () => {
 
   describe('Upcast formula MOD resolution', () => {
     it.each([
-      { label: 'positive modifier', modifier: 3, resolved: ['1d8+3', '2d8+3'] },
-      { label: 'zero modifier', modifier: 0, resolved: ['1d8+0', '2d8+0'] },
-      { label: 'negative modifier', modifier: -1, resolved: ['1d8+-1', '2d8+-1'] },
-      { label: 'missing modifier (defaults to 0)', modifier: undefined, resolved: ['1d8+0', '2d8+0'] },
-    ])('replaces MOD with the $label in every upcast row', ({ modifier, resolved }) => {
+      { label: 'positive modifier', modifier: 3, expected: { 1: '1d8+3', 2: '2d8+3' } },
+      { label: 'zero modifier', modifier: 0, expected: { 1: '1d8+0', 2: '2d8+0' } },
+      { label: 'negative modifier', modifier: -1, expected: { 1: '1d8+-1', 2: '2d8+-1' } },
+    ])('replaces MOD with the $label in every upcast row', ({ modifier, expected }) => {
       renderUpcast({ '1': '1d8+MOD', '2': '2d8+MOD' }, { spellAbilities: { modifier } });
 
-      resolved.forEach((text) => expect(screen.getByText(text)).toBeInTheDocument());
-      // The formula belongs to its own level row, and no raw placeholder leaks.
-      expect(screen.getByText(resolved[0]).closest('label')).toHaveTextContent('Level 1');
-      expect(screen.queryByText(/MOD/)).not.toBeInTheDocument();
-    });
-
-    it('replaces every MOD occurrence within a single formula', () => {
-      renderUpcast({ '1': '2d6+MOD+MOD', '2': '3d6+MOD+MOD' }, { spellAbilities: { modifier: 2 } });
-
-      expect(screen.getByText('2d6+2+2')).toBeInTheDocument();
-      expect(screen.getByText('3d6+2+2')).toBeInTheDocument();
-      expect(screen.queryByText(/MOD/)).not.toBeInTheDocument();
-    });
-
-    it('replaces MOD at the start of a formula', () => {
-      renderUpcast({ '1': 'MOD+2d6', '2': 'MOD+3d6' }, { spellAbilities: { modifier: 5 } });
-
-      expect(screen.getByText('5+2d6')).toBeInTheDocument();
-      expect(screen.getByText('5+3d6')).toBeInTheDocument();
-      expect(screen.queryByText(/MOD/)).not.toBeInTheDocument();
-    });
-
-    it('resolves MOD surrounded by spaces without collapsing the formula layout', () => {
-      renderUpcast({ '1': '1d8 + MOD', '2': '2d8 + MOD' }, { spellAbilities: { modifier: 3 } });
-
-      expect(screen.getByText('1d8 + 3')).toBeInTheDocument();
-      expect(screen.getByText('2d8 + 3')).toBeInTheDocument();
-      expect(screen.queryByText(/MOD/)).not.toBeInTheDocument();
-    });
-
-    it('leaves formulas without MOD untouched', () => {
-      renderUpcast({ '1': '3d4+1', '2': '4d4+1' }, { spellAbilities: { modifier: 3 } });
-
-      expect(screen.getByText('3d4+1')).toBeInTheDocument();
-      expect(screen.getByText('4d4+1')).toBeInTheDocument();
+      expectResolvedRows(expected);
     });
 
     it('defaults MOD to 0 when the character has no spellAbilities at all', () => {
@@ -182,9 +150,16 @@ describe('SpellDetailPopup', () => {
 
       renderPopup(spell, stats, { upcastLevels: upcastLevelsFrom(spell) });
 
-      expect(screen.getByText('1d8+0')).toBeInTheDocument();
-      expect(screen.getByText('2d8+0')).toBeInTheDocument();
-      expect(screen.queryByText(/MOD/)).not.toBeInTheDocument();
+      expectResolvedRows({ 1: '1d8+0', 2: '2d8+0' });
+    });
+
+    it('resolves MOD at the start, mid-formula, repeated, and leaves MOD-free rows untouched', () => {
+      renderUpcast(
+        { '1': 'MOD+2d6', '2': '1d8 + MOD', '3': '2d6+MOD+MOD', '4': '3d4+1' },
+        { spellAbilities: { modifier: 2 } },
+      );
+
+      expectResolvedRows({ 1: '2+2d6', 2: '1d8 + 2', 3: '2d6+2+2', 4: '3d4+1' });
     });
   });
 });

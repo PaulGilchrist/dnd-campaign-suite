@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import SessionPlannerModal from './SessionPlannerModal.jsx';
@@ -15,7 +16,7 @@ const baseFormData = {
   date: '',
   status: 'planned',
   summary: '',
-  links: { maps: ['Cave'], encounters: [], npcs: [], quests: [], settlements: [], notes: [] },
+  links: { maps: ['Cave'], encounters: [], npcs: ['Grixxa'], quests: [], settlements: [], notes: [] },
   contingencies: [],
   checklist: [
     { id: 'auto-map-cave', label: 'Cave set as active map', auto: true, done: false },
@@ -60,30 +61,54 @@ function renderModal(overrides = {}) {
 }
 
 describe('SessionPlannerModal', () => {
-  it('renders linked resource chips with quick actions', () => {
-    renderModal();
+  it('renders linked chips with quick actions wired to onQuickAction', () => {
+    const { props } = renderModal();
     expect(screen.getByText('Cave')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /activate/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /activate/i }));
+    expect(props.onQuickAction).toHaveBeenCalledWith('maps', 'Cave');
+    // NPCs get their own initiative quick action
+    fireEvent.click(screen.getByRole('button', { name: /to initiative/i }));
+    expect(props.onQuickAction).toHaveBeenCalledWith('npcs', 'Grixxa');
   });
 
-  it('toggles a checklist item and updates the progress label', () => {
-    renderModal();
+  it('moves and unlinks linked resources', () => {
+    const { props } = renderModal();
+    fireEvent.change(screen.getByLabelText(/move cave to another session/i), { target: { value: 'Session 8' } });
+    expect(props.onMoveLink).toHaveBeenCalledWith('maps', 'Cave', 'Session 8');
+    fireEvent.click(screen.getByRole('button', { name: /unlink cave/i }));
+    expect(props.onRemoveLink).toHaveBeenCalledWith('maps', 'Cave');
+  });
+
+  it('toggles checklist items by id and reflects progress from parent state', () => {
+    const { props } = renderModal();
     expect(screen.getByText(/0 of 2 ready/i)).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('checkbox')[0]);
-    // onToggleChecklist is called by id; label is controlled by parent.
-    // Also verify the checkbox reflects the checked value passed back:
+    expect(props.onToggleChecklist).toHaveBeenCalledWith('auto-map-cave');
+
     const checkedForm = { ...baseFormData, checklist: baseFormData.checklist.map((c, i) => i === 0 ? { ...c, done: true } : c) };
     renderModal({ formData: checkedForm });
     expect(screen.getByText(/1 of 2 ready/i)).toBeInTheDocument();
   });
 
-  it('calls onQuickAction for maps with the linked name', () => {
-    const { props } = renderModal();
-    fireEvent.click(screen.getByRole('button', { name: /activate/i }));
-    expect(props.onQuickAction).toHaveBeenCalledWith('maps', 'Cave');
+  it('shows auto badge on auto items and allows removing/adding custom items', () => {
+    const formData = {
+      ...baseFormData,
+      checklist: [...baseFormData.checklist, { id: 'custom-1', label: 'Print handout', auto: false, done: false }],
+    };
+    const { props, container } = renderModal({ formData });
+    // auto badge on each auto item, none on the custom item
+    expect(screen.getAllByText('auto')).toHaveLength(2);
+    // one remove button per custom item only
+    expect(container.querySelectorAll('.sessions-checklist-remove')).toHaveLength(1);
+    fireEvent.click(container.querySelector('.sessions-checklist-remove'));
+    expect(props.onRemoveChecklistItem).toHaveBeenCalledWith('custom-1');
+
+    fireEvent.change(screen.getByLabelText(/new checklist item/i), { target: { value: 'Have initiative cards ready' } });
+    fireEvent.click(screen.getByRole('button', { name: /add$/i }));
+    expect(props.onAddChecklistItem).toHaveBeenCalledWith('Have initiative cards ready');
   });
 
-  it('renders contingency If → then rows with branch selector', () => {
+  it('renders contingency If → then rows, changes branch, and adds new ones', () => {
     const formData = {
       ...baseFormData,
       contingencies: [{ id: 'c1', ifText: 'Players parley', thenText: 'Grixxa offers a deal', branch: 'negotiate' }],
@@ -94,33 +119,8 @@ describe('SessionPlannerModal', () => {
     expect(container.querySelector('.session-branch-negotiate')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/contingency 1 branch/i), { target: { value: 'failure' } });
     expect(props.onContingencyChange).toHaveBeenCalledWith('c1', 'branch', 'failure');
-  });
-
-  it('adds a contingency when Add Contingency is clicked', () => {
-    const { props } = renderModal();
     fireEvent.click(screen.getByRole('button', { name: /add contingency/i }));
     expect(props.onAddContingency).toHaveBeenCalled();
-  });
-
-  it('adds a custom checklist item', () => {
-    const { props } = renderModal();
-    fireEvent.change(screen.getByLabelText(/new checklist item/i), { target: { value: 'Have initiative cards ready' } });
-    fireEvent.click(screen.getByRole('button', { name: /add$/i }));
-    expect(props.onAddChecklistItem).toHaveBeenCalledWith('Have initiative cards ready');
-  });
-
-  it('shows the auto badge on auto items but not on custom items', () => {
-    const formData = {
-      ...baseFormData,
-      checklist: [
-        { id: 'auto-map-cave', label: 'Cave set as active map', auto: true, done: false },
-        { id: 'custom-1', label: 'Print handout', auto: false, done: false },
-      ],
-    };
-    const { container } = renderModal({ formData });
-    expect(screen.getByText('auto')).toBeInTheDocument();
-    // one remove button per custom item only
-    expect(container.querySelectorAll('.sessions-checklist-remove')).toHaveLength(1);
   });
 
   it('copies a composed XP prompt to the clipboard', async () => {
@@ -129,46 +129,36 @@ describe('SessionPlannerModal', () => {
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
     const text = navigator.clipboard.writeText.mock.calls[0][0];
     expect(text).toContain('Session 7');
-    expect(text).toContain('Aragorn'.slice(0, 0) + 'average level 5');
+    expect(text).toContain('average level 5');
     await waitFor(() => expect(screen.getByText(/prompt copied/i)).toBeInTheDocument());
   });
 
-  it('copies a composed rumor prompt including campaign name', async () => {
+  it('copies a composed rumor prompt including campaign name and linked NPCs', async () => {
     renderModal();
     fireEvent.click(screen.getByRole('button', { name: /generate rumors/i }));
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
-    expect(navigator.clipboard.writeText.mock.calls[0][0]).toContain('test-campaign');
+    const text = navigator.clipboard.writeText.mock.calls[0][0];
+    expect(text).toContain('test-campaign');
+    expect(text).toContain('Grixxa');
   });
 
-  it('shows Mark as Played only for a planned session', () => {
-    const { unmount } = renderModal();
-    expect(screen.getByRole('button', { name: /mark as played/i })).toBeInTheDocument();
+  it('shows Mark as Played only for a planned session and calls onMarkPlayed', () => {
+    const { props, unmount } = renderModal();
+    const playedBtn = screen.getByRole('button', { name: /mark as played/i });
+    fireEvent.click(playedBtn);
+    expect(props.onMarkPlayed).toHaveBeenCalled();
     unmount();
 
-    const playedSession = { name: 'Session 7', status: 'played' };
     renderModal({
-      editingSession: playedSession,
+      editingSession: { name: 'Session 7', status: 'played' },
       formData: { ...baseFormData, status: 'played' },
     });
     expect(screen.queryByRole('button', { name: /mark as played/i })).not.toBeInTheDocument();
   });
 
-  it('calls onMarkPlayed when Mark as Played is clicked', () => {
-    const { props } = renderModal();
-    fireEvent.click(screen.getByRole('button', { name: /mark as played/i }));
-    expect(props.onMarkPlayed).toHaveBeenCalled();
-  });
-
-  it('calls onMoveLink with the target session name', () => {
-    const { props } = renderModal();
-    const moveSelect = screen.getByLabelText(/move cave to another session/i);
-    fireEvent.change(moveSelect, { target: { value: 'Session 8' } });
-    expect(props.onMoveLink).toHaveBeenCalledWith('maps', 'Cave', 'Session 8');
-  });
-
-  it('unlinks a resource via the unlink button', () => {
-    const { props } = renderModal();
-    fireEvent.click(screen.getByRole('button', { name: /unlink cave/i }));
-    expect(props.onRemoveLink).toHaveBeenCalledWith('maps', 'Cave');
+  it('shows the New Session title and error banner when creating with an error', () => {
+    renderModal({ editingSession: null, formData: { ...baseFormData, name: '' }, error: 'A session with this name already exists' });
+    expect(screen.getByRole('heading', { name: /new session/i })).toBeInTheDocument();
+    expect(screen.getByText(/already exists/i)).toBeInTheDocument();
   });
 });

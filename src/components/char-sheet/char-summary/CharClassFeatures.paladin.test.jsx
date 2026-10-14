@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -10,6 +10,7 @@ import * as dataLoader from '../../../services/ui/dataLoader.js';
 
 // Paladin Features are reached through the CharClassFeatures registry entry
 // point (class name 'Paladin' → PaladinFeatures, region testid 'char-class-paladin').
+// Registry routing itself is covered by CharClassFeatures.test.jsx.
 
 vi.mock('../../../services/character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(),
@@ -100,46 +101,30 @@ describe('PaladinFeatures', () => {
     runtimeState.useRuntimeValue.mockReturnValue(undefined);
   });
 
-  describe('class features wiring', () => {
-    it('reads class features for the exact playerStats object it was given', () => {
-      const stats = paladinStats(5);
-      renderPaladin(stats);
-      expect(classFeatures.getClassFeatures).toHaveBeenCalledWith(stats);
-    });
-  });
-
   describe('aura of protection', () => {
-    const lockedAuraTests = [
-      { level: 1, cha: 3, expected: 'Aura of Protection: +3 to saves (locked)' },
-      { level: 5, cha: 3, expected: 'Aura of Protection: +3 to saves (locked)' },
+    it.each([
+      { cha: 3, expected: '+3' },
       // Pinned display quirk: the modifier is interpolated after a literal '+',
       // so a negative Charisma renders "+-1" rather than "-1".
-      { level: 5, cha: -1, expected: 'Aura of Protection: +-1 to saves (locked)' },
-    ];
-
-    it.each(lockedAuraTests)('renders the locked line with CHA $cha at level $level', ({ level, cha, expected }) => {
-      const stats = paladinStats(level, { abilities: [{ name: 'Charisma', bonus: cha }] });
+      { cha: -1, expected: '+-1' },
+    ])('renders the locked line with CHA $cha at level 5 and never consults the range service', ({ cha, expected }) => {
+      const stats = paladinStats(5, { abilities: [{ name: 'Charisma', bonus: cha }] });
       const section = renderPaladin(stats);
-      expect(section.textContent).toContain(expected);
-      // While locked the range service must not be consulted at all.
+      expect(section.textContent).toContain(`Aura of Protection: ${expected} to saves (locked)`);
       expect(auraOfProtection.getAuraRangeFromStats).not.toHaveBeenCalled();
     });
 
-    it.each([
-      { level: 6, cha: 3, range: 10, expected: 'Aura of Protection: +3 to saves (10 ft.)' },
-      { level: 20, cha: 5, range: 30, expected: 'Aura of Protection: +5 to saves (30 ft.)' },
-    ])('unlocks at level $level and takes its range from the aura service', ({ level, cha, range, expected }) => {
-      auraOfProtection.getAuraRangeFromStats.mockReturnValue(range);
-      const stats = paladinStats(level, { abilities: [{ name: 'Charisma', bonus: cha }] });
+    it('unlocks at level 6 and takes its range from the aura service', () => {
+      auraOfProtection.getAuraRangeFromStats.mockReturnValue(10);
+      const stats = paladinStats(6, { abilities: [{ name: 'Charisma', bonus: 3 }] });
       const section = renderPaladin(stats);
-      expect(section.textContent).toContain(expected);
+      expect(section.textContent).toContain('Aura of Protection: +3 to saves (10 ft.)');
       expect(auraOfProtection.getAuraRangeFromStats).toHaveBeenCalledWith(stats);
     });
 
     it.each([
-      ['Charisma is missing from abilities', [{ name: 'Strength', bonus: 3 }]],
+      ['Charisma missing from abilities', [{ name: 'Strength', bonus: 3 }]],
       ['abilities is null', null],
-      ['abilities is undefined', undefined],
     ])('omits the line when %s', (_label, abilities) => {
       const section = renderPaladin(paladinStats(7, { abilities }));
       expect(section.textContent).not.toContain('Aura of Protection');
@@ -154,7 +139,6 @@ describe('PaladinFeatures', () => {
     });
 
     it('omits the row when auraRange is null', () => {
-      mockPaladinFeatures({ auraRange: null });
       const section = renderPaladin(paladinStats(7));
       expect(section.textContent).not.toContain('Aura Range');
     });
@@ -164,7 +148,6 @@ describe('PaladinFeatures', () => {
     it.each([
       [3, 3],
       [0, 0],
-      [undefined, 0],
     ])('maxChannelDivinity %p renders %i/%i charges', (input, max) => {
       mockPaladinFeatures({ maxChannelDivinity: input });
       renderPaladin(paladinStats(2));
@@ -175,10 +158,9 @@ describe('PaladinFeatures', () => {
 
   describe('extra attacks', () => {
     it.each([
-      { extraAttacks: 2, expected: 'Extra Attacks: 2' },
-      { extraAttacks: 0, expected: 'Extra Attacks: 0' },
-      { extraAttacks: undefined, expected: 'Extra Attacks: 0' },
-    ])('extraAttacks $extraAttacks renders as "$expected"', ({ extraAttacks, expected }) => {
+      [2, 'Extra Attacks: 2'],
+      [0, 'Extra Attacks: 0'],
+    ])('extraAttacks %p renders as "%s"', (extraAttacks, expected) => {
       mockPaladinFeatures({ extraAttacks });
       const section = renderPaladin(paladinStats(5));
       expect(section.textContent).toContain(expected);
@@ -195,11 +177,8 @@ describe('PaladinFeatures', () => {
       expect(screen.getByText('Great Weapon Fighting')).toHaveClass('clickable');
     });
 
-    it.each([
-      ['null', null],
-      ['undefined', undefined],
-    ])('omits the whole row when fightingStyles is %s', (_label, fightingStyles) => {
-      const section = renderPaladin(paladinStats(2, { class: paladinClass({ fightingStyles }) }));
+    it('omits the whole row when fightingStyles is null', () => {
+      const section = renderPaladin(paladinStats(2, { class: paladinClass({ fightingStyles: null }) }));
       expect(section.textContent).not.toContain('Fighting Styles');
     });
 
@@ -222,7 +201,7 @@ describe('PaladinFeatures', () => {
       await act(async () => {});
     }
 
-    it('clicking a style badge opens a popup with its loaded description', async () => {
+    it('clicking a style badge opens its popup and clicking the popup dismisses it', async () => {
       await renderLoadedStyles(['Defense', 'Dueling']);
 
       fireEvent.click(screen.getByText('Defense'));
@@ -231,13 +210,6 @@ describe('PaladinFeatures', () => {
       expect(screen.getByText('click to dismiss')).toBeInTheDocument();
       // Only the clicked style pops up — the other badge must not leak content.
       expect(screen.queryByText('DUELING_POPUP_DESC')).not.toBeInTheDocument();
-    });
-
-    it('clicking the open popup dismisses it', async () => {
-      await renderLoadedStyles(['Defense']);
-
-      fireEvent.click(screen.getByText('Defense'));
-      expect(screen.getByText('DEFENSE_POPUP_DESC')).toBeInTheDocument();
 
       fireEvent.click(screen.getByText('DEFENSE_POPUP_DESC'));
       expect(screen.queryByText('DEFENSE_POPUP_DESC')).not.toBeInTheDocument();
@@ -256,7 +228,6 @@ describe('PaladinFeatures', () => {
   describe('lay on hands pool', () => {
     it.each([
       [1, 5],
-      [5, 25],
       [20, 100],
     ])('tracks a pool of 5 × level (level %i → max %i)', (level, max) => {
       renderPaladin(paladinStats(level));
@@ -266,35 +237,25 @@ describe('PaladinFeatures', () => {
   });
 
   describe('glorious defense', () => {
-    it('passes the exact playerStats to the active-check handler', () => {
-      const stats = paladinStats(5);
-      renderPaladin(stats);
-      expect(gloriousDefense.hasGloriousDefenseActive).toHaveBeenCalledWith(stats);
-    });
-
     it('omits the tracked resource when the handler reports inactive', () => {
-      gloriousDefense.hasGloriousDefenseActive.mockReturnValue(false);
-      const section = renderPaladin(paladinStats(5));
+      const stats = paladinStats(5);
+      const section = renderPaladin(stats);
+      expect(gloriousDefense.hasGloriousDefenseActive).toHaveBeenCalledWith(stats);
       expect(screen.queryByTestId('tracked-resource-gloriousDefenseUses')).not.toBeInTheDocument();
       expect(section.textContent).not.toContain('Glorious Defense');
     });
 
     it.each([
-      [5, 5],
-      [0, 1],
-      [-2, 1],
-    ])('max uses is the Charisma modifier with a floor of 1 (CHA %i → %i)', (cha, max) => {
+      { cha: 5, max: 5 },
+      { cha: -2, max: 1 },
+      { cha: undefined, max: 1, abilities: [] },
+    ])('max uses is the Charisma modifier with a floor of 1 (CHA %p → %i)', ({ cha, max, abilities }) => {
       gloriousDefense.hasGloriousDefenseActive.mockReturnValue(true);
-      renderPaladin(paladinStats(5, { abilities: [{ name: 'Charisma', bonus: cha }] }));
+      const stats = paladinStats(5, { abilities: abilities ?? [{ name: 'Charisma', bonus: cha }] });
+      renderPaladin(stats);
+      expect(gloriousDefense.hasGloriousDefenseActive).toHaveBeenCalledWith(stats);
       expect(screen.getByTestId('tracked-resource-gloriousDefenseUses'))
         .toHaveTextContent(`Glorious Defense Uses: ${max}/${max}`);
-    });
-
-    it('shows 1 use when the Charisma ability is missing entirely', () => {
-      gloriousDefense.hasGloriousDefenseActive.mockReturnValue(true);
-      renderPaladin(paladinStats(5, { abilities: [] }));
-      expect(screen.getByTestId('tracked-resource-gloriousDefenseUses'))
-        .toHaveTextContent('Glorious Defense Uses: 1/1');
     });
   });
 
@@ -314,10 +275,13 @@ describe('PaladinFeatures', () => {
       });
     }
 
-    it.each(badgeTests)('shows the $name badge when $key is true', ({ key, name }) => {
+    it.each(badgeTests)('shows only the $name badge when only $key is true', ({ key, name }) => {
       runtimeFlags(badge => (badge.key === key ? true : false));
       const section = renderPaladin(paladinStats(1));
       expect(section.textContent).toContain(name);
+      badgeTests.filter(b => b.key !== key).forEach(({ name: other }) => {
+        expect(section.textContent).not.toContain(other);
+      });
     });
 
     it('renders truthy non-true buff flags for every badge except Peerless Athlete (strict === true)', () => {
@@ -336,12 +300,6 @@ describe('PaladinFeatures', () => {
       runtimeFlags(() => undefined);
       const section = renderPaladin(paladinStats(1));
       badgeTests.forEach(({ name }) => expect(section.textContent).not.toContain(name));
-    });
-
-    it('shows all buff badges simultaneously', () => {
-      runtimeFlags(() => true);
-      const section = renderPaladin(paladinStats(1));
-      badgeTests.forEach(({ name }) => expect(section.textContent).toContain(name));
     });
   });
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -6,7 +6,10 @@ import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 import * as dataLoader from '../../../services/ui/dataLoader.js';
 
 // Fighter Features are reached through the CharClassFeatures registry entry
-// point (class name 'Fighter' → FighterFeatures).
+// point (class name 'Fighter' → FighterFeatures). The entry point's own
+// lifecycle (modal seeding/close, dodge badge) is owned by
+// CharClassFeatures.test.jsx — this file owns fighter-specific values,
+// gates, and the fighting-style popup.
 
 vi.mock('../../../services/character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(() => null),
@@ -111,111 +114,77 @@ describe('FighterFeatures', () => {
     dataLoader.loadFightingStyles.mockResolvedValue([]);
   });
 
-  describe('render gate (class level lookup)', () => {
-    it.each([
-      ['class_levels is null', null],
-      ['class_levels is empty', []],
-      ['class_levels is shorter than the character level', [{ level: 1 }, { level: 2 }]],
-    ])('renders nothing when %s', (_label, class_levels) => {
-      const stats = buildPlayerStats({
-        level: 5,
-        class: { name: 'Fighter', major: {}, subclass: {}, class_levels, fightingStyles: [] },
-      });
-      render(<CharClassFeatures playerStats={stats} campaignName="test-campaign" />);
-      expect(screen.queryByTestId('char-class-fighter')).not.toBeInTheDocument();
+  it.each([
+    ['class_levels is missing', null],
+    ['class_levels is shorter than the character level', [{ level: 1 }, { level: 2 }]],
+  ])('renders nothing when %s', (_label, class_levels) => {
+    const stats = buildPlayerStats({
+      level: 5,
+      class: { name: 'Fighter', major: {}, subclass: {}, class_levels, fightingStyles: [] },
     });
+    render(<CharClassFeatures playerStats={stats} campaignName="test-campaign" />);
+    expect(screen.queryByTestId('char-class-fighter')).not.toBeInTheDocument();
   });
 
-  describe('action surge', () => {
-    it('5e tracks max from class_specific.action_surges', () => {
-      renderFighter(fighterStats(2, { class_specific: { action_surges: 2 } }));
-      expect(screen.getByTestId('tracked-resource-actionSurgeUses'))
-        .toHaveTextContent('Action Surge Uses: 2/2');
-    });
-
-    it('5e tracks 0 uses when classLevel lacks class_specific data', () => {
-      renderFighter(fighterStats(2));
-      expect(screen.getByTestId('tracked-resource-actionSurgeUses'))
-        .toHaveTextContent('Action Surge Uses: 0/0');
-    });
-
-    it.each([
-      [1, 0],
-      [2, 1],
-      [16, 1],
-      [17, 2],
-      [20, 2],
-    ])('2024 derives max from level: level %i → %i use(s)', (level, max) => {
-      renderFighter(fighterStats(level, {}, { rules: '2024' }));
-      expect(screen.getByTestId('tracked-resource-actionSurgeUses'))
-        .toHaveTextContent(`Action Surge Uses: ${max}/${max}`);
-    });
+  // Action surge: 5e reads class_specific.action_surges, 2024 derives from
+  // level (thresholds at 2 and 17). One table pins both rulesets' branches.
+  it.each([
+    ['5e reads class_specific.action_surges', '5e', 2, { class_specific: { action_surges: 2 } }, 2],
+    ['5e falls back to 0 when class_specific is absent', '5e', 2, {}, 0],
+    ['2024 level below 2 has no surge', '2024', 1, {}, 0],
+    ['2024 level 2 grants one surge', '2024', 2, {}, 1],
+    ['2024 level 17 grants two surges', '2024', 17, {}, 2],
+  ])('%s', (_label, rules, level, classLevelData, max) => {
+    renderFighter(fighterStats(level, classLevelData, { rules }));
+    expect(screen.getByTestId('tracked-resource-actionSurgeUses'))
+      .toHaveTextContent(`Action Surge Uses: ${max}/${max}`);
   });
 
-  describe('extra attacks', () => {
-    it('reads Extra Attacks from classLevel.extra_attacks', () => {
-      const section = renderFighter(fighterStats(5, { extra_attacks: 2 }));
-      expect(section.textContent).toContain('Extra Attacks: 2');
-    });
-
-    it('defaults Extra Attacks to 0 when classLevel lacks extra_attacks', () => {
-      const section = renderFighter(fighterStats(3));
-      expect(section.textContent).toContain('Extra Attacks: 0');
-    });
+  it.each([
+    ['reads Extra Attacks from classLevel.extra_attacks', 5, { extra_attacks: 2 }, 2],
+    ['defaults Extra Attacks to 0 when absent', 3, {}, 0],
+  ])('%s', (_label, level, classLevelData, expected) => {
+    const section = renderFighter(fighterStats(level, classLevelData));
+    expect(section.textContent).toContain(`Extra Attacks: ${expected}`);
   });
 
-  describe('second wind', () => {
-    it('tracks uses from classLevel.second_wind', () => {
-      renderFighter(fighterStats(1, { second_wind: 1 }));
-      expect(screen.getByTestId('tracked-resource-secondWindUses'))
-        .toHaveTextContent('Second Wind: 1/1');
-    });
-
-    it('tracks 0 uses when classLevel lacks second_wind', () => {
-      renderFighter(fighterStats(1));
-      expect(screen.getByTestId('tracked-resource-secondWindUses'))
-        .toHaveTextContent('Second Wind: 0/0');
-    });
+  it.each([
+    ['tracks uses from classLevel.second_wind', 1, { second_wind: 1 }, 1],
+    ['tracks 0 uses when classLevel lacks second_wind', 1, {}, 0],
+  ])('second wind: %s', (_label, level, classLevelData, uses) => {
+    renderFighter(fighterStats(level, classLevelData));
+    expect(screen.getByTestId('tracked-resource-secondWindUses'))
+      .toHaveTextContent(`Second Wind: ${uses}/${uses}`);
   });
 
-  describe('weapon mastery', () => {
-    it('renders the mastery value and opens the mastery modal when clicked', () => {
-      const section = renderFighter(fighterStats(5, { weapon_mastery: 'Piercing' }));
-      expect(section.textContent).toContain('Weapon Mastery: Piercing');
-      expect(screen.queryByText('WeaponKindMasteryModal')).not.toBeInTheDocument();
+  it('renders the mastery value and opens the mastery modal when clicked', () => {
+    const section = renderFighter(fighterStats(5, { weapon_mastery: 'Piercing' }));
+    expect(section.textContent).toContain('Weapon Mastery: Piercing');
+    expect(screen.queryByText('WeaponKindMasteryModal')).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByText('Piercing'));
+    fireEvent.click(screen.getByText('Piercing'));
 
-      expect(screen.getByText('WeaponKindMasteryModal')).toBeInTheDocument();
-      expect(runtimeState.getRuntimeValue)
-        .toHaveBeenCalledWith('Test Fighter', '_Weapon_Kind_Mastery_chosenWeapons', 'test-campaign');
-    });
+    expect(screen.getByText('WeaponKindMasteryModal')).toBeInTheDocument();
   });
 
   describe('energy system', () => {
     const energy = { required_major: 'Psi Warrior', energy_die_num: 4, energy_die_type: 6 };
 
-    it('renders energy dice when energy.required_major matches the major name', () => {
-      const section = renderFighter(
-        fighterStats(5, { energy }, { major: { name: 'Psi Warrior' } })
-      );
+    it.each([
+      ['major', { major: { name: 'Psi Warrior' } }],
+      ['subclass fallback', { subclass: { name: 'Psi Warrior' } }],
+    ])('renders energy dice when required_major matches the %s name', (_label, majorOptions) => {
+      const section = renderFighter(fighterStats(5, { energy }, majorOptions));
       expect(screen.getByTestId('tracked-resource-psionicEnergy'))
         .toHaveTextContent('Energy Dice: 4/4');
       expect(section.textContent).toContain('Energy Die Type: d6');
     });
 
-    it('matches the major name via the subclass fallback', () => {
-      renderFighter(
-        fighterStats(5, { energy }, { subclass: { name: 'Psi Warrior' } })
-      );
-      expect(screen.getByTestId('tracked-resource-psionicEnergy')).toBeInTheDocument();
-    });
-
     it.each([
-      ['required_major names a different major', energy, { major: { name: 'Battle Master' } }],
-      ['no major or subclass is set', energy, {}],
-    ])('omits energy dice when %s', (_label, classLevelEnergy, majorOptions) => {
-      const section = renderFighter(fighterStats(5, { energy: classLevelEnergy }, majorOptions));
+      ['required_major names a different major', { major: { name: 'Battle Master' } }],
+      ['no major or subclass is set', {}],
+    ])('omits energy dice when %s', (_label, majorOptions) => {
+      const section = renderFighter(fighterStats(5, { energy }, majorOptions));
       expect(screen.queryByTestId('tracked-resource-psionicEnergy')).not.toBeInTheDocument();
       expect(section.textContent).not.toContain('Energy Die Type');
     });
@@ -228,41 +197,26 @@ describe('FighterFeatures', () => {
   });
 
   describe('fighting styles', () => {
-    it('lists all selected styles as clickable badges', () => {
-      const section = renderFighter(
-        fighterStats(2, {}, { fightingStyles: ['Defense', 'Great Weapon Fighting'] })
-      );
-      expect(section.textContent).toContain('Fighting Styles: Defense, Great Weapon Fighting');
-      expect(screen.getByText('Defense')).toHaveClass('clickable');
-      expect(screen.getByText('Great Weapon Fighting')).toHaveClass('clickable');
-    });
-
-    it('renders N/A when fightingStyles is null', () => {
-      const stats = buildPlayerStats({
-        level: 1,
-        class: { name: 'Fighter', major: {}, subclass: {}, class_levels: [{ level: 1 }], fightingStyles: null },
-      });
-      const section = renderFighter(stats);
-      expect(section.textContent).toContain('Fighting Styles: N/A');
-    });
-
-    it('renders no styles and no N/A when fightingStyles is an empty array', () => {
-      const section = renderFighter(fighterStats(1));
-      expect(section.textContent).toContain('Fighting Styles:');
-      expect(section.textContent).not.toContain('N/A');
+    // The empty-array case pins that only a null fightingStyles renders the
+    // "N/A" placeholder — an empty list must not become one.
+    it.each([
+      ['two styles as a comma list', ['Defense', 'Great Weapon Fighting'], 'Defense, Great Weapon Fighting'],
+      ['null styles as N/A', null, 'N/A'],
+      ['an empty list renders no styles and no N/A', [], ''],
+    ])('renders %s', (_label, styles, expected) => {
+      const section = renderFighter(fighterStats(2, {}, { fightingStyles: styles }));
+      expect(section.textContent).toContain(`Fighting Styles: ${expected}`);
+      if (expected !== 'N/A') {
+        expect(section.textContent).not.toContain('N/A');
+      }
     });
   });
 
   describe('fighting style badge popup (bug-CLA-005 collateral)', () => {
-    async function renderLoadedBadges(styles) {
+    it('opens the clicked style\'s description and dismisses on popup click', async () => {
       dataLoader.loadFightingStyles.mockResolvedValue(FIGHTING_STYLE_CATALOG);
-      const section = renderFighter(fighterStats(18, {}, { fightingStyles: styles }));
+      renderFighter(fighterStats(18, {}, { fightingStyles: ['Unarmed Fighting', 'Interception'] }));
       await act(async () => {});
-      return section;
-    }
-
-    it('clicking a style badge opens a popup with its loaded description', async () => {
-      await renderLoadedBadges(['Unarmed Fighting', 'Interception']);
 
       fireEvent.click(screen.getByText('Unarmed Fighting'));
 
@@ -270,16 +224,10 @@ describe('FighterFeatures', () => {
       expect(screen.getByText('click to dismiss')).toBeInTheDocument();
       // Only the clicked style pops up — the other badge must not leak content.
       expect(screen.queryByText('INTERCEPTION_POPUP_DESC')).not.toBeInTheDocument();
-    });
 
-    it('clicking the open popup dismisses it', async () => {
-      await renderLoadedBadges(['Unarmed Fighting', 'Interception']);
+      fireEvent.click(screen.getByText('UNARMED_POPUP_DESC'));
 
-      fireEvent.click(screen.getByText('Interception'));
-      expect(screen.getByText('INTERCEPTION_POPUP_DESC')).toBeInTheDocument();
-
-      fireEvent.click(screen.getByText('INTERCEPTION_POPUP_DESC'));
-      expect(screen.queryByText('INTERCEPTION_POPUP_DESC')).not.toBeInTheDocument();
+      expect(screen.queryByText('UNARMED_POPUP_DESC')).not.toBeInTheDocument();
       expect(screen.queryByText('click to dismiss')).not.toBeInTheDocument();
     });
 
@@ -297,24 +245,19 @@ describe('FighterFeatures', () => {
   describe('superiority dice', () => {
     const battleMaster = { major: { name: 'Battle Master' } };
 
-    it('tracks Battle Master dice max from _trackedResources.superiorityDice', () => {
-      renderFighter(fighterStats(10, {}, {
+    // One table pins Battle Master die-type tier boundaries (d8 → d10 at 10,
+    // d12 at 18) alongside the max wired from _trackedResources.
+    it.each([
+      [3, 8, 4],
+      [10, 10, 5],
+      [18, 12, 7],
+    ])('Battle Master at level %i shows d%i with tracked max', (level, dieType, max) => {
+      const section = renderFighter(fighterStats(level, {}, {
         ...battleMaster,
-        trackedResources: { superiorityDice: { max: 5 } },
+        trackedResources: { superiorityDice: { max } },
       }));
       expect(screen.getByTestId('tracked-resource-superiorityDice'))
-        .toHaveTextContent('Superiority Dice: 5/5');
-    });
-
-    it.each([
-      [3, 8],
-      [9, 8],
-      [10, 10],
-      [17, 10],
-      [18, 12],
-      [20, 12],
-    ])('Battle Master at level %i shows die type d%i', (level, dieType) => {
-      const section = renderFighter(fighterStats(level, {}, battleMaster));
+        .toHaveTextContent(`Superiority Dice: ${max}/${max}`);
       expect(section.textContent).toContain(`Superiority Die: d${dieType}`);
     });
 

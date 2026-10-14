@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * CharSpells — target-selection modals (integration wiring).
  *
@@ -8,13 +8,22 @@
  * correct flow handler with the correct payload shape (array vs object vs raw
  * name — these differ per spell and are the real defect surface).
  *
+ * One test per spell covers the whole routing seam (render → pick SECOND target
+ * → assert payload → Skip), because the per-spell risk is the wiring itself:
+ * pending key → modal title → confirm handler → payload shape → skip handler.
+ * Modal internals (confirm-disabled-until-picked, multi-select caps, count
+ * badges) are owned by the modal suites (../modals/shared/*.test.jsx,
+ * ../modals/HexAbilityModal.test.jsx) and are NOT re-asserted here.
+ *
  * Modals are stubbed with a FAITHFUL MINIMAL contract mirroring the real
  * components' user behavior — radio row selects then Confirm dispatches the
  * selection (SecondaryTargetModal), checkbox rows toggle then Confirm dispatches
  * the selected array with a live count (CreatureSelectionModal), damage-type
  * radios then Choose dispatches the type (SingleResistanceSelectionModal),
  * ability buttons dispatch the ability key from the `abilities` prop
- * (HexAbilityModal) — so tests drive real user behavior via accessible roles.
+ * (HexAbilityModal, whose stub default INCLUDES CON as a tripwire so a missing
+ * or wrong abilities prop from CharSpells cannot pass the CON-exclusion test) —
+ * so tests drive real user behavior via accessible roles.
  *
  * NOT covered here (see sibling files to avoid duplication):
  * - Restoration target/effect flow → CharSpells.Popups.restoration.test.jsx
@@ -141,34 +150,29 @@ vi.mock('../modals/PolymorphSelectionModal.jsx', () => ({ default: () => null })
 // --- Faithful minimal stubs of the modals under test ---
 
 // Mirrors SecondaryTargetModal's user contract: radio rows select, Confirm
-// dispatches onTargetSelected(selected), disabled until a pick, Skip closes.
+// dispatches onTargetSelected(selected), Skip closes.
 vi.mock('../modals/shared/SecondaryTargetModal.jsx', async () => {
   const { useState } = await import('react');
   return {
-    default: function SecondaryTargetModalStub({ title, targets = [], onTargetSelected, onSkip, description, confirmLabel, hideConfirm }) {
+    default: function SecondaryTargetModalStub({ title, targets = [], onTargetSelected, onSkip, description, confirmLabel }) {
       const [selected, setSelected] = useState(null);
-      const keyOf = (t) => ('value' in t ? t.value : t.name);
-      const labelOf = (t) => ('value' in t ? t.label : t.name);
-      const showConfirm = !hideConfirm || targets.length > 0;
       return (
         <div role="dialog" aria-label={title}>
           {description && <p dangerouslySetInnerHTML={{ __html: description }} />}
           {targets.map((t) => (
-            <label key={keyOf(t)}>
+            <label key={t.name}>
               <input
                 type="radio"
                 name="secondaryTarget"
-                checked={selected === keyOf(t)}
-                onChange={() => setSelected(keyOf(t))}
+                checked={selected === t.name}
+                onChange={() => setSelected(t.name)}
               />
-              {labelOf(t)}
+              {t.name}
             </label>
           ))}
-          {showConfirm && (
-            <button type="button" disabled={!selected || targets.length === 0} onClick={() => onTargetSelected?.(selected)}>
-              {confirmLabel || 'Attack'}
-            </button>
-          )}
+          <button type="button" onClick={() => onTargetSelected?.(selected)}>
+            {confirmLabel || 'Attack'}
+          </button>
           <button type="button" onClick={() => onSkip?.()}>Skip</button>
         </div>
       );
@@ -178,7 +182,7 @@ vi.mock('../modals/shared/SecondaryTargetModal.jsx', async () => {
 
 // Mirrors CreatureSelectionModal's multi-select contract: checkbox rows toggle
 // (disabled at maxTargets), Confirm dispatches the selected-name array with a
-// live count in its label, disabled while empty, Skip closes.
+// live count in its label, Skip closes.
 vi.mock('../modals/shared/CreatureSelectionModal.jsx', async () => {
   const { useState } = await import('react');
   return {
@@ -203,7 +207,7 @@ vi.mock('../modals/shared/CreatureSelectionModal.jsx', async () => {
               </label>
             );
           })}
-          <button type="button" disabled={selected.length === 0} onClick={() => onConfirm?.(selected)}>
+          <button type="button" onClick={() => onConfirm?.(selected)}>
             {confirmLabel || 'Confirm'} ({selected.length})
           </button>
           <button type="button" onClick={() => onSkip?.()}>Skip</button>
@@ -222,7 +226,7 @@ vi.mock('../modals/SingleResistanceSelectionModal.jsx', async () => {
       const [selected, setSelected] = useState(null);
       const damageTypes = action?.automation?.damageTypes || [];
       return (
-        <div role="dialog" aria-label={title || action?.name || 'Resistance Selection'}>
+        <div role="dialog" aria-label={title || action?.name || 'Choose Damage Type'}>
           {damageTypes.map((type) => (
             <label key={type}>
               <input
@@ -234,7 +238,7 @@ vi.mock('../modals/SingleResistanceSelectionModal.jsx', async () => {
               {type}
             </label>
           ))}
-          <button type="button" disabled={!selected} onClick={() => onConfirm?.(selected)}>Choose Damage Type</button>
+          <button type="button" onClick={() => onConfirm?.(selected)}>Choose Damage Type</button>
           <button type="button" onClick={() => onClose?.()}>Cancel</button>
         </div>
       );
@@ -243,8 +247,8 @@ vi.mock('../modals/SingleResistanceSelectionModal.jsx', async () => {
 });
 
 // Mirrors HexAbilityModal: renders exactly the `abilities` prop it is given,
-// each button dispatches its key. (The offered list is asserted against what
-// CharSpells passes — Enhance Ability excludes CON by project rule.)
+// each button dispatches its key. The stub default INCLUDES CON — CharSpells
+// must pass its own CON-excluded list (project rule) for the tests to pass.
 vi.mock('../modals/HexAbilityModal.jsx', () => ({
   default: function HexAbilityModalStub({ title, abilities, onAbilitySelected, onCancel }) {
     const options = abilities || [
@@ -375,6 +379,32 @@ const CREATURE_MODAL_SPELLS = [
   { pending: 'pendingSleetStorm', title: 'Sleet Storm', confirm: 'handleSleetStormConfirm', skip: 'handleSleetStormSkip' },
 ];
 
+// Protection from Energy and Resistance share one shape: SecondaryTargetModal at
+// the 'target' stage (raw name to targetSelect) → SingleResistanceSelectionModal
+// at the 'type' stage (damage type to typeSelect). Parameterized over both.
+const STAGED_TYPE_FLOWS = [
+  {
+    pending: 'pendingProtectionFromEnergy',
+    stageKey: 'protectionFromEnergyStage',
+    title: 'Protection from Energy',
+    castLabel: 'Cast Protection from Energy',
+    damageTypes: ['fire', 'cold', 'lightning'],
+    targetSelect: 'handleProtectionFromEnergyTargetSelect',
+    typeSelect: 'handleProtectionFromEnergyTypeSelect',
+    skip: 'handleProtectionFromEnergySkip',
+  },
+  {
+    pending: 'pendingResistance',
+    stageKey: 'resistanceStage',
+    title: 'Resistance',
+    castLabel: 'Cast Resistance',
+    damageTypes: ['fire', 'acid'],
+    targetSelect: 'handleResistanceTargetSelect',
+    typeSelect: 'handleResistanceTypeSelect',
+    skip: 'handleResistanceSkip',
+  },
+];
+
 describe('CharSpells - Target selection modals', () => {
   beforeEach(() => {
     flow = {};
@@ -387,38 +417,26 @@ describe('CharSpells - Target selection modals', () => {
   });
 
   describe('SecondaryTargetModal spells', () => {
-    it.each(SECONDARY_SPELLS)('lists creature targets for $title with $confirmLabel disabled until one is picked', (spell) => {
+    it.each(SECONDARY_SPELLS)('routes the picked target to $confirm and Skip to $skip for $title', (spell) => {
       castPending(spell);
 
       const dialog = screen.getByRole('dialog', { name: spell.title });
       expect(within(dialog).getByRole('radio', { name: 'Orc' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('radio', { name: 'Goblin' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: spell.confirmLabel })).toBeDisabled();
-      expect(flow[spell.confirm]).not.toHaveBeenCalled();
-    });
-
-    it.each(SECONDARY_SPELLS)('dispatches the chosen target to $confirm for $title', (spell) => {
-      castPending(spell);
 
       // Pick the SECOND target so a payload of "all targets" or "first target" fails.
-      fireEvent.click(screen.getByRole('radio', { name: 'Goblin' }));
-      fireEvent.click(screen.getByRole('button', { name: spell.confirmLabel }));
+      fireEvent.click(within(dialog).getByRole('radio', { name: 'Goblin' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: spell.confirmLabel }));
 
       expect(flow[spell.confirm]).toHaveBeenCalledTimes(1);
       expect(flow[spell.confirm]).toHaveBeenCalledWith(spell.payload('Goblin'));
       expect(flow[spell.skip]).not.toHaveBeenCalled();
-    });
 
-    it.each(SECONDARY_SPELLS)('routes Skip to $skip without casting for $title', (spell) => {
-      castPending(spell);
-
-      fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-
+      fireEvent.click(skipButton(dialog));
       expect(flow[spell.skip]).toHaveBeenCalledTimes(1);
-      expect(flow[spell.confirm]).not.toHaveBeenCalled();
+      expect(flow[spell.confirm]).toHaveBeenCalledTimes(1);
     });
 
-    it('surfaces the pending range in the Remove Curse description', () => {
+    it('interpolates the live pending range into the Remove Curse description', () => {
       castPending({
         ...SECONDARY_SPELLS.find((s) => s.pending === 'pendingRemoveCurse'),
         state: { range: '90 feet' },
@@ -429,10 +447,10 @@ describe('CharSpells - Target selection modals', () => {
   });
 
   describe('staged flow — Enhance Ability', () => {
-    const flowAtAbilityStage = () => {
+    const flowAtStage = (stage) => {
       flow = {
         pendingEnhanceAbility: { creatureTargets: TARGETS },
-        enhanceAbilityStage: 'ability',
+        enhanceAbilityStage: stage,
         handleEnhanceAbilityAbilitySelect: vi.fn(),
         handleEnhanceAbilityConfirm: vi.fn(),
         handleEnhanceAbilitySkip: vi.fn(),
@@ -440,41 +458,29 @@ describe('CharSpells - Target selection modals', () => {
       return renderCharSpells();
     };
 
-    it('offers exactly the five CON-excluded eligible abilities at the ability stage', () => {
-      flowAtAbilityStage();
+    it('offers exactly the five CON-excluded abilities at the ability stage, dispatching the pick or Cancel', () => {
+      flowAtStage('ability');
 
       const dialog = screen.getByRole('dialog', { name: 'Enhance Ability — Choose Ability' });
-      expect(within(dialog).getByRole('button', { name: 'Strength (STR)' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: 'Dexterity (DEX)' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: 'Intelligence (INT)' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: 'Wisdom (WIS)' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: 'Charisma (CHA)' })).toBeInTheDocument();
+      // The offered list must come from CharSpells' prop, not the stub default (which includes CON).
+      for (const label of ['Strength (STR)', 'Dexterity (DEX)', 'Intelligence (INT)', 'Wisdom (WIS)', 'Charisma (CHA)']) {
+        expect(within(dialog).getByRole('button', { name: label })).toBeInTheDocument();
+      }
       // CON is intentionally not eligible — see enhanceAbilityHandler.test.js.
       expect(within(dialog).queryByRole('button', { name: /Constitution/ })).not.toBeInTheDocument();
       // The target picker must not appear alongside the ability picker.
       expect(screen.queryByRole('dialog', { name: 'Enhance Ability' })).not.toBeInTheDocument();
-    });
 
-    it('dispatches the picked ability key and routes Cancel to skip at the ability stage', () => {
-      flowAtAbilityStage();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Dexterity (DEX)' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Dexterity (DEX)' }));
       expect(flow.handleEnhanceAbilityAbilitySelect).toHaveBeenCalledWith('DEX');
 
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
       expect(flow.handleEnhanceAbilitySkip).toHaveBeenCalledTimes(1);
       expect(flow.handleEnhanceAbilityAbilitySelect).toHaveBeenCalledTimes(1);
     });
 
-    it('shows the creature target picker at the target stage and dispatches the pick', () => {
-      flow = {
-        pendingEnhanceAbility: { creatureTargets: TARGETS },
-        enhanceAbilityStage: 'target',
-        handleEnhanceAbilityAbilitySelect: vi.fn(),
-        handleEnhanceAbilityConfirm: vi.fn(),
-        handleEnhanceAbilitySkip: vi.fn(),
-      };
-      renderCharSpells();
+    it('shows the creature target picker at the target stage and dispatches the pick or Skip', () => {
+      flowAtStage('target');
 
       expect(screen.queryByRole('dialog', { name: 'Enhance Ability — Choose Ability' })).not.toBeInTheDocument();
       const dialog = screen.getByRole('dialog', { name: 'Enhance Ability' });
@@ -484,130 +490,84 @@ describe('CharSpells - Target selection modals', () => {
 
       fireEvent.click(skipButton(dialog));
       expect(flow.handleEnhanceAbilitySkip).toHaveBeenCalledTimes(1);
+      expect(flow.handleEnhanceAbilityConfirm).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('staged flow — Protection from Energy', () => {
-    const flowAtStage = (stage) => {
+  describe('staged flows — Protection from Energy & Resistance', () => {
+    it.each(STAGED_TYPE_FLOWS)('routes $title through its target then damage-type stage', (spell) => {
       flow = {
-        pendingProtectionFromEnergy: { creatureTargets: TARGETS, range: 'Touch', damageTypes: ['fire', 'cold', 'lightning'] },
-        protectionFromEnergyStage: stage,
-        handleProtectionFromEnergyTargetSelect: vi.fn(),
-        handleProtectionFromEnergyTypeSelect: vi.fn(),
-        handleProtectionFromEnergySkip: vi.fn(),
+        [spell.pending]: { creatureTargets: TARGETS, range: 'Touch', damageTypes: spell.damageTypes },
+        [spell.stageKey]: 'target',
+        [spell.targetSelect]: vi.fn(),
+        [spell.typeSelect]: vi.fn(),
+        [spell.skip]: vi.fn(),
       };
-      return renderCharSpells();
-    };
+      const view = renderCharSpells();
 
-    it('picks the creature at the target stage and dispatches the raw name', () => {
-      flowAtStage('target');
+      // Target stage: creature picker, raw-name dispatch.
+      const targetDialog = screen.getByRole('dialog', { name: spell.title });
+      expect(targetDialog).toHaveTextContent(/within Touch/i);
+      fireEvent.click(within(targetDialog).getByRole('radio', { name: 'Goblin' }));
+      fireEvent.click(within(targetDialog).getByRole('button', { name: spell.castLabel }));
+      expect(flow[spell.targetSelect]).toHaveBeenCalledWith('Goblin');
+      expect(flow[spell.typeSelect]).not.toHaveBeenCalled();
+      fireEvent.click(skipButton(targetDialog));
+      expect(flow[spell.skip]).toHaveBeenCalledTimes(1);
+      view.unmount();
 
-      const dialog = screen.getByRole('dialog', { name: 'Protection from Energy' });
-      fireEvent.click(within(dialog).getByRole('radio', { name: 'Goblin' }));
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Cast Protection from Energy' }));
-      expect(flow.handleProtectionFromEnergyTargetSelect).toHaveBeenCalledWith('Goblin');
+      // Type stage: damage-type picker only, dispatches the chosen type; Cancel skips.
+      flow = { ...flow, [spell.stageKey]: 'type' };
+      renderCharSpells();
+      expect(screen.queryByRole('dialog', { name: spell.title })).not.toBeInTheDocument();
+      const typeDialog = screen.getByRole('dialog', { name: 'Choose Damage Type' });
+      for (const type of spell.damageTypes) {
+        expect(within(typeDialog).getByRole('radio', { name: type })).toBeInTheDocument();
+      }
+      const chosen = spell.damageTypes[spell.damageTypes.length - 1];
+      fireEvent.click(within(typeDialog).getByRole('radio', { name: chosen }));
+      fireEvent.click(within(typeDialog).getByRole('button', { name: 'Choose Damage Type' }));
+      expect(flow[spell.typeSelect]).toHaveBeenCalledWith(chosen);
 
-      fireEvent.click(skipButton(dialog));
-      expect(flow.handleProtectionFromEnergySkip).toHaveBeenCalledTimes(1);
-      expect(flow.handleProtectionFromEnergyTypeSelect).not.toHaveBeenCalled();
-    });
-
-    it('offers the pending damage types at the type stage and dispatches the choice or skip', () => {
-      flowAtStage('type');
-
-      expect(screen.queryByRole('dialog', { name: 'Protection from Energy' })).not.toBeInTheDocument();
-      const dialog = screen.getByRole('dialog', { name: 'Choose Damage Type' });
-      expect(within(dialog).getByRole('radio', { name: 'fire' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('radio', { name: 'cold' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('radio', { name: 'lightning' })).toBeInTheDocument();
-
-      fireEvent.click(within(dialog).getByRole('radio', { name: 'cold' }));
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Choose Damage Type' }));
-      expect(flow.handleProtectionFromEnergyTypeSelect).toHaveBeenCalledWith('cold');
-
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-      expect(flow.handleProtectionFromEnergySkip).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('staged flow — Resistance', () => {
-    const flowAtStage = (stage) => {
-      flow = {
-        pendingResistance: { creatureTargets: TARGETS, range: 'Touch', damageTypes: ['fire', 'acid'] },
-        resistanceStage: stage,
-        handleResistanceTargetSelect: vi.fn(),
-        handleResistanceTypeSelect: vi.fn(),
-        handleResistanceSkip: vi.fn(),
-      };
-      return renderCharSpells();
-    };
-
-    it('picks the creature at the target stage and dispatches the raw name', () => {
-      flowAtStage('target');
-
-      const dialog = screen.getByRole('dialog', { name: 'Resistance' });
-      fireEvent.click(within(dialog).getByRole('radio', { name: 'Goblin' }));
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Cast Resistance' }));
-      expect(flow.handleResistanceTargetSelect).toHaveBeenCalledWith('Goblin');
-
-      fireEvent.click(skipButton(dialog));
-      expect(flow.handleResistanceSkip).toHaveBeenCalledTimes(1);
-    });
-
-    it('dispatches the chosen damage type or cancel at the type stage', () => {
-      flowAtStage('type');
-
-      expect(screen.queryByRole('dialog', { name: 'Resistance' })).not.toBeInTheDocument();
-      const dialog = screen.getByRole('dialog', { name: 'Choose Damage Type' });
-      fireEvent.click(within(dialog).getByRole('radio', { name: 'acid' }));
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Choose Damage Type' }));
-      expect(flow.handleResistanceTypeSelect).toHaveBeenCalledWith('acid');
-
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-      expect(flow.handleResistanceSkip).toHaveBeenCalledTimes(1);
-      expect(flow.handleResistanceTypeSelect).toHaveBeenCalledTimes(1);
+      fireEvent.click(within(typeDialog).getByRole('button', { name: 'Cancel' }));
+      expect(flow[spell.skip]).toHaveBeenCalledTimes(2);
+      expect(flow[spell.targetSelect]).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('CreatureSelectionModal spells', () => {
-    it.each(CREATURE_MODAL_SPELLS)('lists checkbox targets for $title with confirm disabled until one is picked', (spell) => {
+    it.each(CREATURE_MODAL_SPELLS)('routes the checked creature to $confirm and Skip to $skip for $title', (spell) => {
       castPending(spell);
 
       const dialog = screen.getByRole('dialog', { name: spell.title });
       expect(within(dialog).getByRole('checkbox', { name: 'Orc' })).toBeInTheDocument();
-      expect(within(dialog).getByRole('checkbox', { name: 'Goblin' })).toBeInTheDocument();
-      expect(confirmButton(dialog)).toBeDisabled();
-      expect(flow[spell.confirm]).not.toHaveBeenCalled();
-    });
 
-    it.each(CREATURE_MODAL_SPELLS)('dispatches the chosen creature to $confirm for $title', (spell) => {
-      castPending(spell);
-
-      const dialog = screen.getByRole('dialog', { name: spell.title });
       fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Goblin' }));
-      expect(confirmButton(dialog)).toBeEnabled();
       fireEvent.click(confirmButton(dialog));
 
       expect(flow[spell.confirm]).toHaveBeenCalledTimes(1);
       expect(flow[spell.confirm]).toHaveBeenCalledWith(['Goblin']);
       expect(flow[spell.skip]).not.toHaveBeenCalled();
-    });
 
-    it.each(CREATURE_MODAL_SPELLS)('routes Skip to $skip without casting for $title', (spell) => {
-      castPending(spell);
-
-      fireEvent.click(skipButton(screen.getByRole('dialog', { name: spell.title })));
-
+      fireEvent.click(skipButton(dialog));
       expect(flow[spell.skip]).toHaveBeenCalledTimes(1);
-      expect(flow[spell.confirm]).not.toHaveBeenCalled();
+      expect(flow[spell.confirm]).toHaveBeenCalledTimes(1);
     });
 
-    it('dispatches every checked creature in selection order for multi-target spells', () => {
-      castPending(CREATURE_MODAL_SPELLS.find((s) => s.pending === 'pendingBless'));
+    it('caps multi-target selection at the pending maxTargets and dispatches all checked names in order', () => {
+      // If CharSpells dropped the maxTargets prop, the third target would stay
+      // selectable and the payload would carry three names.
+      castPending({
+        ...CREATURE_MODAL_SPELLS.find((s) => s.pending === 'pendingBless'),
+        state: { creatureTargets: ['Orc', 'Goblin', 'Ogre'], maxTargets: 2 },
+      });
 
       const dialog = screen.getByRole('dialog', { name: 'Bless' });
       fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Orc' }));
       fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Goblin' }));
+      const ogre = within(dialog).getByRole('checkbox', { name: 'Ogre' });
+      expect(ogre).toBeDisabled();
+      fireEvent.click(ogre);
       fireEvent.click(confirmButton(dialog));
 
       expect(flow.handleBlessConfirm).toHaveBeenCalledWith(['Orc', 'Goblin']);
@@ -625,32 +585,30 @@ describe('CharSpells - Target selection modals', () => {
       return renderCharSpells();
     };
 
-    it('shows the path picker, and no creature modal, before a path is chosen', () => {
+    it('routes every transformation path and Cancel from the path picker, before any creature picker', () => {
       castTruePolymorph();
 
       const dialog = screen.getByRole('dialog', { name: 'True Polymorph' });
-      expect(within(dialog).getByRole('button', { name: 'Creature into Creature' })).toBeInTheDocument();
       expect(within(dialog).queryByRole('checkbox', { name: 'Orc' })).not.toBeInTheDocument();
-    });
 
-    it.each([
-      { path: 'creature_to_creature', label: 'Creature into Creature' },
-      { path: 'object_into_creature', label: 'Object into Creature' },
-      { path: 'creature_to_object', label: 'Creature into Object' },
-    ])('dispatches path $path when $label is chosen', ({ path, label }) => {
-      castTruePolymorph();
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Creature into Creature' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Object into Creature' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Creature into Object' }));
+      expect(flow.handleTruePolymorphPathSelect.mock.calls).toEqual([
+        ['creature_to_creature'],
+        ['object_into_creature'],
+        ['creature_to_object'],
+      ]);
 
-      fireEvent.click(screen.getByRole('button', { name: label }));
-
-      expect(flow.handleTruePolymorphPathSelect).toHaveBeenCalledTimes(1);
-      expect(flow.handleTruePolymorphPathSelect).toHaveBeenCalledWith(path);
-      expect(flow.handleTruePolymorphSkip).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      expect(flow.handleTruePolymorphSkip).toHaveBeenCalledTimes(1);
+      expect(flow.handleTruePolymorphPathSelect).toHaveBeenCalledTimes(3);
     });
 
     it.each([
       { path: 'creature_to_creature', description: /challenge rating/i },
       { path: 'creature_to_object', description: /nonmagical object/i },
-    ])('advances to the creature picker for path $path', ({ path, description }) => {
+    ])('advances to the creature picker for path $path, dispatching confirm or Skip', ({ path, description }) => {
       castTruePolymorph({ path });
 
       const dialog = screen.getByRole('dialog', { name: 'True Polymorph' });
@@ -658,34 +616,14 @@ describe('CharSpells - Target selection modals', () => {
       expect(dialog).toHaveTextContent(description);
       // The path picker is gone once a path is chosen.
       expect(within(dialog).queryByRole('button', { name: 'Object into Creature' })).not.toBeInTheDocument();
-    });
 
-    it('dispatches the confirmed target to handleTruePolymorphTargetConfirm', () => {
-      castTruePolymorph({ path: 'creature_to_creature' });
-
-      const dialog = screen.getByRole('dialog', { name: 'True Polymorph' });
       fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Goblin' }));
       fireEvent.click(confirmButton(dialog));
-
       expect(flow.handleTruePolymorphTargetConfirm).toHaveBeenCalledWith(['Goblin']);
-    });
 
-    it('routes Cancel on the path picker to handleTruePolymorphSkip', () => {
-      castTruePolymorph();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-
+      fireEvent.click(skipButton(dialog));
       expect(flow.handleTruePolymorphSkip).toHaveBeenCalledTimes(1);
-      expect(flow.handleTruePolymorphPathSelect).not.toHaveBeenCalled();
-    });
-
-    it('routes Skip on the creature picker to handleTruePolymorphSkip', () => {
-      castTruePolymorph({ path: 'creature_to_object' });
-
-      fireEvent.click(skipButton(screen.getByRole('dialog', { name: 'True Polymorph' })));
-
-      expect(flow.handleTruePolymorphSkip).toHaveBeenCalledTimes(1);
-      expect(flow.handleTruePolymorphTargetConfirm).not.toHaveBeenCalled();
+      expect(flow.handleTruePolymorphTargetConfirm).toHaveBeenCalledTimes(1);
     });
   });
 });

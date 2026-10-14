@@ -1,9 +1,10 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * Data Management flows of CampaignAdmin: Clear Change Data, Clear Campaign
  * Log, and Full Reset. Covers the confirmation prompt (including declined
  * paths), correct endpoint + URL-encoding of the campaign name, busy state,
- * and success/error status rendering.
+ * and success/error status rendering (non-OK response vs rejected fetch —
+ * two distinct handler branches).
  *
  * Other CampaignAdmin flows are covered by sibling files: backup-restore,
  * rollback-upload, rename, delete, rendering, and theme-toggle tests —
@@ -96,22 +97,23 @@ describe.each(DATA_ACTIONS)('$button', ({ button, path, busyText, confirmPattern
 
         fireEvent.click(screen.getByRole('button', { name: button }));
 
+        expect(window.confirm).toHaveBeenCalledTimes(1);
         expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(confirmPattern));
-        // Flushing microtasks: a POST would already have been issued by now.
-        await waitFor(() => expect(screen.queryByText(busyText)).not.toBeInTheDocument());
-        expect(countPosts(fetchMock, url)).toBe(0);
+        // Decline returns synchronously before any fetch — assert immediately.
+        DATA_ACTIONS.forEach(({ path: p }) =>
+            expect(countPosts(fetchMock, postUrl(CAMPAIGN, p))).toBe(0));
         expect(document.querySelector('.campaign-admin .admin-status')).toBeNull();
         expect(screen.getByRole('button', { name: button })).toBeEnabled();
     });
 
-    it('posts to /admin/$path once confirmed and shows the server success message', async () => {
+    it('posts to /admin/$path exactly once and shows the server success message', async () => {
         const fetchMock = stubFetch(jsonResponse({ message: `${button} complete` }));
         render(<CampaignAdmin {...createDefaultProps()} />);
 
         fireEvent.click(screen.getByRole('button', { name: button }));
 
         const status = await screen.findByText(`${button} complete`);
-        expect(fetchMock).toHaveBeenCalledWith(url, { method: 'POST' });
+        expect(countPosts(fetchMock, url)).toBe(1);
         expect(status.closest('.admin-status')).toHaveClass('admin-status--success');
         // The action settles: busy text gone, buttons usable again.
         expect(screen.queryByText(busyText)).not.toBeInTheDocument();
@@ -149,6 +151,7 @@ describe.each(DATA_ACTIONS)('$button', ({ button, path, busyText, confirmPattern
 });
 
 describe('CampaignAdmin - Data Management network failures', () => {
+    // Distinct branch from the non-OK response test: the fetch itself rejects.
     it('shows the failure reason when the request never reaches the server', async () => {
         const fetchMock = stubFetch(new Error('Network failed'));
         render(<CampaignAdmin {...createDefaultProps()} />);
@@ -162,11 +165,11 @@ describe('CampaignAdmin - Data Management network failures', () => {
     });
 });
 
-describe.each([
-    { campaignName: 'my campaign/1' },
-    { campaignName: 'campaign & stuff' },
-    { campaignName: 'a#b?c' },
-])('URL-encoding for $campaignName', ({ campaignName }) => {
+describe('URL-encoding of the campaign name', () => {
+    // One compound name exercises the single encodeURIComponent code path
+    // across every special-character class (space, slash, &, #, ?).
+    const campaignName = 'test campaign/1 &x#y?';
+
     it('encodes the campaign name in every data-management endpoint', async () => {
         const fetchMock = stubFetch();
         render(<CampaignAdmin {...createDefaultProps({ campaignName })} />);
@@ -174,7 +177,7 @@ describe.each([
         for (const { button, path } of DATA_ACTIONS) {
             fireEvent.click(screen.getByRole('button', { name: button }));
             await waitFor(() => {
-                expect(fetchMock).toHaveBeenCalledWith(postUrl(campaignName, path), { method: 'POST' });
+                expect(countPosts(fetchMock, postUrl(campaignName, path))).toBe(1);
             });
         }
         // No unencoded campaign name ever leaves the client.

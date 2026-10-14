@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -7,6 +7,9 @@ import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 
 // Sorcerer Features are reached through the CharClassFeatures registry entry
 // point (class name 'Sorcerer' → SorcererFeatures, region testid 'char-class-sorcerer').
+// Registry dispatch is owned by CharClassFeatures.test.jsx; the numeric rules
+// behind the service values are owned by classRules.test.js — here we verify
+// only the Sorcerer region's rendering behavior.
 
 // Mock with a resourceKey-scoped testid so assertions can verify a specific
 // tracked resource's computed max, not just that "some" number rendered.
@@ -88,108 +91,70 @@ describe('SorcererFeatures', () => {
     mockRuntime();
   });
 
-  describe('class features wiring', () => {
-    it('reads class features for the exact playerStats object it was given', () => {
-      const stats = sorcererStats();
-      renderSorcerer(stats);
-      expect(classFeatures.getClassFeatures).toHaveBeenCalledWith(stats);
-    });
+  it('reads class features for the exact playerStats object it was given', () => {
+    const stats = sorcererStats();
+    renderSorcerer(stats);
+    expect(classFeatures.getClassFeatures).toHaveBeenCalledWith(stats);
   });
 
-  describe('tracked resources', () => {
-    it.each([
-      ['Sorcery Points', 'sorceryPoints', 5, { maxSorceryPoints: 5 }],
-      ['Sorcery Points', 'sorceryPoints', 7, { maxSorceryPoints: 7 }],
-      ['Metamagic Known', 'metamagicKnown', 2, { metamagicKnown: 2 }],
-      ['Metamagic Known', 'metamagicKnown', 4, { metamagicKnown: 4 }],
-      ['Innate Sorcery', 'innateSorceryUses', 2, { maxInnateSorcery: 2 }],
-    ])('tracks %s with max %i from the service', (_label, testId, expected, overrides) => {
-      mockSorcererFeatures(overrides);
-      renderSorcerer(sorcererStats());
-      expect(screen.getByTestId(`tracked-resource-${testId}`))
-        .toHaveTextContent(`${_label}: ${expected}/${expected}`);
-    });
-
-    it('falls back to 0 max when the service omits every numeric field', () => {
-      mockSorcererFeatures({ maxSorceryPoints: undefined, metamagicKnown: undefined, maxInnateSorcery: undefined });
-      renderSorcerer(sorcererStats());
-      expect(screen.getByTestId('tracked-resource-sorceryPoints')).toHaveTextContent('Sorcery Points: 0/0');
-      expect(screen.getByTestId('tracked-resource-metamagicKnown')).toHaveTextContent('Metamagic Known: 0/0');
-      expect(screen.getByTestId('tracked-resource-innateSorceryUses')).toHaveTextContent('Innate Sorcery: 0/0');
-    });
+  it('tracks sorcery points, metamagic known, and innate sorcery with maxes from the service', () => {
+    mockSorcererFeatures({ maxSorceryPoints: 7, metamagicKnown: 4, maxInnateSorcery: 2 });
+    renderSorcerer(sorcererStats());
+    expect(screen.getByTestId('tracked-resource-sorceryPoints')).toHaveTextContent('Sorcery Points: 7/7');
+    expect(screen.getByTestId('tracked-resource-metamagicKnown')).toHaveTextContent('Metamagic Known: 4/4');
+    expect(screen.getByTestId('tracked-resource-innateSorceryUses')).toHaveTextContent('Innate Sorcery: 2/2');
   });
 
-  describe('sorcerous restoration', () => {
-    it('renders the fixed 1/1 counter when a resource_restoration passive exists', () => {
-      const stats = sorcererStats(20, { automation: { passives: [{ type: 'resource_restoration' }] } });
-      renderSorcerer(stats);
-      expect(screen.getByTestId('tracked-resource-sorcerousRestorationUses'))
-        .toHaveTextContent('Sorcerous Restoration: 1/1');
-    });
-
-    it('omits the counter when no resource_restoration passive exists', () => {
-      const stats = sorcererStats(20, { automation: { passives: [{ type: 'something_else' }] } });
-      const section = renderSorcerer(stats);
-      expect(screen.queryByTestId('tracked-resource-sorcerousRestorationUses')).not.toBeInTheDocument();
-      expect(section.textContent).not.toContain('Sorcerous Restoration');
-    });
+  it('falls back to 0 max when the service omits every numeric field', () => {
+    mockSorcererFeatures({ maxSorceryPoints: undefined, metamagicKnown: undefined, maxInnateSorcery: undefined });
+    renderSorcerer(sorcererStats());
+    expect(screen.getByTestId('tracked-resource-sorceryPoints')).toHaveTextContent('Sorcery Points: 0/0');
+    expect(screen.getByTestId('tracked-resource-metamagicKnown')).toHaveTextContent('Metamagic Known: 0/0');
+    expect(screen.getByTestId('tracked-resource-innateSorceryUses')).toHaveTextContent('Innate Sorcery: 0/0');
   });
 
-  describe('spell slot creation costs', () => {
-    it.each([
-      [[2], '2'],
-      [[2, 3, 5], '2, 3, 5'],
-    ])('joins numeric costs %j into the costs row', (costs, expectedText) => {
-      mockSorcererFeatures({ creatingSpellSlotCosts: costs });
-      const section = renderSorcerer(sorcererStats());
-      expect(section.textContent).toContain(`Spell Slot (level 1-5) Costs: ${expectedText}`);
-    });
-
-    it.each([
-      ['an empty array', []],
-      ['undefined', undefined],
-    ])('omits the costs row when the service returns %s', (_label, costs) => {
-      mockSorcererFeatures({ creatingSpellSlotCosts: costs });
-      const section = renderSorcerer(sorcererStats());
-      expect(section.textContent).not.toContain('Spell Slot');
-    });
+  it.each([
+    ['shown for a resource_restoration passive', [{ type: 'resource_restoration' }], true],
+    ['hidden for any other passive', [{ type: 'something_else' }], false],
+  ])('fixed 1/1 sorcerous restoration counter is %s', (_label, passives, expected) => {
+    const stats = sorcererStats(20, { automation: { passives } });
+    const section = renderSorcerer(stats);
+    expect(section.textContent.includes('Sorcerous Restoration')).toBe(expected);
   });
 
-  describe('buff badges', () => {
-    it('shows the innate sorcery badge while the buff is active', () => {
-      mockRuntime({ buffs: [{ name: 'Innate Sorcery' }] });
-      const section = renderSorcerer(sorcererStats());
-      expect(section.textContent).toContain('+1 Save DC, Spell Adv');
-    });
+  it('joins spell slot creation costs into the costs row', () => {
+    mockSorcererFeatures({ creatingSpellSlotCosts: [2, 3, 5] });
+    const section = renderSorcerer(sorcererStats());
+    expect(section.textContent).toContain('Spell Slot (level 1-5) Costs: 2, 3, 5');
+  });
 
-    it('omits the innate sorcery badge when the buff is not active', () => {
-      mockRuntime({ buffs: [{ name: 'Telepathic Speech' }] });
-      const section = renderSorcerer(sorcererStats());
-      expect(section.textContent).not.toContain('+1 Save DC, Spell Adv');
-    });
+  it.each([
+    ['an empty array', []],
+    ['undefined', undefined],
+  ])('omits the costs row when the service returns %s', (_label, costs) => {
+    mockSorcererFeatures({ creatingSpellSlotCosts: costs });
+    const section = renderSorcerer(sorcererStats());
+    expect(section.textContent).not.toContain('Spell Slot');
+  });
 
-    it('shows the telepathic speech badge while the buff is active', () => {
-      mockRuntime({ buffs: [{ name: 'Telepathic Speech' }] });
-      renderSorcerer(sorcererStats());
-      const badge = screen.getByText('Telepathic Speech');
-      expect(badge.className).toContain('automation-badge');
-    });
+  it.each([
+    ['Innate Sorcery', '+1 Save DC, Spell Adv'],
+    ['Telepathic Speech', 'Telepathic Speech'],
+  ])('shows only the badge for the active %s buff', (buffName, badgeText) => {
+    mockRuntime({ buffs: [{ name: buffName }] });
+    const section = renderSorcerer(sorcererStats());
+    expect(section.textContent).toContain(badgeText);
+    // The other badge in this region is built from the same buff list and
+    // must stay hidden: it only appears when its own buff is the active one.
+    const otherBadgeText = badgeText === '+1 Save DC, Spell Adv' ? 'Telepathic Speech' : '+1 Save DC, Spell Adv';
+    expect(section.textContent).not.toContain(otherBadgeText);
+  });
 
-    it('omits the telepathic speech badge when the buff is not active', () => {
-      mockRuntime({ buffs: [{ name: 'Innate Sorcery' }] });
-      const section = renderSorcerer(sorcererStats());
-      expect(section.textContent).not.toContain('Telepathic Speech');
-    });
-
-    it.each([
-      ['null', null],
-      ['undefined', undefined],
-    ])('survives a non-array activeBuffs value (%s) while still rendering its resources', (_label, buffs) => {
-      mockRuntime({ buffs });
-      const section = renderSorcerer(sorcererStats());
-      expect(section.querySelectorAll('.automation-badge')).toHaveLength(0);
-      expect(screen.getByTestId('tracked-resource-sorceryPoints')).toHaveTextContent('Sorcery Points: 5/5');
-    });
+  it('survives a non-array activeBuffs value while still rendering its resources', () => {
+    mockRuntime({ buffs: null });
+    const section = renderSorcerer(sorcererStats());
+    expect(section.querySelectorAll('.automation-badge')).toHaveLength(0);
+    expect(screen.getByTestId('tracked-resource-sorceryPoints')).toHaveTextContent('Sorcery Points: 5/5');
   });
 
   describe('revelation in flesh effect mapping', () => {
@@ -198,18 +163,12 @@ describe('SorcererFeatures', () => {
       ['glistening_flight', 'Glistening Flight'],
       ['see_the_invisible', 'See the Invisible'],
       ['wormhole_movement', 'Wormhole Movement'],
+      // Unmapped effects fall back to the raw feature name.
+      ['mystery_effect', 'Revelation in Flesh'],
     ])('displays "$label" for effect "$effect"', (effect, label) => {
       mockRuntime({ buffs: [{ name: 'Revelation in Flesh', effect }] });
-      const section = renderSorcerer(sorcererStats());
+      renderSorcerer(sorcererStats());
       expect(screen.getByText(label)).toBeInTheDocument();
-      expect(section.textContent).toContain(label);
-    });
-
-    it('falls back to the raw feature name for an unmapped effect', () => {
-      mockRuntime({ buffs: [{ name: 'Revelation in Flesh', effect: 'mystery_effect' }] });
-      const section = renderSorcerer(sorcererStats());
-      expect(screen.getByText('Revelation in Flesh')).toBeInTheDocument();
-      expect(section.textContent).not.toContain('Mystery');
     });
 
     it('renders multiple revelation effects in one comma-joined badge', () => {
@@ -221,7 +180,6 @@ describe('SorcererFeatures', () => {
       });
       renderSorcerer(sorcererStats());
       const badge = screen.getByText('Aquatic Adaptation, Glistening Flight');
-      expect(badge).toBeInTheDocument();
       expect(badge.className).toContain('automation-badge');
     });
 
@@ -232,38 +190,28 @@ describe('SorcererFeatures', () => {
     });
   });
 
-  describe('trance of order', () => {
-    it('shows the badge when tranceOfOrderActive is strictly true', () => {
-      mockRuntime({ tranceOfOrderActive: true });
-      const section = renderSorcerer(sorcererStats(18));
-      expect(section.textContent).toContain('Trance of Order');
-    });
-
-    it.each([
-      ['false', false],
-      ['the string "true" (strict === guard)', 'true'],
-      ['1 (strict === guard)', 1],
-      ['undefined (never set)', undefined],
-    ])('omits the badge when the flag is %s', (_label, active) => {
-      mockRuntime({ tranceOfOrderActive: active });
-      const section = renderSorcerer(sorcererStats(18));
-      expect(section.textContent).not.toContain('Trance of Order');
-    });
+  it.each([
+    ['true', true, true],
+    ['false', false, false],
+    ['the string "true" (strict === guard)', 'true', false],
+    ['undefined (never set)', undefined, false],
+  ])('trance of order badge renders when the flag is %s', (_label, flag, expected) => {
+    mockRuntime({ tranceOfOrderActive: flag });
+    const section = renderSorcerer(sorcererStats(18));
+    expect(section.textContent.includes('Trance of Order')).toBe(expected);
   });
 
-  describe('coexistence with entry-point features', () => {
-    it('renders dodge, adrenaline rush, and stonecunning alongside the sorcerer region', () => {
-      mockRuntime({ buffs: [{ effect: 'dodge' }] });
-      const stats = sorcererStats(5, {
-        proficiency: 3,
-        automation: { passives: [], specialActions: [{ effect: 'bonus_action_dash' }] },
-        race: { traits: [{ name: 'Stonecunning', automation: true }] },
-      });
-      renderSorcerer(stats);
-      expect(screen.getByText('Dodge — Disadv on attacks vs you, Adv on DEX saves')).toBeInTheDocument();
-      expect(screen.getByTestId('tracked-resource-adrenalineRushUses')).toHaveTextContent('Adrenaline Rush: 3/3');
-      expect(screen.getByTestId('tracked-resource-stonecunningUses')).toHaveTextContent('Stonecunning: 3/3');
-      expect(screen.getByTestId('tracked-resource-sorceryPoints')).toHaveTextContent('Sorcery Points: 5/5');
+  it('renders dodge, adrenaline rush, and stonecunning alongside the sorcerer region', () => {
+    mockRuntime({ buffs: [{ effect: 'dodge' }] });
+    const stats = sorcererStats(5, {
+      proficiency: 3,
+      automation: { passives: [], specialActions: [{ effect: 'bonus_action_dash' }] },
+      race: { traits: [{ name: 'Stonecunning', automation: true }] },
     });
+    renderSorcerer(stats);
+    expect(screen.getByText('Dodge — Disadv on attacks vs you, Adv on DEX saves')).toBeInTheDocument();
+    expect(screen.getByTestId('tracked-resource-adrenalineRushUses')).toHaveTextContent('Adrenaline Rush: 3/3');
+    expect(screen.getByTestId('tracked-resource-stonecunningUses')).toHaveTextContent('Stonecunning: 3/3');
+    expect(screen.getByTestId('tracked-resource-sorceryPoints')).toHaveTextContent('Sorcery Points: 5/5');
   });
 });

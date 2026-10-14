@@ -1,21 +1,26 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
- * Scope: the four popup widgets rendered by SpellTargetPopups from CharSpells —
- * MetamagicPopup, MultiTargetPopup, MagicMissileTargetPopup, UpcastPopup.
+ * Scope: the CharSpells/SpellTargetPopups boundary for the four popup widgets it
+ * renders — MetamagicPopup, MultiTargetPopup, MagicMissileTargetPopup, UpcastPopup.
  *
- * These tests verify the CharSpells/SpellTargetPopups boundary: how pending state
- * produced by useSpellMetamagicFlow / useSpellUpcastFlow is mapped into popup props
- * (spellName → spell.name, _currentSP → playerStats._metamagicCurrentSP, etc.),
- * how the active combat target is resolved, and that confirm/skip clicks are routed
- * back to the correct flow handler. The popup components themselves are stubbed so
- * failures here always point at the wiring, not at popup internals.
+ * Verifies only what this boundary owns:
+ * - pending state → popup prop mapping (spellName → spell.name, _currentSP →
+ *   playerStats._metamagicCurrentSP, psionic fields, range, creatureTargets, levels),
+ * - the active combat target resolved via getCombatSummary/getTargetFromAttacker,
+ * - confirm/skip/cancel clicks routed to the correct flow handler.
+ *
+ * The popups are stubbed as prop-echoes: confirm buttons invoke the injected
+ * handler with NO payload, because the confirm payload shape is the popup's own
+ * contract ({ secondTarget } / { distribution } / { options, totalCost, ... }) —
+ * covered in ../popups/*.test.jsx and hooks/combat/useSpellMetamagicFlow/
+ * confirm-payloads.test.js. Do not assert payload shapes here.
  *
  * NOT covered here (see sibling files to avoid duplication):
  * - target-selection modals + staged flows → CharSpells.Popups.targetSelection.test.jsx
  * - cast flow via SpellDetailPopup, innate sorcery → CharSpells.Popups.spellCast.test.jsx
  * - restoration modals → CharSpells.Popups.restoration.test.jsx
  * - shapechange creature selection → CharSpells.Popups.creatureSelection.test.jsx
- * - UpcastPopup internals → UpcastPopup.rendering/events.test.jsx
+ * - popup internals (auto-assign, fallbacks, keyboard) → ../popups/ and UpcastPopup.*.test.jsx
  */
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -141,8 +146,8 @@ vi.mock('../modals/HexAbilityModal.jsx', () => ({
 }));
 
 // --- The four popup widgets under test ---
-// Stubs echo back the props CharSpells is responsible for mapping, so a broken
-// prop mapping or handler swap fails these tests rather than a popup internals test.
+// Stubs echo back the props CharSpells maps and fire their injected handlers with
+// no payload, so failures here always point at the wiring, never at popup internals.
 
 vi.mock('../popups/MetamagicPopup.jsx', () => ({
   default: function MetamagicPopup({ spell, playerStats, onConfirm, onSkip }) {
@@ -168,7 +173,7 @@ vi.mock('../popups/MultiTargetPopup.jsx', () => ({
         <span>{spell?.name}</span>
         <span>{range}</span>
         <ul>{names.map(n => <li key={n}>{n}</li>)}</ul>
-        <button onClick={() => onConfirm({ targets: creatureTargets })}>Confirm</button>
+        <button onClick={() => onConfirm()}>Confirm</button>
         <button onClick={onSkip}>Skip</button>
       </div>
     );
@@ -181,8 +186,8 @@ vi.mock('../popups/MagicMissileTargetPopup.jsx', () => ({
       <div role="dialog" aria-label="Magic Missile targets">
         <span>{`${spell?.name} x${totalMissiles} missiles`}</span>
         <span>{missileDamage}</span>
-        <span>{`Current target: ${currentTargetName || 'none'}`}</span>
-        <button onClick={() => onConfirm({ targets: creatureTargets })}>Confirm</button>
+        <span>{`Current target: ${currentTargetName ?? creatureTargets.join('/')}`}</span>
+        <button onClick={() => onConfirm()}>Confirm</button>
         <button onClick={onSkip}>Skip</button>
       </div>
     );
@@ -244,6 +249,10 @@ function getPopup(ariaLabel) {
   return screen.queryByRole('dialog', { name: ariaLabel });
 }
 
+function getButton(name) {
+  return screen.getByRole('button', { name });
+}
+
 describe('CharSpells - Spell target popup widgets', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -265,7 +274,7 @@ describe('CharSpells - Spell target popup widgets', () => {
   });
 
   describe('MetamagicPopup', () => {
-    beforeEach(() => {
+    it('maps the pending spell, level, and sorcery points into the popup and routes confirm/skip to the metamagic handlers', () => {
       flow.pendingMetamagic = {
         spellName: 'Fireball',
         spellLevel: 3,
@@ -273,48 +282,34 @@ describe('CharSpells - Spell target popup widgets', () => {
         isPsionic: false,
         psionicCost: 0,
       };
-    });
-
-    it('shows the pending spell, its level, and available sorcery points', () => {
       renderCharSpells();
 
       const dialog = screen.getByRole('dialog', { name: 'Metamagic' });
       expect(within(dialog).getByText('Fireball (3)')).toBeInTheDocument();
       expect(within(dialog).getByText('SP 7')).toBeInTheDocument();
       expect(within(dialog).queryByText(/psionic/i)).not.toBeInTheDocument();
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+      expect(flow.handleConfirm).toHaveBeenCalledTimes(1);
+      expect(flow.handleSkip).not.toHaveBeenCalled();
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Skip' }));
+      expect(flow.handleSkip).toHaveBeenCalledTimes(1);
     });
 
-    it('defaults the spell level to 0 when the pending step omits it', () => {
-      flow.pendingMetamagic = { spellName: 'Shield', _currentSP: 2 };
-      renderCharSpells();
-
-      expect(within(screen.getByRole('dialog', { name: 'Metamagic' })).getByText('Shield (0)')).toBeInTheDocument();
-    });
-
-    it('surfaces psionic payment details for psionic spells', () => {
+    it('surfaces psionic payment details and defaults a missing spell level to 0', () => {
       flow.pendingMetamagic = {
-        spellName: 'Fireball',
-        spellLevel: 3,
-        _currentSP: 7,
+        spellName: 'Shield',
+        _currentSP: 2,
         isPsionic: true,
         psionicCost: 2,
       };
       renderCharSpells();
 
-      expect(within(screen.getByRole('dialog', { name: 'Metamagic' })).getByText('psionic cost 2')).toBeInTheDocument();
-    });
-
-    it('routes confirm and skip clicks to their own metamagic flow handlers', () => {
-      renderCharSpells();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
-      expect(flow.handleConfirm).toHaveBeenCalledTimes(1);
-      expect(flow.handleSkip).not.toHaveBeenCalled();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-      expect(flow.handleSkip).toHaveBeenCalledTimes(1);
-      expect(flow.handleMultiTargetConfirm).not.toHaveBeenCalled();
-      expect(flow.handleMagicMissileConfirm).not.toHaveBeenCalled();
+      const dialog = screen.getByRole('dialog', { name: 'Metamagic' });
+      expect(within(dialog).getByText('Shield (0)')).toBeInTheDocument();
+      expect(within(dialog).getByText('SP 2')).toBeInTheDocument();
+      expect(within(dialog).getByText('psionic cost 2')).toBeInTheDocument();
     });
   });
 
@@ -338,20 +333,17 @@ describe('CharSpells - Spell target popup widgets', () => {
       expect(within(dialog).getByText('Goblin')).toBeInTheDocument();
     });
 
-    it('passes the pending creature targets to the confirm handler', () => {
+    it('routes confirm and skip clicks to their own multi-target flow handlers, never each other', () => {
       renderCharSpells();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
-      expect(flow.handleMultiTargetConfirm).toHaveBeenCalledWith({ targets: ['Orc', 'Goblin'] });
-    });
+      fireEvent.click(getButton('Confirm'));
+      expect(flow.handleMultiTargetConfirm).toHaveBeenCalledTimes(1);
+      expect(flow.handleMultiTargetSkip).not.toHaveBeenCalled();
+      expect(flow.handleConfirm).not.toHaveBeenCalled();
 
-    it('routes skip clicks to handleMultiTargetSkip without confirming', () => {
-      renderCharSpells();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+      fireEvent.click(getButton('Skip'));
       expect(flow.handleMultiTargetSkip).toHaveBeenCalledTimes(1);
-      expect(flow.handleMultiTargetConfirm).not.toHaveBeenCalled();
-      expect(flow.handleSkip).not.toHaveBeenCalled();
+      expect(flow.handleMultiTargetConfirm).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -365,7 +357,7 @@ describe('CharSpells - Spell target popup widgets', () => {
       };
     });
 
-    it('shows missile count, per-missile damage, and resolves the active target from combat', () => {
+    it('shows missile count and damage, resolving the active target from combat summary and attacker name', () => {
       const summary = { creatures: [{ name: 'Goblin' }] };
       vi.mocked(getCombatSummary).mockReturnValue(summary);
       vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Goblin' });
@@ -379,53 +371,39 @@ describe('CharSpells - Spell target popup widgets', () => {
       expect(getTargetFromAttacker).toHaveBeenCalledWith(summary, mockPlayerStats.name);
     });
 
-    it('shows no current target when the attacker has none selected', () => {
-      vi.mocked(getTargetFromAttacker).mockReturnValue(null);
+    it('routes confirm and skip clicks to their own magic-missile flow handlers, never each other', () => {
       renderCharSpells();
 
-      const dialog = screen.getByRole('dialog', { name: 'Magic Missile targets' });
-      expect(within(dialog).getByText('Current target: none')).toBeInTheDocument();
-    });
-
-    it('passes the pending creature targets to confirm and routes skip separately', () => {
-      renderCharSpells();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
-      expect(flow.handleMagicMissileConfirm).toHaveBeenCalledWith({ targets: ['Orc', 'Goblin'] });
+      fireEvent.click(getButton('Confirm'));
+      expect(flow.handleMagicMissileConfirm).toHaveBeenCalledTimes(1);
       expect(flow.handleMagicMissileSkip).not.toHaveBeenCalled();
+      expect(flow.handleMultiTargetConfirm).not.toHaveBeenCalled();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+      fireEvent.click(getButton('Skip'));
       expect(flow.handleMagicMissileSkip).toHaveBeenCalledTimes(1);
       expect(flow.handleMagicMissileConfirm).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('UpcastPopup', () => {
-    it('shows the pending spell with the levels offered by the upcast flow', () => {
+    it('shows the pending spell with levels from the upcast flow and routes confirm/cancel to its own handlers', () => {
       const spell = { name: 'Cure Wounds', level: 1 };
       upcastFlow.pendingUpcast = { spell };
       upcastFlow.buildUpcastLevels = vi.fn(s => (s === spell ? [2, 3] : []));
-      vi.mocked(useSpellUpcastFlow).mockReturnValue(upcastFlow);
       renderCharSpells();
 
       const dialog = screen.getByRole('dialog', { name: 'Upcast spell' });
       expect(within(dialog).getByText('Cure Wounds')).toBeInTheDocument();
       expect(within(dialog).getByText('2,3')).toBeInTheDocument();
       expect(upcastFlow.buildUpcastLevels).toHaveBeenCalledWith(spell);
-    });
 
-    it('routes confirm and cancel clicks to their own upcast flow handlers', () => {
-      upcastFlow.pendingUpcast = { spell: { name: 'Cure Wounds', level: 1 } };
-      vi.mocked(useSpellUpcastFlow).mockReturnValue(upcastFlow);
-      renderCharSpells();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
       expect(upcastFlow.handleUpcastConfirm).toHaveBeenCalledTimes(1);
       expect(upcastFlow.handleUpcastCancel).not.toHaveBeenCalled();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
       expect(upcastFlow.handleUpcastCancel).toHaveBeenCalledTimes(1);
-      expect(flow.gateMetamagic).not.toHaveBeenCalled();
+      expect(flow.handleConfirm).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 // Overchannel channel of SpellDetailPopup: checkbox eligibility, the live
 // necrotic-damage notice driven by the REAL damage table in overchannelHandler
 // (un-mocked on purpose — it is pure given the mocked runtime store), and the
@@ -97,9 +97,9 @@ describe('SpellDetailPopup - Overchannel', () => {
   });
 
   describe('checkbox eligibility', () => {
-    it('offers an unchecked Overchannel checkbox for a damage spell (levels 1-5) with the passive', () => {
+    it.each([1, 5])('offers an unchecked Overchannel checkbox for a level %i damage spell with the passive', (level) => {
       mockOverchannelUseCount(0);
-      renderPopup();
+      renderPopup({ spell: damageSpell(level) });
 
       const checkbox = overchannelCheckbox();
       expect(checkbox).toBeInTheDocument();
@@ -119,84 +119,55 @@ describe('SpellDetailPopup - Overchannel', () => {
     });
   });
 
-  describe('necrotic damage notice', () => {
-    it('shows notices only while ticked, including warning after prior uses', () => {
-      mockOverchannelUseCount(1);
+  describe('necrotic damage notices', () => {
+    it('shows the first-use notice only while ticked, with no warning on the first use', () => {
+      mockOverchannelUseCount(0);
       renderPopup();
 
-      // Section is present but silent until the checkbox is ticked.
+      // Silent until the checkbox is ticked.
       expect(overchannelCheckbox()).toBeInTheDocument();
       expect(screen.queryByText(/Warning: Using Overchannel/)).not.toBeInTheDocument();
       expect(screen.queryByText('First use: no necrotic damage')).not.toBeInTheDocument();
 
-      // Tick then untick: notices appear and disappear with the checkbox.
+      // Tick: reassurance appears; untick: it disappears again.
       fireEvent.click(overchannelCheckbox());
-      expect(overchannelCheckbox()).toBeChecked();
-      expect(screen.getByText(/Warning: Using Overchannel/)).toBeInTheDocument();
+      expect(screen.getByText('First use: no necrotic damage')).toBeInTheDocument();
+      expect(screen.queryByText(/Warning: Using Overchannel/)).not.toBeInTheDocument();
 
       fireEvent.click(overchannelCheckbox());
       expect(overchannelCheckbox()).not.toBeChecked();
-      expect(screen.queryByText(/Warning: Using Overchannel/)).not.toBeInTheDocument();
-      expect(screen.queryByText('First use: no necrotic damage')).not.toBeInTheDocument();
-    });
-
-    it('shows the first-use reassurance when ticked with no prior uses', () => {
-      mockOverchannelUseCount(0);
-      renderPopup();
-
-      fireEvent.click(overchannelCheckbox());
-
-      expect(overchannelCheckbox()).toBeChecked();
-      expect(screen.getByText('First use: no necrotic damage')).toBeInTheDocument();
-      expect(screen.queryByText(/Warning: Using Overchannel/)).not.toBeInTheDocument();
-    });
-
-    it('warns with the next use number and self-damage when ticked after prior uses', () => {
-      mockOverchannelUseCount(1);
-      renderPopup({ spell: damageSpell(1) });
-
-      fireEvent.click(overchannelCheckbox());
-
-      const warning = screen.getByText(/Warning: Using Overchannel/);
-      expect(warning).toHaveTextContent('use #2');
-      expect(warning).toHaveTextContent('2d12');
-      expect(warning).toHaveTextContent('Necrotic');
       expect(screen.queryByText('First use: no necrotic damage')).not.toBeInTheDocument();
     });
 
     it.each([
-      { level: 2, expected: '4d12' },
-      { level: 3, expected: '6d12' },
-    ])('scales the warned self-damage with the spell slot level (level $level → $expected)', ({ level, expected }) => {
-      mockOverchannelUseCount(1);
+      { level: 1, priorUses: 1, expectedUse: 'use #2', expectedDamage: '2d12' },
+      { level: 2, priorUses: 1, expectedUse: 'use #2', expectedDamage: '4d12' },
+      { level: 3, priorUses: 1, expectedUse: 'use #2', expectedDamage: '6d12' },
+      { level: 1, priorUses: 2, expectedUse: 'use #3', expectedDamage: '3d12' },
+    ])('warns of $expectedDamage Necrotic self-damage at $expectedUse after $priorUses prior use(s) on a level $level slot', ({ level, priorUses, expectedUse, expectedDamage }) => {
+      mockOverchannelUseCount(priorUses);
       renderPopup({ spell: damageSpell(level) });
 
       fireEvent.click(overchannelCheckbox());
 
-      expect(screen.getByText(/Warning: Using Overchannel/)).toHaveTextContent(expected);
-    });
-
-    it('escalates the warning as stored uses increase', () => {
-      mockOverchannelUseCount(2);
-      renderPopup({ spell: damageSpell(1) });
-
-      fireEvent.click(overchannelCheckbox());
-
       const warning = screen.getByText(/Warning: Using Overchannel/);
-      expect(warning).toHaveTextContent('use #3');
-      expect(warning).toHaveTextContent('3d12');
+      expect(warning).toHaveTextContent(expectedUse);
+      expect(warning).toHaveTextContent(expectedDamage);
+      expect(warning).toHaveTextContent('Necrotic');
+      expect(screen.queryByText('First use: no necrotic damage')).not.toBeInTheDocument();
     });
   });
 
   describe('cast payload', () => {
     it.each([
-      { toggled: false, expectedOverchannel: false },
-      { toggled: true, expectedOverchannel: true },
-    ])('passes overchannel:$expectedOverchannel in the spell and metaCtx when $toggled', ({ toggled, expectedOverchannel }) => {
+      { label: 'unticked', clicks: 0, expectedOverchannel: false },
+      { label: 'ticked', clicks: 1, expectedOverchannel: true },
+      { label: 'ticked then unticked', clicks: 2, expectedOverchannel: false },
+    ])('passes overchannel:$expectedOverchannel in the spell and metaCtx when $label', ({ clicks, expectedOverchannel }) => {
       mockOverchannelUseCount(0);
       const onCast = renderPopup();
 
-      if (toggled) {
+      for (let i = 0; i < clicks; i += 1) {
         fireEvent.click(overchannelCheckbox());
       }
       fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
@@ -205,22 +176,6 @@ describe('SpellDetailPopup - Overchannel', () => {
       const [passedSpell, metaCtx] = onCast.mock.calls[0];
       expect(metaCtx.overchannel).toBe(expectedOverchannel);
       expect(passedSpell.overchannel).toBe(expectedOverchannel);
-    });
-
-    it('casts without overchannel when the checkbox is ticked then unticked', () => {
-      mockOverchannelUseCount(0);
-      const onCast = renderPopup();
-
-      fireEvent.click(overchannelCheckbox());
-      expect(overchannelCheckbox()).toBeChecked();
-      fireEvent.click(overchannelCheckbox());
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-
-      expect(onCast).toHaveBeenCalledTimes(1);
-      const [passedSpell, metaCtx] = onCast.mock.calls[0];
-      expect(metaCtx.overchannel).toBe(false);
-      expect(passedSpell.overchannel).toBe(false);
     });
   });
 });

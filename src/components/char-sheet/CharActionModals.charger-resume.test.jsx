@@ -1,8 +1,10 @@
-// Regression tests: closing the Charger (Charge Attack) rider modal in
-// CharActionModals must resume the paused attack damage pipeline, and must
-// latch the skip flag when the player declined the option.
+// @maintained-by-ai
+// Regression tests (FT-022/023): closing the Charger (Charge Attack) rider
+// modal in CharActionModals must resume the paused attack damage pipeline,
+// and must latch the once-per-round skip flag only when the player declined
+// the option.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CharActionModals from './CharActionModals.jsx';
 
 vi.mock('./CharActionModals.SecondaryModals.jsx', () => ({
@@ -99,7 +101,13 @@ function makeProps(overrides = {}) {
   };
 }
 
-function chargerModalState(props) {
+// Opens the Charger rider modal, renders CharActionModals, clicks the
+// modal's close button, and returns the props so each test asserts on the
+// observable close behavior. `runtimeOptions` maps runtime-store keys to the
+// values getRuntimeValue should return (empty = player declined).
+function renderAndCloseChargerModal(runtimeOptions = {}) {
+  getRuntimeValue.mockImplementation((_name, key) => runtimeOptions[key] ?? null);
+  const props = makeProps();
   props.modalState.attackRiderModal = {
     action: {
       name: 'Charge Attack',
@@ -111,6 +119,9 @@ function chargerModalState(props) {
     campaignName: 'test-campaign',
     targetName: 'Goblin',
   };
+  render(<CharActionModals {...props} />);
+  fireEvent.click(screen.getByTestId('attack-rider-close'));
+  return props;
 }
 
 describe('CharActionModals — Charger rider close resumes pipeline (FT-022/023)', () => {
@@ -118,28 +129,20 @@ describe('CharActionModals — Charger rider close resumes pipeline (FT-022/023)
     vi.clearAllMocks();
   });
 
-  it('resumes the pipeline when the Charge Attack modal closes with an applied option', async () => {
-    const resumeAttackPipeline = vi.fn(() => Promise.resolve());
-    const props = makeProps({ resumeAttackPipeline });
-    getRuntimeValue.mockImplementation((_name, key) => (key === '_Charge_Attack_option' ? 'Push 10 ft' : null));
-    chargerModalState(props);
-    render(<CharActionModals {...props} />);
-    fireEvent.click(screen.getByTestId('attack-rider-close'));
-    await new Promise((r) => setTimeout(r, 0));
+  it('applied option: closes the modal and resumes the pipeline without latching the skip flag', async () => {
+    const props = renderAndCloseChargerModal({ '_Charge_Attack_option': 'Push 10 ft' });
+
+    await waitFor(() => expect(props.resumeAttackPipeline).toHaveBeenCalledTimes(1));
     expect(props.setModalState).toHaveBeenCalledWith({ attackRiderModal: null });
-    expect(resumeAttackPipeline).toHaveBeenCalledTimes(1);
     expect(setSkipFlag).not.toHaveBeenCalled();
   });
 
-  it('latches the skip flag and resumes when the player declines the option', async () => {
-    const resumeAttackPipeline = vi.fn(() => Promise.resolve());
-    const props = makeProps({ resumeAttackPipeline });
-    getRuntimeValue.mockReturnValue(null);
-    chargerModalState(props);
-    render(<CharActionModals {...props} />);
-    fireEvent.click(screen.getByTestId('attack-rider-close'));
-    await new Promise((r) => setTimeout(r, 0));
-    expect(resumeAttackPipeline).toHaveBeenCalledTimes(1);
+  it('declined option: closes the modal, latches the skip flag, and resumes the pipeline', async () => {
+    const props = renderAndCloseChargerModal();
+
+    await waitFor(() => expect(props.resumeAttackPipeline).toHaveBeenCalledTimes(1));
+    expect(props.setModalState).toHaveBeenCalledWith({ attackRiderModal: null });
+    expect(setSkipFlag).toHaveBeenCalledTimes(1);
     expect(setSkipFlag).toHaveBeenCalledWith(
       '_Charge_Attack_skippedRound',
       props.playerStats,

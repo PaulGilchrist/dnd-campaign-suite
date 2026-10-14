@@ -1,4 +1,20 @@
-// @improved-by-ai
+// @maintained-by-ai
+/**
+ * CharAbilities — skill-cell DISPLAY lane: the "(Expert)" suffix and how the
+ * skill bonus text is formatted.
+ *
+ * Owns behaviors no sibling lane covers:
+ * - "(Expert)" suffix comes solely from the expertise list (proficient and
+ *   plain control cells in the same render prove proficiency alone never suffixes).
+ * - Expert skill bonus display is sign-formatted (Intl signDisplay: 'always')
+ *   and reduced by exhaustionPenalty, suffix intact.
+ *
+ * Covered by sibling lanes (do NOT re-add here):
+ * - saveBonus: save-column display with exhaustion / saveBonusExpression.
+ * - contextFeatures / event-context: event-triggered roll bonuses (incl. exhaustion).
+ * - missingCoverage: JoAT / passWithoutTrace stacking order, roll context stamps.
+ * - toolEntries: tool cell rendering. rendering: baseline layout / headers.
+ */
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
@@ -74,66 +90,49 @@ function renderAbilities(statsOverrides = {}, propOverrides = {}) {
   );
 }
 
-describe('CharAbilities expertise display', () => {
+describe('CharAbilities skill-cell display', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStore.clear();
   });
 
-  it('marks every expert skill with "(Expert)" and leaves non-expert skills unsuffixed', () => {
+  it('suffixes only expertise-list skills with "(Expert)" — proficient and plain skills never suffix', () => {
+    // Expertise and proficiency are deliberately disjoint so each cell isolates
+    // one branch of the suffix rule: expert-only, proficient-not-expert, plain.
     renderAbilities({
-      expertise: ['Athletics', 'Arcana'],
+      expertise: ['Arcana'],
+      skillProficiencies: ['Athletics'],
       abilities: [
         { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [{ name: 'Athletics', bonus: 8 }] },
-        { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [{ name: 'Acrobatics', bonus: 3 }] },
+        { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [{ name: 'Stealth', bonus: 3 }] },
         { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [{ name: 'Arcana', bonus: 2 }] },
       ],
     });
 
-    expect(screen.getByText('Athletics (Expert) (+8)')).toBeInTheDocument();
     expect(screen.getByText('Arcana (Expert) (+2)')).toBeInTheDocument();
-    expect(screen.getByText('Acrobatics (+3)')).toBeInTheDocument();
-    expect(screen.queryByText('Acrobatics (Expert) (+3)')).not.toBeInTheDocument();
-  });
-
-  it('renders no "(Expert)" suffixes when the character has no expertise, even for proficient skills', () => {
-    renderAbilities({ expertise: [] });
-
-    // Athletics and Arcana are proficient in the base fixture — proficiency alone must not suffix.
     expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
-    expect(screen.getByText('Arcana (+2)')).toBeInTheDocument();
-    expect(screen.queryByText(/\(Expert\)/)).not.toBeInTheDocument();
+    expect(screen.getByText('Stealth (+3)')).toBeInTheDocument();
+    // Exactly one suffixed cell — proficiency alone (Athletics) must not suffix.
+    expect(screen.getAllByText(/\(Expert\)/)).toHaveLength(1);
   });
 
-  it('drives the suffix from the expertise list rather than skill proficiencies', () => {
-    renderAbilities({
-      expertise: ['Stealth'],
-      skillProficiencies: ['Athletics'],
-      abilities: [
-        { name: 'Dexterity', bonus: 2, save: 4, totalScore: 12, skills: [{ name: 'Stealth', bonus: 5 }] },
-        { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [{ name: 'Athletics', bonus: 8 }] },
-      ],
-    });
-
-    expect(screen.getByText('Stealth (Expert) (+5)')).toBeInTheDocument();
-    expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
-  });
-
-  it('formats a negative expert skill bonus with a minus sign', () => {
-    renderAbilities({
-      expertise: ['Sleight of Hand'],
-      abilities: [
-        { name: 'Dexterity', bonus: -1, save: 4, totalScore: 8, skills: [{ name: 'Sleight of Hand', bonus: -1 }] },
-      ],
-    });
-
-    expect(screen.getByText('Sleight of Hand (Expert) (-1)')).toBeInTheDocument();
-  });
-
-  it('subtracts the exhaustion penalty from an expert skill bonus while keeping the suffix', () => {
-    renderAbilities({ expertise: ['Athletics'] }, { exhaustionPenalty: 2 });
+  it('formats expert skill bonuses with a leading sign and applies the exhaustion penalty', () => {
+    // One render pins all three sign branches of the formatter plus subtraction:
+    // 8-2=+6, -1-2=-3, 2-2=+0 — the "(Expert)" suffix stays intact in each.
+    renderAbilities(
+      {
+        expertise: ['Athletics', 'Sleight of Hand', 'Arcana'],
+        abilities: [
+          { name: 'Strength', bonus: 4, save: 6, totalScore: 14, skills: [{ name: 'Athletics', bonus: 8 }] },
+          { name: 'Dexterity', bonus: -1, save: 4, totalScore: 8, skills: [{ name: 'Sleight of Hand', bonus: -1 }] },
+          { name: 'Intelligence', bonus: 0, save: 0, totalScore: 10, skills: [{ name: 'Arcana', bonus: 2 }] },
+        ],
+      },
+      { exhaustionPenalty: 2 }
+    );
 
     expect(screen.getByText('Athletics (Expert) (+6)')).toBeInTheDocument();
-    expect(screen.queryByText('Athletics (Expert) (+8)')).not.toBeInTheDocument();
+    expect(screen.getByText('Sleight of Hand (Expert) (-3)')).toBeInTheDocument();
+    expect(screen.getByText('Arcana (Expert) (+0)')).toBeInTheDocument();
   });
 });

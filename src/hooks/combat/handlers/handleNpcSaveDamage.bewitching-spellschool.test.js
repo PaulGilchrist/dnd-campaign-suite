@@ -1,5 +1,7 @@
+// @maintained-by-ai: 2026-10-14
 // CLA-037: the NPC save-damage lane must stamp spellSchool into the campaign
-// lastAttack so the manual Bewitching Magic row gate can ever pass for spell casts.
+// lastAttack (lowercased, or null when the cast context carries none) so the
+// manual Bewitching Magic row gate can ever pass for spell casts.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/rules/features/viciousMockeryService.js', () => ({
@@ -31,7 +33,6 @@ vi.mock('../../../services/rules/features/invisibilityService.js', () => ({
     endInvisibilityOnHostileAction: vi.fn(),
 }));
 vi.mock('../loggedDiceRollUtils.js', () => ({
-    getGuardianProtectionAcBonus: vi.fn(() => 0),
     hasPotentCantrip: vi.fn(() => false),
     hasSoulstitchProtection: vi.fn(() => false),
     clearSoulstitchStamp: vi.fn(),
@@ -60,7 +61,6 @@ vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
     normalizeSaveType: vi.fn((t) => t),
 }));
 
-import { rollExpression } from '../../../services/dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
 import { rollSaveForCreature } from '../../../services/rules/combat/applyDamage.js';
 import { createNpcSaveDamageHandler } from './handleNpcSaveDamage.js';
@@ -80,14 +80,12 @@ describe('handleNpcSaveDamage — CLA-037 spellSchool lastAttack stamp', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        rollExpression.mockReturnValue({ total: 11, rolls: [4, 3, 4], modifier: 0 });
-        getRuntimeValue.mockReset().mockReturnValue(null);
+        getRuntimeValue.mockReturnValue(null);
         rollSaveForCreature.mockReturnValue({ roll: 7, total: 7, bonus: 0, success: false, rawRolls: [7] });
     });
 
     function stampFor(context) {
-        const handler = createNpcSaveDamageHandler(deps);
-        return handler({
+        return createNpcSaveDamageHandler(deps)({
             name: 'Phantasmal Force',
             formula: '2d8',
             total: 11,
@@ -96,10 +94,8 @@ describe('handleNpcSaveDamage — CLA-037 spellSchool lastAttack stamp', () => {
             adjustedTotal: 11,
             context,
             combatSummary,
-        }).then(() => {
-            const call = setRuntimeValue.mock.calls.find(c => c[0] === 'campaign' && c[1] === 'lastAttack');
-            return call ? call[2] : null;
-        });
+        }).then(() => setRuntimeValue.mock.calls
+            .find(c => c[0] === 'campaign' && c[1] === 'lastAttack')?.[2] ?? null);
     }
 
     it('stamps lowercased spellSchool from the cast context into campaign lastAttack', async () => {
@@ -112,9 +108,13 @@ describe('handleNpcSaveDamage — CLA-037 spellSchool lastAttack stamp', () => {
             damageType: 'Psychic',
             spellSchool: 'Illusion',
         });
-        expect(entry).not.toBeNull();
-        expect(entry.spellSchool).toBe('illusion');
-        expect(entry.attackerName).toBe('HexWarlock');
+        expect(entry).toMatchObject({
+            spellSchool: 'illusion',
+            attackerName: 'HexWarlock',
+            targetName: 'Bandit',
+            saveType: 'INT',
+            saveDc: 16,
+        });
     });
 
     it('stamps null spellSchool when the context carries none (non-spell lanes byte-safe)', async () => {
@@ -126,6 +126,6 @@ describe('handleNpcSaveDamage — CLA-037 spellSchool lastAttack stamp', () => {
             dcSuccess: 'half',
             damageType: 'fire',
         });
-        expect(entry.spellSchool).toBeNull();
+        expect(entry).toMatchObject({ spellSchool: null, saveType: 'DEX' });
     });
 });

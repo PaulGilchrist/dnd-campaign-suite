@@ -1,15 +1,17 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * CharConditions — RENDERING contract: what the badge grid shows.
  *
  * Scope (owned by this suite):
  * - empty state (nothing renders when there are no conditions and no exhaustion)
- * - badge display text and tooltip wiring (CONDITION_DESCRIPTIONS lookup +
- *   label fallback) — descriptions are mocked with sentinels so these tests
- *   verify WIRING, not the exact wording of rules prose
+ * - badge display text, tooltip wiring (CONDITION_DESCRIPTIONS lookup +
+ *   label fallback), savable-vs-static rendering, and semantic colour class
+ *   (CreatureBadge.css: Invisible is buff-tinted, others condition-tinted) —
+ *   descriptions are mocked with sentinels so these tests verify WIRING,
+ *   not the exact wording of rules prose
  * - dedup of repeated condition keys
- * - exhaustion badge tooltip, DEAD marker, and +/- disabled states
- * - Invisible tints as a buff badge (semantic colour-class contract)
+ * - exhaustion badge: text, level tooltip, DEAD marker, +/- enabled states,
+ *   and coexistence with condition badges in the same grid
  * - the roll-result popup actually RENDERS after a save click
  *   (popup → DiceRollResult prop wiring; siblings only spy on the payload)
  * - re-mount on playerStats.name change (each character reads its own slot)
@@ -18,9 +20,10 @@
  * - CharConditions.logging.test.jsx        — addEntry/logConditionSave payloads,
  *   persistence, and badge removal after a successful save
  * - CharConditions.condition-saves.test.jsx — advantage triggers, dice/bonus math,
- *   static-badge behaviour for unsavable conditions, per-condition save scoping
+ *   the dc && ability gate halves (missing-dc and missing-ability badges are
+ *   static and never roll), per-condition save scoping
  * - CharConditions.exhaustion.test.jsx     — exhaustion minus-save flow, DC math,
- *   level-0 side effects
+ *   plus incrementing to the level-6 cap, level-0 side effects
  * - CharConditions.slow.test.jsx           — SP-109 mount-wipe guard, Slow re-saves
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -67,6 +70,7 @@ vi.mock('../../../services/combat/conditions/effectDescriptions.js', () => ({
     Blinded: 'TEST blinded description',
     Charmed: 'TEST charmed description',
     Exhausted: 'TEST exhaustion description',
+    Invisible: 'TEST invisible description',
   },
 }));
 
@@ -170,91 +174,69 @@ describe('CharConditions rendering', () => {
     runtimeValues[`${CHAR}::activeConditionMeta`] = meta;
   }
 
-  describe('empty state', () => {
-    it('renders nothing when no conditions and no exhaustion', () => {
-      const { container } = renderSheet();
-      expect(container.firstChild).toBeNull();
-      expect(screen.queryAllByTestId('creature-badge')).toHaveLength(0);
-      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
-    });
+  it('renders nothing when no conditions and no exhaustion', () => {
+    const { container } = renderSheet();
+    expect(container.firstChild).toBeNull();
   });
 
-  describe('condition badge text and tooltips', () => {
+  describe('condition badges', () => {
+    // One row per DISTINCT render path: DC text + live savable button,
+    // buff-tint (Invisible), dictionary tooltip with empty meta, and the
+    // label fallback when the condition is missing from the dictionary.
+    // The static-badge halves of the dc && ability gate (missing-dc,
+    // missing-ability) are owned by CharConditions.condition-saves.test.jsx.
     it.each`
-      description                          | conditions            | meta                                      | badgeText        | tooltip
-      ${'DC and ability'}                  | ${['charmed']}        | ${{ charmed: { dc: 12, ability: 'wis' } }} | ${'Charmed DC 12'} | ${'TEST charmed description'}
-      ${'DC but no ability'}              | ${['blinded']}        | ${{ blinded: { dc: 10 } }}          | ${'Blinded DC 10'}  | ${'TEST blinded description'}
-      ${'ability but no DC'}              | ${['blinded']}        | ${{ blinded: { ability: 'con' } }}    | ${'Blinded'}          | ${'TEST blinded description'}
-      ${'no meta at all'}                 | ${['blinded']}        | ${{}}                                   | ${'Blinded'}          | ${'TEST blinded description'}
-      ${'condition missing from the dict'}| ${['cursed']}         | ${{}}                                   | ${'Cursed'}           | ${'Cursed'}
-    `('renders "$badgeText" with the dictionary tooltip when meta has $description', ({ conditions, meta, badgeText, tooltip }) => {
+      description                       | conditions            | meta                                       | badgeText          | tooltip                      | cls                | savable
+      ${'DC and ability'}              | ${['charmed']}        | ${{ charmed: { dc: 12, ability: 'wis' } }} | ${'Charmed DC 12'} | ${'TEST charmed description'}  | ${'effect-condition'} | ${true}
+      ${'Invisible buff tint'}        | ${['invisible']}      | ${{}}                                      | ${'Invisible'}       | ${'TEST invisible description'} | ${'effect-buff'}     | ${false}
+      ${'no meta'}                    | ${['blinded']}        | ${{}}                                      | ${'Blinded'}         | ${'TEST blinded description'}  | ${'effect-condition'} | ${false}
+      ${'missing from the dict'}      | ${['cursed']}         | ${{}}                                      | ${'Cursed'}          | ${'Cursed'}                  | ${'effect-condition'} | ${false}
+    `('renders "$badgeText" ($cls, savable=$savable) with the tooltip for $description', ({ conditions, meta, badgeText, tooltip, cls, savable }) => {
       setConditions(conditions, meta);
       renderSheet();
 
       const badge = screen.getByText(badgeText);
       expect(badge).toHaveAttribute('title', tooltip);
+      expect(badge).toHaveClass(cls);
+      if (savable) {
+        expect(screen.getByRole('button', { name: badgeText })).toBeEnabled();
+      } else {
+        expect(screen.queryByRole('button', { name: badgeText })).not.toBeInTheDocument();
+      }
     });
   });
 
-  describe('deduplication', () => {
-    it('renders each unique condition once despite duplicates in the store', () => {
-      setConditions(['charmed', 'charmed', 'blinded'], {
-        charmed: { dc: 12, ability: 'wis' },
-        blinded: { dc: 10 },
-      });
-      renderSheet();
-
-      expect(screen.getAllByText('Charmed DC 12')).toHaveLength(1);
-      // No phantom badges: exactly charmed + blinded.
-      expect(screen.getAllByTestId('creature-badge')).toHaveLength(2);
+  it('renders each unique condition once despite duplicates in the store', () => {
+    setConditions(['charmed', 'charmed', 'blinded'], {
+      charmed: { dc: 12, ability: 'wis' },
+      blinded: { dc: 10 },
     });
-  });
+    renderSheet();
 
-  describe('badge colour groups', () => {
-    // Semantic-class contract (CreatureBadge.css): Invisible is a buff-tinted
-    // badge, everything else uses the condition tint.
-    it('tints Invisible as a buff badge and other conditions as condition badges', () => {
-      setConditions(['invisible', 'charmed'], { charmed: { dc: 12 } });
-      renderSheet();
-
-      expect(screen.getByText('Invisible')).toHaveClass('effect-buff');
-      expect(screen.getByText('Charmed DC 12')).toHaveClass('effect-condition');
-    });
+    expect(screen.getAllByText('Charmed DC 12')).toHaveLength(1);
+    // No phantom badges: exactly charmed + blinded.
+    expect(screen.getAllByTestId('creature-badge')).toHaveLength(2);
   });
 
   describe('exhaustion badge', () => {
+    // Levels 2 and 6 are the live vs dead branches; coexistence with
+    // condition badges rides along in the same render pass.
     it.each`
-      level | dead
-      ${2}  | ${false}
-      ${6}  | ${true}
-    `('shows "Exhaustion ($level)" with a level tooltip at level $level', ({ level, dead }) => {
+      level | dead    | plusEnabled
+      ${2}  | ${false} | ${true}
+      ${6}  | ${true}  | ${false}
+    `('renders "Exhaustion ($level)" beside the condition badges at level $level', ({ level, dead, plusEnabled }) => {
+      setConditions(['charmed'], { charmed: { dc: 12, ability: 'wis' } });
       renderSheet({ exhaustionLevel: level });
 
-      const expected = `Exhaustion level ${level}${dead ? ' - DEAD' : ''}\n\nTEST exhaustion description`;
-      expect(screen.getByText(`Exhaustion (${level})`)).toHaveAttribute('title', expected);
-    });
-
-    it.each`
-      level | plusEnabled | why
-      ${1}  | ${true}     | ${'above the floor'}
-      ${5}  | ${true}     | ${'just below the level-6 cap'}
-      ${6}  | ${false}    | ${'at the cap (dead)'}
-    `('minus stays enabled and plus is plusEnabled=$plusEnabled at level $level ($why)', ({ level, plusEnabled }) => {
-      renderSheet({ exhaustionLevel: level });
-
-      // The badge only renders at level > 0, so minus is always live here.
+      const badge = screen.getByText(`Exhaustion (${level})`);
+      expect(badge).toHaveAttribute('title', `Exhaustion level ${level}${dead ? ' - DEAD' : ''}\n\nTEST exhaustion description`);
+      // The badge only renders at level > 0, so minus is always live here;
+      // plus is capped once dead (click flows live in the exhaustion suite).
       expect(screen.getByRole('button', { name: '−' })).toBeEnabled();
       expect(screen.getByRole('button', { name: '+' }).disabled).toBe(!plusEnabled);
-    });
-  });
-
-  describe('conditions with exhaustion', () => {
-    it('renders condition badges and exhaustion controls in the same grid', () => {
-      setConditions(['charmed'], { charmed: { dc: 12, ability: 'wis' } });
-      renderSheet({ exhaustionLevel: 2 });
-
+      // Same grid, both kinds of badge.
       expect(screen.getByText('Charmed DC 12')).toBeInTheDocument();
-      expect(screen.getByText('Exhaustion (2)')).toBeInTheDocument();
     });
   });
 

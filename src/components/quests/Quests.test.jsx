@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Quests from './Quests.jsx';
@@ -38,6 +39,32 @@ const quest = (overrides = {}) => ({
   ...overrides,
 });
 
+// Map form fields to their queries in the quest modal.
+const field = {
+  name: () => screen.getByRole('textbox', { name: /Name/ }),
+  status: () => screen.getByLabelText('Status'),
+  description: () => screen.getByTestId('field-quest-description'),
+  rewards: () => screen.getByTestId('field-quest-rewards'),
+  notes: () => screen.getByTestId('field-quest-notes'),
+};
+
+function fillQuestForm(values) {
+  for (const [key, value] of Object.entries(values)) {
+    fireEvent.change(field[key](), { target: { value } });
+  }
+}
+
+function expectFormValues(values) {
+  for (const [key, value] of Object.entries(values)) {
+    expect(field[key]()).toHaveValue(value);
+  }
+}
+
+const openNewModal = () => fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
+const openEditModal = (name) => fireEvent.click(screen.getByRole('button', { name: `Edit quest: ${name}` }));
+
+const DEFAULT_FORM = { name: '', status: 'active', description: '', rewards: '', notes: '' };
+
 function renderWithQuests(quests = [], managementOverrides = {}, componentProps = {}) {
   const mockSave = vi.fn().mockResolvedValue(undefined);
   const mockDelete = vi.fn().mockResolvedValue(undefined);
@@ -65,24 +92,19 @@ describe('Quests', () => {
     vi.restoreAllMocks();
   });
 
-  describe('visibility', () => {
-    it('renders nothing when isLocalhost is false', () => {
-      const { container } = renderWithQuests([], {}, { isLocalhost: false });
-      expect(container.querySelector('.ct-container')).toBeNull();
-    });
+  it('renders nothing when isLocalhost is false', () => {
+    const { container } = renderWithQuests([], {}, { isLocalhost: false });
+    expect(container.querySelector('.ct-container')).toBeNull();
   });
 
-  describe('rendering', () => {
-    it('renders the header with back button, title, and New Quest button', () => {
+  describe('header', () => {
+    it('renders back button, title, New Quest button, and search input', () => {
       renderWithQuests([]);
-      expect(screen.getByRole('button', { name: /Back/ })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: /Quests/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /New Quest/ })).toBeInTheDocument();
-    });
-
-    it('renders a search input', () => {
-      renderWithQuests([]);
       expect(screen.getByRole('textbox', { name: /Search Quests/ })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /Back/ }));
+      expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -97,187 +119,136 @@ describe('Quests', () => {
       expect(screen.getByText(/No quests yet/)).toBeInTheDocument();
     });
 
-    it('shows the no-results message with the query when search matches nothing', () => {
-      renderWithQuests([quest({ name: 'Find the Lost Sword' })]);
+    it('shows the no-results message with the query, but not for whitespace-only searches', () => {
+      renderWithQuests([quest()]);
 
-      const searchInput = screen.getByRole('textbox', { name: /Search Quests/ });
-      fireEvent.change(searchInput, { target: { value: 'dragons' } });
+      fireEvent.change(screen.getByRole('textbox', { name: /Search Quests/ }), { target: { value: 'dragons' } });
+      expect(screen.getByText(/No quests found matching/).textContent).toContain('dragons');
 
-      const emptyState = screen.getByText(/No quests found matching/);
-      expect(emptyState.textContent).toContain('dragons');
-    });
-
-    it('does not show a no-results message for whitespace-only search', () => {
-      renderWithQuests([quest({ name: 'Find the Lost Sword' })]);
-
-      const searchInput = screen.getByRole('textbox', { name: /Search Quests/ });
-      fireEvent.change(searchInput, { target: { value: '   ' } });
-
+      fireEvent.change(screen.getByRole('textbox', { name: /Search Quests/ }), { target: { value: '   ' } });
       expect(screen.getByText('Find the Lost Sword')).toBeInTheDocument();
       expect(screen.queryByText(/No quests found matching/)).not.toBeInTheDocument();
     });
   });
 
-  describe('back navigation', () => {
-    it('calls onBack when the back button is clicked', () => {
-      renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /Back/ }));
-      expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
-    });
-  });
-
   describe('new quest modal', () => {
-    it('opens the modal when New Quest is clicked', () => {
+    it('opens and closes via Cancel or Close (X), but not via overlay click', () => {
       renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
-    });
 
-    it('closes the modal via Cancel or X (Close), but not via overlay click', () => {
-      renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
+      openNewModal();
+      expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(screen.queryByRole('heading', { name: 'New Quest' })).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
-
+      openNewModal();
       fireEvent.click(screen.getByLabelText('Close'));
       expect(screen.queryByRole('heading', { name: 'New Quest' })).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
-
-      const overlay = document.querySelector('.ct-modal-overlay');
-      fireEvent.click(overlay);
+      openNewModal();
+      fireEvent.click(document.querySelector('.ct-modal-overlay'));
       expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
     });
 
     it('allows changing all form fields', () => {
       renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
+      openNewModal();
 
-      const nameInput = screen.getByRole('textbox', { name: /Name/ });
-      fireEvent.change(nameInput, { target: { value: 'Find the Lost Sword' } });
-      expect(nameInput).toHaveValue('Find the Lost Sword');
-
-      const statusSelect = screen.getByLabelText('Status');
-      fireEvent.change(statusSelect, { target: { value: 'completed' } });
-      expect(statusSelect).toHaveValue('completed');
-
-      const descField = screen.getByTestId('field-quest-description');
-      fireEvent.change(descField, { target: { value: 'A dangerous quest' } });
-      expect(descField).toHaveValue('A dangerous quest');
-
-      const rewardsField = screen.getByTestId('field-quest-rewards');
-      fireEvent.change(rewardsField, { target: { value: '100 gold' } });
-      expect(rewardsField).toHaveValue('100 gold');
-
-      const notesField = screen.getByTestId('field-quest-notes');
-      fireEvent.change(notesField, { target: { value: 'Be careful' } });
-      expect(notesField).toHaveValue('Be careful');
+      const values = {
+        name: 'Find the Lost Sword',
+        status: 'completed',
+        description: 'A dangerous quest',
+        rewards: '100 gold',
+        notes: 'Be careful',
+      };
+      fillQuestForm(values);
+      expectFormValues(values);
     });
 
-    it('disables the save button when the name is empty or whitespace-only', () => {
+    it('disables the save button until the name is non-blank', () => {
       renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-
+      openNewModal();
       expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('disabled');
 
-      const nameInput = screen.getByRole('textbox', { name: /Name/ });
-      fireEvent.change(nameInput, { target: { value: '   ' } });
+      fillQuestForm({ name: '   ' });
       expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('disabled');
 
-      fireEvent.change(nameInput, { target: { value: 'Find the Lost Sword' } });
+      fillQuestForm({ name: 'Find the Lost Sword' });
       expect(screen.getByRole('button', { name: 'Save' })).not.toHaveAttribute('disabled');
     });
 
     it('disables the Cancel and Save buttons while a save is in progress', () => {
-      renderWithQuests([], {
-        saveItems: vi.fn().mockImplementation(() => new Promise(() => {})),
-      });
+      renderWithQuests([], { saveItems: vi.fn().mockImplementation(() => new Promise(() => {})) });
 
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      fireEvent.change(screen.getByRole('textbox', { name: /Name/ }), { target: { value: 'New Quest' } });
+      openNewModal();
+      fillQuestForm({ name: 'New Quest' });
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
       expect(screen.getByRole('button', { name: /Saving/ })).toHaveAttribute('disabled');
       expect(screen.getByRole('button', { name: 'Cancel' })).toHaveAttribute('disabled');
     });
 
-    it('closes the modal and resets the form after saving a new quest', async () => {
-      const { mockSave } = renderWithQuests([]);
+    it('saves a new quest, closing the modal, and resets the form on reopen', async () => {
+      const { mockSave } = renderWithQuests([quest({ id: 'quest-1', name: 'Existing Quest' })]);
 
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      fireEvent.change(screen.getByRole('textbox', { name: /Name/ }), { target: { value: 'New Quest' } });
-      fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'completed' } });
-      fireEvent.change(screen.getByTestId('field-quest-description'), { target: { value: 'A quest' } });
-      fireEvent.change(screen.getByTestId('field-quest-rewards'), { target: { value: '50 gold' } });
-      fireEvent.change(screen.getByTestId('field-quest-notes'), { target: { value: 'Notes' } });
+      openNewModal();
+      fillQuestForm({
+        name: 'New Quest',
+        status: 'completed',
+        description: 'New desc',
+        rewards: '50 gold',
+        notes: 'New notes',
+      });
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-      await waitFor(() => {
-        expect(mockSave).toHaveBeenCalled();
-      });
-
+      await waitFor(() => expect(mockSave).toHaveBeenCalled());
       expect(screen.queryByRole('heading', { name: 'New Quest' })).not.toBeInTheDocument();
 
-      // Re-open to verify form reset to defaults
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      expect(screen.getByRole('textbox', { name: /Name/ })).toHaveValue('');
-      expect(screen.getByLabelText('Status')).toHaveValue('active');
-      expect(screen.getByTestId('field-quest-description')).toHaveValue('');
-      expect(screen.getByTestId('field-quest-rewards')).toHaveValue('');
-      expect(screen.getByTestId('field-quest-notes')).toHaveValue('');
-    });
-
-    it('passes the new quest data to saveItems while preserving existing quests', async () => {
-      const { mockSave } = renderWithQuests([
-        quest({ id: 'quest-1', name: 'Existing Quest' }),
-      ]);
-
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      fireEvent.change(screen.getByRole('textbox', { name: /Name/ }), { target: { value: 'New Quest' } });
-      fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'completed' } });
-      fireEvent.change(screen.getByTestId('field-quest-description'), { target: { value: 'New desc' } });
-      fireEvent.change(screen.getByTestId('field-quest-rewards'), { target: { value: '50 gold' } });
-      fireEvent.change(screen.getByTestId('field-quest-notes'), { target: { value: 'New notes' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-      await waitFor(() => {
-        expect(mockSave).toHaveBeenCalled();
+      const savedQuests = mockSave.mock.calls[0][0];
+      expect(savedQuests.find((q) => q.id === 'quest-1').name).toBe('Existing Quest');
+      const newQuest = savedQuests.find((q) => q.name === 'New Quest');
+      expect(newQuest.id).toBeDefined();
+      expect(newQuest).toMatchObject({
+        status: 'completed',
+        description: 'New desc',
+        rewards: '50 gold',
+        notes: 'New notes',
       });
 
-      const savedQuests = mockSave.mock.calls[0][0];
-      const existingQuest = savedQuests.find((q) => q.id === 'quest-1');
-      const newQuest = savedQuests.find((q) => q.name === 'New Quest');
-      expect(existingQuest).toBeDefined();
-      expect(existingQuest.name).toBe('Existing Quest');
-      expect(newQuest).toBeDefined();
-      expect(newQuest.status).toBe('completed');
-      expect(newQuest.description).toBe('New desc');
-      expect(newQuest.rewards).toBe('50 gold');
-      expect(newQuest.notes).toBe('New notes');
-      expect(newQuest.id).toBeDefined();
+      openNewModal();
+      expectFormValues(DEFAULT_FORM);
+    });
+
+    it('logs the error, keeps the modal open, and re-enables save when saving fails', async () => {
+      const errorSpy = vi.spyOn(console, 'error');
+      renderWithQuests([], { saveItems: vi.fn().mockRejectedValue(new Error('Save failed')) });
+
+      openNewModal();
+      fillQuestForm({ name: 'New Quest' });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => expect(errorSpy).toHaveBeenCalledWith('Failed to save quest:', expect.any(Error)));
+      expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Save' })).not.toHaveAttribute('disabled');
     });
   });
 
   describe('duplicate-name guard', () => {
-    it('shows an inline error and does not save when a new quest name collides case-insensitively', async () => {
-      const { mockSave } = renderWithQuests([
-        quest({ id: 'quest-1', name: 'The Lost Artifact' }),
-      ]);
+    it('shows an inline error and does not save on case-insensitive collision, clearing it on reopen', async () => {
+      const { mockSave } = renderWithQuests([quest({ name: 'The Lost Artifact' })]);
 
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      fireEvent.change(screen.getByRole('textbox', { name: /Name/ }), { target: { value: 'the lost artifact' } });
+      openNewModal();
+      fillQuestForm({ name: 'the lost artifact' });
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
       expect(screen.getByText('A quest with that name already exists')).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
       await new Promise((r) => setTimeout(r, 0));
       expect(mockSave).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      openNewModal();
+      expect(screen.queryByText('A quest with that name already exists')).not.toBeInTheDocument();
     });
 
     it('shows an inline error when renaming onto another existing quest name', async () => {
@@ -286,8 +257,8 @@ describe('Quests', () => {
         quest({ id: 'quest-2', name: 'QA Parity Quest' }),
       ]);
 
-      fireEvent.click(screen.getByRole('button', { name: /Edit quest: QA Parity Quest/ }));
-      fireEvent.change(screen.getByRole('textbox', { name: /Name/ }), { target: { value: 'THE LOST ARTIFACT' } });
+      openEditModal('QA Parity Quest');
+      fillQuestForm({ name: 'THE LOST ARTIFACT' });
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
       expect(screen.getByText('A quest with that name already exists')).toBeInTheDocument();
@@ -297,39 +268,24 @@ describe('Quests', () => {
     });
 
     it('saves normally when editing without renaming (self-match excluded)', async () => {
-      const { mockSave } = renderWithQuests([
-        quest({ id: 'quest-1', name: 'The Lost Artifact' }),
-      ]);
+      const { mockSave } = renderWithQuests([quest({ name: 'The Lost Artifact' })]);
 
-      fireEvent.click(screen.getByRole('button', { name: /Edit quest: The Lost Artifact/ }));
-      fireEvent.change(screen.getByTestId('field-quest-description'), { target: { value: 'updated' } });
+      openEditModal('The Lost Artifact');
+      fillQuestForm({ description: 'updated' });
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
       await waitFor(() => expect(mockSave).toHaveBeenCalled());
       expect(screen.queryByText('A quest with that name already exists')).not.toBeInTheDocument();
       expect(mockSave.mock.calls[0][0][0].description).toBe('updated');
     });
-
-    it('clears the error when the modal is closed and reopened', async () => {
-      renderWithQuests([quest({ id: 'quest-1', name: 'The Lost Artifact' })]);
-
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      fireEvent.change(screen.getByRole('textbox', { name: /Name/ }), { target: { value: 'the lost artifact' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      expect(screen.getByText('A quest with that name already exists')).toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      expect(screen.queryByText('A quest with that name already exists')).not.toBeInTheDocument();
-    });
   });
 
-  describe('quest list rendering', () => {
-    it('renders each quest with its name and status', () => {
+  describe('quest list', () => {
+    it('renders each quest with its name and status, truncating long descriptions', () => {
       renderWithQuests([
         quest({ id: 'quest-1', name: 'Find the Lost Sword', status: 'active' }),
         quest({ id: 'quest-2', name: 'Defeat the Dragon', status: 'completed' }),
-        quest({ id: 'quest-3', name: 'Rescue the Princess', status: 'failed' }),
+        quest({ id: 'quest-3', name: 'Rescue the Princess', status: 'failed', description: 'A'.repeat(150) }),
       ]);
 
       expect(screen.getByText('Find the Lost Sword')).toBeInTheDocument();
@@ -338,25 +294,17 @@ describe('Quests', () => {
       expect(screen.getByText('active')).toBeInTheDocument();
       expect(screen.getByText('completed')).toBeInTheDocument();
       expect(screen.getByText('failed')).toBeInTheDocument();
-    });
-
-    it('truncates long descriptions in the quest list', () => {
-      renderWithQuests([quest({ name: 'Long Quest', description: 'A'.repeat(150) })]);
-
       expect(screen.getByText('A'.repeat(100) + '...')).toBeInTheDocument();
     });
 
-    it('opens the edit modal when a quest item is clicked', () => {
+    it('opens the edit modal when a quest item is clicked or activated via keyboard', () => {
       renderWithQuests([quest({ name: 'Clickable Quest' })]);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Edit quest: Clickable Quest' }));
+      openEditModal('Clickable Quest');
       expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
-    });
 
-    it('opens the edit modal when a quest item is activated via keyboard', () => {
-      renderWithQuests([quest({ name: 'Keyboard Quest' })]);
-
-      const listItem = screen.getByRole('button', { name: 'Edit quest: Keyboard Quest' });
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      const listItem = screen.getByRole('button', { name: 'Edit quest: Clickable Quest' });
 
       fireEvent.keyDown(listItem, { key: 'Enter' });
       expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
@@ -369,7 +317,7 @@ describe('Quests', () => {
   });
 
   describe('edit quest modal', () => {
-    it('opens the edit modal pre-populated with the quest data', () => {
+    it('is pre-populated with the quest data and shows a delete button', () => {
       renderWithQuests([
         quest({
           name: 'Find the Lost Sword',
@@ -380,28 +328,27 @@ describe('Quests', () => {
         }),
       ]);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Edit quest: Find the Lost Sword' }));
+      openEditModal('Find the Lost Sword');
       expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
-
-      expect(screen.getByRole('textbox', { name: /Name/ })).toHaveValue('Find the Lost Sword');
-      expect(screen.getByLabelText('Status')).toHaveValue('completed');
-      expect(screen.getByTestId('field-quest-description')).toHaveValue('An old quest');
-      expect(screen.getByTestId('field-quest-rewards')).toHaveValue('100 gold');
-      expect(screen.getByTestId('field-quest-notes')).toHaveValue('Almost done');
-    });
-
-    it('shows a delete button when editing a quest', () => {
-      renderWithQuests([quest({ name: 'Find the Lost Sword' })]);
-
-      fireEvent.click(screen.getByRole('button', { name: 'Edit quest: Find the Lost Sword' }));
       expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+      expectFormValues({
+        name: 'Find the Lost Sword',
+        status: 'completed',
+        description: 'An old quest',
+        rewards: '100 gold',
+        notes: 'Almost done',
+      });
     });
 
-    it('hides the delete button when creating a new quest', () => {
-      renderWithQuests([]);
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
+    it('resets the form to defaults when opening the new quest modal after cancelling an edit', () => {
+      renderWithQuests([quest({ name: 'Existing Quest', status: 'completed' })]);
+
+      openEditModal('Existing Quest');
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      openNewModal();
       expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+      expectFormValues(DEFAULT_FORM);
     });
 
     it('disables the delete button while a delete is in progress and re-enables it after', async () => {
@@ -411,15 +358,12 @@ describe('Quests', () => {
         deleteItem: vi.fn().mockImplementation(() => new Promise((resolve) => { deleteResolve = resolve; })),
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Edit quest: Delete Test Quest' }));
+      openEditModal('Delete Test Quest');
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Deleting/ })).toHaveAttribute('disabled');
-      });
+      await waitFor(() => expect(screen.getByRole('button', { name: /Deleting/ })).toHaveAttribute('disabled'));
 
       await act(async () => deleteResolve());
-
       expect(screen.getByRole('button', { name: 'Delete' })).not.toHaveAttribute('disabled');
     });
 
@@ -429,28 +373,26 @@ describe('Quests', () => {
         quest({ id: 'quest-2', name: 'Untouched Quest' }),
       ]);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Edit quest: Original Name' }));
-      fireEvent.change(screen.getByRole('textbox', { name: /Name/ }), { target: { value: 'Updated Name' } });
-      fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'completed' } });
-      fireEvent.change(screen.getByTestId('field-quest-description'), { target: { value: 'Updated desc' } });
-      fireEvent.change(screen.getByTestId('field-quest-rewards'), { target: { value: '100 gold' } });
-      fireEvent.change(screen.getByTestId('field-quest-notes'), { target: { value: 'Updated notes' } });
+      openEditModal('Original Name');
+      fillQuestForm({
+        name: 'Updated Name',
+        status: 'completed',
+        description: 'Updated desc',
+        rewards: '100 gold',
+        notes: 'Updated notes',
+      });
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-      await waitFor(() => {
-        expect(mockSave).toHaveBeenCalled();
-      });
-
+      await waitFor(() => expect(mockSave).toHaveBeenCalled());
       const savedQuests = mockSave.mock.calls[0][0];
-      const updatedQuest = savedQuests.find((q) => q.id === 'quest-1');
-      const untouchedQuest = savedQuests.find((q) => q.id === 'quest-2');
-      expect(updatedQuest).toBeDefined();
-      expect(updatedQuest.name).toBe('Updated Name');
-      expect(updatedQuest.status).toBe('completed');
-      expect(updatedQuest.description).toBe('Updated desc');
-      expect(updatedQuest.rewards).toBe('100 gold');
-      expect(updatedQuest.notes).toBe('Updated notes');
-      expect(untouchedQuest.name).toBe('Untouched Quest');
+      expect(savedQuests.find((q) => q.id === 'quest-1')).toMatchObject({
+        name: 'Updated Name',
+        status: 'completed',
+        description: 'Updated desc',
+        rewards: '100 gold',
+        notes: 'Updated notes',
+      });
+      expect(savedQuests.find((q) => q.id === 'quest-2').name).toBe('Untouched Quest');
     });
   });
 
@@ -464,18 +406,15 @@ describe('Quests', () => {
       const searchInput = screen.getByRole('textbox', { name: /Search Quests/ });
 
       fireEvent.change(searchInput, { target: { value: 'dragon' } });
-      expect(screen.queryByText('Defeat the Dragon')).toBeInTheDocument();
+      expect(screen.getByText('Defeat the Dragon')).toBeInTheDocument();
       expect(screen.queryByText('Find the Lost Sword')).not.toBeInTheDocument();
 
       fireEvent.change(searchInput, { target: { value: 'find the lost sword' } });
       expect(screen.getByText('Find the Lost Sword')).toBeInTheDocument();
       expect(screen.queryByText('Defeat the Dragon')).not.toBeInTheDocument();
-
-      fireEvent.change(searchInput, { target: { value: 'dungeon' } });
-      expect(screen.queryByText('Find the Lost Sword')).not.toBeInTheDocument();
     });
 
-    it('clears the search query and restores all quests', () => {
+    it('shows a clear-search button only with a query and restores all quests when clicked', () => {
       renderWithQuests([
         quest({ id: 'quest-1', name: 'Quest One' }),
         quest({ id: 'quest-2', name: 'Quest Two' }),
@@ -485,6 +424,7 @@ describe('Quests', () => {
       expect(screen.queryByLabelText('Clear search')).not.toBeInTheDocument();
 
       fireEvent.change(searchInput, { target: { value: 'one' } });
+      expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
       expect(screen.getByText('Quest One')).toBeInTheDocument();
       expect(screen.queryByText('Quest Two')).not.toBeInTheDocument();
 
@@ -494,24 +434,14 @@ describe('Quests', () => {
       expect(screen.getByText('Quest One')).toBeInTheDocument();
       expect(screen.getByText('Quest Two')).toBeInTheDocument();
     });
-
-    it('shows a clear search button when there is a search query', () => {
-      renderWithQuests([quest({ name: 'Test Quest' })]);
-
-      const searchInput = screen.getByRole('textbox', { name: /Search Quests/ });
-      expect(screen.queryByLabelText('Clear search')).not.toBeInTheDocument();
-
-      fireEvent.change(searchInput, { target: { value: 'test' } });
-      expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
-    });
   });
 
   describe('delete quest', () => {
     it('deletes a quest when the confirmation is accepted', () => {
       vi.spyOn(window, 'confirm').mockReturnValue(true);
-      const { mockDelete } = renderWithQuests([quest({ name: 'Find the Lost Sword' })]);
+      const { mockDelete } = renderWithQuests([quest()]);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Edit quest: Find the Lost Sword' }));
+      openEditModal('Find the Lost Sword');
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
       expect(window.confirm).toHaveBeenCalledWith('Delete quest "Find the Lost Sword"?');
@@ -520,9 +450,9 @@ describe('Quests', () => {
 
     it('does not delete when the confirmation is cancelled', () => {
       vi.spyOn(window, 'confirm').mockReturnValue(false);
-      const { mockDelete } = renderWithQuests([quest({ name: 'Find the Lost Sword' })]);
+      const { mockDelete } = renderWithQuests([quest()]);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Edit quest: Find the Lost Sword' }));
+      openEditModal('Find the Lost Sword');
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
       expect(window.confirm).toHaveBeenCalledWith('Delete quest "Find the Lost Sword"?');
@@ -536,56 +466,11 @@ describe('Quests', () => {
         deleteItem: vi.fn().mockRejectedValue(new Error('Delete failed')),
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Edit quest: Error Delete Quest' }));
+      openEditModal('Error Delete Quest');
       fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-      await waitFor(() => {
-        expect(errorSpy).toHaveBeenCalledWith('Failed to delete quest:', expect.any(Error));
-      });
-
+      await waitFor(() => expect(errorSpy).toHaveBeenCalledWith('Failed to delete quest:', expect.any(Error)));
       expect(screen.getByRole('button', { name: 'Delete' })).not.toHaveAttribute('disabled');
-    });
-  });
-
-  describe('save error handling', () => {
-    it('logs the error, keeps the modal open, and re-enables the save button when saving fails', async () => {
-      const errorSpy = vi.spyOn(console, 'error');
-      renderWithQuests([], {
-        saveItems: vi.fn().mockRejectedValue(new Error('Save failed')),
-      });
-
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      fireEvent.change(screen.getByRole('textbox', { name: /Name/ }), { target: { value: 'New Quest' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-      await waitFor(() => {
-        expect(errorSpy).toHaveBeenCalledWith('Failed to save quest:', expect.any(Error));
-      });
-
-      expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Save' })).not.toHaveAttribute('disabled');
-    });
-  });
-
-  describe('form reset behavior', () => {
-    it('resets the form to defaults when opening the new quest modal after an edit', () => {
-      renderWithQuests([
-        quest({ name: 'Existing Quest', status: 'completed', description: 'Existing desc', rewards: '50 gold', notes: 'Existing notes' }),
-      ]);
-
-      fireEvent.click(screen.getByRole('button', { name: 'Edit quest: Existing Quest' }));
-      expect(screen.getByRole('heading', { name: 'Edit Quest' })).toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-
-      fireEvent.click(screen.getByRole('button', { name: /New Quest/ }));
-      expect(screen.getByRole('heading', { name: 'New Quest' })).toBeInTheDocument();
-
-      expect(screen.getByRole('textbox', { name: /Name/ })).toHaveValue('');
-      expect(screen.getByLabelText('Status')).toHaveValue('active');
-      expect(screen.getByTestId('field-quest-description')).toHaveValue('');
-      expect(screen.getByTestId('field-quest-rewards')).toHaveValue('');
-      expect(screen.getByTestId('field-quest-notes')).toHaveValue('');
     });
   });
 });

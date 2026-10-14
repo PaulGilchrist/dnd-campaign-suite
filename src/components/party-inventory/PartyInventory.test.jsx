@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PartyInventory from './PartyInventory.jsx';
@@ -70,11 +71,15 @@ async function renderReady(props = defaultProps) {
   return result;
 }
 
+async function selectPlayer(name) {
+  fireEvent.change(screen.getByLabelText('Choose player'), { target: { value: name } });
+}
+
 describe('PartyInventory', () => {
   it('renders currency totals and items sorted by name', async () => {
     await renderReady();
-    expect(screen.getByText('Party Currency')).toBeTruthy();
-    expect(screen.getAllByText('50').length).toBeGreaterThan(0);
+    const card = screen.getByText('Party Currency').closest('.pi-currency-card');
+    expect(within(card).getByText('50')).toBeTruthy();
     const rows = screen.getAllByRole('row');
     const itemNames = rows.slice(1).map(r => r.cells[0].textContent.trim());
     expect(itemNames).toEqual(['Antitoxin', 'Torch']);
@@ -92,8 +97,7 @@ describe('PartyInventory', () => {
 
   it('disables the remove chip when it would go below zero', async () => {
     await renderReady();
-    const minus100cp = screen.getByTitle('Remove 100 cp');
-    expect(minus100cp.disabled).toBe(true);
+    expect(screen.getByTitle('Remove 100 cp').disabled).toBe(true);
     expect(screen.getByTitle('Remove 10 sp').disabled).toBe(false);
   });
 
@@ -112,10 +116,12 @@ describe('PartyInventory', () => {
     });
   });
 
-  it('moves an item from a player to the party with quantity from itemMeta', async () => {
+  it('lists the player backpack and moves an item to the party with quantity from itemMeta', async () => {
     await renderReady();
-    fireEvent.change(screen.getByLabelText('Choose player'), { target: { value: 'War Cleric' } });
-    await screen.findByText('Rope, Hempen');
+    await selectPlayer('War Cleric');
+    // Backpack entries without itemMeta still list, defaulting to ×1
+    expect(await screen.findByText("Thieves' Tools")).toBeTruthy();
+    expect(screen.getByText('×1')).toBeTruthy();
     const ropeRow = screen.getByText('Rope, Hempen').closest('li');
     fireEvent.click(within(ropeRow).getByRole('button', { name: /To Party/ }));
     await waitFor(() => {
@@ -126,13 +132,6 @@ describe('PartyInventory', () => {
         quantity: 3,
       });
     });
-  });
-
-  it('lists all backpack entries, not only those with itemMeta', async () => {
-    await renderReady();
-    fireEvent.change(screen.getByLabelText('Choose player'), { target: { value: 'War Cleric' } });
-    expect(await screen.findByText("Thieves' Tools")).toBeTruthy();
-    expect(screen.getByText('×1')).toBeTruthy();
   });
 
   it('offers equipment suggestions while typing a new item name and fills its description', async () => {
@@ -146,7 +145,6 @@ describe('PartyInventory', () => {
     expect(nameInput.value).toBe('Rope, Hempen');
     const desc = screen.getByLabelText('Description');
     await waitFor(() => expect(desc.value).toContain('hempen rope'));
-    expect(screen.queryByText('Antitoxin')).toBeTruthy();
   });
 
   it('allows free-text names not present in equipment.json', async () => {

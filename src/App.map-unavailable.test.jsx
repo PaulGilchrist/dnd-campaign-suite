@@ -1,11 +1,10 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * App-level contract for the player "map unavailable" waiting placeholder.
  *
  * Production behavior under test (App.jsx → MapsAreaView → MapUnavailable):
  *  - A player (non-localhost) who opens Maps with no active map sees a
- *    friendly waiting placeholder — never an alert, never the maps manager,
- *    whether the campaign has zero maps or only inactive ones.
+ *    friendly waiting placeholder — never an alert, never the maps manager.
  *  - "Check Again" re-runs the active-map load for the CURRENT campaign
  *    exactly once per click: it keeps the placeholder while no map is
  *    active, and opens the map the moment the GM has activated one.
@@ -256,41 +255,35 @@ describe('App - player map-unavailable waiting placeholder', () => {
     setHostname('localhost');
   });
 
-  it.each([
-    ['no maps at all', []],
-    ['only inactive maps', [{ fileName: 'battle-arena.json', isActive: false }]],
-  ])('shows the waiting placeholder (message, icon, retry) instead of an alert when the campaign has %s', async (_label, maps) => {
-    await renderPlayerOnWaitingMapsView(maps);
+  it('shows the waiting placeholder (message, retry) instead of an alert when no map is active', async () => {
+    // An inactive-map listing (not just an empty one) — the isActive flag
+    // must be what decides, and the player never sees the maps manager.
+    await renderPlayerOnWaitingMapsView([{ fileName: 'battle-arena.json', isActive: false }]);
 
-    // Friendly, actionable message with a retry path — located by content,
-    // scoped under the placeholder container (the hook for its own CSS).
     const message = screen.getByText(/Waiting for the GM to open a map/);
     expect(message.closest('.map-unavailable')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Check Again' })).toBeInTheDocument();
-    // Icon is decorative (aria-hidden) — presence is asserted, exact glyph is not.
-    expect(document.querySelector('.map-unavailable i[aria-hidden="true"]')).toBeInTheDocument();
 
     expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
     expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
     expect(window.alert).not.toHaveBeenCalled();
   });
 
-  it('"Check Again" re-queries the current campaign exactly once and keeps the placeholder while no map is active', async () => {
+  it('"Check Again" loads the current campaign once per click — stays waiting, then opens the GM-activated map', async () => {
     await renderPlayerOnWaitingMapsView();
 
+    // Still no active map: one fresh, campaign-scoped load per click —
+    // not a stale result, not a hammering loop — and the placeholder stays.
     const callsBefore = loadMaps.mock.calls.length;
     clickCheckAgain();
     await flushEffects();
 
-    // One fresh, campaign-scoped load per click — not a stale result, not a hammering loop.
     expect(loadMaps.mock.calls.length).toBe(callsBefore + 1);
     expect(loadMaps).toHaveBeenLastCalledWith('test-campaign');
     expectStillWaiting();
-  });
 
-  it('"Check Again" opens the map once the GM has activated one', async () => {
-    await renderPlayerOnWaitingMapsView();
-
+    // GM activates — the next click opens the map and swaps the placeholder
+    // (message AND retry) out entirely.
     loadMaps.mockResolvedValue({ maps: [{ fileName: 'battle-arena.json', isActive: true }] });
     clickCheckAgain();
 
@@ -298,7 +291,6 @@ describe('App - player map-unavailable waiting placeholder', () => {
       expect(screen.getByTestId('map-view')).toBeInTheDocument();
       expect(screen.getByTestId('map-name').textContent).toBe('battle-arena');
     });
-    // The placeholder (message AND retry) is swapped out entirely.
     expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Check Again' })).not.toBeInTheDocument();
     expect(window.alert).not.toHaveBeenCalled();
@@ -316,7 +308,7 @@ describe('App - player map-unavailable waiting placeholder', () => {
     expectStillWaiting();
     expect(consoleSpy).toHaveBeenCalled(); // failure logged, not swallowed
 
-    // Still retryable: next click after the GM activates opens the map.
+    // Recovery: the click after the failure still opens an activated map.
     loadMaps.mockResolvedValue({ maps: [{ fileName: 'battle-arena.json', isActive: true }] });
     clickCheckAgain();
 

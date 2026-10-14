@@ -1,9 +1,10 @@
+// @maintained-by-ai: 2026-10-14
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import GenerateDungeonModal from './GenerateDungeonModal';
 
 const { dungeonMocks } = vi.hoisted(() => {
-  const defaultDungeonResult = {
+  const dungeonResult = {
     name: 'Test Dungeon',
     gridSize: 30,
     walls: [],
@@ -15,8 +16,8 @@ const { dungeonMocks } = vi.hoisted(() => {
   };
   return {
     dungeonMocks: {
-      generateDungeon: vi.fn(() => ({ ...defaultDungeonResult })),
-      generateAdjacentDungeon: vi.fn(() => ({ ...defaultDungeonResult })),
+      generateDungeon: vi.fn(() => ({ ...dungeonResult })),
+      generateAdjacentDungeon: vi.fn(() => ({ ...dungeonResult })),
     },
   };
 });
@@ -39,11 +40,22 @@ const fillMapName = (name) =>
 const clickGenerate = () =>
   fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
 
-const clickCancelButton = () =>
-  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-
 const selectMode = (modeLabel) =>
   fireEvent.click(screen.getByRole('button', { name: modeLabel }));
+
+const changeField = (matcher, value) =>
+  fireEvent.change(screen.getByLabelText(matcher), { target: { value } });
+
+// Fill the name, run an optional per-case interaction, generate, and assert
+// the generator received the expected options.
+const submitAndExpect = async (generatorMock, expectedOptions, interact) => {
+  fillMapName('Dungeon');
+  if (interact) interact();
+  clickGenerate();
+  await waitFor(() => {
+    expect(generatorMock).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
+  });
+};
 
 const deferred = () => {
   let resolve;
@@ -56,7 +68,6 @@ const deferred = () => {
 // ---------------------------------------------------------------------------
 describe('GenerateDungeonModal', () => {
   let props;
-  let container;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -68,19 +79,9 @@ describe('GenerateDungeonModal', () => {
     };
   });
 
-  afterEach(() => {
-    if (container) {
-      container.remove();
-      container = null;
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Rendering
-  // -------------------------------------------------------------------------
   describe('rendering', () => {
     it('renders modal with title and form fields', () => {
-      ({ container } = render(<GenerateDungeonModal {...props} />));
+      render(<GenerateDungeonModal {...props} />);
       expect(screen.getByText('Generate Dungeon Map')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('e.g. Goblin Hideout')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('Random if empty')).toBeInTheDocument();
@@ -96,32 +97,22 @@ describe('GenerateDungeonModal', () => {
       selectMode('Room Adjacent');
       expect(screen.getByRole('slider', { name: /Room Count/ })).toBeInTheDocument();
     });
-  });
 
-  // -------------------------------------------------------------------------
-  // Generate button state
-  // -------------------------------------------------------------------------
-  describe('generate button state', () => {
-    it('is disabled when map name is empty', () => {
+    it('enables Generate only when map name has content', () => {
       render(<GenerateDungeonModal {...props} />);
       expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled();
-    });
-
-    it('is enabled when map name has content', () => {
-      render(<GenerateDungeonModal {...props} />);
       fillMapName('My Dungeon');
       expect(screen.getByRole('button', { name: 'Generate' })).not.toBeDisabled();
     });
 
-    it('is disabled during generation', async () => {
+    it('disables both buttons during generation', async () => {
       const pending = deferred();
       mapsServiceMocks.createMap.mockImplementationOnce(() => pending.promise);
       render(<GenerateDungeonModal {...props} />);
       fillMapName('Test');
       clickGenerate();
 
-      const generatingButton = await screen.findByRole('button', { name: 'Generating...' });
-      expect(generatingButton).toBeDisabled();
+      expect(await screen.findByRole('button', { name: 'Generating...' })).toBeDisabled();
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
 
       pending.resolve({});
@@ -129,260 +120,130 @@ describe('GenerateDungeonModal', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Cancel
-  // -------------------------------------------------------------------------
-  describe('cancel', () => {
-    it('calls onClose when Cancel button is clicked', () => {
-      render(<GenerateDungeonModal {...props} />);
-      clickCancelButton();
-      expect(props.onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onClose when the overlay background is clicked', () => {
+  describe('closing', () => {
+    it('closes via Cancel but not via overlay click', () => {
       render(<GenerateDungeonModal {...props} />);
       const overlay = screen.getByText('Generate Dungeon Map').closest('.maps-manager-modal-overlay');
       fireEvent.click(overlay);
       expect(props.onClose).not.toHaveBeenCalled();
-      expect(screen.getByText('Generate Dungeon Map')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(props.onClose).toHaveBeenCalledTimes(1);
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Generation flow
-  // -------------------------------------------------------------------------
   describe('generation flow', () => {
     it('creates the map with typed name and generated data, then notifies and closes', async () => {
       render(<GenerateDungeonModal {...props} />);
       fillMapName('Goblin Hideout');
       clickGenerate();
 
+      // BSP defaults: grid 30, density 50% → 0.5, random numeric seed
+      await waitFor(() => {
+        expect(dungeonMocks.generateDungeon).toHaveBeenCalledWith(
+          expect.objectContaining({ gridSize: 30, density: 0.5, seed: expect.any(Number) }),
+        );
+      });
       await waitFor(() => {
         expect(mapsServiceMocks.createMap).toHaveBeenCalledWith(
           'test-campaign',
           'Goblin Hideout',
-          expect.objectContaining({ gridSize: 30 }),
+          expect.not.objectContaining({ name: expect.anything() }),
         );
-      });
-      await waitFor(() => {
         expect(props.onMapCreated).toHaveBeenCalledTimes(1);
         expect(props.onClose).toHaveBeenCalledTimes(1);
       });
       expect(dungeonMocks.generateAdjacentDungeon).not.toHaveBeenCalled();
     });
-  });
 
-  // -------------------------------------------------------------------------
-  // Grid size clamping
-  // -------------------------------------------------------------------------
-  describe('grid size clamping', () => {
-    it('clamps to minimum when grid size is below 7', async () => {
-      render(<GenerateDungeonModal {...props} />);
-      fillMapName('Dungeon');
-      fireEvent.change(screen.getByLabelText(/Grid Size/), { target: { value: '3' } });
-      clickGenerate();
-
-      await waitFor(() => {
-        expect(dungeonMocks.generateDungeon).toHaveBeenCalledWith(
-          expect.objectContaining({ gridSize: 7 }),
-        );
-      });
-    });
-
-    it('clamps to maximum when grid size is above 100', async () => {
-      render(<GenerateDungeonModal {...props} />);
-      fillMapName('Dungeon');
-      fireEvent.change(screen.getByLabelText(/Grid Size/), { target: { value: '200' } });
-      clickGenerate();
-
-      await waitFor(() => {
-        expect(dungeonMocks.generateDungeon).toHaveBeenCalledWith(
-          expect.objectContaining({ gridSize: 100 }),
-        );
-      });
-    });
-
-    it('uses grid size as-is when within valid range', async () => {
-      render(<GenerateDungeonModal {...props} />);
-      fillMapName('Dungeon');
-      fireEvent.change(screen.getByLabelText(/Grid Size/), { target: { value: '50' } });
-      clickGenerate();
-
-      await waitFor(() => {
-        expect(dungeonMocks.generateDungeon).toHaveBeenCalledWith(
-          expect.objectContaining({ gridSize: 50 }),
-        );
-      });
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Density slider
-  // -------------------------------------------------------------------------
-  describe('density slider', () => {
     it.each([
-      ['default 50%', null, 0.5],
-      ['10%', '10', 0.1],
-      ['80%', '80', 0.8],
-      ['100%', '100', 1.0],
-    ])('passes density %s as decimal to generateDungeon', async (_label, typedValue, expectedDensity) => {
+      ['3', 7],
+      ['200', 100],
+      ['50', 50],
+    ])('clamps grid size input %s to %s', async (typed, clamped) => {
       render(<GenerateDungeonModal {...props} />);
-      fillMapName('Dungeon');
-      if (typedValue !== null) {
-        fireEvent.change(screen.getByRole('slider', { name: /Density/ }), { target: { value: typedValue } });
+      await submitAndExpect(dungeonMocks.generateDungeon, { gridSize: clamped },
+        () => changeField(/Grid Size/, typed));
+      if (typed !== '50') {
+        expect(screen.getByText(new RegExp(`Using ${clamped}`))).toBeInTheDocument();
       }
-      clickGenerate();
+    });
 
-      await waitFor(() => {
-        expect(dungeonMocks.generateDungeon).toHaveBeenCalledWith(
-          expect.objectContaining({ density: expectedDensity }),
-        );
-      });
+    it.each([
+      ['10', 0.1],
+      ['80', 0.8],
+      ['100', 1.0],
+    ])('passes density %s%% as %s to generateDungeon', async (typed, density) => {
+      render(<GenerateDungeonModal {...props} />);
+      await submitAndExpect(dungeonMocks.generateDungeon, { density },
+        () => fireEvent.change(screen.getByRole('slider', { name: /Density/ }), { target: { value: typed } }));
+    });
+
+    it.each([
+      ['42', 42],
+      ['abc', NaN],
+    ])('passes seed input "%s" through parseInt', async (typedSeed, expectedSeed) => {
+      render(<GenerateDungeonModal {...props} />);
+      await submitAndExpect(dungeonMocks.generateDungeon, { seed: expectedSeed },
+        () => changeField(/Seed/, typedSeed));
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Adjacent mode parameters
-  // -------------------------------------------------------------------------
   describe('adjacent mode parameters', () => {
+    const submitAdjacent = (expectedOptions, interact) =>
+      submitAndExpect(dungeonMocks.generateAdjacentDungeon, expectedOptions, interact);
+
     it.each([
-      ['min room count', 3],
-      ['default room count', 8],
-      ['max room count', 20],
-    ])('passes %s to generateAdjacentDungeon', async (_label, roomCount) => {
+      ['3', 'min'],
+      ['20', 'max'],
+    ])('passes %s room count (%s) to generateAdjacentDungeon', async (typed) => {
       render(<GenerateDungeonModal {...props} />);
       selectMode('Room Adjacent');
-      fillMapName('Adjacent Dungeon');
-      fireEvent.change(screen.getByRole('slider', { name: /Room Count/ }), { target: { value: String(roomCount) } });
-      clickGenerate();
-
-      await waitFor(() => {
-        expect(dungeonMocks.generateAdjacentDungeon).toHaveBeenCalledWith(
-          expect.objectContaining({ roomCount }),
-        );
-      });
+      await submitAdjacent({ roomCount: Number(typed) },
+        () => fireEvent.change(screen.getByRole('slider', { name: /Room Count/ }), { target: { value: typed } }));
     });
 
+    // Room size scales min/max room dims off the grid-30 base (min 4, max 12)
     it.each([
-      ['Cramped', 3, 8],
-      ['Standard', 4, 12],
-      ['Spacious', 5, 15],
-    ])('scales min/max room dimensions for %s room size', async (roomSize, minRoom, maxRoom) => {
+      ['Cramped', { minRoom: 3, maxRoom: 8 }],
+      ['Standard', { minRoom: 4, maxRoom: 12, roomCount: 8, corridorLength: 'compact', layoutStyle: 'balanced' }],
+      ['Spacious', { minRoom: 5, maxRoom: 15 }],
+      ['Compact (rooms adjacent)', { corridorLength: 'compact' }],
+      ['Moderate', { corridorLength: 'moderate' }],
+      ['Sprawling (long halls)', { corridorLength: 'sprawling' }],
+      ['Balanced', { layoutStyle: 'balanced' }],
+      ['Linear', { layoutStyle: 'linear' }],
+      ['Forking', { layoutStyle: 'forking' }],
+      ['Winding', { layoutStyle: 'winding' }],
+    ])('clicking "%s" passes %o to generateAdjacentDungeon', async (label, expected) => {
       render(<GenerateDungeonModal {...props} />);
       selectMode('Room Adjacent');
-      fillMapName('Adjacent Dungeon');
-      fireEvent.click(screen.getByText(roomSize));
-      clickGenerate();
-
-      await waitFor(() => {
-        expect(dungeonMocks.generateAdjacentDungeon).toHaveBeenCalledWith(
-          expect.objectContaining({ minRoom, maxRoom }),
-        );
-      });
-    });
-
-    it.each([
-      ['Compact (rooms adjacent)', 'compact'],
-      ['Moderate', 'moderate'],
-      ['Sprawling (long halls)', 'sprawling'],
-    ])('passes corridor length "%s" to generateAdjacentDungeon', async (_label, expectedValue) => {
-      render(<GenerateDungeonModal {...props} />);
-      selectMode('Room Adjacent');
-      fillMapName('Adjacent Dungeon');
-      fireEvent.click(screen.getByText(_label));
-      clickGenerate();
-
-      await waitFor(() => {
-        expect(dungeonMocks.generateAdjacentDungeon).toHaveBeenCalledWith(
-          expect.objectContaining({ corridorLength: expectedValue }),
-        );
-      });
-    });
-
-    it.each([
-      ['Balanced', 'balanced'],
-      ['Linear', 'linear'],
-      ['Forking', 'forking'],
-      ['Winding', 'winding'],
-    ])('passes layout style "%s" to generateAdjacentDungeon', async (_label, expectedValue) => {
-      render(<GenerateDungeonModal {...props} />);
-      selectMode('Room Adjacent');
-      fillMapName('Adjacent Dungeon');
-      fireEvent.click(screen.getByText(_label));
-      clickGenerate();
-
-      await waitFor(() => {
-        expect(dungeonMocks.generateAdjacentDungeon).toHaveBeenCalledWith(
-          expect.objectContaining({ layoutStyle: expectedValue }),
-        );
-      });
+      await submitAdjacent(expected, () => fireEvent.click(screen.getByText(label)));
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Seed handling
-  // -------------------------------------------------------------------------
-  describe('seed handling', () => {
-    it.each([
-      ['passes parsed integer seed', '42', 42],
-      ['generates random seed when empty', '', expect.any(Number)],
-    ])('seed %s', async (_label, typedSeed, expectedSeed) => {
-      render(<GenerateDungeonModal {...props} />);
-      fillMapName('Dungeon');
-      fireEvent.change(screen.getByPlaceholderText('Random if empty'), { target: { value: typedSeed } });
-      clickGenerate();
-
-      await waitFor(() => {
-        expect(dungeonMocks.generateDungeon).toHaveBeenCalledWith(
-          expect.objectContaining({ seed: expectedSeed }),
-        );
-      });
-    });
-
-    it('passes NaN for non-numeric input', async () => {
-      render(<GenerateDungeonModal {...props} />);
-      fillMapName('Dungeon');
-      fireEvent.change(screen.getByPlaceholderText('Random if empty'), { target: { value: 'abc' } });
-      clickGenerate();
-
-      await waitFor(() => {
-        const callArgs = dungeonMocks.generateDungeon.mock.calls[0][0];
-        expect(callArgs.seed).toBeNaN();
-      });
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Error handling
-  // -------------------------------------------------------------------------
   describe('error handling', () => {
-    it('shows error, re-enables buttons, and does not close when generation throws', async () => {
-      dungeonMocks.generateDungeon.mockImplementationOnce(() => { throw new Error('Boom'); });
+    it.each([
+      ['generation error', () => dungeonMocks.generateDungeon.mockImplementationOnce(() => { throw new Error('First fail'); }), 'First fail'],
+      ['save failure', () => mapsServiceMocks.createMap.mockRejectedValueOnce(new Error('Network error')), 'Network error'],
+    ])('shows %s, re-enables buttons, and recovers on retry', async (_label, failOnce, message) => {
+      failOnce();
       render(<GenerateDungeonModal {...props} />);
-      fillMapName('Test');
+      fillMapName('Retry');
       clickGenerate();
 
       await waitFor(() => {
-        expect(screen.getByText('Boom')).toBeInTheDocument();
+        expect(screen.getByText(message)).toBeInTheDocument();
+        expect(props.onMapCreated).not.toHaveBeenCalled();
+        expect(props.onClose).not.toHaveBeenCalled();
       });
       expect(screen.getByRole('button', { name: 'Generate' })).not.toBeDisabled();
       expect(screen.getByRole('button', { name: 'Cancel' })).not.toBeDisabled();
-      expect(props.onMapCreated).not.toHaveBeenCalled();
-      expect(props.onClose).not.toHaveBeenCalled();
-    });
 
-    it('shows error and does not close when createMap fails', async () => {
-      mapsServiceMocks.createMap.mockRejectedValueOnce(new Error('Save failed'));
-      render(<GenerateDungeonModal {...props} />);
-      fillMapName('Test');
       clickGenerate();
-
       await waitFor(() => {
-        expect(screen.getByText('Save failed')).toBeInTheDocument();
+        expect(props.onMapCreated).toHaveBeenCalledTimes(1);
+        expect(props.onClose).toHaveBeenCalledTimes(1);
       });
-      expect(screen.getByRole('button', { name: 'Generate' })).not.toBeDisabled();
-      expect(props.onMapCreated).not.toHaveBeenCalled();
-      expect(props.onClose).not.toHaveBeenCalled();
     });
 
     it('uses default error message when error has no message', async () => {
@@ -391,49 +252,7 @@ describe('GenerateDungeonModal', () => {
       fillMapName('Test');
       clickGenerate();
 
-      await waitFor(() => {
-        expect(screen.getByText('Failed to generate dungeon')).toBeInTheDocument();
-      });
-    });
-
-    it('allows a successful retry after a generation error', async () => {
-      dungeonMocks.generateDungeon
-        .mockImplementationOnce(() => { throw new Error('First fail'); })
-        .mockReturnValueOnce({ name: 'Retry Dungeon', gridSize: 30, walls: [], placedItems: [], players: [], zoom: 1, panX: 0, panY: 0 });
-
-      render(<GenerateDungeonModal {...props} />);
-      fillMapName('Retry');
-      clickGenerate();
-
-      await waitFor(() => {
-        expect(screen.getByText('First fail')).toBeInTheDocument();
-      });
-
-      clickGenerate();
-      await waitFor(() => {
-        expect(props.onMapCreated).toHaveBeenCalled();
-        expect(props.onClose).toHaveBeenCalled();
-      });
-    });
-
-    it('allows a successful retry after a createMap failure', async () => {
-      mapsServiceMocks.createMap
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({});
-
-      render(<GenerateDungeonModal {...props} />);
-      fillMapName('Retry');
-      clickGenerate();
-
-      await waitFor(() => {
-        expect(screen.getByText('Network error')).toBeInTheDocument();
-      });
-
-      clickGenerate();
-      await waitFor(() => {
-        expect(props.onMapCreated).toHaveBeenCalled();
-        expect(props.onClose).toHaveBeenCalled();
-      });
+      expect(await screen.findByText('Failed to generate dungeon')).toBeInTheDocument();
     });
   });
 });

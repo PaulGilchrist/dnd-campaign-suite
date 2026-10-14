@@ -1,17 +1,19 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * CharAbilities — modifier-stacking & runtime-store roll lane.
  * Owns behaviors no sibling lane covers:
  * - getSkillBonus stacking ORDER with exhaustion (JoAT / passWithoutTrace / rage
  *   combined with the penalty — siblings own each modifier in isolation).
- * - bardicInspirationDie stamped onto ability/skill/save rolls from the runtime store.
+ * - bardicInspirationDie stamped onto ability/skill/save rolls from the runtime store
+ *   (absence when the store is empty is pinned by clickHandlers' bare-{} assertions).
  * - the `luckyDisadvantageActive` PROP (clickHandlers only covers ce.luckyDisadvantage).
  * - getSaveAdvantageSource tooltip SOURCES (computedStats fallback, top-level
  *   precedence, non-spell source list — saveBonus owns Warding Bond tooltips).
  * - null saveBonusExpression zeroing the bonus without breaking the roll path.
  *
  * Covered by sibling lanes (do NOT re-add here):
- * - clickHandlers: click → roll calls, check/save context matrices, forcedMode priority.
+ * - clickHandlers: click → roll calls incl. empty-context deep-equality, check/save
+ *   context matrices, forcedMode priority.
  * - conditionEffects: JoAT / passWithoutTrace / rage / (Adv) / AUTO FAIL in isolation.
  * - saveBonus: saveBonusExpression parsing, wisdom_modifier, saveBonusAbilities filter.
  * - event-context / contextFeatures: `internal-skill-check` event routing.
@@ -134,7 +136,8 @@ describe('skill bonus stacking order with exhaustion', () => {
 
 describe('rage rewrites primal-knowledge skills listed under Strength', () => {
   // conditionEffects lane covers STR-replacing a DEX skill; this pins the
-  // rage GATE itself on a skill filed under Strength (raw bonus vs STR bonus).
+  // rage GATE itself on a skill filed under Strength — including the
+  // rage-OFF control explicitly delegated to this lane.
   it('shows the STR bonus only while raging and the raw skill bonus when rage ends', () => {
     const stats = createPlayerStats({
       automation: { primalKnowledge: ['Stealth'], passives: [] },
@@ -163,73 +166,42 @@ describe('bardic inspiration die flows from the runtime store into clicked rolls
     mockStore.set('Test Fighter:bardicInspirationDie', 8);
   });
 
-  it('stamps bardicInspiration and its die onto ability-check clicks', () => {
-    const { rollAbilityCheck } = mockRoll;
-    fireEvent.click(renderAbilities().getByText('+4'));
-    expect(rollAbilityCheck).toHaveBeenCalledWith('Strength', 4, {
-      bardicInspiration: true,
-      bardicInspirationDie: 8,
-    });
-  });
+  // One render, all three stamped roll sites (ability / skill / save cells).
+  // Absence of bardic keys on an empty store is pinned by clickHandlers'
+  // exact-{} / base-save-context assertions — not re-added here.
+  it('stamps bardicInspiration and its die onto ability, skill, and save clicks', () => {
+    const { getByText } = renderAbilities();
+    const bi = { bardicInspiration: true, bardicInspirationDie: 8 };
 
-  it('stamps bardicInspiration onto skill-check clicks', () => {
-    const { rollSkillCheck } = mockRoll;
-    fireEvent.click(renderAbilities().getByText('Athletics (+8)'));
-    expect(rollSkillCheck).toHaveBeenCalledWith('Athletics', 8, {
-      bardicInspiration: true,
-      bardicInspirationDie: 8,
-    });
-  });
+    fireEvent.click(getByText('+4'));
+    expect(mockRoll.rollAbilityCheck).toHaveBeenCalledWith('Strength', 4, bi);
 
-  it('stamps bardicInspiration onto saving-throw clicks', () => {
-    const { rollSavingThrow } = mockRoll;
-    fireEvent.click(renderAbilities().getByText('+6'));
-    expect(rollSavingThrow).toHaveBeenCalledWith('Strength', 6, {
+    fireEvent.click(getByText('Athletics (+8)'));
+    expect(mockRoll.rollSkillCheck).toHaveBeenCalledWith('Athletics', 8, bi);
+
+    fireEvent.click(getByText('+6'));
+    expect(mockRoll.rollSavingThrow).toHaveBeenCalledWith('Strength', 6, {
       forcedMode: undefined,
       autoFail: undefined,
-      bardicInspiration: true,
-      bardicInspirationDie: 8,
-    });
-  });
-});
-
-describe('rolls stamp no spurious context when nothing is pending', () => {
-  it('clicks an ability bonus with a bare empty context object', () => {
-    // Empty store + empty conditionEffects: { } exactly — no forcedMode,
-    // no bardicInspiration, no lucky keys (deep-equality pins absence).
-    const { rollAbilityCheck } = mockRoll;
-    fireEvent.click(renderAbilities({ luckyDisadvantageActive: false }).getByText('+4'));
-    expect(rollAbilityCheck).toHaveBeenCalledWith('Strength', 4, {});
-  });
-
-  it('clicks a save with only the base save-context keys', () => {
-    // makeSaveContext always emits forcedMode/autoFail (undefined here);
-    // nothing else may be stamped when no save effects exist.
-    const { rollSavingThrow } = mockRoll;
-    fireEvent.click(renderAbilities().getByText('+6'));
-    expect(rollSavingThrow).toHaveBeenCalledWith('Strength', 6, {
-      forcedMode: undefined,
-      autoFail: undefined,
+      ...bi,
     });
   });
 });
 
 describe('luckyDisadvantageActive prop', () => {
   // Unique to this lane: the prop (not the conditionEffects field) forcing
-  // luck disadvantage onto rolls.
-  it('forces luck disadvantage onto ability check context from the prop alone', () => {
-    const { rollAbilityCheck } = mockRoll;
-    fireEvent.click(renderAbilities({ luckyDisadvantageActive: true }).getByText('+4'));
-    expect(rollAbilityCheck).toHaveBeenCalledWith('Strength', 4, {
+  // luck disadvantage onto rolls — check and save context builders.
+  it('forces luck disadvantage onto ability-check and save contexts from the prop alone', () => {
+    const { getByText } = renderAbilities({ luckyDisadvantageActive: true });
+
+    fireEvent.click(getByText('+4'));
+    expect(mockRoll.rollAbilityCheck).toHaveBeenCalledWith('Strength', 4, {
       luckyDisadvantage: true,
       luckyDisadvantageType: 'disadvantage',
     });
-  });
 
-  it('forces luck disadvantage onto save context from the prop alone', () => {
-    const { rollSavingThrow } = mockRoll;
-    fireEvent.click(renderAbilities({ luckyDisadvantageActive: true }).getByText('+6'));
-    expect(rollSavingThrow).toHaveBeenCalledWith('Strength', 6, {
+    fireEvent.click(getByText('+6'));
+    expect(mockRoll.rollSavingThrow).toHaveBeenCalledWith('Strength', 6, {
       forcedMode: undefined,
       autoFail: undefined,
       luckyDisadvantage: true,
@@ -240,39 +212,34 @@ describe('luckyDisadvantageActive prop', () => {
 describe('save advantage tooltip sources', () => {
   // getSaveAdvantageSource tooltip text — saveBonus lane owns Warding Bond.
 
-  it('falls back to computedStats.saveModifiers when top-level saveModifiers is absent', () => {
-    const stats = createPlayerStats({
-      saveModifiers: undefined,
-      computedStats: {
+  it('prefers top-level saveModifiers sources and falls back to computedStats when absent', () => {
+    const computed = [
+      { target: 'saving_throw', effect: 'advantage', condition: 'against_spell', source: 'Stale Computed Source' },
+    ];
+    // Top-level present: its source wins, the stale computedStats entry never shows.
+    const topRender = renderAbilities({
+      stats: createPlayerStats({
         saveModifiers: [
-          { target: 'saving_throw', effect: 'advantage', condition: 'against_spell', source: 'Stone of Protection' },
+          { target: 'saving_throw', effect: 'advantage', condition: 'against_spell', source: 'Ring of Protection' },
         ],
-      },
-    });
-    const saveCell = renderAbilities({
-      stats,
+        computedStats: { saveModifiers: computed },
+      }),
       conditionEffects: { saveAdvantage: ['against_spell'] },
-    }).getByText(/^\+6/);
-    expect(saveCell.title).toBe('Stone of Protection');
-  });
+    });
+    const top = topRender.getByText(/^\+6/);
+    expect(top.title).toContain('Ring of Protection');
+    expect(top.title).not.toContain('Stale Computed Source');
+    topRender.unmount();
 
-  it('prefers top-level saveModifiers sources over computedStats', () => {
-    const stats = createPlayerStats({
-      saveModifiers: [
-        { target: 'saving_throw', effect: 'advantage', condition: 'against_spell', source: 'Ring of Protection' },
-      ],
-      computedStats: {
-        saveModifiers: [
-          { target: 'saving_throw', effect: 'advantage', condition: 'against_spell', source: 'Stale Computed Source' },
-        ],
-      },
-    });
-    const saveCell = renderAbilities({
-      stats,
+    // Top-level absent: same source resolves via the computedStats fallback.
+    const fallback = renderAbilities({
+      stats: createPlayerStats({
+        saveModifiers: undefined,
+        computedStats: { saveModifiers: computed },
+      }),
       conditionEffects: { saveAdvantage: ['against_spell'] },
     }).getByText(/^\+6/);
-    expect(saveCell.title).toContain('Ring of Protection');
-    expect(saveCell.title).not.toContain('Stale Computed Source');
+    expect(fallback.title).toBe('Stale Computed Source');
   });
 
   it('lists every non-spell advantage source for saveAdvantageCount', () => {
@@ -294,14 +261,13 @@ describe('save advantage tooltip sources', () => {
 
 describe('null saveBonusExpression is treated as no bonus', () => {
   it('renders the unmodified save, shows no warding-bond tooltip, and still rolls', () => {
-    const { rollSavingThrow } = mockRoll;
     const saveCell = renderAbilities({
       conditionEffects: { saveBonusExpression: null, saveBonusAbilities: ['STR'] },
     }).getByText('+6');
     expect(saveCell).toBeInTheDocument();
     expect(saveCell.title).not.toContain('Warding Bond');
     fireEvent.click(saveCell);
-    expect(rollSavingThrow).toHaveBeenCalledWith('Strength', 6, {
+    expect(mockRoll.rollSavingThrow).toHaveBeenCalledWith('Strength', 6, {
       forcedMode: undefined,
       autoFail: undefined,
     });

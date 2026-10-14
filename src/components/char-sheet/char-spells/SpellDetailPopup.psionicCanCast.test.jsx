@@ -1,4 +1,17 @@
-// @improved-by-ai
+// @maintained-by-ai
+// SpellDetailPopup — Psionic Sorcery canCast lane (component level).
+// Proves that a Sorcerer whose spell is in the Psionic Sorcery list can cast
+// with NO spell slots when the runtime SP balance covers the spell-level cost:
+//   - the SP ≥ spell-level truth table (below / exact boundary / surplus),
+//   - the SP total echoed in "Slots Remaining",
+//   - Rage still blocks an SP-covered cast (canonical home per the rage suite),
+//   - the channel is denied for spells outside the list and for non-Sorcerers,
+//   - upcast radios unlock per-level with SP, and an SP-selected upcast
+//     reaches onCast with the level carried (payment enforced downstream).
+// The metamagic predicates run REAL; only the runtime store, buffs, and
+// sanitize are mocked. The payment checkbox lane lives in
+// SpellDetailPopup.psionicPayment.test.jsx; slot-based Rage blocking in
+// SpellDetailPopup.rageRestriction.test.jsx.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -77,10 +90,10 @@ const createPsionicStats = (psionicSpellNames = ['Magic Missile']) => ({
 
 // A spell with a single-slot-level damage ladder — never shows the upcast
 // selector, so canCast falls through to the base-slot / Psionic-Sorcery check.
-const flatSpell = (level, formula = '4d4+1') => ({
+const flatSpell = (level) => ({
   ...baseMockSpell,
   level,
-  damage: { damage_at_slot_level: { [String(level)]: formula } },
+  damage: { damage_at_slot_level: { [String(level)]: '4d4+1' } },
 });
 
 const castButton = () => screen.getByRole('button', { name: /Cast Spell/ });
@@ -98,38 +111,30 @@ describe('SpellDetailPopup - Psionic Sorcery canCast', () => {
   });
 
   describe('SP enabling casting', () => {
-    it('enables Cast Spell for a psionic spell with SP when no slots remain, showing the SP in Slots Remaining', () => {
-      withRuntime({ sorceryPoints: 2, spell_slots_level_1: 0 });
-
-      renderPopup({}, createPsionicStats());
-
-      expect(castButton()).toBeEnabled();
-      expect(screen.getByText(/2 SP/)).toBeInTheDocument();
-    });
-
+    // Truth table for the SP ≥ spell-level gate at zero spell slots.
+    // Each level is exercised so the comparison uses the spell's own level.
     it.each([
-      { label: 'no SP', sorceryPoints: 0 },
-      { label: 'uninitialized SP (treated as zero)', sorceryPoints: null },
-      { label: 'SP below the spell level cost', sorceryPoints: 1 },
+      { level: 1, sp: 0, enabled: false, note: 'no points to pay with' },
+      { level: 2, sp: 1, enabled: false, note: 'short of the level-2 cost' },
+      { level: 2, sp: 2, enabled: true, note: 'exactly covers the cost' },
+      { level: 1, sp: 3, enabled: true, note: 'surplus covers the cost' },
     ])(
-      'disables Cast Spell for a level 2 psionic spell with $label and no slots',
-      ({ sorceryPoints }) => {
-        withRuntime({ sorceryPoints, spell_slots_level_2: 0 });
+      'level $level spell with SP:$sp — $note',
+      ({ level, sp, enabled }) => {
+        withRuntime({ sorceryPoints: sp, [`spell_slots_level_${level}`]: 0 });
 
-        renderPopup({ spell: flatSpell(2) }, createPsionicStats());
+        renderPopup({ spell: flatSpell(level) }, createPsionicStats());
 
-        expect(castButton()).toBeDisabled();
-        expect(screen.getByText(NO_SLOTS_TEXT)).toBeInTheDocument();
+        if (enabled) {
+          expect(castButton()).toBeEnabled();
+          expect(screen.queryByText(NO_SLOTS_TEXT)).not.toBeInTheDocument();
+          expect(screen.getByText(new RegExp(`${sp} SP`))).toBeInTheDocument();
+        } else {
+          expect(castButton()).toBeDisabled();
+          expect(screen.getByText(NO_SLOTS_TEXT)).toBeInTheDocument();
+        }
       },
     );
-
-    it('enables Cast Spell at the exact SP boundary (SP equals spell level)', () => {
-      withRuntime({ sorceryPoints: 2, spell_slots_level_2: 0 });
-
-      renderPopup({ spell: flatSpell(2) }, createPsionicStats());
-
-      expect(castButton()).toBeEnabled();
-    });
 
     it('blocks casting while raging even when SP covers the cost', () => {
       withRuntime({ sorceryPoints: 5, spell_slots_level_1: 0 });
@@ -143,7 +148,7 @@ describe('SpellDetailPopup - Psionic Sorcery canCast', () => {
     it('does not let SP enable a spell that is not in the Psionic Sorcery list', () => {
       withRuntime({ sorceryPoints: 5, spell_slots_level_1: 0 });
 
-      renderPopup({ spell: flatSpell(1, '5d4') }, createPsionicStats(['Shield']));
+      renderPopup({ spell: flatSpell(1) }, createPsionicStats(['Shield']));
 
       expect(castButton()).toBeDisabled();
       expect(screen.getByText(NO_SLOTS_TEXT)).toBeInTheDocument();
@@ -159,6 +164,7 @@ describe('SpellDetailPopup - Psionic Sorcery canCast', () => {
       renderPopup({}, wizardStats);
 
       expect(castButton()).toBeDisabled();
+      expect(screen.getByText(NO_SLOTS_TEXT)).toBeInTheDocument();
     });
   });
 
@@ -178,20 +184,9 @@ describe('SpellDetailPopup - Psionic Sorcery canCast', () => {
       { level: 3, formula: '5d4+1', availableSlots: 0 },
     ];
 
-    it('enables Cast Spell and every upcast radio whose SP cost is covered', () => {
-      withRuntime({ sorceryPoints: 4, spell_slots_level_2: 0, spell_slots_level_3: 0 });
-
-      renderPopup(
-        { spell: upcastSpellLevel2, upcastLevels: upcastLevelsNoSlots },
-        createPsionicStats(),
-      );
-
-      expect(castButton()).toBeEnabled();
-      expect(screen.getByRole('radio', { name: /Level 2/ })).toBeEnabled();
-      expect(screen.getByRole('radio', { name: /Level 3/ })).toBeEnabled();
-    });
-
-    it('disables only the upcast radio whose SP cost is not covered', () => {
+    it('unlocks each upcast radio only when the SP balance covers that level', () => {
+      // SP=2 covers the level-2 step exactly but not the level-3 step —
+      // one fixture discriminates both branches of the per-level check.
       withRuntime({ sorceryPoints: 2, spell_slots_level_2: 0, spell_slots_level_3: 0 });
 
       renderPopup(
@@ -201,6 +196,7 @@ describe('SpellDetailPopup - Psionic Sorcery canCast', () => {
 
       expect(screen.getByRole('radio', { name: /Level 2/ })).toBeEnabled();
       expect(screen.getByRole('radio', { name: /Level 3/ })).toBeDisabled();
+      expect(castButton()).toBeEnabled();
     });
 
     it('passes the selected upcast level to onCast when switching to a higher SP-covered level', () => {

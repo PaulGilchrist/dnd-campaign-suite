@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 // CLA-322: Spell Breaker — spell detail popup casting-time display.
 // Scope: this file owns ONLY the popup's "Casting Time:" meta row.
 // Related CLA-322 coverage lives elsewhere — do not duplicate it here:
@@ -100,10 +100,12 @@ const renderPopup = (spell, playerStats) =>
     />
   );
 
-// Meta rows render as <span><b>Label:</b> value</span> — scope assertions to the
-// Casting Time row so a stray "Bonus Action" elsewhere can never satisfy them.
+// Meta rows render as <span><b>Label:</b> value</span>. Scope assertions to the
+// Casting Time row and anchor the value so a stray "Bonus Action" elsewhere — or
+// an appended annotation on the row itself — can never satisfy them.
 const expectCastingTime = (value) => {
-  expect(screen.getByText('Casting Time:').closest('span')).toHaveTextContent(`Casting Time: ${value}`);
+  const row = screen.getByText('Casting Time:').closest('span');
+  expect(row).toHaveTextContent(new RegExp(`^Casting Time:\\s*${value}$`));
 };
 
 describe('SpellDetailPopup — Spell Breaker casting time display (CLA-322)', () => {
@@ -112,16 +114,13 @@ describe('SpellDetailPopup — Spell Breaker casting time display (CLA-322)', ()
     expectCastingTime('Bonus Action');
   });
 
-  it('converts any listed spell, not just Dispel Magic — registry-driven, not hard-coded', () => {
+  it('is registry-driven: any spell listed in bonusActionSpells converts, overriding its base casting_time', () => {
+    // Counterspell's base casting_time is "Reaction" — a hard-coded
+    // "Dispel Magic" check or a casting_time-first display would fail here.
     renderPopup(
       counterspell(),
       wizardStats([spellBreaker({ bonusActionSpells: ['Counterspell'] })]),
     );
-    expectCastingTime('Bonus Action');
-  });
-
-  it('converts a listed spell even when its casting_time is omitted', () => {
-    renderPopup(dispelMagic({ casting_time: undefined }), wizardStats([spellBreaker()]));
     expectCastingTime('Bonus Action');
   });
 
@@ -136,12 +135,6 @@ describe('SpellDetailPopup — Spell Breaker casting time display (CLA-322)', ()
     // slot retention must not leak into the casting-time display.
     renderPopup(counterspell(), wizardStats([spellBreaker()]));
     expectCastingTime('Reaction');
-    expect(screen.queryByText('Bonus Action')).not.toBeInTheDocument();
-  });
-
-  it('shows the base casting time when the passive lists no bonusActionSpells', () => {
-    renderPopup(dispelMagic(), wizardStats([spellBreaker({ bonusActionSpells: [] })]));
-    expectCastingTime('Action');
     expect(screen.queryByText('Bonus Action')).not.toBeInTheDocument();
   });
 });

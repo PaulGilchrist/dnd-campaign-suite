@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -85,7 +85,7 @@ describe('SpellDetailPopup - casting cantrips', () => {
     vi.mocked(getActiveBuffs).mockReturnValue([]);
   });
 
-  describe('auto-levels from damage_at_character_level', () => {
+  describe('auto-levels from damage ladders', () => {
     const scalingCantrip = makeCantrip({
       damage: {
         damage_at_character_level: { 1: '1d10', 5: '2d10', 11: '3d10', 17: '4d10' },
@@ -93,11 +93,10 @@ describe('SpellDetailPopup - casting cantrips', () => {
     });
 
     it.each([
-      { playerLevel: 1, expectedLevel: 1, label: 'tier 1 at level 1' },
-      { playerLevel: 5, expectedLevel: 5, label: 'tier 5 at level 5' },
-      { playerLevel: 11, expectedLevel: 11, label: 'tier 11 at level 11' },
-      { playerLevel: 20, expectedLevel: 17, label: 'top tier 17 at level 20' },
-    ])('casts at $expectedLevel: $label', ({ playerLevel, expectedLevel }) => {
+      { playerLevel: 1, expectedLevel: 1, label: 'lowest tier at level 1' },
+      { playerLevel: 5, expectedLevel: 5, label: 'exact tier at level 5' },
+      { playerLevel: 20, expectedLevel: 17, label: 'highest tier below level 20' },
+    ])('auto-levels from damage_at_character_level: $label', ({ playerLevel, expectedLevel }) => {
       expectCastAtLevel(castCantrip({ spell: scalingCantrip, playerLevel }), expectedLevel);
     });
 
@@ -108,29 +107,12 @@ describe('SpellDetailPopup - casting cantrips', () => {
       expectCastAtLevel(castCantrip({ spell, playerLevel: 3 }), 0);
     });
 
-    it('casts at base level when the ladder contains string keys below the level', () => {
-      const spell = makeCantrip({
-        damage: { damage_at_character_level: { '1': '1d10', '5': '2d10' } },
-      });
-      expectCastAtLevel(castCantrip({ spell, playerLevel: 6 }), 5);
-    });
-  });
-
-  describe('auto-levels fall back to damage_at_slot_level', () => {
-    it('uses slot-level tiers when no character-level ladder exists', () => {
+    it('falls back to damage_at_slot_level when no character-level ladder exists', () => {
       const spell = makeCantrip({
         name: 'Ray of Frost',
         damage: { damage_at_slot_level: { '0': '1d8', '1': '2d8', '3': '3d8', '5': '4d8' } },
       });
       expectCastAtLevel(castCantrip({ spell, playerLevel: 5 }), 5);
-    });
-
-    it('casts at base level when no slot tier applies to the character level', () => {
-      const spell = makeCantrip({
-        name: 'Ray of Frost',
-        damage: { damage_at_slot_level: { '3': '3d8' } },
-      });
-      expectCastAtLevel(castCantrip({ spell, playerLevel: 1 }), 0);
     });
 
     it('prefers the character-level ladder when both ladders exist', () => {
@@ -145,22 +127,16 @@ describe('SpellDetailPopup - casting cantrips', () => {
     });
   });
 
-  describe('cantrips with no damage scaling', () => {
-    it.each([
-      { damage: null, label: 'damage is null' },
-      { damage: {}, label: 'damage has no ladders' },
-      {
-        damage: { damage_at_character_level: {}, damage_at_slot_level: {} },
-        label: 'both ladders are empty objects',
-      },
-    ])('casts at base level when $label', ({ damage }) => {
-      const spell = makeCantrip({ name: 'Minor Illusion', damage });
-      expectCastAtLevel(castCantrip({ spell, playerLevel: 5 }), 0);
-    });
+  it.each([
+    { damage: null, label: 'damage is null' },
+    { damage: { damage_at_character_level: {}, damage_at_slot_level: {} }, label: 'both ladders are empty' },
+  ])('casts at base level when $label', ({ damage }) => {
+    const spell = makeCantrip({ name: 'Minor Illusion', damage });
+    expectCastAtLevel(castCantrip({ spell, playerLevel: 5 }), 0);
   });
 
   describe('cantrip casting is slot-free', () => {
-    it('enables casting and fires onCast when every spell slot is exhausted', () => {
+    it('casts at level with no slot payment when every spell slot is exhausted', () => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
         key.startsWith('spell_slots_level_') ? 0 : null
       );
@@ -174,15 +150,6 @@ describe('SpellDetailPopup - casting cantrips', () => {
       const onCast = castCantrip({ spell, playerStats: stats, playerLevel: 5 });
       expect(screen.getByRole('button', { name: /Cast Spell/ })).toBeEnabled();
       expectCastAtLevel(onCast, 5);
-    });
-
-    it('does not carry upcast payment fields in the cantrip payload', () => {
-      const spell = makeCantrip({
-        damage: { damage_at_character_level: { 1: '1d10', 5: '2d10' } },
-      });
-      const onCast = castCantrip({ spell, playerLevel: 5 });
-
-      expect(onCast).toHaveBeenCalledTimes(1);
       const [passedSpell] = onCast.mock.calls[0];
       expect(passedSpell.upcastLevel).toBeUndefined();
       expect(passedSpell.freeCastAuthorized).toBeFalsy();

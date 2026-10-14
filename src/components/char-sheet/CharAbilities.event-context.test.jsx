@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * CharAbilities — event-context roll lane (`internal-skill-check` window event).
  * Verifies the event handler's routing contract and the bonus/context it derives
@@ -10,6 +10,7 @@
  *   raw ability bonus (wisCheckReplace affects only the ctx: the roller applies
  *   `wisCheckMinBonus` downstream — that stamping is what these tests pin).
  * - every OTHER checkType (including unknown ones) falls through to SKILL lookup.
+ * - this lane OWNS ability-check exhaustion and wisCheckReplace ctx/display.
  *
  * Covered by sibling lanes (do NOT re-add here):
  * - contextFeatures: baseline event routing (skill + ability), exhaustion on skill
@@ -119,18 +120,17 @@ beforeEach(() => {
 });
 
 describe('CharAbilities internal-skill-check → ability checks (checkType "check")', () => {
-  it('rolls with the raw ability bonus minus the exhaustion penalty', () => {
-    render(<CharAbilities {...defaultProps} exhaustionPenalty={2} />);
+  it('subtracts the exhaustion penalty from current props on fresh mount and after a re-render', () => {
+    const { rerender } = render(<CharAbilities {...defaultProps} exhaustionPenalty={2} />);
     dispatchSkillCheck({ skillName: 'Strength', checkType: 'check' });
-    expect(getRollMocks().rollAbilityCheck).toHaveBeenCalledWith('Strength', 2, undefined);
-  });
+    const { rollAbilityCheck } = getRollMocks();
+    expect(rollAbilityCheck).toHaveBeenCalledWith('Strength', 2, undefined);
 
-  it('uses the exhaustion penalty from current props after a re-render', () => {
-    const { rerender } = render(<CharAbilities {...defaultProps} exhaustionPenalty={0} />);
-    rerender(<CharAbilities {...defaultProps} exhaustionPenalty={2} />);
+    rerender(<CharAbilities {...defaultProps} exhaustionPenalty={1} />);
     dispatchSkillCheck({ skillName: 'Strength', checkType: 'check' });
-    // Guards the listener effect's prop deps: a stale closure would roll 4, not 2.
-    expect(getRollMocks().rollAbilityCheck).toHaveBeenCalledWith('Strength', 2, undefined);
+    // 4 − 1: different value per mount proves recompute — a stale closure would
+    // still roll the previous penalty (or the unpenalized 4).
+    expect(rollAbilityCheck).toHaveBeenLastCalledWith('Strength', 3, undefined);
   });
 
   it('stamps wisCheckReplace context with the Wisdom-derived minimum on Charisma checks', () => {
@@ -164,15 +164,11 @@ describe('CharAbilities internal-skill-check → skill checks', () => {
       <CharAbilities {...defaultProps} conditionEffects={{ peerlessAthleteAdvantageSkills: ['Athletics'] }} />
     );
     dispatchSkillCheck({ skillName: 'Athletics', checkType: 'skill' });
-    expect(getRollMocks().rollSkillCheck).toHaveBeenCalledWith('Athletics', 8, { forcedMode: 'advantage' });
-  });
-
-  it('does not force advantage for skills absent from peerlessAthleteAdvantageSkills', () => {
-    render(
-      <CharAbilities {...defaultProps} conditionEffects={{ peerlessAthleteAdvantageSkills: ['Athletics'] }} />
-    );
+    const { rollSkillCheck } = getRollMocks();
+    expect(rollSkillCheck).toHaveBeenCalledWith('Athletics', 8, { forcedMode: 'advantage' });
+    // Unlisted skill rolls unforced with no context.
     dispatchSkillCheck({ skillName: 'Acrobatics', checkType: 'skill' });
-    expect(getRollMocks().rollSkillCheck).toHaveBeenCalledWith('Acrobatics', 6, undefined);
+    expect(rollSkillCheck).toHaveBeenLastCalledWith('Acrobatics', 6, undefined);
   });
 
   it('routes unrecognized checkTypes through the skill lookup (only "check" means ability)', () => {
@@ -196,7 +192,7 @@ describe('CharAbilities internal-skill-check → skill checks', () => {
 });
 
 describe('CharAbilities wisCheckReplace charisma display', () => {
-  it('replaces a proficient charisma skill bonus with max(1, WIS) + proficiency', () => {
+  it('replaces a proficient charisma skill bonus with max(1, WIS) + proficiency, leaving other skills untouched', () => {
     const stats = createPlayerStats({
       abilityOverrides: { Wisdom: { bonus: 3 } },
       skillProficiencies: ['Deception'],
@@ -204,6 +200,9 @@ describe('CharAbilities wisCheckReplace charisma display', () => {
     render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ wisCheckReplace: true }} />);
     // 3 (wis) + 3 (proficiency at level 5) = +6, vs the raw +2 without the flag.
     expect(screen.getByText('Deception (+6)')).toBeInTheDocument();
+    // The replacement is charisma-only — non-charisma bonuses are unchanged.
+    expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
+    expect(screen.getByText('Arcana (+2)')).toBeInTheDocument();
   });
 
   it('adds proficiency twice for charisma skills with expertise', () => {
@@ -215,12 +214,6 @@ describe('CharAbilities wisCheckReplace charisma display', () => {
     render(<CharAbilities {...defaultProps} playerStats={stats} conditionEffects={{ wisCheckReplace: true }} />);
     // 2 (wis) + 3 (proficiency) + 3 (expertise) = +8.
     expect(screen.getByText('Persuasion (Expert) (+8)')).toBeInTheDocument();
-  });
-
-  it('leaves non-charisma skill bonuses untouched', () => {
-    render(<CharAbilities {...defaultProps} conditionEffects={{ wisCheckReplace: true }} />);
-    expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
-    expect(screen.getByText('Arcana (+2)')).toBeInTheDocument();
   });
 
   it('shows the raw charisma bonus when the flag is not set', () => {

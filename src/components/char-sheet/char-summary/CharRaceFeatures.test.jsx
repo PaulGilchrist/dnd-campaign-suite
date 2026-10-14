@@ -1,7 +1,7 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * CharRaceFeatures — which race-tracked resource rows render, and with what
- * label / store key / max.
+ * label / store key / max / player / campaign wiring.
  *
  * Seam mock (TrackedResourceInput's own hook/editing behavior is covered by
  * TrackedResourceInput.test.jsx): renders "<label>: <getMax()>" as visible
@@ -10,10 +10,12 @@
  *
  * Covered behavior:
  *  - Dragonborn always shows a Breath Weapon row; max comes from
- *    traits[0].automation.uses (number, "proficiency_bonus", or default 1).
+ *    traits[0].automation.uses (number, "proficiency_bonus" → proficiency,
+ *    falsy or missing → 1).
  *  - Goliath shows exactly the row mapped from its giant ancestry subrace;
- *    max is proficiency.
- *  - Unsupported races, missing race, and missing playerStats render nothing.
+ *    max is proficiency (0 when missing). Unmapped subrace → nothing.
+ *  - Anything else (unsupported race, case mismatch, missing race or
+ *    playerStats) renders an empty DOM.
  */
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
@@ -56,107 +58,70 @@ function goliathStats(overrides = {}) {
     };
 }
 
-function renderFeatures(playerStats) {
-    return render(<CharRaceFeatures playerStats={playerStats} campaignName={CAMPAIGN} />);
-}
-
-function expectTrackedRow(label, max, resourceKey) {
+function expectSingleRow(playerStats, label, max, resourceKey) {
+    render(<CharRaceFeatures playerStats={playerStats} campaignName={CAMPAIGN} />);
     const rows = screen.getAllByTestId('tracked-resource');
     expect(rows).toHaveLength(1);
     expect(rows[0]).toHaveTextContent(`${label}: ${max}`);
     expect(rows[0]).toHaveAttribute('data-resource-key', resourceKey);
+    expect(rows[0]).toHaveAttribute('data-player', playerStats.name);
+    expect(rows[0]).toHaveAttribute('data-campaign', CAMPAIGN);
 }
 
-function expectNothingRendered() {
+function expectNothingRendered(playerStats) {
+    const { container } = render(<CharRaceFeatures playerStats={playerStats} campaignName={CAMPAIGN} />);
     expect(screen.queryAllByTestId('tracked-resource')).toHaveLength(0);
+    expect(container).toBeEmptyDOMElement();
 }
 
 describe('CharRaceFeatures', () => {
     describe('Dragonborn — Breath Weapon', () => {
         it.each([
-            ['a number', { uses: 3 }, 3],
-            ['"proficiency_bonus"', { uses: 'proficiency_bonus' }, 4],
-            ['0 (falls back to default)', { uses: 0 }, 1],
-            ['missing (defaults to 1)', {}, 1],
-        ])('%s: automation.uses %j renders max %i', (_desc, automation, expectedMax) => {
-            renderFeatures(dragonbornStats({ race: { name: 'Dragonborn', traits: [{ automation }] } }));
-            expectTrackedRow('Breath Weapon', expectedMax, 'breathweaponUses');
-        });
-
-        it('resolves "proficiency_bonus" to 0 when proficiency is missing', () => {
-            renderFeatures(dragonbornStats({
-                proficiency: undefined,
-                race: { name: 'Dragonborn', traits: [{ automation: { uses: 'proficiency_bonus' } }] },
-            }));
-            expectTrackedRow('Breath Weapon', 0, 'breathweaponUses');
-        });
-
-        it('still shows the row with max 1 when the race has no traits', () => {
-            renderFeatures(dragonbornStats({ race: { name: 'Dragonborn' } }));
-            expectTrackedRow('Breath Weapon', 1, 'breathweaponUses');
-        });
-
-        it('still shows the row with max 1 when traits is an empty array', () => {
-            renderFeatures(dragonbornStats({ race: { name: 'Dragonborn', traits: [] } }));
-            expectTrackedRow('Breath Weapon', 1, 'breathweaponUses');
-        });
-
-        it('wires player name and campaign through to the tracked resource row', () => {
-            renderFeatures(dragonbornStats({ name: 'Vex' }));
-            const row = screen.getByTestId('tracked-resource');
-            expect(row).toHaveAttribute('data-player', 'Vex');
-            expect(row).toHaveAttribute('data-campaign', CAMPAIGN);
+            ['numeric automation.uses', 3, { name: 'Dragonborn', traits: [{ automation: { uses: 3 } }] }, 4],
+            ['"proficiency_bonus"', 4, { name: 'Dragonborn', traits: [{ automation: { uses: 'proficiency_bonus' } }] }, 4],
+            ['"proficiency_bonus" with proficiency missing', 0, { name: 'Dragonborn', traits: [{ automation: { uses: 'proficiency_bonus' } }] }, undefined],
+            ['0 (falls back to default 1)', 1, { name: 'Dragonborn', traits: [{ automation: { uses: 0 } }] }, 4],
+            ['race with no traits (defaults to 1)', 1, { name: 'Dragonborn' }, 4],
+        ])('%s renders Breath Weapon max %i', (desc, max, race, proficiency) => {
+            expectSingleRow(dragonbornStats({ race, proficiency }), 'Breath Weapon', max, 'breathweaponUses');
         });
     });
 
     describe('Goliath — Giant Ancestry', () => {
         it.each([
-            ['Stone Giant', "Stone's Endurance", 'stonesEnduranceUses'],
-            ['Cloud Giant', "Cloud's Jaunt", 'cloudsJauntUses'],
-            ['Fire Giant', "Fire's Burn", 'firesBurnUses'],
-            ['Frost Giant', "Frost's Chill", 'frostsChillUses'],
-            ['Hill Giant', "Hill's Tumble", 'hillsTumbleUses'],
-            ['Storm Giant', "Storm's Thunder", 'stormsThunderUses'],
-        ])('shows %s ancestry feature with proficiency as max', (subrace, label, resourceKey) => {
-            renderFeatures(goliathStats({ race: { name: 'Goliath', subrace: { name: subrace } } }));
-            expectTrackedRow(label, 5, resourceKey);
+            ['Stone Giant', 5, "Stone's Endurance", 'stonesEnduranceUses', 5],
+            ['Cloud Giant', 5, "Cloud's Jaunt", 'cloudsJauntUses', 5],
+            ['Fire Giant', 5, "Fire's Burn", 'firesBurnUses', 5],
+            ['Frost Giant', 5, "Frost's Chill", 'frostsChillUses', 5],
+            ['Hill Giant', 5, "Hill's Tumble", 'hillsTumbleUses', 5],
+            ['Storm Giant', 5, "Storm's Thunder", 'stormsThunderUses', 5],
+        ])('shows %s ancestry feature with max %i', (subrace, max, label, resourceKey, proficiency) => {
+            expectSingleRow(
+                goliathStats({ proficiency, race: { name: 'Goliath', subrace: { name: subrace } } }),
+                label,
+                max,
+                resourceKey,
+            );
         });
 
-        it('uses the current proficiency as max (0 when undefined)', () => {
-            renderFeatures(goliathStats({ proficiency: undefined }));
-            expectTrackedRow("Stone's Endurance", 0, 'stonesEnduranceUses');
-        });
-
-        it('renders nothing when the Goliath has no subrace', () => {
-            renderFeatures(goliathStats({ race: { name: 'Goliath' } }));
-            expectNothingRendered();
-        });
-
-        it('renders nothing for an unknown giant ancestry subrace', () => {
-            renderFeatures(goliathStats({ race: { name: 'Goliath', subrace: { name: 'Frost Giantkin' } } }));
-            expectNothingRendered();
+        it('uses 0 as max when proficiency is missing', () => {
+            expectSingleRow(
+                goliathStats({ proficiency: undefined }),
+                "Stone's Endurance",
+                0,
+                'stonesEnduranceUses',
+            );
         });
     });
 
-    describe('unsupported races and missing data — render nothing', () => {
+    describe('renders nothing for everything else', () => {
         it.each([
-            ['an unsupported race', { name: 'Human' }],
-            ['a race name with different capitalization (registry is exact-match)', { name: 'dragonborn' }],
-            ['no race at all', undefined],
-        ])('renders nothing for %s', (_desc, race) => {
-            const { container } = renderFeatures(dragonbornStats({ race }));
-            expectNothingRendered();
-            expect(container).toBeEmptyDOMElement();
-        });
-
-        it('renders nothing when playerStats is null', () => {
-            renderFeatures(null);
-            expectNothingRendered();
-        });
-
-        it('renders nothing when playerStats is undefined', () => {
-            renderFeatures(undefined);
-            expectNothingRendered();
+            ['null playerStats', null],
+            ['an unsupported race', dragonbornStats({ race: { name: 'Human' } })],
+            ['a race name with different capitalization (registry is exact-match)', dragonbornStats({ race: { name: 'dragonborn' } })],
+            ['a Goliath with an unmapped giant ancestry subrace', goliathStats({ race: { name: 'Goliath', subrace: { name: 'Frost Giantkin' } } })],
+        ])('%s', (_desc, playerStats) => {
+            expectNothingRendered(playerStats);
         });
     });
 });

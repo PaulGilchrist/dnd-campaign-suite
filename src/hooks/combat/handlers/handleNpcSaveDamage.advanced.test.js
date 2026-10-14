@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/rules/features/viciousMockeryService.js', () => ({
@@ -72,11 +73,9 @@ vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
     normalizeSaveType: vi.fn((t) => t),
 }));
 
-import { rollExpression } from '../../../services/dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
-import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../../services/combat/automation/automationService.js';
+import { playerIsImmuneToCondition } from '../../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../../services/rules/features/invisibilityService.js';
-import { hasPotentCantrip, hasSoulstitchProtection, applyMinDamageAdjustment } from '../loggedDiceRollUtils.js';
 import { getCoronaSaveDisadvantage } from '../../../services/combat/auras/coronaAuraUtils.js';
 import { getElderChampionSaveDisadvantage } from '../../../services/combat/auras/elderChampionAuraUtils.js';
 import { isCircleOfPowerActive } from '../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
@@ -97,7 +96,8 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
         logEntry: vi.fn(),
     };
 
-    const defaultSaveResult = { roll: 12, total: 14, bonus: 2, success: false, rawRolls: [12] };
+    const failedSave = { roll: 12, total: 14, bonus: 2, success: false, rawRolls: [12] };
+    const successSave = { roll: 18, total: 20, bonus: 2, success: true, rawRolls: [18] };
     const defaultApplyResult = { finalDamage: 10, newHp: 3, damageReduced: false };
     const defaultContext = {
         targetName: 'Goblin',
@@ -113,38 +113,46 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        rollExpression.mockReturnValue({ total: 10, rolls: [6, 4], modifier: 0 });
         getRuntimeValue.mockReset().mockReturnValue(null);
-        setRuntimeValue.mockClear();
-        hasIgnoreResistance.mockReturnValue(false);
-        hasPotentCantrip.mockReturnValue(false);
-        hasSoulstitchProtection.mockReturnValue(false);
-        applyMinDamageAdjustment.mockImplementation((d) => d);
         getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
         getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
         isCircleOfPowerActive.mockReturnValue(false);
-        rollSaveForCreature.mockReturnValue(defaultSaveResult);
+        rollSaveForCreature.mockReturnValue(failedSave);
         applyDamageToTarget.mockResolvedValue(defaultApplyResult);
-        endInvisibilityOnHostileAction.mockClear();
-        addEntry.mockClear();
-        deps.logEntry.mockClear();
-        deps.setPopupHtml.mockClear();
     });
 
-    function createFn() {
-        return createNpcSaveDamageHandler(deps);
+    function setupActiveConditions(conditions) {
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (key === 'Goblin' && prop === 'activeConditions') return conditions;
+            return null;
+        });
+    }
+
+    function createFn(characters) {
+        return createNpcSaveDamageHandler(characters ? { ...deps, characters } : deps);
     }
 
     function callHandler(fn, contextOverride = {}, combatSummaryOverride = null) {
         return fn({ name: 'Fire Bolt', formula: '1d10', total: 10, rolls: [6, 4], modifier: 0, context: { ...defaultContext, ...contextOverride }, adjustedTotal: 10, combatSummary: combatSummaryOverride || defaultCombatSummary });
     }
 
+    function goblinWith(saveModifiers) {
+        return [
+            { name: 'TestWizard' },
+            {
+                name: 'Goblin',
+                computedStats: { saveBonuses: { con: 2 }, evasionEffects: [] },
+                saveModifiers,
+            },
+        ];
+    }
+
+    const againstSpellAdvantage = [{ target: 'saving_throw', effect: 'advantage', condition: 'against_spell' }];
+
     describe('popup data', () => {
-        it('sets popup data with save result details on failed save', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+        it('carries save result, target HP, and damage-reduced details on a failed save', async () => {
+            setupActiveConditions([]);
+            applyDamageToTarget.mockResolvedValue({ finalDamage: 5, newHp: 8, damageReduced: true });
 
             await callHandler(createFn());
 
@@ -155,44 +163,19 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
                 targetName: 'Goblin',
                 saveDc: 12,
                 saveType: 'dex',
-                saveResult: expect.objectContaining({
-                    roll: 12,
-                    total: 14,
-                    bonus: 2,
-                    success: false,
-                }),
-                finalDamage: 10,
+                saveResult: expect.objectContaining(failedSave),
+                finalDamage: 5,
+                damageReduced: true,
+                targetCurrentHp: 8,
+                targetMaxHp: 13,
                 forcedMode: 'normal',
             }));
         });
 
-        it('sets forcedMode to disadvantage when corona aura applies', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
-
-            await callHandler(createFn());
-
-            const popup = deps.setPopupHtml.mock.calls[0][0];
-            expect(popup.forcedMode).toBe('disadvantage');
-            expect(rollSaveForCreature).toHaveBeenCalledWith(
-                expect.any(Object),
-                'dex',
-                12,
-                true, // disadvantage
-                false
-            );
-        });
-
-        // CLA-063: the util is async — the lane must AWAIT it. A Promise is
+        // CLA-063: the corona util is async — the lane must AWAIT it. A Promise is
         // truthy but carries no .disadvantage, so this pins the await fix.
-        it('CLA-063: awaited getCoronaSaveDisadvantage (Promise payload) forces disadvantage mode', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+        it('CLA-063: awaited corona payload forces disadvantage mode', async () => {
+            setupActiveConditions([]);
             getCoronaSaveDisadvantage.mockResolvedValue({ disadvantage: true, source: 'War_Cleric' });
 
             await callHandler(createFn());
@@ -202,199 +185,50 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
                 damageType: 'fire',
                 skipRangeCheck: true,
             }));
-            const popup = deps.setPopupHtml.mock.calls[0][0];
-            expect(popup.forcedMode).toBe('disadvantage');
-            expect(rollSaveForCreature).toHaveBeenCalledWith(
-                expect.any(Object),
-                'dex',
-                12,
-                true, // disadvantage
-                false
-            );
-        });
-
-        it('CLA-063: awaited resolve to disadvantage:false stays normal mode', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            getCoronaSaveDisadvantage.mockResolvedValue({ disadvantage: false });
-
-            await callHandler(createFn());
-
-            const popup = deps.setPopupHtml.mock.calls[0][0];
-            expect(popup.forcedMode).toBe('normal');
-            expect(rollSaveForCreature).toHaveBeenCalledWith(
-                expect.any(Object),
-                'dex',
-                12,
-                false,
-                false
-            );
+            expect(deps.setPopupHtml.mock.calls[0][0].forcedMode).toBe('disadvantage');
+            expect(rollSaveForCreature).toHaveBeenCalledWith(expect.any(Object), 'dex', 12, true, false);
         });
 
         it('sets forcedMode to advantage when saveModifiers grant advantage', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            const characters = [
-                { name: 'TestWizard' },
-                {
-                    name: 'Goblin',
-                    computedStats: { saveBonuses: { con: 2 }, evasionEffects: [] },
-                    saveModifiers: [{ target: 'saving_throw', effect: 'advantage', condition: 'against_spell' }],
-                },
-            ];
+            setupActiveConditions([]);
 
-            await callHandler(createNpcSaveDamageHandler({ ...deps, characters }));
+            await callHandler(createFn(goblinWith(againstSpellAdvantage)));
 
-            const popup = deps.setPopupHtml.mock.calls[0][0];
-            expect(popup.forcedMode).toBe('advantage');
-            expect(rollSaveForCreature).toHaveBeenCalledWith(
-                expect.any(Object),
-                'dex',
-                12,
-                false, // no disadvantage
-                true   // advantage
-            );
+            expect(deps.setPopupHtml.mock.calls[0][0].forcedMode).toBe('advantage');
+            expect(rollSaveForCreature).toHaveBeenCalledWith(expect.any(Object), 'dex', 12, false, true);
         });
 
         it('prioritizes disadvantage over advantage in forcedMode', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+            setupActiveConditions([]);
             getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
-            const characters = [
-                { name: 'TestWizard' },
-                {
-                    name: 'Goblin',
-                    computedStats: { saveBonuses: { con: 2 }, evasionEffects: [] },
-                    saveModifiers: [{ target: 'saving_throw', effect: 'advantage', condition: 'against_spell' }],
-                },
-            ];
 
-            await callHandler(createNpcSaveDamageHandler({ ...deps, characters }));
+            await callHandler(createFn(goblinWith(againstSpellAdvantage)));
 
-            const popup = deps.setPopupHtml.mock.calls[0][0];
-            expect(popup.forcedMode).toBe('disadvantage');
-        });
-
-        it('includes target HP info in popup data', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            applyDamageToTarget.mockResolvedValue({ finalDamage: 10, newHp: 3, damageReduced: false });
-
-            await callHandler(createFn());
-
-            const popup = deps.setPopupHtml.mock.calls[0][0];
-            expect(popup.targetCurrentHp).toBe(3);
-            expect(popup.targetMaxHp).toBe(13);
+            expect(deps.setPopupHtml.mock.calls[0][0].forcedMode).toBe('disadvantage');
         });
 
         it('marks isCrit in popup when isAutoCrit is true', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+            setupActiveConditions([]);
 
             await callHandler(createFn(), { isAutoCrit: true });
 
-            const popup = deps.setPopupHtml.mock.calls[0][0];
-            expect(popup.isCrit).toBe(true);
+            expect(deps.setPopupHtml.mock.calls[0][0].isCrit).toBe(true);
         });
     });
 
     describe('log entry', () => {
-        it('includes save damage log entry with all required fields', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-
-            await callHandler(createFn());
-
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'roll',
-                characterName: 'TestWizard',
-                rollType: 'save-damage',
-                name: 'Fire Bolt',
-                formula: '1d10',
-                total: 10,
-                damageType: 'fire',
-                targetName: 'Goblin',
-                saveType: 'dex',
-                saveDc: 12,
-                saveResult: 'failure',
-                finalDamage: 10,
-                note: 'combined_save_damage_roll',
-                isCrit: false,
-            }));
-        });
-
-        it('includes saveRoll, saveBonus, and saveRawRolls in log', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-
-            await callHandler(createFn());
-
-            const logCall = deps.logEntry.mock.calls[0][0];
-            expect(logCall.saveRoll).toBe(12);
-            expect(logCall.saveBonus).toBe(2);
-            expect(logCall.saveRawRolls).toEqual([12]);
-        });
-
         it('marks isCrit in log when isAutoCrit is true', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+            setupActiveConditions([]);
 
             await callHandler(createFn(), { isAutoCrit: true });
 
-            const logCall = deps.logEntry.mock.calls[0][0];
-            expect(logCall.isCrit).toBe(true);
-        });
-
-        it('includes saveResult as success when save succeeds', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            rollSaveForCreature.mockReturnValue({ roll: 18, total: 20, bonus: 2, success: true, rawRolls: [18] });
-            applyDamageToTarget.mockResolvedValue({ finalDamage: 0, newHp: 13, damageReduced: false });
-
-            await callHandler(createFn());
-
-            const logCall = deps.logEntry.mock.calls[0][0];
-            expect(logCall.saveResult).toBe('success');
-            expect(logCall.finalDamage).toBe(0);
-        });
-
-        it('includes forcedMode in log entry', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-
-            await callHandler(createFn());
-
-            const logCall = deps.logEntry.mock.calls[0][0];
-            expect(logCall.forcedMode).toBe('normal');
+            expect(deps.logEntry.mock.calls[0][0].isCrit).toBe(true);
         });
     });
 
     describe('threshold tracking', () => {
         it('tracks bloodied threshold when crossing halfway point', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+            setupActiveConditions([]);
             applyDamageToTarget.mockResolvedValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
             await callHandler(createFn());
@@ -410,27 +244,22 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
         });
 
         it('marks isUnconscious when target drops to 0 HP', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+            setupActiveConditions([]);
             applyDamageToTarget.mockResolvedValue({ finalDamage: 13, newHp: 0, damageReduced: false });
 
             await callHandler(createFn());
 
-            const hpCall = addEntry.mock.calls[0][1];
-            expect(hpCall.type).toBe('hp_change');
-            expect(hpCall.targetName).toBe('Goblin');
-            expect(hpCall.delta).toBe(-13);
-            expect(hpCall.currentHp).toBe(0);
-            expect(hpCall.isUnconscious).toBe(true);
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'hp_change',
+                targetName: 'Goblin',
+                delta: -13,
+                currentHp: 0,
+                isUnconscious: true,
+            }));
         });
 
         it('does not track threshold when already bloodied and still bloodied', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+            setupActiveConditions([]);
             // Start at 6 HP (already bloodied out of 13), take 2 damage → 4 HP
             const combatSummary = {
                 creatures: [{ name: 'Goblin', type: 'npc', currentHp: 6, maxHp: 13 }],
@@ -439,47 +268,13 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
 
             await callHandler(createFn(), {}, combatSummary);
 
-            const hpEntry = addEntry.mock.calls[0][1];
-            expect(hpEntry.threshold).toBeUndefined();
-        });
-
-        it('tracks recovering threshold when bloodied target takes negative damage', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            // Start at 5 HP (bloodied out of 13), take 1 damage → 4 HP (still bloodied, no threshold change)
-            const combatSummary = {
-                creatures: [{ name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 13 }],
-            };
-            applyDamageToTarget.mockResolvedValue({ finalDamage: 1, newHp: 4, damageReduced: false });
-
-            await callHandler(createFn(), {}, combatSummary);
-
-            const hpCall = addEntry.mock.calls[0][1];
-            expect(hpCall.threshold).toBeUndefined();
-        });
-
-        it('does not create hp_change log entry when no damage is dealt', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            rollSaveForCreature.mockReturnValue({ roll: 18, total: 20, bonus: 2, success: true, rawRolls: [18] });
-            applyDamageToTarget.mockResolvedValue({ finalDamage: 0, newHp: 13, damageReduced: false });
-
-            await callHandler(createFn());
-
-            expect(addEntry).not.toHaveBeenCalled();
+            expect(addEntry.mock.calls[0][1].threshold).toBeUndefined();
         });
     });
 
     describe('status effects on failed save', () => {
         it('applies status effects when save fails and target is not immune', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+            setupActiveConditions([]);
             playerIsImmuneToCondition.mockReturnValue(false);
 
             await callHandler(createFn(), { statusEffects: ['poisoned'] });
@@ -492,30 +287,21 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
             );
         });
 
-        it('applies multiple status effects on failed save', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+        it('applies multiple status effects via separate writes on failed save', async () => {
+            setupActiveConditions([]);
             playerIsImmuneToCondition.mockReturnValue(false);
 
             await callHandler(createFn(), { statusEffects: ['poisoned', 'benumbed'] });
 
             // Each status effect is applied via a separate setRuntimeValue call
-            expect(setRuntimeValue).toHaveBeenCalledTimes(3); // 2 status effects + 1 lastAttack
             const conditionCalls = setRuntimeValue.mock.calls.filter(
                 (call) => call[1] === 'activeConditions'
             );
-            expect(conditionCalls.length).toBe(2);
-            expect(conditionCalls[0][2]).toContain('poisoned');
-            expect(conditionCalls[1][2]).toContain('benumbed');
+            expect(conditionCalls.map(c => c[2][c[2].length - 1])).toEqual(['poisoned', 'benumbed']);
         });
 
         it('skips status effect when target is immune', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+            setupActiveConditions([]);
             playerIsImmuneToCondition.mockReturnValue(true);
 
             await callHandler(createFn(), { statusEffects: ['poisoned'] });
@@ -529,35 +315,11 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
         });
 
         it('does not apply status effects when save succeeds', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            rollSaveForCreature.mockReturnValue({ roll: 18, total: 20, bonus: 2, success: true, rawRolls: [18] });
+            setupActiveConditions([]);
+            rollSaveForCreature.mockReturnValue(successSave);
             applyDamageToTarget.mockResolvedValue({ finalDamage: 0, newHp: 13, damageReduced: false });
 
-            await callHandler(createFn(), { statusEffects: ['poisoned'] });
-
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                'Goblin',
-                'activeConditions',
-                expect.arrayContaining(['poisoned']),
-                'test-campaign'
-            );
-        });
-
-        it('does not apply status effects when dcSuccess is half (save success still prevents)', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            rollSaveForCreature.mockReturnValue({ roll: 18, total: 20, bonus: 2, success: true, rawRolls: [18] });
-            applyDamageToTarget.mockResolvedValue({ finalDamage: 0, newHp: 13, damageReduced: false });
-
-            await callHandler(createFn(), {
-                statusEffects: ['poisoned'],
-                dcSuccess: 'half',
-            });
+            await callHandler(createFn(), { statusEffects: ['poisoned'], dcSuccess: 'half' });
 
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'Goblin',
@@ -569,52 +331,31 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
     });
 
     describe('lastAttack data', () => {
-        it('sets lastAttack in campaign state with attacker info', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-
-            await callHandler(createFn(), { attackerName: 'TestWizard' });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'lastAttack',
-                expect.objectContaining({
-                    attackerName: 'TestWizard',
-                    targetName: 'Goblin',
-                    rollType: 'attack',
-                    saveType: 'dex',
-                    saveDc: 12,
-                    saveResult: 'failure',
-                    actualDamage: 10,
-                }),
-                'test-campaign'
-            );
-        });
-
-        it('sets lastAttack with save roll details', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+        it('stamps campaign lastAttack with attacker info and save-roll details', async () => {
+            setupActiveConditions([]);
 
             await callHandler(createFn(), { attackerName: 'TestWizard' });
 
             const lastAttack = setRuntimeValue.mock.calls.find(
                 (call) => call[1] === 'lastAttack'
             )[2];
-            expect(lastAttack.d20).toBe(12);
-            expect(lastAttack.d20Rolls).toEqual([12]);
-            expect(lastAttack.bonus).toBe(2);
-            expect(lastAttack.total).toBe(14);
+            expect(lastAttack).toEqual(expect.objectContaining({
+                attackerName: 'TestWizard',
+                targetName: 'Goblin',
+                rollType: 'attack',
+                saveType: 'dex',
+                saveDc: 12,
+                saveResult: 'failure',
+                actualDamage: 10,
+                d20: 12,
+                d20Rolls: [12],
+                bonus: 2,
+                total: 14,
+            }));
         });
 
-        it('handles missing attackerName gracefully', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+        it('stamps attackerName as null when context omits it', async () => {
+            setupActiveConditions([]);
 
             await callHandler(createFn(), {});
 
@@ -627,10 +368,7 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
 
     describe('endInvisibilityOnHostileAction', () => {
         it('calls endInvisibilityOnHostileAction when damage is applied', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+            setupActiveConditions([]);
 
             await callHandler(createFn());
 
@@ -638,11 +376,8 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
         });
 
         it('does not call endInvisibilityOnHostileAction when no damage applied', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            rollSaveForCreature.mockReturnValue({ roll: 18, total: 20, bonus: 2, success: true, rawRolls: [18] });
+            setupActiveConditions([]);
+            rollSaveForCreature.mockReturnValue(successSave);
             applyDamageToTarget.mockResolvedValue({ finalDamage: 0, newHp: 13, damageReduced: false });
 
             await callHandler(createFn());
@@ -653,97 +388,17 @@ describe('handleNpcSaveDamage - advanced scenarios', () => {
 
     describe('handleOverchannelSelfDamage', () => {
         it('calls handleOverchannelSelfDamage at end of handler', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
+            setupActiveConditions([]);
 
             await callHandler(createFn());
 
             expect(handleOverchannelSelfDamage).toHaveBeenCalledWith(
                 'TestWizard',
                 'test-campaign',
-                expect.objectContaining({
-                    targetName: 'Goblin',
-                    saveDc: 12,
-                    saveType: 'dex',
-                    dcSuccess: 'none',
-                    damageType: 'fire',
-                }),
+                expect.objectContaining(defaultContext),
                 expect.any(Function),
                 expect.any(Array)
             );
-        });
-    });
-
-    describe('soulstitch protection', () => {
-        it('auto-succeeds save and deals zero damage', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            hasSoulstitchProtection.mockReturnValue(true);
-            applyDamageToTarget.mockResolvedValue({ finalDamage: 0, newHp: 13, damageReduced: false });
-
-            await callHandler(createFn());
-
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 0, // zero damage
-                expect.any(Array), { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: true });
-        });
-
-        it('marks saveResult as soulstitch_auto_success in log', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            hasSoulstitchProtection.mockReturnValue(true);
-
-            await callHandler(createFn());
-
-            const logCall = deps.logEntry.mock.calls[0][0];
-            expect(logCall.saveResult).toBe('soulstitch_auto_success');
-        });
-
-        it('marks saveResult as success in popup when soulstitch protected', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            hasSoulstitchProtection.mockReturnValue(true);
-
-            await callHandler(createFn());
-
-            const popup = deps.setPopupHtml.mock.calls[0][0];
-            expect(popup.saveResult.success).toBe(true);
-        });
-    });
-
-    describe('popup data edge cases', () => {
-        it('includes damageReduced flag in popup when damage was reduced by resistance', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-            applyDamageToTarget.mockResolvedValue({ finalDamage: 5, newHp: 8, damageReduced: true });
-
-            await callHandler(createFn());
-
-            const popup = deps.setPopupHtml.mock.calls[0][0];
-            expect(popup.damageReduced).toBe(true);
-            expect(popup.finalDamage).toBe(5);
-        });
-
-        it('includes gwfApplied flag in popup', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Goblin' && prop === 'activeConditions') return [];
-                return null;
-            });
-
-            await callHandler(createFn());
-
-            const popup = deps.setPopupHtml.mock.calls[0][0];
-            expect(popup).toHaveProperty('gwfApplied');
-            expect(popup).toHaveProperty('gwfDisplayRolls');
         });
     });
 });

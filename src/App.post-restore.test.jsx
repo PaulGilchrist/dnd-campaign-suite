@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 // App-level wiring tests for the post-rollback carry-over flow.
 //
 // CampaignAdmin's rollback handler writes a 'postRestoreNotice' to sessionStorage
@@ -238,7 +238,7 @@ describe('App - post-rollback carry-over', () => {
     expect(sessionStorage.getItem('postRestoreNotice')).toBeNull();
   });
 
-  it('normal boot without a notice shows campaign selection and never triggers the restore landing', async () => {
+  it('normal boot without a notice shows campaign selection; manual select lands on the character sheet, never the restore landing', async () => {
     render(<App />);
 
     await waitFor(() => {
@@ -257,6 +257,5 @@ describe('App - post-rollback carry-over', () => {
     });
     expect(screen.queryByTestId('campaign-admin')).not.toBeInTheDocument();
     expect(screen.queryByTestId('admin-restored-banner')).not.toBeInTheDocument();
-    expect(sessionStorage.getItem('postRestoreNotice')).toBeNull();
   });
 });

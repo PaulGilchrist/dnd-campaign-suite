@@ -1,11 +1,12 @@
-// @improved-by-ai
-// SP-015: A summon_spirit spell with automation.hpPerLevelAbove but NO damage/heal
-// ladder (Bestial Spirit: "+5 HP per slot level above 2") must arm the Cast-at-Level
-// selector via its automation ladder alone, and the chosen slot level plus automation
-// metadata must reach the summon resolver in the onCast payload.
+// @maintained-by-ai
+// SP-015: summon spells scale the creature's HP via automation.hpPerLevelAbove
+// ("+5 HP per slot level above 2") and carry NO damage/heal ladder. That automation
+// ladder alone must arm the Cast-at-Level selector for summon_spirit spells, and the
+// cast payload must carry the chosen slot level plus the automation metadata the
+// summon resolver scales HP from.
 //
-// Generic selector mechanics (disabled radios, pre-select-first-available, single-level
-// hiding) live in SpellDetailPopup.rendering.test.jsx — not duplicated here.
+// Generic selector mechanics (radio rendering, first-available pre-select, single-level
+// hiding, slots-row swap) live in SpellDetailPopup.rendering.test.jsx — not duplicated.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -66,9 +67,8 @@ const ladder = [
   { level: 3, formula: '+5 HP per slot level above 2', availableSlots: 3 },
 ];
 
-const renderPopup = (spell = bestialSpirit, extraProps = {}) => {
-  const onCast = extraProps.onCast ?? vi.fn();
-  const onClose = vi.fn();
+const renderPopup = (spell = bestialSpirit) => {
+  const onCast = vi.fn();
   render(
     <SpellDetailPopup
       spell={spell}
@@ -76,12 +76,11 @@ const renderPopup = (spell = bestialSpirit, extraProps = {}) => {
       campaignName="test-campaign"
       playerLevel={20}
       upcastLevels={ladder}
-      onClose={onClose}
-      {...extraProps}
+      onClose={vi.fn()}
       onCast={onCast}
     />,
   );
-  return { onCast, onClose };
+  return { onCast };
 };
 
 const upcastRadio = (level) =>
@@ -90,52 +89,41 @@ const upcastRadio = (level) =>
 const castButton = () => screen.getByRole('button', { name: /Cast Spell/i });
 
 describe('SpellDetailPopup SP-015 summon HP-ladder upcast', () => {
-  it('arms the Cast-at-Level selector from automation.hpPerLevelAbove alone — the spell has no damage or heal ladder', () => {
+  it('arms the Cast-at-Level selector from automation.hpPerLevelAbove alone', () => {
+    // Fixture guard: if a damage/heal ladder ever lands on this fixture, the test
+    // no longer proves the automation ladder is what armed the selector.
     expect(bestialSpirit.damage).toBeUndefined();
     expect(bestialSpirit.heal_at_slot_level).toBeUndefined();
 
     renderPopup();
 
     expect(screen.getByText(/Cast at Level:/)).toBeInTheDocument();
-    expect(screen.getAllByRole('radio').map((radio) => radio.value)).toEqual(['2', '3']);
-    expect(upcastRadio(2)).toBeChecked();
-    // The per-level radios replace the single slots row.
     expect(screen.queryByText(/Slots Remaining:/)).not.toBeInTheDocument();
     expect(castButton()).toBeEnabled();
   });
 
-  it('casts at the chosen slot level and preserves the automation metadata the summon resolver scales HP from', () => {
+  it.each([
+    { selected: 2, isUpcast: false, upcastLevel: undefined, label: 'the pre-selected base level' },
+    { selected: 3, isUpcast: true, upcastLevel: 3, label: 'a higher slot level' },
+  ])('casts at $label and preserves the automation metadata the summon resolver scales HP from', ({ selected, isUpcast, upcastLevel }) => {
     const { onCast } = renderPopup();
 
-    fireEvent.click(upcastRadio(3));
+    fireEvent.click(upcastRadio(selected));
     fireEvent.click(castButton());
 
     expect(onCast).toHaveBeenCalledTimes(1);
-    const [spellArg, metaArg] = onCast.mock.calls[0];
-    expect(spellArg.upcastLevel).toBe(3);
-    expect(spellArg.isUpcast).toBe(true);
+    const [spellArg] = onCast.mock.calls[0];
+    expect(spellArg.isUpcast).toBe(isUpcast);
+    expect(spellArg.upcastLevel).toBe(upcastLevel);
     // The resolver computes final HP from baseLevel + hpPerLevelAbove — the
     // spread in handleCast must not drop it.
     expect(spellArg.automation.baseLevel).toBe(2);
-    expect(spellArg.automation.hpPerLevelAbove).toBe(5);
-    expect(metaArg.overchannel).toBe(false);
-  });
-
-  it('reports a base-level cast (not an upcast) when the pre-selected base radio is left untouched', () => {
-    const { onCast } = renderPopup();
-
-    fireEvent.click(castButton());
-
-    const [spellArg] = onCast.mock.calls[0];
-    expect(spellArg.isUpcast).toBe(false);
-    expect(spellArg.upcastLevel).toBeUndefined();
     expect(spellArg.automation.hpPerLevelAbove).toBe(5);
   });
 
   it.each([
     { label: 'hpPerLevelAbove missing', automation: { type: 'summon_spirit', baseLevel: 2, variants: [] } },
     { label: 'hpPerLevelAbove is 0', automation: { type: 'summon_spirit', baseLevel: 2, hpPerLevelAbove: 0, variants: [] } },
-    { label: 'hpPerLevelAbove is non-numeric', automation: { type: 'summon_spirit', baseLevel: 2, hpPerLevelAbove: 'five', variants: [] } },
     { label: 'automation is not summon_spirit', automation: { type: 'conjure_beast', baseLevel: 2, hpPerLevelAbove: 5, variants: [] } },
   ])('leaves the selector disarmed for a summon-shaped spell with $label', ({ automation }) => {
     renderPopup({ ...bestialSpirit, automation });

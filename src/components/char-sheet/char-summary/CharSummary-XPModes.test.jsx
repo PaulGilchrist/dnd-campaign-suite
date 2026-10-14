@@ -1,29 +1,44 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // CharSummary XP modes + Bait and Switch AC badge.
 //
 // Coverage ownership (CharSummary family delegation):
 //   OWNED HERE (unique behavioral coverage — no sibling covers these):
-//   - XP modal open → preview calculation (positive / negative / clamped /
-//     non-numeric deltas)
-//   - XP modal Apply → displayed XP updates, clamped to 0, and the write
-//     reaches the runtime store (server-first: other players see it)
+//   - XP modal preview calculation (hidden until a valid number is typed,
+//     positive delta, clamped-to-zero delta)
+//   - XP modal Apply → full chain: displayed XP updates, clamped to 0, modal
+//     closes, and the write reaches the runtime store (server-first: other
+//     players see it)
 //   - XP modal Apply-with-empty-delta and Cancel → modal closes, XP and
 //     runtime store untouched
 //   - Milestone checkbox → subtitle switches between "(N XP)" and
 //     "(milestone)", persisted via the runtime store
-//   - Bait and Switch AC badge rendering and its contribution to the AC total
+//   - Bait and Switch AC badge: source attribution, generic-label fallback,
+//     active/bonus gating, and its contribution to the AC total
 //
 // NOT owned here (delegated — do not re-add):
+//   - XP modal open via the clickable suffix + "Current:" display and
+//     milestone-checkbox mutation isolation of the shared fixture
+//     → CharSummary-FixtureContract.test.jsx
 //   - XP subtitle rerender on playerStats.xp prop change, window events
 //     → CharSummary-EventHandlers.test.jsx
 //   - "(milestone)" subtitle row content → CharSummary-Display.test.jsx
 //   - Other AC badges / AC totals → CharSummary-BadgesAndAC.test.jsx
 //   - Surge badges → CharSummary-WildMagic.test.jsx
 //
-// Notes on what used to live here and stays removed:
-//   - displayXp useState sync and "hides/shows info text" tests — React
-//     internals trivia, zero business-logic value.
+// Notes on trims (8 tests / 18 runs → 6 tests / 11 runs):
+//   - "opens showing current XP" and the 'abc'/empty preview cases were
+//     absorbed into one test: jsdom sanitizes type=number to '', so a
+//     non-numeric entry, an empty entry, and the pristine open state are the
+//     same code path.
+//   - Preview and Apply cases were merged into one delta → preview → persist
+//     chain per case; only two genuinely distinct branches remain (normal
+//     addition, Math.max clamp — the clamp branch must both preview AND
+//     persist 0).
+//   - The {source: 'Bait and Switch'} badge case was dropped: its rendered
+//     text is identical to the null-source fallback, so it proved nothing the
+//     fallback case doesn't. 'Trickster' is the only source that can
+//     distinguish attribution from fallback.
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -133,6 +148,7 @@ function renderSummary(stats) {
 
 // Opens the XP modal via the clickable XP suffix in the subtitle and
 // returns the delta input (role: spinbutton, labelled "Add or subtract XP:").
+// The spinbutton lookup doubles as the "modal opened" assertion.
 function openXpModal(stats = xpStats()) {
     renderSummary(stats);
     const suffix = stats.xpMode === 'experience' ? /\d XP\)/ : /\(milestone\)/;
@@ -166,63 +182,47 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// XP Modal — open, preview, apply, cancel, mode toggle
+// XP Modal — preview, apply, cancel, mode toggle
 // ---------------------------------------------------------------------------
 describe('XP Modal', () => {
-    it('opens from the clickable XP suffix showing the current XP with no preview yet', () => {
-        openXpModal(xpStats());
+    // jsdom sanitizes a type=number input to '' for non-numeric entry, so
+    // 'abc' exercises the same "no valid number" path as the pristine open
+    // state — both must show the current total with no preview arrow.
+    it('shows the current XP with no preview arrow until a valid number is typed', () => {
+        const input = openXpModal(xpStats());
+        expect(screen.getByText('Current: 2,300 XP')).toBeInTheDocument();
+        expect(screen.queryByText(/→/)).not.toBeInTheDocument();
+
+        typeDelta(input, 'abc');
         expect(screen.getByText('Current: 2,300 XP')).toBeInTheDocument();
         expect(screen.queryByText(/→/)).not.toBeInTheDocument();
     });
 
     it.each([
-        { label: 'positive', delta: '100', expected: '→ 2,400 XP' },
-        { label: 'negative', delta: '-50', expected: '→ 2,250 XP' },
-        { label: 'clamped to zero', delta: '-999', xp: 10, expected: '→ 0 XP' },
-    ])('previews the new total for a $label delta', ({ delta, xp, expected }) => {
-        const input = openXpModal(xpStats(xp));
-        typeDelta(input, delta);
-        expect(screen.getByText(expected)).toBeVisible();
-    });
-
-    // jsdom sanitizes a type=number input to '' when a non-numeric value is
-    // set, so both entry states must keep the preview arrow hidden.
-    it.each([
-        { label: 'non-numeric', delta: 'abc' },
-        { label: 'empty', delta: '' },
-    ])('hides the preview arrow when the delta is $label', ({ delta }) => {
-        const input = openXpModal(xpStats());
-        typeDelta(input, '+100');
-        typeDelta(input, delta);
-        expect(screen.getByText('Current: 2,300 XP')).toBeInTheDocument();
-        expect(screen.queryByText(/→/)).not.toBeInTheDocument();
-    });
-
-    it.each([
-        { delta: '100', expected: 2400 },
-        { delta: '-250', expected: 2050 },
-        { delta: '-99999', expected: 0 },
-    ])('apply of delta $delta updates the displayed XP and persists the clamped total', ({ delta, expected }) => {
+        { label: 'addition', delta: '100', expected: 2400 },
+        { label: 'subtracting below zero', delta: '-2500', expected: 0 },
+    ])('previews then applies delta $delta, persisting the $label result', ({ delta, expected }) => {
         const input = openXpModal(xpStats());
         typeDelta(input, delta);
+        expect(screen.getByText(`→ ${expected.toLocaleString()} XP`)).toBeVisible();
+
         clickButton('Apply');
-
         expect(screen.getByText(`(${expected.toLocaleString()} XP)`)).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
         // Server-first: the persisted write is the cross-player behavior.
-        expect(setRuntimeValue).toHaveBeenCalledWith('Thorin', 'xp', expected, mockCampaignName);
+        expect(setRuntimeValue).toHaveBeenCalledWith(mockPlayerStats.name, 'xp', expected, mockCampaignName);
     });
 
     it.each([
         { label: 'applying with an empty delta', action: () => clickButton('Apply') },
         { label: 'cancelling', action: () => clickButton('Cancel') },
-    ])('leaves XP and the runtime store untouched when $label', ({ action }) => {
+    ])('closes without touching XP or the runtime store when $label', ({ action }) => {
         openXpModal(xpStats());
         action();
 
         expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument();
         expect(screen.getByText('(2,300 XP)')).toBeInTheDocument();
-        expect(setRuntimeValue).not.toHaveBeenCalledWith('Thorin', 'xp', expect.anything(), mockCampaignName);
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(mockPlayerStats.name, 'xp', expect.anything(), mockCampaignName);
     });
 
     it.each([
@@ -234,21 +234,23 @@ describe('XP Modal', () => {
 
         expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument();
         expect(screen.getByText(suffix)).toBeInTheDocument();
-        expect(setRuntimeValue).toHaveBeenCalledWith('Thorin', 'xpMode', to, mockCampaignName);
+        expect(setRuntimeValue).toHaveBeenCalledWith(mockPlayerStats.name, 'xpMode', to, mockCampaignName);
     });
 });
 
 // ---------------------------------------------------------------------------
 // Bait and Switch AC badge — sourced from runtime values (charSummaryCalc
-// reads them through the mocked getRuntimeValue)
+// gates the bonus on active && stored bonus; the badge renders the source
+// or falls back to the generic label)
 // ---------------------------------------------------------------------------
 describe('Bait and Switch AC bonus display', () => {
     it.each([
-        { bonus: 3, source: 'Bait and Switch', ac: 21 },
-        { bonus: 5, source: 'Trickster', ac: 23 },
+        // Named source must be attributed verbatim — 'Trickster' is distinct
+        // from the fallback label so this proves attribution, not fallback.
+        { bonus: 5, source: 'Trickster', label: 'Trickster' },
         // No stored source → badge falls back to the generic label.
-        { bonus: 2, source: null, ac: 20 },
-    ])('adds +$bonus to AC attributing to $source', ({ bonus, source, ac }) => {
+        { bonus: 2, source: null, label: 'Bait and Switch' },
+    ])('adds +$bonus to AC attributing to $label', ({ bonus, source, label }) => {
         vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
             if (key === 'baitAndSwitchActive') return true;
             if (key === 'baitAndSwitchBonus') return bonus;
@@ -257,10 +259,10 @@ describe('Bait and Switch AC bonus display', () => {
         });
         renderSummary(mockPlayerStats);
 
-        const acLine = armorClassLine();
-        expect(screen.getByText(new RegExp(`\\+${bonus} from ${source || 'Bait and Switch'}`))).toBeVisible();
-        // The badge is not decorative — the bonus is included in the AC total.
-        expect(acLine).toHaveTextContent(`Armor Class: ${ac}`);
+        expect(screen.getByText(new RegExp(`\\+${bonus} from ${label}`))).toBeVisible();
+        // The badge is not decorative — the bonus is included in the AC total
+        // (base 18 from the shared fixture).
+        expect(armorClassLine()).toHaveTextContent(`Armor Class: ${18 + bonus}`);
     });
 
     it.each([

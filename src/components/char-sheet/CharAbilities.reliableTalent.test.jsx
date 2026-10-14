@@ -1,20 +1,28 @@
-// CLA-291 regression: Reliable Talent must floor ONLY proficient skill/tool checks
+// @maintained-by-ai
+/**
+ * CLA-291 regression — CharAbilities CLICK lane for the Reliable Talent gate.
+ * makeCheckContext stamps reliableTalent ONLY for proficient skill/tool checks:
+ *   - proficient skill / tool  -> stamp
+ *   - non-proficient skill / tool AND raw ability check -> never stamp
+ *
+ * This file owns the click path only. Do NOT re-add here:
+ * - DiceRollResult.displayFeatures: reliableTalent FLOOR rendering (roll ≤9/10, attack, save).
+ * - CharAbilities.contextFeatures: the same gate driven by the internal-skill-check EVENT.
+ */
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
-import DiceRollResult from './DiceRollResult.jsx';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  const mockFn = vi.fn(() => ({
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  default: vi.fn(() => ({
     popupHtml: null,
     setPopupHtml: vi.fn(),
     rollAbilityCheck: vi.fn(),
     rollSavingThrow: vi.fn(),
     rollSkillCheck: vi.fn(),
-  }));
-  return { default: mockFn };
-});
+  })),
+}));
 
 vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
   useDiceRollPopup: vi.fn(() => ({ setPopupHtml: vi.fn() })),
@@ -46,6 +54,7 @@ const mockAllAbilityScores = [
   { full_name: 'Charisma', description: 'CHA desc' },
 ];
 
+// Insight + Thieves' Tools are proficient; Acrobatics + Navigator's Tools are not.
 function createPlayerStats(overrides = {}) {
   return {
     name: 'Rogue Test',
@@ -67,116 +76,65 @@ function createPlayerStats(overrides = {}) {
   };
 }
 
-function defaultProps(overrides = {}) {
-  return {
-    allAbilityScores: mockAllAbilityScores,
-    playerStats: createPlayerStats(),
-    campaignName: 'test-campaign',
-    exhaustionPenalty: 0,
-    conditionEffects: {},
-    isRaging: false,
-    ...overrides,
-  };
-}
-
-function getMocks() {
+function rollMocks() {
   const results = vi.mocked(useLoggedDiceRoll).mock.results;
   return results[results.length - 1].value;
 }
 
-function findClickableByPrefix(prefix) {
-  const clickableEls = Array.from(document.querySelectorAll('.clickable'));
-  return clickableEls.find((el) => el.textContent.startsWith(prefix));
+// Skills render synchronously; tools render after the equipment effect resolves — poll (bounded).
+async function clickCell(prefix) {
+  let el = null;
+  for (let i = 0; i < 20 && !el; i++) {
+    el = Array.from(document.querySelectorAll('.clickable')).find((c) => c.textContent.startsWith(prefix));
+    if (!el) await new Promise((r) => setTimeout(r, 25));
+  }
+  expect(el, `clickable cell "${prefix}" not found`).toBeTruthy();
+  fireEvent.click(el);
 }
 
-describe('CLA-291 makeCheckContext reliableTalent proficiency gate', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockStore.clear();
-  });
-
-  it('stamps reliableTalent for PROFICIENT skill checks', () => {
-    render(<CharAbilities {...defaultProps({ conditionEffects: { reliableTalent: true } })} />);
-    fireEvent.click(findClickableByPrefix('Insight'));
-    const ctx = getMocks().rollSkillCheck.mock.calls[0][2] || {};
-    expect(ctx.reliableTalent).toBe(true);
-  });
-
-  it('does NOT stamp reliableTalent for NON-PROFICIENT skill checks', () => {
-    render(<CharAbilities {...defaultProps({ conditionEffects: { reliableTalent: true } })} />);
-    fireEvent.click(findClickableByPrefix('Animal Handling'));
-    const ctx = getMocks().rollSkillCheck.mock.calls[0][2] || {};
-    expect(ctx.reliableTalent).toBeUndefined();
-  });
-
-  it('does NOT stamp reliableTalent for raw ability check cells', () => {
-    render(<CharAbilities {...defaultProps({ conditionEffects: { reliableTalent: true } })} />);
-    fireEvent.click(findClickableByPrefix('Strength'));
-    // Strength name cell opens the popup, bonus cell (+0) rolls the check — use the bonus cell of the STR row
-    const bonusCells = Array.from(document.querySelectorAll('.abilities .clickable'));
-    const strBonusCell = bonusCells.find((el) => el.textContent.trim() === '+0');
-    if (strBonusCell) fireEvent.click(strBonusCell);
-    const abilityCalls = getMocks().rollAbilityCheck.mock.calls.filter(c => c[0] === 'Strength');
-    expect(abilityCalls.length).toBeGreaterThan(0);
-    const ctx = abilityCalls[abilityCalls.length - 1][2] || {};
-    expect(ctx.reliableTalent).toBeUndefined();
-  });
-
-  it('stamps reliableTalent for PROFICIENT tool checks', async () => {
-    render(<CharAbilities {...defaultProps({ conditionEffects: { reliableTalent: true } })} />);
-    const toolCell = await (async () => {
-      for (let i = 0; i < 20; i++) {
-        const el = findClickableByPrefix("Thieves' Tools");
-        if (el) return el;
-        await new Promise((r) => setTimeout(r, 50));
-      }
-      return null;
-    })();
-    expect(toolCell).toBeTruthy();
-    fireEvent.click(toolCell);
-    const ctx = getMocks().rollAbilityCheck.mock.calls[0][2] || {};
-    expect(ctx.reliableTalent).toBe(true);
-  });
-
-  it('does NOT stamp reliableTalent for NON-PROFICIENT tool checks', async () => {
-    render(<CharAbilities {...defaultProps({ conditionEffects: { reliableTalent: true } })} />);
-    const toolCell = await (async () => {
-      for (let i = 0; i < 20; i++) {
-        const el = findClickableByPrefix("Navigator's Tools");
-        if (el) return el;
-        await new Promise((r) => setTimeout(r, 50));
-      }
-      return null;
-    })();
-    expect(toolCell).toBeTruthy();
-    fireEvent.click(toolCell);
-    const ctx = getMocks().rollAbilityCheck.mock.calls[0][2] || {};
-    expect(ctx.reliableTalent).toBeUndefined();
-  });
-
-  it('stamps nothing else spuriously when reliableTalent modifier is present but check is not proficient', () => {
-    render(<CharAbilities {...defaultProps({ conditionEffects: { reliableTalent: true } })} />);
-    fireEvent.click(findClickableByPrefix('Acrobatics'));
-    const ctx = getMocks().rollSkillCheck.mock.calls[0][2];
-    expect(ctx).toEqual({});
-    expect('reliableTalent' in ctx).toBe(false);
-  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockStore.clear();
 });
 
-describe('CLA-291 DiceRollResult floor respects the reliableTalent flag', () => {
-  it('floors low d20 totals when flag set on a skill roll', () => {
-    const { container } = render(
-      <DiceRollResult name="Insight" type="d20" rolls={[4]} bonus={7} rollType="skill" reliableTalent={true} />
-    );
-    const rt = container.querySelector('.dice-roll-reliable-talent');
-    expect(rt).toBeInTheDocument();
-    expect(rt.textContent).toContain('10');
+describe('CLA-291 CharAbilities click lane — reliableTalent proficiency gate', () => {
+  const renderAbilities = () => render(
+    <CharAbilities
+      allAbilityScores={mockAllAbilityScores}
+      playerStats={createPlayerStats()}
+      campaignName="test-campaign"
+      exhaustionPenalty={0}
+      conditionEffects={{ reliableTalent: true }}
+      isRaging={false}
+    />
+  );
+
+  it.each`
+    cell                | roll
+    ${'Insight'}        | ${'rollSkillCheck'}
+    ${"Thieves' Tools"} | ${'rollAbilityCheck'}
+  `('stamps reliableTalent for a proficient $cell check', async ({ cell, roll }) => {
+    renderAbilities();
+    await clickCell(cell);
+    expect(rollMocks()[roll]).toHaveBeenCalledWith(cell, expect.any(Number), { reliableTalent: true });
   });
 
-  it('does NOT floor when flag not set', () => {
-    const { container } = render(
-      <DiceRollResult name="Animal Handling" type="d20" rolls={[4]} bonus={1} rollType="skill" />
-    );
-    expect(container.querySelector('.dice-roll-reliable-talent')).not.toBeInTheDocument();
+  it.each`
+    cell                  | roll
+    ${'Acrobatics'}       | ${'rollSkillCheck'}
+    ${"Navigator's Tools"} | ${'rollAbilityCheck'}
+  `('never stamps reliableTalent for a NON-proficient $cell check', async ({ cell, roll }) => {
+    renderAbilities();
+    await clickCell(cell);
+    // Exact-match: reliableTalent absent AND nothing spurious stamped.
+    expect(rollMocks()[roll]).toHaveBeenCalledWith(cell, expect.any(Number), {});
+  });
+
+  it('never stamps reliableTalent on a raw ability-check bonus cell', () => {
+    const { container } = renderAbilities();
+    const strRow = Array.from(container.querySelectorAll('.abilities'))
+      .find((r) => r.querySelector('.left')?.textContent === 'Strength');
+    fireEvent.click(strRow.children[2]); // col 3 = ability check bonus
+    expect(rollMocks().rollAbilityCheck).toHaveBeenCalledWith('Strength', expect.any(Number), {});
   });
 });

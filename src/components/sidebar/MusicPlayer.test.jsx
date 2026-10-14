@@ -1,5 +1,6 @@
+// @maintained-by-ai: 2026-10-14
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MusicPlayer from './MusicPlayer.jsx';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
 import * as youtubePlayer from '../../services/ui/youtubePlayer.js';
@@ -12,8 +13,6 @@ vi.mock('../../services/ui/youtubePlayer.js', () => ({
   resume: vi.fn(),
   stop: vi.fn(),
   setVolume: vi.fn(),
-  subscribe: vi.fn(() => vi.fn()),
-  isPlayingNow: vi.fn(() => false),
   dispose: vi.fn(),
 }));
 
@@ -24,20 +23,19 @@ vi.mock('../../services/ui/logService.js', () => ({
 }));
 
 function renderPlayer(overrides = {}) {
-  const props = { campaignName: 'test-campaign', isLocalhost: true, ...overrides };
-  return { props, ...render(<MusicPlayer {...props} />) };
+  return render(<MusicPlayer campaignName="test-campaign" isLocalhost {...overrides} />);
 }
 
 function musicState() {
   return getStore('campaign').get('music');
 }
 
+function trackIds(moodKey) {
+  return MOODS.find(m => m.key === moodKey).tracks.map(t => t.videoId);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  getStore('campaign').delete('music');
-});
-
-afterEach(() => {
   getStore('campaign').delete('music');
 });
 
@@ -47,7 +45,7 @@ describe('MusicPlayer', () => {
     expect(container.querySelector('.music-player')).toBeNull();
   });
 
-  it('renders the mood buttons and transport controls on localhost', () => {
+  it('renders mood buttons and transport controls on localhost', () => {
     renderPlayer();
     expect(screen.getByText('Music')).toBeInTheDocument();
     for (const mood of MOODS) {
@@ -56,79 +54,64 @@ describe('MusicPlayer', () => {
     expect(screen.getByTitle('Volume')).toBeInTheDocument();
   });
 
-  it('does not mount the YouTube iframe while idle', () => {
-    const { container } = renderPlayer();
-    expect(container.querySelector('.yt-music-frame')).toBeNull();
-    expect(container.querySelector('#yt-music-frame')).toBeNull();
-    expect(youtubePlayer.ensurePlayer).not.toHaveBeenCalled();
-  });
-
-  it('lazy-mounts the YouTube iframe on first mood play', () => {
-    const { container } = renderPlayer();
-    fireEvent.click(screen.getByTitle('Play Town ambience'));
-    expect(youtubePlayer.ensurePlayer).toHaveBeenCalledWith('yt-music-frame');
-    expect(container.querySelector('#yt-music-frame')).not.toBeNull();
-  });
-
-  it('lazy-mounts the iframe and queues tracks when resuming after reload', () => {
-    getStore('campaign').set('music', { mood: 'town', playing: false, volume: 0.7, overrides: {} });
+  it('lazy-mounts the iframe on first mood play, queues tracks, stores state, and logs', () => {
     const { container } = renderPlayer();
     expect(container.querySelector('.yt-music-frame')).toBeNull();
     expect(youtubePlayer.ensurePlayer).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTitle('Play'));
+
+    fireEvent.click(screen.getByTitle('Play Town ambience'));
+
     expect(youtubePlayer.ensurePlayer).toHaveBeenCalledWith('yt-music-frame');
     expect(container.querySelector('#yt-music-frame')).not.toBeNull();
-    const town = MOODS.find(m => m.key === 'town');
-    expect(youtubePlayer.playTracks).toHaveBeenCalledWith(town.tracks.map(t => t.videoId));
-    expect(youtubePlayer.resume).not.toHaveBeenCalled();
-  });
-
-  it('keeps the same iframe node across pause/play and mood switches', () => {
-    const { container } = renderPlayer();
-    fireEvent.click(screen.getByTitle('Play Town ambience'));
-    const frame = container.querySelector('.yt-music-frame');
-    fireEvent.click(screen.getByTitle('Pause'));
-    fireEvent.click(screen.getByTitle('Play'));
-    expect(container.querySelector('.yt-music-frame')).toBe(frame);
-    expect(youtubePlayer.resume).toHaveBeenCalled();
-    fireEvent.click(screen.getByTitle('Play Combat ambience'));
-    expect(container.querySelector('.yt-music-frame')).toBe(frame);
-    expect(youtubePlayer.ensurePlayer).toHaveBeenCalledTimes(1);
-    const combat = MOODS.find(m => m.key === 'combat');
-    expect(youtubePlayer.playTracks).toHaveBeenLastCalledWith(combat.tracks.map(t => t.videoId));
-  });
-
-  it('plays a mood, stores state, and logs the ambience change', () => {
-    renderPlayer();
-    fireEvent.click(screen.getByTitle('Play Town ambience'));
-
-    const town = MOODS.find(m => m.key === 'town');
-    expect(youtubePlayer.playTracks).toHaveBeenCalledWith(town.tracks.map(t => t.videoId));
-    const state = musicState();
-    expect(state.mood).toBe('town');
-    expect(state.playing).toBe(true);
+    expect(youtubePlayer.playTracks).toHaveBeenCalledWith(trackIds('town'));
+    expect(musicState()).toMatchObject({ mood: 'town', playing: true });
     expect(mockAddEntry).toHaveBeenCalledWith(
       'test-campaign',
       expect.objectContaining({ type: 'music', action: 'set_ambience', mood: 'town' })
     );
   });
 
-  it('highlights the active mood button while playing', () => {
+  it('re-queues persisted tracks when resuming after reload', () => {
+    getStore('campaign').set('music', { mood: 'town', playing: false, volume: 0.7, overrides: {} });
+    const { container } = renderPlayer();
+    expect(container.querySelector('.yt-music-frame')).toBeNull();
+
+    fireEvent.click(screen.getByTitle('Play'));
+
+    expect(youtubePlayer.ensurePlayer).toHaveBeenCalledWith('yt-music-frame');
+    expect(container.querySelector('#yt-music-frame')).not.toBeNull();
+    expect(youtubePlayer.playTracks).toHaveBeenCalledWith(trackIds('town'));
+    expect(youtubePlayer.resume).not.toHaveBeenCalled();
+    expect(musicState().playing).toBe(true);
+  });
+
+  it('reuses the iframe across pause, resume, and mood switches', () => {
+    const { container } = renderPlayer();
+    fireEvent.click(screen.getByTitle('Play Town ambience'));
+    const frame = container.querySelector('.yt-music-frame');
+
+    fireEvent.click(screen.getByTitle('Pause'));
+    expect(youtubePlayer.pause).toHaveBeenCalled();
+    expect(musicState().playing).toBe(false);
+
+    fireEvent.click(screen.getByTitle('Play'));
+    expect(youtubePlayer.resume).toHaveBeenCalled();
+    expect(musicState().playing).toBe(true);
+    expect(container.querySelector('.yt-music-frame')).toBe(frame);
+
+    fireEvent.click(screen.getByTitle('Play Combat ambience'));
+    expect(container.querySelector('.yt-music-frame')).toBe(frame);
+    expect(youtubePlayer.ensurePlayer).toHaveBeenCalledTimes(1);
+    expect(youtubePlayer.playTracks).toHaveBeenLastCalledWith(trackIds('combat'));
+  });
+
+  it('highlights the active mood button only while playing', () => {
     renderPlayer();
     fireEvent.click(screen.getByTitle('Play Combat ambience'));
     expect(screen.getByTitle('Play Combat ambience').className).toContain('active');
     expect(screen.getByTitle('Play Town ambience').className).not.toContain('active');
-  });
-
-  it('toggles pause and resume', () => {
-    renderPlayer();
-    fireEvent.click(screen.getByTitle('Play Tavern ambience'));
     fireEvent.click(screen.getByTitle('Pause'));
-    expect(youtubePlayer.pause).toHaveBeenCalled();
-    expect(musicState().playing).toBe(false);
-    fireEvent.click(screen.getByTitle('Play'));
-    expect(youtubePlayer.resume).toHaveBeenCalled();
-    expect(musicState().playing).toBe(true);
+    expect(screen.getByTitle('Play Combat ambience').className).not.toContain('active');
   });
 
   it('stops playback and logs the stop', () => {
@@ -136,31 +119,29 @@ describe('MusicPlayer', () => {
     fireEvent.click(screen.getByTitle('Play Dungeon ambience'));
     fireEvent.click(screen.getByTitle('Stop'));
     expect(youtubePlayer.stop).toHaveBeenCalled();
-    const state = musicState();
-    expect(state.mood).toBeNull();
-    expect(state.playing).toBe(false);
+    expect(musicState()).toMatchObject({ mood: null, playing: false });
     expect(mockAddEntry).toHaveBeenCalledWith(
       'test-campaign',
       expect.objectContaining({ type: 'music', action: 'stop' })
     );
   });
 
-  it('forwards volume changes to the player', () => {
+  it('forwards volume changes to the player and store', () => {
     renderPlayer();
     fireEvent.change(screen.getByTitle('Volume'), { target: { value: '40' } });
-    expect(youtubePlayer.setVolume).toHaveBeenCalledWith(expect.closeTo(0.4));
+    expect(youtubePlayer.setVolume).toHaveBeenLastCalledWith(expect.closeTo(0.4));
     expect(musicState().volume).toBeCloseTo(0.4);
   });
 
   it('lets the GM override a mood with pasted YouTube URLs', () => {
     renderPlayer();
     fireEvent.click(screen.getByTitle('Edit tracks for this mood'));
-    const textarea = screen.getByPlaceholderText('One YouTube URL or video ID per line');
-    fireEvent.change(textarea, { target: { value: 'https://youtu.be/aaaaaaaaaaa\nhttps://www.youtube.com/watch?v=bbbbbbbbbbb' } });
+    fireEvent.change(screen.getByPlaceholderText('One YouTube URL or video ID per line'), {
+      target: { value: 'https://youtu.be/aaaaaaaaaaa\nhttps://www.youtube.com/watch?v=bbbbbbbbbbb' }
+    });
     fireEvent.click(screen.getByText('Save'));
 
-    const state = musicState();
-    expect(state.overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa', 'bbbbbbbbbbb']);
+    expect(musicState().overrides.town.map(t => t.videoId)).toEqual(['aaaaaaaaaaa', 'bbbbbbbbbbb']);
 
     fireEvent.click(screen.getByTitle('Play Town ambience'));
     expect(youtubePlayer.playTracks).toHaveBeenCalledWith(['aaaaaaaaaaa', 'bbbbbbbbbbb']);
@@ -172,6 +153,7 @@ describe('MusicPlayer', () => {
     fireEvent.change(screen.getByPlaceholderText('One YouTube URL or video ID per line'), { target: { value: 'not a url' } });
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     fireEvent.click(screen.getByText('Save'));
+    expect(spy).toHaveBeenCalledWith('No valid YouTube URLs or video ids entered');
     expect(musicState()).toBeUndefined();
     spy.mockRestore();
   });

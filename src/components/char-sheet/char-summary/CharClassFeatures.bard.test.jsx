@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -6,8 +6,9 @@ import * as classFeatures from '../../../services/character/classFeatures.js';
 import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 import * as unbreakableMajesty from '../../../services/combat/auras/unbreakableMajesty.js';
 
-// Bard Features are reached through the CharClassFeatures registry entry
-// point (class name 'Bard' → BardFeatures).
+// Owns: Bard region rendering only — what BardFeatures displays from the
+// values the class-rules service returns (that service's level math is
+// pinned by classRules.test.js; registry dispatch by CharClassFeatures.test.jsx).
 
 vi.mock('./TrackedResourceInput.jsx', () => ({
   default: function MockTrackedResourceInput({ label, getMax, resourceKey }) {
@@ -36,23 +37,19 @@ vi.mock('../../../services/combat/auras/unbreakableMajesty.js', () => ({
   clearUnbreakableMajesty: vi.fn(),
 }));
 
-// Mirrors the shape classRules.getBardFeatures returns in the real service.
-const defaultBardFeatures = {
-  bardicDie: 6,
-  songOfRestDie: null,
-  magicalSecrets: null,
-  subclassMagicalSecrets: 0,
-};
-
 function mockBardFeatures(overrides = {}) {
-  classFeatures.getClassFeatures.mockReturnValue({ ...defaultBardFeatures, ...overrides });
+  classFeatures.getClassFeatures.mockReturnValue({
+    bardicDie: 6,
+    songOfRestDie: null,
+    magicalSecrets: null,
+    subclassMagicalSecrets: 0,
+    ...overrides,
+  });
 }
 
-function mockRuntime({ buffs = undefined } = {}) {
-  runtimeState.useRuntimeValue.mockImplementation((_name, key) => {
-    if (key === 'activeBuffs') return buffs;
-    return undefined;
-  });
+function mockBuffs(buffs) {
+  runtimeState.useRuntimeValue.mockImplementation((_name, key) =>
+    (key === 'activeBuffs' ? buffs : undefined));
 }
 
 function bardStats(level, overrides = {}) {
@@ -76,9 +73,7 @@ function bardStats(level, overrides = {}) {
       { name: 'Wisdom', bonus: 1 },
       { name: 'Charisma', bonus: 3 },
     ],
-    automation: {
-      passives: [],
-    },
+    automation: { passives: [] },
     ...overrides,
   };
 }
@@ -92,190 +87,140 @@ describe('BardFeatures', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockBardFeatures();
-    mockRuntime({ buffs: [] });
+    mockBuffs([]);
     unbreakableMajesty.isUnbreakableMajestyActive.mockReturnValue(false);
     unbreakableMajesty.getUnbreakableMajestySaveDc.mockReturnValue(0);
   });
 
-  describe('bardic inspiration die', () => {
-    it.each([
-      [1, 6],
-      [5, 8],
-      [10, 10],
-      [15, 12],
-    ])('at level %i renders the die from bardicDie (d%i)', (level, bardicDie) => {
-      mockBardFeatures({ bardicDie });
-      const section = renderBard(bardStats(level));
-      expect(section.textContent).toContain(`Bardic Inspiration Die: d${bardicDie}`);
-    });
-
-    it('renders d0 when the class rules provide no die', () => {
-      mockBardFeatures({ bardicDie: 0 });
-      const section = renderBard(bardStats(1));
-      expect(section.textContent).toContain('Bardic Inspiration Die: d0');
-    });
+  it.each([
+    [8, 'Bardic Inspiration Die: d8'],
+    [12, 'Bardic Inspiration Die: d12'],
+    [undefined, 'Bardic Inspiration Die: d0'],
+  ])('renders the inspiration die from class rules %p', (bardicDie, expected) => {
+    mockBardFeatures({ bardicDie });
+    expect(renderBard(bardStats(5)).textContent).toContain(expected);
   });
 
-  describe('bardic inspiration uses', () => {
-    it('tracks uses with max from the Charisma modifier', () => {
-      renderBard(bardStats(1));
-      expect(screen.getByTestId('tracked-resource-bardicInspirationUses'))
-        .toHaveTextContent('Bardic Inspiration Uses: 3/3');
-    });
-
-    it.each([
-      ['Charisma modifier is 0', [{ name: 'Charisma', bonus: 0 }]],
-      ['Charisma ability is missing', []],
-    ])('shows 0 uses when %s', (_label, abilities) => {
-      renderBard(bardStats(1, { abilities }));
-      expect(screen.getByTestId('tracked-resource-bardicInspirationUses'))
-        .toHaveTextContent('Bardic Inspiration Uses: 0/0');
-    });
+  it.each([
+    [3, 'Bardic Inspiration Uses: 3/3'],
+    [0, 'Bardic Inspiration Uses: 0/0'],
+  ])('tracks inspiration uses from the Charisma modifier %p', (bonus, expected) => {
+    renderBard(bardStats(1, {
+      abilities: [{ name: 'Charisma', bonus }],
+    }));
+    expect(screen.getByTestId('tracked-resource-bardicInspirationUses')).toHaveTextContent(expected);
   });
 
-  describe('expertise', () => {
-    it('lists joined expertise just above the level threshold (level 3)', () => {
-      const section = renderBard(bardStats(3, { expertise: ['Athletics', 'Stealth', 'Persuasion'] }));
-      expect(section.textContent).toContain('Expertise: Athletics, Stealth, Persuasion');
-    });
-
-    it.each([
-      ['level is exactly 2', 2, ['Athletics']],
-      ['expertise is undefined', 5, undefined],
-      ['expertise is an empty array', 5, []],
-    ])('omits expertise when %s', (_label, level, expertise) => {
-      const section = renderBard(bardStats(level, { expertise }));
-      expect(section.textContent).not.toContain('Expertise');
-    });
+  it('tracks inspiration uses as 0/0 when the Charisma ability is missing', () => {
+    renderBard(bardStats(1, { abilities: [] }));
+    expect(screen.getByTestId('tracked-resource-bardicInspirationUses')).toHaveTextContent('Bardic Inspiration Uses: 0/0');
   });
 
-  describe('extra attacks via magical secrets', () => {
-    it('renders when level > 5 and the bard has magical secrets', () => {
-      mockBardFeatures({ magicalSecrets: 3 });
-      const section = renderBard(bardStats(6));
-      expect(section.textContent).toContain('Extra Attacks: 1');
-    });
-
-    it.each([
-      ['level is exactly 5', 5, 3],
-      ['magical secrets are not yet known (null)', 10, null],
-      ['magical secrets key is absent (undefined)', 10, undefined],
-    ])('omits extra attacks when %s', (_label, level, magicalSecrets) => {
-      mockBardFeatures({ magicalSecrets });
-      const section = renderBard(bardStats(level));
-      expect(section.textContent).not.toContain('Extra Attacks');
-    });
+  it('renders joined expertise above level 2', () => {
+    const section = renderBard(bardStats(3, { expertise: ['Athletics', 'Stealth', 'Persuasion'] }));
+    expect(section.textContent).toContain('Expertise: Athletics, Stealth, Persuasion');
   });
 
-  describe('magical secrets tracked resource', () => {
-    it.each([
-      ['class secrets only', 3, 0, 3],
-      ['class and subclass secrets', 3, 2, 5],
-      ['level 14 cap', 5, 0, 5],
-    ])('sums max from magicalSecrets + subclassMagicalSecrets (%s)', (_label, secrets, subclass, expectedMax) => {
-      mockBardFeatures({ magicalSecrets: secrets, subclassMagicalSecrets: subclass });
-      renderBard(bardStats(14));
-      expect(screen.getByTestId('tracked-resource-magicalSecrets'))
-        .toHaveTextContent(`Magical Secrets: ${expectedMax}/${expectedMax}`);
-    });
-
-    it('omits the tracked resource when magicalSecrets is null', () => {
-      mockBardFeatures({ magicalSecrets: null });
-      renderBard(bardStats(1));
-      expect(screen.queryByTestId('tracked-resource-magicalSecrets')).not.toBeInTheDocument();
-    });
+  it.each([
+    ['locked at level 2', 2, ['Athletics']],
+    ['expertise is missing', 5, undefined],
+    ['expertise is empty', 5, []],
+  ])('omits expertise when %s', (_label, level, expertise) => {
+    expect(renderBard(bardStats(level, { expertise })).textContent).not.toContain('Expertise:');
   });
 
-  describe('beguiling magic', () => {
-    it('renders a single-use tracked resource for a passive_rule with riderSave', () => {
-      renderBard(bardStats(6, {
-        automation: { passives: [{ type: 'passive_rule', riderSave: true }] },
-      }));
-      expect(screen.getByTestId('tracked-resource-postCastRider_Beguiling_Magic'))
-        .toHaveTextContent('Beguiling Magic: 1/1');
-    });
-
-    it.each([
-      ['passives is empty', []],
-      ['passives is undefined', undefined],
-      ['passive_rule lacks riderSave', [{ type: 'passive_rule' }]],
-      ['riderSave is on a non-passive_rule entry', [{ type: 'active_rule', riderSave: true }]],
-    ])('omits the tracked resource when %s', (_label, passives) => {
-      renderBard(bardStats(6, { automation: { passives } }));
-      expect(screen.queryByTestId('tracked-resource-postCastRider_Beguiling_Magic')).not.toBeInTheDocument();
-    });
+  it.each([
+    ['shown above level 5 with secrets', 6, 3, true],
+    ['locked at exactly level 5', 5, 3, false],
+    ['hidden without secrets', 10, null, false],
+  ])('extra attacks via magical secrets: %s', (_label, level, magicalSecrets, shouldShow) => {
+    mockBardFeatures({ magicalSecrets });
+    const text = renderBard(bardStats(level)).textContent;
+    if (shouldShow) {
+      expect(text).toContain('Extra Attacks: 1');
+    } else {
+      expect(text).not.toContain('Extra Attacks');
+    }
   });
 
-  describe('song of rest die', () => {
-    it.each([
-      [5, 6],
-      [9, 8],
-      [13, 10],
-      [17, 12],
-    ])('at level %i renders the die from songOfRestDie (d%i)', (level, die) => {
-      mockBardFeatures({ songOfRestDie: die });
-      const section = renderBard(bardStats(level));
-      expect(section.textContent).toContain(`Song of Rest Die: d${die}`);
-    });
-
-    it('omits song of rest when songOfRestDie is null', () => {
-      mockBardFeatures({ songOfRestDie: null });
-      const section = renderBard(bardStats(1));
-      expect(section.textContent).not.toContain('Song of Rest');
-    });
+  it.each([
+    [null, false],
+    [3, true],
+  ])('renders the Magical Secrets tracked resource only when secrets are known (%p)', (magicalSecrets, shouldShow) => {
+    mockBardFeatures({ magicalSecrets, subclassMagicalSecrets: 2 });
+    renderBard(bardStats(14));
+    const resource = screen.queryByTestId('tracked-resource-magicalSecrets');
+    if (shouldShow) {
+      expect(resource).toHaveTextContent('Magical Secrets: 5/5');
+    } else {
+      expect(resource).not.toBeInTheDocument();
+    }
   });
 
-  describe('unbreakable majesty', () => {
-    it('renders an active majesty badge with the reported save DC', () => {
-      unbreakableMajesty.isUnbreakableMajestyActive.mockReturnValue(true);
-      unbreakableMajesty.getUnbreakableMajestySaveDc.mockReturnValue(15);
-      const section = renderBard(bardStats(18));
-      const button = screen.getByRole('button', { name: /Unbreakable Majesty DC 15/ });
-      expect(button).toBeInTheDocument();
-      expect(button).toHaveClass('majesty-badge--active');
-      expect(section.contains(button)).toBe(true);
-    });
-
-    it('clears the aura when the active badge is clicked', () => {
-      unbreakableMajesty.isUnbreakableMajestyActive.mockReturnValue(true);
-      unbreakableMajesty.getUnbreakableMajestySaveDc.mockReturnValue(15);
-      renderBard(bardStats(18));
-      fireEvent.click(screen.getByRole('button', { name: /Unbreakable Majesty/ }));
-      expect(unbreakableMajesty.clearUnbreakableMajesty).toHaveBeenCalledWith('Test Bard', 'test-campaign');
-    });
-
-    it('does not render the badge and queries the aura for this player and campaign when inactive', () => {
-      const section = renderBard(bardStats(18));
-      expect(screen.queryByRole('button', { name: /Unbreakable Majesty/ })).not.toBeInTheDocument();
-      expect(section.textContent).not.toContain('Unbreakable Majesty');
-      expect(unbreakableMajesty.isUnbreakableMajestyActive).toHaveBeenCalledWith('Test Bard', 'test-campaign');
-    });
+  it('renders a single-use Beguiling Magic tracker for a passive_rule with riderSave', () => {
+    renderBard(bardStats(6, {
+      automation: { passives: [{ type: 'passive_rule', riderSave: true }] },
+    }));
+    expect(screen.getByTestId('tracked-resource-postCastRider_Beguiling_Magic')).toHaveTextContent('Beguiling Magic: 1/1');
   });
 
-  describe('multi-minute buff badges', () => {
-    it('renders automation badges for multi-minute durations and filters the rest', () => {
-      mockRuntime({ buffs: [
-        { name: 'Buff A', duration: '1_minute' },
-        { name: 'Buff B', duration: 'hour' },
-        { name: 'Buff C', duration: '1_round' },
-      ] });
-      const section = renderBard(bardStats(1));
-      const badges = [...section.querySelectorAll('.automation-badge')].map(el => el.textContent);
-      expect(badges).toContain('Buff A');
-      expect(badges).toContain('Buff B');
-      expect(badges).not.toContain('Buff C');
-    });
-
-    it('renders no badges when activeBuffs is empty', () => {
-      mockRuntime({ buffs: [] });
-      const section = renderBard(bardStats(1));
-      expect(section.querySelectorAll('.automation-badge')).toHaveLength(0);
-    });
-
-    it('survives a non-array activeBuffs value without rendering badges', () => {
-      mockRuntime({ buffs: undefined });
-      const section = renderBard(bardStats(1));
-      expect(section.querySelectorAll('.automation-badge')).toHaveLength(0);
-    });
+  it.each([
+    ['no passives at all', undefined],
+    ['no passives listed', []],
+    ['a passive_rule without riderSave', [{ type: 'passive_rule' }]],
+    ['riderSave on a non-passive_rule entry', [{ type: 'active_rule', riderSave: true }]],
+  ])('omits the Beguiling Magic tracker when %s', (_label, passives) => {
+    renderBard(bardStats(6, { automation: { passives } }));
+    expect(screen.queryByTestId('tracked-resource-postCastRider_Beguiling_Magic')).not.toBeInTheDocument();
   });
+
+  it.each([
+    [8, true],
+    [null, false],
+  ])('renders the Song of Rest die when songOfRestDie is %p', (die, shouldShow) => {
+    mockBardFeatures({ songOfRestDie: die });
+    const text = renderBard(bardStats(9)).textContent;
+    if (shouldShow) {
+      expect(text).toContain('Song of Rest Die: d8');
+    } else {
+      expect(text).not.toContain('Song of Rest');
+    }
+  });
+
+  it('shows an active Unbreakable Majesty badge with its save DC and clears the aura on click', () => {
+    unbreakableMajesty.isUnbreakableMajestyActive.mockReturnValue(true);
+    unbreakableMajesty.getUnbreakableMajestySaveDc.mockReturnValue(15);
+    const section = renderBard(bardStats(18));
+    const button = screen.getByRole('button', { name: /Unbreakable Majesty DC 15/ });
+    expect(button).toHaveClass('majesty-badge--active');
+    expect(section.contains(button)).toBe(true);
+    fireEvent.click(button);
+    expect(unbreakableMajesty.clearUnbreakableMajesty).toHaveBeenCalledWith('Test Bard', 'test-campaign');
+  });
+
+  it('hides majesty and queries the aura for this player and campaign when inactive', () => {
+    const section = renderBard(bardStats(18));
+    expect(screen.queryByRole('button', { name: /Unbreakable Majesty/ })).not.toBeInTheDocument();
+    expect(section.textContent).not.toContain('Unbreakable Majesty');
+    expect(unbreakableMajesty.isUnbreakableMajestyActive).toHaveBeenCalledWith('Test Bard', 'test-campaign');
+  });
+
+  it('badges multi-minute buffs and filters shorter or unlisted durations', () => {
+    mockBuffs([
+      { name: 'Buff A', duration: '1_minute' },
+      { name: 'Buff B', duration: 'hour' },
+      { name: 'Buff C', duration: '1_round' },
+      { name: 'Buff D', duration: '1_hour' },
+    ]);
+    const badges = [...renderBard(bardStats(1)).querySelectorAll('.automation-badge')].map(el => el.textContent);
+    expect(badges).toEqual(['Buff A', 'Buff B']);
+  });
+
+  it.each([[[]], [undefined], ['corrupted']])(
+    'renders no buff badges when activeBuffs is %p',
+    (buffs) => {
+      mockBuffs(buffs);
+      expect(renderBard(bardStats(1)).querySelectorAll('.automation-badge')).toHaveLength(0);
+    }
+  );
 });

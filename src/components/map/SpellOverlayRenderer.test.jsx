@@ -1,369 +1,175 @@
+// @maintained-by-ai: 2026-10-14
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
-import { OverlayShape, OVERLAY_STROKE_ALPHA } from '../../models/SpellOverlay.js';
+import {
+    OverlayShape,
+    createOverlay,
+    svgOrigin,
+    toGrid,
+    OVERLAY_STROKE_ALPHA,
+} from '../../models/SpellOverlay.js';
 import { CELL_SIZE } from '../../config/mapConfig.js';
 
-const toGrid = (ft) => ft / 5;
+const px = (ft) => toGrid(ft) * CELL_SIZE;
+const center = (gridX, gridY) => svgOrigin({ startGridX: gridX, startGridY: gridY });
 
-const gridCenterX = (gridX) => gridX * CELL_SIZE + CELL_SIZE / 2;
-const gridCenterY = (gridY) => gridY * CELL_SIZE + CELL_SIZE / 2;
+const makeSphere = (overrides = {}) =>
+    createOverlay(OverlayShape.SPHERE, 5, 5, 0, { id: 'sphere-1', ...overrides });
+const makeCylinder = (overrides = {}) =>
+    createOverlay(OverlayShape.CYLINDER, 3, 3, 0, {
+        id: 'cylinder-1',
+        color: 'rgba(100,150,255,0.07)',
+        ...overrides,
+    });
+const makeCube = (overrides = {}) =>
+    createOverlay(OverlayShape.CUBE, 4, 4, 0, {
+        id: 'cube-1',
+        color: 'rgba(255,200,50,0.07)',
+        ...overrides,
+    });
+const makeCone = (overrides = {}) =>
+    createOverlay(OverlayShape.CONE, 2, 2, 0, {
+        id: 'cone-1',
+        coneAngle: 90,
+        distanceFt: 60,
+        ...overrides,
+    });
+const makeLine = (overrides = {}) =>
+    createOverlay(OverlayShape.LINE, 1, 1, 0, { id: 'line-1', distanceFt: 30, ...overrides });
 
-const makeSphereOverlay = (overrides = {}) => ({
-    id: 'sphere-1',
-    shape: OverlayShape.SPHERE,
-    startGridX: 5,
-    startGridY: 5,
-    angle: 0,
-    radiusFt: 20,
-    coneAngle: 0,
-    widthFt: 0,
-    distanceFt: 0,
-    sizeFt: 0,
-    color: 'rgba(255,80,60,0.07)',
-    ...overrides,
-});
+const renderComponent = (overlays = [], pendingOverlay = null) =>
+    render(<SpellOverlayRenderer overlays={overlays} pendingOverlay={pendingOverlay} />);
 
-const makeCylinderOverlay = (overrides = {}) => ({
-    id: 'cylinder-1',
-    shape: OverlayShape.CYLINDER,
-    startGridX: 3,
-    startGridY: 3,
-    angle: 0,
-    radiusFt: 15,
-    coneAngle: 0,
-    widthFt: 0,
-    distanceFt: 0,
-    sizeFt: 0,
-    color: 'rgba(100,150,255,0.07)',
-    ...overrides,
-});
-
-const makeCubeOverlay = (overrides = {}) => ({
-    id: 'cube-1',
-    shape: OverlayShape.CUBE,
-    startGridX: 4,
-    startGridY: 4,
-    angle: 0,
-    radiusFt: 0,
-    coneAngle: 0,
-    widthFt: 0,
-    distanceFt: 0,
-    sizeFt: 15,
-    color: 'rgba(255,200,50,0.07)',
-    ...overrides,
-});
-
-const makeConeOverlay = (overrides = {}) => ({
-    id: 'cone-1',
-    shape: OverlayShape.CONE,
-    startGridX: 2,
-    startGridY: 2,
-    angle: 0,
-    radiusFt: 0,
-    coneAngle: 90,
-    widthFt: 0,
-    distanceFt: 60,
-    sizeFt: 0,
-    color: 'rgba(255,100,100,0.07)',
-    ...overrides,
-});
-
-const makeLineOverlay = (overrides = {}) => ({
-    id: 'line-1',
-    shape: OverlayShape.LINE,
-    startGridX: 1,
-    startGridY: 1,
-    angle: 0,
-    radiusFt: 0,
-    coneAngle: 0,
-    widthFt: 5,
-    distanceFt: 30,
-    sizeFt: 0,
-    color: 'rgba(100,255,100,0.07)',
-    ...overrides,
-});
-
-const makeUnknownOverlay = (overrides = {}) => ({
-    id: 'unknown-1',
-    shape: 'unknown-shape',
-    startGridX: 0,
-    startGridY: 0,
-    ...overrides,
-});
-
-const renderComponent = (props, overlays = [], pendingOverlay = null) =>
-    render(
-        <g>
-            <SpellOverlayRenderer
-                overlays={overlays}
-                pendingOverlay={pendingOverlay}
-                {...props}
-            />
-        </g>
-    );
-
-const getLayer = (container) => container.querySelector('g.spell-overlay-layer');
 const getGroups = (container) => container.querySelectorAll('g.spell-overlay-group');
-const getSpellOverlay = (container) => container.querySelector('circle.spell-overlay');
-const getConePath = (container) => container.querySelector('path.spell-overlay');
-const getLineRect = (container) => container.querySelector('rect.spell-overlay');
+const getHandles = (container) => container.querySelectorAll('circle.spell-overlay-handle');
 
 describe('SpellOverlayRenderer', () => {
-    describe('layer rendering', () => {
-        it('should render a layer', () => {
-            const { container } = renderComponent({}, [], null);
-            expect(getLayer(container)).toBeInTheDocument();
-        });
-
-        it('should render all overlay shapes in a single layer', () => {
-            const overlays = [
-                makeSphereOverlay({ id: 's1' }),
-                makeCylinderOverlay({ id: 's2' }),
-                makeCubeOverlay({ id: 'c1' }),
-                makeConeOverlay({ id: 'cn1' }),
-                makeLineOverlay({ id: 'l1' }),
-            ];
-            const { container } = renderComponent({}, overlays);
-            expect(getGroups(container).length).toBe(5);
-        });
-
-        it('should render overlay groups keyed by overlay id for correct reconciliation', () => {
-            const sphere1 = makeSphereOverlay({ id: 'unique-id-1' });
-            const sphere2 = makeSphereOverlay({ id: 'unique-id-2' });
-            const { container } = renderComponent({}, [sphere1, sphere2]);
-            expect(getGroups(container).length).toBe(2);
-            expect(getGroups(container)[0].querySelector('circle.spell-overlay')).toBeInTheDocument();
-            expect(getGroups(container)[1].querySelector('circle.spell-overlay')).toBeInTheDocument();
-        });
+    it('renders one group per known shape plus the pending overlay, and a layer wrapper', () => {
+        const { container } = renderComponent(
+            [makeSphere(), makeCylinder(), makeCube(), makeCone(), makeLine()],
+            makeSphere({ id: 'pending-1' }),
+        );
+        expect(container.querySelector('g.spell-overlay-layer')).toBeInTheDocument();
+        const groups = getGroups(container);
+        expect(groups.length).toBe(6);
+        // pending overlay renders last, after the committed overlays
+        expect(groups[5].querySelector('circle.spell-overlay')).toBeInTheDocument();
     });
 
-    describe('unknown shape handling', () => {
-        it('should render no group for an unknown overlay shape', () => {
-            const { container } = renderComponent({}, [makeUnknownOverlay()]);
-            expect(getGroups(container).length).toBe(0);
-        });
-
-        it('should still render other overlays when one has an unknown shape', () => {
-            const sphere = makeSphereOverlay({ id: 's1' });
-            const unknown = makeUnknownOverlay({ id: 'u1' });
-            const { container } = renderComponent({}, [sphere, unknown]);
-            expect(getGroups(container).length).toBe(1);
-        });
+    it('skips overlays with an unknown shape but renders the rest', () => {
+        const unknown = { id: 'u1', shape: 'unknown-shape', startGridX: 0, startGridY: 0 };
+        const { container } = renderComponent([makeSphere(), unknown]);
+        expect(getGroups(container).length).toBe(1);
     });
 
     describe('sphere overlay', () => {
-        it('should render a sphere with correct circle radius', () => {
-            const sphere = makeSphereOverlay({ radiusFt: 20 });
-            const { container } = renderComponent({}, [sphere]);
-            const circle = getSpellOverlay(container);
-            const expectedR = toGrid(20) * CELL_SIZE;
-            expect(circle.getAttribute('r')).toBe(String(expectedR));
+        it('renders a circle centered on its grid cell with radius from radiusFt', () => {
+            const { container } = renderComponent([makeSphere({ radiusFt: 20 })]);
+            const circle = container.querySelector('circle.spell-overlay');
+            const { x, y } = center(5, 5);
+            expect(circle.getAttribute('cx')).toBe(String(x));
+            expect(circle.getAttribute('cy')).toBe(String(y));
+            expect(circle.getAttribute('r')).toBe(String(px(20)));
         });
 
-        it('should render a sphere at correct center position', () => {
-            const sphere = makeSphereOverlay({ startGridX: 5, startGridY: 5 });
-            const { container } = renderComponent({}, [sphere]);
-            const circle = getSpellOverlay(container);
-            expect(circle.getAttribute('cx')).toBe(String(gridCenterX(5)));
-            expect(circle.getAttribute('cy')).toBe(String(gridCenterY(5)));
-        });
-
-        it('should render a sphere with the specified fill color', () => {
-            const sphere = makeSphereOverlay({ color: 'rgba(0,255,0,0.35)' });
-            const { container } = renderComponent({}, [sphere]);
-            const circle = getSpellOverlay(container);
+        it('fills with the overlay color and strokes at fixed alpha regardless of fill alpha', () => {
+            const { container } = renderComponent([makeSphere({ color: 'rgba(0,255,0,0.35)' })]);
+            const circle = container.querySelector('circle.spell-overlay');
             expect(circle.getAttribute('fill')).toBe('rgba(0,255,0,0.35)');
+            expect(circle.getAttribute('stroke')).toBe(`rgba(0,255,0,${OVERLAY_STROKE_ALPHA})`);
         });
 
-        it('should keep a 0.8 alpha stroke regardless of fill alpha', () => {
-            const sphere = makeSphereOverlay();
-            const { container } = renderComponent({}, [sphere]);
-            const circle = getSpellOverlay(container);
-            expect(circle.getAttribute('fill')).toBe('rgba(255,80,60,0.07)');
-            expect(circle.getAttribute('stroke')).toBe(`rgba(255,80,60,${OVERLAY_STROKE_ALPHA})`);
-        });
-
-        it('should render a sphere with a drag handle at the center', () => {
-            const sphere = makeSphereOverlay({ startGridX: 5, startGridY: 5 });
-            const { container } = renderComponent({}, [sphere]);
-            const handles = container.querySelectorAll('circle.spell-overlay-handle');
+        it('renders a move handle at the center', () => {
+            const { container } = renderComponent([makeSphere()]);
+            const handles = getHandles(container);
             expect(handles.length).toBe(1);
-            expect(handles[0].getAttribute('cx')).toBe(String(gridCenterX(5)));
-            expect(handles[0].getAttribute('cy')).toBe(String(gridCenterY(5)));
+            const { x, y } = center(5, 5);
+            expect(handles[0].getAttribute('cx')).toBe(String(x));
+            expect(handles[0].getAttribute('cy')).toBe(String(y));
         });
     });
 
-    describe('cylinder overlay', () => {
-        it('should render a cylinder as a circle like a sphere', () => {
-            const cylinder = makeCylinderOverlay({ radiusFt: 20 });
-            const { container } = renderComponent({}, [cylinder]);
-            const circle = getSpellOverlay(container);
-            const expectedR = toGrid(20) * CELL_SIZE;
-            expect(circle.getAttribute('r')).toBe(String(expectedR));
-            expect(circle.getAttribute('cx')).toBe(String(gridCenterX(3)));
-            expect(circle.getAttribute('cy')).toBe(String(gridCenterY(3)));
-        });
-
-        it('should render a cylinder with a drag handle at center', () => {
-            const cylinder = makeCylinderOverlay();
-            const { container } = renderComponent({}, [cylinder]);
-            const handles = container.querySelectorAll('circle.spell-overlay-handle');
-            expect(handles.length).toBe(1);
-        });
+    it('renders a cylinder as a circle like a sphere with a center handle', () => {
+        const { container } = renderComponent([makeCylinder()]);
+        const circle = container.querySelector('circle.spell-overlay');
+        const { x, y } = center(3, 3);
+        expect(circle.getAttribute('cx')).toBe(String(x));
+        expect(circle.getAttribute('cy')).toBe(String(y));
+        expect(circle.getAttribute('r')).toBe(String(px(20)));
+        expect(getHandles(container).length).toBe(1);
     });
 
     describe('cube overlay', () => {
-        it('should render a cube with correct size', () => {
-            const cube = makeCubeOverlay({ sizeFt: 15 });
-            const { container } = renderComponent({}, [cube]);
-            const rect = getLineRect(container);
-            const expectedSize = toGrid(15) * CELL_SIZE;
-            expect(rect.getAttribute('width')).toBe(String(expectedSize));
-            expect(rect.getAttribute('height')).toBe(String(expectedSize));
+        it('renders a centered rect sized from sizeFt with its fill color and a move handle', () => {
+            const { container } = renderComponent([makeCube({ sizeFt: 15 })]);
+            const rect = container.querySelector('rect.spell-overlay');
+            const { x, y } = center(4, 4);
+            const size = px(15);
+            expect(rect.getAttribute('width')).toBe(String(size));
+            expect(rect.getAttribute('height')).toBe(String(size));
+            expect(rect.getAttribute('x')).toBe(String(x - size / 2));
+            expect(rect.getAttribute('y')).toBe(String(y - size / 2));
+            expect(rect.getAttribute('fill')).toBe('rgba(255,200,50,0.07)');
+            expect(getHandles(container).length).toBe(1);
         });
 
-        it('should render a cube centered at correct position', () => {
-            const cube = makeCubeOverlay({ startGridX: 4, startGridY: 4, sizeFt: 15 });
-            const { container } = renderComponent({}, [cube]);
-            const rect = getLineRect(container);
-            const cx = gridCenterX(4);
-            const cy = gridCenterY(4);
-            const size = toGrid(15) * CELL_SIZE;
-            expect(rect.getAttribute('x')).toBe(String(cx - size / 2));
-            expect(rect.getAttribute('y')).toBe(String(cy - size / 2));
-        });
-
-        it('should render a cube with a drag handle at center', () => {
-            const cube = makeCubeOverlay({ startGridX: 4, startGridY: 4 });
-            const { container } = renderComponent({}, [cube]);
-            const handles = container.querySelectorAll('circle.spell-overlay-handle');
-            expect(handles.length).toBe(1);
-        });
-
-        it('should render a cube with the specified fill color', () => {
-            const cube = makeCubeOverlay({ color: 'rgba(0,100,200,0.35)' });
-            const { container } = renderComponent({}, [cube]);
-            const rect = getLineRect(container);
-            expect(rect.getAttribute('fill')).toBe('rgba(0,100,200,0.35)');
-        });
-
-        it('should apply rotation transform to the cube based on angle', () => {
-            const cube = makeCubeOverlay({ angle: 45 });
-            const { container } = renderComponent({}, [cube]);
+        it('applies a rotation transform around the center based on angle', () => {
+            const { container } = renderComponent([makeCube({ angle: 45 })]);
+            const { x, y } = center(4, 4);
             const transformGroup = container.querySelector('g.spell-overlay-group g');
-            expect(transformGroup.getAttribute('transform')).toContain('rotate(45');
+            expect(transformGroup.getAttribute('transform')).toContain(`rotate(45, ${x}, ${y})`);
         });
     });
 
     describe('cone overlay', () => {
-        it('should render a cone with a path element', () => {
-            const cone = makeConeOverlay();
-            const { container } = renderComponent({}, [cone]);
-            expect(getConePath(container)).toBeInTheDocument();
-        });
-
-        it('should render a cone with a path starting at origin', () => {
-            const cone = makeConeOverlay({ startGridX: 2, startGridY: 2, distanceFt: 60, coneAngle: 90, angle: 90 });
-            const { container } = renderComponent({}, [cone]);
-            const path = getConePath(container);
-            const startX = gridCenterX(2);
-            const startY = gridCenterY(2);
-            expect(path.getAttribute('d')).toContain(`M ${startX},${startY}`);
-        });
-
-        it('should render a cone with two drag handles (origin and edge)', () => {
-            const cone = makeConeOverlay();
-            const { container } = renderComponent({}, [cone]);
-            const handles = container.querySelectorAll('circle.spell-overlay-handle');
+        it('renders a wedge path from the origin with origin and edge drag handles', () => {
+            const { container } = renderComponent([makeCone({ angle: 90 })]);
+            const path = container.querySelector('path.spell-overlay');
+            const { x, y } = center(2, 2);
+            expect(path.getAttribute('d')).toContain(`M ${x},${y}`);
+            expect(path.getAttribute('fill')).toBe('rgba(255,80,60,0.07)');
+            const handles = getHandles(container);
             expect(handles.length).toBe(2);
+            expect(handles[0].getAttribute('cx')).toBe(String(x));
+            expect(handles[0].getAttribute('cy')).toBe(String(y));
+            // edge handle sits on the arc at the trailing cone edge
+            const dist = px(60);
+            const halfSpread = (90 / 2) * (Math.PI / 180);
+            const edgeAngle = (90 * Math.PI) / 180 + halfSpread;
+            expect(Number(handles[1].getAttribute('cx'))).toBeCloseTo(x + dist * Math.cos(edgeAngle));
+            expect(Number(handles[1].getAttribute('cy'))).toBeCloseTo(y + dist * Math.sin(edgeAngle));
         });
 
-        it('should render a cone with the specified fill color', () => {
-            const cone = makeConeOverlay({ color: 'rgba(0,200,100,0.35)' });
-            const { container } = renderComponent({}, [cone]);
-            const path = getConePath(container);
-            expect(path.getAttribute('fill')).toBe('rgba(0,200,100,0.35)');
-        });
-
-        it('should render a cone path with large arc flag when coneAngle exceeds 180', () => {
-            const cone = makeConeOverlay({ coneAngle: 270, distanceFt: 60, angle: 0 });
-            const { container } = renderComponent({}, [cone]);
-            const path = getConePath(container);
-            const d = path.getAttribute('d');
-            expect(d).toContain('A 480,480 0 1,1');
-        });
-
-        it('should render a cone path without large arc flag when coneAngle is 180 or less', () => {
-            const cone = makeConeOverlay({ coneAngle: 90, distanceFt: 60, angle: 0 });
-            const { container } = renderComponent({}, [cone]);
-            const path = getConePath(container);
-            const d = path.getAttribute('d');
-            expect(d).toContain('A 480,480 0 0,1');
+        it('sets the large-arc path flag only when coneAngle exceeds 180', () => {
+            const dist = px(60);
+            const { container: wide } = renderComponent([makeCone({ coneAngle: 270 })]);
+            expect(wide.querySelector('path.spell-overlay').getAttribute('d'))
+                .toContain(`A ${dist},${dist} 0 1,1`);
+            const { container: narrow } = renderComponent([makeCone({ coneAngle: 90 })]);
+            expect(narrow.querySelector('path.spell-overlay').getAttribute('d'))
+                .toContain(`A ${dist},${dist} 0 0,1`);
         });
     });
 
-    describe('line overlay', () => {
-        it('should render a line with a rect element', () => {
-            const line = makeLineOverlay();
-            const { container } = renderComponent({}, [line]);
-            expect(getLineRect(container)).toBeInTheDocument();
-        });
-
-        it('should render a line with correct width and length', () => {
-            const line = makeLineOverlay({ widthFt: 5, distanceFt: 30 });
-            const { container } = renderComponent({}, [line]);
-            const rect = getLineRect(container);
-            const expectedWidth = toGrid(5) * CELL_SIZE;
-            const expectedLength = toGrid(30) * CELL_SIZE;
-            expect(rect.getAttribute('height')).toBe(String(expectedWidth));
-            expect(rect.getAttribute('width')).toBe(String(expectedLength));
-        });
-
-        it('should render a line with two drag handles', () => {
-            const line = makeLineOverlay();
-            const { container } = renderComponent({}, [line]);
-            const handles = container.querySelectorAll('circle.spell-overlay-handle');
-            expect(handles.length).toBe(2);
-        });
-
-        it('should render a line with the specified fill color', () => {
-            const line = makeLineOverlay({ color: 'rgba(100,100,255,0.35)' });
-            const { container } = renderComponent({}, [line]);
-            const rect = getLineRect(container);
-            expect(rect.getAttribute('fill')).toBe('rgba(100,100,255,0.35)');
-        });
-
-        it('should apply rotation transform to the line based on angle', () => {
-            const line = makeLineOverlay({ angle: 90 });
-            const { container } = renderComponent({}, [line]);
-            const transformGroup = container.querySelector('g.spell-overlay-group g');
-            expect(transformGroup.getAttribute('transform')).toContain('rotate(90');
-        });
-    });
-
-    describe('multiple overlays', () => {
-        it('should render overlay groups in correct order: overlays then pending', () => {
-            const sphere = makeSphereOverlay({ id: 's1' });
-            const cube = makeCubeOverlay({ id: 'c1' });
-            const pending = makeConeOverlay({ id: 'p1' });
-            const { container } = renderComponent({}, [sphere, cube], pending);
-            expect(getGroups(container).length).toBe(3);
-        });
-    });
-
-    describe('pending overlay', () => {
-        it('should render a pending overlay', () => {
-            const pending = makeSphereOverlay({ id: 'pending-1' });
-            const { container } = renderComponent({}, [], pending);
-            expect(getGroups(container).length).toBe(1);
-        });
-
-        it('should render both overlays and pending overlay', () => {
-            const sphere = makeSphereOverlay({ id: 's1' });
-            const pending = makeCubeOverlay({ id: 'pending-1' });
-            const { container } = renderComponent({}, [sphere], pending);
-            expect(getGroups(container).length).toBe(2);
-        });
+    it('renders a line as a rotated rect along the angle with origin and end handles', () => {
+        const { container } = renderComponent([makeLine({ angle: 90 })]);
+        const rect = container.querySelector('rect.spell-overlay');
+        const { x, y } = center(1, 1);
+        const dist = px(30);
+        const w = px(5);
+        expect(rect.getAttribute('width')).toBe(String(dist));
+        expect(rect.getAttribute('height')).toBe(String(w));
+        expect(rect.getAttribute('x')).toBe(String(x));
+        expect(rect.getAttribute('y')).toBe(String(y - w / 2));
+        expect(rect.getAttribute('fill')).toBe('rgba(255,80,60,0.07)');
+        const transformGroup = container.querySelector('g.spell-overlay-group g');
+        expect(transformGroup.getAttribute('transform')).toContain(`rotate(90, ${x}, ${y})`);
+        const handles = getHandles(container);
+        expect(handles.length).toBe(2);
+        expect(handles[0].getAttribute('cx')).toBe(String(x));
+        // end handle rotates with the angle: straight down at 90 degrees
+        expect(Number(handles[1].getAttribute('cx'))).toBeCloseTo(x);
+        expect(Number(handles[1].getAttribute('cy'))).toBeCloseTo(y + dist);
     });
 });

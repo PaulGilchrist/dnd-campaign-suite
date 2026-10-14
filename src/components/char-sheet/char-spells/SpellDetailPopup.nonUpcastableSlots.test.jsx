@@ -1,13 +1,13 @@
-// @improved-by-ai
+// @maintained-by-ai
 // SpellDetailPopup paid-cast slot lane for NON-upcastable spells (single
 // damage tier at base level). The popup pays a slot at the spell's FIXED
 // base level: the runtime counter takes precedence over the spellAbilities
 // max (falling back to max only when the runtime has no value), higher-level
 // slots can never cover a non-upcastable spell, and the cast payload must
 // report the cast as a paid, non-upcast cast. Rage, cantrips, warlock
-// slots, free casts, and upcast-selector visibility have their own suites
-// (castCantrip / warlockSlots / freeCast / rendering) and are not re-tested
-// here.
+// slots, free casts, psionic payment, and upcast-selector rendering have
+// their own suites (rageRestriction / castCantrip / warlockSlots / freeCast
+// / psionicPayment / rendering) and are not re-tested here.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -75,8 +75,7 @@ const stubRuntime = (values = {}) => {
     Object.prototype.hasOwnProperty.call(values, key) ? values[key] : null);
 };
 
-const renderPopup = (spell, playerStats = makeStats(), extraProps = {}) => {
-  const onCast = extraProps.onCast || vi.fn();
+const renderPopup = (spell, playerStats = makeStats(), { onCast = vi.fn(), ...rest } = {}) => {
   render(
     <SpellDetailPopup
       spell={spell}
@@ -84,13 +83,17 @@ const renderPopup = (spell, playerStats = makeStats(), extraProps = {}) => {
       campaignName={CAMPAIGN}
       onClose={vi.fn()}
       onCast={onCast}
-      {...extraProps}
+      {...rest}
     />
   );
   return onCast;
 };
 
 const castButton = () => screen.getByRole('button', { name: /Cast Spell/ });
+
+// The meta span renders "<b>Slots Remaining:</b> N slot(s)" — assert the
+// whole row so a count from the wrong slot level can never slip through.
+const slotsRow = () => screen.getByText('Slots Remaining:').closest('span');
 
 describe('SpellDetailPopup — paid casting of non-upcastable spells', () => {
   beforeEach(() => {
@@ -99,55 +102,66 @@ describe('SpellDetailPopup — paid casting of non-upcastable spells', () => {
     vi.mocked(getActiveBuffs).mockReturnValue([]);
   });
 
-  it('enables the paid cast while current slots remain at the base level', () => {
-    stubRuntime({ spell_slots_level_1: 2 });
+  it.each([
+    {
+      case: 'live runtime counter wins over the spellAbilities max',
+      runtime: { spell_slots_level_1: 2 },
+      expectedRow: 'Slots Remaining: 2 slots',
+    },
+    {
+      case: 'spellAbilities max is the fallback when the runtime has no value',
+      runtime: {},
+      expectedRow: 'Slots Remaining: 4 slots',
+    },
+  ])('enables the paid cast and shows $expectedRow — $case', ({ runtime, expectedRow }) => {
+    stubRuntime(runtime);
     renderPopup(makeSpell());
 
     expect(castButton()).toBeEnabled();
-    expect(screen.getByText(/Slots Remaining:/)).toBeInTheDocument();
-    expect(screen.getByText(/2 slots/)).toBeInTheDocument();
+    expect(slotsRow()).toHaveTextContent(expectedRow);
     expect(screen.queryByText(noSlotsText)).not.toBeInTheDocument();
   });
 
-  it('prefers the runtime counter over the spellAbilities max — exhausted slots disable the cast', () => {
-    // spellAbilities max is 4, but the runtime says every slot is spent:
-    // the live counter must win and the popup must say so.
-    stubRuntime({ spell_slots_level_1: 0 });
-    renderPopup(makeSpell());
+  it.each([
+    {
+      case: 'runtime says spent even though the max is 4',
+      runtime: { spell_slots_level_1: 0 },
+      maxSlots: 4,
+    },
+    {
+      case: 'neither source has a slot at the spell level',
+      runtime: { spell_slots_level_1: null },
+      maxSlots: 0,
+    },
+  ])('disables the cast when the base-level counter resolves to zero — $case', ({ runtime, maxSlots }) => {
+    stubRuntime(runtime);
+    renderPopup(makeSpell(), makeStats({ spellAbilities: { spell_slots_level_1: maxSlots, spells: [] } }));
 
     expect(castButton()).toBeDisabled();
-    expect(screen.getByText(noSlotsText)).toBeInTheDocument();
-  });
-
-  it('falls back to the spellAbilities max when the runtime has no value', () => {
-    stubRuntime({});
-    renderPopup(makeSpell());
-
-    expect(castButton()).toBeEnabled();
-    expect(screen.getByText(/Slots Remaining:/)).toBeInTheDocument();
-    expect(screen.getByText(/4 slots/)).toBeInTheDocument();
-  });
-
-  it('disables the cast when no slots exist at the spell level in either source', () => {
-    stubRuntime({ spell_slots_level_1: null });
-    renderPopup(makeSpell(), makeStats({ spellAbilities: { spell_slots_level_1: 0, spells: [] } }));
-
-    expect(castButton()).toBeDisabled();
+    expect(slotsRow()).toHaveTextContent('Slots Remaining: 0');
     expect(screen.getByText(noSlotsText)).toBeInTheDocument();
   });
 
   it('never pays with a higher-level slot — zero base slots disables the cast even when upcastLevels report availability', () => {
     // Non-upcastable spells are locked to their base level: slots at other
     // levels (and any upcastLevels offered upstream) cannot cover the cost.
-    stubRuntime({ spell_slots_level_1: 0, spell_slots_level_2: 2 });
+    // Two AVAILABLE upcast levels are offered so the selector can only be
+    // suppressed by the spell being non-upcastable, not by an empty list.
+    stubRuntime({ spell_slots_level_1: 0, spell_slots_level_2: 2, spell_slots_level_3: 2 });
     renderPopup(
       makeSpell(),
       makeStats(),
-      { upcastLevels: [{ level: 2, formula: '3d8', availableSlots: 2 }] }
+      {
+        upcastLevels: [
+          { level: 2, formula: '3d8', availableSlots: 2 },
+          { level: 3, formula: '4d8', availableSlots: 2 },
+        ],
+      }
     );
 
     expect(castButton()).toBeDisabled();
     expect(screen.getByText(noSlotsText)).toBeInTheDocument();
+    expect(slotsRow()).toHaveTextContent('Slots Remaining: 0');
     expect(screen.queryByText(/Cast at Level:/)).not.toBeInTheDocument();
   });
 

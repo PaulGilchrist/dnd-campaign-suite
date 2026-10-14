@@ -1,17 +1,21 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * CharConditions — CAMPAIGN LOG payloads (every automation must log).
  *
  * Scope (owned by this suite):
  * - addEntry roll entries and logConditionSave payloads: exact shape, both
- *   channels agreeing, bonusDetail formatting for Aura of Protection
- * - Persistence of a successful escape (conditions AND meta cleared in the
- *   runtime store) and preservation of both on a failed save
+ *   channels agreeing, and bonusDetail formatting for Aura of Protection
+ *   (including the omitted-detail case for a zero aura, pinned by the
+ *   exact-object assertion in the first test)
+ * - Persistence of a successful escape (condition cleared in the runtime
+ *   store) and preservation of everything on a failed save (save-meta
+ *   cleanup is component-local state, observed via badge removal)
  * - The condition-save popup payload produced alongside the log entries
  *
  * Covered by sibling suites (intentionally NOT re-tested here):
- * - CharConditions.condition-saves.test.jsx — advantage triggers, dice/bonus
- *   math, popup totals, unsavable badges, per-condition save scoping
+ * - CharConditions.condition-saves.test.jsx — advantage triggers (including
+ *   Powerful Build dice mechanics: two distinguishable dice, keep the higher),
+ *   dice/bonus math, popup totals, unsavable badges, per-condition save scoping
  * - CharConditions.rendering.test.jsx       — badge text/tooltips, dedup,
  *   empty state, re-mount
  * - CharConditions.exhaustion.test.jsx      — exhaustion +/- buttons, the
@@ -177,7 +181,8 @@ describe('CharConditions logging', () => {
       await vi.waitFor(() => expect(logConditionSave).toHaveBeenCalled());
 
       // The component's exact logEntry contract — not objectContaining, so a
-      // missing or extra field in the campaign log is caught.
+      // missing or extra field in the campaign log is caught. This also pins
+      // the zero-aura case: bonusDetail is omitted (undefined) when no aura applies.
       expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
         type: 'roll',
         characterName: CHAR,
@@ -252,7 +257,7 @@ describe('CharConditions logging', () => {
       }));
       expect(logConditionSave).toHaveBeenCalledWith(expect.objectContaining({
         campaignName: CAMPAIGN,
-        roll: 1,
+        roll: 1, // scalar, not an array — single-die failure shape
         dc: 14,
         success: false,
       }));
@@ -264,10 +269,13 @@ describe('CharConditions logging', () => {
       expect(screen.getByRole('button', { name: 'Charmed DC 14' })).toBeInTheDocument();
     });
 
-    // CLA-209 regression: a Powerful Build grapple escape must log BOTH dice
-    // with mode 'advantage' — on the primary roll entry AND the condition-save entry.
+    // CLA-209 regression: an advantage save must log BOTH dice on BOTH
+    // channels — addEntry carries rolls+mode, logConditionSave carries the
+    // roll array. Advantage dice mechanics themselves (2 rolls, keep-high)
+    // are owned by condition-saves.test.jsx, so no total/roll-count asserts.
+    // Dice 8/14 vs DC 13: success:true itself pins keep-high without
+    // re-asserting the math (min would give 10 < 13 → failure).
     it('logs both dice with mode advantage for a Powerful Build grapple escape (CLA-209)', async () => {
-      // Distinguishable dice: max(8, 14) = 14; +2 = 16 >= DC 13 → success.
       vi.mocked(rollD20).mockReturnValueOnce(8).mockReturnValueOnce(14);
       seedCondition('grappled', { dc: 13, ability: 'str' });
       renderWith({
@@ -279,12 +287,10 @@ describe('CharConditions logging', () => {
       await vi.waitFor(() => expect(addEntry).toHaveBeenCalled());
       await vi.waitFor(() => expect(logConditionSave).toHaveBeenCalled());
 
-      expect(rollD20).toHaveBeenCalledTimes(2);
       expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
         rollType: 'save',
         rolls: [8, 14],
         mode: 'advantage',
-        total: 16,
         dc: 13,
         success: true,
         condition: 'Grappled',
@@ -293,8 +299,6 @@ describe('CharConditions logging', () => {
         campaignName: CAMPAIGN,
         creatureName: CHAR,
         roll: [8, 14],
-        bonus: 2,
-        bonusDetail: undefined, // no aura in play — not a wildcard
         conditionLabel: 'Grappled',
         abilityLabel: 'Strength',
         dc: 13,
@@ -304,12 +308,14 @@ describe('CharConditions logging', () => {
   });
 
   describe('aura bonusDetail logging', () => {
+    // Only the two bonusDetail string formats are unique here; the zero-bonus
+    // (detail omitted) case is pinned by the exact addEntry payload in the
+    // first test. Totals/success are literals, not recomputed business math.
     it.each`
-      description                          | aura                               | bonus | bonusDetail
-      ${'named aura source'}             | ${{ bonus: 3, sourceName: 'Paladin' }} | ${5} | ${'(+3 aura from Paladin)'}
-      ${'aura with no known source'}     | ${{ bonus: 3, sourceName: null }}      | ${5} | ${'(+3 aura)'}
-      ${'no aura bonus (detail omitted)'} | ${{ bonus: 0, sourceName: null }}     | ${2} | ${undefined}
-    `('logs bonus $bonus with bonusDetail $bonusDetail when $description', async ({ aura, bonus, bonusDetail }) => {
+      description                      | aura                                    | bonus | bonusDetail                | total
+      ${'named aura source'}         | ${{ bonus: 3, sourceName: 'Paladin' }} | ${5} | ${'(+3 aura from Paladin)'} | ${20}
+      ${'aura with no known source'} | ${{ bonus: 3, sourceName: null }}      | ${5} | ${'(+3 aura)'}              | ${20}
+    `('logs bonus $bonus with bonusDetail $bonusDetail when $description', async ({ aura, bonus, bonusDetail, total }) => {
       vi.mocked(computeAuraBonus).mockResolvedValue(aura);
       seedCondition('charmed', { dc: 14, ability: 'wis' });
       renderWith();
@@ -318,18 +324,16 @@ describe('CharConditions logging', () => {
 
       await vi.waitFor(() => expect(addEntry).toHaveBeenCalled());
 
-      // save bonus 2 + aura bonus = bonus; total 15 + bonus vs DC 14.
-      const expectedTotal = 15 + bonus;
       expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
         bonus,
         bonusDetail,
-        total: expectedTotal,
-        success: expectedTotal >= 14,
+        total,
+        success: true, // total 20 >= DC 14
       }));
       expect(logConditionSave).toHaveBeenCalledWith(expect.objectContaining({
         bonus,
         bonusDetail,
-        success: expectedTotal >= 14,
+        success: true,
       }));
       expect(lastPopup()).toEqual(expect.objectContaining({ bonus, bonusDetail }));
     });

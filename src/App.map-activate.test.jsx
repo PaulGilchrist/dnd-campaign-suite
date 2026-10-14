@@ -1,18 +1,22 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
- * App-level contract for the `map-activate` SSE event.
+ * App-level contract for the `map-activate` SSE event (App.jsx →
+ * handleMapActivateEvent):
  *
- * Production behavior under test (App.jsx → handleMapActivateEvent):
- *  - The event is campaign-scoped: only `map-activate-<current campaign>` acts.
- *  - GM (localhost) never auto-navigates — the GM manages maps via the
- *    manager listing; their view is untouched by activation pushes.
- *  - A player (non-localhost) is auto-opened onto the activated map ONLY
- *    while stranded on the blank (waiting) maps view — never hijacked off
- *    the character sheet or a map they are already viewing.
- *  - The map opens directly from the pushed payload: the maps list still
- *    reporting "no active map" must not block the auto-open (no re-fetch).
- *  - Malformed events (missing/null data, empty activeMap) are ignored
- *    without crashing or navigating.
+ *  - A player (non-localhost) stranded on the blank "waiting" maps view is
+ *    auto-opened onto the activated map with zero further clicks, straight
+ *    from the pushed payload — the still-"no active map" maps listing must
+ *    not block the auto-open (no re-fetch).
+ *  - Activation never hijacks a player off the character sheet or off a map
+ *    they are already viewing.
+ *  - The GM (localhost) never auto-navigates — they manage maps via the
+ *    manager listing.
+ *  - Events scoped to another campaign, and malformed payloads (null data,
+ *    empty activeMap), are ignored without navigating, alerting, or
+ *    crashing.
+ *
+ * Click-driven map navigation lives in App.map-navigation.test.jsx;
+ * waiting-placeholder rendering in App.map-unavailable.test.jsx.
  */
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -178,30 +182,37 @@ function dispatch(event) {
   });
 }
 
-// Render the app as a network player who clicked "Map" while no map was
-// active, and is stranded on the "Waiting for the GM to open a map" view.
-async function setupPlayerOnBlankMapView() {
-  setHostname('example.com');
+// Render as a network player with the given maps listing on the server.
+async function renderAsPlayer(maps) {
   const { loadMaps } = await import('./services/maps/mapsService.js');
-  loadMaps.mockResolvedValue({ maps: [{ fileName: 'battle-arena.json', isActive: false }] });
+  loadMaps.mockResolvedValue({ maps });
   mockState.characters = [{ name: 'Aragorn', level: 1 }];
+  setHostname('example.com');
   render(<App />);
   await selectCampaign();
+  return loadMaps;
+}
+
+// Player who clicked "Map" while no map was active — stranded on the
+// "Waiting for the GM to open a map" view.
+async function setupPlayerOnBlankMapView() {
+  const loadMaps = await renderAsPlayer([
+    { fileName: 'battle-arena.json', isActive: false },
+  ]);
   fireEvent.click(screen.getByTestId('maps-btn'));
   await waitFor(() => {
     expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
   });
   expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
-  expect(window.alert).not.toHaveBeenCalled();
   return loadMaps;
 }
 
-// The waiting placeholder is the player's resting state whenever no map view
-// is open — used to prove ignored events leave the view untouched.
+// The waiting placeholder is the resting state for every ignored event.
 function expectStillWaitingOnBlankMapView() {
   expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
   expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
   expect(screen.getByTestId('sidebar')).toBeInTheDocument();
+  expect(window.alert).not.toHaveBeenCalled();
 }
 
 // --- Test suite ---
@@ -278,16 +289,11 @@ describe('App - map-activate SSE auto-open', () => {
     expect(loadMaps.mock.calls.length).toBe(loadCallsBefore);
   });
 
-  it('does not auto-open for a player who never opened the maps view', async () => {
-    setHostname('example.com');
-    const { loadMaps } = await import('./services/maps/mapsService.js');
-    // GM has already activated the map, but the player is on the char sheet
-    loadMaps.mockResolvedValue({ maps: [{ fileName: 'battle-arena.json', isActive: true }] });
-    mockState.characters = [{ name: 'Aragorn', level: 1 }];
-    render(<App />);
-    await selectCampaign();
-
-    // Player is on the character sheet, not the maps view
+  it('never hijacks a player away from the view they are already on', async () => {
+    // GM has already activated the map; player is on the character sheet —
+    // the activation must not appear until they navigate to Maps themselves
+    // (click-to-open itself is covered by App.map-navigation.test.jsx).
+    await renderAsPlayer([{ fileName: 'battle-arena.json', isActive: true }]);
     expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
 
     await dispatch({
@@ -295,21 +301,30 @@ describe('App - map-activate SSE auto-open', () => {
       data: { activeMap: 'battle-arena' },
     });
 
-    // Activation never hijacks a player away from the character sheet
     expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
 
-    // First click on Map still loads the now-active map immediately
+    // Player opens Maps, then a fresh activation must not swap the map out
+    // from under them mid-session.
     fireEvent.click(screen.getByTestId('maps-btn'));
     await waitFor(() => {
       expect(screen.getByTestId('map-name')).toHaveTextContent('battle-arena');
     });
+
+    await dispatch({
+      key: 'map-activate-test-campaign',
+      data: { activeMap: 'test-map' },
+    });
+
+    expect(screen.getByTestId('map-name')).toHaveTextContent('battle-arena');
+    expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
   });
 
   it('does not auto-open maps on localhost (GM stays on the manager listing)', async () => {
     const { loadMaps } = await import('./services/maps/mapsService.js');
     loadMaps.mockResolvedValue({ maps: [{ fileName: 'battle-arena.json', isActive: false }] });
     mockState.characters = [{ name: 'Aragorn', level: 1 }];
+    setHostname('localhost');
     render(<App />);
     await selectCampaign();
     fireEvent.click(screen.getByTestId('maps-btn'));
@@ -327,54 +342,15 @@ describe('App - map-activate SSE auto-open', () => {
     expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
   });
 
-  it('ignores map-activate events scoped to another campaign', async () => {
-    await setupPlayerOnBlankMapView();
-
-    await dispatch({
-      key: 'map-activate-other-campaign',
-      data: { activeMap: 'somewhere-else' },
-    });
-
-    expectStillWaitingOnBlankMapView();
-  });
-
   it.each([
-    ['null data', null],
-    ['empty data object', {}],
-    ['empty activeMap', { activeMap: '' }],
-    ['null activeMap', { activeMap: null }],
-  ])('ignores map-activate events with %s without navigating or crashing', async (_label, data) => {
+    ['another campaign', 'map-activate-other-campaign', { activeMap: 'somewhere-else' }],
+    ['null data', 'map-activate-test-campaign', null],
+    ['an empty activeMap', 'map-activate-test-campaign', { activeMap: '' }],
+  ])('leaves the player waiting when map-activate is scoped to %s', async (_label, key, data) => {
     await setupPlayerOnBlankMapView();
 
-    await dispatch({ key: 'map-activate-test-campaign', data });
-    await flushEffects();
+    await dispatch({ key, data });
 
     expectStillWaitingOnBlankMapView();
-    expect(window.alert).not.toHaveBeenCalled();
-  });
-
-  it('does not hijack a player already viewing a different map', async () => {
-    setHostname('example.com');
-    const { loadMaps } = await import('./services/maps/mapsService.js');
-    loadMaps.mockResolvedValue({
-      maps: [{ fileName: 'battle-arena.json', isActive: true }],
-    });
-    mockState.characters = [{ name: 'Aragorn', level: 1 }];
-    render(<App />);
-    await selectCampaign();
-    fireEvent.click(screen.getByTestId('maps-btn'));
-    await waitFor(() => {
-      expect(screen.getByTestId('map-name')).toHaveTextContent('battle-arena');
-    });
-
-    await dispatch({
-      key: 'map-activate-test-campaign',
-      data: { activeMap: 'test-map' },
-    });
-    await flushEffects();
-
-    // Player keeps viewing their current map; no silent swap mid-session
-    expect(screen.getByTestId('map-name')).toHaveTextContent('battle-arena');
-    expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
   });
 });

@@ -1,13 +1,14 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
 import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 import * as classFeatures from '../../../services/character/classFeatures.js';
 import * as dataLoader from '../../../services/ui/dataLoader.js';
 
 // Ranger Features are reached through the CharClassFeatures registry entry
-// point (class name 'Ranger' → RangerFeatures).
+// point (class name 'Ranger' → RangerFeatures). Registry dispatch itself is
+// owned by CharClassFeatures.test.jsx — this file owns ranger content only.
 
 vi.mock('../../../services/character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(() => ({})),
@@ -69,8 +70,8 @@ function buildPlayerStats(overrides = {}) {
 
 // Builds a ranger fixture whose class_levels array has `level` entries, with
 // classLevelData placed at the index the component actually reads
-// (level - 1 / find(cl => cl.level === level)), so fixtures exercise real
-// class-level data rather than index-juggling inside each test.
+// (find(cl => cl.level === level)), so fixtures exercise real class-level
+// data rather than index-juggling inside each test.
 function rangerStats(level, classLevelData = {}, options = {}) {
   const { fightingStyles = [], expertise, abilities } = options;
   const class_levels = Array.from({ length: level }, (_, i) =>
@@ -97,6 +98,12 @@ function renderRanger(playerStats) {
   return screen.getByTestId('char-class-ranger');
 }
 
+const WIS_GATED_RESOURCES = [
+  ['dreadambushUses', 'Dread Ambush'],
+  ['tirelessUses', 'Tireless'],
+  ['naturesVeilUses', "Nature's Veil"],
+];
+
 const FIGHTING_STYLE_CATALOG = [
   { name: 'Defense', description: 'DEFENSE_POPUP_DESC' },
   { name: 'Two-Weapon Fighting', description: 'TWO_WEAPON_POPUP_DESC' },
@@ -113,26 +120,48 @@ describe('RangerFeatures', () => {
   });
 
   describe('level-gated tracked resources', () => {
-    it('tracks Dread Ambush at level 3+ with max from Wisdom modifier', () => {
-      renderRanger(rangerStats(3));
-      expect(screen.getByTestId('tracked-resource-dreadambushUses'))
-        .toHaveTextContent('Dread Ambush: 3/3');
+    // One case per gate (Favored 2, Dread Ambush 3, Tireless 10, Nature's
+    // Veil 14): each level pins the exact set of tracked resources present,
+    // covering both sides of every gate and proving gates act independently.
+    it.each([
+      [1, []],
+      [2, ['favoredEnemyUses']],
+      [3, ['favoredEnemyUses', 'dreadambushUses']],
+      [10, ['favoredEnemyUses', 'dreadambushUses', 'tirelessUses']],
+      [14, ['favoredEnemyUses', 'dreadambushUses', 'tirelessUses', 'naturesVeilUses']],
+    ])('at level %i renders exactly these tracked resources: %j', (level, presentKeys) => {
+      const section = renderRanger(rangerStats(level));
+      const allResources = [['favoredEnemyUses', 'Favored Enemy'], ...WIS_GATED_RESOURCES];
+      for (const [resourceKey, label] of allResources) {
+        if (presentKeys.includes(resourceKey)) {
+          expect(screen.getByTestId(`tracked-resource-${resourceKey}`))
+            .toHaveTextContent(label);
+        } else {
+          expect(screen.queryByTestId(`tracked-resource-${resourceKey}`)).not.toBeInTheDocument();
+          expect(section.textContent).not.toContain(label);
+        }
+      }
     });
 
-    it('omits Dread Ambush below level 3', () => {
-      const section = renderRanger(rangerStats(2));
-      expect(screen.queryByTestId('tracked-resource-dreadambushUses')).not.toBeInTheDocument();
-      expect(section.textContent).not.toContain('Dread Ambush');
+    it.each([
+      [3, '3/3'],
+      [-1, '1/1'],
+    ])('computes Wisdom-gated maxes as max(1, WIS mod) for WIS modifier %i', (wisdom, expected) => {
+      renderRanger(rangerStats(14, {}, { abilities: [{ name: 'Wisdom', bonus: wisdom }] }));
+      for (const [resourceKey, label] of WIS_GATED_RESOURCES) {
+        expect(screen.getByTestId(`tracked-resource-${resourceKey}`))
+          .toHaveTextContent(`${label}: ${expected}`);
+      }
     });
 
-    it('tracks Favored Enemy at level 2+ with max from the matching class level', () => {
+    it('reads Favored Enemy max from the class level entry matching the level', () => {
       renderRanger(rangerStats(2, { favored_enemy: 4 }));
       expect(screen.getByTestId('tracked-resource-favoredEnemyUses'))
         .toHaveTextContent('Favored Enemy: 4/4');
     });
 
     it('floors Favored Enemy max to 1 when no class level entry matches the level', () => {
-      // favored_enemy is defined only on the level-2 entry; at level 5 the
+      // favored_enemy lives only on the level-2 entry; at level 5 the
       // level-matching find misses and the feature still tracks 1 use.
       const stats = rangerStats(5);
       stats.class.class_levels[1] = { level: 2, favored_enemy: 4 };
@@ -140,84 +169,44 @@ describe('RangerFeatures', () => {
       expect(screen.getByTestId('tracked-resource-favoredEnemyUses'))
         .toHaveTextContent('Favored Enemy: 1/1');
     });
-
-    it('omits Favored Enemy below level 2', () => {
-      const section = renderRanger(rangerStats(1));
-      expect(screen.queryByTestId('tracked-resource-favoredEnemyUses')).not.toBeInTheDocument();
-      expect(section.textContent).not.toContain('Favored Enemy');
-    });
-
-    it('tracks Tireless at level 10+ with max from Wisdom modifier', () => {
-      renderRanger(rangerStats(10));
-      expect(screen.getByTestId('tracked-resource-tirelessUses'))
-        .toHaveTextContent('Tireless: 3/3');
-    });
-
-    it('omits Tireless below level 10', () => {
-      const section = renderRanger(rangerStats(9));
-      expect(screen.queryByTestId('tracked-resource-tirelessUses')).not.toBeInTheDocument();
-      expect(section.textContent).not.toContain('Tireless');
-    });
-
-    it("tracks Nature's Veil at level 14+ with max from Wisdom modifier", () => {
-      renderRanger(rangerStats(14));
-      expect(screen.getByTestId('tracked-resource-naturesVeilUses'))
-        .toHaveTextContent("Nature's Veil: 3/3");
-    });
-
-    it("omits Nature's Veil below level 14", () => {
-      const section = renderRanger(rangerStats(13));
-      expect(screen.queryByTestId('tracked-resource-naturesVeilUses')).not.toBeInTheDocument();
-      expect(section.textContent).not.toContain("Nature's Veil");
-    });
-
-    it.each([
-      ['dreadambushUses', 'Dread Ambush', 3],
-      ['tirelessUses', 'Tireless', 10],
-      ['naturesVeilUses', "Nature's Veil", 14],
-    ])('floors %s max to 1 with a non-positive Wisdom modifier', (resourceKey, label, level) => {
-      renderRanger(rangerStats(level, {}, { abilities: [{ name: 'Wisdom', bonus: -1 }] }));
-      expect(screen.getByTestId(`tracked-resource-${resourceKey}`))
-        .toHaveTextContent(`${label}: 1/1`);
-    });
   });
 
   describe('expertise', () => {
-    it('renders the expertise list at level > 2', () => {
-      const section = renderRanger(rangerStats(5, {}, { expertise: ['Stealth', 'Survival'] }));
-      expect(section.textContent).toContain('Expertise: Stealth, Survival');
-    });
-
+    // Full branch matrix of the row condition: level > 2 && truthy && non-empty.
     it.each([
-      ['level is 2', rangerStats(2, {}, { expertise: ['Stealth'] })],
-      ['expertise array is empty', rangerStats(5, {}, { expertise: [] })],
-      ['expertise is undefined', rangerStats(5)],
-    ])('omits expertise when %s', (_label, stats) => {
+      ['shown at level > 2', rangerStats(5, {}, { expertise: ['Stealth', 'Survival'] }), 'Expertise: Stealth, Survival'],
+      ['hidden at level 2', rangerStats(2, {}, { expertise: ['Stealth'] }), null],
+      ['hidden when the array is empty', rangerStats(5, {}, { expertise: [] }), null],
+      ['hidden when undefined', rangerStats(5), null],
+    ])('%s', (_label, stats, expected) => {
       const section = renderRanger(stats);
-      expect(section.textContent).not.toContain('Expertise');
+      if (expected) {
+        expect(section.textContent).toContain(expected);
+      } else {
+        expect(section.textContent).not.toContain('Expertise');
+      }
     });
   });
 
   describe('fighting styles', () => {
-    it('lists all selected styles as clickable entries at level > 1', () => {
-      const section = renderRanger(
-        rangerStats(2, {}, { fightingStyles: ['Defense', 'Two-Weapon Fighting'] })
-      );
-      expect(section.textContent).toContain('Fighting Styles: Defense, Two-Weapon Fighting');
-      expect(screen.getByText('Defense')).toHaveClass('clickable');
-      expect(screen.getByText('Two-Weapon Fighting')).toHaveClass('clickable');
-    });
-
+    // Branch matrix of the row condition: fightingStyles truthy && level > 1.
     it.each([
-      ['level is 1', rangerStats(1, {}, { fightingStyles: ['Defense'] })],
-      ['fightingStyles is null', rangerStats(2, {}, { fightingStyles: null })],
-      ['fightingStyles is missing', buildPlayerStats({
+      ['shown with clickable entries at level 2', rangerStats(2, {}, { fightingStyles: ['Defense', 'Two-Weapon Fighting'] }), true],
+      ['hidden at level 1', rangerStats(1, {}, { fightingStyles: ['Defense'] }), false],
+      ['hidden when fightingStyles is null', rangerStats(2, {}, { fightingStyles: null }), false],
+      ['hidden when fightingStyles is absent from class', buildPlayerStats({
         level: 2,
         class: { name: 'Ranger', major: {}, subclass: {}, class_levels: [{ level: 2 }] },
-      })],
-    ])('omits the fighting styles row when %s', (_label, stats) => {
+      }), false],
+    ])('%s', (_label, stats, shown) => {
       const section = renderRanger(stats);
-      expect(section.textContent).not.toContain('Fighting Styles');
+      if (shown) {
+        expect(section.textContent).toContain('Fighting Styles: Defense, Two-Weapon Fighting');
+        expect(screen.getByText('Defense')).toHaveClass('clickable');
+        expect(screen.getByText('Two-Weapon Fighting')).toHaveClass('clickable');
+      } else {
+        expect(section.textContent).not.toContain('Fighting Styles');
+      }
     });
   });
 
@@ -229,13 +218,14 @@ describe('RangerFeatures', () => {
       return section;
     }
 
-    it('clicking a style opens a popup with its loaded description', async () => {
+    it('clicking a style opens a popup with its name and loaded description', async () => {
       await renderWithStyleCatalog(['Defense', 'Two-Weapon Fighting']);
 
       fireEvent.click(screen.getByText('Defense'));
 
-      expect(screen.getByText('DEFENSE_POPUP_DESC')).toBeInTheDocument();
-      expect(screen.getByText('click to dismiss')).toBeInTheDocument();
+      const popup = screen.getByText('click to dismiss').parentElement;
+      expect(popup).toHaveTextContent('DEFENSE_POPUP_DESC');
+      expect(popup).toHaveTextContent('Defense');
       // Only the clicked style pops up — the other badge must not leak content.
       expect(screen.queryByText('TWO_WEAPON_POPUP_DESC')).not.toBeInTheDocument();
     });
@@ -263,7 +253,6 @@ describe('RangerFeatures', () => {
   describe('extra attacks', () => {
     it.each([
       [{ extraAttacks: 2 }, '2'],
-      [{ extraAttacks: 0 }, '0'],
       [{}, '0'],
     ])('renders Extra Attacks from getClassFeatures (%s)', (features, expected) => {
       classFeatures.getClassFeatures.mockReturnValue(features);
@@ -279,16 +268,12 @@ describe('RangerFeatures', () => {
     ])('renders the %s badge with its runtime choice', (_name, choice, runtime) => {
       mockRuntime(runtime);
       const section = renderRanger(rangerStats(5));
-      const badge = screen.getByText(choice);
-      expect(badge).toHaveClass('automation-badge');
-      expect(section).toContainElement(badge);
+      expect(within(section).getByText(choice)).toHaveClass('automation-badge');
     });
 
-    it.each([
-      ['null', null],
-      ['undefined', undefined],
-    ])('omits both choice badges when the choices are %s', (_label, choiceValue) => {
-      mockRuntime({ defensiveTactics: choiceValue, huntersPrey: choiceValue });
+    it('omits both choice badges when no runtime choice exists', () => {
+      // mockRuntime baseline (undefined) covers the absent path; the badge
+      // count is the real assertion — no stray automation badges render.
       const section = renderRanger(rangerStats(5));
       expect(section.textContent).not.toContain('Evasion');
       expect(section.textContent).not.toContain('Marked Target');

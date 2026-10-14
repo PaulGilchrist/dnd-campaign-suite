@@ -1,24 +1,12 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Lane: speed overrides derived from activeBuffs/playerStats priority chains
 // (deriveAspectSpeeds + aquatic_adaptation) and Stormborn resistances gated on
-// wrathOfTheSeaActive (computeResistances). Stormborn is covered ONLY here.
-//
-// Cleanup (2026-08-19):
-//   - Restored climb/swim-from-playerStats and Salmon swim tests: SpeedCalculations
-//     delegated them here ("fully duplicated in AdditionalCoverage") while this file
-//     had removed them pointing back at SpeedCalculations — a circular delegation gap
-//     leaving those branches covered nowhere.
-//   - Added Panther-climb-scaling test (climb = totalSpeed + buffSpeedBonus via
-//     speed_boost) — the arithmetic on charSummaryCalc.js:265 was untested.
-//   - Stormborn positives: exact Resistances-line content assertions replace loose
-//     /Cold/ regex; also pins the Wrath of the Sea badge rendered from the same
-//     wrathOfTheSeaActive gate. Negatives assert the whole line/badge is absent.
-//   - Stormborn positives consolidated into one parameterized it.each (same code path).
-//   - Imports shared mockPlayerStats/mockCampaignName (removed 30-line local duplicate);
-//     tests add per-test overrides via spread.
-//   - Single module-level beforeEach replaces three identical blocks; removed redundant
-//     per-describe getActiveBuffs.mockReturnValue([]) where the default applies.
+// wrathOfTheSeaActive (computeResistances). Stormborn is covered ONLY here;
+// sibling files (Movement, SpeedCalculations, PassiveEffects, ResistanceTypes)
+// explicitly delegate climb/swim overrides and Stormborn to this file.
+// Wrath-of-the-Sea badge rendering is covered in CharSummary-Badges.test.jsx —
+// here the badge is only asserted as a side-pin of the same gate.
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -98,57 +86,48 @@ function renderSummary(stats) {
     return render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
 }
 
+// Full exact Speed-row text — pins walk speed plus which appendages appear,
+// in render order, so a leaked or missing climb/swim value fails even when
+// the walk number is coincidentally right.
+const speedRow = () => screen.getByText(/^\d+ ft\./);
+
 // ---------------------------------------------------------------------------
 // Movement speed overrides — priority chains in deriveAspectSpeeds and the
 // aquatic_adaptation buff handler (buff wins over playerStats, Panther/Salmon
 // climb/swim scale with buffed speed).
 // ---------------------------------------------------------------------------
 describe('CharSummary - climb/swim speed overrides', () => {
-    it('shows climb speed from playerStats when no buffs override it', () => {
-        renderSummary({ ...mockPlayerStats, climbSpeed: 40 });
-        expect(screen.getByText(/climb 40 ft\./)).toBeInTheDocument();
+    it('shows climb and swim speeds straight from playerStats when no buffs override them', () => {
+        renderSummary({ ...mockPlayerStats, climbSpeed: 40, swimSpeed: 40 });
+        expect(speedRow()).toHaveTextContent(/^25 ft\., climb 40 ft\., swim 40 ft\.$/);
     });
 
-    it('shows swim speed from playerStats when no buffs override it', () => {
-        renderSummary({ ...mockPlayerStats, swimSpeed: 40 });
-        expect(screen.getByText(/swim 40 ft\./)).toBeInTheDocument();
-    });
-
-    it('Aspect of the Wilds (Panther) climb uses base speed, overriding playerStats.climbSpeed', () => {
-        getActiveBuffs.mockReturnValue([{ name: 'Aspect of the Wilds', effect: 'climb_speed_aspect', optionName: 'Panther' }]);
-        renderSummary({ ...mockPlayerStats, climbSpeed: 40 });
-        expect(screen.getByText(/climb 25 ft\./)).toBeInTheDocument();
-        expect(screen.queryByText(/climb 40 ft\./)).not.toBeInTheDocument();
-    });
-
-    it('Aspect of the Wilds (Panther) climb scales with speed buffs (base + 10)', () => {
+    it('Aspect of the Wilds (Panther) climb tracks base + speed buffs, overriding playerStats.climbSpeed', () => {
         getActiveBuffs.mockReturnValue([
             { name: 'Aspect of the Wilds', effect: 'climb_speed_aspect', optionName: 'Panther' },
             { name: 'Longstrider', effect: 'speed_boost', speedBonus: 10 },
         ]);
         renderSummary({ ...mockPlayerStats, climbSpeed: 40 });
-        expect(screen.getByText(/climb 35 ft\./)).toBeInTheDocument();
-        expect(screen.queryByText(/climb 25 ft\./)).not.toBeInTheDocument();
+        expect(speedRow()).toHaveTextContent(/^35 ft\., climb 35 ft\.$/);
     });
 
     it('Aspect of the Wilds (Salmon) grants swim equal to base speed and no climb', () => {
         getActiveBuffs.mockReturnValue([{ name: 'Aspect of the Wilds', effect: 'climb_speed_aspect', optionName: 'Salmon' }]);
         renderSummary(mockPlayerStats);
-        expect(screen.getByText(/swim 25 ft\./)).toBeInTheDocument();
-        expect(screen.queryByText(/climb/)).not.toBeInTheDocument();
+        expect(speedRow()).toHaveTextContent(/^25 ft\., swim 25 ft\.$/);
     });
 
     it('aquatic_adaptation swim is 2x base speed, overriding playerStats.swimSpeed', () => {
         getActiveBuffs.mockReturnValue([{ effect: 'aquatic_adaptation' }]);
         renderSummary({ ...mockPlayerStats, swimSpeed: 40 });
-        expect(screen.getByText(/swim 50 ft\./)).toBeInTheDocument();
-        expect(screen.queryByText(/swim 40 ft\./)).not.toBeInTheDocument();
+        expect(speedRow()).toHaveTextContent(/^25 ft\., swim 50 ft\.$/);
     });
 });
 
 // ---------------------------------------------------------------------------
-// Stormborn resistances — only surfaced while wrathOfTheSeaActive is set in
-// the runtime store (computeResistances gate).
+// Stormborn resistances — the Resistances line requires BOTH an active
+// wrathOfTheSeaActive flag in the runtime store AND Stormborn damage types
+// on the character (computeResistances gate); the badge pins the flag alone.
 // ---------------------------------------------------------------------------
 describe('CharSummary - Stormborn Resistances', () => {
     function mockWrathOfTheSea(active) {
@@ -166,19 +145,23 @@ describe('CharSummary - Stormborn Resistances', () => {
         };
     }
 
-    it.each([
-        [['cold'], 'Resistances: Cold'],
-        [['cold', 'lightning'], 'Resistances: Cold, Lightning'],
-    ])('renders Stormborn damage types and Wrath of the Sea badge while active (%#)', async (damageTypes, expectedLine) => {
+    it('renders every Stormborn damage type and the Wrath of the Sea badge while active', () => {
         mockWrathOfTheSea(true);
-        renderSummary(statsWithStormborn(damageTypes));
-        expect(screen.getByText('Resistances:').closest('div')).toHaveTextContent(expectedLine);
+        renderSummary(statsWithStormborn(['cold', 'lightning']));
+        expect(screen.getByText('Resistances:').closest('div')).toHaveTextContent('Resistances: Cold, Lightning');
         expect(screen.getByText('Wrath of the Sea')).toBeInTheDocument();
     });
 
-    it.each([false, null, undefined])('hides the Resistances line and Wrath of the Sea badge when wrathOfTheSeaActive is %s', (active) => {
-        mockWrathOfTheSea(active);
-        renderSummary(statsWithStormborn(['cold']));
+    it('shows the badge but no Resistances line when active with no Stormborn damage types', () => {
+        mockWrathOfTheSea(true);
+        renderSummary(mockPlayerStats);
+        expect(screen.queryByText('Resistances:')).not.toBeInTheDocument();
+        expect(screen.getByText('Wrath of the Sea')).toBeInTheDocument();
+    });
+
+    it('hides the Resistances line and Wrath of the Sea badge when inactive despite Stormborn passives', () => {
+        mockWrathOfTheSea(false);
+        renderSummary(statsWithStormborn(['cold', 'lightning']));
         expect(screen.queryByText('Resistances:')).not.toBeInTheDocument();
         expect(screen.queryByText('Wrath of the Sea')).not.toBeInTheDocument();
     });

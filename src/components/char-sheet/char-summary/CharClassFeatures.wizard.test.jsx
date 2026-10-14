@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -7,6 +7,9 @@ import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 
 // Wizard Features are reached through the CharClassFeatures registry entry
 // point (class name 'Wizard' → WizardFeatures, region testid 'char-class-wizard').
+// Registry dispatch and entry-level dodge/adrenaline/stonecunning coexistence
+// are owned by CharClassFeatures.test.jsx and the sorcerer sibling — here we
+// verify only the wizard region's rendering behavior.
 
 // Mock with a resourceKey-scoped testid so assertions can verify a specific
 // tracked resource's computed max, not just that "some" number rendered.
@@ -35,7 +38,8 @@ const CAMPAIGN = 'test-campaign';
 
 // Mirrors the shape classRules.getWizardFeatures returns in the real service
 // (arcaneWard/arcaneWardMax are informational — the component re-derives the
-// ward max itself from passives, level, and the INT modifier).
+// ward max itself from passives, level, and the INT modifier, never from
+// these fields).
 const defaultWizardFeatures = {
   arcaneRecoveryLevels: 1,
   arcaneWard: false,
@@ -90,10 +94,8 @@ function wizardStats(level = 5, overrides = {}) {
   };
 }
 
-const PORTENT_ACTION = { automation: { type: 'portent' } };
-
 function portentStats(level = 5) {
-  return wizardStats(level, { specialActions: [PORTENT_ACTION] });
+  return wizardStats(level, { specialActions: [{ automation: { type: 'portent' } }] });
 }
 
 function renderWizard(playerStats) {
@@ -108,50 +110,43 @@ describe('WizardFeatures', () => {
     mockRuntime();
   });
 
-  describe('class features wiring', () => {
-    it('reads class features for the exact playerStats object it was given', () => {
-      const stats = wizardStats();
-      renderWizard(stats);
-      expect(classFeatures.getClassFeatures).toHaveBeenCalledWith(stats);
-    });
-
-    it('subscribes to portent dice and buffs under the player name and campaign', () => {
-      renderWizard(wizardStats());
-      expect(runtimeState.useRuntimeValue).toHaveBeenCalledWith('Test Wizard', 'portentDice', CAMPAIGN);
-      expect(runtimeState.useRuntimeValue).toHaveBeenCalledWith('Test Wizard', 'activeBuffs', CAMPAIGN);
-    });
+  it('wires the service and runtime subscriptions to the exact character it was given', () => {
+    const stats = wizardStats();
+    renderWizard(stats);
+    expect(classFeatures.getClassFeatures).toHaveBeenCalledWith(stats);
+    expect(runtimeState.useRuntimeValue).toHaveBeenCalledWith('Test Wizard', 'portentDice', CAMPAIGN);
+    expect(runtimeState.useRuntimeValue).toHaveBeenCalledWith('Test Wizard', 'activeBuffs', CAMPAIGN);
   });
 
   describe('arcane recovery', () => {
-    it.each([1, 2, 3])('tracks arcane recovery max %i from the service', (levels) => {
+    it.each([
+      ['a value from the service', 2, 'Arcane Recovery Levels: 2/2'],
+      ['an omitted value (falls back to 0)', undefined, 'Arcane Recovery Levels: 0/0'],
+    ])('tracks the arcane recovery max from %s', (_label, levels, expected) => {
       mockWizardFeatures({ arcaneRecoveryLevels: levels });
       renderWizard(wizardStats());
       expect(screen.getByTestId('tracked-resource-arcaneRecoveryLevels'))
-        .toHaveTextContent(`Arcane Recovery Levels: ${levels}/${levels}`);
-    });
-
-    it('falls back to 0 max when the service omits arcaneRecoveryLevels', () => {
-      mockWizardFeatures({ arcaneRecoveryLevels: undefined });
-      renderWizard(wizardStats());
-      expect(screen.getByTestId('tracked-resource-arcaneRecoveryLevels'))
-        .toHaveTextContent('Arcane Recovery Levels: 0/0');
+        .toHaveTextContent(expected);
     });
   });
 
   describe('arcane ward', () => {
+    // One level/INT pair is enough to pin the 2 × level + INT formula
+    // (5 × 2 + 3 = 13 — all three terms distinct so hardcoding any one
+    // fails); each row exercises a different passive-detection shape.
     it.each([
-      ['an arcane_ward passive at level 5 with INT 3', [{ type: 'arcane_ward' }], 5, 3, 13],
-      ['a passive_rule arcane_ward passive at level 5 with INT 3', [{ type: 'passive_rule', effect: 'arcane_ward' }], 5, 3, 13],
-      ['an arcane_ward passive at level 12 with INT 4', [{ type: 'arcane_ward' }], 12, 4, 28],
-      ['an arcane_ward passive at level 20 with INT 5', [{ type: 'arcane_ward' }], 20, 5, 45],
-    ])('computes ward max as 2 × level + INT when given %s', (_label, passives, level, intBonus, expected) => {
-      const stats = wizardStats(level, {
-        abilities: abilities(intBonus),
-        automation: { passives, reactions: [] },
-      });
+      ['an arcane_ward passive', [{ type: 'arcane_ward' }], {}],
+      [
+        'a passive_rule arcane_ward passive (and ignores the service\'s informational arcaneWardMax)',
+        [{ type: 'passive_rule', effect: 'arcane_ward' }],
+        { arcaneWard: true, arcaneWardMax: 99 },
+      ],
+    ])('computes ward max as 2 × level + INT at level 5 with INT 3, given %s', (_label, passives, featureOverrides) => {
+      mockWizardFeatures(featureOverrides);
+      const stats = wizardStats(5, { automation: { passives, reactions: [] } });
       renderWizard(stats);
       expect(screen.getByTestId('tracked-resource-arcaneWardHp'))
-        .toHaveTextContent(`Arcane Ward HP: ${expected}/${expected}`);
+        .toHaveTextContent('Arcane Ward HP: 13/13');
     });
 
     it('treats a missing INT modifier as 0 when computing ward max', () => {
@@ -165,11 +160,11 @@ describe('WizardFeatures', () => {
     });
 
     it.each([
-      ['no passives at all', []],
-      ['an unrelated passive type', [{ type: 'something_else' }]],
-      ['a passive_rule without the arcane_ward effect', [{ type: 'passive_rule', effect: 'quickened' }]],
-      ['no automation block', undefined],
-    ])('omits the ward counter when given %s', (_label, passives) => {
+      ['passives of unrelated shapes', [{ type: 'something_else' }, { type: 'passive_rule', effect: 'quickened' }], {}],
+      ['no automation block', undefined, {}],
+      ['no passives even when the service claims a ward', [], { arcaneWard: true, arcaneWardMax: 42 }],
+    ])('omits the ward counter when given %s', (_label, passives, featureOverrides) => {
+      mockWizardFeatures(featureOverrides);
       const stats = wizardStats(5, { automation: { passives, reactions: [] } });
       const section = renderWizard(stats);
       expect(screen.queryByTestId('tracked-resource-arcaneWardHp')).not.toBeInTheDocument();
@@ -197,11 +192,12 @@ describe('WizardFeatures', () => {
       expect(section.textContent).toContain('2 remaining (refreshes on Long Rest)');
     });
 
+    // Rows hit distinct parse paths: empty array, JSON.parse throw, parsed
+    // non-array, and the nullish early-return (null takes this same path).
     it.each([
       ['an empty array', []],
       ['invalid JSON text', 'not json'],
       ['a JSON object instead of an array', '{"a":1}'],
-      ['null (never set)', null],
       ['undefined (never set)', undefined],
     ])('shows the no-dice state for %s', (_label, value) => {
       mockRuntime({ portentDice: value });
@@ -211,8 +207,8 @@ describe('WizardFeatures', () => {
       expect(section.querySelectorAll('.portent-die')).toHaveLength(0);
     });
 
+    // An empty specialActions array hits the same ?? [] path as undefined.
     it.each([
-      ['no special actions', []],
       ['a non-portent special action', [{ automation: { type: 'other' } }]],
       ['portent carried outside the automation wrapper', [{ type: 'portent' }]],
       ['no specialActions block', undefined],
@@ -226,7 +222,6 @@ describe('WizardFeatures', () => {
 
   describe('projected ward', () => {
     it.each([
-      ['a projected_ward reaction at 30 ft', { type: 'projected_ward', range: 30 }, 30],
       ['a projected_ward reaction at 60 ft', { type: 'projected_ward', range: 60 }, 60],
       ['a reaction matched by name', { name: 'Projected Ward', range: 45 }, 45],
       ['a projected_ward reaction without a range (defaults to 30 ft)', { type: 'projected_ward' }, 30],
@@ -237,7 +232,6 @@ describe('WizardFeatures', () => {
     });
 
     it.each([
-      ['no reactions', []],
       ['an unrelated reaction', [{ type: 'opportunity_attack' }]],
       ['no automation block', undefined],
     ])('omits the badge when given %s', (_label, reactions) => {
@@ -254,18 +248,14 @@ describe('WizardFeatures', () => {
       ['see_invisibility', 'See Invisibility'],
     ])('displays "$label" for effect "$effect"', (effect, label) => {
       mockRuntime({ buffs: [{ name: 'The Third Eye', effect }] });
-      const section = renderWizard(wizardStats());
+      renderWizard(wizardStats());
       const badge = screen.getByText(`The Third Eye: ${label}`);
       expect(badge).toBeInTheDocument();
       expect(badge.className).toContain('automation-badge');
-      expect(section.textContent).toContain(`The Third Eye: ${label}`);
     });
 
-    it.each([
-      ['an unmapped effect', 'mystery_effect'],
-      ['a buff with no effect', undefined],
-    ])('falls back to "Active" for %s', (_label, effect) => {
-      mockRuntime({ buffs: [{ name: 'The Third Eye', effect }] });
+    it('falls back to "Active" for an unmapped effect', () => {
+      mockRuntime({ buffs: [{ name: 'The Third Eye', effect: 'mystery_effect' }] });
       const section = renderWizard(wizardStats());
       expect(screen.getByText('The Third Eye: Active')).toBeInTheDocument();
       expect(section.textContent).not.toContain('mystery');
@@ -278,11 +268,8 @@ describe('WizardFeatures', () => {
       expect(section.textContent).not.toContain('See Invisibility');
     });
 
-    it.each([
-      ['null', null],
-      ['undefined', undefined],
-    ])('survives a non-array activeBuffs value (%s) while still rendering its resources', (_label, buffs) => {
-      mockRuntime({ buffs });
+    it('survives a non-array activeBuffs value while still rendering its resources', () => {
+      mockRuntime({ buffs: null });
       const section = renderWizard(wizardStats());
       expect(section.textContent).not.toContain('The Third Eye');
       expect(screen.getByTestId('tracked-resource-arcaneRecoveryLevels'))
@@ -297,32 +284,12 @@ describe('WizardFeatures', () => {
       expect(screen.queryByTestId('char-class-wizard')).not.toBeInTheDocument();
     });
 
-    it('renders the wizard region when showWizardFeatures is true', () => {
-      mockWizardFeatures({ showWizardFeatures: true });
-      const section = renderWizard(wizardStats());
-      expect(section).toBeInTheDocument();
-      expect(screen.getByTestId('tracked-resource-arcaneRecoveryLevels')).toBeInTheDocument();
-    });
-
+    // The "renders when true" path is already exercised by every other test
+    // here (the default mock has showWizardFeatures: true); this pins the
+    // ?? true default for an omitted flag.
     it('renders by default when showWizardFeatures is omitted', () => {
       mockWizardFeatures({ showWizardFeatures: undefined });
       expect(renderWizard(wizardStats())).toBeInTheDocument();
-    });
-  });
-
-  describe('coexistence with entry-point features', () => {
-    it('renders dodge, adrenaline rush, and stonecunning alongside the wizard region', () => {
-      mockRuntime({ buffs: [{ effect: 'dodge' }] });
-      const stats = wizardStats(5, {
-        proficiency: 3,
-        automation: { passives: [], reactions: [], specialActions: [{ effect: 'bonus_action_dash' }] },
-        race: { traits: [{ name: 'Stonecunning', automation: true }] },
-      });
-      renderWizard(stats);
-      expect(screen.getByText('Dodge — Disadv on attacks vs you, Adv on DEX saves')).toBeInTheDocument();
-      expect(screen.getByTestId('tracked-resource-adrenalineRushUses')).toHaveTextContent('Adrenaline Rush: 3/3');
-      expect(screen.getByTestId('tracked-resource-stonecunningUses')).toHaveTextContent('Stonecunning: 3/3');
-      expect(screen.getByTestId('tracked-resource-arcaneRecoveryLevels')).toHaveTextContent('Arcane Recovery Levels: 1/1');
     });
   });
 });

@@ -1,20 +1,22 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * CharSpells — spell cast popups & innate sorcery.
  *
  * Owns the single-entry cast seam (SpellDetailPopup → handleSpellCast →
- * gateMetamagic), including position-resolution ordering, metaCtx
- * pass-through, and the auto-damage callback CharSpells hands to
- * useLoggedDiceRoll; plus the Words of Creation secondary-target modal
- * round-trip (flow state → SpellTargetPopups → SecondaryTargetModal) and
+ * gateMetamagic): popup closes, position resolves before gating, the gate
+ * is hit exactly once with the popup's cast metadata, and prepareSpellCast
+ * never runs from JSX. Plus the auto-damage callback CharSpells hands to
+ * useLoggedDiceRoll, the Words of Creation secondary-target modal round-trip
+ * (flow setter → wordsOfCreationTarget state → SecondaryTargetModal), and
  * the innate sorcery save-DC / spell-attack-advantage rules.
  *
  * Deliberately NOT re-tested here (covered by sibling suites):
- * - attack header to-hit math, conditionAttackMode, cannotAct
+ * - attack header to-hit math, conditionAttackMode pass-through, cannotAct
  *   → CharSpells.Interactions.test.jsx
  * - table structure, sorting, prepared filter, 2024 wizard gating
  *   → CharSpells.Table.test.jsx
- * - row formatting, popup overlay behavior → CharSpells.Rendering.test.jsx
+ * - row formatting, spell-name click opening the detail popup, overlay
+ *   behavior → CharSpells.Rendering.test.jsx
  * - pending* popup wiring for individual spells
  *   → CharSpells.Popups.targetSelection / popupWidgets / restoration / creatureSelection
  */
@@ -217,13 +219,7 @@ describe('CharSpells - spell cast flow', () => {
     vi.mocked(normalizeAutoDamage).mockReturnValue(NORMALIZED_AUTO_DAMAGE);
   });
 
-  it('opening a spell name shows the detail popup for that spell', () => {
-    renderCharSpells();
-    const dialog = openSpellDetail();
-    expect(within(dialog).getByText('Light')).toBeInTheDocument();
-  });
-
-  it('casting closes the detail popup and routes the spell exactly once through the metamagic gate', async () => {
+  it('casting closes the detail popup, resolves position before gating, and routes the spell through the metamagic gate exactly once', async () => {
     renderCharSpells();
     openSpellDetail();
 
@@ -231,24 +227,17 @@ describe('CharSpells - spell cast flow', () => {
 
     expect(screen.queryByRole('dialog', { name: 'Light details' })).not.toBeInTheDocument();
     await waitFor(() => expect(rolls.gateMetamagic).toHaveBeenCalledTimes(1));
-    // Invariant: prepareSpellCast runs only inside the gate, never from JSX.
-    expect(prepareSpellCast).not.toHaveBeenCalled();
-  });
-
-  it('resolves spell position before gating, and forwards the popup cast metadata to the gate', async () => {
-    renderCharSpells();
-    openSpellDetail();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Cast' }));
-
-    await waitFor(() => expect(rolls.gateMetamagic).toHaveBeenCalled());
-    expect(rolls.resolvePositions).toHaveBeenCalledTimes(1);
-    expect(rolls.resolvePositions.mock.invocationCallOrder[0])
-      .toBeLessThan(rolls.gateMetamagic.mock.invocationCallOrder[0]);
+    // The popup's selected cast level reaches the gate unchanged.
     expect(rolls.gateMetamagic).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Light', level: 0 }),
       { selectedLevel: 0 }
     );
+    // Position must be resolved before the gate fires, exactly once.
+    expect(rolls.resolvePositions).toHaveBeenCalledTimes(1);
+    expect(rolls.resolvePositions.mock.invocationCallOrder[0])
+      .toBeLessThan(rolls.gateMetamagic.mock.invocationCallOrder[0]);
+    // Invariant: prepareSpellCast runs only inside the gate, never from JSX.
+    expect(prepareSpellCast).not.toHaveBeenCalled();
   });
 
   it('auto-damage from a spell attack resolves through the standalone damage pipeline', async () => {
@@ -303,27 +292,23 @@ describe('CharSpells - words of creation target selection', () => {
     act(() => seams.openWordsOfCreation(request));
   }
 
-  it('opens the target modal with the title, description, and targets supplied by the flow', () => {
-    renderCharSpells();
-    openWordsOfCreation(wordsOfCreationRequest());
-
-    const dialog = screen.getByRole('dialog', { name: 'Words of Creation' });
-    expect(within(dialog).getByText('Choose a creature within 60 feet.')).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Orc' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Goblin' })).toBeInTheDocument();
-  });
-
-  it('selecting a target invokes the flow handler and closes the modal', () => {
+  it('shows the flow-supplied title, description, and targets, and selecting one dispatches it and closes the modal', () => {
     const request = wordsOfCreationRequest({
       onTargetSelected: vi.fn(() => seams.openWordsOfCreation(null)),
     });
     renderCharSpells();
     openWordsOfCreation(request);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Orc' }));
+    const dialog = screen.getByRole('dialog', { name: 'Words of Creation' });
+    expect(within(dialog).getByText('Choose a creature within 60 feet.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Orc' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Goblin' })).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Orc' }));
 
     expect(request.onTargetSelected).toHaveBeenCalledTimes(1);
     expect(request.onTargetSelected).toHaveBeenCalledWith('Orc');
+    expect(request.onSkip).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog', { name: 'Words of Creation' })).not.toBeInTheDocument();
   });
 
@@ -359,18 +344,21 @@ describe('CharSpells - innate sorcery', () => {
     expect(displayedSaveDc()).toBe(expectedDc);
   });
 
+  // Only the isSorcerer && innateSorceryActive advantage branch and its two
+  // negative guards — condition-mode pass-through (including disadvantage
+  // outranking innate advantage) is covered by CharSpells.Interactions.test.jsx.
   it.each([
-    { className: 'Sorcerer', active: true, conditionAttackMode: 'normal', forcedMode: 'advantage' },
-    { className: 'Wizard', active: true, conditionAttackMode: 'normal', forcedMode: undefined },
-    { className: 'Sorcerer', active: false, conditionAttackMode: 'normal', forcedMode: undefined },
-    // A condition's disadvantage outranks innate-sorcery advantage.
-    { className: 'Sorcerer', active: true, conditionAttackMode: 'disadvantage', forcedMode: 'disadvantage' },
-  ])('spell attack rolls with forcedMode=$forcedMode (class=$className, innateSorcery=$active, condition=$conditionAttackMode)',
-    ({ className, active, conditionAttackMode, forcedMode }) => {
+    { className: 'Sorcerer', active: true, expectedForcedMode: 'advantage' },
+    { className: 'Wizard', active: true, expectedForcedMode: undefined },
+    { className: 'Sorcerer', active: false, expectedForcedMode: undefined },
+  ])('spell attack rolls with forcedMode=$expectedForcedMode (class=$className, innateSorcery=$active)',
+    ({ className, active, expectedForcedMode }) => {
       vi.mocked(isInnateSorceryActive).mockReturnValue(active);
       renderCharSpells({
         playerStats: { ...mockPlayerStats, class: { name: className } },
-        conditionAttackMode,
+        // Explicit 'normal' so the innate-sorcery branch (not the
+        // condition-mode branch) is the one under test.
+        conditionAttackMode: 'normal',
       });
 
       fireEvent.click(screen.getByText('Attack (to hit):'));
@@ -379,7 +367,7 @@ describe('CharSpells - innate sorcery', () => {
       expect(rolls.rollAttack).toHaveBeenCalledWith(
         'Spell Attack',
         mockPlayerStats.spellAbilities.toHit,
-        { forcedMode }
+        { forcedMode: expectedForcedMode }
       );
     });
 });

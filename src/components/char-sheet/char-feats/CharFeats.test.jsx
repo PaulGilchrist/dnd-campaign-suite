@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharFeats from './CharFeats.jsx';
@@ -51,84 +51,60 @@ describe('CharFeats', () => {
       expect(container.innerHTML).toBe('');
     });
 
-    it('renders the section header and each feat name without fetching details up front', () => {
-      renderCharFeats(['Actor', 'Athlete']);
-      expect(screen.getByText('Feats:')).toBeInTheDocument();
-      expect(screen.getByText('Actor')).toBeInTheDocument();
-      expect(screen.getByText('Athlete')).toBeInTheDocument();
-      expect(loadFeatData).not.toHaveBeenCalled();
-    });
-
-    it('joins multiple feats with commas in the original order', () => {
+    it('renders the header and feat names comma-joined in original order, defers detail fetching, and shows no badge for single feats', () => {
       const { container } = renderCharFeats(['Zombie Feat', 'Alpha Feat', 'Athlete']);
       expect(container.textContent).toBe('Feats: Zombie Feat, Alpha Feat, Athlete');
+      // Details arrive from the rules database only on click, never up front.
+      expect(loadFeatData).not.toHaveBeenCalled();
+      expect(screen.queryByText(/\* \d/)).not.toBeInTheDocument();
     });
 
     it('collapses duplicate feats into one entry with a count badge per duplicate set', () => {
       renderCharFeats(['Actor', 'Actor', 'Athlete', 'Athlete', 'Athlete']);
       expect(screen.getAllByText('Actor * 2')).toHaveLength(1);
       expect(screen.getAllByText('Athlete * 3')).toHaveLength(1);
-    });
-
-    it('shows no count badge for a feat taken once', () => {
-      renderCharFeats(['Actor', 'Athlete']);
-      expect(screen.getByText('Actor')).toBeInTheDocument();
-      expect(screen.queryByText(/\* \d/)).not.toBeInTheDocument();
+      expect(screen.queryByText('Actor', { exact: true })).not.toBeInTheDocument();
     });
   });
 
   describe('opening feat details', () => {
-    it('delegates the matched feat object to showPopup without rendering its own popup', async () => {
-      const { showPopup } = renderCharFeats(['Actor']);
+    it.each([
+      ['5e by default when the character has no rules version', undefined, '5e'],
+      ['2024 when the character uses the 2024 ruleset', '2024', '2024'],
+    ])('loads %s data and delegates the matched feat to showPopup without rendering its own popup', async (_label, rules, expectedVersion) => {
+      const { showPopup } = renderCharFeats(['Actor'], { rules });
       fireEvent.click(screen.getByText('Actor'));
       await waitFor(() => {
+        expect(loadFeatData).toHaveBeenCalledWith(expectedVersion);
         expect(showPopup).toHaveBeenCalledWith(FEAT_ACTOR);
       });
       // Found feats are rendered by the caller's popup, not this component's.
       expect(screen.queryByText('Done')).not.toBeInTheDocument();
     });
 
-    it('defaults to 5e rules data when the character has no rules version', async () => {
-      const { showPopup } = renderCharFeats(['Actor']);
-      fireEvent.click(screen.getByText('Actor'));
+    it.each([
+      ['by index when the database name differs', [
+        { name: 'Some Other Feat', index: 'actor', desc: ['Not the actor feat'] },
+      ], 'Actor'],
+      ['by normalised case and spaces when the database name differs in format', [
+        { name: 'GREAT WEAPON MASTER', index: 'great weapon master', desc: ['2024 version'] },
+      ], 'Great Weapon Master'],
+    ])('matches feats %s', async (_label, dbFeats, clickedName) => {
+      loadFeatData.mockResolvedValue(dbFeats);
+      const { showPopup } = renderCharFeats([clickedName]);
+      fireEvent.click(screen.getByText(clickedName));
       await waitFor(() => {
-        expect(loadFeatData).toHaveBeenCalledWith('5e');
-        expect(showPopup).toHaveBeenCalledWith(FEAT_ACTOR);
-      });
-    });
-
-    it('loads 2024 rules data when the character uses the 2024 ruleset', async () => {
-      renderCharFeats(['Actor'], { rules: '2024' });
-      fireEvent.click(screen.getByText('Actor'));
-      await waitFor(() => {
-        expect(loadFeatData).toHaveBeenCalledWith('2024');
-      });
-    });
-
-    it('matches a feat by index when the database name differs', async () => {
-      const aliased = { name: 'Some Other Feat', index: 'actor', desc: ['Not the actor feat'] };
-      loadFeatData.mockResolvedValue([aliased]);
-      const { showPopup } = renderCharFeats(['Actor']);
-      fireEvent.click(screen.getByText('Actor'));
-      await waitFor(() => {
-        expect(showPopup).toHaveBeenCalledWith(aliased);
-      });
-    });
-
-    it('normalises case and spaces when matching multi-word feat names', async () => {
-      const feat2024 = { name: 'GREAT WEAPON MASTER', index: 'great weapon master', desc: ['2024 version'] };
-      loadFeatData.mockResolvedValue([feat2024]);
-      const { showPopup } = renderCharFeats(['Great Weapon Master'], { rules: '2024' });
-      fireEvent.click(screen.getByText('Great Weapon Master'));
-      await waitFor(() => {
-        expect(showPopup).toHaveBeenCalledWith(feat2024);
+        expect(showPopup).toHaveBeenCalledWith(dbFeats[0]);
       });
     });
   });
 
   describe('not found and error popups', () => {
-    it('shows a not-found popup in the DOM when the feat is absent from a loaded database, without calling showPopup', async () => {
-      loadFeatData.mockResolvedValue([FEAT_ATHLETE]);
+    it.each([
+      ['feat is absent from a loaded database', [FEAT_ATHLETE]],
+      ['database loads empty', []],
+    ])('shows a dismissible not-found popup in the DOM when the %s, without calling showPopup', async (_label, dbFeats) => {
+      loadFeatData.mockResolvedValue(dbFeats);
       const { showPopup } = renderCharFeats(['Actor']);
       fireEvent.click(screen.getByText('Actor'));
 

@@ -1,65 +1,65 @@
+// @maintained-by-ai
 //
-// Cleanup (2026-08-18):
-//   - Consolidated 8 single-buff tests → 1 parameterized it.each test.
-//     All 8 followed identical execution path: renderSummary([buff]) → getByText(/.../).
-//   - Removed empty/missing resistanceTypes tests (lines 198-206):
-//     charSummaryCalc.js flatMap(b => b.resistanceTypes || []) handles these;
-//     component-level assertions add minimal confidence.
-//   - Removed duplicate Stone Skin bludgeoning test (lines 235-238):
-//     identical to line 173-176 — same buff, same assertion.
-//   - Removed "three different buffs" test (lines 257-266):
-//     trivial string concatenation, no logic to exercise; covered by dedup tests.
-//   - Rewrote "no active buffs" test: replaced 7 brittle string-absence assertions
-//     with single structural assertion querying .resistance-types container.
-//   - Reduced file from 306 lines / 17 tests to 230 lines / 7 tests.
+// Coverage ownership (CharSummary family delegation): BUFF-derived resistances on the
+// "Resistances:"/"Immunities:" rows (charSummaryCalc.js computeResistances) — one test
+// per DISTINCT filter path, not per whitelist member:
+//   - RAGE_RESISTANCE_BUFF_NAMES lane ('Rage' representative; Superior Defense / Rage of
+//     the Gods / Rage of the Wilds share the identical b => b.name === name matcher)
+//   - LATER_RESISTANCE_BUFF_NAMES lane ('Aura of Life' representative; Aura of Purity /
+//     Protection from Poison share it — Stone Skin and Feign Death have dedicated tests)
+//   - effect-based lane (warding_bond) and the Starry Form name matcher
+//   - allow-list NEGATIVE: a non-whitelisted buff carrying resistanceTypes contributes
+//     nothing (this also subsumes the empty-getActiveBuffs negative — a broken
+//     filter passes on [] but fails here) AND the getActiveBuffs player/campaign wiring
+//   - Feign Death dual-lane (same buff feeds Resistances AND Immunities rows)
+//   - Stone Skin runtime 'stoneSkinDamageTypes' through the REAL stoneSkinHandler
+//     (additive types + buff-vs-buff AND buff-vs-runtime dedup, pinned in one render)
+//   - delegated badge lane: Aura of Life / Heroes' Feast badges + the dynamic Heroes'
+//     Feast tooltip derivation (all three sibling files delegate badges here; previously
+//     owned by nobody)
+//
+// NOT owned here (delegated to siblings — do not re-add):
+//   - runtime-store chosen-type keys (Fiendish/Epitome/Boon/Elemental Adept) and their
+//     dedup → CharSummary-ResistanceTypes.test.jsx
+//   - Immunities-row base/automation/Rage-gate sources and allow-list → CharSummary-ConditionImmunities.test.jsx
+//   - auraComboEffects resistances + asterisk markers → CharSummary-AuraAndInitiative.test.jsx
+//   - AC attribution badges → CharSummary-BuffEffects.test.jsx
+//   - Starry Form / Nature's Sanctuary badge details → CharSummary-Badges.test.jsx
+//   - Stormborn gating → CharSummary-AdditionalCoverage.test.jsx
+//   - rest persistence of chosen keys → services/rules/effects/restRules-*.test.js
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { isAuraOfLifeActive } from '../../../services/automation/handlers/buffs/auraOfLifeHandler.js';
+import { mockPlayerStats, mockCampaignName } from './CharSummary.test-mocks.test.jsx';
 
-// ---------------------------------------------------------------------------
-// Mocks — co-located component imports that must not render real DOM
-// ---------------------------------------------------------------------------
 vi.mock('./CharGold.jsx', () => ({ default: () => <div data-testid="char-gold">Gold</div> }));
 vi.mock('./CharHitPoints.jsx', () => ({ default: () => <div data-testid="char-hp">HP</div> }));
 vi.mock('./CharClassFeatures.jsx', () => ({ default: () => <div data-testid="char-class-features">Class Features</div> }));
-vi.mock('./CharRaceFeatures.jsx', () => ({ default: () => <div data-testid="char-race-features">Race Features</div> }));
-vi.mock('./CharFeatFeatures.jsx', () => ({ default: () => <div data-testid="char-feat-features">Feat Features</div> }));
-vi.mock('./TrackedResourceInput.jsx', () => ({ default: () => <div data-testid="tracked-resource-input">TrackedResource</div> }));
 vi.mock('../char-feats/CharFeats.jsx', () => ({ default: () => <div data-testid="char-feats">Feats</div> }));
 vi.mock('../../common/AvatarImage.jsx', () => ({ default: () => <div data-testid="avatar-image">Avatar</div> }));
 vi.mock('../../common/AvatarModal.jsx', () => ({ default: () => null }));
-vi.mock('../../common/CreatureBadge.jsx', () => ({ default: ({ label }) => <span data-testid="creature-badge">{label}</span> }));
-vi.mock('../../common/AllySelectionModal.jsx', () => ({ default: () => null }));
-vi.mock('../../initiative/ConditionEffectBadges.jsx', () => ({ default: () => <div data-testid="condition-effect-badges">Badges</div> }));
 vi.mock('../LongRestButton.jsx', () => ({ default: () => <div data-testid="long-rest-btn">Long Rest</div> }));
 vi.mock('../ShortRestButton.jsx', () => ({ default: () => <div data-testid="short-rest-btn">Short Rest</div> }));
 vi.mock('../ShortRestModal.jsx', () => ({ default: () => <div data-testid="short-rest-modal">Short Rest Modal</div> }));
 vi.mock('./CharConditions.jsx', () => ({ default: () => <div data-testid="char-conditions">Conditions</div> }));
-vi.mock('../../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 
-// ---------------------------------------------------------------------------
-// Runtime / state mocks
-// ---------------------------------------------------------------------------
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
     default: vi.fn(({ maxGetter }) => ({ current: maxGetter(), update: vi.fn() })),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
-    useRuntimeValue: vi.fn((_name, _key, _campaign) => null),
-    getRuntimeValue: vi.fn((_name, _key, _campaign) => null),
+    useRuntimeValue: vi.fn(() => null),
+    getRuntimeValue: vi.fn(() => null),
     getStore: vi.fn(() => new Map()),
 }));
 
 vi.mock('../../../hooks/runtime/useSyncedState.js', () => ({
     useSyncedState: vi.fn((_name, _key, defaultValue) => [defaultValue, vi.fn()]),
-}));
-
-vi.mock('../../../hooks/combat/DiceRollContext.js', () => ({
-    useDiceRollPopup: vi.fn(() => ({ setPopupHtml: vi.fn() })),
 }));
 
 vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
@@ -70,90 +70,28 @@ vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
     default: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn(), rollInitiative: vi.fn() })),
 }));
 
-// ---------------------------------------------------------------------------
-// Service mocks
-// ---------------------------------------------------------------------------
 vi.mock('../../../services/combat/buffs/buffService.js', () => ({
     getActiveBuffs: vi.fn(() => []),
-}));
-
-vi.mock('../../../services/rules/rulesFactory.js', () => ({
-    default: {
-        getRules: vi.fn(() => ({ classRules: { getUnarmoredMovementIncrease: vi.fn(() => 0) } })),
-    },
-    getRules: vi.fn(() => ({ classRules: { getUnarmoredMovementIncrease: vi.fn(() => 0) } })),
-}));
-
-vi.mock('../../../services/rules/core/attackCalc.js', () => ({
-    parseMagicItemName: (name) => ({ baseName: name }),
 }));
 
 vi.mock('../../../services/encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(() => ({ creatures: [] })),
 }));
 
-vi.mock('../../../services/automation/common/buffToggle.js', () => ({
-    isBuffActive: vi.fn(() => false),
-}));
-
-vi.mock('../../../services/combat/auras/unbreakableMajesty.js', () => ({
-    isUnbreakableMajestyActive: vi.fn(() => false),
-    getUnbreakableMajestySaveDc: vi.fn(() => 0),
-}));
-
+// The badge lane gates on this handler; every other buff/aura handler resolves through
+// the mocked runtime store (falsy by default) and needs no module mock.
 vi.mock('../../../services/automation/handlers/buffs/auraOfLifeHandler.js', () => ({
     isAuraOfLifeActive: vi.fn(() => false),
     handle: vi.fn(),
 }));
 
-vi.mock('../../../services/automation/handlers/buffs/circleOfPowerHandler.js', () => ({
-    isCircleOfPowerActive: vi.fn(() => false),
-    handle: vi.fn(),
-}));
+beforeEach(() => {
+    vi.resetAllMocks();
+    getActiveBuffs.mockReturnValue([]);
+});
 
-vi.mock('../../../services/automation/handlers/buffs/deathWardHandler.js', () => ({
-    isDeathWardActive: vi.fn(() => false),
-    handle: vi.fn(),
-}));
-
-// ---------------------------------------------------------------------------
-// Shared test fixtures
-// ---------------------------------------------------------------------------
-const mockPlayerStats = {
-    name: 'Thorin',
-    xp: 2300,
-    xpMode: 'milestone',
-    race: { name: 'Dwarf', type: 'Hill Dwarf', subrace: { name: 'Hill Dwarf', speed: 25 } },
-    class: { name: 'Cleric', subclass: { name: 'War', type: 'Choice' }, major: { name: 'Cleric' } },
-    level: 5,
-    alignment: 'Lawful Good',
-    proficiency: 3,
-    initiative: 2,
-    initiativeAdvantage: false,
-    abilities: [{ name: 'Wisdom', bonus: 3 }, { name: 'Strength', bonus: 2 }],
-    armorClass: 18,
-    armorClassFormula: '16 + 2 (shield)',
-    hitPoints: 45,
-    inventory: { equipped: ['Scale Mail', 'Shield'] },
-    equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }, { name: 'Shield', type: 'Shield' }],
-    background: 'Soldier',
-    immunities: [],
-    resistances: [],
-    vulnerabilities: [],
-    senses: [],
-    proficiencies: [],
-    languages: [],
-    automation: { passives: [], actions: [] },
-    passives: [],
-    exhaustionLevel: 0,
-};
-
-const mockCampaignName = 'test-campaign';
-
-function renderSummary(buffsOverride) {
-    if (buffsOverride !== undefined) {
-        vi.mocked(getActiveBuffs).mockReturnValue(buffsOverride);
-    }
+function renderSummary(buffs = []) {
+    getActiveBuffs.mockReturnValue(buffs);
     render(
         <CharSummary
             playerStats={mockPlayerStats}
@@ -163,100 +101,128 @@ function renderSummary(buffsOverride) {
     );
 }
 
-// ---------------------------------------------------------------------------
-// Buff resistance types — parameterized across all tested buff sources
-// ---------------------------------------------------------------------------
-describe('CharSummary — buff resistance types render correctly', () => {
-    beforeEach(() => vi.resetAllMocks());
+// Serve the given runtime keys; every other key returns undefined, mirroring
+// the real store's missing-key behavior (also feeds the real stoneSkinHandler).
+function mockRuntime(values) {
+    vi.mocked(getRuntimeValue).mockImplementation((_name, key) => values[key]);
+}
 
+// Exact (not substring) row match so duplicates, wrong capitalization, or wrong
+// join order fail.
+function expectResistancesRow(expectedRowText) {
+    const row = screen.getByText('Resistances:').closest('div');
+    expect(row.textContent.replace(/\s+/g, ' ').trim()).toBe(expectedRowText);
+}
+
+function expectNoResistancesRow() {
+    expect(screen.queryByText('Resistances:')).not.toBeInTheDocument();
+}
+
+// ---------------------------------------------------------------------------
+// One case per DISTINCT buff→resistance filter path, pinning row order.
+// Rage-lane and later-lane share one render (rage joins before later);
+// effect-based lanes (warding_bond, Starry Form) share the other.
+// ---------------------------------------------------------------------------
+describe('CharSummary - buff resistance lanes', () => {
     it.each([
-        [{ name: 'Aura of Life', resistanceTypes: ['necrotic'] }, /Necrotic/],
-        [{ name: 'Aura of Purity', resistanceTypes: ['poison'] }, /Poison/],
-        [{ name: 'Protection from Poison', resistanceTypes: ['poison'] }, /Poison/],
-        [{ name: 'Stone Skin', resistanceTypes: ['bludgeoning'] }, /Bludgeoning/],
-        [{ effect: 'warding_bond', resistanceTypes: ['cold'] }, /Cold/],
-        [{ name: 'Starry Form', constellation: 'Archer', resistanceTypes: ['fire'] }, /Fire/],
-        [{ name: 'Superior Defense', resistanceTypes: ['slashing'] }, /Slashing/],
-        [{ name: 'Rage of the Gods', resistanceTypes: ['radiant'] }, /Radiant/],
-    ])('renders %p resistance type', (buff, expectedText) => {
-        renderSummary([buff]);
-        expect(screen.getByText(expectedText)).toBeInTheDocument();
+        {
+            desc: 'rage lane joins before later-name lane',
+            buffs: [
+                { name: 'Aura of Life', resistanceTypes: ['necrotic'] },
+                { name: 'Rage', resistanceTypes: ['bludgeoning'] },
+            ],
+            expected: 'Resistances: Bludgeoning, Necrotic',
+        },
+        {
+            desc: 'warding_bond effect and Starry Form name matcher',
+            buffs: [
+                { effect: 'warding_bond', resistanceTypes: ['cold'] },
+                { name: 'Starry Form', resistanceTypes: ['fire'] },
+            ],
+            expected: 'Resistances: Cold, Fire',
+        },
+    ])('$desc', ({ buffs, expected }) => {
+        renderSummary(buffs);
+        expectResistancesRow(expected);
     });
 });
 
 // ---------------------------------------------------------------------------
-// Feign Death — resistance + condition immunity (unique: tests both)
+// Allow-list guard: resistanceTypes on a buff outside every name/effect matcher
+// contributes nothing. Also pins the getActiveBuffs player/campaign wiring.
 // ---------------------------------------------------------------------------
-describe('CharSummary — Feign Death (resistance + condition immunity)', () => {
-    beforeEach(() => vi.resetAllMocks());
+describe('CharSummary - buffs outside the resistance allow-list', () => {
+    it('ignores resistanceTypes on a non-whitelisted buff and queries the right character store', () => {
+        renderSummary([{ name: 'Bless', resistanceTypes: ['poison'] }]);
 
-    it('renders poison condition immunity and poison resistance from Feign Death', () => {
-        renderSummary([
-            {
-                name: 'Feign Death',
-                resistanceTypes: ['poison'],
-                conditionImmunity: ['Poisoned'],
-            },
-        ]);
-        expect(screen.getByText(/Immunities:/)).toBeInTheDocument();
-        expect(screen.getByText(/Poisoned/)).toBeInTheDocument();
-        expect(screen.getByText('Poison')).toBeInTheDocument();
+        expectNoResistancesRow();
+        expect(getActiveBuffs).toHaveBeenCalledWith('Thorin', mockCampaignName);
     });
 });
 
 // ---------------------------------------------------------------------------
-// Stone Skin — buff resistance + runtime value damage types
+// Feign Death is in BOTH the resistance and condition-immunity buff lists —
+// one buff drives both rows.
 // ---------------------------------------------------------------------------
-describe('CharSummary — Stone Skin (buff + runtime value)', () => {
-    beforeEach(() => vi.resetAllMocks());
+describe('CharSummary - Feign Death dual lane', () => {
+    it('feeds the Resistances row (poison) and the Immunities row (Poisoned) from one buff', () => {
+        renderSummary([{
+            name: 'Feign Death',
+            resistanceTypes: ['poison'],
+            conditionImmunity: ['Poisoned'],
+        }]);
 
-    it('renders piercing resistance from stoneSkinDamageTypes runtime value alongside buff resistance', () => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === 'stoneSkinDamageTypes') return ['piercing'];
-            return null;
-        });
-        renderSummary([{ name: 'Stone Skin', resistanceTypes: ['bludgeoning'] }]);
-        expect(screen.getByText(/Piercing/)).toBeInTheDocument();
-        expect(screen.getByText(/Bludgeoning/)).toBeInTheDocument();
+        expectResistancesRow('Resistances: Poison');
+        expect(screen.getByText('Immunities:').closest('div')
+            .textContent.replace(/\s+/g, ' ').trim()).toBe('Immunities: Poisoned');
     });
 });
 
 // ---------------------------------------------------------------------------
-// Resistance deduplication
+// Stone Skin: named buff + runtime 'stoneSkinDamageTypes' (read via the REAL
+// stoneSkinHandler). Pins buff-vs-buff dedup, buff-vs-runtime dedup, and
+// additive runtime-only types in one row.
 // ---------------------------------------------------------------------------
-describe('CharSummary — resistance deduplication', () => {
-    beforeEach(() => vi.resetAllMocks());
-
-    it('deduplicates a resistance type that appears in two buffs', () => {
+describe('CharSummary - Stone Skin runtime types + deduplication', () => {
+    it('merges runtime stoneSkinDamageTypes with buff resistances, each type listed once', () => {
+        mockRuntime({ stoneSkinDamageTypes: ['bludgeoning', 'piercing'] });
         renderSummary([
             { name: 'Aura of Purity', resistanceTypes: ['poison'] },
             { name: 'Feign Death', resistanceTypes: ['poison'] },
-        ]);
-        const poisonElements = screen.queryAllByText('Poison');
-        expect(poisonElements.length).toBe(1);
-    });
-
-    it('deduplicates a resistance type that appears in buff and runtime value', () => {
-        vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-            if (key === 'stoneSkinDamageTypes') return ['bludgeoning'];
-            return null;
-        });
-        renderSummary([
             { name: 'Stone Skin', resistanceTypes: ['bludgeoning'] },
         ]);
-        const bludgeoningElements = screen.queryAllByText('Bludgeoning');
-        expect(bludgeoningElements.length).toBe(1);
+
+        expectResistancesRow('Resistances: Poison, Bludgeoning, Piercing');
     });
 });
 
 // ---------------------------------------------------------------------------
-// No active buffs — negative path
+// Badge lane (delegated here by CharSummary-Badges / -ConditionImmunities /
+// -AuraAndInitiative): gated Aura of Life badge + dynamic Heroes' Feast badge
+// whose tooltip is derived from the buff's resistance and immunity lists.
 // ---------------------------------------------------------------------------
-describe('CharSummary — no active buffs', () => {
-    beforeEach(() => vi.resetAllMocks());
+describe('CharSummary - aura and Heroes\' Feast badges', () => {
+    it('renders the gated Aura of Life badge and the Heroes\' Feast badge with derived tooltip', () => {
+        vi.mocked(isAuraOfLifeActive).mockReturnValue(true);
+        renderSummary([{
+            name: "Heroes' Feast",
+            resistanceTypes: ['poison'],
+            conditionImmunity: ['poisoned', 'frightened'],
+        }]);
 
-    it('renders no buff-derived resistances when getActiveBuffs returns empty array', () => {
-        renderSummary([]);
-        expect(document.querySelectorAll('.resistance-type').length).toBe(0);
+        const auraBadge = screen.getByText('Aura of Life');
+        expect(auraBadge).toHaveAttribute('title', expect.stringContaining('Necrotic'));
+
+        const feastBadge = screen.getByText("Heroes' Feast");
+        expect(feastBadge).toHaveAttribute(
+            'title',
+            "Heroes' Feast: Resistance to poison, Immune to Poisoned, Frightened, HP maximum increased by 2d10. Lasts 24 hours."
+        );
+    });
+
+    it('shows no Heroes\' Feast badge when no Heroes\' Feast buff is active', () => {
+        renderSummary([{ name: 'Rage', resistanceTypes: ['bludgeoning'] }]);
+
+        expect(screen.queryByText("Heroes' Feast")).not.toBeInTheDocument();
     });
 });

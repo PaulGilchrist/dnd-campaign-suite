@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
@@ -114,6 +114,9 @@ const landStats = (level, overrides = {}) => circleStats('Circle of the Land', l
 const stormStats = (level, overrides = {}) => circleStats('Circle of the Storm', level, overrides);
 const seaStats = (level = 2, overrides = {}) => circleStats('Circle of the Sea', level, overrides);
 
+const recoveryStats = (level = 2) =>
+  druidStats(level, { automation: { passives: [{ type: 'natural_recovery' }] } });
+
 function renderDruid(playerStats) {
   render(<CharClassFeatures playerStats={playerStats} campaignName={CAMPAIGN} />);
   return screen.getByTestId('char-class-druid');
@@ -127,16 +130,13 @@ describe('DruidFeatures', () => {
     mockGetRuntime();
   });
 
-  describe('level gating', () => {
-    it('renders nothing below level 2 (Wild Shape is a level 2 feature)', () => {
-      render(<CharClassFeatures playerStats={druidStats(1)} campaignName={CAMPAIGN} />);
-      expect(screen.queryByTestId('char-class-druid')).not.toBeInTheDocument();
-    });
-
-    it('renders the druid section at level 2', () => {
-      const section = renderDruid(druidStats(2));
-      expect(section).toBeInTheDocument();
-    });
+  it.each([
+    [1, false],
+    [2, true],
+  ])('renders the druid section at level %i: %s (Wild Shape is a level 2 feature)', (level, expected) => {
+    render(<CharClassFeatures playerStats={druidStats(level)} campaignName={CAMPAIGN} />);
+    if (expected) expect(screen.getByTestId('char-class-druid')).toBeInTheDocument();
+    else expect(screen.queryByTestId('char-class-druid')).not.toBeInTheDocument();
   });
 
   describe('wild shape basics', () => {
@@ -157,19 +157,15 @@ describe('DruidFeatures', () => {
         .toHaveTextContent('Wild Shape Uses: 3/3');
     });
 
-    it('lists Beast Forms Known when the count is positive', () => {
-      mockDruidFeatures({ beastKnownForms: 5 });
-      const section = renderDruid(druidStats(2));
-      expect(section.textContent).toContain('Beast Forms Known: 5');
-    });
-
     it.each([
-      ['zero forms', 0],
-      ['count is undefined', undefined],
-    ])('omits Beast Forms Known when %s', (_label, beastKnownForms) => {
+      ['shown when count is positive', 5, 'Beast Forms Known: 5'],
+      ['hidden when count is zero', 0, null],
+      ['hidden when count is undefined', undefined, null],
+    ])('Beast Forms Known is %s', (_label, beastKnownForms, expectedText) => {
       mockDruidFeatures({ beastKnownForms });
       const section = renderDruid(druidStats(2));
-      expect(section.textContent).not.toContain('Beast Forms Known');
+      if (expectedText) expect(section.textContent).toContain(expectedText);
+      else expect(section.textContent).not.toContain('Beast Forms Known');
     });
 
     it('CLA-013: renders Unlimited (Archdruid) badge instead of a counter when max is Infinity', () => {
@@ -189,13 +185,11 @@ describe('DruidFeatures', () => {
       [20, true],
     ])('at level %i renders cosmic omen tracked resources: %s', (level, expected) => {
       renderDruid(starsStats(level));
-      const check = (label) => {
-        const query = screen.queryByText(label);
-        if (expected) expect(query).toBeInTheDocument();
-        else expect(query).not.toBeInTheDocument();
-      };
-      check('Cosmic Omen Uses:');
-      check('Star Map Free Casts:');
+      for (const resourceKey of ['cosmicomenUses', '_Star_Map_freeCastCount']) {
+        const tracker = screen.queryByTestId(`tracked-resource-${resourceKey}`);
+        if (expected) expect(tracker).toBeInTheDocument();
+        else expect(tracker).not.toBeInTheDocument();
+      }
     });
 
     it.each([
@@ -211,37 +205,30 @@ describe('DruidFeatures', () => {
     });
 
     it.each([
-      ['Fortune, even', { type: 'Fortune', isEven: true }, 'Cosmic Omen: Fortune (Even)'],
-      ['Bane, odd', { type: 'Bane', isEven: false }, 'Cosmic Omen: Bane (Odd)'],
-      ['Fortune with isEven absent (Odd)', { type: 'Fortune' }, 'Cosmic Omen: Fortune (Odd)'],
-    ])('renders the omen badge for %s', (_label, effect, expectedText) => {
-      mockRuntime({ cosmicOmenEffect: JSON.stringify(effect) });
-      const section = renderDruid(starsStats(6));
-      expect(section.textContent).toContain(expectedText);
-    });
-
-    it.each([
-      ['null', null],
-      ['an empty string', ''],
-      ['invalid JSON', 'invalid json'],
-      ['JSON without a type', '{"isEven":true}'],
-    ])('omits the omen badge when the effect is %s', (_label, effect) => {
+      ['Fortune, even', JSON.stringify({ type: 'Fortune', isEven: true }), 'Cosmic Omen: Fortune (Even)'],
+      ['Bane, odd', JSON.stringify({ type: 'Bane', isEven: false }), 'Cosmic Omen: Bane (Odd)'],
+      ['Fortune with isEven absent', JSON.stringify({ type: 'Fortune' }), 'Cosmic Omen: Fortune (Odd)'],
+      ['null', null, null],
+      ['an empty string', '', null],
+      ['invalid JSON', 'invalid json', null],
+      ['JSON without a type', '{"isEven":true}', null],
+    ])('renders the omen badge from cosmicOmenEffect %s', (_label, effect, expectedText) => {
       mockRuntime({ cosmicOmenEffect: effect });
       const section = renderDruid(starsStats(6));
-      expect(section.textContent).not.toContain('Cosmic Omen:');
+      if (expectedText) expect(section.textContent).toContain(expectedText);
+      else expect(section.textContent).not.toContain('Cosmic Omen:');
     });
   });
 
   describe('circle of the moon', () => {
-    it('tracks Moonlight Step Uses for moon druids', () => {
-      renderDruid(moonStats(10));
-      expect(screen.getByTestId('tracked-resource-moonlightStepUses')).toBeInTheDocument();
-    });
-
-    it('omits Moonlight Step Uses for non-moon circles', () => {
-      const section = renderDruid(landStats(10));
-      expect(screen.queryByTestId('tracked-resource-moonlightStepUses')).not.toBeInTheDocument();
-      expect(section.textContent).not.toContain('Moonlight Step');
+    it.each([
+      ['Circle of the Moon', true],
+      ['Circle of the Land', false],
+    ])('%s druids get Moonlight Step tracking: %s', (circle, expected) => {
+      renderDruid(circleStats(circle, 10));
+      const tracker = screen.queryByTestId('tracked-resource-moonlightStepUses');
+      if (expected) expect(tracker).toBeInTheDocument();
+      else expect(tracker).not.toBeInTheDocument();
     });
 
     it.each([
@@ -255,19 +242,18 @@ describe('DruidFeatures', () => {
     });
 
     it('CLA-230: Restore Uses button dispatches the moonlight-step-restore bus event', () => {
-      const section = renderDruid(moonStats(10));
+      renderDruid(moonStats(10));
       const handler = vi.fn();
       window.addEventListener('moonlight-step-restore', handler);
       try {
         fireEvent.click(screen.getByRole('button', { name: /Restore Uses/i }));
         expect(handler).toHaveBeenCalledTimes(1);
-        expect(section.querySelector('.moonlight-step-restore-btn')).not.toBeNull();
       } finally {
         window.removeEventListener('moonlight-step-restore', handler);
       }
     });
 
-    it.each([3, 9])('CLA-230: hides Restore Uses at level %i (unlocks at 10)', (level) => {
+    it.each([3, 9])('CLA-230: hides Restore Uses below level 10 (level %i)', (level) => {
       renderDruid(moonStats(level));
       expect(screen.queryByRole('button', { name: /Restore Uses/i })).not.toBeInTheDocument();
     });
@@ -290,26 +276,20 @@ describe('DruidFeatures', () => {
       expect(section.textContent).not.toContain('Circle of the Land');
     });
 
-    it('renders elemental fury badges for the storm druid without needing a land type', () => {
-      mockRuntime({ elementalFury: 'Lightning', improvedElementalFury: 'Fire' });
+    it.each([
+      ['both fury choices', { elementalFury: 'Lightning', improvedElementalFury: 'Fire' },
+        ['Elemental Fury: Lightning', 'Improved Elemental Fury: Fire']],
+      ['only the improved fury choice', { improvedElementalFury: 'Thunder' },
+        ['Improved Elemental Fury: Thunder']],
+      ['no fury choices', {}, []],
+    ])('renders fury badges independently from each other and from %s', (_label, furyRuntime, expectedBadges) => {
+      mockRuntime(furyRuntime);
       const section = renderDruid(stormStats(18));
-      expect(section.textContent).toContain('Elemental Fury: Lightning');
-      expect(section.textContent).toContain('Improved Elemental Fury: Fire');
+      const furyBadges = [...section.querySelectorAll('.automation-badge')]
+        .map(el => el.textContent.trim())
+        .filter(t => t.includes('Elemental Fury'));
+      expect(furyBadges).toEqual(expectedBadges);
       expect(section.textContent).not.toContain('Circle of the Land');
-    });
-
-    it('renders fury badges independently of the land type when only choices are set', () => {
-      mockRuntime({ improvedElementalFury: 'Thunder' });
-      const section = renderDruid(stormStats(18));
-      const badgeTexts = [...section.querySelectorAll('.automation-badge')].map(el => el.textContent.trim());
-      expect(badgeTexts).toContain('Improved Elemental Fury: Thunder');
-      expect(badgeTexts.filter(t => t.startsWith('Elemental Fury:'))).toHaveLength(0);
-      expect(section.textContent).not.toContain('Circle of the Land');
-    });
-
-    it('omits elemental fury badges when no choices are set', () => {
-      const section = renderDruid(stormStats(18));
-      expect(section.textContent).not.toContain('Elemental Fury');
     });
   });
 
@@ -319,17 +299,15 @@ describe('DruidFeatures', () => {
       expect(section.textContent).not.toContain('Natural Recovery');
     });
 
-    it('renders the section header when the passive exists', () => {
-      const stats = druidStats(2, { automation: { passives: [{ type: 'natural_recovery' }] } });
-      const section = renderDruid(stats);
+    it('renders the section header when the passive exists, with no free-cast badges by default', () => {
+      const section = renderDruid(recoveryStats());
       expect(section.textContent).toContain('Natural Recovery:');
       expect(section.textContent).not.toContain('Free cast');
     });
 
-    it('badges the first selected free cast spell', () => {
+    it('badges the first selected free cast spell only', () => {
       mockGetRuntime({ freeCast: ['Moonbeam', 'Speak with Animals'] });
-      const stats = druidStats(2, { automation: { passives: [{ type: 'natural_recovery' }] } });
-      const section = renderDruid(stats);
+      const section = renderDruid(recoveryStats());
       expect(section.textContent).toContain('Free cast: Moonbeam');
       expect(section.textContent).not.toContain('Speak with Animals');
     });
@@ -340,71 +318,60 @@ describe('DruidFeatures', () => {
       [null, false],
     ])('shows the free-cast-used badge only when the flag is truthy (%s)', (used, expected) => {
       mockGetRuntime({ freeCastUsed: used });
-      const stats = druidStats(2, { automation: { passives: [{ type: 'natural_recovery' }] } });
-      const section = renderDruid(stats);
+      const section = renderDruid(recoveryStats());
       expect(section.textContent.includes('Free cast used')).toBe(expected);
     });
   });
 
-  describe('wrath of the sea', () => {
-    it('renders the active badge when wrathOfTheSeaActive is true', () => {
-      mockRuntime({ wrathOfTheSeaActive: true });
-      const section = renderDruid(seaStats());
-      expect(section.textContent).toContain('Wrath of the Sea Active');
-    });
-
-    it.each([
-      ['false', false],
-      ['undefined', undefined],
-    ])('omits the badge when the flag is %s', (_label, active) => {
-      mockRuntime({ wrathOfTheSeaActive: active });
-      const section = renderDruid(seaStats());
-      expect(section.textContent).not.toContain('Wrath of the Sea Active');
-    });
+  it.each([
+    ['true', true],
+    ['false', false],
+    ['undefined', false],
+  ])('shows the Wrath of the Sea badge only when wrathOfTheSeaActive is %s', (_label, active) => {
+    mockRuntime({ wrathOfTheSeaActive: active });
+    const section = renderDruid(seaStats());
+    // Match badge nodes (not raw textContent — the 'Circle of the Sea' badge
+    // label contains 'Sea' and concatenates against adjacent badges).
+    const wrathBadges = [...section.querySelectorAll('.automation-badge')]
+      .filter(el => el.textContent.trim() === 'Wrath of the Sea Active');
+    expect(wrathBadges).toHaveLength(active ? 1 : 0);
   });
 
   describe('multi-minute buff badges', () => {
     it.each([
-      ['1_minute'],
-      ['hour'],
-      ['long_rest'],
-      ['while_illusion_active'],
-    ])('renders a badge for %s duration', (duration) => {
+      ['1_minute', true],
+      ['10_minutes', true],
+      ['hour', true],
+      ['long_rest', true],
+      ['while_illusion_active', true],
+      ['instant', false],
+      ['1_round', false],
+      [undefined, false],
+    ])('renders buff badge for duration %s: %s', (duration, expected) => {
       mockRuntime({ buffs: [{ name: 'Test Buff', duration }] });
       const section = renderDruid(druidStats(2));
-      expect(section.textContent).toContain(`Test Buff: ${duration}`);
+      if (expected) expect(section.textContent).toContain(`Test Buff: ${duration}`);
+      else expect(section.textContent).not.toContain('Test Buff');
     });
 
     it.each([
-      ['combat-scoped round', '1_round'],
-      ['instant', 'instant'],
-      ['missing duration', undefined],
-    ])('filters out %s', (_label, duration) => {
-      mockRuntime({ buffs: [{ name: 'Test Buff', duration }] });
-      const section = renderDruid(druidStats(2));
-      expect(section.textContent).not.toContain('Test Buff');
-    });
-
-    it('CLA-391: formats half_druid_level_hours from druid LEVEL, not wild shape uses', () => {
+      // CLA-391: hours come from druid LEVEL ÷ 2, never wild_shape uses.
+      // class_levels wild_shape: 4 would have produced the old buggy '2 hours'.
+      [20, '10 hours'],
+      [3, '1 hour'],
+    ])('CLA-391: formats half_druid_level_hours at level %i as %s', (level, expected) => {
       mockRuntime({ buffs: [{ name: 'Wild Shape', effect: 'shape_shift', duration: 'half_druid_level_hours' }] });
-      const stats = druidStats(20, {
+      const stats = druidStats(level, {
         class: {
           name: 'Druid',
           major: {},
           subclass: {},
-          class_levels: [{ level: 20, wild_shape: 4 }],
+          class_levels: [{ level, wild_shape: 4 }],
           fightingStyles: [],
         },
       });
       const section = renderDruid(stats);
-      expect(section.textContent).toContain('Wild Shape: 10 hours');
-      expect(section.textContent).not.toContain('Wild Shape: 2 hours');
-    });
-
-    it('pluralizes half_druid_level_hours for odd levels (lv3 → 1 hour)', () => {
-      mockRuntime({ buffs: [{ name: 'Test Buff', duration: 'half_druid_level_hours' }] });
-      const section = renderDruid(druidStats(3));
-      expect(section.textContent).toContain('Test Buff: 1 hour');
+      expect(section.textContent).toContain(`Wild Shape: ${expected}`);
     });
 
     it.each([

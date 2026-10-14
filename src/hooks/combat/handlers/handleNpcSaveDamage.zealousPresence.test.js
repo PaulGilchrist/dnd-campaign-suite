@@ -1,9 +1,12 @@
-// CLA-394: Zealous Presence buff (advantage_attacks_and_saves) must grant
-// advantage on the NPC auto-save roll path (handleNpcSaveDamage:109 seam).
+// @maintained-by-ai: 2026-10-14
+// CLA-394: Zealous Presence (2024 Barbarian, buffExpression advantage_attacks_and_saves
+// stored on the target's activeBuffs by buffToggle.toggleBuff) must grant advantage on
+// the NPC auto-save path: handleNpcSaveDamage resolveSaveAdvantage → rollSaveForCreature.
+// buffToggle.js stays unmocked so the seam exercised is the real hasBuffEffect lookup.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/rules/features/viciousMockeryService.js', () => ({
-    triggerViciousMockeryForGeneric: vi.fn(() => Promise.resolve()),
+    triggerViciousMockeryForGeneric: vi.fn(),
 }));
 vi.mock('../../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
@@ -17,34 +20,30 @@ vi.mock('../../../services/ui/utils.js', () => ({
     },
 }));
 vi.mock('../../runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
 vi.mock('../../../services/combat/automation/automationService.js', () => ({
-    hasIgnoreResistance: vi.fn(),
+    hasIgnoreResistance: vi.fn(() => false),
     playerIsImmuneToCondition: vi.fn(),
-    hasGreatWeaponFighting: vi.fn(),
-    applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
     evaluateAutoExpression: vi.fn(),
 }));
 vi.mock('../../../services/rules/features/invisibilityService.js', () => ({
     endInvisibilityOnHostileAction: vi.fn(),
 }));
 vi.mock('../loggedDiceRollUtils.js', () => ({
-    getGuardianProtectionAcBonus: vi.fn(() => 0),
-    hasPotentCantrip: vi.fn(),
-    hasSoulstitchProtection: vi.fn(),
+    hasPotentCantrip: vi.fn(() => false),
+    hasSoulstitchProtection: vi.fn(() => false),
     clearSoulstitchStamp: vi.fn(),
-    applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 vi.mock('../../../services/combat/auras/coronaAuraUtils.js', () => ({
-    getCoronaSaveDisadvantage: vi.fn(),
+    getCoronaSaveDisadvantage: vi.fn(async () => ({ disadvantage: false })),
 }));
 vi.mock('../../../services/combat/auras/elderChampionAuraUtils.js', () => ({
-    getElderChampionSaveDisadvantage: vi.fn(),
+    getElderChampionSaveDisadvantage: vi.fn(async () => ({ disadvantage: false })),
 }));
 vi.mock('../../../services/automation/handlers/buffs/circleOfPowerHandler.js', () => ({
-    isCircleOfPowerActive: vi.fn(),
+    isCircleOfPowerActive: vi.fn(() => false),
 }));
 vi.mock('./handleOverchannelSelfDamage.js', () => ({
     handleOverchannelSelfDamage: vi.fn(),
@@ -53,24 +52,15 @@ vi.mock('../../../services/ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
-    computeDamageAfterSave: vi.fn((total, success, _dcSuccess) => success ? 0 : total),
-    computeDamageAfterEvasion: vi.fn((total, success, dcSuccess, evasion) => {
-        if (evasion && dcSuccess === 'half') return success ? 0 : Math.floor(total / 2);
-        return success ? 0 : total;
-    }),
-    rollSaveForCreature: vi.fn(),
-    applyDamageToTarget: vi.fn(),
+    computeDamageAfterSave: vi.fn((total, success) => (success ? 0 : total)),
+    computeDamageAfterEvasion: vi.fn((total, success) => (success ? 0 : total)),
+    rollSaveForCreature: vi.fn(() => ({ roll: 5, total: 7, bonus: 2, success: false, rawRolls: [5] })),
+    applyDamageToTarget: vi.fn(async () => ({ finalDamage: 5, newHp: 8, damageReduced: false })),
     normalizeSaveType: vi.fn((t) => t),
 }));
 
-import { rollExpression } from '../../../services/dice/diceRoller.js';
 import { getRuntimeValue } from '../../runtime/useRuntimeState.js';
-import { hasIgnoreResistance } from '../../../services/combat/automation/automationService.js';
-import { hasPotentCantrip, hasSoulstitchProtection, applyMinDamageAdjustment } from '../loggedDiceRollUtils.js';
-import { getCoronaSaveDisadvantage } from '../../../services/combat/auras/coronaAuraUtils.js';
-import { getElderChampionSaveDisadvantage } from '../../../services/combat/auras/elderChampionAuraUtils.js';
-import { isCircleOfPowerActive } from '../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
-import { applyDamageToTarget, rollSaveForCreature } from '../../../services/rules/combat/applyDamage.js';
+import { rollSaveForCreature } from '../../../services/rules/combat/applyDamage.js';
 import { createNpcSaveDamageHandler } from './handleNpcSaveDamage.js';
 
 describe('handleNpcSaveDamage — CLA-394 Zealous Presence save advantage', () => {
@@ -86,6 +76,7 @@ describe('handleNpcSaveDamage — CLA-394 Zealous Presence save advantage', () =
     };
 
     const context = {
+        attackerName: 'TestWizard',
         targetName: 'Goblin',
         saveDc: 12,
         saveType: 'dex',
@@ -98,52 +89,48 @@ describe('handleNpcSaveDamage — CLA-394 Zealous Presence save advantage', () =
 
     beforeEach(() => {
         vi.clearAllMocks();
-        rollExpression.mockReturnValue({ total: 10, rolls: [6, 4], modifier: 0 });
+        // mockReset (not clear) — per-test activeBuffs impls must not leak between tests.
         getRuntimeValue.mockReset().mockReturnValue(null);
-        hasIgnoreResistance.mockReturnValue(false);
-        hasPotentCantrip.mockReturnValue(false);
-        hasSoulstitchProtection.mockReturnValue(false);
-        applyMinDamageAdjustment.mockImplementation((d) => d);
-        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
-        isCircleOfPowerActive.mockReturnValue(false);
-        rollSaveForCreature.mockReturnValue({ roll: 5, total: 7, bonus: 2, success: false, rawRolls: [5] });
-        applyDamageToTarget.mockResolvedValue({ finalDamage: 5, newHp: 8, damageReduced: false });
     });
 
-    async function call() {
-        const fn = createNpcSaveDamageHandler(deps);
-        await fn({ name: 'Fire Bolt', formula: '1d10', total: 10, rolls: [6, 4], modifier: 0, context: context, adjustedTotal: 10, combatSummary: combatSummary });
+    function targetBuffs(buffs) {
+        getRuntimeValue.mockImplementation((name, key) => (name === 'Goblin' && key === 'activeBuffs' ? buffs : null));
+    }
+
+    async function callHandler() {
+        await createNpcSaveDamageHandler(deps)({
+            name: 'Fire Bolt', formula: '1d10', total: 10, rolls: [6, 4], modifier: 0,
+            context, adjustedTotal: 10, combatSummary,
+        });
+    }
+
+    function expectSaveRollAdvantage(advantage) {
+        expect(rollSaveForCreature).toHaveBeenCalledWith(
+            expect.objectContaining({ name: 'Goblin' }),
+            'dex',
+            12,
+            false,
+            advantage
+        );
+        expect(deps.setPopupHtml).toHaveBeenCalledWith(
+            expect.objectContaining({ forcedMode: advantage ? 'advantage' : 'normal' })
+        );
     }
 
     it('rolls with advantage=true when the target carries the Zealous Presence buff', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (name === 'Goblin' && key === 'activeBuffs') {
-                return [{ name: 'Zealous Presence', effect: 'advantage_attacks_and_saves' }];
-            }
-            return null;
-        });
-
-        await call();
-
-        expect(rollSaveForCreature).toHaveBeenCalledWith(
-            expect.objectContaining({ name: 'Goblin' }),
-            'dex',
-            12,
-            false,
-            true
-        );
+        targetBuffs([{ name: 'Zealous Presence', effect: 'advantage_attacks_and_saves', duration: 'until_start_of_next_turn' }]);
+        await callHandler();
+        expectSaveRollAdvantage(true);
     });
 
     it('control: rolls with advantage=false when the buff is absent', async () => {
-        await call();
+        await callHandler();
+        expectSaveRollAdvantage(false);
+    });
 
-        expect(rollSaveForCreature).toHaveBeenCalledWith(
-            expect.objectContaining({ name: 'Goblin' }),
-            'dex',
-            12,
-            false,
-            false
-        );
+    it('matches on buff effect, not buff name — a same-named buff without the effect grants no advantage', async () => {
+        targetBuffs([{ name: 'Zealous Presence', duration: 'until_start_of_next_turn' }]);
+        await callHandler();
+        expectSaveRollAdvantage(false);
     });
 });

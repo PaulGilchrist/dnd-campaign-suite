@@ -1,8 +1,7 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpellSlots from './CharSpellSlots.jsx';
-import rules from '../../../services/rules/rules.js';
 
 // CharSpellSlots is pure wiring: it asks the rules engine for the character's
 // max spell-slot level, then renders one CharSpellSlotLevel per level 1..max,
@@ -10,9 +9,10 @@ import rules from '../../../services/rules/rules.js';
 //
 // The rules engine (rules.getSpellMaxLevel) is a pure function of the slot
 // data, so it runs for real here — tests drive behavior through realistic
-// spellAbilities fixtures instead of mock return values. Only the child is
-// stubbed, so assertions target this parent's data flow; the child's own
-// rendering, interactions, and value resolution are covered by
+// spellAbilities fixtures instead of mock return values, and the exact child
+// rows pin the max-level computation. Only the child is stubbed, so assertions
+// target this parent's data flow; the child's own rendering, interactions, and
+// value resolution are covered by
 // CharSpellSlotLevel.{rendering,interactions,fallback}.test.jsx.
 vi.mock('./CharSpellSlotLevel.jsx', () => {
   const stub = vi.fn(() => null);
@@ -49,15 +49,8 @@ function renderSlots(playerStats) {
 }
 
 describe('CharSpellSlots', () => {
-  let maxLevelSpy;
-
   beforeEach(() => {
     CharSpellSlotLevel.mockClear();
-    maxLevelSpy = vi.spyOn(rules, 'getSpellMaxLevel');
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it.each([
@@ -70,14 +63,8 @@ describe('CharSpellSlots', () => {
     expect(CharSpellSlotLevel).not.toHaveBeenCalled();
   });
 
-  it('asks the rules engine for the max level from the character spellAbilities', () => {
-    const playerStats = createPlayerStats({ 1: 4, 2: 3 });
-
-    renderSlots(playerStats);
-
-    expect(maxLevelSpy).toHaveBeenCalledWith(playerStats.spellAbilities);
-  });
-
+  // The real engine derives max level from the fixture, so each row set also
+  // proves getSpellMaxLevel was consulted with the character's spellAbilities.
   it.each([
     {
       description: 'a caster with levels 1-3',
@@ -86,6 +73,16 @@ describe('CharSpellSlots', () => {
         { level: 1, totalSlots: 4 },
         { level: 2, totalSlots: 3 },
         { level: 3, totalSlots: 3 },
+      ],
+    },
+    {
+      // Real rule: max level is the highest level with more than zero slots,
+      // so the 0-slot level 3 and unconfigured level 4 never appear.
+      description: 'a caster whose highest level has zero slots',
+      levels: { 1: 4, 2: 3, 3: 0 },
+      expected: [
+        { level: 1, totalSlots: 4 },
+        { level: 2, totalSlots: 3 },
       ],
     },
     {
@@ -103,44 +100,26 @@ describe('CharSpellSlots', () => {
         { level: 9, totalSlots: 1 },
       ],
     },
+    {
+      // E.g. a martial character with an empty spellbook: header, no rows.
+      description: 'a character with no slots configured',
+      levels: {},
+      expected: [],
+    },
   ])(
     'shows the header and one row per level 1..max for $description',
     ({ levels, expected }) => {
-      renderSlots(createPlayerStats(levels));
+      const playerStats = createPlayerStats(levels);
+
+      renderSlots(playerStats);
 
       expect(screen.getByText('Spell Slots')).toBeInTheDocument();
       expect(renderedChildren()).toEqual(expected);
+      // Every row also receives the character and campaign, by identity.
+      for (const [props] of CharSpellSlotLevel.mock.calls) {
+        expect(props.playerStats).toBe(playerStats);
+        expect(props.campaignName).toBe(CAMPAIGN);
+      }
     }
   );
-
-  it('does not render levels at or above a zero-slot level', () => {
-    // Real rule: max level is the highest level with more than zero slots,
-    // so the 0-slot level 3 and unconfigured level 4 never appear.
-    renderSlots(createPlayerStats({ 1: 4, 2: 3, 3: 0 }));
-
-    expect(renderedChildren()).toEqual([
-      { level: 1, totalSlots: 4 },
-      { level: 2, totalSlots: 3 },
-    ]);
-  });
-
-  it('shows the header but no level rows when no slots are configured', () => {
-    // E.g. a martial character with an empty spellbook.
-    renderSlots(createPlayerStats());
-
-    expect(screen.getByText('Spell Slots')).toBeInTheDocument();
-    expect(renderedChildren()).toEqual([]);
-  });
-
-  it('forwards the character and campaign to every level row', () => {
-    const playerStats = createPlayerStats({ 1: 4, 2: 2 });
-
-    renderSlots(playerStats);
-
-    expect(CharSpellSlotLevel).toHaveBeenCalledTimes(2);
-    for (const [props] of CharSpellSlotLevel.mock.calls) {
-      expect(props.playerStats).toBe(playerStats);
-      expect(props.campaignName).toBe(CAMPAIGN);
-    }
-  });
 });

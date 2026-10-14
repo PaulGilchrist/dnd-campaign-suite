@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CampaignSelection from './CampaignSelection.jsx';
@@ -13,7 +13,7 @@ vi.mock('../../services/campaign/campaignService.js', () => ({
 
 import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign/campaignService.js';
 
-// --- Per-test fixtures / helpers ---------------------------------------------
+// --- Fixtures / helpers ------------------------------------------------------
 
 // Build a fetch Response-like object without touching the network.
 const httpResponse = ({ ok = true, body = {} } = {}) => ({
@@ -21,13 +21,25 @@ const httpResponse = ({ ok = true, body = {} } = {}) => ({
   json: () => Promise.resolve(body),
 });
 
-// Stub fetch, returning the mock so tests can assert on calls.
-// Always via vi.stubGlobal so afterEach can restore it.
 function stubFetch(...responses) {
   const fetchMock = vi.fn();
   responses.forEach((response) => fetchMock.mockResolvedValue(response));
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
+}
+
+// Stub fetch with a pending promise so tests can observe the in-flight UI
+// and resolve it explicitly.
+function stubPendingFetch() {
+  let resolveFetch;
+  const fetchMock = vi.fn(
+    () =>
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      })
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  return { fetchMock, resolve: (response) => resolveFetch(response) };
 }
 
 // Stub window.location so reloads are observable and never navigate.
@@ -61,11 +73,12 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe('CampaignSelection', () => {
-  describe('initial load', () => {
-    it('shows a loading state and no actions while folders are in flight', async () => {
+  describe('loading and error states', () => {
+    it('shows only a loading message while campaigns are in flight', async () => {
       // Pending forever for this test — the render cleanup unmounts safely.
       getCharacterFolders.mockReturnValue(new Promise(() => {}));
 
@@ -75,7 +88,8 @@ describe('CampaignSelection', () => {
       expect(screen.queryAllByRole('button')).toHaveLength(0);
     });
 
-    it('shows an error state with a reload option when loading folders fails', async () => {
+    it('shows an error screen when loading folders fails and reloads the page when Reload Page is clicked', async () => {
+      const reloadSpy = stubReload();
       getCharacterFolders.mockRejectedValue(new Error('Network error'));
 
       render(<CampaignSelection />);
@@ -83,24 +97,22 @@ describe('CampaignSelection', () => {
       await waitFor(() => {
         expect(screen.getByText(/Failed to load campaigns/)).toBeInTheDocument();
       });
-      expect(screen.getByRole('button', { name: 'Reload Page' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Reload Page' }));
+
+      expect(reloadSpy).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('campaign list', () => {
-    it('renders one enabled button per campaign', async () => {
+    it('renders the heading, an Add button, and one enabled button per campaign', async () => {
       await renderCampaigns({ folders: ['Alpha', 'Beta', 'Gamma'] });
-
-      ['Alpha', 'Beta', 'Gamma'].forEach((name) => {
-        expect(campaignButton(name)).toBeEnabled();
-      });
-    });
-
-    it('shows the page heading and an Add button', async () => {
-      await renderCampaigns();
 
       expect(screen.getByRole('heading', { level: 1, name: 'Select a Campaign' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
+      ['Alpha', 'Beta', 'Gamma'].forEach((name) => {
+        expect(campaignButton(name)).toBeEnabled();
+      });
     });
 
     it('shows guidance and keeps Add available when no campaigns exist', async () => {
@@ -113,26 +125,20 @@ describe('CampaignSelection', () => {
   });
 
   describe('create campaign modal', () => {
-    it('opens the create-campaign modal when Add is clicked', async () => {
+    it('opens from Add, discards the typed name on Cancel, and reopens blank', async () => {
       await renderCampaigns();
 
       openCreateModal();
-
       expect(screen.getByRole('heading', { level: 2, name: 'Create New Campaign' })).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Enter campaign name')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
 
-    it('closes the modal and discards the typed name when Cancel is clicked', async () => {
-      await renderCampaigns();
-
-      openCreateModal();
       fireEvent.change(nameInput(), { target: { value: 'My Campaign' } });
       expect(nameInput()).toHaveValue('My Campaign');
 
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(screen.queryByRole('heading', { name: 'Create New Campaign' })).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Enter campaign name')).not.toBeInTheDocument();
 
       // Re-opening starts from a clean slate.
       openCreateModal();
@@ -153,85 +159,48 @@ describe('CampaignSelection', () => {
       await waitFor(() => {
         expect(screen.getByText('Please enter a campaign name')).toBeInTheDocument();
       });
+      expect(screen.queryByText(/successfully/)).not.toBeInTheDocument();
       expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 
   describe('campaign creation', () => {
-    it('POSTs the entered campaign name to the campaigns endpoint', async () => {
-      const fetchSpy = stubFetch(httpResponse());
+    it('POSTs the name, shows creating and success states, then reloads the page', async () => {
+      const reloadSpy = stubReload();
+      const { fetchMock, resolve } = stubPendingFetch();
       await renderCampaigns();
 
-      openCreateModal();
-      fireEvent.change(nameInput(), { target: { value: 'Test Campaign' } });
-      await act(async () => {
-        submitCampaign();
-      });
+      // Fake the reload delay only from this point on, so the already-awaited
+      // folder fetch stays untouched.
+      vi.useFakeTimers();
 
-      expect(fetchSpy).toHaveBeenCalledWith(
+      openCreateModal();
+      fireEvent.change(nameInput(), { target: { value: 'New Campaign' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+      expect(fetchMock).toHaveBeenCalledWith(
         '/api/campaigns',
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ campaignName: 'Test Campaign' }),
+          body: JSON.stringify({ campaignName: 'New Campaign' }),
         })
       );
-    });
-
-    it('shows a creating state while the POST is in flight', async () => {
-      let resolveFetch;
-      vi.stubGlobal('fetch', vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; })));
-      await renderCampaigns();
-
-      openCreateModal();
-      fireEvent.change(nameInput(), { target: { value: 'New Campaign' } });
-      await act(async () => {
-        submitCampaign();
-      });
-
       expect(screen.getByText('Creating campaign...')).toBeInTheDocument();
-      expect(screen.queryByText(/successfully/)).not.toBeInTheDocument();
 
       await act(async () => {
-        resolveFetch(httpResponse());
+        resolve(httpResponse());
       });
+
       expect(screen.getByText(/Campaign created successfully/)).toBeInTheDocument();
-    });
-
-    it('shows success and reloads the page shortly after creation', async () => {
-      const reloadSpy = stubReload();
-      stubFetch(httpResponse());
-      await renderCampaigns();
-
-      // Capture timers only from this point on, so the component's reload
-      // timer is the first long-delay timeout scheduled. The test then
-      // fires the captured callback itself instead of waiting in real time.
-      const originalSetTimeout = window.setTimeout.bind(window);
-      const originalClearTimeout = window.clearTimeout.bind(window);
-      const scheduled = [];
-      vi.spyOn(window, 'setTimeout').mockImplementation((cb, ms) => {
-        const id = originalSetTimeout(cb, ms);
-        scheduled.push({ cb, ms, id });
-        return id;
-      });
-
-      openCreateModal();
-      fireEvent.change(nameInput(), { target: { value: 'New Campaign' } });
-      await act(async () => {
-        submitCampaign();
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText(/Campaign created successfully/)).toBeInTheDocument();
-      });
-      expect(screen.getByText(/Reloading.../)).toBeInTheDocument();
+      expect(screen.getByText('Reloading...')).toBeInTheDocument();
       // The success screen replaces the modal — the input is cleared with it.
       expect(screen.queryByPlaceholderText('Enter campaign name')).not.toBeInTheDocument();
+      expect(reloadSpy).not.toHaveBeenCalled();
 
-      const reloadTimer = scheduled.find(({ ms }) => typeof ms === 'number' && ms >= 1000);
-      expect(reloadTimer, 'expected a page reload to be scheduled after success').toBeDefined();
-      originalClearTimeout(reloadTimer.id);
-      act(() => reloadTimer.cb());
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
       expect(reloadSpy).toHaveBeenCalledTimes(1);
     });
 
@@ -258,10 +227,13 @@ describe('CampaignSelection', () => {
   });
 
   describe('campaign selection', () => {
-    it('loads the campaign characters and notifies the parent on click', async () => {
+    it.each([
+      ['a campaign with characters', ['char1.json'], [{ name: 'Character1' }]],
+      ['a character-less campaign', [], []],
+    ])('loads %s and notifies the parent on click', async (_label, files, characters) => {
       const onSelect = vi.fn();
-      getCharacterFiles.mockResolvedValue(['char1.json']);
-      loadCharacters.mockResolvedValue([{ name: 'Character1' }]);
+      getCharacterFiles.mockResolvedValue(files);
+      loadCharacters.mockResolvedValue(characters);
 
       await renderCampaigns({ onCampaignSelect: onSelect });
       await act(async () => {
@@ -269,21 +241,8 @@ describe('CampaignSelection', () => {
       });
 
       expect(getCharacterFiles).toHaveBeenCalledWith('Campaign1');
-      expect(loadCharacters).toHaveBeenCalledWith('Campaign1', ['char1.json']);
-      expect(onSelect).toHaveBeenCalledWith('Campaign1', [{ name: 'Character1' }]);
-    });
-
-    it('notifies the parent with an empty character list for a character-less campaign', async () => {
-      const onSelect = vi.fn();
-      getCharacterFiles.mockResolvedValue([]);
-      loadCharacters.mockResolvedValue([]);
-
-      await renderCampaigns({ folders: ['EmptyCampaign'], onCampaignSelect: onSelect });
-      await act(async () => {
-        fireEvent.click(campaignButton('EmptyCampaign'));
-      });
-
-      expect(onSelect).toHaveBeenCalledWith('EmptyCampaign', []);
+      expect(loadCharacters).toHaveBeenCalledWith('Campaign1', files);
+      expect(onSelect).toHaveBeenCalledWith('Campaign1', characters);
     });
 
     it('lets the user pick a different campaign after a successful selection', async () => {
@@ -306,6 +265,7 @@ describe('CampaignSelection', () => {
         fireEvent.click(second);
       });
 
+      expect(getCharacterFiles).toHaveBeenCalledWith('Campaign2');
       expect(onSelect).toHaveBeenLastCalledWith('Campaign2', []);
       expect(onSelect).toHaveBeenCalledTimes(2);
     });
@@ -326,60 +286,34 @@ describe('CampaignSelection', () => {
       expect(onSelect).not.toHaveBeenCalled();
     });
 
-    it('auto-selects the campaign named by autoSelectCampaign without a click', async () => {
+    it('auto-selects the campaign named by autoSelectCampaign, and only once across re-renders', async () => {
       const onSelect = vi.fn();
       getCharacterFolders.mockResolvedValue(['Campaign1', 'Campaign2']);
       getCharacterFiles.mockResolvedValue(['char1.json']);
       loadCharacters.mockResolvedValue([{ name: 'Character1' }]);
 
-      render(<CampaignSelection onCampaignSelect={onSelect} autoSelectCampaign="Campaign1" />);
+      const { rerender } = render(
+        <CampaignSelection onCampaignSelect={onSelect} autoSelectCampaign="Campaign1" />
+      );
 
       await waitFor(() => {
         expect(onSelect).toHaveBeenCalledWith('Campaign1', [{ name: 'Character1' }]);
       });
       expect(getCharacterFiles).toHaveBeenCalledWith('Campaign1');
-    });
 
-    it('auto-selects only once when re-rendered with the same prop', async () => {
-      const onSelect = vi.fn();
-      getCharacterFolders.mockResolvedValue(['Campaign1']);
-      getCharacterFiles.mockResolvedValue([]);
-      loadCharacters.mockResolvedValue([]);
-
-      const { rerender } = render(
-        <CampaignSelection onCampaignSelect={onSelect} autoSelectCampaign="Campaign1" />
-      );
-      await waitFor(() => expect(onSelect).toHaveBeenCalledTimes(1));
-
+      // A re-render with the same prop must not re-trigger the selection.
       rerender(<CampaignSelection onCampaignSelect={onSelect} autoSelectCampaign="Campaign1" />);
       await act(async () => {});
       expect(onSelect).toHaveBeenCalledTimes(1);
     });
 
-    it('does not auto-select when autoSelectCampaign is absent', async () => {
+    it('does not auto-select or fetch characters when autoSelectCampaign is absent', async () => {
       const onSelect = vi.fn();
 
       await renderCampaigns({ onCampaignSelect: onSelect });
 
       expect(onSelect).not.toHaveBeenCalled();
       expect(getCharacterFiles).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('error recovery', () => {
-    it('reloads the page when Reload Page is clicked in the error state', async () => {
-      const reloadSpy = stubReload();
-      getCharacterFolders.mockRejectedValue(new Error('Network error'));
-
-      render(<CampaignSelection />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Failed to load campaigns/)).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByRole('button', { name: 'Reload Page' }));
-
-      expect(reloadSpy).toHaveBeenCalled();
     });
   });
 });

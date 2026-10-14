@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import NPCRoleplayForm from './NPCRoleplayForm.jsx';
@@ -25,86 +26,35 @@ describe('NPCRoleplayForm', () => {
     mockOnFieldChange.mockClear();
   });
 
-  // ── Text inputs ─────────────────────────────────────────────────────
+  // Every editable field (text inputs, attitude select, PreviewToggle
+  // textareas) shares one contract: render its value, then report only
+  // that field's change via onFieldChange(key, value).
+  const fields = [
+    { label: 'Race', key: 'race', typed: 'Elf' },
+    { label: 'Class / Role', key: 'classRole', typed: 'Rogue' },
+    { label: 'Attitude', key: 'attitude', typed: 'positive' },
+    { label: 'Appearance', key: 'appearance', typed: 'Updated text' },
+    { label: 'Personality', key: 'personality', typed: 'Updated text' },
+    { label: 'Goals', key: 'goals', typed: 'Updated text' },
+    { label: 'Secrets', key: 'secrets', typed: 'Updated text' },
+    { label: 'Notes', key: 'notes', typed: 'Updated text' },
+    { label: 'Tags (comma separated)', key: 'tags', typed: 'boss, dragon' },
+  ];
 
-  describe('Text inputs', () => {
-    const textFields = [
-      { label: 'Race', key: 'race', value: 'Human' },
-      { label: 'Class / Role', key: 'classRole', value: 'Wizard' },
-      { label: 'Tags (comma separated)', key: 'tags', value: 'ally, quest-giver' },
-    ];
-
-    it.each(textFields)('renders the "$label" input with its current value', ({ label, value }) => {
-      renderForm();
-      expect(screen.getByLabelText(label)).toHaveValue(value);
-    });
-
-    it.each([
-      { label: 'Race', key: 'race', typed: 'Elf' },
-      { label: 'Class / Role', key: 'classRole', typed: 'Rogue' },
-      { label: 'Tags (comma separated)', key: 'tags', typed: 'boss, dragon' },
-    ])('reports only the "$label" change with the "$key" key', ({ label, key, typed }) => {
-      renderForm();
-      fireEvent.change(screen.getByLabelText(label), { target: { value: typed } });
-      expect(mockOnFieldChange).toHaveBeenCalledTimes(1);
-      expect(mockOnFieldChange).toHaveBeenCalledWith(key, typed);
-    });
+  it.each(fields)('renders "$label" with its value and reports only the "$key" change', ({ label, key, typed }) => {
+    renderForm();
+    expect(screen.getByLabelText(label)).toHaveValue(defaultFormData[key]);
+    fireEvent.change(screen.getByLabelText(label), { target: { value: typed } });
+    expect(mockOnFieldChange).toHaveBeenCalledTimes(1);
+    expect(mockOnFieldChange).toHaveBeenCalledWith(key, typed);
   });
 
-  // ── Attitude select ─────────────────────────────────────────────────
-
-  describe('Attitude select', () => {
-    it('renders a select labeled "Attitude"', () => {
-      renderForm();
-      screen.getByLabelText('Attitude');
-    });
-
-    it.each([
-      { input: 'neutral', expected: 'neutral' },
-      { input: 'negative', expected: 'negative' },
-    ])('shows the attitude value ($input)', ({ input, expected }) => {
-      renderForm({ ...defaultFormData, attitude: input });
-      expect(screen.getByLabelText('Attitude')).toHaveValue(expected);
-    });
-
-    it('renders every option from ATTITUDE_OPTIONS', () => {
-      renderForm();
-      const options = Array.from(screen.getByLabelText('Attitude').querySelectorAll('option'));
-      expect(options).toHaveLength(ATTITUDE_OPTIONS.length);
-      for (const option of ATTITUDE_OPTIONS) {
-        expect(options.find((o) => o.value === option.value)).toHaveTextContent(option.label);
-      }
-    });
-
-    it('reports only the attitude change', () => {
-      renderForm();
-      fireEvent.change(screen.getByLabelText('Attitude'), { target: { value: 'positive' } });
-      expect(mockOnFieldChange).toHaveBeenCalledTimes(1);
-      expect(mockOnFieldChange).toHaveBeenCalledWith('attitude', 'positive');
-    });
-  });
-
-  // ── PreviewToggle fields ────────────────────────────────────────────
-
-  describe('PreviewToggle fields', () => {
-    const previewFields = [
-      { label: 'Appearance', key: 'appearance', value: 'Tall with a long beard' },
-      { label: 'Personality', key: 'personality', value: 'Wise and mysterious' },
-      { label: 'Goals', key: 'goals', value: 'Defeat Sauron' },
-      { label: 'Secrets', key: 'secrets', value: 'He is a Maia' },
-      { label: 'Notes', key: 'notes', value: 'Carries a staff' },
-    ];
-
-    it.each(previewFields)('renders the "$label" field with its current value', ({ label, value }) => {
-      renderForm();
-      expect(screen.getByLabelText(label)).toHaveValue(value);
-    });
-
-    it.each(previewFields)('reports only the "$key" change from the "$label" textarea', ({ label, key }) => {
-      renderForm();
-      fireEvent.change(screen.getByLabelText(label), { target: { value: 'Updated text' } });
-      expect(mockOnFieldChange).toHaveBeenCalledTimes(1);
-      expect(mockOnFieldChange).toHaveBeenCalledWith(key, 'Updated text');
-    });
+  it('renders every option from ATTITUDE_OPTIONS and selects the formData value', () => {
+    renderForm({ ...defaultFormData, attitude: 'extreme opposition' });
+    const select = screen.getByLabelText('Attitude');
+    expect(select).toHaveValue('extreme opposition');
+    const options = Array.from(select.querySelectorAll('option'));
+    expect(options.map((o) => o.value)).toEqual(ATTITUDE_OPTIONS.map((o) => o.value));
+    ATTITUDE_OPTIONS.forEach(({ label }, i) => expect(options[i]).toHaveTextContent(label));
   });
 });

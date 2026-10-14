@@ -1,12 +1,16 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * Rollback & Upload flows of CampaignAdmin: the destructive confirmation gate
- * (campaign-naming warning copy, cancel/close/overlay behaviour, danger
- * styling), client-side zip validation, POST wiring for /admin/rollback and
- * /admin/upload (including URL-encoding of the campaign name — the sibling
- * data-management tests only encode-check those routes), busy/success/error
- * status rendering, post-success plumbing (location.reload + the
- * postRestoreNotice sessionStorage handoff), and the restored-snapshot banner.
+ * (one full-lifecycle test per flow — campaign-naming warning copy, danger
+ * styling, overlay/content clicks are inert, Cancel/close dismiss without
+ * contacting the server), client-side zip validation (the check is by file
+ * name, case-sensitive ".zip" is the documented contract, plus the accept
+ * filter), POST wiring for /admin/rollback and /admin/upload — including
+ * URL-encoding of the campaign name, which the data-management sibling
+ * encode-checks only for its own routes — one assertion set per terminal
+ * outcome (busy/success/error, alert copy, reload semantics), the
+ * postRestoreNotice sessionStorage handoff that survives the reload, and the
+ * restored-snapshot banner.
  *
  * Sibling files cover the other flows and are deliberately not repeated here:
  * backup-restore (snapshot/download), data-management (clear/reset), rename,
@@ -20,6 +24,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CampaignAdmin from './CampaignAdmin.jsx';
 
 const CAMPAIGN = 'test-campaign';
+// One compound name exercises verbatim display in warning copy and the
+// encodeURIComponent path for every request in the same test.
+const TRICKY = 'my campaign/1';
 const ROLLBACK_BTN = 'Rollback to Snapshot';
 const RESTORED_ZIP = 'test-campaign-2026-10-10T12-34-56-789.zip';
 
@@ -95,165 +102,105 @@ afterEach(() => {
 });
 
 describe('CampaignAdmin - Rollback', () => {
-    describe('confirmation gate', () => {
-        it.each([CAMPAIGN, 'my campaign/1'])(
-            'asks for confirmation naming "$campaignName" and the data it overwrites, without touching the server',
-            (campaignName) => {
-                const fetchMock = stubFetch();
-                const { unmount } = renderAdmin({ campaignName });
+    it('gates rollback behind a destructive confirmation naming the campaign — dismissing it sends nothing', async () => {
+        const fetchMock = stubFetch();
+        const { container } = renderAdmin({ campaignName: TRICKY });
 
-                fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
+        fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
 
-                expect(screen.getByRole('heading', { name: 'Rollback Campaign' })).toBeInTheDocument();
-                // The warning names this campaign verbatim and spells out the loss.
-                const warning = screen.getByText(/overwrite ALL current campaign data/);
-                expect(warning.textContent).toContain(`"${campaignName}"`);
-                // Nothing destructive has been sent yet.
-                expect(postCount(fetchMock, adminPath(campaignName, 'rollback'))).toBe(0);
-                unmount();
-            }
-        );
+        const heading = screen.getByRole('heading', { name: 'Rollback Campaign' });
+        // The warning names this campaign verbatim and spells out the loss.
+        const warning = screen.getByText(/overwrite ALL current campaign data/);
+        expect(warning.textContent).toContain(`"${TRICKY}"`);
+        // Styled destructively so it can never be mistaken for a safe action.
+        const confirmBtn = screen.getByRole('button', { name: 'Confirm' });
+        expect(confirmBtn).toHaveClass('ct-btn-danger');
+        expect(confirmBtn.querySelector('i.fa-exclamation-triangle')).toBeInTheDocument();
 
-        it('closes via Cancel without sending anything', async () => {
-            const fetchMock = stubFetch();
-            renderAdmin();
+        // Only the explicit Cancel/close controls dismiss it.
+        fireEvent.click(document.querySelector('.ct-modal-overlay'));
+        fireEvent.click(heading);
+        expect(screen.getByRole('heading', { name: 'Rollback Campaign' })).toBeInTheDocument();
 
-            fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
-            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(container.querySelector('.ct-modal-header .ct-modal-close'));
+        expect(screen.queryByRole('heading', { name: 'Rollback Campaign' })).not.toBeInTheDocument();
 
-            expect(screen.queryByRole('heading', { name: 'Rollback Campaign' })).not.toBeInTheDocument();
-            // Flush microtasks: a rollback POST would already have landed.
-            await waitFor(() => expect(postCount(fetchMock, adminPath(CAMPAIGN, 'rollback'))).toBe(0));
-            expect(document.querySelector('.campaign-admin .admin-status')).toBeNull();
-        });
+        // Re-open, then dismiss via Cancel too.
+        fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.queryByRole('heading', { name: 'Rollback Campaign' })).not.toBeInTheDocument();
 
-        it('closes via the header close button without sending anything', async () => {
-            const fetchMock = stubFetch();
-            const { container } = renderAdmin();
-
-            fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
-            fireEvent.click(container.querySelector('.ct-modal-header .ct-modal-close'));
-
-            expect(screen.queryByRole('heading', { name: 'Rollback Campaign' })).not.toBeInTheDocument();
-            await waitFor(() => expect(postCount(fetchMock, adminPath(CAMPAIGN, 'rollback'))).toBe(0));
-        });
-
-        it('stays open when clicking the overlay or the modal content', () => {
-            stubFetch();
-            renderAdmin();
-            fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
-
-            // Only the explicit Cancel/Confirm/close controls dismiss it.
-            fireEvent.click(document.querySelector('.ct-modal-overlay'));
-            fireEvent.click(screen.getByRole('heading', { name: 'Rollback Campaign' }));
-
-            expect(screen.getByRole('heading', { name: 'Rollback Campaign' })).toBeInTheDocument();
-        });
-
-        it('frames confirmation as a destructive action', () => {
-            stubFetch();
-            renderAdmin();
-            fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
-
-            const confirmBtn = screen.getByRole('button', { name: 'Confirm' });
-            expect(confirmBtn).toHaveClass('ct-btn-danger');
-            expect(confirmBtn.querySelector('i.fa-exclamation-triangle')).toBeInTheDocument();
-        });
+        // Flush microtasks: a rollback POST would already have landed.
+        await waitFor(() => expect(postCount(fetchMock, adminPath(TRICKY, 'rollback'))).toBe(0));
+        expect(document.querySelector('.campaign-admin .admin-status')).toBeNull();
     });
 
-    describe('confirmed rollback', () => {
-        it('posts to /admin/rollback, shows the server message, and reloads', async () => {
-            const fetchMock = stubFetch();
-            renderAdmin();
+    it('confirmed rollback posts once to the encoded URL, shows the server message, hands off the post-restore notice, and reloads', async () => {
+        const fetchMock = stubFetch();
+        renderAdmin({ campaignName: TRICKY });
 
-            fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
-            clickModalConfirm();
+        fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
+        clickModalConfirm();
 
-            const status = await screen.findByText('Rolled back');
-            expect(status.closest('.admin-status')).toHaveClass('admin-status--success');
-            expect(fetchMock).toHaveBeenCalledWith(adminPath(CAMPAIGN, 'rollback'), { method: 'POST' });
-            await waitFor(() => expect(window.location.reload).toHaveBeenCalledTimes(1));
-            // The busy flag has cleared by the time the flow settles.
-            expect(screen.getByRole('button', { name: ROLLBACK_BTN })).toBeEnabled();
+        const status = await screen.findByText('Rolled back');
+        expect(status.closest('.admin-status')).toHaveClass('admin-status--success');
+        expect(postCount(fetchMock, adminPath(TRICKY, 'rollback'))).toBe(1);
+        // No unencoded campaign name ever leaves the client.
+        fetchMock.mock.calls.forEach(([u]) => expect(u).not.toContain(TRICKY));
+        // The reload wipes the in-memory status; the notice naming the
+        // restored snapshot is the only thing that survives to explain the
+        // fresh page to the GM.
+        expect(JSON.parse(sessionStorage.getItem('postRestoreNotice'))).toEqual({
+            campaign: TRICKY,
+            restored: RESTORED_ZIP,
         });
+        await waitFor(() => expect(window.location.reload).toHaveBeenCalledTimes(1));
+        // The busy flag has cleared by the time the flow settles.
+        expect(screen.getByRole('button', { name: ROLLBACK_BTN })).toBeEnabled();
+    });
 
-        it('hands off a post-restore notice naming the restored snapshot before reloading', async () => {
-            stubFetch();
-            renderAdmin();
+    it.each([
+        {
+            name: 'the server rejects it',
+            handler: jsonResponse({ error: 'No snapshot found' }, false),
+            statusText: 'No snapshot found',
+        },
+        {
+            name: 'the request never reaches the server',
+            handler: new Error('Network failed'),
+            statusText: 'Network failed',
+        },
+    ])('surfaces the error when rollback $name, without reloading or storing a restore notice', async ({ handler, statusText }) => {
+        const fetchMock = stubFetch({ rollback: handler });
+        renderAdmin();
 
-            fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
-            clickModalConfirm();
+        fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
+        clickModalConfirm();
 
-            await waitFor(() => expect(window.location.reload).toHaveBeenCalledTimes(1));
-            // The reload wipes the in-memory status; the notice is the only
-            // thing that survives to explain the fresh page to the GM.
-            expect(JSON.parse(sessionStorage.getItem('postRestoreNotice'))).toEqual({
-                campaign: CAMPAIGN,
-                restored: RESTORED_ZIP,
-            });
-        });
+        const status = await screen.findByText(statusText);
+        expect(status.closest('.admin-status')).toHaveClass('admin-status--error');
+        expect(postCount(fetchMock, adminPath(CAMPAIGN, 'rollback'))).toBe(1);
+        expect(window.location.reload).not.toHaveBeenCalled();
+        expect(sessionStorage.getItem('postRestoreNotice')).toBeNull();
+        // The GM can read the status and try again.
+        expect(screen.getByRole('button', { name: ROLLBACK_BTN })).toBeEnabled();
+    });
 
-        it('encodes the campaign name in the rollback URL', async () => {
-            const campaignName = 'my campaign/1';
-            const fetchMock = stubFetch();
-            renderAdmin({ campaignName });
+    it('shows a busy state and blocks repeat rollbacks while rolling back', async () => {
+        const fetchMock = stubFetch({ rollback: neverSettles() });
+        renderAdmin();
 
-            fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
-            clickModalConfirm();
+        fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
+        clickModalConfirm();
 
-            await waitFor(() =>
-                expect(fetchMock).toHaveBeenCalledWith(adminPath(campaignName, 'rollback'), { method: 'POST' })
-            );
-            // No unencoded campaign name ever leaves the client.
-            fetchMock.mock.calls.forEach(([u]) => {
-                expect(u).not.toContain(campaignName);
-            });
-        });
+        const busy = await screen.findByText('Rolling back...');
+        expect(busy.closest('.admin-status')).toHaveClass('admin-status--loading');
+        // Busy state spans the other backup/restore controls too.
+        expect(screen.getByRole('button', { name: 'Create Snapshot' })).toBeDisabled();
+        expect(fileInput()).toBeDisabled();
 
-        it('surfaces the server error without reloading or storing a restore notice', async () => {
-            const fetchMock = stubFetch({ rollback: jsonResponse({ error: 'No snapshot found' }, false) });
-            renderAdmin();
-
-            fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
-            clickModalConfirm();
-
-            const status = await screen.findByText('No snapshot found');
-            expect(status.closest('.admin-status')).toHaveClass('admin-status--error');
-            expect(window.location.reload).not.toHaveBeenCalled();
-            expect(sessionStorage.getItem('postRestoreNotice')).toBeNull();
-            expect(screen.getByRole('button', { name: ROLLBACK_BTN })).toBeEnabled();
-            expect(postCount(fetchMock, adminPath(CAMPAIGN, 'rollback'))).toBe(1);
-        });
-
-        it('surfaces the failure reason when the rollback never reaches the server', async () => {
-            stubFetch({ rollback: new Error('Network failed') });
-            renderAdmin();
-
-            fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
-            clickModalConfirm();
-
-            const status = await screen.findByText('Network failed');
-            expect(status.closest('.admin-status')).toHaveClass('admin-status--error');
-            expect(window.location.reload).not.toHaveBeenCalled();
-            expect(screen.getByRole('button', { name: ROLLBACK_BTN })).toBeEnabled();
-        });
-
-        it('shows a busy state and blocks repeat rollbacks while rolling back', async () => {
-            const fetchMock = stubFetch({ rollback: neverSettles() });
-            renderAdmin();
-
-            fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
-            clickModalConfirm();
-
-            const busy = await screen.findByText('Rolling back...');
-            expect(busy.closest('.admin-status')).toHaveClass('admin-status--loading');
-            // Busy state spans the other backup/restore controls too.
-            expect(screen.getByRole('button', { name: 'Create Snapshot' })).toBeDisabled();
-            expect(fileInput()).toBeDisabled();
-
-            fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
-            expect(postCount(fetchMock, adminPath(CAMPAIGN, 'rollback'))).toBe(1);
-        });
+        fireEvent.click(screen.getByRole('button', { name: ROLLBACK_BTN }));
+        expect(postCount(fetchMock, adminPath(CAMPAIGN, 'rollback'))).toBe(1);
     });
 });
 
@@ -271,105 +218,67 @@ describe('CampaignAdmin - Restored snapshot banner', () => {
 
 describe('CampaignAdmin - Upload', () => {
     describe('file validation', () => {
-        it.each(['test.txt', 'backup.tar.gz', 'notes.pdf'])(
-            'rejects %s with an error, clears the input, and never opens the modal',
-            (name) => {
-                stubFetch();
+        it.each([
+            { name: 'test.txt', type: 'text/plain' },
+            { name: 'backup.tar.gz', type: 'application/gzip' },
+            // Documented contract: the name check is case-sensitive — only
+            // exactly ".zip" passes, even though the OS picker may label
+            // both alike and both arrive with a zip MIME type.
+            { name: 'test.ZIP', type: 'application/zip' },
+            { name: 'test.Zip', type: 'application/zip' },
+        ])(
+            'rejects $name with an error, clears the input, and never opens the modal or uploads',
+            async ({ name, type }) => {
+                const fetchMock = stubFetch();
                 renderAdmin();
 
-                selectFile(name, 'text/plain');
+                // The OS picker is pre-filtered to .zip as a first line of defence.
+                expect(fileInput()).toHaveAttribute('accept', '.zip');
+
+                selectFile(name, type);
 
                 expect(screen.getByText('Please select a .zip file')).toBeInTheDocument();
                 expect(fileInput().value).toBe('');
                 expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
+                await waitFor(() => expect(postCount(fetchMock, adminPath(CAMPAIGN, 'upload'))).toBe(0));
             }
         );
-
-        // Documented contract: the check is case-sensitive — only exactly
-        // ".zip" passes, even though the OS picker may label both alike.
-        it.each(['test.ZIP', 'test.Zip'])('rejects the uppercase-extension file %s', (name) => {
-            stubFetch();
-            renderAdmin();
-
-            selectFile(name);
-
-            expect(screen.getByText('Please select a .zip file')).toBeInTheDocument();
-            expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
-        });
-
-        it('limits the OS file picker to .zip via accept', () => {
-            stubFetch();
-            renderAdmin();
-
-            expect(fileInput()).toHaveAttribute('accept', '.zip');
-        });
     });
 
     describe('confirmation gate', () => {
-        it('opens when a valid zip is selected, naming the campaign and archive — with no validation error', () => {
-            stubFetch();
-            renderAdmin();
+        it('opens on a valid zip naming the campaign, archive, and safety net — dismissing it never uploads', async () => {
+            const fetchMock = stubFetch();
+            const { container } = renderAdmin({ campaignName: TRICKY });
 
             selectFile('backup.zip');
 
-            expect(screen.getByRole('heading', { name: 'Upload Campaign' })).toBeInTheDocument();
+            const heading = screen.getByRole('heading', { name: 'Upload Campaign' });
             const warning = screen.getByText(/replace ALL current campaign data/);
-            expect(warning.textContent).toContain(`"${CAMPAIGN}"`);
+            expect(warning.textContent).toContain(`"${TRICKY}"`);
             expect(warning.textContent).toContain('"backup.zip"');
-            expect(screen.queryByText('Please select a .zip file')).not.toBeInTheDocument();
-        });
-
-        it('warns that a safety snapshot is taken and restores on failure', () => {
-            stubFetch();
-            renderAdmin();
-
-            selectFile('backup.zip');
-
+            // The auto-rollback safety net is spelled out before anything happens.
             expect(screen.getByText(/safety net/i)).toBeInTheDocument();
             expect(screen.getByText(/automatically rolled back/i)).toBeInTheDocument();
-        });
-
-        it('closes via Cancel without uploading', async () => {
-            const fetchMock = stubFetch();
-            renderAdmin();
-
-            selectFile('backup.zip');
-            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-
-            expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
-            await waitFor(() => expect(postCount(fetchMock, adminPath(CAMPAIGN, 'upload'))).toBe(0));
-        });
-
-        it('closes via the header close button without uploading', async () => {
-            const fetchMock = stubFetch();
-            const { container } = renderAdmin();
-
-            selectFile('backup.zip');
-            fireEvent.click(container.querySelector('.ct-modal-header .ct-modal-close'));
-
-            expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
-            await waitFor(() => expect(postCount(fetchMock, adminPath(CAMPAIGN, 'upload'))).toBe(0));
-        });
-
-        it('stays open when clicking the overlay or the modal content', () => {
-            stubFetch();
-            renderAdmin();
-            selectFile('backup.zip');
-
-            fireEvent.click(document.querySelector('.ct-modal-overlay'));
-            fireEvent.click(screen.getByRole('heading', { name: 'Upload Campaign' }));
-
-            expect(screen.getByRole('heading', { name: 'Upload Campaign' })).toBeInTheDocument();
-        });
-
-        it('frames confirmation as a destructive action', () => {
-            stubFetch();
-            renderAdmin();
-            selectFile('backup.zip');
+            expect(screen.queryByText('Please select a .zip file')).not.toBeInTheDocument();
 
             const confirmBtn = screen.getByRole('button', { name: 'Confirm' });
             expect(confirmBtn).toHaveClass('ct-btn-danger');
             expect(confirmBtn.querySelector('i.fa-exclamation-triangle')).toBeInTheDocument();
+
+            // Only the explicit Cancel/close controls dismiss it.
+            fireEvent.click(document.querySelector('.ct-modal-overlay'));
+            fireEvent.click(heading);
+            expect(screen.getByRole('heading', { name: 'Upload Campaign' })).toBeInTheDocument();
+
+            fireEvent.click(container.querySelector('.ct-modal-header .ct-modal-close'));
+            expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
+
+            // Re-open, then dismiss via Cancel too.
+            selectFile('backup.zip');
+            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+            expect(screen.queryByRole('heading', { name: 'Upload Campaign' })).not.toBeInTheDocument();
+
+            await waitFor(() => expect(postCount(fetchMock, adminPath(TRICKY, 'upload'))).toBe(0));
         });
     });
 
@@ -406,32 +315,24 @@ describe('CampaignAdmin - Upload', () => {
             },
         ];
 
-        it('posts the selected file as FormData to /admin/upload', async () => {
-            const fetchMock = stubFetch();
-            renderAdmin();
-
-            const file = selectFile('backup.zip');
-            clickModalConfirm();
-
-            await waitFor(() =>
-                expect(postCount(fetchMock, adminPath(CAMPAIGN, 'upload'))).toBe(1)
-            );
-            const [, options] = fetchMock.mock.calls.find(([u]) => u.endsWith('/admin/upload'));
-            expect(options.body).toBeInstanceOf(FormData);
-            expect(options.body.get('file')).toBe(file);
-        });
-
         it.each(OUTCOMES)(
-            'when the upload $name: shows the $kind status, clears the input, and reloads=$reloads',
+            'when upload $name: posts the file once to the encoded URL, shows the $kind status, clears the input, and reloads=$reloads',
             async ({ handler, statusText, kind, reloads, alertText }) => {
-                stubFetch({ upload: handler });
-                renderAdmin();
+                const fetchMock = stubFetch({ upload: handler });
+                renderAdmin({ campaignName: TRICKY });
 
-                selectFile('backup.zip');
+                const file = selectFile('backup.zip');
                 clickModalConfirm();
 
                 const status = await screen.findByText(statusText);
                 expect(status.closest('.admin-status')).toHaveClass(`admin-status--${kind}`);
+                expect(postCount(fetchMock, adminPath(TRICKY, 'upload'))).toBe(1);
+                // The file travels as FormData under the "file" field.
+                const [, options] = fetchMock.mock.calls.find(([u]) => u.endsWith('/admin/upload'));
+                expect(options.body).toBeInstanceOf(FormData);
+                expect(options.body.get('file')).toBe(file);
+                // No unencoded campaign name ever leaves the client.
+                fetchMock.mock.calls.forEach(([u]) => expect(u).not.toContain(TRICKY));
                 // The input is reset whatever happens, so re-picking the same
                 // file still fires change next time.
                 expect(fileInput().value).toBe('');
@@ -446,24 +347,6 @@ describe('CampaignAdmin - Upload', () => {
             }
         );
 
-        it('encodes the campaign name in the upload URL', async () => {
-            const campaignName = 'my campaign/1';
-            const fetchMock = stubFetch();
-            renderAdmin({ campaignName });
-
-            const file = selectFile('backup.zip');
-            clickModalConfirm();
-
-            await waitFor(() =>
-                expect(postCount(fetchMock, adminPath(campaignName, 'upload'))).toBe(1)
-            );
-            const [, options] = fetchMock.mock.calls.find(([u]) => u.endsWith('/admin/upload'));
-            expect(options.body.get('file')).toBe(file);
-            fetchMock.mock.calls.forEach(([u]) => {
-                expect(u).not.toContain(campaignName);
-            });
-        });
-
         it('shows a busy state and blocks the upload control while uploading', async () => {
             const fetchMock = stubFetch({ upload: neverSettles() });
             renderAdmin();
@@ -474,10 +357,9 @@ describe('CampaignAdmin - Upload', () => {
             const busy = await screen.findByText('Uploading and extracting...');
             expect(busy.closest('.admin-status')).toHaveClass('admin-status--loading');
             expect(fileInput()).toBeDisabled();
-            expect(screen.getByRole('button', { name: ROLLBACK_BTN })).toBeDisabled();
-
             // Busy state spans the sibling controls; the in-flight upload
             // is never repeated.
+            expect(screen.getByRole('button', { name: ROLLBACK_BTN })).toBeDisabled();
             expect(screen.getByRole('button', { name: 'Create Snapshot' })).toBeDisabled();
             expect(postCount(fetchMock, adminPath(CAMPAIGN, 'upload'))).toBe(1);
         });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai: 2026-10-14
 // Regression tests for the character-creation wizard duplicate-name gate:
 // Step 2 validation and final-submit validation must reject names that
 // collide case-insensitively (and whitespace-insensitively) with existing
@@ -13,78 +13,59 @@ import * as utils from './utils.js';
 const DUPLICATE_ERROR = 'A character with that name already exists';
 const REQUIRED_NAME_ERROR = 'Character name is required';
 
-// Step 2 only reads level_range (via validateLevel); keeping the mock to
-// exactly that makes it explicit the duplicate guard is rules-independent.
-const MOCK_VALIDATION_RULES = {
-  level_range: { min: 1, max: 20 },
-};
-
-const stepContext = (overrides = {}) => ({
-  racesData: [],
-  classSubtypes: [],
-  ruleset: '5e',
-  ...overrides,
-});
-
 describe('character-creation duplicate-name guard', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   describe('hasDuplicateCharacterName', () => {
-    it('matches existing names case-insensitively and trims whitespace on both sides', () => {
-      expect(utils.hasDuplicateCharacterName('AasimarTest', ['aasimartest'])).toBe(true);
-      expect(utils.hasDuplicateCharacterName('  aasimarTEST  ', ['AasimarTest'])).toBe(true);
-      expect(utils.hasDuplicateCharacterName('  AasimarTest  ', [' AasimarTest '])).toBe(true);
+    it('matches existing names case- and whitespace-insensitively', () => {
+      for (const name of ['AasimarTest', 'aasimartest', '  AASIMARTEST  ']) {
+        expect(utils.hasDuplicateCharacterName(name, ['  AasimarTest '])).toBe(true);
+      }
       expect(utils.hasDuplicateCharacterName('FreshName', ['AasimarTest'])).toBe(false);
     });
 
-    it('never flags empty, whitespace-only, or falsy names against a populated list', () => {
+    it('tolerates blank names and blank list entries: never flags without a real collision', () => {
       for (const name of ['', '   ', undefined, null, 0]) {
         expect(utils.hasDuplicateCharacterName(name, ['AasimarTest'])).toBe(false);
       }
-    });
-
-    it('never flags a name when no existing names are supplied and tolerates blank entries in the list', () => {
       expect(utils.hasDuplicateCharacterName('AasimarTest')).toBe(false);
-      expect(utils.hasDuplicateCharacterName('AasimarTest', [])).toBe(false);
-      expect(utils.hasDuplicateCharacterName('AasimarTest', [null, undefined, '', 'AasimarTest'])).toBe(true);
       expect(utils.hasDuplicateCharacterName('FreshName', [null, undefined, '', '   '])).toBe(false);
+      expect(utils.hasDuplicateCharacterName('AasimarTest', [null, undefined, '', 'AasimarTest'])).toBe(true);
     });
   });
 
   describe('validateStep 2 (Basic Information)', () => {
+    // Step 2 only reads level_range (via validateLevel); mocking exactly
+    // that (matching rules-validation.json) keeps the duplicate guard
+    // hermetic and shows it is rules-independent.
     beforeEach(() => {
-      vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
+      vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue({
+        level_range: { min: 1, max: 20 },
+      });
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
     });
 
     const validFormData = { name: 'AasimarTest', level: 1, alignment: 'Good' };
+    const stepContext = (overrides = {}) => ({ ruleset: '5e', ...overrides });
 
-    it('rejects a duplicate character name with the canonical message and no unrelated errors', async () => {
+    it('rejects a duplicate name with the canonical error and no unrelated errors, for both rulesets', async () => {
       const errors = await utils.validateStep(2, validFormData, stepContext({
-        existingNames: ['ElderPaladin', 'aasimartest'],
+        existingNames: ['ElderPaladin', '  aasimarTEST  '],
       }));
       expect(errors).toEqual({ name: DUPLICATE_ERROR });
-    });
-
-    it('flags a duplicate that only collides after case-folding and trimming', async () => {
-      const errors = await utils.validateStep(2, { ...validFormData, name: '  aasimarTEST  ' }, stepContext({
+      const errors2024 = await utils.validateStep(2, validFormData, stepContext({
+        ruleset: '2024',
         existingNames: ['AasimarTest'],
       }));
-      expect(errors).toEqual({ name: DUPLICATE_ERROR });
+      expect(errors2024).toEqual({ name: DUPLICATE_ERROR });
     });
 
-    it('accepts a unique name while other fields stay valid', async () => {
-      const errors = await utils.validateStep(2, { ...validFormData, name: 'BrandNewHero' }, stepContext({
-        existingNames: ['AasimarTest'],
-      }));
-      expect(errors).toEqual({});
-    });
-
-    it('accepts any valid name when the campaign has no existing characters (names omitted or empty)', async () => {
-      await expect(utils.validateStep(2, validFormData, stepContext({ existingNames: [] }))).resolves.toEqual({});
-      await expect(utils.validateStep(2, validFormData, stepContext())).resolves.toEqual({});
-      await expect(utils.validateStep(2, validFormData)).resolves.toEqual({});
+    it('accepts a unique name, with, without, or amid existing characters', async () => {
+      const unique = { ...validFormData, name: 'BrandNewHero' };
+      await expect(utils.validateStep(2, unique)).resolves.toEqual({});
+      for (const ctx of [{}, { existingNames: [] }, { existingNames: ['AasimarTest'] }]) {
+        await expect(utils.validateStep(2, unique, stepContext(ctx))).resolves.toEqual({});
+      }
     });
 
     it('keeps the required-name error precedence over the duplicate error, even if blank strings are in the list', async () => {
@@ -92,14 +73,6 @@ describe('character-creation duplicate-name guard', () => {
         existingNames: ['   ', 'AasimarTest'],
       }));
       expect(errors).toEqual({ name: REQUIRED_NAME_ERROR });
-    });
-
-    it('gates duplicates identically for the 2024 ruleset', async () => {
-      const errors = await utils.validateStep(2, validFormData, stepContext({
-        ruleset: '2024',
-        existingNames: ['AasimarTest'],
-      }));
-      expect(errors).toEqual({ name: DUPLICATE_ERROR });
     });
   });
 
@@ -113,15 +86,9 @@ describe('character-creation duplicate-name guard', () => {
       expertSkills: [],
     };
 
-    it('rejects a duplicate name on final submit validation', () => {
-      const errors = utils.validateFinalFormData(COMPLETE_FORM_DATA, ['aasimartest']);
-      expect(errors).toEqual({ name: DUPLICATE_ERROR });
-    });
-
-    it('matches duplicates case- and whitespace-insensitively on final submit', () => {
+    it('rejects a duplicate name case- and whitespace-insensitively on final submit', () => {
+      expect(utils.validateFinalFormData(COMPLETE_FORM_DATA, ['aasimartest'])).toEqual({ name: DUPLICATE_ERROR });
       expect(utils.validateFinalFormData({ ...COMPLETE_FORM_DATA, name: '  AASIMARTEST ' }, ['AasimarTest']))
-        .toEqual({ name: DUPLICATE_ERROR });
-      expect(utils.validateFinalFormData(COMPLETE_FORM_DATA, ['  aasimarTest ']))
         .toEqual({ name: DUPLICATE_ERROR });
     });
 

@@ -1,7 +1,8 @@
-// @improved-by-ai
+// @maintained-by-ai
 // CLA-322 Spell Breaker and Psychic Spells damage-type override — cast-payload behavior.
 // Casting-time display is covered in SpellDetailPopup.spellBreaker.test.jsx;
-// the cantrip psychic path is covered in SpellDetailPopup.castCantrip.test.jsx.
+// the registry helper in services/ui/spellSectionUtils.spellBreaker.test.js;
+// the cantrip psychic path in SpellDetailPopup.castCantrip.test.jsx.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -104,10 +105,12 @@ describe('SpellDetailPopup — special feature cast payloads', () => {
       makeSpell({ name: 'Dispel Magic', level: 3, school: 'Abjuration' });
 
     // The bonus mirrors the proficiency-bonus ladder: floor((level - 1) / 4) + 2.
-    // Multiple levels pin the formula; a hard-coded constant would pass even if
-    // the level scaling were broken.
+    // Level 1 also pins it against the stats' constant proficiency (3), and the
+    // 4/5 pair pins the tier boundary — a hard-coded constant or a mis-tiered
+    // ladder would fail.
     it.each([
       { level: 1, expectedBonus: 2 },
+      { level: 4, expectedBonus: 2 },
       { level: 5, expectedBonus: 3 },
       { level: 9, expectedBonus: 4 },
     ])('passes proficiency bonus $expectedBonus as dispelAbilityCheckBonus for Dispel Magic at player level $level', ({ level, expectedBonus }) => {
@@ -122,23 +125,20 @@ describe('SpellDetailPopup — special feature cast payloads', () => {
       expect(metaCtx.dispelAbilityCheckBonus).toBe(expectedBonus);
     });
 
-    it('omits dispelAbilityCheckBonus when a Spell Breaker casts a spell outside bonusActionSpells', () => {
+    it.each([
+      {
+        label: 'the spell is outside bonusActionSpells (Counterspell sits only in slotRetentionSpells)',
+        spell: makeSpell({ name: 'Counterspell', level: 3, casting_time: '1 reaction', school: 'Abjuration' }),
+        stats: spellBreakerStats(),
+      },
+      {
+        label: 'the caster lacks the Spell Breaker passive',
+        spell: dispelMagic(),
+        stats: makeStats(),
+      },
+    ])('omits dispelAbilityCheckBonus when $label', ({ spell, stats }) => {
       const onCast = vi.fn();
-      renderPopup(
-        makeSpell({ name: 'Counterspell', level: 3, casting_time: '1 reaction', school: 'Abjuration' }),
-        spellBreakerStats(),
-        onCast,
-      );
-
-      fireEvent.click(castSpellButton());
-
-      expect(onCast).toHaveBeenCalledTimes(1);
-      expect(onCast.mock.calls[0][1]).not.toHaveProperty('dispelAbilityCheckBonus');
-    });
-
-    it('omits dispelAbilityCheckBonus for Dispel Magic without the Spell Breaker passive', () => {
-      const onCast = vi.fn();
-      renderPopup(dispelMagic(), makeStats(), onCast);
+      renderPopup(spell, stats, onCast);
 
       fireEvent.click(castSpellButton());
 
@@ -147,7 +147,7 @@ describe('SpellDetailPopup — special feature cast payloads', () => {
     });
   });
 
-  describe('Psychic Spells — damage type override', () => {
+  describe('Psychic Spells — damage type override (spell path)', () => {
     const PSYCHIC_PASSIVE = { type: 'psychic_spells' };
 
     const warlockStats = (passives = [PSYCHIC_PASSIVE]) =>
@@ -165,35 +165,29 @@ describe('SpellDetailPopup — special feature cast payloads', () => {
     const psychicCheckbox = () =>
       screen.getByRole('checkbox', { name: /Change damage type to Psychic/ });
 
-    it('offers the Psychic damage checkbox unchecked by default', () => {
-      renderPopup(burningHands(), warlockStats());
-      expect(psychicCheckbox()).not.toBeChecked();
-    });
-
-    it('passes usePsychicDamage:true when the checkbox is checked', () => {
+    // Opt-in contract: the checkbox exists for an eligible caster, defaults to
+    // unchecked, and its state always travels in the payload as an explicit
+    // boolean (spellCastService.psychic-optin relies on false ≠ missing).
+    it.each([
+      { toggleOn: true, expected: true, label: 'checked' },
+      { toggleOn: false, expected: false, label: 'left unchecked' },
+    ])('passes usePsychicDamage:$expected when the checkbox is $label', ({ toggleOn, expected }) => {
       const onCast = vi.fn();
       renderPopup(burningHands(), warlockStats(), onCast);
 
-      fireEvent.click(psychicCheckbox());
-      expect(psychicCheckbox()).toBeChecked();
+      expect(psychicCheckbox()).not.toBeChecked();
+      if (toggleOn) {
+        fireEvent.click(psychicCheckbox());
+        expect(psychicCheckbox()).toBeChecked();
+      }
 
       fireEvent.click(castSpellButton());
 
       expect(onCast).toHaveBeenCalledTimes(1);
       expect(onCast.mock.calls[0][0]).toMatchObject({
         name: 'Burning Hands',
-        usePsychicDamage: true,
+        usePsychicDamage: expected,
       });
-    });
-
-    it('passes usePsychicDamage:false when the checkbox is left unchecked', () => {
-      const onCast = vi.fn();
-      renderPopup(burningHands(), warlockStats(), onCast);
-
-      fireEvent.click(castSpellButton());
-
-      expect(onCast).toHaveBeenCalledTimes(1);
-      expect(onCast.mock.calls[0][0]).toMatchObject({ usePsychicDamage: false });
     });
 
     // canChangeDamageType requires ALL of: Warlock class, psychic_spells passive, damaging spell.

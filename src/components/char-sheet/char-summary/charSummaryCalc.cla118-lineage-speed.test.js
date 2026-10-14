@@ -1,13 +1,16 @@
-// @improved-by-ai
+// @maintained-by-ai
 // CLA-118 regression: the sheet Speed line must fold in the Elfish Lineage
 // ladder grant (Wood Elf speedBonus 5 from races.json) — race JSON alone
 // renders Wood Elf at 30 ft.
 //
-// Sheet seam only: handler-unit behavior (resolveElfishLineage precedence,
-// option lookups, missing-speedBonus logging) is covered by
-// elfishLineageHandler.test.js — these tests pin what the SPEED LINE shows.
-// Lineage resolution precedence: race.lineage > race.subrace.name > legacy
-// runtime _elfishLineageSelection (stale after wizard edits).
+// Sheet seam only: lineage channel precedence (race.lineage > subrace >
+// legacy runtime key), trait gating, non-Wood-Elf zeroing, and the
+// absolute-speed guard are all pinned by elfishLineageSpeedBonus unit tests
+// in elfishLineageHandler.test.js — charSummaryCalc delegates to that one
+// function, so re-pinning channels here would only re-run the same line.
+// What this file owns is the getBaseSpeed arithmetic the SPEED LINE shows:
+// subrace.speed ?? race.speed, the +bonus applied to the BASE lane (never
+// fabricated as a buff), and the missing-speed guard.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/rules/rulesFactory.js', () => ({
@@ -57,13 +60,7 @@ const elfishLineageRow = {
     ],
 };
 
-// Character without the elfish_lineage trait — the grant must stay gated on it.
-const elfWithoutTraitRow = {
-    type: 'other',
-    options: elfishLineageRow.options,
-};
-
-const statsWithRace = (race, automation = { passives: [], specialActions: [elfishLineageRow] }) => ({
+const statsWithRace = (race) => ({
     name: 'ElfTest',
     level: 1,
     rules: '2024',
@@ -72,7 +69,7 @@ const statsWithRace = (race, automation = { passives: [], specialActions: [elfis
     abilities: [{ name: 'Dexterity', bonus: 2 }],
     inventory: { equipped: [] },
     equipment: [],
-    automation,
+    automation: { passives: [], specialActions: [elfishLineageRow] },
     immunities: [],
     resistances: [],
 });
@@ -81,15 +78,10 @@ const ctxFor = (playerStats) => computeCharSummaryContext({
     playerStats, campaignName, characters: [], conditionEffects: {}, auraComboEffects: {}, exhaustionLevel: 0,
 });
 
-// Seed only the legacy chooser runtime key; every other runtime key reads null.
-const seedRuntimeLineage = (selection) => {
-    getRuntimeValue.mockImplementation((name, key) => (key === '_elfishLineageSelection' ? selection : null));
-};
-
 describe('charSummaryCalc — CLA-118 Elfish Lineage speed lane', () => {
     beforeEach(() => {
-        // mockReturnValue also replaces any per-test mockImplementation,
-        // so each test starts from a clean, null-reading runtime store.
+        // Runtime store reads null for every key (including the legacy
+        // _elfishLineageSelection), so each test resolves lineage from race JSON only.
         vi.clearAllMocks();
         getRuntimeValue.mockReturnValue(null);
     });
@@ -101,36 +93,17 @@ describe('charSummaryCalc — CLA-118 Elfish Lineage speed lane', () => {
         expect(ctx.buffSpeedBonus).toBe(0);
     });
 
-    it('shows Wood Elf at 35 ft via the race.lineage channel with no subrace', () => {
-        expect(ctxFor(statsWithRace({ name: 'Elf', speed: 30, lineage: 'Wood Elf' })).totalSpeedWithBuff).toBe(35);
-    });
-
-    it('shows Wood Elf at 35 ft when the legacy runtime chooser selection is the only channel', () => {
-        seedRuntimeLineage('Wood Elf');
-        expect(ctxFor(statsWithRace({ name: 'Elf', speed: 30 })).totalSpeedWithBuff).toBe(35);
-    });
-
-    it('keeps Drow at 30 ft even when a stale runtime key says Wood Elf', () => {
-        seedRuntimeLineage('Wood Elf');
-        const ctx = ctxFor(statsWithRace({ name: 'Elf', speed: 30, subrace: { name: 'Drow' } }));
-        expect(ctx.totalSpeedWithBuff).toBe(30);
-        expect(ctx.buffSpeedBonus).toBe(0);
-    });
-
     it('does not double-grant when 5e subrace JSON already carries the absolute speed', () => {
         const ctx = ctxFor(statsWithRace({ name: 'Elf', speed: 30, subrace: { name: 'Wood Elf', speed: 35 } }));
         expect(ctx.totalSpeedWithBuff).toBe(35);
         expect(ctx.buffSpeedBonus).toBe(0);
     });
 
-    it('gates the grant on the elfish_lineage trait — traitless Elf stays 30 ft even when runtime says Wood Elf', () => {
-        seedRuntimeLineage('Wood Elf');
-        expect(ctxFor(statsWithRace({ name: 'Elf', speed: 30 }, elfWithoutTraitRow)).totalSpeedWithBuff).toBe(30);
-    });
-
-    it('leaves non-elven speeds untouched even when an elfish_lineage row lingers in automation', () => {
-        const ctx = ctxFor(statsWithRace({ name: 'Dwarf', speed: 25, subrace: { name: 'Hill Dwarf', speed: 25 } }));
-        expect(ctx.totalSpeedWithBuff).toBe(25);
-        expect(ctx.buffSpeedBonus).toBe(0);
+    it('logs and shows 0 ft when the race carries no speed, keeping NaN out of the display', () => {
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const ctx = ctxFor(statsWithRace({ name: 'Elf' }));
+        expect(ctx.totalSpeedWithBuff).toBe(0);
+        expect(spy).toHaveBeenCalled();
+        spy.mockRestore();
     });
 });

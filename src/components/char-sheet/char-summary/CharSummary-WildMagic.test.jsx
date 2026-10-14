@@ -1,26 +1,17 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Owns: WildSurgeBadge rendering in CharSummary —
 //   - one list item per surge effect, "#roll — effect" format
 //   - name tooltip (on the item) and duration tooltip (hourglass icon)
 //   - "Tamed" special case replacing the roll number
-//   - no-render guards: null AND empty array (distinct branches of the
-//     `surgeEffects && Array.isArray && length > 0` guard in CharSummary.jsx)
+//   - no-render guards: null AND empty array are DISTINCT branches of the
+//     `!surgeEffects || !Array.isArray || length === 0` guard in
+//     CharSummary.jsx — null short-circuits before the length check, so
+//     both inputs must stay covered (parameterized, not consolidated away).
 //
 // NOT covered here (owned by siblings):
 //   - CharSummary-EventHandlers.test.jsx: 'initiative-rolled' event clears
 //     surge effects and writes null through the synced setter.
-//
-// Improvement notes (2026-10-14):
-//   - Removed createUseSyncedStateMock/defaultSyncedStateKeys: every branch
-//     of that helper returned the same [defaultValue, vi.fn()] except the
-//     surge key, so it was noise. Replaced with a focused mockSurgeEffects.
-//   - Assertions are now scoped inside the surge list via role queries and
-//     check exact item count/text and per-item tooltip presence, so a broken
-//     length guard or unconditional duration icon can no longer pass silently.
-//   - Restored the empty-array test removed by a previous pass: the null test
-//     cannot catch a regression of the `length === 0` guard (null short-circuits
-//     before it), so the previous "redundant" judgment was wrong.
 
 import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -146,7 +137,6 @@ describe('CharSummary - Wild Magic Surge Effects', () => {
         window.location.hostname = 'localhost';
         vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] });
         vi.mocked(getRuntimeValue).mockReturnValue(null);
-        mockSurgeEffects(null);
     });
 
     it('renders one list item per surge effect with roll number and tooltips', () => {
@@ -181,15 +171,11 @@ describe('CharSummary - Wild Magic Surge Effects', () => {
         expect(items[0].textContent).not.toContain('#');
     });
 
-    it('does not render the surge section when surgeEffects is null', () => {
-        renderSummary(null);
-
-        expect(screen.queryByText('Surge Effects:')).not.toBeInTheDocument();
-        expect(screen.queryByRole('list')).not.toBeInTheDocument();
-    });
-
-    it('does not render the surge section when surgeEffects is an empty array', () => {
-        renderSummary([]);
+    it.each([
+        ['null', null],
+        ['an empty array', []],
+    ])('does not render the surge section when surgeEffects is %s', (_label, surgeEffects) => {
+        renderSummary(surgeEffects);
 
         expect(screen.queryByText('Surge Effects:')).not.toBeInTheDocument();
         expect(screen.queryByRole('list')).not.toBeInTheDocument();

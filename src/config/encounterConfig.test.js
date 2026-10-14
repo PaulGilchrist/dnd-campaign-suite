@@ -1,77 +1,53 @@
-// @improved-by-ai
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect } from 'vitest';
 import { ENCOUNTER_CONFIG } from './encounterConfig.js';
 
 // These tests guard the *contract* consumers rely on (encounterGenerator.js,
 // EncounterBuilder.jsx), not the individual tunable numbers — the config is
-// meant to be adjusted. Each test below fails only when a value would
-// silently break the encounter engine:
-//  - calculateXPThreshold indexes xpThresholds[level][difficulty] for level 0..20
-//  - calculateDifficultyMultiplier scans difficultyMultipliers for the first
-//    ratioMax >= monsterCount/partySize, so bands must partition (0, ∞]
-//  - getDifficultyLabel divides effectiveXP by the party threshold and
-//    compares against difficultyRatios, so thresholds and ratios must be positive
-//  - EncounterBuilder uses defaultDifficulty as the initial UI selection
-// Generator behavior through these values is covered in
-// src/services/encounters/encounterGenerator.test.js — not re-tested here.
+// meant to be adjusted. Generator behavior through these values is covered
+// in src/services/encounters/encounterGenerator.test.js, not re-tested here.
 
 const DIFFICULTY_TIERS = 4; // Easy, Medium, Hard, Deadly
-const PARTY_LEVELS = 21;    // generator accepts levels 0..20
-
-const EXPECTED_KEYS = [
-  'budgetTolerance',
-  'crRange',
-  'deadlyMultiplier',
-  'defaultDifficulty',
-  'defaultSuggestionCount',
-  'difficultyMultipliers',
-  'difficultyRatios',
-  'suggestionOvergenerate',
-  'xpThresholds',
-];
+const PARTY_LEVELS = 21;    // calculateXPThreshold indexes levels 0..20
 
 const isPositiveInteger = (value) => Number.isInteger(value) && value > 0;
 
 describe('encounterConfig', () => {
   it('exports exactly the keys its consumers import, and no extras', () => {
-    // Sorted comparison gives a readable diff when a key is renamed or added.
-    expect(Object.keys(ENCOUNTER_CONFIG).sort()).toEqual(EXPECTED_KEYS);
+    expect(Object.keys(ENCOUNTER_CONFIG).sort()).toEqual([
+      'budgetTolerance',
+      'crRange',
+      'deadlyMultiplier',
+      'defaultDifficulty',
+      'defaultSuggestionCount',
+      'difficultyMultipliers',
+      'difficultyRatios',
+      'suggestionOvergenerate',
+      'xpThresholds',
+    ]);
   });
 
   describe('xpThresholds', () => {
-    it('is indexed [level 0..20][difficulty 0..3] as the generator expects', () => {
-      expect(ENCOUNTER_CONFIG.xpThresholds).toHaveLength(PARTY_LEVELS);
-      for (const levelThresholds of ENCOUNTER_CONFIG.xpThresholds) {
-        expect(levelThresholds).toHaveLength(DIFFICULTY_TIERS);
-      }
-    });
-
-    it('contains only positive integers (thresholds are summed and used as divisors)', () => {
-      for (const levelThresholds of ENCOUNTER_CONFIG.xpThresholds) {
-        for (const threshold of levelThresholds) {
-          expect(isPositiveInteger(threshold)).toBe(true);
-        }
-      }
-    });
-
-    it('increases from Easy to Deadly within each level', () => {
-      for (const [level, thresholds] of ENCOUNTER_CONFIG.xpThresholds.entries()) {
+    it('is an ascending table of positive integers, [level 0..20][difficulty 0..3]', () => {
+      const { xpThresholds } = ENCOUNTER_CONFIG;
+      expect(xpThresholds).toHaveLength(PARTY_LEVELS);
+      // Thresholds are summed and used as divisors — every entry must be positive.
+      expect(xpThresholds.flat().every(isPositiveInteger)).toBe(true);
+      for (const [level, thresholds] of xpThresholds.entries()) {
+        expect(thresholds).toHaveLength(DIFFICULTY_TIERS);
         for (let d = 1; d < DIFFICULTY_TIERS; d++) {
           expect(
             thresholds[d],
-            `level ${level}: difficulty ${d} threshold should exceed difficulty ${d - 1}`,
+            `level ${level}: difficulty ${d} should exceed difficulty ${d - 1}`,
           ).toBeGreaterThan(thresholds[d - 1]);
         }
-      }
-    });
-
-    it('increases with party level within each difficulty tier', () => {
-      for (let d = 0; d < DIFFICULTY_TIERS; d++) {
-        for (let level = 1; level < PARTY_LEVELS; level++) {
-          expect(
-            ENCOUNTER_CONFIG.xpThresholds[level][d],
-            `difficulty ${d}: level ${level} threshold should exceed level ${level - 1}`,
-          ).toBeGreaterThan(ENCOUNTER_CONFIG.xpThresholds[level - 1][d]);
+        if (level > 0) {
+          for (let d = 0; d < DIFFICULTY_TIERS; d++) {
+            expect(
+              thresholds[d],
+              `difficulty ${d}: level ${level} should exceed level ${level - 1}`,
+            ).toBeGreaterThan(xpThresholds[level - 1][d]);
+          }
         }
       }
     });
@@ -83,31 +59,24 @@ describe('encounterConfig', () => {
   });
 
   describe('difficultyMultipliers', () => {
-    const { difficultyMultipliers } = ENCOUNTER_CONFIG;
-
-    it('covers every possible ratio — last band extends to Infinity', () => {
+    it('bands partition (0, ∞] so every monster-count ratio resolves', () => {
+      // calculateDifficultyMultiplier returns the first band whose ratioMax
+      // >= monsterCount/partySize, so bands must be ordered and gapless.
+      const { difficultyMultipliers } = ENCOUNTER_CONFIG;
       expect(difficultyMultipliers.length).toBeGreaterThan(0);
-      const last = difficultyMultipliers[difficultyMultipliers.length - 1];
-      expect(last.ratioMax).toBe(Infinity);
-    });
-
-    it('has strictly ascending ratio bands with no gaps or overlaps', () => {
-      // The generator returns the first band whose ratioMax >= ratio, so
-      // unordered or overlapping bands would silently mis-score encounters.
-      for (let i = 0; i < difficultyMultipliers.length; i++) {
-        const { ratioMax } = difficultyMultipliers[i];
+      difficultyMultipliers.forEach(({ ratioMax }, i) => {
         if (i === difficultyMultipliers.length - 1) {
-          expect(Number.isFinite(ratioMax)).toBe(false);
+          expect(ratioMax).toBe(Infinity);
         } else {
-          expect(Number.isFinite(ratioMax) && ratioMax > 0).toBe(true);
+          expect(ratioMax).toBeGreaterThan(0);
           expect(ratioMax).toBeLessThan(difficultyMultipliers[i + 1].ratioMax);
         }
-      }
+      });
     });
 
     it('scales multipliers up with monster pressure, from a neutral first band', () => {
-      // More monsters per adventurer must never make an encounter count for
-      // *less* effective XP; the first band (few monsters) stays unadjusted.
+      // More monsters per adventurer must never reduce effective XP.
+      const { difficultyMultipliers } = ENCOUNTER_CONFIG;
       expect(difficultyMultipliers[0].multiplier).toBe(1);
       for (let i = 1; i < difficultyMultipliers.length; i++) {
         expect(difficultyMultipliers[i].multiplier)
@@ -125,16 +94,13 @@ describe('encounterConfig', () => {
 
     it('crRange keeps candidate CR bounds finite and non-degenerate', () => {
       const { minMultiplier, minGap } = ENCOUNTER_CONFIG.crRange;
-      expect(Number.isFinite(minMultiplier) && minMultiplier > 0).toBe(true);
+      expect(minMultiplier).toBeGreaterThan(0);
       expect(minMultiplier).toBeLessThanOrEqual(1);
-      expect(Number.isFinite(minGap) && minGap >= 0).toBe(true);
+      expect(minGap).toBeGreaterThanOrEqual(0);
     });
 
-    it('budgetTolerance is at least 1 (never trims a suggestion below target XP)', () => {
+    it('budgetTolerance and deadlyMultiplier keep trims and safety caps at or above target', () => {
       expect(ENCOUNTER_CONFIG.budgetTolerance).toBeGreaterThanOrEqual(1);
-    });
-
-    it('deadlyMultiplier keeps the safety cap above the deadly threshold', () => {
       expect(ENCOUNTER_CONFIG.deadlyMultiplier).toBeGreaterThan(1);
     });
 

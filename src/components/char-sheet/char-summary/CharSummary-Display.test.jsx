@@ -1,40 +1,31 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Coverage ownership (CharSummary family delegation):
 //   - Character header area: name, header action buttons, and the delete-confirm
 //     flow (onDeleteCharacter fires ONLY when window.confirm is accepted) —
-//     no sibling touches onDeleteCharacter/window.confirm.
-//   - Subtitle row (CharacterSummaryText): subrace-over-race precedence,
-//     lowercase race/class-type suffixes, alignment. CharSummary-XPModes.test.jsx
-//     owns the XP/milestone suffix content inside this row (pinned here only as
-//     part of the exact full-line string of the default fixture).
-//   - Real AvatarImage URL construction (campaign-scoped src prefix, absolute-URL
-//     passthrough, initial fallback) — every other sibling mocks AvatarImage, so
-//     this is the only place the actual <img src> can be verified. Modal open/
-//     close flow → CharSummary-Prerequisites.test.jsx.
-//   - StatListsBlock rows: Senses (incl. See Invisibility append), Proficiencies
-//     (join order + 'N from: X' regex filter), Languages. Vulnerabilities row
+//     no sibling touches onDeleteCharacter/window.confirm on CharSummary.
+//   - Subtitle-row fallbacks (no subrace / no race type / no subclass). The
+//     exact full-line grammar of the untouched fixture is pinned (fixture-
+//     derived) by CharSummary-FixtureContract.test.jsx; XP/milestone suffix
+//     content → CharSummary-XPModes.test.jsx.
+//   - One integration pin that CharSummary wires playerStats.imagePath +
+//     campaignName + name into the REAL AvatarImage (every other sibling mocks
+//     it). The AvatarImage URL-branch matrix (absolute, campaign prefix,
+//     http(s) passthrough) and initial-fallback live in
+//     src/components/common/AvatarImage.test.jsx — not restated here.
+//     Modal open/close flow → CharSummary-Prerequisites.test.jsx.
+//   - StatListsBlock rows: Senses (join + See Invisibility append + null
+//     guard), Proficiencies (join order with 'N from: X' filter + row guard),
+//     Languages join + null guard. Absence of all empty-list rows on the
+//     untouched fixture is pinned by CharSummary-FixtureContract.test.jsx, so
+//     only the null paths are re-pinned here. Vulnerabilities row
 //     → CharSummary-OtherEffects.test.jsx.
 //   - Background row presence/negatives (negatives delegated here by
 //     CharSummary-UI-Interactions.test.jsx); popup content on click stays there.
 //
-// Quality improvements over previous revision (10 runs → 24 runs):
-//   - Row assertions now pin the FULL rendered row text (order, separators,
-//     capitalization) via the statRowText helper instead of page-wide /regex/
-//     presence — loose regexes passed even if items were duplicated, reordered,
-//     or rendered by the wrong row.
-//   - Added See Invisibility append (charSummaryCalc seeInvisibilityActive →
-//     senses row), untested at component level anywhere in the family.
-//   - Added Avatar src assertions (campaign prefix + http passthrough) — the
-//     old tests only checked alt/initial, passing even if src were broken.
-//   - Added delete-confirm flow (both confirm outcomes) and header button set.
-//   - Added subtitle-row subrace-fallback and negative paths for Languages and
-//     the proficiencies guard (empty proficiencies with tools → row hidden).
-//   - Removed unused sanitize.js mock (no unmocked module in the render tree
-//     imports it); deterministic beforeEach re-pins getActiveBuffs instead of
-//     vi.restoreAllMocks (which had reset the useTrackedResource/useLoggedDiceRoll
-//     factory implementations, leaving behavior version-dependent).
-//   - Added '@testing-library/jest-dom' import (family convention).
+//   - Short rest button open/close flow is owned by CharSummary-Prerequisites
+//     .test.jsx (which also asserts the modal is closed pre-click) — the
+//     former "renders without opening" test here was a subset and was removed.
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -44,8 +35,8 @@ import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 import { mockPlayerStats, mockCampaignName } from './CharSummary.test-mocks.test.jsx';
 
 // ---------------------------------------------------------------------------
-// Mocks — minimal for this lane. AvatarImage and ShortRestButton intentionally
-// NOT mocked (this file owns their rendered output); AvatarModal is mocked to
+// Mocks — minimal for this lane. AvatarImage intentionally NOT mocked (this
+// file owns the CharSummary→AvatarImage wiring pin); AvatarModal is mocked to
 // null so avatar clicks are inert while src construction stays real.
 // ---------------------------------------------------------------------------
 vi.mock('./CharGold.jsx', () => ({ default: () => <div data-testid="char-gold">Gold</div> }));
@@ -179,16 +170,10 @@ describe('CharSummary - Display', () => {
     });
 
     // -------------------------------------------------------------------
-    // Subtitle row — race/class/level/alignment composition
+    // Subtitle row — fallback composition when subrace/type/subclass absent
+    // (exact full-line grammar of the default fixture → FixtureContract)
     // -------------------------------------------------------------------
     describe('Subtitle', () => {
-        it('renders subrace, lowercase race type, class with subclass type, level and alignment', () => {
-            renderSummary();
-            expect(subtitleText()).toBe(
-                'Hill Dwarf (hill dwarf), Cleric (war-choice), Level 5 (milestone), Lawful Good'
-            );
-        });
-
         it('falls back to the race name and omits parentheticals when subrace and types are absent', () => {
             const stats = {
                 ...mockPlayerStats,
@@ -196,17 +181,21 @@ describe('CharSummary - Display', () => {
                 class: { name: 'Wizard', subclass: null },
             };
             renderSummary(stats);
-            expect(subtitleText()).toContain('Elf, Wizard');
-            expect(subtitleText()).not.toContain('()');
-            expect(subtitleText()).not.toContain('Dwarf');
+            const text = subtitleText();
+            expect(text).toContain('Elf, Wizard');
+            expect(text).toContain('Level 5');
+            expect(text).toContain('Lawful Good');
+            expect(text).not.toContain('()');
+            expect(text).not.toContain('Dwarf');
         });
     });
 
     // -------------------------------------------------------------------
-    // Avatar Image — real AvatarImage: URL construction and fallbacks
+    // Avatar Image — integration wiring of the real AvatarImage
+    // (URL branch matrix + initial fallback → common/AvatarImage.test.jsx)
     // -------------------------------------------------------------------
     describe('Avatar Image', () => {
-        it('builds a campaign-scoped src and accessible name for local images', () => {
+        it('wires name, imagePath and campaignName into a campaign-scoped img', () => {
             const stats = { ...mockPlayerStats, imagePath: '/images/character.png' };
             renderSummary(stats);
             const img = screen.getByRole('img', { name: mockPlayerStats.name });
@@ -215,20 +204,6 @@ describe('CharSummary - Display', () => {
             const src = img.getAttribute('src');
             expect(src).toMatch(new RegExp(`^campaigns/${mockCampaignName}/`));
             expect(src).toContain('images/character.png');
-        });
-
-        it('keeps absolute http image URLs unchanged', () => {
-            const stats = { ...mockPlayerStats, imagePath: 'https://cdn.example.com/portrait.png' };
-            renderSummary(stats);
-            expect(screen.getByRole('img', { name: mockPlayerStats.name }))
-                .toHaveAttribute('src', 'https://cdn.example.com/portrait.png');
-        });
-
-        it('renders the uppercased initial instead of an img when imagePath is null', () => {
-            const stats = { ...mockPlayerStats, imagePath: null };
-            renderSummary(stats);
-            expect(screen.queryByRole('img')).not.toBeInTheDocument();
-            expect(screen.getByText(/^T$/)).toBeInTheDocument();
         });
     });
 
@@ -254,12 +229,8 @@ describe('CharSummary - Display', () => {
             expect(statRowText('Senses:')).toBe('Senses: Darkvision 60 ft, See Invisibility');
         });
 
-        it.each`
-            senses  | description
-            ${null} | ${'null'}
-            ${[]}   | ${'empty array'}
-        `('does not render the senses row when senses is $description', ({ senses }) => {
-            renderSummary({ ...mockPlayerStats, senses });
+        it('does not render the senses row when senses is null', () => {
+            renderSummary({ ...mockPlayerStats, senses: null });
             expect(screen.queryByText('Senses:')).not.toBeInTheDocument();
         });
     });
@@ -268,32 +239,21 @@ describe('CharSummary - Display', () => {
     // Proficiencies row
     // -------------------------------------------------------------------
     describe('Proficiencies', () => {
-        it('renders proficiencies followed by tool proficiencies in one comma-separated row', () => {
+        it('joins real proficiencies and tools in order, filtering out synthetic "N from: Source" entries', () => {
             const stats = {
                 ...mockPlayerStats,
-                proficiencies: ['Heavy Armor', 'Light Armor'],
+                proficiencies: ['10 from: Druid', 'Heavy Armor', 'Light Armor'],
                 toolProficiencies: ["Blacksmith's Tools", "Thieves' Tools"],
             };
             renderSummary(stats);
             expect(statRowText('Proficiencies:')).toBe("Proficiencies: Heavy Armor, Light Armor, Blacksmith's Tools, Thieves' Tools");
-        });
-
-        it('filters out synthetic "N from: Source" entries and keeps real proficiencies', () => {
-            const stats = {
-                ...mockPlayerStats,
-                proficiencies: ['10 from: Druid', 'Heavy Armor'],
-                toolProficiencies: [],
-            };
-            renderSummary(stats);
-            expect(statRowText('Proficiencies:')).toBe('Proficiencies: Heavy Armor');
             expect(screen.queryByText(/10 from:/)).not.toBeInTheDocument();
         });
 
         it.each`
-            proficiencies      | toolProficiencies      | description
-            ${null}            | ${[]}                  | ${'null with no tools'}
-            ${[]}              | ${[]}                  | ${'empty with no tools'}
-            ${[]}              | ${["Thieves' Tools"]}  | ${'empty even when tools exist'}
+            proficiencies     | toolProficiencies     | description
+            ${null}           | ${[]}                 | ${'null with no tools'}
+            ${[]}             | ${["Thieves' Tools"]} | ${'empty even when tools exist'}
         `('does not render the proficiencies row when proficiencies is $description', ({ proficiencies, toolProficiencies }) => {
             renderSummary({ ...mockPlayerStats, proficiencies, toolProficiencies });
             expect(screen.queryByText('Proficiencies:')).not.toBeInTheDocument();
@@ -310,12 +270,8 @@ describe('CharSummary - Display', () => {
             expect(statRowText('Languages:')).toBe('Languages: Common, Dwarvish, Celestial');
         });
 
-        it.each`
-            languages  | description
-            ${null}    | ${'null'}
-            ${[]}      | ${'empty array'}
-        `('does not render the languages row when languages is $description', ({ languages }) => {
-            renderSummary({ ...mockPlayerStats, languages });
+        it('does not render the languages row when languages is null', () => {
+            renderSummary({ ...mockPlayerStats, languages: null });
             expect(screen.queryByText('Languages:')).not.toBeInTheDocument();
         });
     });
@@ -329,24 +285,9 @@ describe('CharSummary - Display', () => {
             expect(statRowText('Background:')).toBe('Background: Soldier');
         });
 
-        it.each`
-            background   | description
-            ${null}      | ${'null'}
-            ${''}        | ${'an empty string'}
-        `('does not render the background row when background is $description', ({ background }) => {
-            renderSummary({ ...mockPlayerStats, background });
+        it('does not render the background row when background is an empty string', () => {
+            renderSummary({ ...mockPlayerStats, background: '' });
             expect(screen.queryByText('Background:')).not.toBeInTheDocument();
-        });
-    });
-
-    // -------------------------------------------------------------------
-    // Short rest button (modal open/close flow → CharSummary-Prerequisites)
-    // -------------------------------------------------------------------
-    describe('Short Rest Button', () => {
-        it('renders the real short rest button without opening its modal until clicked', () => {
-            renderSummary();
-            expect(screen.getByRole('button', { name: /short rest/i })).toBeInTheDocument();
-            expect(screen.queryByTestId('short-rest-modal')).not.toBeInTheDocument();
         });
     });
 });

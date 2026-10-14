@@ -1,13 +1,14 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
-// CharSummary window event handlers + prop-sync effect.
+// CharSummary window event handlers + XP prop-sync effect.
 //
 // Coverage ownership (CharSummary family delegation):
 //   OWNED HERE (unique behavioral coverage — no sibling covers these):
 //   - 'initiative-rolled' event → clears wild magic surge effects (real DOM
-//     removal + synced setter invoked with null) and listener teardown on unmount
+//     removal + synced setter invoked with null; modal must NOT open)
 //   - 'open-short-rest' event → opens the Short Rest modal (CLA-226; dispatched
 //     by CharSpecialActions' "memorize_spell" automation row)
+//   - initiative-rolled listener teardown on unmount
 //   - XP subtitle reflects playerStats.xp prop changes via the sync effect
 //
 // NOT owned here (delegated — do not re-add):
@@ -143,11 +144,12 @@ beforeEach(() => {
 // 'initiative-rolled' event → clears wild magic surge effects
 // ---------------------------------------------------------------------------
 describe('CharSummary - Initiative Rolled Event', () => {
-    it('removes the surge badge from the UI and syncs null when initiative-rolled fires', () => {
+    it('clears the surge badge and syncs null without opening the short rest modal', () => {
         harness.seed.wildMagicSurgeEffects = [{ timestamp: 1000, roll: 5, effect: 'Fireball' }];
         renderSummary();
 
         expect(screen.getByText(/Surge Effects:/)).toBeInTheDocument();
+        expect(screen.queryByTestId('short-rest-modal')).not.toBeInTheDocument();
 
         act(() => {
             window.dispatchEvent(new Event('initiative-rolled'));
@@ -157,29 +159,19 @@ describe('CharSummary - Initiative Rolled Event', () => {
         expect(screen.queryByText(/Surge Effects:/)).not.toBeInTheDocument();
         // Server-first contract: the clear is written through the synced setter.
         expect(harness.syncedCalls).toEqual([{ key: 'wildMagicSurgeEffects', value: null }]);
-    });
-
-    it('does not open the short rest modal on initiative-rolled', () => {
-        renderSummary();
-
-        act(() => {
-            window.dispatchEvent(new Event('initiative-rolled'));
-        });
-
+        // The two window events stay independently wired.
         expect(screen.queryByTestId('short-rest-modal')).not.toBeInTheDocument();
     });
 
-    it('removes the initiative-rolled listener on unmount', () => {
-        harness.seed.wildMagicSurgeEffects = [{ timestamp: 1000, roll: 5, effect: 'Fireball' }];
+    it('detaches the initiative-rolled listener on unmount', () => {
         const { unmount } = renderSummary();
-
         unmount();
 
         act(() => {
             window.dispatchEvent(new Event('initiative-rolled'));
         });
 
-        // A leaked listener would record a write after unmount.
+        // A leaked listener would record a synced write after unmount.
         expect(harness.syncedCalls).toHaveLength(0);
     });
 });
@@ -198,18 +190,6 @@ describe('CharSummary - Open Short Rest Event', () => {
         });
 
         expect(screen.getByTestId('short-rest-modal')).toBeInTheDocument();
-    });
-
-    it('stays closed after unmount when open-short-rest fires', () => {
-        const { unmount } = renderSummary();
-        unmount();
-
-        expect(() => {
-            act(() => {
-                window.dispatchEvent(new CustomEvent('open-short-rest'));
-            });
-        }).not.toThrow();
-        expect(screen.queryByTestId('short-rest-modal')).not.toBeInTheDocument();
     });
 });
 

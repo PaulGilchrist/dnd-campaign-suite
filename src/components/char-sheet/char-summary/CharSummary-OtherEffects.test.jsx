@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Coverage ownership (CharSummary family delegation): the "Vulnerabilities:"
 // row of StatListsBlock (CharSummary.jsx:273) — the ONLY non-empty
@@ -11,25 +11,20 @@
 //     → CharSummary-ConditionImmunities / -BuffResistances / -ResistanceTypes
 //       / -AuraAndInitiative.test.jsx
 //   - Background popup content → CharSummary-UI-Interactions.test.jsx
+//   - Empty-list row omission on the untouched fixture
+//     → CharSummary-FixtureContract.test.jsx ("omits every empty stat-list
+//       row") — only the null/undefined guard branches are unique here.
 //
-// Quality improvements over previous revision (2 tests → 3 tests / 6 runs):
-//   - Positives assert the FULL row text (label + join order + separator),
-//     not a page-wide /fire/ regex that passed if "fire" appeared in any
-//     element anywhere (badges, tooltips, other rows).
-//   - Pinned the verbatim-render contract: unlike the Resistances/Immunities
-//     rows, vulnerabilities are NOT capitalized. A test mixes case-sensitive
-//     values next to populated sibling rows so a copy-paste of the sibling
-//     capitalization into this row now fails here.
-//   - Negative covers all three guard branches on line 273 ([] / null /
-//     undefined) via it.each — previously only [] was tested.
-//   - Reduced over-mocking: dropped Popup, rulesFactory, and attackCalc
-//     mocks (this path never touches them; the identical-fixture sibling
-//     CharSummary-ConditionImmunities renders without them).
+// Trimmed vs previous revision: the verbatim-vs-capitalized contrast test was
+// removed — the multi-case it.each already pins the FULL row text with mixed
+// casing ("fire, Piercing, cold"), so copy-pasted capitalization into this
+// row still fails loudly here. Resistances capitalization is its siblings'
+// contract. beforeEach re-pin also dropped: the vi.mock factory pins
+// getActiveBuffs to [] and vi.clearAllMocks preserves implementations.
 
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import CharSummary from './CharSummary.jsx';
-import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 
 import { mockPlayerStats, mockCampaignName } from './CharSummary.test-mocks.test.jsx';
 
@@ -89,13 +84,6 @@ function vulnerabilityRow() {
     return screen.getByText('Vulnerabilities:').closest('span');
 }
 
-beforeEach(() => {
-    vi.clearAllMocks();
-    // Re-pin inert buffs: this lane reads vulnerabilities straight from
-    // playerStats, so an empty buff list keeps the render deterministic.
-    getActiveBuffs.mockReturnValue([]);
-});
-
 // ---------------------------------------------------------------------------
 // Vulnerabilities row
 // ---------------------------------------------------------------------------
@@ -107,19 +95,9 @@ describe('CharSummary - Vulnerabilities row', () => {
         renderSummary({ playerStats: { ...mockPlayerStats, vulnerabilities: values } });
 
         // Exact content pins label, join order, ", " separator, and that
-        // values render verbatim (no forced capitalization).
+        // values render verbatim (no forced capitalization — unlike the
+        // Resistances row, this row must never title-case "fire").
         expect(vulnerabilityRow()).toHaveTextContent(expected);
-    });
-
-    it('renders vulnerabilities verbatim without leaking into the capitalized Resistances row', () => {
-        renderSummary({
-            playerStats: { ...mockPlayerStats, vulnerabilities: ['fire'], resistances: ['fire'] },
-        });
-
-        // Same raw type, two rows, two render contracts: Resistances is
-        // capitalized ("Fire"), Vulnerabilities stays verbatim ("fire").
-        expect(screen.getByText('Resistances:').closest('div')).toHaveTextContent('Resistances: Fire');
-        expect(vulnerabilityRow()).toHaveTextContent('Vulnerabilities: fire');
     });
 
     it.each([

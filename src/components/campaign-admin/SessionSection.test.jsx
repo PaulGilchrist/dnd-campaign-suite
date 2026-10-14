@@ -1,12 +1,13 @@
-// @improved-by-ai
-// P4-a (§10.1/§10.4): session console — pills reflect phase, clicks move it
-// with audit, ledger filters enforcement/AI rows, empty state stays honest.
+// @maintained-by-ai
+// P4-a (§10.1/§10.4): session console — which pill is lit, clicks move the
+// phase with an audit, the ledger filters/enforces/caps honestly, and the
+// Take-over-manually safety valve switches enforcement + AI off.
 //
 // The runtime-store mocks share ONE backing object so the two halves of the
-// component's contract (synced read path + runtime write path) stay coherent:
-// a phase click lands in the same store the SSE echo would later fill.
-// Service-level semantics (invalid phase, same-phase guard) are covered by
-// sessionService.test.js — these tests cover the console's own behavior.
+// component's contract (synced read path + runtime write path) stay coherent.
+// Service-level semantics (same-phase silence, invalid-phase refusal) are
+// covered by sessionService.test.js — the console delegates to setSessionPhase
+// and adds no guard of its own, so those paths are not re-tested here.
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
@@ -53,22 +54,21 @@ beforeEach(() => {
 
 afterEach(() => { vi.unstubAllGlobals(); });
 
-describe('phase pills', () => {
-    it('renders the whole phase row, exploration lit while sessionState is unset', () => {
-        const { getByRole } = render(<SessionSection campaignName={CN} />);
-        for (const p of ['Exploration', 'Encounter', 'Travel', 'Roleplay']) {
-            expect(getByRole('button', { name: p })).toBeInTheDocument();
-        }
-        expect(getByRole('button', { name: 'Exploration' })).toHaveAttribute('aria-pressed', 'true');
-        expect(getByRole('button', { name: 'Encounter' })).toHaveAttribute('aria-pressed', 'false');
-    });
+describe('session console', () => {
+    it('lights one pill: exploration by default, synced sessionState wins when set', () => {
+        const first = render(<SessionSection campaignName={CN} />);
+        expect(first.getByRole('button', { name: 'Exploration' })).toHaveAttribute('aria-pressed', 'true');
+        expect(first.getByRole('button', { name: 'Encounter' })).toHaveAttribute('aria-pressed', 'false');
+        first.unmount();
 
-    it('synced sessionState picks the lit pill and names who moved it', () => {
         store.sessionState = { phase: 'travel', changedBy: 'initiative tracker' };
-        const { getByRole, getByText } = render(<SessionSection campaignName={CN} />);
-        expect(getByRole('button', { name: 'Travel' })).toHaveAttribute('aria-pressed', 'true');
-        expect(getByRole('button', { name: 'Exploration' })).toHaveAttribute('aria-pressed', 'false');
-        expect(getByText(/Last moved by initiative tracker/i)).toBeInTheDocument();
+        const second = render(<SessionSection campaignName={CN} />);
+        for (const p of ['Exploration', 'Encounter', 'Travel', 'Roleplay']) {
+            expect(second.getByRole('button', { name: p })).toBeInTheDocument();
+        }
+        expect(second.getByRole('button', { name: 'Travel' })).toHaveAttribute('aria-pressed', 'true');
+        expect(second.getByRole('button', { name: 'Exploration' })).toHaveAttribute('aria-pressed', 'false');
+        expect(second.getByText(/Last moved by initiative tracker/i)).toBeInTheDocument();
     });
 
     it('pill click moves the phase through the store + writes a session_phase audit', async () => {
@@ -77,23 +77,8 @@ describe('phase pills', () => {
         await waitFor(() => expect(setCalls).toHaveLength(1));
         expect(setCalls[0]).toMatchObject({ who: 'campaign', key: 'sessionState' });
         expect(setCalls[0].value).toMatchObject({ phase: 'encounter', changedBy: 'referee console' });
+        expect(store.sessionState).toMatchObject({ phase: 'encounter' }); // the same store SSE echoes back
         expect(logs[0]).toMatchObject({ type: 'session_phase', phase: 'encounter', previousPhase: 'exploration' });
-    });
-
-    it('same-phase click writes nothing (no spam)', async () => {
-        const { getByRole } = render(<SessionSection campaignName={CN} />);
-        fireEvent.click(getByRole('button', { name: 'Exploration' }));
-        await waitFor(() => expect(setCalls.length + logs.length).toBe(0));
-        expect(setCalls).toHaveLength(0);
-    });
-
-    it('lit pill follows the store once the move lands (SSE echo ⇒ rerender)', async () => {
-        const { getByRole, rerender } = render(<SessionSection campaignName={CN} />);
-        fireEvent.click(getByRole('button', { name: 'Roleplay' }));
-        await waitFor(() => expect(setCalls).toHaveLength(1));
-        rerender(<SessionSection campaignName={CN} />); // store already holds the new phase
-        expect(getByRole('button', { name: 'Roleplay' })).toHaveAttribute('aria-pressed', 'true');
-        expect(getByRole('button', { name: 'Exploration' })).toHaveAttribute('aria-pressed', 'false');
     });
 });
 
@@ -121,37 +106,38 @@ describe('enforcement & AI audit ledger', () => {
     });
 
     it('keeps the ledger readable: only the newest 25 audit rows', async () => {
-        const rows = Array.from({ length: 30 }, (_, i) => ({
+        stubFetch(Array.from({ length: 30 }, (_, i) => ({
             type: 'enforcement_triggered',
             description: `entry-${i + 1}`,
-        }));
-        stubFetch(rows);
-        const { findByText, queryByText, findAllByText } = render(<SessionSection campaignName={CN} />);
+        })));
+        const { queryByText, findAllByText } = render(<SessionSection campaignName={CN} />);
         const items = await findAllByText(/entry-\d+/);
         expect(items).toHaveLength(25);
-        expect(await findByText(/entry-30/)).toBeInTheDocument(); // newest kept…
-        expect(queryByText('entry-5')).toBeNull();                // …oldest five dropped
+        expect(items[0]).toHaveTextContent('entry-30');   // newest kept, rendered first…
+        expect(queryByText('entry-5')).toBeNull();        // …oldest five dropped
     });
 
-    it('Refresh button re-reads the campaign log by URL', async () => {
-        const fetchMock = stubFetch([]);
-        const { getByRole } = render(<SessionSection campaignName={CN} />);
-        await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-        fetchMock.mockClear();
+    it('stays honestly empty on a failed fetch, then fills on Refresh', async () => {
+        let fail = true;
+        let rows = [];
+        const fetchMock = vi.fn(async (url, opts = {}) => {
+            if (opts.method === 'POST') return { ok: true, json: async () => ({}) };
+            if (String(url) === LOG_URL) {
+                return fail ? { ok: false, json: async () => [] } : { ok: true, json: async () => rows };
+            }
+            return { ok: true, json: async () => ({}) };
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        const { findByText, getByRole, queryByText } = render(<SessionSection campaignName={CN} />);
+        // failed fetch must not crash or show stale data — just the honest empty copy
+        expect(await findByText(/Nothing to show/)).toBeInTheDocument();
+
+        fail = false;
+        rows = [{ type: 'enforcement_denied', description: 'wall denied the move' }];
         fireEvent.click(getByRole('button', { name: /Refresh/i }));
-        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(LOG_URL));
-    });
-
-    it('failed fetch leaves the ledger honestly empty, not stale or crashed', async () => {
-        vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => [] })));
-        const { findByText } = render(<SessionSection campaignName={CN} />);
-        expect(await findByText(/Nothing to show/)).toBeInTheDocument();
-    });
-
-    it('empty audit shows the honest empty copy', async () => {
-        stubFetch([]);
-        const { findByText } = render(<SessionSection campaignName={CN} />);
-        expect(await findByText(/Nothing to show/)).toBeInTheDocument();
+        expect(await findByText(/wall denied the move/)).toBeInTheDocument();
+        expect(queryByText(/Nothing to show/)).toBeNull();
+        expect(fetchMock).toHaveBeenCalledWith(LOG_URL);
     });
 });
 

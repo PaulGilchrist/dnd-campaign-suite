@@ -1,16 +1,26 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * Behavior tests for the "Delete Campaign" flow (handleDeleteCampaign).
  *
- * Safety: every test targets test-campaign only (or a display-only variant used
- * strictly to check exact-name matching and URL encoding). fetch is stubbed in
- * beforeEach and restored in afterEach, so no DELETE can ever reach a live server.
+ * Safety: fetch is stubbed in beforeEach and restored in afterEach, so no
+ * DELETE can ever reach a live server. Only test-campaign (and a display-only
+ * variant used strictly to exercise exact-name matching and URL encoding) is
+ * ever passed to the component.
+ *
+ * Coverage map — each block is one distinct safety gate or outcome branch:
+ *  - prompt: dismissed (silent abort) vs. non-exact input (empty / casing /
+ *    whitespace) — each guards a different kind of accidental leniency
+ *  - escalating confirms: decline at WARNING vs. decline at FINAL WARNING
+ *  - success: exactly one DELETE to the URL-encoded endpoint, success alert,
+ *    reload — only after every gate passes
+ *  - failure: server error message, generic fallback, network rejection
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CampaignAdmin from './CampaignAdmin.jsx';
 
 const CAMPAIGN = 'test-campaign';
+const MISMATCH_ALERT = 'Campaign name did not match. Deletion cancelled.';
 
 const createDefaultProps = (overrides = {}) => ({
     campaignName: CAMPAIGN,
@@ -81,10 +91,15 @@ describe('CampaignAdmin - Delete Campaign', () => {
         fetchSpy.mock.calls.filter(([, options]) => options?.method === 'DELETE');
 
     // Answer only the DELETE call differently; every other fetch succeeds.
-    const stubDeleteResponse = (response) => {
-        fetchSpy.mockImplementation((url, options) =>
-            Promise.resolve(options?.method === 'DELETE' ? response : jsonResponse(true, {}))
-        );
+    const stubDeleteOutcome = ({ response, error }) => {
+        fetchSpy.mockImplementation((url, options) => {
+            if (options?.method !== 'DELETE') {
+                return Promise.resolve(jsonResponse(true, {}));
+            }
+            return error
+                ? Promise.reject(error)
+                : Promise.resolve(response ?? jsonResponse(true, {}));
+        });
     };
 
     const openAndClickDelete = () => {
@@ -93,65 +108,40 @@ describe('CampaignAdmin - Delete Campaign', () => {
     };
 
     describe('exact-name prompt', () => {
-        it('asks the user to type the exact campaign name before anything is deleted', () => {
+        it.each([
+            { typed: null, label: 'dismissed', alert: null },
+            { typed: '', label: 'empty', alert: MISMATCH_ALERT },
+            { typed: 'Test-Campaign', label: 'typed with different casing', alert: MISMATCH_ALERT },
+            { typed: ` ${CAMPAIGN} `, label: 'padded with spaces', alert: MISMATCH_ALERT },
+        ])('aborts when the prompt is $label', ({ typed, alert }) => {
+            window.prompt.mockReturnValueOnce(typed);
             openAndClickDelete();
 
             expect(window.prompt).toHaveBeenCalledWith(
                 `Type the exact campaign name to confirm deletion of "${CAMPAIGN}":`
             );
-            expect(deleteRequests()).toHaveLength(0);
-            expect(window.location.reload).not.toHaveBeenCalled();
-        });
-
-        it('silently aborts when the user dismisses the prompt', () => {
-            window.prompt.mockReturnValueOnce(null);
-            openAndClickDelete();
-
-            expect(window.alert).not.toHaveBeenCalled();
-            expect(window.confirm).not.toHaveBeenCalled();
-            expect(deleteRequests()).toHaveLength(0);
-            expect(window.location.reload).not.toHaveBeenCalled();
-        });
-
-        it.each([
-            { typed: '', label: 'empty input' },
-            { typed: 'wrong-name', label: 'a different name' },
-            { typed: 'Test-Campaign', label: 'the name with different casing' },
-            { typed: ` ${CAMPAIGN} `, label: 'the name padded with spaces' },
-        ])('cancels with an alert when the typed name is not an exact match ($label)', ({ typed }) => {
-            window.prompt.mockReturnValueOnce(typed);
-            openAndClickDelete();
-
-            expect(window.alert).toHaveBeenCalledWith(
-                'Campaign name did not match. Deletion cancelled.'
-            );
+            if (alert) {
+                expect(window.alert).toHaveBeenCalledWith(alert);
+            } else {
+                expect(window.alert).not.toHaveBeenCalled();
+            }
             expect(window.confirm).not.toHaveBeenCalled();
             expect(deleteRequests()).toHaveLength(0);
             expect(window.location.reload).not.toHaveBeenCalled();
         });
     });
 
-    describe('double-warning confirmations', () => {
-        it('aborts at the first warning when declined', () => {
-            consent({ confirms: [false] });
+    describe('escalating confirmations', () => {
+        it.each([
+            { confirms: [false], lastWarning: 'permanently delete the entire campaign' },
+            { confirms: [true, false], lastWarning: 'FINAL WARNING' },
+        ])('aborts when the user declines at the last confirmation shown', ({ confirms, lastWarning }) => {
+            consent({ confirms });
             openAndClickDelete();
 
-            expect(window.confirm).toHaveBeenCalledTimes(1);
-            expect(window.confirm).toHaveBeenCalledWith(
-                expect.stringContaining('permanently delete the entire campaign')
-            );
-            expect(window.alert).not.toHaveBeenCalled();
-            expect(deleteRequests()).toHaveLength(0);
-            expect(window.location.reload).not.toHaveBeenCalled();
-        });
-
-        it('aborts at the final warning when declined', () => {
-            consent({ confirms: [true, false] });
-            openAndClickDelete();
-
-            expect(window.confirm).toHaveBeenCalledTimes(2);
+            expect(window.confirm).toHaveBeenCalledTimes(confirms.length);
             expect(window.confirm).toHaveBeenLastCalledWith(
-                expect.stringContaining('FINAL WARNING')
+                expect.stringContaining(lastWarning)
             );
             expect(window.alert).not.toHaveBeenCalled();
             expect(deleteRequests()).toHaveLength(0);
@@ -160,20 +150,10 @@ describe('CampaignAdmin - Delete Campaign', () => {
     });
 
     describe('DELETE request', () => {
-        it('sends exactly one DELETE request and reloads only after every confirmation passes', async () => {
-            consent();
-            openAndClickDelete();
-
-            await waitFor(() => {
-                expect(deleteRequests()).toHaveLength(1);
-            }, WAIT_OPTIONS);
-            expect(fetchSpy).toHaveBeenCalledWith(`/api/campaigns/${CAMPAIGN}`, { method: 'DELETE' });
-            expect(window.alert).toHaveBeenCalledWith('Campaign deleted successfully.');
-            expect(window.location.reload).toHaveBeenCalledTimes(1);
-        });
-
-        it('URL-encodes the campaign name in the DELETE endpoint', async () => {
-            const name = 'test campaign/1';
+        it.each([
+            { name: CAMPAIGN, url: `/api/campaigns/${CAMPAIGN}` },
+            { name: 'test campaign/1', url: '/api/campaigns/test%20campaign%2F1' },
+        ])('sends exactly one DELETE to $url and reloads only after every gate passes', async ({ name, url }) => {
             consent({ name });
             renderCampaignAdmin({ campaignName: name });
             clickDeleteCampaign();
@@ -181,47 +161,23 @@ describe('CampaignAdmin - Delete Campaign', () => {
             await waitFor(() => {
                 expect(deleteRequests()).toHaveLength(1);
             }, WAIT_OPTIONS);
-            expect(fetchSpy).toHaveBeenCalledWith('/api/campaigns/test%20campaign%2F1', { method: 'DELETE' });
+            expect(fetchSpy).toHaveBeenCalledWith(url, { method: 'DELETE' });
+            expect(window.alert).toHaveBeenCalledWith('Campaign deleted successfully.');
+            expect(window.location.reload).toHaveBeenCalledTimes(1);
         });
 
-        it('surfaces the server error and does not reload when deletion fails', async () => {
+        it.each([
+            { label: 'server error message', response: jsonResponse(false, { error: 'Campaign not found' }), message: 'Campaign not found' },
+            { label: 'generic fallback', response: jsonResponse(false, {}), message: 'Unknown error' },
+            { label: 'network rejection', error: new Error('Network failed'), message: 'Network failed' },
+        ])('alerts "$message" without reloading on $label', async ({ response, error, message }) => {
             consent();
-            stubDeleteResponse(jsonResponse(false, { error: 'Campaign not found' }));
+            stubDeleteOutcome({ response, error });
             openAndClickDelete();
 
             await waitFor(() => {
                 expect(window.alert).toHaveBeenCalledWith(
-                    'Failed to delete campaign: Campaign not found'
-                );
-            }, WAIT_OPTIONS);
-            expect(window.location.reload).not.toHaveBeenCalled();
-        });
-
-        it('falls back to a generic error when the failure response carries no message', async () => {
-            consent();
-            stubDeleteResponse(jsonResponse(false, {}));
-            openAndClickDelete();
-
-            await waitFor(() => {
-                expect(window.alert).toHaveBeenCalledWith(
-                    'Failed to delete campaign: Unknown error'
-                );
-            }, WAIT_OPTIONS);
-            expect(window.location.reload).not.toHaveBeenCalled();
-        });
-
-        it('reports network errors and does not reload', async () => {
-            consent();
-            fetchSpy.mockImplementation((url, options) =>
-                options?.method === 'DELETE'
-                    ? Promise.reject(new Error('Network failed'))
-                    : Promise.resolve(jsonResponse(true, {}))
-            );
-            openAndClickDelete();
-
-            await waitFor(() => {
-                expect(window.alert).toHaveBeenCalledWith(
-                    'Failed to delete campaign: Network failed'
+                    `Failed to delete campaign: ${message}`
                 );
             }, WAIT_OPTIONS);
             expect(deleteRequests()).toHaveLength(1);

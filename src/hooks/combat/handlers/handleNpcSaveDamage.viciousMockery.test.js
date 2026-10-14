@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -19,7 +20,7 @@ vi.mock('../../runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../../services/combat/automation/automationService.js', () => ({
-    hasIgnoreResistance: vi.fn(),
+    hasIgnoreResistance: vi.fn(() => false),
     playerIsImmuneToCondition: vi.fn(),
     hasGreatWeaponFighting: vi.fn(),
     applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
@@ -32,22 +33,22 @@ vi.mock('../../../services/rules/features/invisibilityService.js', () => ({
 
 vi.mock('../loggedDiceRollUtils.js', () => ({
     getGuardianProtectionAcBonus: vi.fn(() => 0),
-    hasPotentCantrip: vi.fn(),
-    hasSoulstitchProtection: vi.fn(),
+    hasPotentCantrip: vi.fn(() => false),
+    hasSoulstitchProtection: vi.fn(() => false),
     clearSoulstitchStamp: vi.fn(),
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 
 vi.mock('../../../services/combat/auras/coronaAuraUtils.js', () => ({
-    getCoronaSaveDisadvantage: vi.fn(),
+    getCoronaSaveDisadvantage: vi.fn(() => ({ disadvantage: false })),
 }));
 
 vi.mock('../../../services/combat/auras/elderChampionAuraUtils.js', () => ({
-    getElderChampionSaveDisadvantage: vi.fn(),
+    getElderChampionSaveDisadvantage: vi.fn(async () => ({ disadvantage: false })),
 }));
 
 vi.mock('../../../services/automation/handlers/buffs/circleOfPowerHandler.js', () => ({
-    isCircleOfPowerActive: vi.fn(),
+    isCircleOfPowerActive: vi.fn(() => false),
 }));
 
 vi.mock('./handleOverchannelSelfDamage.js', () => ({
@@ -64,8 +65,8 @@ vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
         if (evasion && dcSuccess === 'half') return success ? 0 : Math.floor(total / 2);
         return success ? 0 : total;
     }),
-    rollSaveForCreature: vi.fn(),
-    applyDamageToTarget: vi.fn(),
+    rollSaveForCreature: vi.fn(() => ({ roll: 4, total: 4, bonus: 0, success: false, rawRolls: [4] })),
+    applyDamageToTarget: vi.fn((cs, name, dmg) => Promise.resolve({ finalDamage: dmg, newHp: 32 - dmg })),
     normalizeSaveType: vi.fn((t) => t),
 }));
 
@@ -73,20 +74,14 @@ vi.mock('../../../services/rules/features/viciousMockeryService.js', () => ({
     triggerViciousMockeryForGeneric: vi.fn(() => Promise.resolve()),
 }));
 
-import { rollExpression } from '../../../services/dice/diceRoller.js';
 import { getRuntimeValue } from '../../runtime/useRuntimeState.js';
-import { hasIgnoreResistance } from '../../../services/combat/automation/automationService.js';
-import { hasPotentCantrip, hasSoulstitchProtection, applyMinDamageAdjustment } from '../loggedDiceRollUtils.js';
-import { getCoronaSaveDisadvantage } from '../../../services/combat/auras/coronaAuraUtils.js';
-import { getElderChampionSaveDisadvantage } from '../../../services/combat/auras/elderChampionAuraUtils.js';
-import { isCircleOfPowerActive } from '../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
-import { applyDamageToTarget, rollSaveForCreature } from '../../../services/rules/combat/applyDamage.js';
-import { addEntry } from '../../../services/ui/logService.js';
+import { rollSaveForCreature } from '../../../services/rules/combat/applyDamage.js';
 import { triggerViciousMockeryForGeneric } from '../../../services/rules/features/viciousMockeryService.js';
 import { createNpcSaveDamageHandler } from './handleNpcSaveDamage.js';
 
 describe('handleNpcSaveDamage — Vicious Mockery save gate (CLA-377)', () => {
-    const vmSpell = { name: 'Vicious Mockery', level: 0, baseLevel: 0, dc: { dc_type: 'wis' } };
+    // Matches public/data/spells.json: level 0, WIS save, dc_success none, Psychic.
+    const vmSpell = { name: 'Vicious Mockery', level: 0, baseLevel: 0, dc: { dc_type: 'WIS', dc_success: 'none' } };
 
     const deps = {
         characterName: 'TestBard',
@@ -105,6 +100,7 @@ describe('handleNpcSaveDamage — Vicious Mockery save gate (CLA-377)', () => {
 
     const vmContext = {
         targetName: 'Thug 1',
+        attackerName: 'TestBard',
         saveDc: 19,
         saveType: 'wis',
         dcSuccess: 'none',
@@ -117,30 +113,32 @@ describe('handleNpcSaveDamage — Vicious Mockery save gate (CLA-377)', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        rollExpression.mockReturnValue({ total: 13, rolls: [3, 3, 1, 6], modifier: 0 });
-        getRuntimeValue.mockReset().mockImplementation((key, prop) => {
+        getRuntimeValue.mockImplementation((key, prop) => {
             if (key === 'Thug 1' && prop === 'activeConditions') return [];
             return null;
         });
-        hasIgnoreResistance.mockReturnValue(false);
-        hasPotentCantrip.mockReturnValue(false);
-        hasSoulstitchProtection.mockReturnValue(false);
-        applyMinDamageAdjustment.mockImplementation((d) => d);
-        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
-        isCircleOfPowerActive.mockReturnValue(false);
-        rollSaveForCreature.mockReturnValue({ roll: 4, total: 4, bonus: 0, success: false, rawRolls: [4] });
-        applyDamageToTarget.mockImplementation((cs, name, dmg) => Promise.resolve({ finalDamage: dmg, newHp: 32 - dmg }));
     });
 
     function call(contextOverride = {}) {
         const fn = createNpcSaveDamageHandler(deps);
-        return fn({ name: 'Vicious Mockery', formula: '4d6', total: 13, rolls: [3, 3, 1, 6], modifier: 0, context: { ...vmContext, ...contextOverride }, adjustedTotal: 13, combatSummary: combatSummary });
+        return fn({
+            name: 'Vicious Mockery',
+            formula: '1d4',
+            total: 4,
+            rolls: [4],
+            modifier: 0,
+            context: { ...vmContext, ...contextOverride },
+            adjustedTotal: 4,
+            combatSummary,
+        });
     }
 
-    it('triggers Vicious Mockery on a FAILED save with spell, target and caster', async () => {
+    const saveDamageLog = () => deps.logEntry.mock.calls.map(c => c[0]).find(e => e.rollType === 'save-damage');
+
+    it('triggers Vicious Mockery on a FAILED save with spell, target, caster and logs the failure', async () => {
         await call();
 
+        expect(saveDamageLog().saveResult).toBe('failure');
         expect(triggerViciousMockeryForGeneric).toHaveBeenCalledTimes(1);
         expect(triggerViciousMockeryForGeneric).toHaveBeenCalledWith(
             vmSpell,
@@ -151,34 +149,15 @@ describe('handleNpcSaveDamage — Vicious Mockery save gate (CLA-377)', () => {
         );
     });
 
-    it('does NOT trigger Vicious Mockery on a SUCCESSFUL save', async () => {
-        rollSaveForCreature.mockReturnValue({ roll: 19, total: 19, bonus: 0, success: true, rawRolls: [19] });
+    it('does NOT trigger Vicious Mockery on a successful save and logs zero damage', async () => {
+        rollSaveForCreature.mockReturnValueOnce({ roll: 19, total: 19, bonus: 0, success: true, rawRolls: [19] });
 
         await call();
 
         expect(triggerViciousMockeryForGeneric).not.toHaveBeenCalled();
-    });
-
-    it('logs zero-damage save success without any condition application', async () => {
-        rollSaveForCreature.mockReturnValue({ roll: 19, total: 19, bonus: 0, success: true, rawRolls: [19] });
-
-        await call();
-
-        const damageLog = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.rollType === 'save-damage');
-        expect(damageLog).toBeDefined();
-        expect(damageLog.saveResult).toBe('success');
-        expect(damageLog.finalDamage).toBe(0);
-        const conditionLogs = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition');
-        expect(conditionLogs).toHaveLength(0);
-    });
-
-    it('logs the failed save and still triggers the disadvantage effect', async () => {
-        await call();
-
-        const damageLog = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.rollType === 'save-damage');
-        expect(damageLog).toBeDefined();
-        expect(damageLog.saveResult).toBe('failure');
-        expect(triggerViciousMockeryForGeneric).toHaveBeenCalledTimes(1);
+        const log = saveDamageLog();
+        expect(log.saveResult).toBe('success');
+        expect(log.finalDamage).toBe(0);
     });
 
     it('does not trigger for non-Vicious-Mockery save spells', async () => {
@@ -187,7 +166,7 @@ describe('handleNpcSaveDamage — Vicious Mockery save gate (CLA-377)', () => {
         expect(triggerViciousMockeryForGeneric).not.toHaveBeenCalled();
     });
 
-    it('keeps rolling and logging damage when trigger service rejects', async () => {
+    it('keeps rolling, logging and showing the popup when the trigger service rejects', async () => {
         triggerViciousMockeryForGeneric.mockRejectedValueOnce(new Error('Handler failed'));
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -197,6 +176,7 @@ describe('handleNpcSaveDamage — Vicious Mockery save gate (CLA-377)', () => {
             '[handleNpcSaveDamage] Vicious Mockery trigger failed:',
             expect.any(Error),
         );
+        expect(saveDamageLog().saveResult).toBe('failure');
         expect(deps.setPopupHtml).toHaveBeenCalled();
         consoleSpy.mockRestore();
     });

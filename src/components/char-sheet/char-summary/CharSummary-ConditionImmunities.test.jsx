@@ -1,40 +1,27 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Coverage ownership: the condition-immunity sources of the "Immunities:" row
-// (charSummaryCalc.js computeResistances, lines 180-186) — NOT the aura source.
-//   - playerStats.immunities (base) and playerStats.automationConditionImmunities
-//   - automationConditionalImmunities gated on an active 'Rage' buff
-//     (collectRageConditionalImmunities — previously untested anywhere)
-//   - conditionImmunity from buffs whose name is in CONDITION_IMMUNITY_BUFF_NAMES,
-//     including the allow-list guard (previously untested anywhere)
-//   - cross-source deduplication with lowercase normalization
+// (charSummaryCalc.js computeResistances) — NOT the aura source.
+// Three exact-text tests pin the whole row-assembly lane:
+//   A. base playerStats.immunities + unconditional automationConditionImmunities
+//      merge, with Set dedup of a shared type.
+//   B. automationConditionalImmunities gated on an active 'Rage' buff
+//      (collectRageConditionalImmunities) — positive + both gate negatives.
+//   C. conditionImmunity from buffs in CONDITION_IMMUNITY_BUFF_NAMES: allow-list
+//      guard (Bless filtered), membership (Calm Emotions, Heroes' Feast),
+//      cross-buff + cross-source dedup via the buff lowercase normalization,
+//      and row order (fixed by CONDITION_IMMUNITY_BUFF_NAMES order, base first).
+// Exact textContent equality (not substring/has-text) catches extra types,
+// missing types, wrong order, and wrong capitalization in every test.
 //
 // NOT owned here (delegated to siblings — do not re-add):
 //   - auraComboEffects immunities merge/dedup → CharSummary-AuraAndInitiative.test.jsx
-//   - Feign Death resistance + condition immunity → CharSummary-BuffResistances.test.jsx
-//   - Heroes' Feast / Rage / Aura BADGES and tooltips → CharSummary-BuffResistances.test.jsx
-//
-// Quality improvements over previous revision (6 tests → 9 tests / 12 runs):
-//   - Queries scoped to the "Immunities:" row via statRow helper (was page-wide
-//     regex: /Poison/ matched any element anywhere, including badges and tooltips).
-//   - Positive tests assert the full rendered row text, so ordering, capitalization,
-//     and separator formatting are pinned — text-presence checks passed even if a
-//     type rendered twice or in the wrong place.
-//   - Old "buff is inactive" negative passed even if the buff code were deleted
-//     (empty getActiveBuffs is the fixture default). Replaced with negatives that
-//     fail when the guards break: non-allow-listed buff names, missing Rage buff,
-//     and requiresActive mismatch.
-//   - Added Rage-gate coverage (positive + two gate negatives) and the
-//     CONDITION_IMMUNITY_BUFF_NAMES allow-list guard.
-//   - Imports shared mockPlayerStats/mockCampaignName (removed 38-line local
-//     duplicate fixture); per-test overrides via spread.
-//   - Removed unused mocks (rulesFactory is only called for Monks; attackCalc is
-//     exercised harmlessly by the real module) and the unnecessary
-//     window.location.hostname mutation.
-//   - One beforeEach re-pins inert getActiveBuffs (mockReturnValue survives
-//     clearAllMocks; re-pinning makes ordering explicit).
+//   - Feign Death resistance + condition immunity dual lane, badge/tooltips
+//     → CharSummary-BuffResistances.test.jsx
+//   - computeResistances calc-level contract (runCalc) → CharSummary.test-mocks.test.jsx
+//     (this file owns the rendered-row lane only)
 
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
@@ -93,8 +80,11 @@ function renderSummary(props = {}) {
     );
 }
 
-function statRow(label) {
-    return screen.getByText(label).closest('div');
+// Exact rendered row text (whitespace-collapsed) — a substring match would
+// pass even if an extra type were appended or capitalization drifted.
+function immunityRowText() {
+    const row = screen.getByText('Immunities:').closest('div');
+    return row.textContent.replace(/\s+/g, ' ').trim();
 }
 
 beforeEach(() => {
@@ -102,111 +92,72 @@ beforeEach(() => {
     getActiveBuffs.mockReturnValue([]);
 });
 
-// ---------------------------------------------------------------------------
-// Direct sources: playerStats.immunities, automationConditionImmunities,
-// and Rage-gated automationConditionalImmunities.
-// ---------------------------------------------------------------------------
-describe('CharSummary - Immunities row direct sources', () => {
-    it('renders the Immunities row from playerStats.immunities, capitalized and comma-separated', () => {
-        renderSummary({ playerStats: { ...mockPlayerStats, immunities: ['poison', 'charm'] } });
-
-        expect(statRow('Immunities:')).toHaveTextContent('Immunities: Poison, Charm');
-    });
-
-    it('merges automationConditionImmunities into the row without duplicating a shared type', () => {
+describe('CharSummary - Immunities row sources', () => {
+    it('merges base immunities and automationConditionImmunities, listing a shared type once', () => {
         renderSummary({
             playerStats: {
                 ...mockPlayerStats,
-                immunities: ['poison'],
+                immunities: ['poison', 'charm'],
                 automationConditionImmunities: ['poison', 'charmed'],
             },
         });
 
-        const row = statRow('Immunities:');
-        // Dedup: a broken merge would render "Poison" twice.
-        expect(within(row).getAllByText(/Poison/)).toHaveLength(1);
-        expect(row).toHaveTextContent('Immunities: Poison, Charmed');
-    });
-
-    it('surfaces automationConditionalImmunities only while Rage is active', () => {
-        getActiveBuffs.mockReturnValue([{ name: 'Rage' }]);
-        renderSummary({
-            playerStats: {
-                ...mockPlayerStats,
-                automationConditionalImmunities: [{ requiresActive: 'Rage', immunities: ['charmed'] }],
-            },
-        });
-
-        expect(statRow('Immunities:')).toHaveTextContent('Immunities: Charmed');
+        // Pins base rendering, capitalization, comma separator, unconditional
+        // merge of the automation list, and dedup of the shared 'poison'.
+        expect(immunityRowText()).toBe('Immunities: Poison, Charm, Charmed');
     });
 
     it.each([
         {
-            desc: 'no Rage buff is active',
+            desc: 'Rage is active and the feature requires Rage',
+            buffs: [{ name: 'Rage' }],
+            requiresActive: 'Rage',
+            expected: 'Immunities: Charmed',
+        },
+        {
+            desc: 'no buff is active',
             buffs: [],
-            conditionals: [{ requiresActive: 'Rage', immunities: ['charmed'] }],
+            requiresActive: 'Rage',
+            expected: null,
         },
         {
             desc: 'Rage is active but the feature requires Heroism',
             buffs: [{ name: 'Rage' }],
-            conditionals: [{ requiresActive: 'Heroism', immunities: ['charmed'] }],
+            requiresActive: 'Heroism',
+            expected: null,
         },
-    ])('gates conditional immunities OFF when $desc', ({ buffs, conditionals }) => {
+    ])('gates automationConditionalImmunities on an active Rage buff: $desc', ({ buffs, requiresActive, expected }) => {
         getActiveBuffs.mockReturnValue(buffs);
         renderSummary({
-            playerStats: { ...mockPlayerStats, automationConditionalImmunities: conditionals },
+            playerStats: {
+                ...mockPlayerStats,
+                automationConditionalImmunities: [{ requiresActive, immunities: ['charmed'] }],
+            },
         });
 
-        expect(screen.queryByText(/Charmed/)).not.toBeInTheDocument();
-    });
-});
-
-// ---------------------------------------------------------------------------
-// Buff-derived sources: only buffs named in CONDITION_IMMUNITY_BUFF_NAMES
-// contribute their conditionImmunity to the row.
-// ---------------------------------------------------------------------------
-describe('CharSummary - Immunities row from buffs', () => {
-    it.each(["Heroes' Feast", 'Calm Emotions', 'Heroism'])('surfaces $name condition immunities in the row', (buffName) => {
-        getActiveBuffs.mockReturnValue([{ name: buffName, conditionImmunity: ['frightened'] }]);
-        renderSummary();
-
-        expect(statRow('Immunities:')).toHaveTextContent('Immunities: Frightened');
+        if (expected) {
+            expect(immunityRowText()).toBe(expected);
+        } else {
+            // Row absent entirely: catches both a leaked immunity and a
+            // spuriously rendered empty row (default fixture immunities is []).
+            expect(screen.queryByText('Immunities:')).not.toBeInTheDocument();
+        }
     });
 
-    it('ignores conditionImmunity on buffs outside the condition-immunity allow-list', () => {
-        getActiveBuffs.mockReturnValue([{ name: 'Bless', conditionImmunity: ['charmed'] }]);
-        renderSummary();
-
-        expect(screen.queryByText('Immunities:')).not.toBeInTheDocument();
-    });
-
-    it('unions condition immunities from multiple buffs, listing each type exactly once', () => {
+    it('surfaces only allow-listed buff immunities, unioned in list order and deduplicated case-insensitively', () => {
         getActiveBuffs.mockReturnValue([
-            { name: 'Bless', conditionImmunity: ['charmed'] },
-            { name: "Heroes' Feast", conditionImmunity: ['Poisoned'] },
-            { name: 'Calm Emotions', conditionImmunity: ['frightened'] },
+            { name: 'Bless', conditionImmunity: ['charmed'] },           // outside the allow-list → absent
+            { name: 'Calm Emotions', conditionImmunity: ['frightened'] }, // unique → membership pinned
+            { name: "Heroes' Feast", conditionImmunity: ['poisoned'] },   // unique → membership pinned
+            { name: 'Heroism', conditionImmunity: ['Frightened'] },       // real mixed-case value; deduped
         ]);
-        renderSummary();
+        renderSummary({ playerStats: { ...mockPlayerStats, immunities: ['poison'] } });
 
-        // Allow-list filter drops "Bless"; buff-name-list order (Calm Emotions
-        // before Heroes' Feast in CONDITION_IMMUNITY_BUFF_NAMES) fixes the row
-        // order, and the mixed-case "Poisoned" is normalized identically.
-        expect(statRow('Immunities:')).toHaveTextContent('Immunities: Frightened, Poisoned');
-    });
-
-    it('deduplicates a condition shared between base immunities and a buff', () => {
-        getActiveBuffs.mockReturnValue([{ name: 'Calm Emotions', conditionImmunity: ['Frightened'] }]);
-        renderSummary({ playerStats: { ...mockPlayerStats, immunities: ['frightened'] } });
-
-        const row = statRow('Immunities:');
-        // Case-insensitive dedup: base "frightened" + buff "Frightened" → one entry.
-        expect(within(row).getAllByText(/Frightened/)).toHaveLength(1);
-        expect(row).toHaveTextContent('Immunities: Frightened');
-    });
-
-    it('omits the Immunities row when no source provides an immunity', () => {
-        renderSummary({ playerStats: { ...mockPlayerStats, immunities: [] } });
-
-        expect(screen.queryByText('Immunities:')).not.toBeInTheDocument();
+        // Order: base immunities first, then buffs in CONDITION_IMMUNITY_BUFF_NAMES
+        // order (Calm Emotions < Heroes' Feast < Heroism); Heroism's mixed-case
+        // 'Frightened' normalizes to the Calm Emotions entry. If the allow-list
+        // guard broke, ', Charmed' would appear; removing a name from the list
+        // drops or reorders its type.
+        expect(immunityRowText()).toBe('Immunities: Poison, Frightened, Poisoned');
     });
 });

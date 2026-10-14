@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpells from './CharSpells.jsx';
@@ -99,14 +99,13 @@ vi.mock('./TargetSpellPopups.jsx', () => ({
 
 const CAMPAIGN = 'test-campaign';
 
-function renderSpells(props = {}) {
+function renderSpells() {
   return render(<CharSpells
     playerStats={mockPlayerStats}
     campaignName={CAMPAIGN}
     mapName="test-map"
     characters={[]}
     setModalState={vi.fn()}
-    {...props}
   />);
 }
 
@@ -121,8 +120,8 @@ function stubTargetSources({ combatSummary = null, target = null, overlayName = 
 // Render CharSpells and hand back the getTargetInfo it passed to the spell
 // cast executor, asserting SP-097's contract (a real function, not a null
 // stub) before any test invokes the seam.
-function renderAndGetTargetInfo(props = {}) {
-  renderSpells(props);
+function renderAndGetTargetInfo() {
+  renderSpells();
   const { getTargetInfo } = vi.mocked(useSpellCastExecutor).mock.calls.at(-1)[0];
   expect(typeof getTargetInfo).toBe('function');
   return getTargetInfo;

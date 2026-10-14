@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Coverage ownership (CharSummary family delegation): automation/passive movement
 // effects of computeCharSummaryContext — the ONLY owner in the family of all four
@@ -14,24 +14,26 @@
 //   - Buff-driven speed (haste/speed_boost/large_form), exhaustion & condition speed,
 //     fly-condition rendering → CharSummary-SpeedCalculations.test.jsx
 //   - Barbarian/Monk unarmored movement, Circle Forms AC → CharSummary-Movement.test.jsx
+//     (Movement also pins BOTH computeHasArmorOrShield detection arms — armor-only and
+//     shield-only — so this file only needs one suppression run per affected passive)
 //   - Climb/swim stat overrides, Salmon/Panther aspects, stormborn → CharSummary-AdditionalCoverage.test.jsx
+//   - no_armor_no_shield calc-lane gating + default +10 parse → CharSummary.test-mocks.test.jsx
+//     fixture-contract suite
 //
-// Quality improvements over previous revision (11 tests → 16 tests / 22 runs):
-//   - Speed assertions now scope to the Speed-row span (speedSpan helper, family
-//     convention from CharSummary-Movement) and pin the FULL span text — the old
-//     page-wide /25 ft/ regex passed even if armor gating leaked "swim" or the
-//     bonus rendered anywhere else on the sheet.
-//   - Added guard-branch coverage that previously let broken code pass silently:
-//     wrong passive type, unknown effect, conditionless speed_bonus, malformed
-//     bonusExpression (exposed a real NaN defect — fixed in charSummaryCalc.js),
-//     stacking accumulation loop, and the armorClassFormula heavy-armor fallback.
-//   - Pinned the automation-passives vs top-level-passives list split:
-//     elemental_attunement_movement reads playerStats.passives while every other
-//     movement passive reads automation.passives — an easy wiring regression.
-//   - Single module-level beforeEach replaces four identical blocks; stats() /
-//     speedBonusPassive() fixture helpers remove 6 duplicated 8-line fixture objects.
-//   - Removed ShortRestModal and useActionPopup mocks: never mounted/triggered by
-//     these render-only tests (over-mocking noise).
+// Trim pass (16 tests / 22 runs → 13 tests / 18 runs) — every production branch in
+// passiveSpeedContribution / applyMovementPassives stays pinned; removed runs were
+// second and third occurrences of the same branch:
+//   - Stacking test now runs on the ARMORED default fixture (speed_bonus no_heavy_armor
+//     +10 default parse + speed_increase +5 → 40), absorbing the separate "speed_increase
+//     unconditional" test and the unarmored single-effect grant test.
+//   - no_armor_no_shield suppression keeps the shield-only run only (the quirky
+//     baseName==='Shield' arm); armor-only and both were covered by Movement siblings.
+//   - Malformed/missing bonusExpression folds into one it.each covering the NaN guard
+//     on both effects AND the missing-bonusExpression truthy guard on speed_increase.
+//   - Heavy-armor suppression and the armorClassFormula fallback share one it.each.
+//   - Speed assertions scope to the Speed-row span (speedSpan helper, family convention)
+//     and pin the FULL span text; guard branches previously let broken code pass silently
+//     (the malformed-expression case exposed a real NaN defect, fixed in charSummaryCalc.js).
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -92,6 +94,11 @@ const stats = (passives, overrides = {}) => ({
 const speedBonusPassive = (condition, bonusExpression = '10') =>
     ({ type: 'passive_buff', effect: 'speed_bonus', condition, bonusExpression });
 
+const speedIncreasePassive = (bonusExpression) =>
+    ({ type: 'passive_buff', effect: 'speed_increase', bonusExpression });
+
+const unarmored = { inventory: { equipped: [] }, equipment: [] };
+
 // exhaustionLevel is a required numeric input to applySpeedConditions — omitting it NaNs the total.
 const renderSummary = (playerStats) =>
     render(<CharSummary playerStats={playerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
@@ -105,25 +112,24 @@ const speedSpan = () => screen.getByText(/^\d+ ft\./);
 // ---------------------------------------------------------------------------
 describe('speed_bonus passive — no_heavy_armor condition', () => {
     it('adds the bonus when equipped armor is not heavy', () => {
+        // Default fixture wears Scale Mail (Medium) — the mid-point between
+        // unarmored and heavy, so a leaked "anything armored blocks it" bug fails here.
         renderSummary(stats([speedBonusPassive('no_heavy_armor')]));
         expect(speedSpan()).toHaveTextContent(/^35 ft\.$/);
     });
 
-    it('suppresses the bonus when heavy armor is equipped', () => {
-        const playerStats = stats([speedBonusPassive('no_heavy_armor')], {
+    it.each([
+        ['heavy armor is in the equipment list', {
             inventory: { equipped: ['Plate'] },
             equipment: [{ name: 'Plate', armor_category: 'Heavy' }],
-        });
-        renderSummary(playerStats);
-        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
-    });
-
-    it('detects heavy armor via armorClassFormula when no equipment list exists', () => {
-        const playerStats = stats([speedBonusPassive('no_heavy_armor')], {
+        }],
+        // Fallback branch: no equipment list at all — only the AC formula string names it.
+        ['heavy armor is only named in armorClassFormula', {
             equipment: undefined,
             armorClassFormula: '16 + 2 (Heavy)',
-        });
-        renderSummary(playerStats);
+        }],
+    ])('suppresses the bonus when %s', (_label, overrides) => {
+        renderSummary(stats([speedBonusPassive('no_heavy_armor')], overrides));
         expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
     });
 });
@@ -132,40 +138,24 @@ describe('speed_bonus passive — no_heavy_armor condition', () => {
 // speed_bonus passive — no_armor_no_shield condition
 // ---------------------------------------------------------------------------
 describe('speed_bonus passive — no_armor_no_shield condition', () => {
-    it('adds the bonus when nothing protective is equipped', () => {
-        const playerStats = stats([speedBonusPassive('no_armor_no_shield')], {
-            inventory: { equipped: [] },
-            equipment: [],
-        });
-        renderSummary(playerStats);
-        expect(speedSpan()).toHaveTextContent(/^35 ft\.$/);
-    });
-
-    it.each([
-        ['armor', ['Scale Mail'], [{ name: 'Scale Mail', equipment_category: 'Armor' }]],
-        ['shield alone', ['Shield'], [{ name: 'Shield', type: 'Shield' }]],
-        ['both armor and shield', ['Scale Mail', 'Shield'], [{ name: 'Scale Mail', equipment_category: 'Armor' }, { name: 'Shield', type: 'Shield' }]],
-    ])('suppresses the bonus when %s is equipped', (_label, equipped, equipment) => {
-        const playerStats = stats([speedBonusPassive('no_armor_no_shield')], {
-            inventory: { equipped },
-            equipment,
-        });
-        renderSummary(playerStats);
-        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
-    });
-
-    it('uses the parsed bonusExpression instead of the +10 default', () => {
-        const playerStats = stats([speedBonusPassive('no_armor_no_shield', '15')], {
-            inventory: { equipped: [] },
-            equipment: [],
-        });
-        renderSummary(playerStats);
+    it('adds its parsed bonusExpression when nothing protective is equipped', () => {
+        renderSummary(stats([speedBonusPassive('no_armor_no_shield', '15')], unarmored));
         expect(speedSpan()).toHaveTextContent(/^40 ft\.$/);
+    });
+
+    it('suppresses the bonus when a shield alone is equipped', () => {
+        // Shield-only pins the baseName==='Shield' detection arm here; the
+        // armor-only arm is pinned by CharSummary-Movement's armored negatives.
+        renderSummary(stats([speedBonusPassive('no_armor_no_shield')], {
+            inventory: { equipped: ['Shield'] },
+            equipment: [{ name: 'Shield', type: 'Shield' }],
+        }));
+        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
     });
 });
 
 // ---------------------------------------------------------------------------
-// speed_bonus / speed_increase guards and stacking
+// speed_bonus / speed_increase guards, expression hygiene, and stacking
 // ---------------------------------------------------------------------------
 describe('passive speed bonus guards', () => {
     it.each([
@@ -173,37 +163,30 @@ describe('passive speed bonus guards', () => {
         ['an unrecognized effect', { type: 'passive_buff', effect: 'darkvision_bonus', condition: 'no_armor_no_shield' }],
         ['no condition at all', { type: 'passive_buff', effect: 'speed_bonus' }],
     ])('contributes nothing for %s', (_label, passive) => {
-        const playerStats = stats([passive], { inventory: { equipped: [] }, equipment: [] });
-        renderSummary(playerStats);
+        // Unarmored setup: these also act as the positive-control baseline —
+        // qualifying passives add to 25 ft. in the very same fixture above.
+        renderSummary(stats([passive], unarmored));
         expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
     });
 
-    it('treats a malformed speed_bonus bonusExpression as zero instead of rendering NaN', () => {
-        const playerStats = stats([speedBonusPassive('no_armor_no_shield', 'fast')], {
-            inventory: { equipped: [] },
-            equipment: [],
-        });
-        renderSummary(playerStats);
+    it.each([
+        ['a malformed speed_bonus bonusExpression', speedBonusPassive('no_armor_no_shield', 'fast'), unarmored],
+        ['a malformed speed_increase bonusExpression', speedIncreasePassive('five'), undefined],
+        ['speed_increase with no bonusExpression', speedIncreasePassive(undefined), undefined],
+    ])('treats %s as zero instead of rendering NaN', (_label, passive, overrides) => {
+        renderSummary(stats([passive], overrides));
         expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
     });
 
-    it('stacks bonuses from multiple qualifying passives', () => {
-        const playerStats = stats([
-            speedBonusPassive('no_armor_no_shield'),
-            { type: 'passive_buff', effect: 'speed_increase', bonusExpression: '5' },
-        ], { inventory: { equipped: [] }, equipment: [] });
-        renderSummary(playerStats);
+    it('stacks bonuses and applies speed_increase unconditionally, armor equipped', () => {
+        // Default fixture wears Scale Mail + Shield: the +10 no_heavy_armor bonus
+        // still qualifies (Medium), speed_increase +5 ignores armor entirely, and
+        // 25+10+5=40 pins the accumulation loop (assignment instead of += fails).
+        renderSummary(stats([
+            speedBonusPassive('no_heavy_armor'),
+            speedIncreasePassive('5'),
+        ]));
         expect(speedSpan()).toHaveTextContent(/^40 ft\.$/);
-    });
-
-    it('applies speed_increase unconditionally with its parsed bonus', () => {
-        renderSummary(stats([{ type: 'passive_buff', effect: 'speed_increase', bonusExpression: '5' }]));
-        expect(speedSpan()).toHaveTextContent(/^30 ft\.$/);
-    });
-
-    it('treats a malformed speed_increase bonusExpression as zero', () => {
-        renderSummary(stats([{ type: 'passive_buff', effect: 'speed_increase', bonusExpression: 'five' }]));
-        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
     });
 });
 
@@ -212,23 +195,15 @@ describe('passive speed bonus guards', () => {
 // ---------------------------------------------------------------------------
 describe('acrobatic_movement passive', () => {
     it('appends the acrobatic movement suffix while unarmored and unshielded', () => {
-        const playerStats = stats([{ effect: 'acrobatic_movement' }], {
-            inventory: { equipped: [] },
-            equipment: [],
-        });
-        renderSummary(playerStats);
+        renderSummary(stats([{ effect: 'acrobatic_movement' }], unarmored));
         expect(speedSpan()).toHaveTextContent(/^25 ft\., acrobatic movement$/);
     });
 
-    it.each([
-        ['armor', ['Scale Mail'], [{ name: 'Scale Mail', equipment_category: 'Armor' }]],
-        ['shield alone', ['Shield'], [{ name: 'Shield', type: 'Shield' }]],
-    ])('omits the suffix when %s is equipped', (_label, equipped, equipment) => {
-        const playerStats = stats([{ effect: 'acrobatic_movement' }], {
-            inventory: { equipped },
-            equipment,
-        });
-        renderSummary(playerStats);
+    it('omits the suffix when armor is equipped', () => {
+        renderSummary(stats([{ effect: 'acrobatic_movement' }], {
+            inventory: { equipped: ['Scale Mail'] },
+            equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }],
+        }));
         expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
     });
 });

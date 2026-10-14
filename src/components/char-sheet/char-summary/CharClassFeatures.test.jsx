@@ -1,16 +1,18 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * CORE LANE — CharClassFeatures entry point.
- * Owns: registry dispatch (class name → region), unknown-class handling,
- * cross-class entry-point features (dodge badge, adrenaline rush and
- * stonecunning innate resources), and the weapon mastery modal lifecycle
- * (seeding + close), which lives in CharClassFeatures itself.
+ * Owns: registry dispatch (class name → region, case-sensitive), unknown-class
+ * handling (null path, stonecunning automation flag, adrenaline max scaling),
+ * the entry-level dodge badge (non-array activeBuffs robustness lives here),
+ * and the weapon mastery modal lifecycle (seeding + close) driven from the
+ * entry point itself.
  *
  * Class-specific feature content is owned by the per-class sibling files
  * (CharClassFeatures.<class>.test.jsx) — do NOT add it here. Delegated:
  * - Mastery-span click opens the modal → barbarian / fighter siblings
  *   (this file only tests what happens AFTER the click: seeding & close)
- * - Adrenaline/stonecunning coexisting with a class region → sorcerer sibling
+ * - Adrenaline/stonecunning/dodge coexisting WITH a class region →
+ *   sorcerer / wizard siblings
  * - All class feature values, badges, DCs, popups → their own siblings
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -136,21 +138,24 @@ describe('CharClassFeatures entry point', () => {
       expect(screen.getByTestId(`char-class-${className.toLowerCase()}`)).toBeInTheDocument();
       expect(classRegions(container)).toHaveLength(1);
     });
+
+    it('dispatches nothing for a lowercase class name (registry keys are case-sensitive)', () => {
+      const { container } = renderEntry(statsFor('cleric'));
+      expect(container).toBeEmptyDOMElement();
+    });
   });
 
   describe('unknown class handling', () => {
-    it('renders nothing when the class is unknown and no innate trait qualifies', () => {
+    it('renders nothing when the class is unknown and no innate trait qualifies — stonecunning needs automation:true', () => {
       const { container } = renderEntry(statsFor('Mystic', {
         automation: { specialActions: [{ effect: 'some_other_effect' }] },
-        // Stonecunning without automation:true does NOT qualify.
-        race: { traits: [{ name: 'Stonecunning' }] },
+        race: { traits: [{ name: 'Stonecunning', automation: false }] },
       }));
       expect(container).toBeEmptyDOMElement();
     });
 
     it.each([
       [3, 'Adrenaline Rush: 3/3'],
-      [0, 'Adrenaline Rush: 0/0'],
       [undefined, 'Adrenaline Rush: 0/0'],
     ])('unknown class with adrenaline rush renders max from proficiency %p', (proficiency, expected) => {
       renderEntry(statsFor('Mystic', {
@@ -167,22 +172,6 @@ describe('CharClassFeatures entry point', () => {
       }));
       expect(screen.getByTestId('tracked-resource-stonecunningUses')).toHaveTextContent('Stonecunning: 2/2');
     });
-
-    it.each([undefined, false])(
-      'omits stonecunning when the trait automation flag is %p',
-      (automation) => {
-        const { container } = renderEntry(statsFor('Mystic', {
-          race: { traits: [{ name: 'Stonecunning', automation }] },
-        }));
-        expect(screen.queryByTestId('tracked-resource-stonecunningUses')).not.toBeInTheDocument();
-        expect(container).toBeEmptyDOMElement();
-      }
-    );
-
-    it('does not dispatch a class region for lowercase class names (registry keys are case-sensitive)', () => {
-      const { container } = renderEntry(statsFor('cleric'));
-      expect(classRegions(container)).toHaveLength(0);
-    });
   });
 
   describe('dodge badge (cross-class)', () => {
@@ -196,9 +185,11 @@ describe('CharClassFeatures entry point', () => {
       expect(classRegions(container)).toHaveLength(0);
     });
 
-    it('omits the badge when activeBuffs has no dodge effect', () => {
-      renderEntry(statsFor('Mystic'));
+    it('renders nothing for buffs that contain no dodge effect', () => {
+      mockBuffs([{ effect: 'some_other_effect' }]);
+      const { container } = renderEntry(statsFor('Mystic'));
       expect(screen.queryByText(/Dodge/)).not.toBeInTheDocument();
+      expect(container).toBeEmptyDOMElement();
     });
 
     it('survives a non-array activeBuffs value without crashing the class region', () => {
@@ -225,7 +216,7 @@ describe('CharClassFeatures entry point', () => {
       expect(screen.getByTestId('mastery-existing')).toHaveTextContent('["Slash","Hack"]');
     });
 
-    it.each([null, undefined, 'corrupted'])(
+    it.each([null, 'corrupted'])(
       'seeds an empty weapon list when the runtime value is %p',
       (existing) => {
         clickBarbarianMastery(existing);

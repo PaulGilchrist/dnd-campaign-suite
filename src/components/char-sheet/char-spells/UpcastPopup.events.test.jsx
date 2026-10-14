@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import UpcastPopup from './UpcastPopup.jsx';
@@ -29,78 +29,41 @@ function castButton() {
 }
 
 describe('UpcastPopup events', () => {
-  describe('casting a spell', () => {
-    it('confirms the default selected level when the cast button is clicked', () => {
-      const { onConfirm } = renderUpcastPopup();
+  it('confirms the default level, then the newly selected level after the player switches slots', () => {
+    const { onConfirm, onCancel } = renderUpcastPopup();
 
-      fireEvent.click(castButton());
+    fireEvent.click(castButton());
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith(3);
 
-      expect(onConfirm).toHaveBeenCalledTimes(1);
-      expect(onConfirm).toHaveBeenCalledWith(3);
-    });
-
-    it('confirms the newly selected level after the player picks a higher slot', () => {
-      const { onConfirm } = renderUpcastPopup();
-
-      fireEvent.click(screen.getByRole('radio', { name: /^Level 4/ }));
-      fireEvent.click(screen.getByRole('button', { name: /cast at level 4/i }));
-
-      expect(onConfirm).toHaveBeenCalledTimes(1);
-      expect(onConfirm).toHaveBeenCalledWith(4);
-    });
-
-    it('does not cast when every spell slot is exhausted', () => {
-      const { onConfirm } = renderUpcastPopup({
-        levels: [
-          { level: 3, formula: '+1d6', availableSlots: 0 },
-          { level: 4, formula: '+2d6', availableSlots: 0 },
-        ],
-      });
-
-      const button = castButton();
-      expect(button).toBeDisabled();
-      fireEvent.click(button);
-
-      expect(onConfirm).not.toHaveBeenCalled();
-    });
+    fireEvent.click(screen.getByRole('radio', { name: /^Level 4/ }));
+    fireEvent.click(screen.getByRole('button', { name: /cast at level 4/i }));
+    expect(onConfirm).toHaveBeenCalledTimes(2);
+    expect(onConfirm).toHaveBeenLastCalledWith(4);
+    expect(onCancel).not.toHaveBeenCalled();
   });
 
-  describe('cancelling', () => {
-    it('calls onCancel when the Cancel button is clicked', () => {
-      const { onCancel } = renderUpcastPopup();
+  it('cancels when the Cancel button is clicked, without casting', () => {
+    const { onConfirm, onCancel } = renderUpcastPopup();
 
-      fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
 
-      expect(onCancel).toHaveBeenCalledTimes(1);
-    });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
 
-    it('calls onCancel once when the Escape key is pressed', () => {
-      const { onCancel } = renderUpcastPopup();
+  it('cancels once on Escape, ignores other keys, and stops responding after unmount', () => {
+    const { unmount, onCancel } = renderUpcastPopup();
 
-      fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Enter' });
+    fireEvent.keyDown(document, { key: 'Delete' });
+    expect(onCancel).not.toHaveBeenCalled();
 
-      expect(onCancel).toHaveBeenCalledTimes(1);
-    });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onCancel).toHaveBeenCalledTimes(1);
 
-    it('ignores keys other than Escape', () => {
-      const { onCancel } = renderUpcastPopup();
-
-      fireEvent.keyDown(document, { key: 'Enter' });
-      fireEvent.keyDown(document, { key: 'Delete' });
-
-      expect(onCancel).not.toHaveBeenCalled();
-    });
-
-    it('stops responding to Escape after the popup is unmounted', () => {
-      const { unmount, onCancel } = renderUpcastPopup();
-
-      fireEvent.keyDown(document, { key: 'Escape' });
-      expect(onCancel).toHaveBeenCalledTimes(1);
-
-      unmount();
-      fireEvent.keyDown(document, { key: 'Escape' });
-
-      expect(onCancel).toHaveBeenCalledTimes(1);
-    });
+    unmount();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });

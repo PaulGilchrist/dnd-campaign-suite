@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 // MA-1352: NPC-inline save-roll consumer for the ability-scoped
 // ability_save_disadvantage te (Psychic Gray Ooze Pseudopod hit-clause):
 // disadvantage (2d20, min) on saves of the te's ability ONLY, other save
@@ -35,7 +36,6 @@ vi.mock('../../../services/rules/features/invisibilityService.js', () => ({
 }));
 
 vi.mock('../loggedDiceRollUtils.js', () => ({
-    getGuardianProtectionAcBonus: vi.fn(() => 0),
     hasPotentCantrip: vi.fn(),
     hasSoulstitchProtection: vi.fn(),
     clearSoulstitchStamp: vi.fn(),
@@ -70,14 +70,6 @@ vi.mock('../../../services/rules/features/cockatricePetrifyService.js', () => ({
     stagePetrifyingBiteTargets: vi.fn(),
 }));
 
-vi.mock('../../../services/combat/auras/pendingSaveRegistry.js', () => ({
-    registerPendingSavePrompt: vi.fn(),
-}));
-
-vi.mock('../../../services/combat/auras/pendingPopupRegistry.js', () => ({
-    registerPendingPopupSetter: vi.fn(),
-}));
-
 vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
     computeDamageAfterSave: vi.fn((total, success, _dcSuccess) => success ? 0 : total),
     computeDamageAfterEvasion: vi.fn((total, success, dcSuccess, evasion) => {
@@ -107,7 +99,7 @@ function saveContext(saveType) {
         saveDc: 15,
         saveType,
         dcSuccess: 'half',
-        damageType: 'Psychic',
+        damageType: 'Acid',
     };
 }
 
@@ -136,7 +128,7 @@ describe('MA-1352 NPC-inline ability-scoped save disadvantage', () => {
     async function rollSave(saveType) {
         const handler = createNpcSaveDamageHandler(deps);
         await handler({
-            name: 'Mind Flayer Tentacle',
+            name: 'Pseudopod',
             formula: '3d6',
             total: 10,
             rolls: [3, 3, 4],
@@ -150,38 +142,34 @@ describe('MA-1352 NPC-inline ability-scoped save disadvantage', () => {
         });
     }
 
-    it('rolls the INT save with Disadvantage from the ability-scoped te', async () => {
-        await rollSave('Intelligence');
-
-        expect(rollSaveForCreature).toHaveBeenCalledWith(
+    function expectSaveForcedMode(saveType, disadvantage) {
+        expect(rollSaveForCreature).toHaveBeenLastCalledWith(
             expect.objectContaining({ name: 'Bandit 1' }),
-            'Intelligence',
+            saveType,
             15,
-            true,
+            disadvantage,
             expect.anything(),
         );
+    }
+
+    it('rolls the INT save with Disadvantage from the ability-scoped te', async () => {
+        await rollSave('Intelligence');
+        expectSaveForcedMode('Intelligence', true);
+
         const saveLog = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.type === 'roll' && e.rollType === 'save-damage');
         expect(saveLog?.forcedMode).toBe('disadvantage');
     });
 
-    it('leaves saves of every OTHER ability unaffected by the INT te', async () => {
+    it('does not force disadvantage on other-ability saves or without the te', async () => {
         await rollSave('Dexterity');
-        expect(rollSaveForCreature).toHaveBeenLastCalledWith(
-            expect.objectContaining({ name: 'Bandit 1' }),
-            'Dexterity',
-            15,
-            false,
-            expect.anything(),
-        );
+        expectSaveForcedMode('Dexterity', false);
 
         await rollSave('Wisdom');
-        expect(rollSaveForCreature).toHaveBeenLastCalledWith(
-            expect.objectContaining({ name: 'Bandit 1' }),
-            'Wisdom',
-            15,
-            false,
-            expect.anything(),
-        );
+        expectSaveForcedMode('Wisdom', false);
+
+        getRuntimeValue.mockReturnValue(null);
+        await rollSave('Intelligence');
+        expectSaveForcedMode('Intelligence', false);
     });
 
     it('does NOT consume the te (anchor clock owns removal)', async () => {
@@ -189,18 +177,5 @@ describe('MA-1352 NPC-inline ability-scoped save disadvantage', () => {
 
         const teWrites = setRuntimeValue.mock.calls.filter(c => c[0] === 'campaign' && c[1] === 'targetEffects');
         expect(teWrites).toHaveLength(0);
-    });
-
-    it('byte-inert without the te (plain save, disadvantage false)', async () => {
-        getRuntimeValue.mockReturnValue(null);
-        await rollSave('Intelligence');
-
-        expect(rollSaveForCreature).toHaveBeenCalledWith(
-            expect.objectContaining({ name: 'Bandit 1' }),
-            'Intelligence',
-            15,
-            false,
-            expect.anything(),
-        );
     });
 });

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * CharSpells — Shapechange creature-selection popup (integration).
  *
@@ -6,10 +6,11 @@
  * cast is pending: the real PolymorphSelectionModal receives the integration's
  * selection props (maxCR from character level, allowAnyCreature, excludeTypes
  * construct/undead) and confirming dispatches to the spell-preparation and
- * shapechange services with the correct slot-payment semantics.
+ * shapechange services with the correct slot-payment semantics. Cancel is the
+ * negative path: nothing is dispatched or spent.
  *
  * Not re-tested here (covered elsewhere):
- * - Modal internals (CR parsing, search, exclusion UI): modals/PolymorphSelectionModal*.test.jsx
+ * - Modal internals (CR parsing, search, exclusion UI, empty state): modals/PolymorphSelectionModal*.test.jsx
  * - CharSheet-level popup routing: CharSheet.modalConfirmHandlers.test.jsx
  * - Other creature/target popups: sibling CharSpells.Popups.*.test.jsx files
  */
@@ -140,9 +141,12 @@ describe('CharSpells - Shapechange creature selection', () => {
 
     await waitFor(() => expect(screen.getByText('Brown Bear')).toBeInTheDocument());
 
-    // allowAnyCreature + maxCR = character level (3): beast and fey forms show...
+    // maxCR = character level (3), not a fixed cap: the modal advertises the
+    // level-derived CR ceiling to the player.
+    expect(screen.getByText('Choose a creature form (CR 3 or lower)')).toBeInTheDocument();
+    // allowAnyCreature: the non-beast fey form shows...
     expect(screen.getByText('Sprite')).toBeInTheDocument();
-    // ...while excluded types and over-cap CRs never appear.
+    // ...excludeTypes hides undead, and over-cap CRs never appear.
     expect(screen.queryByText('Ghast')).not.toBeInTheDocument();
     expect(screen.queryByText('Ancient Brass Dragon')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
@@ -191,13 +195,6 @@ describe('CharSpells - Shapechange creature selection', () => {
     expect(prepareSpellCast).not.toHaveBeenCalled();
     expect(isFreeCastAuthorized).not.toHaveBeenCalled();
     expect(confirmShapechangeTransform).toHaveBeenCalledWith(expect.objectContaining({ formChange: true }));
-  });
-
-  it('shows a no-results message when every creature exceeds the CR cap', async () => {
-    renderShapechangeFlow({ monsters: [CREATURE_FORMS[3]] });
-
-    await waitFor(() => expect(screen.getByText("No creatures match the target's CR requirement.")).toBeInTheDocument());
-    expect(screen.queryByText('Ancient Brass Dragon')).not.toBeInTheDocument();
   });
 
   it('does not transform or spend a slot when the selection is cancelled', async () => {

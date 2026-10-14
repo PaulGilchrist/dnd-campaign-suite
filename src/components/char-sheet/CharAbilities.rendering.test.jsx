@@ -1,17 +1,31 @@
+// @maintained-by-ai
+/**
+ * CharAbilities — baseline layout lane (owner: headers + grid structure).
+ * Pins the section/column headers, one row per ability with cells in column
+ * order (name/score/bonus/save/skills, sign-formatted columns), and the
+ * empty-abilities negative path.
+ *
+ * Covered by sibling lanes (do NOT re-add here):
+ * - clickHandlers: click → roll contract incl. ability name → description popup.
+ * - display-save: "(Expert)" suffix and skill-cell text formatting.
+ * - saveBonus / conditionEffects / missingCoverage: save column and modifier
+ *   display ((Adv), AUTO FAIL, tooltip sources, stacking order).
+ * - toolEntries: tool cells. event-context / contextFeatures / reliableTalent
+ *   / psiBolsteredKnack: event routing and feature gates.
+ */
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
 
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  const mockFn = vi.fn(() => ({
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  default: vi.fn(() => ({
     popupHtml: null,
     setPopupHtml: vi.fn(),
     rollAbilityCheck: vi.fn(),
     rollSavingThrow: vi.fn(),
     rollSkillCheck: vi.fn(),
-  }));
-  return { default: mockFn };
-});
+  })),
+}));
 
 vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
   useDiceRollPopup: vi.fn(() => ({ setPopupHtml: vi.fn() })),
@@ -48,6 +62,17 @@ const mockAllAbilityScores = [
   { full_name: 'Charisma', description: 'CHA desc' },
 ];
 
+// Expected cell text per row, in column order — the fixture is the baseline
+// (no modifiers, no exhaustion), so bonus/save use the always-sign formatter.
+const EXPECTED_ROWS = [
+  { name: 'Strength', score: '14', bonus: '+4', save: '+6', skills: ['Athletics (+8)'] },
+  { name: 'Dexterity', score: '12', bonus: '+2', save: '+4', skills: ['Acrobatics (+6)'] },
+  { name: 'Constitution', score: '11', bonus: '+1', save: '+3', skills: [] },
+  { name: 'Intelligence', score: '10', bonus: '+0', save: '+0', skills: ['Arcana (+2)'] },
+  { name: 'Wisdom', score: '9', bonus: '-1', save: '+1', skills: ['Perception (+3)'] },
+  { name: 'Charisma', score: '10', bonus: '+0', save: '+2', skills: [] },
+];
+
 function createPlayerStats(overrides = {}) {
   return {
     name: 'Test Fighter',
@@ -74,61 +99,46 @@ const defaultProps = {
   exhaustionPenalty: 0,
   conditionEffects: {},
   isRaging: false,
-  onReroll: vi.fn(),
-  onStrokeOfLuck: vi.fn(),
 };
 
-describe('CharAbilities rendering', () => {
+describe('CharAbilities baseline layout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStore.clear();
   });
 
-  describe('header rendering', () => {
-    it('renders all column headers', () => {
-      render(<CharAbilities {...defaultProps} />);
-      expect(screen.getByText('Abilities')).toBeInTheDocument();
-      expect(screen.getByText('Score')).toBeInTheDocument();
-      expect(screen.getByText('Bonus')).toBeInTheDocument();
-      expect(screen.getByText('Save')).toBeInTheDocument();
-      expect(screen.getByText('Skills')).toBeInTheDocument();
+  it('renders section/column headers and one row per ability with cells in column order', () => {
+    const { container } = render(<CharAbilities {...defaultProps} />);
+
+    expect(screen.getByText('Abilities')).toBeInTheDocument();
+    const headers = Array.from(screen.getByText('Name').closest('.tableHeader').children)
+      .map(el => el.textContent);
+    expect(headers).toEqual(['Name', 'Score', 'Bonus', 'Save', 'Skills']);
+
+    const rows = Array.from(container.querySelectorAll('.abilities'));
+    expect(rows).toHaveLength(EXPECTED_ROWS.length);
+    rows.forEach((row, i) => {
+      const expected = EXPECTED_ROWS[i];
+      const cells = Array.from(row.children).map(el => el.textContent);
+      // Column-order contract: name, score, sign-formatted bonus, sign-formatted save.
+      expect(cells.slice(0, 4)).toEqual([expected.name, expected.score, expected.bonus, expected.save]);
+      expected.skills.forEach(skillText => expect(cells[4]).toContain(skillText));
+    });
+    // Abilities with no skills render an empty skills cell.
+    EXPECTED_ROWS.forEach((expected, i) => {
+      if (expected.skills.length === 0) {
+        expect(Array.from(rows[i].children)[4].textContent).toBe('');
+      }
     });
   });
 
-  describe('ability row rendering', () => {
-    it('renders all six ability names as clickable elements', () => {
-      render(<CharAbilities {...defaultProps} />);
-      const abilityNames = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
-      abilityNames.forEach((name) => {
-        const el = screen.getByText(name);
-        expect(el).toBeInTheDocument();
-        expect(el.classList.contains('clickable')).toBe(true);
-      });
-    });
+  it('renders headers with no ability rows when the abilities array is empty', () => {
+    const stats = createPlayerStats({ abilities: [] });
+    const { container } = render(<CharAbilities {...defaultProps} playerStats={stats} />);
 
-    it('renders ability scores in the score column', () => {
-      render(<CharAbilities {...defaultProps} />);
-      expect(screen.getByText('14')).toBeInTheDocument();
-      expect(screen.getByText('12')).toBeInTheDocument();
-      expect(screen.getByText('11')).toBeInTheDocument();
-      expect(screen.getByText('9')).toBeInTheDocument();
-      const scores = screen.getAllByText('10');
-      expect(scores).toHaveLength(2);
-    });
-
-    it('renders skill bonuses next to skill names', () => {
-      render(<CharAbilities {...defaultProps} />);
-      expect(screen.getByText('Athletics (+8)')).toBeInTheDocument();
-      expect(screen.getByText('Acrobatics (+6)')).toBeInTheDocument();
-      expect(screen.getByText('Arcana (+2)')).toBeInTheDocument();
-      expect(screen.getByText('Perception (+3)')).toBeInTheDocument();
-    });
-
-    it('renders no ability rows when abilities array is empty', () => {
-      const stats = createPlayerStats({ abilities: [] });
-      render(<CharAbilities {...defaultProps} playerStats={stats} />);
-      expect(screen.getByText('Abilities')).toBeInTheDocument();
-      expect(screen.queryByText('Strength')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Abilities')).toBeInTheDocument();
+    expect(screen.getByText('Score')).toBeInTheDocument();
+    expect(container.querySelectorAll('.abilities')).toHaveLength(0);
+    expect(screen.queryByText('Strength')).not.toBeInTheDocument();
   });
 });

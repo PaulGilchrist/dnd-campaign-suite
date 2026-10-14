@@ -1,8 +1,9 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // CharSummary speed-row calculations — the ONLY owner in the CharSummary family of:
 // exhaustion reduction (applySpeedConditions), condition speed effects
-// (speedHalved / speedReduction / speedZero), fly-speed suffixes, and ice walk.
+// (speedHalved / speedReduction / speedZero + halved-source notice), fly-speed
+// suffixes, and ice walk.
 // Delegated to siblings (do not duplicate here):
 //   - Barbarian/Monk unarmored movement .......... CharSummary-Movement.test.jsx
 //   - passive speed_bonus / speed_increase /
@@ -11,19 +12,12 @@
 //     aquatic_adaptation ......................... CharSummary-AdditionalCoverage.test.jsx
 //   - fly-buff "Active" badges ................... CharSummary-Badges*.test.jsx
 //
-// Quality improvements (2026-10-14):
-//   - All speed assertions now target the Speed-row span (speedSpan(), the family
-//     convention) and match its FULL text. The previous page-wide /5 ft/ and
-//     /0 ft/ regexes also matched substrings of "25 ft." and "10 ft.", so the
-//     exhaustion ladder could be completely broken and the tests still passed.
-//   - Added previously untested behavior: halve-then-reduce ordering, floor clamp
-//     at 0 ft, the "Speed halved" penalty notice incl. speedHalvedSource, fly
-//     mirroring exhaustion-reduced walk speed, glistening_flight ignoring a
-//     provided flySpeed, and negative paths (no fly / no ice walk suffix).
-//   - Consolidated 4 identical beforeEach blocks into one; dropped the
-//     AllySelectionModal mock (closed modal renders nothing — same mock set as
-//     CharSummary-Movement.test.jsx); removed the stale header (claimed 12
-//     tests, file had 18).
+// Each case here must discriminate: linear-coefficient levels are sampled once
+// (level 2 pins the −5/level slope; level 6 uniquely pins the clamp at 0 —
+// level 5 would render 0 even without the clamp), speedZero's early-return is
+// proven by the standalone case alone (adding halve/reduce flags on top can
+// never change a 0 output), and "reduce after exhaustion" is dropped because
+// exhaustion and flat reduction are both subtractions (order cannot diverge).
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -94,16 +88,12 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Exhaustion: 25 − 5/level, clamped at 0 (levels 5–6 never go negative)
+// Exhaustion: 25 − 5/level, clamped at 0 (level 2 pins the slope,
+// level 6 pins the clamp — the only value that goes negative unclamped)
 // ---------------------------------------------------------------------------
 describe('exhaustion reduces walk speed by 5 ft per level', () => {
     it.each([
-        { level: 0, text: /^25 ft\.$/, label: 'baseline, no reduction' },
-        { level: 1, text: /^20 ft\.$/, label: '−5 ft' },
-        { level: 2, text: /^15 ft\.$/, label: '−10 ft' },
-        { level: 3, text: /^10 ft\.$/, label: '−15 ft' },
-        { level: 4, text: /^5 ft\.$/, label: '−20 ft' },
-        { level: 5, text: /^0 ft\.$/, label: 'speed reduced to zero' },
+        { level: 2, text: /^15 ft\.$/, label: '−5 ft per level' },
         { level: 6, text: /^0 ft\.$/, label: 'clamped at zero, never negative' },
     ])('exhaustion level $level ($label) shows $text', ({ level, text }) => {
         renderSummary({ exhaustionLevel: level });
@@ -112,24 +102,46 @@ describe('exhaustion reduces walk speed by 5 ft per level', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Condition speed effects — halved, flat reduction, zero, precedence, clamping
+// Condition speed effects — halved (with source notice), flat reduction,
+// zero, halve-before-reduce ordering, clamp after reduction
 // ---------------------------------------------------------------------------
 describe('condition speed effects', () => {
     it.each([
-        { effects: { speedHalved: true }, text: /^12 ft\.$/, label: 'speed halved with floor (25 → 12)' },
-        { effects: { speedReduction: 10 }, text: /^15 ft\.$/, label: 'flat reduction (25 − 10)' },
-        { effects: { speedZero: true }, text: /^0 ft\.$/, label: 'speed set to zero' },
-    ])('$label', ({ effects, text }) => {
+        {
+            effects: { speedHalved: true },
+            text: /^12 ft\.$/,
+            notice: '(Speed halved from Slow)',
+            label: 'speed halved with floor (25 → 12), generic Slow notice',
+        },
+        {
+            effects: { speedHalved: true, speedHalvedSource: 'Ray of Enfeeblement' },
+            text: /^12 ft\.$/,
+            notice: '(Speed halved by Ray of Enfeeblement)',
+            label: 'halved notice names the provided source',
+        },
+        {
+            effects: { speedReduction: 10 },
+            text: /^15 ft\.$/,
+            notice: null,
+            label: 'flat reduction (25 − 10), no halved notice',
+        },
+        {
+            effects: { speedZero: true },
+            text: /^0 ft\.$/,
+            notice: null,
+            label: 'speed set to zero, no halved notice',
+        },
+    ])('$label', ({ effects, text, notice }) => {
         renderSummary({ conditionEffects: effects });
         expect(speedSpan()).toHaveTextContent(text);
+        if (notice) {
+            expect(screen.getByText(notice)).toBeInTheDocument();
+        } else {
+            expect(screen.queryByText(/\(Speed halved/)).not.toBeInTheDocument();
+        }
     });
 
-    it('speedZero takes precedence over speedHalved and speedReduction', () => {
-        renderSummary({ conditionEffects: { speedZero: true, speedHalved: true, speedReduction: 10 } });
-        expect(speedSpan()).toHaveTextContent(/^0 ft\.$/);
-    });
-
-    it('halves before applying a flat reduction (25 → 12 → 2)', () => {
+    it('halves before applying a flat reduction (25 → 12 → 2, not 7)', () => {
         renderSummary({ conditionEffects: { speedHalved: true, speedReduction: 10 } });
         expect(speedSpan()).toHaveTextContent(/^2 ft\.$/);
     });
@@ -139,23 +151,9 @@ describe('condition speed effects', () => {
         expect(speedSpan()).toHaveTextContent(/^0 ft\.$/);
     });
 
-    it.each([
-        { level: 1, effects: { speedHalved: true }, text: /^10 ft\.$/, label: 'halved after exhaustion (25 − 5 → 10)' },
-        { level: 1, effects: { speedReduction: 5 }, text: /^15 ft\.$/, label: 'reduced after exhaustion (25 − 5 − 5)' },
-    ])('stacks with exhaustion: $label', ({ level, effects, text }) => {
-        renderSummary({ exhaustionLevel: level, conditionEffects: effects });
-        expect(speedSpan()).toHaveTextContent(text);
-    });
-
-    it('shows a halved-speed penalty notice next to the reduced speed', () => {
-        renderSummary({ conditionEffects: { speedHalved: true } });
-        expect(speedSpan()).toHaveTextContent(/^12 ft\.$/);
-        expect(screen.getByText('(Speed halved from Slow)')).toBeInTheDocument();
-    });
-
-    it('names the halving source when conditionEffects provides one', () => {
-        renderSummary({ conditionEffects: { speedHalved: true, speedHalvedSource: 'Ray of Enfeeblement' } });
-        expect(screen.getByText('(Speed halved by Ray of Enfeeblement)')).toBeInTheDocument();
+    it('halves the exhaustion-reduced walk speed (25 − 5 → 10, not 7)', () => {
+        renderSummary({ exhaustionLevel: 1, conditionEffects: { speedHalved: true } });
+        expect(speedSpan()).toHaveTextContent(/^10 ft\.$/);
     });
 });
 
@@ -167,29 +165,20 @@ describe('fly speed suffix from buffs', () => {
         { buff: { effect: 'fly_speed_equals_walk_speed' }, text: /^25 ft\., fly 25 ft\.\s*$/, label: 'generic fly mirrors walk speed, no hover' },
         { buff: { effect: 'fly_speed_20_hover' }, text: /^25 ft\., fly 20 ft\.\s+\(hover\)\s*$/, label: 'fixed 20 ft fly with hover' },
         { buff: { effect: 'dragon_wings', flySpeed: 60 }, text: /^25 ft\., fly 60 ft\.\s+\(hover\)\s*$/, label: 'dragon_wings uses its own flySpeed' },
+        { buff: { effect: 'glistening_flight', flySpeed: 40 }, text: /^25 ft\., fly 25 ft\.\s+\(hover\)\s*$/, label: 'glistening_flight mirrors walk speed with hover, ignoring any provided flySpeed' },
     ])('$label', ({ buff, text }) => {
         renderSummary({ buffs: [buff] });
         expect(speedSpan()).toHaveTextContent(text);
-    });
-
-    it('glistening_flight mirrors walk speed with hover, ignoring any provided flySpeed', () => {
-        renderSummary({ buffs: [{ effect: 'glistening_flight', flySpeed: 40 }] });
-        expect(speedSpan()).toHaveTextContent(/^25 ft\., fly 25 ft\.\s+\(hover\)\s*$/);
     });
 
     it('mirrored fly follows the exhaustion-reduced walk speed (exhaustion 1 → fly 20 ft)', () => {
         renderSummary({ buffs: [{ effect: 'fly_speed_equals_walk_speed' }], exhaustionLevel: 1 });
         expect(speedSpan()).toHaveTextContent(/^20 ft\., fly 20 ft\.\s*$/);
     });
-
-    it('omits the fly suffix when no fly buff is active', () => {
-        renderSummary();
-        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
-    });
 });
 
 // ---------------------------------------------------------------------------
-// Ice walk suffix
+// Ice walk suffix + plain-speed negative control
 // ---------------------------------------------------------------------------
 describe('ice walk suffix', () => {
     it('appends ", ice walk" to the speed row when the ice_walk buff is active', () => {
@@ -197,8 +186,8 @@ describe('ice walk suffix', () => {
         expect(speedSpan()).toHaveTextContent(/^25 ft\., ice walk$/);
     });
 
-    it('omits the ice walk suffix when no ice_walk buff is active', () => {
+    it('renders plain walk speed when no fly or ice-walk effects are active', () => {
         renderSummary();
-        expect(screen.queryByText(/ice walk/)).not.toBeInTheDocument();
+        expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
     });
 });

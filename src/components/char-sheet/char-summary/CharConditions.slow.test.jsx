@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * CharConditions — SP-109: store hydration safety and Slow ending on itself.
  *
@@ -178,118 +178,109 @@ describe('CharConditions — SP-109 store hydration and Slow teardown', () => {
   const conditionLogEntries = () =>
     addEntry.mock.calls.filter(([, entry]) => entry.type === 'condition');
 
-  describe('mount-wipe guard', () => {
-    it('makes no activeConditions POST on mount while the store is un-hydrated', () => {
-      // Store reports NO activeConditions key at all (fresh sheet, store
-      // still hydrating) — a mount must not answer with a stale empty list.
-      const { container } = render(sheet());
+  it('writes activeConditions on mount only once the store is hydrated', () => {
+    // Un-hydrated store: NO activeConditions key at all (fresh sheet while
+    // the store is still hydrating). A mount must not answer with a stale
+    // empty list — nothing POSTed, nothing invented on the sheet either.
+    const { container, unmount } = render(sheet());
+    expect(conditionWrites()).toHaveLength(0);
+    expect(container.firstChild).toBeNull();
+    unmount();
 
-      expect(conditionWrites()).toHaveLength(0);
-      // Nothing to show yet, and nothing invented in its place.
-      expect(container.firstChild).toBeNull();
-    });
-
-    it('re-saves the empty list harmlessly once the store is hydrated to empty', () => {
-      seedConditions([]);
-      render(sheet());
-
-      // Positive evidence of the (benign) write-through, not just a value
-      // that was seeded and left untouched.
-      expect(setRuntimeValue).toHaveBeenCalledTimes(1);
-      expect(setRuntimeValue).toHaveBeenCalledWith(CHAR, 'activeConditions', [], CAMPAIGN);
-    });
-
-    it('shows conditions that hydrate after mount and echoes them back intact', () => {
-      // The SP-109 race: sheet mounts against an un-hydrated store, then
-      // server data arrives through the storage change listener.
-      render(sheet());
-      expect(conditionWrites()).toHaveLength(0);
-
-      seedConditions(['slow'], { slow: { dc: 12, ability: 'wis' } });
-      act(() => storageListeners.forEach((callback) => callback()));
-
-      expect(screen.getByRole('button', { name: 'Slow DC 12' })).toBeInTheDocument();
-      // The follow-up write must carry the hydrated list, never an empty one.
-      expect(conditionWrites()).toEqual([[CHAR, 'activeConditions', ['slow'], CAMPAIGN]]);
-      expect(readStoredConditions()).toEqual(['slow']);
-    });
+    // Hydrated to empty: the store reports a real [] key, so the (benign)
+    // write-through is positive evidence, not a value left untouched.
+    seedConditions([]);
+    render(sheet());
+    expect(conditionWrites()).toEqual([[CHAR, 'activeConditions', [], CAMPAIGN]]);
   });
 
-  describe('Slow ends on a successful repeat save', () => {
-    // Slow sits at DC 12; roll 15 + save bonus 2 = 17 clears it.
-    function seedSlow() {
-      seedConditions(['slow'], { slow: { dc: 12, ability: 'wis' } });
-    }
+  it('shows conditions that hydrate after mount and echoes them back intact', () => {
+    // The SP-109 race: sheet mounts against an un-hydrated store, then
+    // server data arrives through the storage change listener.
+    render(sheet());
+    expect(conditionWrites()).toHaveLength(0);
 
-    it('clears the condition, strips its target effects, and logs the removal', async () => {
-      seedSlow();
-      render(sheet());
+    seedConditions(['slow'], { slow: { dc: 12, ability: 'wis' } });
+    act(() => storageListeners.forEach((callback) => callback()));
 
-      fireEvent.click(screen.getByRole('button', { name: 'Slow DC 12' }));
+    expect(screen.getByRole('button', { name: 'Slow DC 12' })).toBeInTheDocument();
+    // The follow-up write must carry the hydrated list, never an empty one.
+    expect(conditionWrites()).toEqual([[CHAR, 'activeConditions', ['slow'], CAMPAIGN]]);
+  });
 
-      // Effect-strip is scoped to this character and campaign, exactly once.
-      await waitFor(() =>
-        expect(removeSlowEffects).toHaveBeenCalledWith(CHAR, CAMPAIGN)
-      );
-      expect(removeSlowEffects).toHaveBeenCalledTimes(1);
+  // Slow sits at DC 12; roll 15 + save bonus 2 = 17 clears it.
+  function seedSlow() {
+    seedConditions(['slow'], { slow: { dc: 12, ability: 'wis' } });
+  }
 
-      // Condition gone from the store and off the sheet.
-      await waitFor(() =>
-        expect(screen.queryByRole('button', { name: 'Slow DC 12' })).not.toBeInTheDocument()
-      );
-      expect(readStoredConditions()).toEqual([]);
+  it('clears Slow on a successful repeat save, strips its target effects, and logs the removal', async () => {
+    seedSlow();
+    render(sheet());
 
-      // Exactly one condition-removal log entry, naming the stripped effects.
-      // timestamp is Date.now() metadata — only its presence is asserted.
-      const entries = conditionLogEntries();
-      expect(entries).toHaveLength(1);
-      const [, entry] = entries[0];
-      expect(entry).toEqual(expect.objectContaining({
-        type: 'condition',
-        action: 'removed',
-        characterName: CHAR,
-        condition: 'Slow effects',
-        reason: 'Slow (successful repeat save)',
-      }));
-      expect(entry.timestamp).toEqual(expect.any(Number));
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Slow DC 12' }));
 
-    it('keeps the condition and leaves target effects untouched when the repeat save fails', async () => {
-      vi.mocked(rollD20).mockReturnValue(5); // 5 + 2 < DC 12
-      seedSlow();
-      render(sheet());
+    // Effect-strip is scoped to this character and campaign, exactly once.
+    await waitFor(() =>
+      expect(removeSlowEffects).toHaveBeenCalledWith(CHAR, CAMPAIGN)
+    );
+    expect(removeSlowEffects).toHaveBeenCalledTimes(1);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Slow DC 12' }));
+    // Condition gone from the store and off the sheet.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Slow DC 12' })).not.toBeInTheDocument()
+    );
+    expect(readStoredConditions()).toEqual([]);
 
-      // Positive evidence the save flow ran and FAILED, then the negatives.
-      await waitFor(() =>
-        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-          rollType: 'save',
-          dc: 12,
-          success: false,
-        }))
-      );
+    // Exactly one condition-removal log entry, naming the stripped effects.
+    // timestamp is Date.now() metadata — only its presence is asserted.
+    const entries = conditionLogEntries();
+    expect(entries).toHaveLength(1);
+    const [, entry] = entries[0];
+    expect(entry).toEqual(expect.objectContaining({
+      type: 'condition',
+      action: 'removed',
+      characterName: CHAR,
+      condition: 'Slow effects',
+      reason: 'Slow (successful repeat save)',
+    }));
+    expect(entry.timestamp).toEqual(expect.any(Number));
+  });
 
-      expect(removeSlowEffects).not.toHaveBeenCalled();
-      expect(conditionLogEntries()).toHaveLength(0);
-      expect(readStoredConditions()).toEqual(['slow']);
-      expect(screen.getByRole('button', { name: 'Slow DC 12' })).toBeInTheDocument();
-    });
+  it('keeps Slow and leaves target effects untouched when the repeat save fails', async () => {
+    vi.mocked(rollD20).mockReturnValue(5); // 5 + 2 < DC 12
+    seedSlow();
+    render(sheet());
 
-    it('never strips Slow target effects when a different condition ends', async () => {
-      // Same savable shape, different condition — the Slow teardown must not
-      // piggyback on unrelated successful saves.
-      seedConditions(['charmed'], { charmed: { dc: 12, ability: 'wis' } });
-      render(sheet());
+    fireEvent.click(screen.getByRole('button', { name: 'Slow DC 12' }));
 
-      fireEvent.click(screen.getByRole('button', { name: 'Charmed DC 12' }));
+    // Positive evidence the save flow ran and FAILED, then the negatives.
+    await waitFor(() =>
+      expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+        rollType: 'save',
+        dc: 12,
+        success: false,
+      }))
+    );
 
-      await waitFor(() =>
-        expect(screen.queryByRole('button', { name: 'Charmed DC 12' })).not.toBeInTheDocument()
-      );
+    expect(removeSlowEffects).not.toHaveBeenCalled();
+    expect(conditionLogEntries()).toHaveLength(0);
+    expect(readStoredConditions()).toEqual(['slow']);
+    expect(screen.getByRole('button', { name: 'Slow DC 12' })).toBeInTheDocument();
+  });
 
-      expect(removeSlowEffects).not.toHaveBeenCalled();
-      expect(conditionLogEntries()).toHaveLength(0);
-    });
+  it('never strips Slow target effects when a different condition ends', async () => {
+    // Same savable shape, different condition — the Slow teardown must not
+    // piggyback on unrelated successful saves.
+    seedConditions(['charmed'], { charmed: { dc: 12, ability: 'wis' } });
+    render(sheet());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Charmed DC 12' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Charmed DC 12' })).not.toBeInTheDocument()
+    );
+
+    expect(removeSlowEffects).not.toHaveBeenCalled();
+    expect(conditionLogEntries()).toHaveLength(0);
   });
 });

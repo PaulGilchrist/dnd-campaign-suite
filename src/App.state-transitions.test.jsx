@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 /**
  * App-level contract for view/theme title state transitions (App.jsx).
  *
@@ -6,8 +6,9 @@
  * exercises:
  *
  *  - Re-entry reset: leaving a campaign via "Campaigns" and selecting it
- *    again always lands back on the character sheet, regardless of which
- *    view was open when leaving (initiative, maps manager, notes).
+ *    again always lands back on the character sheet, whichever view was
+ *    open when leaving (initiative, maps manager — the maps-manager row
+ *    also pins that the persistent mapsView sub-state unmounts).
  *  - Campaign switching: selecting a DIFFERENT campaign clears the maps
  *    area state — a player who had a map open in the previous campaign
  *    must be able to open the new campaign's active map with one "Maps"
@@ -15,11 +16,12 @@
  *    click on the player branch of handleMapsClick).
  *  - Idempotent sidebar navigation: re-clicking the button for the view
  *    you are already on keeps you there (view + sidebar indicator intact),
- *    without crashing.
- *  - Theme transitions: default dark on a clean slate, restore from stored
- *    preference (including invalid values), and toggle round-trips that
- *    persist to localStorage and echo into the Admin readout. Theme is
- *    display formatting, so localStorage is the sanctioned store here.
+ *    without crashing. (Maps-specific no-op re-clicks are covered by
+ *    App.map-navigation.test.jsx.)
+ *  - Theme transitions: restore from stored preference (valid and invalid
+ *    values), and toggle round-trips from the default dark that persist
+ *    to localStorage and echo into the Admin readout. Theme is display
+ *    formatting, so localStorage is the sanctioned store here.
  *  - document.title follows the active view/character.
  *
  * Deliberately NOT re-tested here (covered by siblings):
@@ -280,12 +282,13 @@ describe('App - State Transitions', () => {
 
   describe('Campaign re-entry resets the active view', () => {
     // Re-selecting the campaign must always land on the character sheet,
-    // whichever view was open when the user left. One flow per view so a
-    // regression in the shared reset fails loudly for each entry point.
+    // whichever view was open when the user left. Initiative represents the
+    // plain views; the maps-manager row additionally pins that the mapsView
+    // sub-state (which survives a same-campaign re-select via campaignName)
+    // does not keep the maps area mounted over the sheet.
     it.each([
       ['initiative', 'initiative-btn', 'initiative'],
       ['maps manager', 'maps-btn', 'maps-manager'],
-      ['notes', 'notes-btn', 'notes-view'],
     ])('re-entering the campaign from the %s view lands on the character sheet', async (_label, buttonTestId, viewTestId) => {
       await renderInCampaign();
 
@@ -346,37 +349,25 @@ describe('App - State Transitions', () => {
     it('re-clicking the active view\'s button keeps the view and selection intact', async () => {
       await renderInCampaign();
 
-      // Move to initiative and click its button again — same view, no crash.
+      // Move to initiative and click its button again — same view, no crash,
+      // no re-mount, sidebar indicator unchanged.
       await openView('initiative-btn', 'initiative');
       fireEvent.click(screen.getByTestId('initiative-btn'));
       await flushEffects();
       expect(screen.getByTestId('initiative')).toBeInTheDocument();
       expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Initiative');
       expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-
-      // Move to notes and click its button again — same view, no crash.
-      await openView('notes-btn', 'notes-view');
-      fireEvent.click(screen.getByTestId('notes-btn'));
-      await flushEffects();
-      expect(screen.getByTestId('notes-view')).toBeInTheDocument();
-      expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Notes');
-      expect(screen.queryByTestId('initiative')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
     });
   });
 
   describe('Theme state transitions', () => {
-    async function openAdmin() {
-      await openView('admin-btn', 'campaign-admin');
-    }
-
     it('toggles light and dark from the default, updating the sheet and persisting each choice', async () => {
       await renderInCampaign();
 
       // Clean localStorage → dark is the default.
       expect(document.body.getAttribute('data-theme')).toBe('dark');
 
-      await openAdmin();
+      await openView('admin-btn', 'campaign-admin');
 
       fireEvent.click(screen.getByTestId('admin-toggle-theme-btn'));
       await waitFor(() => {
@@ -393,23 +384,18 @@ describe('App - State Transitions', () => {
       expect(localStorage.getItem('theme')).toBe('dark');
     });
 
-    it('restores the stored light theme on mount', async () => {
-      localStorage.setItem('theme', 'light');
-
-      await renderInCampaign();
-
-      expect(document.body.getAttribute('data-theme')).toBe('light');
-    });
-
+    // "Nothing stored → dark" is the clean-slate default already asserted
+    // at the top of the toggle test, so only the restore and invalid-value
+    // branches are parameterized here.
     it.each([
-      ['nothing stored', null],
-      ['an unrecognized value', 'neon'],
-    ])('falls back to dark when %s', async (_label, stored) => {
-      if (stored !== null) localStorage.setItem('theme', stored);
+      ['light', 'light', 'light'],
+      ['an unrecognized value', 'neon', 'dark'],
+    ])('restores %s theme on mount', async (_label, stored, expected) => {
+      localStorage.setItem('theme', stored);
 
       await renderInCampaign();
 
-      expect(document.body.getAttribute('data-theme')).toBe('dark');
+      expect(document.body.getAttribute('data-theme')).toBe(expected);
     });
   });
 

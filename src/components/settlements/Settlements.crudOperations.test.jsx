@@ -1,14 +1,14 @@
-// Row-level CRUD is covered in Settlements.serviceNPCRumor.test.jsx (new modal)
-// and Settlements.modalActions.test.jsx (edit modal open/close + prefilled data).
-// This file retains only the unique behavioral gap: draft-discard semantics
-// when the edit modal is closed and reopened.
+// @maintained-by-ai: 2026-10-14
+// Row-level CRUD lives in sibling lanes: serviceNPCRumor (row add/remove),
+// modalActions (open/close + prefilled edit), saveDelete (save/delete flows),
+// duplicate-name (name guard). This file retains only the unique behavioral
+// gap: draft-discard semantics when the edit modal is closed and reopened.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
-// Module-level mock store for useEntityManagement — vi.mock captures this
-// object by reference. Tests mutate its `items` field before rendering so the
-// component reads fresh state.
+// Module-level mock store captured by the vi.mock factory by reference.
+// Tests mutate `items` before rendering so the component reads fresh state.
 const settlementMockStore = {
   items: [],
   loading: false,
@@ -36,40 +36,15 @@ vi.mock('../common/PreviewToggle.jsx', () => ({
   },
 }));
 
-vi.mock('../../services/campaign/settlementGenerator.js', () => ({
-  generateSettlement: vi.fn(),
-}));
-
-const makeSettlement = (name, overrides = {}) => ({
-  name,
-  size: 'village',
-  population: '',
-  tags: '',
-  services: [],
-  description: '',
-  atmosphere: '',
-  government: '',
-  notableNPCs: [],
-  rumors: [],
-  notes: '',
-  threat: '',
-  ...overrides,
-});
-
-const openEditSettlement = () => {
+const openEditSettlement = () =>
   fireEvent.click(screen.getByRole('button', { name: /edit settlement/i }));
-};
 
-describe('Settlements - CRUD operations (behavioral)', () => {
-  const campaignName = 'test-campaign';
-
+describe('Settlements - draft discard (behavioral)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     settlementMockStore.items = [];
     settlementMockStore.loading = false;
-    settlementMockStore.loadItems.mockResolvedValue(undefined);
-    // The component fetches settlement-descriptions.json on mount; no test here
-    // changes the size select, so the response body is irrelevant.
+    // The component fetches settlement-descriptions.json on mount; no test
+    // here changes the size select, so the response body is irrelevant.
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({}),
@@ -80,20 +55,20 @@ describe('Settlements - CRUD operations (behavioral)', () => {
     vi.restoreAllMocks();
   });
 
-  describe('Draft lifecycle', () => {
-    it('discards unsaved row edits when the modal is closed and reopened', () => {
-      settlementMockStore.items = [makeSettlement('Old Town')];
-      render(<Settlements campaignName={campaignName} onBack={() => {}} />);
-      openEditSettlement();
+  it('discards unsaved row edits when the edit modal is closed and reopened', () => {
+    // getDefaultFormData() fills any missing fields on edit, so a name-only
+    // settlement is enough to exercise the open → edit → cancel → reopen flow.
+    settlementMockStore.items = [{ name: 'Old Town' }];
+    render(<Settlements campaignName="test-campaign" onBack={() => {}} />);
+    openEditSettlement();
 
-      fireEvent.click(screen.getByRole('button', { name: /add service/i }));
-      expect(screen.queryByPlaceholderText('Business name')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /add service/i }));
+    expect(screen.getByPlaceholderText('Business name')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-      openEditSettlement();
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    openEditSettlement();
 
-      expect(screen.queryByPlaceholderText('Business name')).not.toBeInTheDocument();
-      expect(screen.getByDisplayValue('Old Town')).toBeInTheDocument();
-    });
+    expect(screen.queryByPlaceholderText('Business name')).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue('Old Town')).toBeInTheDocument();
   });
 });

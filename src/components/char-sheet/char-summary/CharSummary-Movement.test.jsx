@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Coverage ownership (per family delegation):
 //   - Class-based unarmored movement in the Speed row: Barbarian (fixture-driven
@@ -12,25 +12,19 @@
 //   - AC totals, penalties, barkskin/mage-armor numbers → CharSummary-BadgesAndAC.test.jsx
 //   - Climb/swim stat overrides → CharSummary-AdditionalCoverage.test.jsx
 //
-// Quality improvements over previous revision (9 tests → 15 runs):
-//   - AC assertions now scope to the Armor Class row (armorClassLine helper,
-//     family convention) instead of a document-wide /\bNN\b/ that could match
-//     any unrelated "16"/"18" text and pass on broken AC rendering.
-//   - Speed assertions now assert the full speed span text AND that the bonus
-//     value is absent on negative paths — the old getByText(/25 ft/) passed
-//     even if the +10 bonus leaked in elsewhere on the line.
-//   - Added Monk unarmored movement lane (was zero-coverage): rulesFactory mock
-//     now exposes a shared getUnarmoredMovementIncrease fn so tests can pin a
-//     non-zero bonus; armored Monk asserting 25 ft fails loudly if the
-//     armor/no-shield guard breaks.
-//   - Added Barbarian level-index test (class_levels[level - 1]): catches
-//     off-by-one class level lookups, which the old single level-1 case could not.
-//   - Added shield-only blocking (computeHasArmorOrShield shield branch) and
-//     large_form as a second shape-shift trigger for Circle Forms.
-//   - Dropped window.location.hostname mutations (jsdom default is already
-//     localhost) and over-mocks of auraOfLife/circleOfPower/deathWard handlers
-//     (real guards read the already-mocked runtime store and return false —
-//     same mock set as CharSummary-BadgesAndAC.test.jsx).
+// Quality improvements over previous revision (15 runs → 12):
+//   - Dropped the level-1 Barbarian test: the level-index test (level 2 with
+//     class_levels [35,10] → 35) dominates it — same positive lane, and it
+//     additionally catches missing-bonus AND wrong-index mutations.
+//   - Dropped the Monk shield-block case: the shield branch lives in the
+//     shared computeHasArmorOrShield already proven by the Barbarian shield
+//     test; one armored-Monk negative still proves Monk's own
+//     `!hasArmorOrShield` guard line (separate from Barbarian's).
+//   - Dropped the short-name 'Moon' Circle Forms negative: same code path as
+//     the Land Druid negative (both identifier fields miss → no override).
+//   - AC assertions scope to the Armor Class row (armorClassLine helper) and
+//     speed assertions pin the exact span text with an absent-bonus check on
+//     negative paths, so broken rendering fails loudly.
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -143,12 +137,9 @@ describe('CharSummary - Barbarian Unarmored Movement', () => {
         ...over,
     });
 
-    it('shows 35 ft for an unarmored Barbarian (25 base + 10 feature)', () => {
-        renderSummary(barbarian(1));
-        expect(speedSpan()).toHaveTextContent(/^35 ft\.$/);
-    });
-
-    it('reads the bonus for the current level, not just the first class_levels entry', () => {
+    it('adds the bonus from class_levels[level - 1] to base speed for an unarmored Barbarian', () => {
+        // level 2 with class_levels [35,10]: correct class_levels[level-1]
+        // reads 10 → 25+10=35; a hard-coded index 0 would render 60.
         const stats = barbarian(2);
         stats.class.class_levels = [
             { class_specific: { unarmored_movement: 35 } },
@@ -201,11 +192,14 @@ describe('CharSummary - Monk Unarmored Movement (rulesFactory lane)', () => {
         expect(speedSpan()).toHaveTextContent(/^35 ft\.$/);
     });
 
-    it.each([
-        { name: 'armor equipped', inventory: { equipped: ['Scale Mail'] }, equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }] },
-        { name: 'shield equipped', inventory: { equipped: ['Shield'] }, equipment: [] },
-    ])('applies no class-rule bonus when $name', ({ inventory, equipment }) => {
-        renderSummary(monk({ inventory, equipment }));
+    // One negative is enough here: the shield branch of the shared
+    // computeHasArmorOrShield is proven by the Barbarian shield test above;
+    // this guards the Monk branch's own `!hasArmorOrShield` check.
+    it('applies no class-rule bonus when armored', () => {
+        renderSummary(monk({
+            inventory: { equipped: ['Scale Mail'] },
+            equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }],
+        }));
         expect(speedSpan()).toHaveTextContent(/^25 ft\.$/);
         expect(screen.queryByText(/35 ft/)).not.toBeInTheDocument();
     });
@@ -224,7 +218,6 @@ describe('CharSummary - Circle Forms AC Override', () => {
     const druid = (classInfo, over = {}) => ({
         ...mockPlayerStats,
         class: classInfo,
-        abilities: [{ name: 'Wisdom', bonus: 3 }],
         inventory: { equipped: [] },
         equipment: [],
         ...over,
@@ -236,7 +229,6 @@ describe('CharSummary - Circle Forms AC Override', () => {
         { name: 'large_form triggers the override like shape_shift', class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: { name: 'Circle of the Moon' } }, abilities: [{ name: 'Wisdom', bonus: 3 }], buffs: [{ effect: 'large_form' }], expectedAC: 16 },
         { name: 'missing Wisdom scores the override at flat 13', class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: { name: 'Circle of the Moon' } }, abilities: [], buffs: [{ effect: 'shape_shift' }], expectedAC: 13 },
         { name: 'non-Moon Druid keeps base AC', class: { name: 'Druid', subclass: { name: 'Land' }, major: { name: 'Druid' } }, abilities: [{ name: 'Wisdom', bonus: 3 }], buffs: [{ effect: 'shape_shift' }], expectedAC: 18 },
-        { name: 'short-name subclass is not app-canonical and gets no override', class: { name: 'Druid', subclass: { name: 'Moon' }, major: null }, abilities: [{ name: 'Wisdom', bonus: 3 }], buffs: [{ effect: 'shape_shift' }], expectedAC: 18 },
         { name: 'Moon Druid out of beast form keeps base AC', class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, major: { name: 'Circle of the Moon' } }, abilities: [{ name: 'Wisdom', bonus: 3 }], buffs: [], expectedAC: 18 },
     ])('renders Armor Class $expectedAC when $name', ({ class: classInfo, abilities, buffs, expectedAC }) => {
         renderSummary(druid(classInfo, { abilities }), buffs);

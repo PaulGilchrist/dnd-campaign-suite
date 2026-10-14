@@ -1,11 +1,14 @@
-// Modal action mechanics only: loading/empty states, modal open/close, generate
-// button state, and delete button conditional visibility. Intentionally NOT
+// @maintained-by-ai: 2026-10-14
+// Modal action mechanics only: loading/empty states, modal open/close,
+// delete-button visibility, and generate button state. Intentionally NOT
 // duplicated here (covered in sibling files):
 //   - size badges, population, service counts, tags, description previews
 //       -> Settlements.listRendering.test.jsx
-//   - search/size filtering (behavioral), no-results messages
+//   - search/size filtering behavior, no-results messages
 //       -> Settlements.filtering.test.jsx
-//   - generate button disabled/label/re-enabled, prefilled modal content, error handling
+//   - search clear-button visibility, accessible names, focus management
+//       -> Settlements.accessibility.test.jsx
+//   - generated draft prefilled into the modal, generation error handling
 //       -> Settlements.generate.test.jsx
 //   - save/delete behavior, draft lifecycle
 //       -> Settlements.saveDelete.test.jsx / crudOperations.test.jsx
@@ -13,8 +16,6 @@
 //       -> Settlements.formFields.test.jsx / formChanges.test.jsx
 //   - service/NPC/rumor add-remove cycles
 //       -> Settlements.serviceNPCRumor.test.jsx
-//   - accessible names, keyboard navigation, focus management, clear button visibility
-//       -> Settlements.accessibility.test.jsx
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
@@ -53,40 +54,15 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
   generateSettlement: vi.fn(),
 }));
 
-const makeSettlement = (name, overrides = {}) => ({
-  name,
-  size: 'village',
-  population: '',
-  tags: '',
-  services: [],
-  description: '',
-  atmosphere: '',
-  government: '',
-  notableNPCs: [],
-  rumors: [],
-  notes: '',
-  threat: '',
-  ...overrides,
-});
+const renderSettlements = () =>
+  render(<Settlements campaignName="test-campaign" onBack={() => {}} />);
 
 describe('Settlements - modal actions', () => {
-  const campaignName = 'test-campaign';
-
   beforeEach(() => {
     vi.clearAllMocks();
     settlementMockStore.items = [];
     settlementMockStore.loading = false;
     settlementMockStore.loadItems.mockResolvedValue(undefined);
-    settlementMockStore.deleteItem.mockResolvedValue(undefined);
-    vi.mocked(generateSettlement).mockResolvedValue(makeSettlement('Generated Town', {
-      size: 'town',
-      description: 'A bustling town',
-      atmosphere: 'Lively',
-      government: 'Council',
-      population: '1,500 souls',
-      tags: 'generated',
-      threat: 'Bandits',
-    }));
     // The component fetches settlement-descriptions.json on mount; no test
     // in this file changes the size select, so the response body is irrelevant.
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
@@ -102,62 +78,40 @@ describe('Settlements - modal actions', () => {
   describe('List view', () => {
     it('shows a loading state while settlements are being fetched', () => {
       settlementMockStore.loading = true;
-      render(<Settlements campaignName={campaignName} onBack={() => {}} />);
+      renderSettlements();
       expect(screen.getByText(/loading settlements/i)).toBeInTheDocument();
       expect(screen.queryByText(/no settlements yet/i)).not.toBeInTheDocument();
     });
 
     it('shows the empty state when there are no settlements', () => {
-      render(<Settlements campaignName={campaignName} onBack={() => {}} />);
+      renderSettlements();
       expect(screen.getByText(/no settlements yet/i)).toBeInTheDocument();
-    });
-
-    it('clears the search query when the clear button is clicked', () => {
-      settlementMockStore.items = [makeSettlement('Fireport'), makeSettlement('Hollow Oak')];
-      render(<Settlements campaignName={campaignName} onBack={() => {}} />);
-      fireEvent.change(screen.getByLabelText('Search settlements'), { target: { value: 'fire' } });
-      expect(screen.queryByText('Hollow Oak')).not.toBeInTheDocument();
-      fireEvent.click(screen.getByLabelText('Clear search'));
-      expect(screen.getByText('Hollow Oak')).toBeInTheDocument();
     });
   });
 
   describe('New settlement modal', () => {
-    it('opens the new settlement modal when "New Settlement" is clicked', () => {
-      render(<Settlements campaignName={campaignName} onBack={() => {}} />);
+    it('opens on "New Settlement", hides Delete, and closes on Cancel', () => {
+      renderSettlements();
       fireEvent.click(screen.getByRole('button', { name: /new settlement/i }));
       expect(screen.getByRole('heading', { name: 'New Settlement' })).toBeInTheDocument();
-    });
+      // Delete is reserved for editing an existing settlement.
+      expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
 
-    it('closes the new settlement modal when cancel is clicked', () => {
-      render(<Settlements campaignName={campaignName} onBack={() => {}} />);
-      fireEvent.click(screen.getByRole('button', { name: /new settlement/i }));
-      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
       expect(screen.queryByRole('heading', { name: 'New Settlement' })).not.toBeInTheDocument();
     });
   });
 
   describe('Edit settlement modal', () => {
-    it('opens the edit modal with the settlement data prefilled when a list item is clicked', () => {
-      settlementMockStore.items = [makeSettlement('Old Town', { size: 'town', population: '2,500 souls' })];
-      render(<Settlements campaignName={campaignName} onBack={() => {}} />);
+    it('opens prefilled with the settlement data and shows the Delete button', () => {
+      settlementMockStore.items = [{ name: 'Old Town', size: 'town', population: '2,500 souls' }];
+      renderSettlements();
       fireEvent.click(screen.getByRole('button', { name: /edit settlement: old town/i }));
       expect(screen.getByRole('heading', { name: 'Edit Settlement' })).toBeInTheDocument();
       expect(screen.getByRole('textbox', { name: /name\s?\*/i })).toHaveValue('Old Town');
       expect(screen.getByRole('combobox', { name: /size/i })).toHaveValue('town');
-    });
-
-    it('shows the delete button only when editing an existing settlement', () => {
-      settlementMockStore.items = [makeSettlement('Old Town')];
-      render(<Settlements campaignName={campaignName} onBack={() => {}} />);
-
-      fireEvent.click(screen.getByRole('button', { name: /new settlement/i }));
-      expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-      fireEvent.click(screen.getByRole('button', { name: /edit settlement: old town/i }));
-      expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+      expect(screen.getByLabelText('Population')).toHaveValue('2,500 souls');
+      expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
     });
   });
 
@@ -168,7 +122,7 @@ describe('Settlements - modal actions', () => {
         resolveGenerate = resolve;
       }));
 
-      render(<Settlements campaignName={campaignName} onBack={() => {}} />);
+      renderSettlements();
       const generateBtn = screen.getByRole('button', { name: /generate settlement/i });
       fireEvent.click(generateBtn);
 
@@ -177,7 +131,7 @@ describe('Settlements - modal actions', () => {
       });
       expect(generateBtn).toHaveTextContent('Generating…');
 
-      resolveGenerate(makeSettlement('Generated Town'));
+      resolveGenerate({ name: 'Generated Town' });
 
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: 'New Settlement' })).toBeInTheDocument();

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 // FT-105 regression: the Charger (Improved Dash) speed_boost stamp written by
 // buffHandler.handleDashSpeedBonus (CLA-067 shape) must fold into the
 // displayed Speed via charSummaryCalc's buffEffectHandlers ['speed_boost'].
@@ -84,37 +84,31 @@ describe('charSummaryCalc — FT-105 Charger Improved Dash speed_boost fold', ()
         getActiveBuffs.mockReturnValue([]);
     });
 
-    it('displays base 30 ft with no dash stamp', () => {
-        const ctx = ctxFor();
-        expect(ctx.totalSpeedWithBuff).toBe(30);
-        expect(ctx.buffSpeedBonus).toBe(0);
-    });
-
-    it('folds the CLA-067 speed_boost stamp into displayed Speed (30 → 40)', () => {
-        seedRuntimeBuffs([dashStamp()]);
-        const ctx = ctxFor();
-        expect(ctx.buffSpeedBonus).toBe(10);
-        expect(ctx.totalSpeedWithBuff).toBe(40);
-    });
-
-    it('does NOT fold the old pre-fix unconsumed tempBuff shape (regression guard)', () => {
-        seedRuntimeBuffs([{ name: 'Improved Dash', tempBuff: true, speedBonus: 10, duration: 'same_action' }]);
-        const ctx = ctxFor();
-        expect(ctx.buffSpeedBonus).toBe(0);
-        expect(ctx.totalSpeedWithBuff).toBe(30);
-    });
-
-    it('folds a speed_boost arriving on the buffService lane when the runtime lane is empty', () => {
-        // computeCharSummaryContext prefers runtime activeBuffs and falls back
-        // to buffService — FT-105 dashes must fold via whichever lane carries
-        // the stamp (buffStore-vs-runtime divergence seen live).
-        getActiveBuffs.mockReturnValue([dashStamp()]);
+    it.each([
+        ['the runtime lane', buffs => seedRuntimeBuffs(buffs)],
+        // FT-105 dashes must fold via whichever lane carries the stamp
+        // (buffStore-vs-runtime divergence seen live), and a stamp present
+        // on BOTH lanes must fold exactly once, not double.
+        ['the buffService lane when runtime is empty', buffs => getActiveBuffs.mockReturnValue(buffs)],
+        ['both lanes at once', buffs => { seedRuntimeBuffs(buffs); getActiveBuffs.mockReturnValue(buffs); }],
+    ])('folds one CLA-067 speed_boost stamp on %s into displayed Speed (30 → 40)', (_lane, seed) => {
+        seed([dashStamp()]);
         const ctx = ctxFor();
         expect(ctx.buffSpeedBonus).toBe(10);
         expect(ctx.totalSpeedWithBuff).toBe(40);
     });
 
-    it('stacks multiple speed_boost stamps additively (Charger + Longstrider)', () => {
+    it.each([
+        ['the old pre-fix unconsumed tempBuff shape', { name: 'Improved Dash', tempBuff: true, speedBonus: 10, duration: 'same_action' }],
+        ['a malformed speed_boost stamp missing speedBonus', { name: 'Improved Dash', effect: 'speed_boost', duration: 'same_action' }],
+    ])('ignores %s — speed stays a clean 30 ft (never folded, never NaN)', (_shape, buff) => {
+        seedRuntimeBuffs([buff]);
+        const ctx = ctxFor();
+        expect(ctx.buffSpeedBonus).toBe(0);
+        expect(ctx.totalSpeedWithBuff).toBe(30);
+    });
+
+    it('stacks multiple speed_boost stamps additively (Charger dash + Longstrider)', () => {
         seedRuntimeBuffs([
             dashStamp(10),
             { name: 'Longstrider', effect: 'speed_boost', speedBonus: 10, duration: 'concentration' },
@@ -122,12 +116,5 @@ describe('charSummaryCalc — FT-105 Charger Improved Dash speed_boost fold', ()
         const ctx = ctxFor();
         expect(ctx.buffSpeedBonus).toBe(20);
         expect(ctx.totalSpeedWithBuff).toBe(50);
-    });
-
-    it('never leaks NaN into the speed line when a speed_boost stamp is missing speedBonus', () => {
-        seedRuntimeBuffs([{ name: 'Improved Dash', effect: 'speed_boost', duration: 'same_action' }]);
-        const ctx = ctxFor();
-        expect(ctx.buffSpeedBonus).toBe(0);
-        expect(ctx.totalSpeedWithBuff).toBe(30);
     });
 });

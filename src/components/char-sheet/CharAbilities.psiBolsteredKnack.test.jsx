@@ -1,7 +1,10 @@
+// @maintained-by-ai
 // CLA-270: Psi-Bolstered Knack proficiency gate on check contexts.
 // The Knack boost must only be offered for skill/tool checks the
-// character has proficiency with — never raw ability checks or
-// non-proficient skill cells.
+// character has proficiency with — never raw ability checks, non-
+// proficient cells, non-Soulknives, or Soulknives below level 3.
+// This file OWNS the CLA-270 proficiency gates (CharAbilities
+// .missingCoverage.test.jsx explicitly defers them here).
 
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -77,6 +80,18 @@ function createSoulknifeStats(overrides = {}) {
   };
 }
 
+function rogueClassStats(level, subclass) {
+  return createSoulknifeStats({
+    level,
+    class: {
+      name: 'Rogue',
+      major: { name: subclass },
+      subclass: { name: subclass },
+      class_levels: [],
+    },
+  });
+}
+
 function defaultProps(playerStats) {
   return {
     allAbilityScores: mockAllAbilityScores,
@@ -105,86 +120,74 @@ function clickAbilityCheckCell(abilityName) {
   fireEvent.click(row.children[2]);
 }
 
+// Asserts the roll actually happened (pins name+bonus) and then checks
+// whether the Knack flag is present — never a vacuous pass on zero calls.
+function lastRollCall(mock, name, bonus) {
+  expect(mock).toHaveBeenCalledWith(name, bonus, expect.any(Object));
+  return mock.mock.calls.at(-1)[2];
+}
+
 describe('CharAbilities Psi-Bolstered Knack proficiency gate (CLA-270)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('offers the Knack on a proficient skill check', () => {
+  it('offers the Knack with the class psionic die on proficient skill and tool checks', async () => {
     render(<CharAbilities {...defaultProps(createSoulknifeStats())} />);
+
     fireEvent.click(findClickableByText('Insight (+6)'));
-    expect(getMocks().rollSkillCheck).toHaveBeenCalledWith(
-      'Insight',
-      6,
-      expect.objectContaining({ psiBolsteredKnack: true, psiBolsteredKnackDieSize: 10 })
-    );
-  });
+    const skillCtx = lastRollCall(getMocks().rollSkillCheck, 'Insight', 6);
+    expect(skillCtx).toEqual(expect.objectContaining({ psiBolsteredKnack: true, psiBolsteredKnackDieSize: 10 }));
 
-  it('does NOT offer the Knack on a non-proficient skill check', () => {
-    render(<CharAbilities {...defaultProps(createSoulknifeStats())} />);
-    fireEvent.click(findClickableByText('Perception (+1)'));
-    const ctx = getMocks().rollSkillCheck.mock.calls[0][2] || {};
-    expect(ctx.psiBolsteredKnack).toBeUndefined();
-  });
-
-  it('does NOT offer the Knack on a raw ability check', () => {
-    render(<CharAbilities {...defaultProps(createSoulknifeStats())} />);
-    clickAbilityCheckCell('Intelligence');
-    const ctx = getMocks().rollAbilityCheck.mock.calls[0][2] || {};
-    expect(ctx.psiBolsteredKnack).toBeUndefined();
-  });
-
-  it('offers the Knack on a proficient tool check', async () => {
-    render(<CharAbilities {...defaultProps(createSoulknifeStats())} />);
-    await waitFor(() => {
-      const toolCell = findClickableByText("Thieves' Tools (+9)");
-      expect(toolCell).toBeTruthy();
-    });
+    await waitFor(() => expect(findClickableByText("Thieves' Tools (+9)")).toBeTruthy());
     fireEvent.click(findClickableByText("Thieves' Tools (+9)"));
-    expect(getMocks().rollAbilityCheck).toHaveBeenCalledWith(
-      "Thieves' Tools",
-      9,
-      expect.objectContaining({ psiBolsteredKnack: true })
-    );
+    const toolCtx = lastRollCall(getMocks().rollAbilityCheck, "Thieves' Tools", 9);
+    expect(toolCtx).toEqual(expect.objectContaining({ psiBolsteredKnack: true, psiBolsteredKnackDieSize: 10 }));
   });
 
-  it('does NOT offer the Knack for non-Soulknife rogues', () => {
-    const stats = createSoulknifeStats({
-      class: { name: 'Rogue', major: { name: 'Thief' }, subclass: { name: 'Thief' }, class_levels: [] },
-    });
-    render(<CharAbilities {...defaultProps(stats)} />);
+  it('rolls WITHOUT the Knack on ineligible cells: non-proficient skill and raw ability check', () => {
+    render(<CharAbilities {...defaultProps(createSoulknifeStats())} />);
+
+    fireEvent.click(findClickableByText('Perception (+1)'));
+    const skillCtx = lastRollCall(getMocks().rollSkillCheck, 'Perception', 1);
+    expect(skillCtx.psiBolsteredKnack).toBeUndefined();
+
+    clickAbilityCheckCell('Intelligence');
+    const abilityCtx = lastRollCall(getMocks().rollAbilityCheck, 'Intelligence', 0);
+    expect(abilityCtx.psiBolsteredKnack).toBeUndefined();
+  });
+
+  it.each([
+    { label: 'never for a non-Soulknife rogue', level: 14, subclass: 'Thief', offers: false },
+    { label: 'never below level 3', level: 2, subclass: 'Soulknife', offers: false },
+    { label: 'from level 3, defaulting to d6 without psionic die data', level: 3, subclass: 'Soulknife', offers: true },
+  ])('gates on subclass and level: $label', ({ level, subclass, offers }) => {
+    render(<CharAbilities {...defaultProps(rogueClassStats(level, subclass))} />);
     fireEvent.click(findClickableByText('Insight (+6)'));
-    const ctx = getMocks().rollSkillCheck.mock.calls[0][2] || {};
-    expect(ctx.psiBolsteredKnack).toBeUndefined();
+
+    const ctx = lastRollCall(getMocks().rollSkillCheck, 'Insight', 6);
+    if (offers) {
+      expect(ctx.psiBolsteredKnack).toBe(true);
+      expect(ctx.psiBolsteredKnackDieSize).toBe(6);
+    } else {
+      expect(ctx.psiBolsteredKnack).toBeUndefined();
+    }
   });
 });
 
 describe('isProficientSkillOrToolCheck', () => {
   const stats = createSoulknifeStats();
 
-  it('is true for proficient skills', () => {
-    expect(isProficientSkillOrToolCheck(stats, 'Insight')).toBe(true);
-  });
-
-  it('is true for expertise skills', () => {
-    expect(isProficientSkillOrToolCheck({ ...stats, skillProficiencies: [], expertise: ['Acrobatics'] }, 'Acrobatics')).toBe(true);
-  });
-
-  it('is false for non-proficient skills', () => {
-    expect(isProficientSkillOrToolCheck(stats, 'Arcana')).toBe(false);
-  });
-
-  it('is false for raw ability names', () => {
-    expect(isProficientSkillOrToolCheck(stats, 'Intelligence')).toBe(false);
-  });
-
-  it('is true for proficient tools and false for non-proficient tools', () => {
-    expect(isProficientSkillOrToolCheck(stats, "Thieves' Tools")).toBe(true);
-    expect(isProficientSkillOrToolCheck(stats, "Navigator's Tools")).toBe(false);
-  });
-
-  it('is false for missing check names or stats', () => {
-    expect(isProficientSkillOrToolCheck(stats, undefined)).toBe(false);
-    expect(isProficientSkillOrToolCheck(null, 'Insight')).toBe(false);
+  it.each([
+    ['proficient skill', stats, 'Insight', true],
+    ['expertise-only skill', { ...stats, skillProficiencies: [], expertise: ['Acrobatics'] }, 'Acrobatics', true],
+    ['proficient tool', stats, "Thieves' Tools", true],
+    ['non-proficient skill', stats, 'Arcana', false],
+    ['non-proficient tool', stats, "Navigator's Tools", false],
+    ['raw ability name', stats, 'Intelligence', false],
+    ['missing check name', stats, undefined, false],
+    ['missing stats', null, 'Insight', false],
+  ])('is %s', (_label, s, name, expected) => {
+    expect(isProficientSkillOrToolCheck(s, name)).toBe(expected);
   });
 });

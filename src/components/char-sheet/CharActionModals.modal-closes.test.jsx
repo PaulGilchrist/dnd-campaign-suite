@@ -1,10 +1,15 @@
-// Tests for modal close handlers in CharActionModals.jsx:
-// - attackRiderModal close (dispatches events)
-// - openHandFromFlurry close (calls handler + dispatches events)
-// - openHandFromFlurry confirm (calls handler + dispatches events)
+// @maintained-by-ai
+// Tests for CharActionModals.jsx close/confirm wiring:
+// - attackRiderModal generic close (clears modal, refreshes target effects,
+//   does NOT resume the attack pipeline for non-resuming actions)
+// - openHandFromFlurry renders the current flurry target and its close/confirm
+//   handlers (skip vs confirm + refresh events)
 //
-// Already covered elsewhere (NOT duplicated):
-// - shieldBashModal, quiveringPalmModal → modal-closes-2.test.jsx
+// Covered elsewhere (NOT duplicated here):
+// - shieldBashModal, quiveringPalmModal close → modal-closes-2.test.jsx
+// - openHandTechniqueModal close → CharActionModals.handler-callbacks.test.jsx
+// - Stalker's Flurry / Charger / Cunning Strike resume-on-close → *-resume.test.jsx
+// - useCharActionModals flurry handler logic → useModalHandlers-flurry.test.js
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -23,9 +28,11 @@ vi.mock('./modals/shared/AttackRiderModal.jsx', () => ({
   },
 }));
 vi.mock('./modals/OpenHandTechniqueModal.jsx', () => ({
-  default: function TestModal({ onClose, onConfirm }) {
+  default: function TestModal({ onClose, onConfirm, targetName, saveDc }) {
     return (
       <div data-testid="open-hand-technique-modal">
+        <span data-testid="open-hand-target">{targetName}</span>
+        <span data-testid="open-hand-save-dc">{saveDc}</span>
         <button data-testid="open-hand-close" onClick={onClose}>Close</button>
         <button data-testid="open-hand-confirm" onClick={() => onConfirm('grappled')}>Grapple</button>
       </div>
@@ -56,69 +63,67 @@ describe('CharActionModals — modal close handlers', () => {
     vi.clearAllMocks();
   });
 
-  describe('AttackRiderModal close handler', () => {
-    it('sets modalState to null and dispatches target-effects-updated on close', () => {
-      const setModalState = vi.fn();
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-      render(
-        <CharActionModals
-          {...createBaseProps()}
-          modalState={{ attackRiderModal: { action: { name: 'Test Attack' } } }}
-          setModalState={setModalState}
-        />
-      );
-      fireEvent.click(screen.getByTestId('attack-rider-close'));
-      expect(setModalState).toHaveBeenCalledWith({ attackRiderModal: null });
-      expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'target-effects-updated' }));
-      dispatchSpy.mockRestore();
-    });
+  it('closes attackRiderModal, refreshes target effects, and does not resume the pipeline for a plain action', () => {
+    const setModalState = vi.fn();
+    const resumeAttackPipeline = vi.fn();
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    render(
+      <CharActionModals
+        {...createBaseProps({ resumeAttackPipeline })}
+        modalState={{ attackRiderModal: { action: { name: 'Test Attack' } } }}
+        setModalState={setModalState}
+      />
+    );
+    fireEvent.click(screen.getByTestId('attack-rider-close'));
+    expect(setModalState).toHaveBeenCalledWith({ attackRiderModal: null });
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'target-effects-updated' }));
+    // Only resume-capable riders (Stalker's Flurry, Charger, Cunning Strike)
+    // resume on close — a plain action must leave the pipeline paused state alone.
+    expect(resumeAttackPipeline).not.toHaveBeenCalled();
+    dispatchSpy.mockRestore();
   });
 
-  describe('openHandFromFlurry modal', () => {
-    it('calls handleOpenHandFromFlurrySkip on close and dispatches events', () => {
-      const handler = vi.fn();
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-      render(
-        <CharActionModals
-          {...createBaseProps({ handleOpenHandFromFlurrySkip: handler })}
-          modalState={{
-            openHandFromFlurry: {
-              targets: [{ action: {}, playerStats: {}, campaignName: 'test-campaign', targetName: 'Goblin' }],
-              currentIndex: 0,
-              saveDc: 15,
-            },
-          }}
-          setModalState={vi.fn()}
-        />
-      );
-      fireEvent.click(screen.getByTestId('open-hand-close'));
-      expect(handler).toHaveBeenCalled();
-      expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'target-effects-updated' }));
-      expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
-      dispatchSpy.mockRestore();
-    });
+  it('openHandFromFlurry shows the current target; close skips, confirm confirms — both refresh effects and combat summary', () => {
+    const handleSkip = vi.fn();
+    const handleConfirm = vi.fn();
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    render(
+      <CharActionModals
+        {...createBaseProps({
+          handleOpenHandFromFlurrySkip: handleSkip,
+          handleOpenHandFromFlurryConfirm: handleConfirm,
+        })}
+        modalState={{
+          openHandFromFlurry: {
+            targets: [
+              { action: {}, playerStats: {}, campaignName: 'test-campaign', targetName: 'Decoy', saveDc: 11 },
+              { action: {}, playerStats: {}, campaignName: 'test-campaign', targetName: 'Goblin', saveDc: 15 },
+            ],
+            currentIndex: 1,
+            saveDc: 15,
+          },
+        }}
+        setModalState={vi.fn()}
+      />
+    );
 
-    it('calls handleOpenHandFromFlurryConfirm with optionName and dispatches events on confirm', () => {
-      const handler = vi.fn();
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-      render(
-        <CharActionModals
-          {...createBaseProps({ handleOpenHandFromFlurryConfirm: handler })}
-          modalState={{
-            openHandFromFlurry: {
-              targets: [{ action: {}, playerStats: {}, campaignName: 'test-campaign', targetName: 'Goblin' }],
-              currentIndex: 0,
-              saveDc: 15,
-            },
-          }}
-          setModalState={vi.fn()}
-        />
-      );
-      fireEvent.click(screen.getByTestId('open-hand-confirm'));
-      expect(handler).toHaveBeenCalledWith({ optionName: 'grappled' });
-      expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'target-effects-updated' }));
-      expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
-      dispatchSpy.mockRestore();
-    });
+    // Modal shows the target at currentIndex, not the first target.
+    expect(screen.getByTestId('open-hand-target')).toHaveTextContent('Goblin');
+    expect(screen.getByTestId('open-hand-save-dc')).toHaveTextContent('15');
+
+    // Confirm passes the chosen technique option through to the handler.
+    fireEvent.click(screen.getByTestId('open-hand-confirm'));
+    expect(handleConfirm).toHaveBeenCalledWith({ optionName: 'grappled' });
+    expect(handleSkip).not.toHaveBeenCalled();
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'target-effects-updated' }));
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
+
+    // Close declines via the skip handler.
+    dispatchSpy.mockClear();
+    fireEvent.click(screen.getByTestId('open-hand-close'));
+    expect(handleSkip).toHaveBeenCalled();
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'target-effects-updated' }));
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
+    dispatchSpy.mockRestore();
   });
 });

@@ -1,12 +1,17 @@
-// @improved-by-ai
+// @maintained-by-ai
 // SpellDetailPopup free-cast authorization lane (component-level).
-// The popup delegates authorization to the REAL isFreeCastAuthorized service
-// (spellPreparationService) with the runtime store mocked — service internals
-// have their own suites (spellPreparationService.*.test.js); this file proves
-// the component contract per channel: the classic "Free Cast" banner, a
-// Cast Spell button that works at ZERO spell slots (a free cast must never
-// fabricate payment), the denial warning + disabled button when unauthorized,
-// and the freeCastAuthorized flag carried through the onCast payload.
+// The popup delegates channel logic to the REAL isFreeCastAuthorized service
+// (spellPreparationService) — every channel (Natural Recovery, Bewitching
+// Magic, Spell Mastery, Signature Spells, Savants, automation free_spell
+// entries, buffs) has its own service suite (spellPreparationService.*.test.js).
+// This file proves only the component contract:
+//   • granted → classic "Free Cast" banner, Cast works at ZERO spell slots,
+//     payload carries freeCastAuthorized:true, popup never pays (no runtime writes);
+//   • denied → no banner, honest "No spell slots available" warning, Cast
+//     disabled and a click does nothing;
+//   • playerStats (automation entries) actually reach the service;
+//   • CLA-312: the component-owned upcast selector gates authorization on the
+//     EFFECTIVE level — upcasting revokes the free cast and pays the slot.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
@@ -26,7 +31,6 @@ const CAMPAIGN = 'test-campaign';
 const freeCastText = 'Free Cast — no spell slot consumed';
 const noSlotsText = 'No spell slots available for this level.';
 
-// Per-test fixtures via factories — no shared mutable objects.
 const makeSpell = (overrides = {}) => ({
   name: 'Magic Missile',
   level: 1,
@@ -40,7 +44,7 @@ const makeSpell = (overrides = {}) => ({
 });
 
 // Slots are deliberately EMPTY at every level in every test: any cast that
-// happens must be free. If an authorization check broke, the popup would show
+// happens must be free. If authorization broke, the popup would show
 // "No spell slots available" and disable Cast — the assertions catch it.
 const makeStats = (overrides = {}) => {
   const { automation: automationOverrides, spellAbilities: spellAbilitiesOverrides, ...rest } = overrides;
@@ -70,7 +74,7 @@ const stubRuntime = (values = {}) => {
 
 const renderPopup = (spell, playerStats = makeStats(), extraProps = {}) => {
   const onCast = extraProps.onCast || vi.fn();
-  render(
+  const utils = render(
     <SpellDetailPopup
       spell={spell}
       playerStats={playerStats}
@@ -80,22 +84,7 @@ const renderPopup = (spell, playerStats = makeStats(), extraProps = {}) => {
       {...extraProps}
     />
   );
-  return onCast;
-};
-
-// Authorized at zero slots: classic banner, no slot warning, Cast enabled —
-// the free cast is genuinely slotless, not incidentally paid.
-const expectFreeCastGranted = () => {
-  expect(screen.getByText(freeCastText)).toBeInTheDocument();
-  expect(screen.queryByText(noSlotsText)).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /Cast Spell/ })).toBeEnabled();
-};
-
-// Denied at zero slots: no banner, the slot warning appears, Cast disabled.
-const expectFreeCastDenied = () => {
-  expect(screen.queryByText(freeCastText)).not.toBeInTheDocument();
-  expect(screen.getByText(noSlotsText)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /Cast Spell/ })).toBeDisabled();
+  return { onCast, ...utils };
 };
 
 describe('SpellDetailPopup — Free Cast authorization', () => {
@@ -104,144 +93,42 @@ describe('SpellDetailPopup — Free Cast authorization', () => {
     vi.mocked(getRuntimeValue).mockReturnValue(null);
   });
 
-  describe('Natural Recovery', () => {
-    it('authorizes a spell on the recovery list, casting slotless at zero slots', () => {
-      stubRuntime({ naturalRecoveryFreeCast: ['Healing Word'] });
-      renderPopup(makeSpell({ name: 'Healing Word' }));
-      expectFreeCastGranted();
-    });
+  it('grants a free cast at zero slots (banner, enabled Cast) and reports it in the payload without paying', () => {
+    // Natural Recovery runtime lane (channel selection itself: service suites).
+    stubRuntime({ naturalRecoveryFreeCast: ['Healing Word'] });
+    const { onCast } = renderPopup(makeSpell({ name: 'Healing Word' }));
 
-    it('does not authorize a spell that is not on the recovery list', () => {
-      stubRuntime({ naturalRecoveryFreeCast: ['Healing Word'] });
-      renderPopup(makeSpell({ name: 'Fire Bolt', level: 0 }));
-      // Cantrips need no grant and no payment — deny means "no free-cast banner".
-      expect(screen.queryByText(freeCastText)).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Cast Spell/ })).toBeEnabled();
-    });
+    expect(screen.getByText(freeCastText)).toBeInTheDocument();
+    expect(screen.queryByText(noSlotsText)).not.toBeInTheDocument();
+    const castButton = screen.getByRole('button', { name: /Cast Spell/ });
+    expect(castButton).toBeEnabled();
 
-    it('does not authorize any spell when the recovery list is empty', () => {
-      stubRuntime({ naturalRecoveryFreeCast: [] });
-      renderPopup(makeSpell({ name: 'Healing Word' }));
-      expectFreeCastDenied();
-    });
+    fireEvent.click(castButton);
+    expect(onCast).toHaveBeenCalledTimes(1);
+    const payload = onCast.mock.calls[0][0];
+    expect(payload.name).toBe('Healing Word');
+    expect(payload.freeCastAuthorized).toBe(true);
+    expect(payload.isUpcast).toBe(false);
+    // The popup only authorizes and reports — payment/consumption happens
+    // downstream in prepareSpellCast, never fabricated here.
+    expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  describe('Bewitching Magic', () => {
-    it('authorizes Misty Step while the free-cast flag is up', () => {
-      stubRuntime({ '_Bewitching_Magic_freeCast': true });
-      renderPopup(makeSpell({ name: 'Misty Step', level: 2, casting_time: '1 bonus action', school: 'Conjuration' }));
-      expectFreeCastGranted();
-    });
+  it('denies a spell with no grant at zero slots: warning, disabled Cast, click does nothing', () => {
+    const { onCast } = renderPopup(makeSpell());
 
-    it('does not authorize other spells while the flag is up', () => {
-      stubRuntime({ '_Bewitching_Magic_freeCast': true });
-      renderPopup(makeSpell({ name: 'Fireball', level: 3 }));
-      expectFreeCastDenied();
-    });
+    expect(screen.queryByText(freeCastText)).not.toBeInTheDocument();
+    expect(screen.getByText(noSlotsText)).toBeInTheDocument();
+    const castButton = screen.getByRole('button', { name: /Cast Spell/ });
+    expect(castButton).toBeDisabled();
 
-    it('does not authorize Misty Step when the flag is absent', () => {
-      renderPopup(makeSpell({ name: 'Misty Step', level: 2, casting_time: '1 bonus action', school: 'Conjuration' }));
-      expectFreeCastDenied();
-    });
+    fireEvent.click(castButton);
+    expect(onCast).not.toHaveBeenCalled();
   });
 
-  describe('Spell Mastery', () => {
-    it('authorizes the level 1 mastery spell at its fixed level', () => {
-      stubRuntime({ SpellMastery_level1: 'Shield' });
-      renderPopup(makeSpell({ name: 'Shield', school: 'Abjuration' }));
-      expectFreeCastGranted();
-    });
-
-    it('does not authorize the mastery spell cast above its fixed level', () => {
-      stubRuntime({ SpellMastery_level1: 'Shield' });
-      renderPopup(makeSpell({ name: 'Shield', level: 2, school: 'Abjuration' }));
-      expectFreeCastDenied();
-    });
-
-    it('does not authorize a spell outside the mastery selection', () => {
-      stubRuntime({ SpellMastery_level1: 'Shield' });
-      renderPopup(makeSpell());
-      expectFreeCastDenied();
-    });
-  });
-
-  describe('Signature Spells', () => {
-    it('authorizes the selected level 3 spell while unused', () => {
-      stubRuntime({ SignatureSpells_selection: ['Fireball'], SignatureSpells_Fireball_used: false });
-      renderPopup(makeSpell({
-        name: 'Fireball',
-        level: 3,
-        damage: { damage_at_slot_level: { '3': '8d6', '4': '9d6' } },
-      }));
-      expectFreeCastGranted();
-    });
-
-    it('does not authorize the signature spell once it has been used', () => {
-      stubRuntime({ SignatureSpells_selection: ['Fireball'], SignatureSpells_Fireball_used: true });
-      renderPopup(makeSpell({
-        name: 'Fireball',
-        level: 3,
-        damage: { damage_at_slot_level: { '3': '8d6', '4': '9d6' } },
-      }));
-      expectFreeCastDenied();
-    });
-
-    it('does not authorize a spell outside the signature selection', () => {
-      stubRuntime({ SignatureSpells_selection: ['Fireball'], SignatureSpells_Fireball_used: false });
-      renderPopup(makeSpell());
-      expectFreeCastDenied();
-    });
-
-    // CLA-312: authorization is gated on the EFFECTIVE level — upcasting past
-    // the fixed level revokes the free cast, and the paid cast says so.
-    it('revokes the free cast and pays the slot when upcast above the fixed level', () => {
-      stubRuntime({ SignatureSpells_selection: ['Fireball'], SignatureSpells_Fireball_used: false });
-      const upcastLevels = [
-        { level: 3, formula: '8d6', availableSlots: 1 },
-        { level: 4, formula: '9d6', availableSlots: 1 },
-      ];
-      const onCast = renderPopup(
-        makeSpell({ name: 'Fireball', level: 3, damage: { damage_at_slot_level: { '3': '8d6', '4': '9d6' } } }),
-        makeStats(),
-        { upcastLevels }
-      );
-
-      // Default selection is the first available level (3) — free cast armed.
-      expectFreeCastGranted();
-
-      fireEvent.click(screen.getByRole('radio', { name: /Level 4/ }));
-      expect(screen.queryByText(freeCastText)).not.toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-      expect(onCast).toHaveBeenCalledTimes(1);
-      const payload = onCast.mock.calls[0][0];
-      expect(payload.freeCastAuthorized).toBe(false);
-      expect(payload.isUpcast).toBe(true);
-      expect(payload.upcastLevel).toBe(4);
-    });
-  });
-
-  describe('Divination Savant', () => {
-    it('authorizes the chosen spell while unused', () => {
-      stubRuntime({ '_Divination_Savant_selection': ['Warding Bond'], '_Divination_Savant_Warding_Bond_used': false });
-      renderPopup(makeSpell({ name: 'Warding Bond', level: 2, school: 'Abjuration' }));
-      expectFreeCastGranted();
-    });
-
-    it('does not authorize the chosen spell once used', () => {
-      stubRuntime({ '_Divination_Savant_selection': ['Warding Bond'], '_Divination_Savant_Warding_Bond_used': true });
-      renderPopup(makeSpell({ name: 'Warding Bond', level: 2, school: 'Abjuration' }));
-      expectFreeCastDenied();
-    });
-
-    it('does not authorize a spell outside the selection', () => {
-      stubRuntime({ '_Divination_Savant_selection': ['Warding Bond'], '_Divination_Savant_Warding_Bond_used': false });
-      renderPopup(makeSpell());
-      expectFreeCastDenied();
-    });
-  });
-
-  describe('Counter-based free_spell actions', () => {
+  it('authorizes the automation free_spell entry its counter names — and only that spell', () => {
+    // Proves playerStats.automation reaches the service and the grant is
+    // per-entry/per-spell, not blanket-free at zero slots.
     const smiteStats = () => makeStats({
       automation: {
         actions: [{
@@ -254,167 +141,45 @@ describe('SpellDetailPopup — Free Cast authorization', () => {
       },
     });
 
-    it('authorizes when the runtime counter is above zero', () => {
-      stubRuntime({ "_Paladin's_Smite_freeCastCount": 1 });
-      renderPopup(makeSpell({ name: 'Divine Smite' }), smiteStats());
-      expectFreeCastGranted();
-    });
+    stubRuntime({ "_Paladin's_Smite_freeCastCount": 1 });
+    const { unmount } = renderPopup(makeSpell({ name: 'Divine Smite' }), smiteStats());
+    expect(screen.getByText(freeCastText)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Cast Spell/ })).toBeEnabled();
+    unmount();
 
-    it('does not authorize when the runtime counter is spent (0)', () => {
-      stubRuntime({ "_Paladin's_Smite_freeCastCount": 0 });
-      renderPopup(makeSpell({ name: 'Divine Smite' }), smiteStats());
-      expectFreeCastDenied();
-    });
-
-    it('does not authorize a spell the action does not grant', () => {
-      stubRuntime({ "_Paladin's_Smite_freeCastCount": 1 });
-      renderPopup(makeSpell({ name: 'Fireball', level: 3 }), smiteStats());
-      expectFreeCastDenied();
-    });
-
-    it('falls back to the entry uses value when no runtime counter exists', () => {
-      renderPopup(
-        makeSpell({ name: 'Divine Smite' }),
-        makeStats({
-          automation: {
-            actions: [{ name: "Paladin's Smite", type: 'free_spell', spell: 'Divine Smite', uses: 1, recharge: 'long_rest' }],
-          },
-        })
-      );
-      expectFreeCastGranted();
-    });
-
-    it('does not authorize when the uses fallback is exhausted (0)', () => {
-      renderPopup(
-        makeSpell({ name: 'Divine Smite' }),
-        makeStats({
-          automation: {
-            actions: [{ name: "Paladin's Smite", type: 'free_spell', spell: 'Divine Smite', uses: 0, recharge: 'long_rest' }],
-          },
-        })
-      );
-      expectFreeCastDenied();
-    });
+    // Same counter up, different spell — must NOT be free.
+    renderPopup(makeSpell({ name: 'Fireball', level: 3 }), smiteStats());
+    expect(screen.queryByText(freeCastText)).not.toBeInTheDocument();
+    expect(screen.getByText(noSlotsText)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Cast Spell/ })).toBeDisabled();
   });
 
-  describe('Level-gated free_spell actions (Mystic Arcanum)', () => {
-    const arcanumStats = () => makeStats({
-      automation: {
-        actions: [{
-          name: 'Mystic Arcanum',
-          type: 'free_spell',
-          spell: 'level 8 spell',
-          uses_expression: '1/long rest',
-          usesMax: 1,
-        }],
-      },
-    });
+  // CLA-312: authorization is gated on the EFFECTIVE level the component owns —
+  // upcasting past the fixed level revokes the free cast, and the paid cast says so.
+  it('revokes the free cast and pays the slot when upcast above the fixed level', () => {
+    stubRuntime({ SignatureSpells_selection: ['Fireball'], SignatureSpells_Fireball_used: false });
+    const upcastLevels = [
+      { level: 3, formula: '8d6', availableSlots: 1 },
+      { level: 4, formula: '9d6', availableSlots: 1 },
+    ];
+    const { onCast } = renderPopup(
+      makeSpell({ name: 'Fireball', level: 3, damage: { damage_at_slot_level: { '3': '8d6', '4': '9d6' } } }),
+      makeStats(),
+      { upcastLevels }
+    );
 
-    it('authorizes at the feature\'s fixed spell level while the counter remains', () => {
-      stubRuntime({ '_Mystic_Arcanum_freeCastCount': 1 });
-      renderPopup(makeSpell({ name: 'Incendiary Cloud', level: 8, school: 'Evocation' }), arcanumStats());
-      expectFreeCastGranted();
-    });
+    // Default selection is the first available level (3) — free cast armed.
+    expect(screen.getByText(freeCastText)).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Level 3/ })).toBeChecked();
 
-    it('does not authorize a spell below the feature\'s fixed spell level', () => {
-      stubRuntime({ '_Mystic_Arcanum_freeCastCount': 1 });
-      renderPopup(makeSpell({ name: 'Power Word Stun', level: 7, school: 'Enchantment' }), arcanumStats());
-      expectFreeCastDenied();
-    });
-  });
+    fireEvent.click(screen.getByRole('radio', { name: /Level 4/ }));
+    expect(screen.queryByText(freeCastText)).not.toBeInTheDocument();
 
-  describe('Fey Reinforcements / Dragon Companion', () => {
-    it('authorizes the Fey Reinforcements spell by name', () => {
-      stubRuntime({ '_Fey_Reinforcements_freeCast': ["Hunter's Mark"] });
-      renderPopup(
-        makeSpell({ name: "Hunter's Mark", school: 'Conjuration' }),
-        makeStats({ automation: { actions: [{ name: 'Fey Reinforcements', type: 'fey_reinforcements', spell: "Hunter's Mark" }] } })
-      );
-      expectFreeCastGranted();
-    });
-
-    it('authorizes the Dragon Companion spell by name', () => {
-      stubRuntime({ '_Dragon_Companion_freeCast': ['Dragon Breath'] });
-      renderPopup(
-        makeSpell({ name: 'Dragon Breath' }),
-        makeStats({ automation: { actions: [{ name: 'Dragon Companion', type: 'dragon_companion', spell: 'Dragon Breath' }] } })
-      );
-      expectFreeCastGranted();
-    });
-  });
-
-  describe('Mantle of Majesty bonusActions', () => {
-    it('authorizes a spell sitting in the shared free-cast array', () => {
-      stubRuntime({ '_Mantle_of_Majesty_freeCast': ['Command'] });
-      renderPopup(
-        makeSpell({ name: 'Command', school: 'Enchantment' }),
-        makeStats({ automation: { bonusActions: [{ name: 'Mantle of Majesty', type: 'free_spell', spell: 'Command' }] } })
-      );
-      expectFreeCastGranted();
-    });
-
-    it('authorizes via the uses/recharge counter lane while uses remain', () => {
-      stubRuntime({ '_Test_Feature_freeCastCount': 2 });
-      renderPopup(
-        makeSpell({ name: 'Test Spell' }),
-        makeStats({ automation: { bonusActions: [{ name: 'Test Feature', type: 'free_spell', spell: 'Test Spell', uses: 2, recharge: 'long_rest' }] } })
-      );
-      expectFreeCastGranted();
-    });
-
-    it('does not authorize when the bonusActions counter is spent (0)', () => {
-      stubRuntime({ '_Test_Feature_freeCastCount': 0 });
-      renderPopup(
-        makeSpell({ name: 'Test Spell' }),
-        makeStats({ automation: { bonusActions: [{ name: 'Test Feature', type: 'free_spell', spell: 'Test Spell', uses: 2, recharge: 'long_rest' }] } })
-      );
-      expectFreeCastDenied();
-    });
-
-    it('does not authorize a spell the bonusActions entry does not grant', () => {
-      stubRuntime({ '_Test_Feature_freeCastCount': 2 });
-      renderPopup(
-        makeSpell({ name: 'Fireball', level: 3 }),
-        makeStats({ automation: { bonusActions: [{ name: 'Test Feature', type: 'free_spell', spell: 'Test Spell', uses: 2, recharge: 'long_rest' }] } })
-      );
-      expectFreeCastDenied();
-    });
-  });
-
-  describe('Mantle of Majesty active buff', () => {
-    it('authorizes Command while Mantle of Majesty is an active buff', () => {
-      stubRuntime({ activeBuffs: [{ name: 'Mantle of Majesty' }] });
-      renderPopup(makeSpell({ name: 'Command', school: 'Enchantment' }));
-      expectFreeCastGranted();
-    });
-
-    it('does not authorize Command when Mantle of Majesty is not active', () => {
-      renderPopup(makeSpell({ name: 'Command', school: 'Enchantment' }));
-      expectFreeCastDenied();
-    });
-
-    it('does not authorize other spells while Mantle of Majesty is active', () => {
-      stubRuntime({ activeBuffs: [{ name: 'Mantle of Majesty' }] });
-      renderPopup(makeSpell({ name: 'Fireball', level: 3 }));
-      expectFreeCastDenied();
-    });
-  });
-
-  describe('Cast payload integrity', () => {
-    it('carries freeCastAuthorized:true on cast and never touches runtime state from the popup', () => {
-      stubRuntime({ naturalRecoveryFreeCast: ['Healing Word'] });
-      const onCast = renderPopup(makeSpell({ name: 'Healing Word' }));
-
-      fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
-
-      expect(onCast).toHaveBeenCalledTimes(1);
-      const payload = onCast.mock.calls[0][0];
-      expect(payload.name).toBe('Healing Word');
-      expect(payload.freeCastAuthorized).toBe(true);
-      expect(payload.isUpcast).toBe(false);
-      // The popup only authorizes and reports — payment/consumption happens
-      // downstream in prepareSpellCast, never fabricated here.
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
+    fireEvent.click(screen.getByRole('button', { name: /Cast Spell/ }));
+    expect(onCast).toHaveBeenCalledTimes(1);
+    const payload = onCast.mock.calls[0][0];
+    expect(payload.freeCastAuthorized).toBe(false);
+    expect(payload.isUpcast).toBe(true);
+    expect(payload.upcastLevel).toBe(4);
   });
 });

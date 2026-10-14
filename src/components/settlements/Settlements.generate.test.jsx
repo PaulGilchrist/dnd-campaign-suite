@@ -1,20 +1,17 @@
-// Generate-settlement behavior only. Intentionally NOT duplicated here
-// (covered in sibling files):
-//   - generate button disabled / "Generating…" label / re-enabled on success
-//       -> Settlements.modalActions.test.jsx
-//   - modal open/close mechanics for new and edit settlements
-//       -> Settlements.modalActions.test.jsx
-//   - error logging pattern (generic save/delete failure)
-//       -> Settlements.saveDelete.test.jsx
-//   - generator input arguments (implementation detail)
-//       -> removed (covered implicitly by modal-content test below)
+// @maintained-by-ai: 2026-10-14
+// Generate-settlement behavior only: the generator's output lands in the new-
+// settlement modal as a fully prefilled draft, and failures are logged without
+// opening the modal. Intentionally NOT duplicated here (sibling lanes):
+//   - generate button disabled/"Generating…"/re-enabled, modal open/close,
+//     delete-button visibility -> Settlements.modalActions.test.jsx
+//   - generic save/delete error logging -> Settlements.saveDelete.test.jsx
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 import { generateSettlement } from '../../services/campaign/settlementGenerator.js';
 
 // Module-level mock store captured by the vi.mock factory. Tests mutate its
-// `items` field before rendering so the component reads fresh state.
+// fields before rendering so the component reads fresh state.
 const settlementMockStore = {
   items: [],
   loading: false,
@@ -46,6 +43,7 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
   generateSettlement: vi.fn(),
 }));
 
+// Mirrors the exact shape settlementGenerator.generateSettlement() returns.
 const generatedSettlement = {
   name: 'Generated Town',
   size: 'town',
@@ -80,15 +78,13 @@ describe('Settlements - generate settlement', () => {
     vi.restoreAllMocks();
   });
 
-  const renderSettlements = () => render(<Settlements campaignName="test" onBack={() => {}} />);
-
-  const clickGenerate = () => {
+  const renderAndGenerate = () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /generate settlement/i }));
   };
 
   it('opens the new settlement modal prefilled with every generated field', async () => {
-    renderSettlements();
-    clickGenerate();
+    renderAndGenerate();
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'New Settlement' })).toBeInTheDocument();
@@ -114,19 +110,11 @@ describe('Settlements - generate settlement', () => {
   it('logs the error, keeps the modal closed, and re-enables the button when generation fails', async () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(generateSettlement).mockRejectedValueOnce(new Error('Generation failed'));
-    renderSettlements();
-    const genBtn = screen.getByRole('button', { name: /generate settlement/i });
-    clickGenerate();
+    renderAndGenerate();
 
-    await waitFor(() => {
-      expect(generateSettlement).toHaveBeenCalled();
-    });
     await waitFor(() => {
       expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to generate settlement:', expect.any(Error));
-    });
-
-    await waitFor(() => {
-      expect(genBtn).toBeEnabled();
+      expect(screen.getByRole('button', { name: /generate settlement/i })).toBeEnabled();
     });
 
     expect(screen.queryByRole('heading', { name: 'New Settlement' })).not.toBeInTheDocument();

@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Coverage ownership (CharSummary family delegation): runtime-store-driven damage
 // types on the "Resistances:" row (charSummaryCalc.js computeResistances) —
@@ -6,33 +6,30 @@
 //   - '_Fiendish_Resilience_chosenType'   (single value)
 //   - 'epitomeResistanceType'             (single value)
 //   - '_Energy_Resistances_chosenTypes'   (array, Boon of Energy Resistance)
-//   - '_Elemental_Adept_chosenType'       (array of passives via collectElementalAdeptTypes)
-// plus deduplication of these runtime inputs against other sources.
+//   - '_Elemental_Adept_chosenType'       (collected from damage_type_choice
+//                                            passives via collectElementalAdeptTypes)
+//
+// This file is ALSO the single owner of the Resistances-row row-text contract
+// (lowercase→capitalized values, ", " separator, join order) per the
+// CharSummary-OtherEffects delegation — sibling row pins are lane-local only.
 //
 // NOT owned here (delegated to siblings — do not re-add):
 //   - buff-derived resistanceTypes / Feign Death / Stone Skin buffs → CharSummary-BuffResistances.test.jsx
 //   - auraComboEffects resistances + asterisk markers → CharSummary-AuraAndInitiative.test.jsx
 //   - Stormborn gated on wrathOfTheSeaActive → CharSummary-AdditionalCoverage.test.jsx
-//   - base playerStats.resistances verbatim row → CharSummary-OtherEffects.test.jsx
+//   - empty-fixture row omission baseline → CharSummary-FixtureContract.test.jsx
 //   - rest persistence of the chosen keys → services/rules/effects/restRules-*.test.js
 //
-// Quality improvements over previous revision (8 tests / 17 runs → 10 tests / 19 runs):
-//   - All assertions are scoped to the "Resistances:" row and pin the FULL row
-//     text (label + capitalization + join order). The previous page-wide
-//     getByText(/Fire/) regex passed if "Fire" appeared in any element anywhere
-//     (badges, tooltips, sibling rows) and proved nothing about the resistance row.
-//   - Negatives now assert the ENTIRE row is absent (queryByText('Resistances:')),
-//     not just absence of one type name scattered across the page.
-//   - Added missing edge/negative paths: elemental_adept effect filter (a
-//     damage_type_choice passive with a different effect must not contribute),
-//     the typeof-string filter in ResistanceImmunityLines (null entries in the
-//     boon array must not render), and dedup ACROSS two runtime sources
-//     (fiendish + boon energy granting the same type) — previously only
-//     runtime-vs-base dedup was tested.
-//   - One module-level beforeEach replaces five identical blocks; a mockRuntime()
-//     helper replaces repeated if-chain mockImplementations.
-//   - Pins the runtime wiring (player name + campaign) once, so a key looked up
-//     against the wrong character store fails here.
+// Trimmed vs previous revision (10 tests / 19 runs → 4 tests / 4 runs): every
+// it.each over multiple damage types and every per-key falsy negative re-exercised
+// the SAME paths (render-time charAt(0).toUpperCase(), singleToArray()/|| [] on any
+// falsy, one Set for dedup) — one representative per path pins them equally well.
+// The two-source and three-source dedup tests plus the multi-source join-order test
+// collapse into one all-sources merge test. Each of the four runtime keys still has
+// a UNIQUE-contribution detection: fiendish via test 1, epitome/boon/adept via the
+// merge test (removing any getRuntimeValue read in computeResistances fails there).
+// Runtime-vs-empty-store negatives are kept exactly once, runtime-lane only
+// (BuffResistances' allow-list negative covers the buff lane).
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -133,6 +130,17 @@ beforeEach(() => {
     getActiveBuffs.mockReturnValue([]);
 });
 
+const elementalAdeptPassives = [
+    { type: 'damage_type_choice', effect: 'elemental_adept', name: 'Elemental Adept' },
+];
+
+function statsWithPassives(passives) {
+    return {
+        ...mockPlayerStats,
+        automation: { ...mockPlayerStats.automation, passives },
+    };
+}
+
 function renderSummary(stats = mockPlayerStats) {
     render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
 }
@@ -143,7 +151,8 @@ function mockRuntime(values) {
     vi.mocked(getRuntimeValue).mockImplementation((_name, key) => values[key]);
 }
 
-// Exact (not substring) row match so duplicates or wrong join order fail.
+// Exact (not substring) row match so duplicates, wrong capitalization, or
+// wrong join order fail — this is the family's row-text contract pin.
 function expectResistancesRow(expectedRowText) {
     const row = screen.getByText('Resistances:').closest('div');
     expect(row.textContent.replace(/\s+/g, ' ').trim()).toBe(expectedRowText);
@@ -153,156 +162,46 @@ function expectNoResistancesRow() {
     expect(screen.queryByText('Resistances:')).not.toBeInTheDocument();
 }
 
-// ---------------------------------------------------------------------------
-// Fiendish Resilience — single runtime value folded into the Resistances row
-// ---------------------------------------------------------------------------
-describe('CharSummary - Fiendish Resilience', () => {
-    it.each(['fire', 'poison', 'cold'])(
-        'shows capitalized %s as the only resistance when chosenType is set',
-        (type) => {
-            mockRuntime({ '_Fiendish_Resilience_chosenType': type });
-            renderSummary();
-            expectResistancesRow(`Resistances: ${type.charAt(0).toUpperCase()}${type.slice(1)}`);
-            // Runtime lookups must be scoped to this character and campaign.
-            expect(getRuntimeValue).toHaveBeenCalledWith('Thorin', '_Fiendish_Resilience_chosenType', mockCampaignName);
-        }
-    );
-
-    it.each([['not set (undefined)', undefined], ['null', null]])(
-        'shows no Resistances row when chosenType is %s',
-        (_label, value) => {
-            mockRuntime({ '_Fiendish_Resilience_chosenType': value });
-            renderSummary();
-            expectNoResistancesRow();
-        }
-    );
-});
-
-// ---------------------------------------------------------------------------
-// Elemental Epitome — single runtime value folded into the Resistances row
-// ---------------------------------------------------------------------------
-describe('CharSummary - Elemental Epitome', () => {
-    it.each(['lightning', 'acid'])(
-        'shows capitalized %s as the only resistance when epitomeResistanceType is set',
-        (type) => {
-            mockRuntime({ epitomeResistanceType: type });
-            renderSummary();
-            expectResistancesRow(`Resistances: ${type.charAt(0).toUpperCase()}${type.slice(1)}`);
-        }
-    );
-
-    it('shows no Resistances row when epitomeResistanceType is not set', () => {
-        mockRuntime({});
-        renderSummary();
-        expectNoResistancesRow();
-    });
-});
-
-// ---------------------------------------------------------------------------
-// Boon of Energy Resistance — array runtime value
-// ---------------------------------------------------------------------------
-describe('CharSummary - Boon of Energy Resistance', () => {
-    it('lists every chosen type, capitalized, in stored order', () => {
-        mockRuntime({ '_Energy_Resistances_chosenTypes': ['fire', 'cold'] });
-        renderSummary();
-        expectResistancesRow('Resistances: Fire, Cold');
-    });
-
-    it.each([['null', null], ['an empty array', []]])(
-        'shows no Resistances row when the chosen types value is %s',
-        (_label, value) => {
-            mockRuntime({ '_Energy_Resistances_chosenTypes': value });
-            renderSummary();
-            expectNoResistancesRow();
-        }
-    );
-
-    it('filters non-string entries out of the chosen types array', () => {
-        mockRuntime({ '_Energy_Resistances_chosenTypes': ['fire', null, undefined] });
+describe('CharSummary - runtime resistance sources on the Resistances row', () => {
+    it('shows the Fiendish Resilience chosen type capitalized, looked up on this character and campaign', () => {
+        mockRuntime({ '_Fiendish_Resilience_chosenType': 'fire' });
         renderSummary();
         expectResistancesRow('Resistances: Fire');
+        // Runtime lookups must be scoped to this character and campaign; a read
+        // against the wrong store fails here (single-value + capitalization lane).
+        expect(getRuntimeValue).toHaveBeenCalledWith('Thorin', '_Fiendish_Resilience_chosenType', mockCampaignName);
     });
-});
 
-// ---------------------------------------------------------------------------
-// Elemental Adept — types collected from damage_type_choice passives, keyed
-// by passive name ('_Elemental_Adept_chosenType')
-// ---------------------------------------------------------------------------
-describe('CharSummary - Elemental Adept', () => {
-    const elementalAdeptPassives = [
-        { type: 'damage_type_choice', effect: 'elemental_adept', name: 'Elemental Adept' },
-    ];
-
-    function statsWithPassives(passives) {
-        return {
-            ...mockPlayerStats,
-            automation: { ...mockPlayerStats.automation, passives },
-        };
-    }
-
-    it.each(['fire', 'cold'])(
-        'shows capitalized %s chosen via the elemental_adept passive',
-        (type) => {
-            mockRuntime({ '_Elemental_Adept_chosenType': type });
-            renderSummary(statsWithPassives(elementalAdeptPassives));
-            expectResistancesRow(`Resistances: ${type.charAt(0).toUpperCase()}${type.slice(1)}`);
-        }
-    );
-
-    it('shows no Resistances row when the passive exists but no type is chosen', () => {
+    it('omits the Resistances row when no runtime choice exists, even with an Elemental Adept passive present', () => {
         mockRuntime({});
         renderSummary(statsWithPassives(elementalAdeptPassives));
         expectNoResistancesRow();
     });
 
-    it('ignores damage_type_choice passives whose effect is not elemental_adept', () => {
+    it('ignores a damage_type_choice passive whose effect is not elemental_adept, even when its chosen type is stored', () => {
         mockRuntime({ '_Energy_Weapons_chosenType': 'fire' });
         renderSummary(statsWithPassives([
             { type: 'damage_type_choice', effect: 'energy_weapons', name: 'Energy Weapons' },
         ]));
         expectNoResistancesRow();
     });
-});
 
-// ---------------------------------------------------------------------------
-// Deduplication: runtime-set types already present via another source are
-// listed exactly once
-// ---------------------------------------------------------------------------
-describe('CharSummary - Resistance deduplication', () => {
-    it('does not repeat a runtime fiendish type already in base resistances', () => {
-        mockRuntime({ '_Fiendish_Resilience_chosenType': 'fire' });
-        renderSummary({ ...mockPlayerStats, resistances: ['fire'] });
-        expectResistancesRow('Resistances: Fire');
-    });
-
-    it('does not repeat a runtime epitome type already in base resistances', () => {
-        mockRuntime({ epitomeResistanceType: 'lightning' });
-        renderSummary({ ...mockPlayerStats, resistances: ['lightning'] });
-        expectResistancesRow('Resistances: Lightning');
-    });
-
-    it('does not repeat a type granted by two different runtime sources', () => {
+    it('merges epitome, fiendish, boon, and Elemental Adept types with base resistances — deduped, non-strings dropped, in computed order', () => {
         mockRuntime({
-            '_Fiendish_Resilience_chosenType': 'fire',
-            '_Energy_Resistances_chosenTypes': ['fire', 'cold'],
+            epitomeResistanceType: 'lightning',                                    // unique, joins after base
+            '_Fiendish_Resilience_chosenType': 'fire',                           // deduped vs base
+            '_Energy_Resistances_chosenTypes': ['poison', 'cold', null, 'fire'], // order kept; null filtered at render; fire deduped across sources
+            '_Elemental_Adept_chosenType': 'acid',                               // key derived from passive name
         });
-        renderSummary();
-        expectResistancesRow('Resistances: Fire, Cold');
-    });
-});
-
-// ---------------------------------------------------------------------------
-// Multiple runtime sources active together — pins join order
-// (epitome → fiendish → boon energy, per computeResistances insertion order)
-// ---------------------------------------------------------------------------
-describe('CharSummary - Multiple runtime resistance sources together', () => {
-    it('renders all three sources once, in computed order', () => {
-        mockRuntime({
-            epitomeResistanceType: 'lightning',
-            '_Fiendish_Resilience_chosenType': 'fire',
-            '_Energy_Resistances_chosenTypes': ['poison', 'radiant'],
+        renderSummary({
+            ...statsWithPassives([
+                ...elementalAdeptPassives,
+                { type: 'damage_type_choice', effect: 'energy_weapons', name: 'Energy Weapons' },
+            ]),
+            resistances: ['fire'],
         });
-        renderSummary();
-        expectResistancesRow('Resistances: Lightning, Fire, Poison, Radiant');
+        // Pins base→epitome→fiendish→boon→adept join order: dropping or
+        // reordering any getRuntimeValue read in computeResistances fails here.
+        expectResistancesRow('Resistances: Fire, Lightning, Poison, Cold, Acid');
     });
 });

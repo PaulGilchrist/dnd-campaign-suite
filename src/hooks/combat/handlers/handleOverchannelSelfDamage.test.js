@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 // CLA-244 regression: Overchannel backlash dice count — dicePerLevel = max(2, useCount),
 // scaled by slot level; use #1 deals no damage; IRV-ignore note preserved.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -5,12 +6,10 @@ import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
   rollExpression: vi.fn((formula) => {
-    if (!formula) return null;
-    const match = formula.match(/^(\d+)d(\d+)$/i);
+    const match = formula?.match(/^(\d+)d(\d+)$/i);
     if (!match) return null;
-    const count = parseInt(match[1], 10);
-    const rolls = Array(count).fill(6);
-    return { total: rolls.reduce((s, r) => s + r, 0), rolls, modifier: 0 };
+    const rolls = Array(parseInt(match[1], 10)).fill(6);
+    return { total: rolls.length * 6, rolls, modifier: 0 };
   }),
 }));
 
@@ -25,31 +24,27 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
 import { rollExpression } from '../../../services/dice/diceRoller.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 
-const characters = [];
+const invoke = async (context) => {
+  const logEntry = vi.fn();
+  await handleOverchannelSelfDamage('TestWizard', 'test-campaign', context, logEntry, []);
+  return logEntry;
+};
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+beforeEach(() => vi.clearAllMocks());
 
 describe('handleOverchannelSelfDamage — CLA-244 backlash dice count', () => {
-  it('rolls nothing when overchannel is inactive', async () => {
-    const logEntry = vi.fn();
-    await handleOverchannelSelfDamage('TestWizard', 'test-campaign', { overchannelActive: false, overchannelUseCount: 2, overchannelSpellLevel: 2 }, logEntry, characters);
-    expect(rollExpression).not.toHaveBeenCalled();
-    expect(logEntry).not.toHaveBeenCalled();
-  });
-
-  it('rolls nothing on first use (useCount 1)', async () => {
-    const logEntry = vi.fn();
-    await handleOverchannelSelfDamage('TestWizard', 'test-campaign', { overchannelActive: true, overchannelUseCount: 1, overchannelSpellLevel: 2 }, logEntry, characters);
+  it.each([
+    ['overchannel inactive', { overchannelActive: false, overchannelUseCount: 2, overchannelSpellLevel: 2 }],
+    ['first use (useCount 1)', { overchannelActive: true, overchannelUseCount: 1, overchannelSpellLevel: 2 }],
+  ])('rolls nothing when %s', async (_label, context) => {
+    const logEntry = await invoke(context);
     expect(rollExpression).not.toHaveBeenCalled();
     expect(applyDamageToTarget).not.toHaveBeenCalled();
     expect(logEntry).not.toHaveBeenCalled();
   });
 
   it('rolls 4d12 for use #2 level 2 slot and applies ignoring resistance/immunity', async () => {
-    const logEntry = vi.fn();
-    await handleOverchannelSelfDamage('TestWizard', 'test-campaign', { overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 2 }, logEntry, characters);
+    const logEntry = await invoke({ overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 2 });
 
     expect(rollExpression).toHaveBeenCalledWith('4d12');
     expect(applyDamageToTarget).toHaveBeenCalledWith(
@@ -70,22 +65,17 @@ describe('handleOverchannelSelfDamage — CLA-244 backlash dice count', () => {
     }));
   });
 
-  it('rolls 9d12 for use #3 level 3 slot (dicePerLevel = useCount)', async () => {
-    const logEntry = vi.fn();
-    await handleOverchannelSelfDamage('TestWizard', 'test-campaign', { overchannelActive: true, overchannelUseCount: 3, overchannelSpellLevel: 3 }, logEntry, characters);
-    expect(rollExpression).toHaveBeenCalledWith('9d12');
-  });
-
-  it('rolls 2d12 for use #2 level 1 slot', async () => {
-    const logEntry = vi.fn();
-    await handleOverchannelSelfDamage('TestWizard', 'test-campaign', { overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 1 }, logEntry, characters);
-    expect(rollExpression).toHaveBeenCalledWith('2d12');
+  it.each([
+    [2, 1, '2d12'],
+    [3, 3, '9d12'],
+  ])('use #%i level %i slot rolls %s', async (useCount, spellLevel, formula) => {
+    await invoke({ overchannelActive: true, overchannelUseCount: useCount, overchannelSpellLevel: spellLevel });
+    expect(rollExpression).toHaveBeenCalledWith(formula);
   });
 
   it('does not apply or log when the roll fails', async () => {
     rollExpression.mockReturnValueOnce(null);
-    const logEntry = vi.fn();
-    await handleOverchannelSelfDamage('TestWizard', 'test-campaign', { overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 2 }, logEntry, characters);
+    const logEntry = await invoke({ overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 2 });
     expect(applyDamageToTarget).not.toHaveBeenCalled();
     expect(logEntry).not.toHaveBeenCalled();
   });

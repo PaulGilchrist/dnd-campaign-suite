@@ -1,4 +1,4 @@
-// @improved-by-ai
+// @maintained-by-ai
 //
 // Coverage ownership (CharSummary family delegation):
 //   OWNED HERE (per sibling delegation comments):
@@ -14,32 +14,26 @@
 //   - 'open-short-rest' window event → CharSummary-EventHandlers.test.jsx
 //   - Background popup → CharSummary-UI-Interactions.test.jsx
 //
-// Improvements (2026-10-14):
-//   - Deleted both window.location hostname fiddles (~40 lines): vitest's jsdom
-//     is configured with url http://localhost/, so isLocalhost was already true —
-//     the defineProperty save/restore machinery was pure noise.
-//   - Imports shared mockPlayerStats/mockCampaignName from
-//     CharSummary.test-mocks.test.jsx instead of duplicating the fixture.
-//   - Inspiration tests now prove the checkbox DISPLAY follows the tracked
-//     resource (rerender with the new value → checked flips), not just that
-//     update was called; added toHaveBeenCalledTimes(1) so double-fire bugs
-//     fail. Dropped the assertion on the test's own mock-captured variable
-//     (tautological — it only re-checked the update spy argument).
-//   - Ally error test: console.error spy installed BEFORE the confirm click
-//     and asserts the exact Error instance is forwarded verbatim (was
-//     expect.any(Error)). Also asserts allies are still persisted via
-//     setRuntimeValue despite the log failure, and the sheet stays mounted.
-//   - Replaced the fragile single `await Promise.resolve()` microtask flush
-//     (and its inaccurate "flushMicrotasks() helper" comment) with waitFor.
-//   - Added a never-settling addEntry test: a hung log request must still not
-//     trap the modal or block persistence (modal close is synchronous by
-//     design — setShowAllyModal(false) fires before the await).
-//   - Added negative path: modal absent before the allies badge is clicked.
-//
-// Before: 3 tests / 207 lines
-// After:  4 tests / ~190 lines
+// Audit trim (2026-10-14): 4 tests / 221 lines → 3 tests / ~170 lines.
+//   - Verified all three tests kill their production lanes (mutation run —
+//     flipped the inspiration toggle / removed console.error / reordered
+//     setShowAllyModal before the persistence write); nothing was weak.
+//   - Inspiration it.each collapsed to ONE test: the toggle is a single
+//     `!hasInspiration` lane, so the false→true arm is fully behavioral and
+//     the true→false arm only duplicated it through the mock-echo rerender
+//     (which proves a mock, not production).
+//   - Ally suite: the never-settling-log test collapsed into the rejecting-log
+//     test — synchronously-closed-modal + persisted-allies are already asserted
+//     there before the rejection settles; an unhandled non-settling promise
+//     was the only (marginal) extra signal.
+//   - AllySelectionModal mock is now conditional: the never-opened modal renders
+//     nothing, so the "modal absent before click" negative is observable against
+//     the REAL modal instead of being an assertion about the test's own mock.
+//   - Dropped the unobservable "sheet stays mounted" assertion (its assertions
+//     live on document.body and survive component unmount) — replaced by the
+//     badge count staying pinned at 1 after the failed log.
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
 import { addEntry } from '../../../services/ui/logService.js';
@@ -62,21 +56,21 @@ vi.mock('../ShortRestButton.jsx', () => ({ default: () => <div data-testid="shor
 vi.mock('../ShortRestModal.jsx', () => ({ default: () => <div data-testid="short-rest-modal">Short Rest Modal</div> }));
 vi.mock('./CharConditions.jsx', () => ({ default: () => <div data-testid="char-conditions">Conditions</div> }));
 
-// AllySelectionModal stand-in: exposes the two confirm paths (with the
-// currentAllies it received) and cancel.
+// AllySelectionModal stand-in: renders NOTHING while closed so the
+// "absent before the badge click" negative is production behavior, and
+// exposes the confirm path with the currentAllies it received.
 vi.mock('../../common/AllySelectionModal.jsx', () => ({
-    default: ({ onConfirm, onCancel, currentAllies }) => (
+    default: ({ currentAllies, onConfirm }) => (
         <div data-testid="ally-selection-modal">
             Select Allies
             <button data-testid="ally-confirm" onClick={() => onConfirm(currentAllies)}>Confirm</button>
-            <button data-testid="ally-cancel" onClick={onCancel}>Cancel</button>
         </div>
     ),
 }));
 
-// Tracked-resource hook: default off (inspiration); tests override per-case.
+// Tracked-resource hook: tests pin the reported value per-case.
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
-    default: vi.fn(({ maxGetter }) => ({ current: maxGetter(), update: vi.fn() })),
+    default: vi.fn(() => ({ current: false, update: vi.fn() })),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -140,32 +134,23 @@ function renderSummary(props = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Inspiration toggle — display follows the tracked resource; one update per
-// click with the toggled value.
+// Inspiration toggle — clicking the checkbox pushes the toggled value to the
+// tracked resource exactly once (the checkbox's checked state is production
+// markup bound to the same `hasInspiration` value).
 // ---------------------------------------------------------------------------
 describe('CharSummary - Inspiration Toggle', () => {
-    it.each`
-        startingValue | expectedAfterToggle
-        ${false}      | ${true}
-        ${true}       | ${false}
-    `('checkbox shows $startingValue and one click updates the tracked resource to $expectedAfterToggle', ({ startingValue, expectedAfterToggle }) => {
+    it('clicking the inspiration checkbox updates the tracked resource to the toggled value', () => {
         const update = vi.fn();
-        vi.mocked(useTrackedResource).mockReturnValue({ current: startingValue, update });
-        const { rerender } = renderSummary();
+        vi.mocked(useTrackedResource).mockReturnValue({ current: false, update });
+        renderSummary();
 
         const checkbox = screen.getByRole('checkbox');
-        expect(checkbox.checked).toBe(startingValue);
+        expect(checkbox.checked).toBe(false);
 
         fireEvent.click(checkbox);
 
         expect(update).toHaveBeenCalledTimes(1);
-        expect(update).toHaveBeenCalledWith(expectedAfterToggle);
-
-        // Display is driven by the tracked resource, not local state:
-        // once the hook reports the toggled value, the checkbox reflects it.
-        vi.mocked(useTrackedResource).mockReturnValue({ current: expectedAfterToggle, update });
-        rerender(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
-        expect(screen.getByRole('checkbox').checked).toBe(expectedAfterToggle);
+        expect(update).toHaveBeenCalledWith(true);
     });
 });
 
@@ -184,38 +169,26 @@ describe('CharSummary - Ally Modal Confirm Error Path', () => {
         consoleErrorSpy.mockRestore();
     });
 
-    function openModalAndConfirm() {
-        expect(screen.queryByTestId('ally-selection-modal')).not.toBeInTheDocument();
-        fireEvent.click(screen.getByText(/Allies \(1\)/));
-        expect(screen.getByTestId('ally-selection-modal')).toBeInTheDocument();
-        fireEvent.click(screen.getByTestId('ally-confirm'));
-    }
-
-    it('forwards the rejection to console.error verbatim while still persisting allies and closing the modal', async () => {
+    it('closes the modal and persists allies before the log rejection settles, forwarding the exact error to console.error', async () => {
         const logError = new Error('log failed');
         addEntry.mockRejectedValue(logError);
         renderSummary();
 
-        openModalAndConfirm();
-
-        // Modal closes synchronously — before the log promise settles.
+        // Modal is not mounted until the allies badge is clicked.
         expect(screen.queryByTestId('ally-selection-modal')).not.toBeInTheDocument();
-        // A failed log must not block ally persistence.
-        expect(setRuntimeValue).toHaveBeenCalledWith(mockPlayerStats.name, 'selectedAllies', [mockPlayerStats.name], mockCampaignName);
-        // The exact Error instance is reported verbatim.
-        await waitFor(() => expect(consoleErrorSpy).toHaveBeenCalledWith('[CharSummary] Error logging ally selection:', logError));
-        // The sheet survives the failed log.
-        expect(screen.getByText(mockPlayerStats.name)).toBeInTheDocument();
-    });
+        fireEvent.click(screen.getByText(/Allies \(1\)/));
+        expect(screen.getByTestId('ally-selection-modal')).toBeInTheDocument();
 
-    it('closes the modal and persists allies even when the campaign log never settles', () => {
-        addEntry.mockReturnValue(new Promise(() => {}));
-        renderSummary();
+        fireEvent.click(screen.getByTestId('ally-confirm'));
 
-        openModalAndConfirm();
-
+        // Modal close + ally persistence are synchronous — neither waits on
+        // (nor is blocked by) the campaign log.
         expect(screen.queryByTestId('ally-selection-modal')).not.toBeInTheDocument();
         expect(setRuntimeValue).toHaveBeenCalledWith(mockPlayerStats.name, 'selectedAllies', [mockPlayerStats.name], mockCampaignName);
-        expect(consoleErrorSpy).not.toHaveBeenCalled();
+        // The badge reflects the persisted selection, not just the write call.
+        expect(screen.getByText(/Allies \(1\)/)).toBeInTheDocument();
+
+        // The exact Error instance is reported verbatim once the log rejects.
+        await vi.waitFor(() => expect(consoleErrorSpy).toHaveBeenCalledWith('[CharSummary] Error logging ally selection:', logError), { timeout: 2000 });
     });
 });
