@@ -1,4 +1,20 @@
-import { render, screen, waitFor } from '@testing-library/react';
+// @improved-by-ai
+// App-level wiring tests for the post-rollback carry-over flow.
+//
+// CampaignAdmin's rollback handler writes a 'postRestoreNotice' to sessionStorage
+// right before its full page reload. On boot, App must consume it: auto-select
+// the campaign, land the GM on the Admin view (NOT the character sheet), and
+// show a banner naming the restored snapshot.
+//
+// Unit-level behavior of the same feature is covered elsewhere and is
+// deliberately NOT re-tested here:
+// - hooks/ui/usePostRestoreNotice.test.js               → notice parsing/consumption,
+//                                                          consumeRestore gating, banner drop
+// - components/campaign-selection/CampaignSelection.test.jsx → auto-select prop behavior
+// - components/campaign-admin/CampaignAdmin.rollback-upload.test.jsx → writing the notice,
+//                                                          rendering the success banner
+
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App.jsx';
 
@@ -43,13 +59,15 @@ vi.mock('./hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
+// useAppData is mocked (not the hook under test) so App renders instantly
+// with deterministic rule data instead of fetching 20+ JSON files.
 const _appDataRef = { value: null };
 
 vi.mock('./hooks/runtime/useAppData.js', () => ({
   default: vi.fn(() => _appDataRef.value),
 }));
 
-// --- Component mocks ---
+// --- Heavy child components replaced with test doubles ---
 
 vi.mock('./components/char-sheet/CharSheet.jsx', async () => {
   const { MockCharSheet } = await import('./test/mockComponents.jsx');
@@ -104,7 +122,10 @@ vi.mock('./components/log/Log.jsx', async () => {
   return { default: MockLog };
 });
 
-// CampaignSelection mock honoring the post-rollback auto-select prop.
+// CampaignSelection double: auto-selects without a click when App passes
+// autoSelectCampaign (mirrors the real component, verified in its own test
+// file), and still offers a manual select button so the no-notice flow can
+// be exercised end-to-end.
 vi.mock('./components/campaign-selection/CampaignSelection.jsx', async () => {
   const React = await import('react');
   const { mockState } = await import('./test/appTestState.js');
@@ -115,12 +136,22 @@ vi.mock('./components/campaign-selection/CampaignSelection.jsx', async () => {
           onCampaignSelect(autoSelectCampaign, mockState.characters);
         }
       }, [autoSelectCampaign, onCampaignSelect]);
-      return React.createElement('div', { 'data-testid': 'campaign-selection' });
+      return (
+        <div data-testid="campaign-selection">
+          <button
+            data-testid="select-campaign-btn"
+            onClick={() => onCampaignSelect(mockState.campaignName, mockState.characters)}
+          >
+            Select Campaign
+          </button>
+        </div>
+      );
     },
   };
 });
 
-// CampaignAdmin mock echoing the restored-snapshot banner prop.
+// CampaignAdmin double echoing the restoredSnapshot prop so the App-level
+// prop wiring (hook state → banner) is observable.
 vi.mock('./components/campaign-admin/CampaignAdmin.jsx', () => ({
   default: ({ campaignName, restoredSnapshot }) => (
     <div data-testid="campaign-admin">
@@ -136,7 +167,15 @@ vi.mock('./components/common/Subscriber.jsx', () => ({
   default: function MockSubscriber() { return null; },
 }));
 
+// --- Helpers ---
+
 const RESTORED_FILE = 'test-campaign-2026-10-10T12-34-56-789.zip';
+
+function writePostRestoreNotice(campaign = 'test-campaign', restored = RESTORED_FILE) {
+  sessionStorage.setItem('postRestoreNotice', JSON.stringify({ campaign, restored }));
+}
+
+// --- Test suite ---
 
 describe('App - post-rollback carry-over', () => {
   beforeEach(() => {
@@ -174,26 +213,50 @@ describe('App - post-rollback carry-over', () => {
     sessionStorage.clear();
   });
 
-  it('auto-selects the campaign, opens the Admin view, shows the restored banner, and clears the flag', async () => {
-    sessionStorage.setItem('postRestoreNotice', JSON.stringify({ campaign: 'test-campaign', restored: RESTORED_FILE }));
+  it('consumes the notice on boot: auto-selects the campaign and lands on the Admin view with the snapshot banner, without a click', async () => {
+    writePostRestoreNotice();
 
     render(<App />);
 
     await waitFor(() => {
       expect(screen.getByTestId('campaign-admin')).toBeInTheDocument();
     });
-    expect(screen.queryByTestId('campaign-selection')).not.toBeInTheDocument();
+
+    // The banner names the exact snapshot that was restored, scoped to the
+    // restored campaign.
     expect(screen.getByTestId('admin-campaign')).toHaveTextContent('test-campaign');
-    expect(screen.getByTestId('admin-restored-banner')).toHaveTextContent(`Campaign restored from ${RESTORED_FILE}`);
+    expect(screen.getByTestId('admin-restored-banner').textContent)
+      .toBe(`Campaign restored from ${RESTORED_FILE}`);
+
+    // The restore landing replaces the normal post-selection landing
+    // (character sheet) and removes the campaign-selection screen — all with
+    // no user interaction after the reload.
+    expect(screen.queryByTestId('campaign-selection')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+
+    // One-shot: the notice is consumed so a later reload cannot re-trigger it.
     expect(sessionStorage.getItem('postRestoreNotice')).toBeNull();
   });
 
-  it('shows campaign selection normally when no restore notice is present', async () => {
+  it('normal boot without a notice shows campaign selection and never triggers the restore landing', async () => {
     render(<App />);
 
     await waitFor(() => {
       expect(screen.getByTestId('campaign-selection')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('campaign-admin')).not.toBeInTheDocument();
+
+    // A normal manual campaign selection lands on the character sheet with
+    // no admin view and no restored banner.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('select-campaign-btn'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('campaign-admin')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('admin-restored-banner')).not.toBeInTheDocument();
+    expect(sessionStorage.getItem('postRestoreNotice')).toBeNull();
   });
 });

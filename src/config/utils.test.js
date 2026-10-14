@@ -1,33 +1,71 @@
+// @improved-by-ai
+// Unit tests for the character-creation validation utils (src/config/utils.js).
+//
+// Seam policy:
+// - dataLoader.loadValidationRules / getCachedPointBuyCosts are mocked: they are
+//   thin JSON-fetch/cache wrappers. These tests pin the rules → verdict contract,
+//   including the documented fallbacks when the loaded rules are partial.
+// - raceBuffService.computeRaceBuffs is mocked to pin HOW validateAbilityTotals
+//   consumes racial increases (race+subrace accumulation, ruleset gating). Its own
+//   computation lives in the raceBuffService suite.
+// - Duplicate-name gating is covered by utils.duplicate-name.test.js and the step-10
+//   skill cap by utils.skill-cap.test.js — deliberately NOT re-tested here.
+//
+// User-facing error messages are pinned as literals (never imported or derived), so
+// accidental rewording breaks these tests on purpose.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+vi.mock('../services/character/raceBuffService.js', () => ({
+  computeRaceBuffs: vi.fn(() => ({ abilityScoreIncreases: [] })),
+}));
+
 import * as dataLoader from '../services/ui/dataLoader.js';
 import * as utils from './utils.js';
-import { REQUIRED_FIELDS } from './constants.js';
+import { computeRaceBuffs } from '../services/character/raceBuffService.js';
 
+// Pinned literal fallback (mirrors utils.js DEFAULT_POINT_BUY_COSTS but is written
+// out independently so a change to the constant without a rules update breaks tests).
 const DEFAULT_POINT_BUY_COSTS = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 };
 
+// Costs served inside MOCK_VALIDATION_RULES below deliberately DIFFER from the
+// defaults (extra 16 tier) so "returns what the rules said" is distinguishable
+// from "returned the fallback" — a pass-through that silently never happened.
+const POINT_BUY_COSTS_FROM_RULES = { ...DEFAULT_POINT_BUY_COSTS, 16: 11 };
+
+// Only the fields utils.js actually reads from rules-validation.json.
 const MOCK_VALIDATION_RULES = {
   level_range: { min: 1, max: 20 },
   point_buy: {
-    total_points: 27,
     min_base_score: 8,
     max_base_score: 15,
     max_total_score: 20,
-    max_total_score_level_20: 24,
-    costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 }
+    costs: POINT_BUY_COSTS_FROM_RULES,
   },
-  ability_score_max: { standard: 20, level_20: 24 }
+  ability_score_max: { level_20: 24 },
 };
 
-const BASE_ABILITY = { baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 };
+// Canonical error messages (pinned literals).
+const MIN_BASE_ERROR = 'Base score must be at least 8';
+const MAX_BASE_ERROR = 'Base score cannot exceed 15 (point buy max)';
+const TOTAL_20_ERROR = 'Total score (base + improvements + misc) cannot exceed 20';
+const MISC_ERROR = 'Misc bonus must be 0 or above';
+const LEVEL_1_20_ERROR = 'Level must be between 1 and 20';
+const NAME_REQUIRED_STEP = 'Character name is required';
 
-const COMPLETE_FORM_DATA = {
-  name: 'Test Character',
-  level: 1,
-  alignment: 'Lawful Good',
-  race: { name: 'Human' },
-  class: { name: 'Wizard' },
-  expertSkills: []
-};
+const ability = (overrides = {}) => ({
+  baseScore: 10,
+  featIncrease: 0,
+  backgroundIncrease: 0,
+  miscIncrease: 0,
+  ...overrides,
+});
+
+const stepContext = (overrides = {}) => ({
+  racesData: [],
+  classSubtypes: [],
+  ruleset: '5e',
+  ...overrides,
+});
 
 describe('character-creation/utils', () => {
   afterEach(() => {
@@ -35,66 +73,81 @@ describe('character-creation/utils', () => {
   });
 
   describe('getPointBuyCosts', () => {
-    beforeEach(() => {
+    it('resolves the costs carried by the loaded rules for the requested ruleset', async () => {
       vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
+      const costs = await utils.getPointBuyCosts('2024');
+      expect(dataLoader.loadValidationRules).toHaveBeenCalledWith('2024');
+      // Distinct from DEFAULT_POINT_BUY_COSTS (has the extra 16 tier), so this
+      // fails if the loader result is ignored in favor of the fallback.
+      expect(costs).toEqual(POINT_BUY_COSTS_FROM_RULES);
     });
 
-    it('returns the costs defined in the loaded rules', async () => {
-      const costs = await utils.getPointBuyCosts('5e');
-      expect(costs).toEqual(MOCK_VALIDATION_RULES.point_buy.costs);
-    });
-
-    it('falls back to default costs when rules are empty or lack point_buy.costs', async () => {
-      dataLoader.loadValidationRules.mockResolvedValue({});
-      await expect(utils.getPointBuyCosts('5e')).resolves.toEqual(DEFAULT_POINT_BUY_COSTS);
-
-      dataLoader.loadValidationRules.mockResolvedValue({ point_buy: {} });
-      await expect(utils.getPointBuyCosts('5e')).resolves.toEqual(DEFAULT_POINT_BUY_COSTS);
-
-      dataLoader.loadValidationRules.mockResolvedValue({ point_buy: { costs: null } });
-      await expect(utils.getPointBuyCosts('5e')).resolves.toEqual(DEFAULT_POINT_BUY_COSTS);
+    it('falls back to the standard costs when rules are empty or lack point_buy.costs', async () => {
+      for (const rules of [{}, { point_buy: {} }, { point_buy: { costs: null } }]) {
+        vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(rules);
+        await expect(utils.getPointBuyCosts('5e')).resolves.toEqual(DEFAULT_POINT_BUY_COSTS);
+        vi.restoreAllMocks();
+      }
     });
   });
 
   describe('getPointBuyCostsSync', () => {
-    it('returns default costs when the cache is empty (null or undefined)', () => {
+    it('returns the cached costs verbatim, querying the requested ruleset', () => {
+      const cached = vi.spyOn(dataLoader, 'getCachedPointBuyCosts').mockReturnValue({ 8: 0, 9: 2, 10: 4 });
+      expect(utils.getPointBuyCostsSync('2024')).toEqual({ 8: 0, 9: 2, 10: 4 });
+      expect(cached).toHaveBeenCalledWith('2024');
+    });
+
+    it('falls back to the standard costs while the cache is unpopulated (null or undefined)', () => {
       vi.spyOn(dataLoader, 'getCachedPointBuyCosts').mockReturnValue(null);
       expect(utils.getPointBuyCostsSync('5e')).toEqual(DEFAULT_POINT_BUY_COSTS);
 
-      vi.spyOn(dataLoader, 'getCachedPointBuyCosts').mockReturnValue(undefined);
+      dataLoader.getCachedPointBuyCosts.mockReturnValue(undefined);
       expect(utils.getPointBuyCostsSync('5e')).toEqual(DEFAULT_POINT_BUY_COSTS);
-    });
-
-    it('returns the cached costs when available', () => {
-      const cachedCosts = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 6, 15: 8 };
-      vi.spyOn(dataLoader, 'getCachedPointBuyCosts').mockReturnValue(cachedCosts);
-      expect(utils.getPointBuyCostsSync('5e')).toEqual(cachedCosts);
     });
   });
 
   describe('validateFinalFormData', () => {
-    it('returns no errors when all required fields are present', () => {
+    const COMPLETE_FORM_DATA = {
+      name: 'Test Character',
+      level: 1,
+      alignment: 'Lawful Good',
+      race: { name: 'Human' },
+      class: { name: 'Wizard' },
+      expertSkills: [],
+    };
+
+    it('accepts a complete form with no existing-name collisions', () => {
       expect(utils.validateFinalFormData(COMPLETE_FORM_DATA)).toEqual({});
     });
 
-    it('returns an error when name is absent or whitespace-only', () => {
-      expect(utils.validateFinalFormData({ ...COMPLETE_FORM_DATA, name: undefined })).toHaveProperty('name');
-      expect(utils.validateFinalFormData({ ...COMPLETE_FORM_DATA, name: null })).toHaveProperty('name');
-      expect(utils.validateFinalFormData({ ...COMPLETE_FORM_DATA, name: '   ' })).toHaveProperty('name');
-      expect(utils.validateFinalFormData({ ...COMPLETE_FORM_DATA, name: '' })).toHaveProperty('name');
+    it('reports exactly the required name/level/alignment/race/class/expertSkills fields when the form is empty', () => {
+      // Contract pinned as a literal set: REQUIRED_FIELDS minus the three
+      // explicitly-skipped fields. Pinning it here (rather than re-deriving the
+      // exclusion list from REQUIRED_FIELDS) means a shared drift between the
+      // implementation and this test can no longer hide a silently-dropped field.
+      expect(utils.validateFinalFormData({})).toEqual({
+        name: 'name is required',
+        level: 'level is required',
+        alignment: 'alignment is required',
+        race: 'race is required',
+        class: 'class is required',
+        expertSkills: 'expertSkills is required',
+      });
     });
 
-    it('returns an error for every non-excluded required field when all are missing', () => {
-      const errors = utils.validateFinalFormData({});
-      // REQUIRED_FIELDS includes abilities, inventory, skillProficiencies which are explicitly skipped
-      const excludedFields = ['abilities', 'inventory', 'skillProficiencies'];
-      const expectedErrorFields = REQUIRED_FIELDS.filter(f => !excludedFields.includes(f));
-      for (const field of expectedErrorFields) {
-        expect(errors).toHaveProperty(field);
+    it('never flags the deliberately-skipped fields abilities, inventory or skillProficiencies', () => {
+      const form = { ...COMPLETE_FORM_DATA, abilities: undefined, inventory: undefined, skillProficiencies: undefined };
+      expect(utils.validateFinalFormData(form)).toEqual({});
+    });
+
+    it('rejects a missing or whitespace-only name as required', () => {
+      for (const name of [undefined, null, '', '   ']) {
+        expect(utils.validateFinalFormData({ ...COMPLETE_FORM_DATA, name })).toEqual({ name: 'name is required' });
       }
     });
 
-    it('returns an empty errors object when formData is null or undefined', () => {
+    it('accepts a null or undefined form (nothing to validate yet)', () => {
       expect(utils.validateFinalFormData(null)).toEqual({});
       expect(utils.validateFinalFormData(undefined)).toEqual({});
     });
@@ -105,45 +158,32 @@ describe('character-creation/utils', () => {
       vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
     });
 
-    it('accepts valid levels at the boundaries and mid-range', async () => {
-      expect(await utils.validateLevel(1, '5e')).toEqual({});
-      expect(await utils.validateLevel(10, '5e')).toEqual({});
-      expect(await utils.validateLevel(20, '5e')).toEqual({});
-    });
-
-    it('rejects levels outside the min/max range', async () => {
-      expect((await utils.validateLevel(0, '5e')).level).toBeDefined();
-      expect((await utils.validateLevel(-1, '5e')).level).toBeDefined();
-      expect((await utils.validateLevel(21, '5e')).level).toBeDefined();
-    });
-
-    it('rejects falsy or non-numeric level values', async () => {
-      const falsyValues = [null, undefined, '', NaN, false, 0];
-      for (const level of falsyValues) {
-        const errors = await utils.validateLevel(level, '5e');
-        expect(errors).toHaveProperty('level');
+    it('accepts levels inside the range, including numeric strings from text inputs', async () => {
+      for (const level of [1, 10, 20, '1', '10', '20']) {
+        await expect(utils.validateLevel(level, '5e')).resolves.toEqual({});
       }
     });
 
-    it('rejects string level values that parse to numbers outside range', async () => {
-      expect((await utils.validateLevel('0', '5e')).level).toBeDefined();
-      expect((await utils.validateLevel('25', '5e')).level).toBeDefined();
+    it('rejects missing, zero, and out-of-range levels with the range message', async () => {
+      for (const level of [null, undefined, '', NaN, false, 0, -1, 21, '0', '25']) {
+        await expect(utils.validateLevel(level, '5e')).resolves.toEqual({ level: LEVEL_1_20_ERROR });
+      }
     });
 
     it('respects a custom min/max from the validation rules', async () => {
       dataLoader.loadValidationRules.mockResolvedValue({ level_range: { min: 1, max: 10 } });
-      expect((await utils.validateLevel(11, '5e')).level).toBeDefined();
-      expect(await utils.validateLevel(10, '5e')).toEqual({});
-      expect(await utils.validateLevel(1, '5e')).toEqual({});
-      expect((await utils.validateLevel(0, '5e')).level).toBeDefined();
+      await expect(utils.validateLevel(1, '5e')).resolves.toEqual({});
+      await expect(utils.validateLevel(10, '5e')).resolves.toEqual({});
+      await expect(utils.validateLevel(11, '5e')).resolves.toEqual({ level: 'Level must be between 1 and 10' });
+      await expect(utils.validateLevel(0, '5e')).resolves.toEqual({ level: 'Level must be between 1 and 10' });
     });
 
-    it('falls back to a 1-20 range when level_range is missing', async () => {
+    it('falls back to a 1-20 range when the rules omit level_range', async () => {
       dataLoader.loadValidationRules.mockResolvedValue({});
-      expect(await utils.validateLevel(1, '5e')).toEqual({});
-      expect(await utils.validateLevel(20, '5e')).toEqual({});
-      expect((await utils.validateLevel(21, '5e')).level).toBeDefined();
-      expect((await utils.validateLevel(0, '5e')).level).toBeDefined();
+      await expect(utils.validateLevel(1, '5e')).resolves.toEqual({});
+      await expect(utils.validateLevel(20, '5e')).resolves.toEqual({});
+      await expect(utils.validateLevel(21, '5e')).resolves.toEqual({ level: LEVEL_1_20_ERROR });
+      await expect(utils.validateLevel(0, '5e')).resolves.toEqual({ level: LEVEL_1_20_ERROR });
     });
   });
 
@@ -152,83 +192,75 @@ describe('character-creation/utils', () => {
       vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
     });
 
-    it('accepts a valid base score with no increases', async () => {
-      expect(await utils.validateAbility(BASE_ABILITY, 0, '5e', 1)).toEqual({});
-    });
-
-    it('accepts base scores at the point buy boundaries', async () => {
-      expect(await utils.validateAbility({ ...BASE_ABILITY, baseScore: 8 }, 0, '5e', 1)).toEqual({});
-      expect(await utils.validateAbility({ ...BASE_ABILITY, baseScore: 15 }, 0, '5e', 1)).toEqual({});
-    });
-
-    it('rejects base scores below the allowed minimum', async () => {
-      expect((await utils.validateAbility({ ...BASE_ABILITY, baseScore: 7 }, 0, '5e', 1)).baseScore).toBeDefined();
-    });
-
-    it('rejects base scores above the point buy maximum', async () => {
-      expect((await utils.validateAbility({ ...BASE_ABILITY, baseScore: 16 }, 0, '5e', 1)).baseScore).toBeDefined();
-    });
-
-    it('rejects a total score above the level 1 cap', async () => {
-      const cases = [
-        { baseScore: 15, featIncrease: 6 },
-        { baseScore: 15, backgroundIncrease: 6 },
-        { baseScore: 15, miscIncrease: 6 }
-      ];
-      for (const increases of cases) {
-        const errors = await utils.validateAbility({ ...BASE_ABILITY, ...increases }, 0, '5e', 1);
-        expect(errors).toHaveProperty('totalScore');
+    it('accepts base scores at and within the point-buy boundaries (8-15)', async () => {
+      for (const baseScore of [8, 10, 15]) {
+        await expect(utils.validateAbility(ability({ baseScore }), 0, '5e', 1)).resolves.toEqual({});
       }
     });
 
-    it('applies the higher total cap only at level 20', async () => {
-      expect((await utils.validateAbility({ ...BASE_ABILITY, baseScore: 15, featIncrease: 6 }, 0, '5e', 19))).toHaveProperty('totalScore');
-      expect(await utils.validateAbility({ ...BASE_ABILITY, baseScore: 15, featIncrease: 9 }, 0, '5e', 20)).toEqual({});
-      expect((await utils.validateAbility({ ...BASE_ABILITY, baseScore: 15, featIncrease: 10 }, 0, '5e', 20))).toHaveProperty('totalScore');
+    it('flags base scores just outside the boundaries, naming the violated limit', async () => {
+      await expect(utils.validateAbility(ability({ baseScore: 7 }), 0, '5e', 1)).resolves.toEqual({ baseScore: MIN_BASE_ERROR });
+      await expect(utils.validateAbility(ability({ baseScore: 16 }), 0, '5e', 1)).resolves.toEqual({ baseScore: MAX_BASE_ERROR });
     });
 
-    it('rejects a negative miscIncrease (numeric and string)', async () => {
-      expect((await utils.validateAbility({ ...BASE_ABILITY, miscIncrease: -1 }, 0, '5e', 1))).toHaveProperty('miscIncrease');
-      expect((await utils.validateAbility({ ...BASE_ABILITY, miscIncrease: '-2' }, 0, '5e', 1))).toHaveProperty('miscIncrease');
+    it('flags totals above the level-1 cap regardless of which increase source pushed it over', async () => {
+      for (const source of ['featIncrease', 'backgroundIncrease', 'miscIncrease']) {
+        await expect(utils.validateAbility(ability({ baseScore: 15, [source]: 6 }), 0, '5e', 1))
+          .resolves.toEqual({ totalScore: TOTAL_20_ERROR });
+      }
     });
 
-    it('accepts a zero miscIncrease', async () => {
-      expect(await utils.validateAbility({ ...BASE_ABILITY, miscIncrease: 0 }, 0, '5e', 1)).toEqual({});
-      expect(await utils.validateAbility({ ...BASE_ABILITY, miscIncrease: '0' }, 0, '5e', 1)).toEqual({});
+    it('applies the higher cap of 24 only at level 20', async () => {
+      await expect(utils.validateAbility(ability({ baseScore: 15, featIncrease: 6 }), 0, '5e', 19))
+        .resolves.toEqual({ totalScore: TOTAL_20_ERROR });
+      await expect(utils.validateAbility(ability({ baseScore: 15, featIncrease: 9 }), 0, '5e', 20)).resolves.toEqual({});
+      await expect(utils.validateAbility(ability({ baseScore: 15, featIncrease: 10 }), 0, '5e', 20))
+        .resolves.toEqual({ totalScore: 'Total score (base + improvements + misc) cannot exceed 24' });
     });
 
-    it('coerces string base scores via parseInt', async () => {
-      const errors = await utils.validateAbility({ ...BASE_ABILITY, baseScore: '10' }, 0, '5e', 1);
-      expect(errors).toEqual({});
+    it('flags negative miscIncrease (numeric or string) and accepts zero miscIncrease', async () => {
+      for (const miscIncrease of [-1, '-2']) {
+        await expect(utils.validateAbility(ability({ miscIncrease }), 0, '5e', 1)).resolves.toEqual({ miscIncrease: MISC_ERROR });
+      }
+      for (const miscIncrease of [0, '0']) {
+        await expect(utils.validateAbility(ability({ miscIncrease }), 0, '5e', 1)).resolves.toEqual({});
+      }
     });
 
-    it('treats unparseable values as defaults (baseScore 8, increases 0)', async () => {
-      const errors = await utils.validateAbility({
+    it('treats numeric strings as numbers and unparseable values as safe defaults', async () => {
+      await expect(utils.validateAbility(ability({ baseScore: '10', featIncrease: '2' }), 0, '5e', 1)).resolves.toEqual({});
+      // Unparseable everything → score falls back to the minimum legal 8/0/0/0.
+      await expect(utils.validateAbility({
         baseScore: 'invalid',
         featIncrease: 'x',
         miscIncrease: 'y',
-        backgroundIncrease: 'z'
-      }, 0, '5e', 1);
-      expect(errors).toEqual({});
+        backgroundIncrease: 'z',
+      }, 0, '5e', 1)).resolves.toEqual({});
     });
 
-    it('uses custom point buy limits from the validation rules', async () => {
+    it('honors custom point-buy limits and a custom level-20 cap from the rules', async () => {
       dataLoader.loadValidationRules.mockResolvedValue({
         point_buy: { min_base_score: 10, max_base_score: 14, max_total_score: 18 },
-        ability_score_max: {}
+        ability_score_max: { level_20: 27 },
       });
-      expect((await utils.validateAbility({ ...BASE_ABILITY, baseScore: 9 }, 0, '5e', 1))).toHaveProperty('baseScore');
-      expect((await utils.validateAbility({ ...BASE_ABILITY, baseScore: 15 }, 0, '5e', 1))).toHaveProperty('baseScore');
-      expect(await utils.validateAbility({ ...BASE_ABILITY, baseScore: 14 }, 0, '5e', 1)).toEqual({});
-      expect((await utils.validateAbility({ ...BASE_ABILITY, baseScore: 14, miscIncrease: 5 }, 0, '5e', 1))).toHaveProperty('totalScore');
+      await expect(utils.validateAbility(ability({ baseScore: 9 }), 0, '5e', 1))
+        .resolves.toEqual({ baseScore: 'Base score must be at least 10' });
+      await expect(utils.validateAbility(ability({ baseScore: 15 }), 0, '5e', 1))
+        .resolves.toEqual({ baseScore: 'Base score cannot exceed 14 (point buy max)' });
+      await expect(utils.validateAbility(ability({ baseScore: 14, miscIncrease: 5 }), 0, '5e', 1))
+        .resolves.toEqual({ totalScore: 'Total score (base + improvements + misc) cannot exceed 18' });
+      await expect(utils.validateAbility(ability({ baseScore: 14, featIncrease: 13 }), 0, '5e', 20)).resolves.toEqual({});
+      await expect(utils.validateAbility(ability({ baseScore: 14, featIncrease: 14 }), 0, '5e', 20))
+        .resolves.toEqual({ totalScore: 'Total score (base + improvements + misc) cannot exceed 27' });
     });
 
-    it('uses default limits when rules omit the point buy config', async () => {
+    it('falls back to the standard 8/15/20 limits when rules omit the point buy config', async () => {
       dataLoader.loadValidationRules.mockResolvedValue({});
-      expect((await utils.validateAbility({ ...BASE_ABILITY, baseScore: 7 }, 0, '5e', 1))).toHaveProperty('baseScore');
-      expect((await utils.validateAbility({ ...BASE_ABILITY, baseScore: 16 }, 0, '5e', 1))).toHaveProperty('baseScore');
-      expect((await utils.validateAbility({ ...BASE_ABILITY, baseScore: 15, miscIncrease: 5 }, 0, '5e', 1))).toEqual({});
-      expect((await utils.validateAbility({ ...BASE_ABILITY, baseScore: 15, miscIncrease: 6 }, 0, '5e', 1))).toHaveProperty('totalScore');
+      await expect(utils.validateAbility(ability({ baseScore: 7 }), 0, '5e', 1)).resolves.toEqual({ baseScore: MIN_BASE_ERROR });
+      await expect(utils.validateAbility(ability({ baseScore: 16 }), 0, '5e', 1)).resolves.toEqual({ baseScore: MAX_BASE_ERROR });
+      await expect(utils.validateAbility(ability({ baseScore: 15, miscIncrease: 5 }), 0, '5e', 1)).resolves.toEqual({});
+      await expect(utils.validateAbility(ability({ baseScore: 15, miscIncrease: 6 }), 0, '5e', 1))
+        .resolves.toEqual({ totalScore: TOTAL_20_ERROR });
     });
   });
 
@@ -240,132 +272,143 @@ describe('character-creation/utils', () => {
     describe('Step 2: Basic Information', () => {
       const validFormData = { name: 'Test', level: 1, alignment: 'Good' };
 
-      it('returns no errors when all required fields are present', async () => {
-        expect(await utils.validateStep(2, validFormData, { racesData: [], classSubtypes: [], ruleset: '5e' })).toEqual({});
+      it('accepts valid basics', async () => {
+        await expect(utils.validateStep(2, validFormData, stepContext())).resolves.toEqual({});
       });
 
-      it('bubbles up invalid level values through the shared level validator', async () => {
-        expect(await utils.validateStep(2, { ...validFormData, level: 0 }, { racesData: [], classSubtypes: [], ruleset: '5e' })).toHaveProperty('level');
-        expect(await utils.validateStep(2, { ...validFormData, level: 21 }, { racesData: [], classSubtypes: [], ruleset: '5e' })).toHaveProperty('level');
+      it('bubbles up the shared level validator on invalid levels', async () => {
+        await expect(utils.validateStep(2, { ...validFormData, level: 0 }, stepContext()))
+          .resolves.toEqual({ level: LEVEL_1_20_ERROR });
+        await expect(utils.validateStep(2, { ...validFormData, level: 21 }, stepContext()))
+          .resolves.toEqual({ level: LEVEL_1_20_ERROR });
       });
 
-      it('rejects missing or whitespace-only name and missing alignment', async () => {
-        const errors = await utils.validateStep(2, { level: 1 }, { racesData: [], classSubtypes: [], ruleset: '5e' });
-        expect(errors).toHaveProperty('name');
-        expect(errors).toHaveProperty('alignment');
+      it('flags a missing name and missing alignment together, and a whitespace name alone', async () => {
+        await expect(utils.validateStep(2, { level: 1 }, stepContext())).resolves.toEqual({
+          name: NAME_REQUIRED_STEP,
+          alignment: 'Alignment is required',
+        });
+        await expect(utils.validateStep(2, { ...validFormData, name: '   ' }, stepContext()))
+          .resolves.toEqual({ name: NAME_REQUIRED_STEP });
       });
     });
 
     describe('Step 3: Race', () => {
-      it('returns an error when race is missing or has no name, and accepts a valid race', async () => {
-        expect(await utils.validateStep(3, {}, { racesData: [], classSubtypes: [], ruleset: '5e' })).toHaveProperty('race');
-        expect(await utils.validateStep(3, { race: {} }, { racesData: [], classSubtypes: [], ruleset: '5e' })).toHaveProperty('race');
-        expect(await utils.validateStep(3, { race: { name: 'Human' } }, { racesData: [], classSubtypes: [], ruleset: '5e' })).toEqual({});
+      it('requires a race with a name, works without a context object, and accepts a valid race', async () => {
+        await expect(utils.validateStep(3, {}, stepContext())).resolves.toEqual({ race: 'Race is required' });
+        await expect(utils.validateStep(3, { race: {} }, stepContext())).resolves.toEqual({ race: 'Race is required' });
+        await expect(utils.validateStep(3, { race: { name: 'Human' } }, stepContext())).resolves.toEqual({});
+        await expect(utils.validateStep(3, { race: { name: 'Human' } })).resolves.toEqual({});
       });
     });
 
     describe('Step 4: Subrace', () => {
-      it('requires a subrace when the race has subraces, accepts a selected subrace, and skips when the race has none or is not found', async () => {
-        const racesWithSubraces = [{ name: 'Elf', subraces: [{ name: 'High Elf' }, { name: 'Wood Elf' }] }];
-        const racesWithoutSubraces = [{ name: 'Human', subraces: [] }];
-        const formData = { race: { name: 'Elf' } };
-        const formDataWithSubrace = { race: { name: 'Elf', subrace: { name: 'High Elf' } } };
-        const noRaceForm = { race: {} };
+      const racesWithSubraces = [{ name: 'Elf', subraces: [{ name: 'High Elf' }, { name: 'Wood Elf' }] }];
 
-        let errors = await utils.validateStep(4, formData, { racesData: racesWithSubraces, classSubtypes: [], ruleset: '5e' });
-        expect(errors).toHaveProperty('subrace');
+      it('requires a subrace when the selected race offers one', async () => {
+        await expect(utils.validateStep(4, { race: { name: 'Elf' } }, stepContext({ racesData: racesWithSubraces })))
+          .resolves.toEqual({ subrace: 'Subrace is required' });
+      });
 
-        errors = await utils.validateStep(4, formDataWithSubrace, { racesData: racesWithSubraces, classSubtypes: [], ruleset: '5e' });
-        expect(errors).not.toHaveProperty('subrace');
-
-        errors = await utils.validateStep(4, formData, { racesData: racesWithoutSubraces, classSubtypes: [], ruleset: '5e' });
-        expect(errors).not.toHaveProperty('subrace');
-
-        errors = await utils.validateStep(4, noRaceForm, { racesData: racesWithSubraces, classSubtypes: [], ruleset: '5e' });
-        expect(errors).not.toHaveProperty('subrace');
-
-        errors = await utils.validateStep(4, { race: { name: 'Gnome' } }, { racesData: [], classSubtypes: [], ruleset: '5e' });
-        expect(errors).not.toHaveProperty('subrace');
+      it('skips the subrace requirement once selected, when the race offers none, is unknown, or no race is selected', async () => {
+        await expect(utils.validateStep(4, { race: { name: 'Elf', subrace: { name: 'High Elf' } } }, stepContext({ racesData: racesWithSubraces })))
+          .resolves.toEqual({});
+        const contexts = [
+          stepContext({ racesData: [{ name: 'Human', subraces: [] }] }),
+          stepContext({ racesData: [] }),
+        ];
+        const forms = [
+          { race: { name: 'Elf', subrace: { name: 'High Elf' } } },
+          { race: { name: 'Human' } },
+          { race: {} },
+          { race: { name: 'Gnome' } },
+        ];
+        for (const form of forms) {
+          for (const context of contexts) {
+            await expect(utils.validateStep(4, form, context)).resolves.toEqual({});
+          }
+        }
       });
     });
 
     describe('Step 5: Background', () => {
       const validFormData = { name: 'Test', level: 1, alignment: 'Good' };
 
-      it('requires a background for 2024 but not 5e, and accepts a present background for 2024', async () => {
-        expect(await utils.validateStep(5, validFormData, { racesData: [], classSubtypes: [], ruleset: '2024' })).toHaveProperty('background');
-        expect(await utils.validateStep(5, validFormData, { racesData: [], classSubtypes: [], ruleset: '5e' })).not.toHaveProperty('background');
-        expect(await utils.validateStep(5, { ...validFormData, background: 'Fighter' }, { racesData: [], classSubtypes: [], ruleset: '2024' })).not.toHaveProperty('background');
+      it('requires a background only for the 2024 ruleset', async () => {
+        await expect(utils.validateStep(5, validFormData, stepContext({ ruleset: '2024' })))
+          .resolves.toEqual({ background: 'Background is required' });
+        await expect(utils.validateStep(5, validFormData, stepContext({ ruleset: '5e' }))).resolves.toEqual({});
+        await expect(utils.validateStep(5, { ...validFormData, background: 'Soldier' }, stepContext({ ruleset: '2024' })))
+          .resolves.toEqual({});
       });
     });
 
     describe('Step 6: Class', () => {
-      it('returns an error when class is missing or has no name, and does not require a subclass', async () => {
-        expect(await utils.validateStep(6, {}, { racesData: [], classSubtypes: [], ruleset: '5e' })).toHaveProperty('class');
-        expect(await utils.validateStep(6, { class: {} }, { racesData: [], classSubtypes: [], ruleset: '5e' })).toHaveProperty('class');
-        const classSubtypes = [{ className: 'Fighter', subtypes: [{ name: 'Champion' }] }];
-        const formData = { class: { name: 'Fighter' } };
-        const errors = await utils.validateStep(6, formData, { racesData: [], classSubtypes, ruleset: '5e' });
-        expect(errors).not.toHaveProperty('subclass');
+      it('requires a class with a name but never demands a subclass at this step', async () => {
+        await expect(utils.validateStep(6, {}, stepContext())).resolves.toEqual({ class: 'Class is required' });
+        await expect(utils.validateStep(6, { class: {} }, stepContext())).resolves.toEqual({ class: 'Class is required' });
+        await expect(utils.validateStep(6, { class: { name: 'Fighter' } }, stepContext({
+          classSubtypes: [{ className: 'Fighter', subtypes: [{ name: 'Champion' }] }],
+        }))).resolves.toEqual({});
       });
     });
 
     describe('Step 7: Subclass', () => {
-      it('requires a subclass when the class has subclasses, accepts a selected subclass, and skips when the class has none, is not found, or is missing', async () => {
-        const classSubtypesWithSubclasses = [{ className: 'Fighter', subtypes: [{ name: 'Champion' }, { name: 'Battle Master' }] }];
-        const classSubtypesEmpty = [{ className: 'Fighter', subtypes: [] }];
-        const formData = { class: { name: 'Fighter' } };
-        const formDataWithSubclass = { class: { name: 'Fighter', subclass: { name: 'Champion' } } };
-        const noClassForm = { class: {} };
+      const classSubtypesWithSubclasses = [{ className: 'Fighter', subtypes: [{ name: 'Champion' }, { name: 'Battle Master' }] }];
 
-        let errors = await utils.validateStep(7, formData, { racesData: [], classSubtypes: classSubtypesWithSubclasses, ruleset: '5e' });
-        expect(errors).toHaveProperty('subclass');
+      it('requires a subclass when the selected class offers one', async () => {
+        await expect(utils.validateStep(7, { class: { name: 'Fighter' } }, stepContext({ classSubtypes: classSubtypesWithSubclasses })))
+          .resolves.toEqual({ subclass: 'Subclass is required' });
+      });
 
-        errors = await utils.validateStep(7, formDataWithSubclass, { racesData: [], classSubtypes: classSubtypesWithSubclasses, ruleset: '5e' });
-        expect(errors).not.toHaveProperty('subclass');
-
-        errors = await utils.validateStep(7, formData, { racesData: [], classSubtypes: classSubtypesEmpty, ruleset: '5e' });
-        expect(errors).not.toHaveProperty('subclass');
-
-        errors = await utils.validateStep(7, { class: { name: 'Rogue' } }, { racesData: [], classSubtypes: [], ruleset: '5e' });
-        expect(errors).not.toHaveProperty('subclass');
-
-        errors = await utils.validateStep(7, noClassForm, { racesData: [], classSubtypes: classSubtypesWithSubclasses, ruleset: '5e' });
-        expect(errors).not.toHaveProperty('subclass');
+      it('skips the subclass requirement once selected, when the class offers none, is unknown, or no class is selected', async () => {
+        await expect(utils.validateStep(7, { class: { name: 'Fighter', subclass: { name: 'Champion' } } }, stepContext({ classSubtypes: classSubtypesWithSubclasses })))
+          .resolves.toEqual({});
+        const contexts = [
+          stepContext({ classSubtypes: [{ className: 'Fighter', subtypes: [] }] }),
+          stepContext({ classSubtypes: [] }),
+        ];
+        const forms = [
+          { class: { name: 'Fighter', subclass: { name: 'Champion' } } },
+          { class: {} },
+          { class: { name: 'Rogue' } },
+        ];
+        for (const form of forms) {
+          for (const context of contexts) {
+            await expect(utils.validateStep(7, form, context)).resolves.toEqual({});
+          }
+        }
       });
     });
 
-    describe('Unhandled steps', () => {
-      it('returns no errors for unrecognized step numbers', async () => {
-        expect(await utils.validateStep(99, {}, { racesData: [], classSubtypes: [], ruleset: '5e' })).toEqual({});
-        expect(await utils.validateStep(1, {}, { racesData: [], classSubtypes: [], ruleset: '5e' })).toEqual({});
-        expect(await utils.validateStep(8, {}, { racesData: [], classSubtypes: [], ruleset: '5e' })).toEqual({});
-      });
-    });
-
-    describe('step 9 ability total cap (FT-001)', () => {
-      beforeEach(() => {
-        vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
-      });
-
+    describe('Step 9: Abilities (FT-001 total cap)', () => {
       const abilities2024 = [
-        { name: 'Strength', baseScore: 8, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
-        { name: 'Dexterity', baseScore: 14, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
-        { name: 'Constitution', baseScore: 14, featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 },
-        { name: 'Intelligence', baseScore: 8, featIncrease: 0, backgroundIncrease: 1, miscIncrease: 0 },
-        { name: 'Wisdom', baseScore: 18, featIncrease: 2, backgroundIncrease: 1, miscIncrease: 0 },
-        { name: 'Charisma', baseScore: 16, featIncrease: 0, backgroundIncrease: 1, miscIncrease: 0 },
+        ability({ name: 'Strength', baseScore: 8 }),
+        ability({ name: 'Dexterity', baseScore: 14 }),
+        ability({ name: 'Constitution', baseScore: 14 }),
+        ability({ name: 'Intelligence', baseScore: 8, backgroundIncrease: 1 }),
+        ability({ name: 'Wisdom', baseScore: 18, featIncrease: 2, backgroundIncrease: 1 }),
+        ability({ name: 'Charisma', baseScore: 16, backgroundIncrease: 1 }),
       ];
+      const step9Form = (abilities) => ({ level: 8, rules: '2024', abilities });
 
-      it('blocks a total above 20 with an ability_${i}_totalScore error', async () => {
-        const errors = await utils.validateStep(9, { level: 8, rules: '2024', abilities: abilities2024, feats: ['Magic Initiate', 'Ability Score Improvement'] }, { racesData: [], classSubtypes: [], ruleset: '2024' });
-        expect(errors).toHaveProperty('ability_4_totalScore');
+      it('blocks an over-cap allocation under an index-keyed error', async () => {
+        // Wisdom 18 + 2 feat + 1 background = 21 at index 4, cap 20 below level 20.
+        await expect(utils.validateStep(9, step9Form(abilities2024), stepContext({ ruleset: '2024' })))
+          .resolves.toEqual({ ability_4_totalScore: 'Wisdom total 21 exceeds the maximum of 20' });
       });
 
-      it('accepts legal allocations at the cap', async () => {
+      it('accepts a legal allocation exactly at the cap', async () => {
         const legal = abilities2024.map(a => (a.name === 'Wisdom' ? { ...a, featIncrease: 1 } : a));
-        const errors = await utils.validateStep(9, { level: 8, rules: '2024', abilities: legal, feats: ['Magic Initiate', 'Ability Score Improvement'] }, { racesData: [], classSubtypes: [], ruleset: '2024' });
-        expect(errors).toEqual({});
+        await expect(utils.validateStep(9, step9Form(legal), stepContext({ ruleset: '2024' }))).resolves.toEqual({});
+      });
+    });
+
+    describe('steps without a registered validator', () => {
+      it('accepts unrecognized step numbers (nothing to validate)', async () => {
+        for (const step of [undefined, 0, 1, 8, 99]) {
+          await expect(utils.validateStep(step, {}, stepContext())).resolves.toEqual({});
+        }
       });
     });
   });
@@ -375,35 +418,109 @@ describe('character-creation/utils', () => {
       vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
     });
 
-    const base = [
-      { name: 'Wisdom', baseScore: 18, featIncrease: 2, backgroundIncrease: 1, miscIncrease: 0 },
-    ];
+    const wisdom18 = ability({ name: 'Wisdom', baseScore: 18 });
+    const wisdom21 = { ...wisdom18, featIncrease: 2, backgroundIncrease: 1 }; // 18 + 2 + 1 = 21
 
-    it('returns no errors for empty abilities', async () => {
-      expect(await utils.validateAbilityTotals({ abilities: [] })).toEqual({});
+    it('accepts an empty abilities list or a missing form', async () => {
+      await expect(utils.validateAbilityTotals({ abilities: [] })).resolves.toEqual({});
+      await expect(utils.validateAbilityTotals({})).resolves.toEqual({});
+      await expect(utils.validateAbilityTotals(null)).resolves.toEqual({});
     });
 
-    it('flags Wisdom 18+1+2=21 over the cap of 20', async () => {
-      const errors = await utils.validateAbilityTotals({ level: 8, rules: '2024', abilities: base });
-      expect(errors).toHaveProperty('ability_0_totalScore');
+    it('flags each over-cap ability under its own index-keyed error', async () => {
+      const abilities = [
+        wisdom21,                                                                 // 21 → flagged
+        ability({ name: 'Strength', baseScore: 12 }),                             // 12 → clean
+        ability({ name: 'Dexterity', baseScore: 20, featIncrease: 2 }),         // 22 → flagged
+      ];
+      await expect(utils.validateAbilityTotals({ level: 8, rules: '2024', abilities }))
+        .resolves.toEqual({
+          ability_0_totalScore: 'Wisdom total 21 exceeds the maximum of 20',
+          ability_2_totalScore: 'Dexterity total 22 exceeds the maximum of 20',
+        });
     });
 
-    it('applies the level 20 cap of 24', async () => {
-      expect(await utils.validateAbilityTotals({ level: 20, rules: '2024', abilities: base })).toEqual({});
-      expect(await utils.validateAbilityTotals({ level: 20, rules: '2024', abilities: [{ ...base[0], featIncrease: 6 }] })).toHaveProperty('ability_0_totalScore');
+    it('applies the level-20 cap of 24', async () => {
+      await expect(utils.validateAbilityTotals({ level: 20, rules: '2024', abilities: [wisdom21] }))
+        .resolves.toEqual({});
+      await expect(utils.validateAbilityTotals({
+        level: 20,
+        rules: '2024',
+        abilities: [{ ...wisdom21, featIncrease: 6 }], // 18 + 6 + 1 = 25 > 24
+      })).resolves.toEqual({ ability_0_totalScore: 'Wisdom total 25 exceeds the maximum of 24' });
     });
 
-    it('honors a selected feat that raises the cap (Epic Boon max_value 30)', async () => {
+    it('honors a 2024 Epic Boon cap only while it is selected (string or object entry)', async () => {
       const boon = { name: 'Boon Of Fortitude', ability_score_increase: { max_value: 30 } };
-      const formData = { level: 20, rules: '2024', abilities: [{ ...base[0], featIncrease: 11 }], feats: ['Boon Of Fortitude'] };
-      expect(await utils.validateAbilityTotals(formData, { allFeats: [boon] })).toEqual({});
-      expect(await utils.validateAbilityTotals({ ...formData, feats: [] }, { allFeats: [boon] })).toHaveProperty('ability_0_totalScore');
+      const formData = { level: 20, rules: '2024', abilities: [{ ...wisdom21, featIncrease: 11 }], feats: ['Boon Of Fortitude'] }; // 18 + 11 + 1 = 30 = cap
+      await expect(utils.validateAbilityTotals(formData, { allFeats: [boon] })).resolves.toEqual({});
+      await expect(utils.validateAbilityTotals({ ...formData, feats: [{ name: 'Boon Of Fortitude' }] }, { allFeats: [boon] }))
+        .resolves.toEqual({});
+      await expect(utils.validateAbilityTotals({ ...formData, feats: [] }, { allFeats: [boon] }))
+        .resolves.toEqual({ ability_0_totalScore: 'Wisdom total 30 exceeds the maximum of 24' });
     });
 
-    it('does not honor unselected cap-raising feats', async () => {
-      const boon = { name: 'Boon Of Fortitude', ability_score_increase: { max_value: 30 } };
-      const formData = { level: 8, rules: '2024', abilities: base, feats: [] };
-      expect(await utils.validateAbilityTotals(formData, { allFeats: [boon] })).toHaveProperty('ability_0_totalScore');
+    it('honors a 5e cap raise (maximum of 30) declared in the feat description', async () => {
+      const feat = { name: 'Improvement', description: 'Increase your Wisdom score by 2, to a maximum of 30.' };
+      const formData = { level: 8, rules: '5e', abilities: [wisdom21], feats: ['Improvement'] }; // 21 > 20 without the feat
+      await expect(utils.validateAbilityTotals(formData, { allFeats: [feat] })).resolves.toEqual({});
+      await expect(utils.validateAbilityTotals({ ...formData, feats: [] }, { allFeats: [feat] }))
+        .resolves.toEqual({ ability_0_totalScore: 'Wisdom total 21 exceeds the maximum of 20' });
+    });
+
+    it('keeps the cap-raise channel ruleset-specific: 5e ignores the 2024 max_value field', async () => {
+      const boon = { name: 'Boon Of Fortitude', ability_score_increase: { max_value: 30 }, description: 'You are hard to kill.' };
+      const formData = { level: 8, rules: '5e', abilities: [wisdom21], feats: ['Boon Of Fortitude'] };
+      await expect(utils.validateAbilityTotals(formData, { allFeats: [boon] }))
+        .resolves.toEqual({ ability_0_totalScore: 'Wisdom total 21 exceeds the maximum of 20' });
+    });
+  });
+
+  describe('validateAbilityTotals with racial bonuses (computeRaceBuffs seam)', () => {
+    beforeEach(() => {
+      vi.spyOn(dataLoader, 'loadValidationRules').mockResolvedValue(MOCK_VALIDATION_RULES);
+      computeRaceBuffs.mockReset().mockReturnValue({ abilityScoreIncreases: [] });
+    });
+
+    const dwarf = { name: 'Hill Dwarf' };
+    const wisdom18 = ability({ name: 'Wisdom', baseScore: 18 });
+
+    it('adds 5e racial bonuses into the gated total', async () => {
+      computeRaceBuffs.mockReturnValue({ abilityScoreIncreases: [{ name: 'Wisdom', amount: 3 }] });
+      const formData = { level: 4, rules: '5e', race: dwarf, abilities: [wisdom18] }; // 18 + 3 = 21 > 20
+      await expect(utils.validateAbilityTotals(formData, { racesData: [dwarf], ruleset: '5e' }))
+        .resolves.toEqual({ ability_0_totalScore: 'Wisdom total 21 exceeds the maximum of 20' });
+      expect(computeRaceBuffs).toHaveBeenCalled();
+    });
+
+    it('accepts a total that reaches the cap only thanks to the racial bonus', async () => {
+      computeRaceBuffs.mockReturnValue({ abilityScoreIncreases: [{ name: 'Wisdom', amount: 2 }] });
+      const formData = { level: 4, rules: '5e', race: dwarf, abilities: [wisdom18] }; // 18 + 2 = 20 = cap
+      await expect(utils.validateAbilityTotals(formData, { racesData: [dwarf], ruleset: '5e' })).resolves.toEqual({});
+    });
+
+    it('stacks subrace increases on top of race increases', async () => {
+      const elf = { name: 'Elf', subrace: { name: 'High Elf' } };
+      computeRaceBuffs
+        .mockReturnValueOnce({ abilityScoreIncreases: [{ name: 'Wisdom', amount: 2 }] })
+        .mockReturnValueOnce({ abilityScoreIncreases: [{ name: 'Wisdom', amount: 1 }] });
+      const formData = { level: 4, rules: '5e', race: elf, abilities: [wisdom18] }; // 18 + 2 + 1 = 21
+      await expect(utils.validateAbilityTotals(formData, {
+        racesData: [{ name: 'Elf', subraces: [{ name: 'High Elf' }] }],
+        ruleset: '5e',
+      })).resolves.toEqual({ ability_0_totalScore: 'Wisdom total 21 exceeds the maximum of 20' });
+      expect(computeRaceBuffs).toHaveBeenCalledTimes(2);
+    });
+
+    it('ignores racial bonuses for 2024, unknown races, and no race selected — never consulting the races service', async () => {
+      computeRaceBuffs.mockReturnValue({ abilityScoreIncreases: [{ name: 'Wisdom', amount: 5 }] });
+      await expect(utils.validateAbilityTotals({ level: 4, rules: '2024', race: dwarf, abilities: [wisdom18] },
+        { racesData: [dwarf], ruleset: '2024' })).resolves.toEqual({});
+      await expect(utils.validateAbilityTotals({ level: 4, rules: '5e', race: { name: 'Gnome' }, abilities: [wisdom18] },
+        { racesData: [dwarf], ruleset: '5e' })).resolves.toEqual({});
+      await expect(utils.validateAbilityTotals({ level: 4, rules: '5e', abilities: [wisdom18] },
+        { racesData: [dwarf], ruleset: '5e' })).resolves.toEqual({});
+      expect(computeRaceBuffs).not.toHaveBeenCalled();
     });
   });
 });

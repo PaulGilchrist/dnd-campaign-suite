@@ -28,7 +28,13 @@ export default function AiWorldConsole({ campaignName }) {
 
     const ask = async () => {
         setAsking(true); setResult(null); setProposal(null)
-        const res = await askWorldKeeper({ campaignName, kind, focus: focus.trim() || null })
+        let res
+        try {
+            res = await askWorldKeeper({ campaignName, kind, focus: focus.trim() || null })
+        } catch (e) { // transport death (offline/API down) — never strand the button mid-spin
+            console.error('[aiWorldConsole:ask]', e)
+            setAsking(false); setResult({ applied: false, detail: 'AI request failed — check the API server.' }); return
+        }
         setAsking(false)
         if (!res.ok && res.code !== 'AI_NEEDS_HUMAN') { setResult({ applied: false, detail: res.error || res.code || 'AI unavailable' }); return }
         setProposal(res.proposal)

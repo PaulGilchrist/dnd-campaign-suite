@@ -1,9 +1,34 @@
-
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+// @improved-by-ai
+/**
+ * App-level contract for map view navigation (App.jsx):
+ *
+ * GM (localhost):
+ *  - "Maps" from any other view opens the maps manager listing.
+ *  - The manager opens a map; both the map's back button and the "Maps"
+ *    sidebar button return the GM to the manager listing.
+ *  - Entering a map from a POI/encounter pushes it onto a navigation stack:
+ *    back walks the stack (inner map → original map → manager), and returning
+ *    to the manager via "Maps" clears the stack so a fresh open starts clean.
+ *  - The manager's back button closes the maps area entirely (blank canvas).
+ *
+ * Player (non-localhost):
+ *  - "Maps" never shows the manager — it resolves the active map via
+ *    loadMaps and opens it directly.
+ *  - Back from a map lands on the waiting placeholder, never the manager.
+ *  - With no active map, a friendly placeholder is shown (never an alert);
+ *    clicking "Maps" again re-runs the load and opens the map once the GM
+ *    has activated one. A failed load keeps the placeholder quietly.
+ *
+ * Waiting-placeholder rendering, "Check Again", and map-activate SSE
+ * auto-open are covered by App.map-unavailable.test.jsx and
+ * App.map-activate.test.jsx — not re-tested here.
+ */
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App.jsx';
 
 import { mockState, dataLoaderMocks } from './test/appTestState.js';
+import { loadMaps } from './services/maps/mapsService.js';
 
 // --- Core mocks (shared with other App test files) ---
 
@@ -53,7 +78,7 @@ vi.mock('./hooks/runtime/useAppData.js', () => ({
   default: vi.fn(() => _appDataRef.value),
 }));
 
-_appDataRef.value = {
+const defaultAppData = () => ({
   abilityScores: [{ full_name: 'Strength' }],
   classes: [{ name: 'Fighter' }],
   classes2024: [{ name: 'Fighter 2024' }],
@@ -65,7 +90,7 @@ _appDataRef.value = {
   spells: [{ name: 'Fireball' }],
   spells2024: [{ name: 'Fireball 2024' }],
   isLoading: false,
-};
+});
 
 // --- Component mocks ---
 
@@ -130,16 +155,15 @@ vi.mock('./components/campaign-admin/CampaignAdmin.jsx', async () => {
   return { default: MockCampaignAdmin };
 });
 
-// Subscriber fires events asynchronously via setTimeout to match real SSE timing.
-// This avoids synchronous event dispatch during render which would cause
-// inconsistent state and unreliable tests.
+// Stub the SSE subscriber so tests never open a real EventSource.
+// Events are only pushed by tests that need them (see map-activate suite).
 vi.mock('./components/common/Subscriber.jsx', () => ({
   default: function MockSubscriber() { return null; },
 }));
 
 // --- Helpers ---
 
-function setLocalhost(hostname = 'localhost') {
+function setLocalhost(hostname) {
   Object.defineProperty(window, 'location', {
     value: { hostname, reload: vi.fn() },
     writable: true,
@@ -147,63 +171,59 @@ function setLocalhost(hostname = 'localhost') {
   });
 }
 
-// Helper to wait for all microtasks and useEffects to flush.
-// This ensures document.title updates (which happen in useEffect) are visible.
+// Let pending microtasks/effects settle (e.g. document.title updates).
 async function flushEffects() {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-// Helper to wait for the campaign selection screen to appear, then click select.
+// Click through the campaign selection screen into the app shell.
 async function selectCampaign() {
   await waitFor(() => {
     expect(screen.getByTestId('campaign-selection')).toBeInTheDocument();
   });
-  fireEvent.click(screen.getByTestId('select-campaign-btn'));
+  await act(async () => {
+    fireEvent.click(screen.getByTestId('select-campaign-btn'));
+  });
   await waitFor(() => {
     expect(screen.queryByTestId('campaign-selection')).not.toBeInTheDocument();
   });
   await flushEffects();
 }
 
+// Render the app with one character and land on the character sheet.
+async function renderInCampaign(hostname = 'localhost') {
+  setLocalhost(hostname);
+  mockState.characters = [{ name: 'Aragorn', level: 1 }];
+  render(<App />);
+  await selectCampaign();
+  expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+}
+
+function clickMaps() {
+  fireEvent.click(screen.getByTestId('maps-btn'));
+}
+
 // --- Test suite ---
 
 describe('App - Map Navigation & View Management', () => {
-  const defaultFetch = () =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-
-  const setupWithCharacters = (chars) => {
-    mockState.characters = chars || [{ name: 'Aragorn', level: 1 }];
-    render(<App />);
-    return selectCampaign();
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Reset useAppData mock to default (isLoading: false).
-    _appDataRef.value = {
-      abilityScores: [{ full_name: 'Strength' }],
-      classes: [{ name: 'Fighter' }],
-      classes2024: [{ name: 'Fighter 2024' }],
-      equipment: [{ name: 'Longsword' }],
-      magicItems: [{ name: 'Wand' }],
-      monsters: [],
-      races: [{ name: 'Human' }],
-      races2024: [{ name: 'Human 2024' }],
-      spells: [{ name: 'Fireball' }],
-      spells2024: [{ name: 'Fireball 2024' }],
-      isLoading: false,
-    };
+    _appDataRef.value = defaultAppData();
 
     mockState.campaignName = 'test-campaign';
     mockState.characters = [];
 
+    // Quiet, observable failure channel — map flows must never alert the user.
     window.alert = vi.fn();
-    window.confirm = vi.fn(() => true);
-    window.prompt = vi.fn(() => 'New Campaign Name');
 
-    setLocalhost('localhost');
-    global.fetch = vi.fn(defaultFetch);
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve({}) }),
+    );
+
+    // Default: campaign exists with no maps. Individual tests activate maps.
+    // (vi.clearAllMocks does NOT reset implementations, so re-arm here.)
+    loadMaps.mockResolvedValue({ maps: [] });
 
     dataLoaderMocks.loadAbilityScores.mockResolvedValue([{ full_name: 'Strength' }]);
     dataLoaderMocks.loadClassData.mockImplementation((v) =>
@@ -226,133 +246,233 @@ describe('App - Map Navigation & View Management', () => {
     setLocalhost('localhost');
   });
 
-  describe('Map navigation stack', () => {
-    it('navigates back to manager from map view', async () => {
-      await setupWithCharacters();
-      fireEvent.click(screen.getByTestId('maps-btn'));
+  describe('GM (localhost) navigation', () => {
+    beforeEach(async () => {
+      await renderInCampaign('localhost');
+    });
+
+    it('opens the maps manager, and the manager opens a map', async () => {
+      clickMaps();
       await waitFor(() => {
         expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
       });
+
+      fireEvent.click(screen.getByTestId('open-map-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('map-view')).toBeInTheDocument();
+        expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
+      });
+      expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
+    });
+
+    it('map back button returns the GM to the manager listing', async () => {
+      clickMaps();
       fireEvent.click(screen.getByTestId('open-map-btn'));
       await waitFor(() => {
         expect(screen.getByTestId('map-view')).toBeInTheDocument();
       });
-      // Both back mechanisms return to manager on localhost
+
       fireEvent.click(screen.getByTestId('map-back-btn'));
       await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
-      });
-      // Navigate to map again and test maps-btn as back
-      fireEvent.click(screen.getByTestId('open-map-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('map-view')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
         expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
       });
     });
 
-    it('goes back to none (not manager) when map history is empty on non-localhost', async () => {
-      setLocalhost('example.com');
-
-      const { loadMaps } = await import('./services/maps/mapsService.js');
-      loadMaps.mockResolvedValue({
-        maps: [{ fileName: 'dungeon-1.json', isActive: true }],
-      });
-
-      await setupWithCharacters();
-      fireEvent.click(screen.getByTestId('maps-btn'));
+    it('Maps sidebar button acts as back from a map to the manager listing', async () => {
+      clickMaps();
+      fireEvent.click(screen.getByTestId('open-map-btn'));
       await waitFor(() => {
         expect(screen.getByTestId('map-view')).toBeInTheDocument();
       });
-      fireEvent.click(screen.getByTestId('map-back-btn'));
+
+      clickMaps();
       await waitFor(() => {
         expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      });
+    });
+
+    it('does nothing when Maps is clicked while the manager listing is already open', async () => {
+      clickMaps();
+      await waitFor(() => {
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      });
+
+      clickMaps();
+      await flushEffects();
+      expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+    });
+
+    it('manager back button closes the maps area entirely', async () => {
+      clickMaps();
+      await waitFor(() => {
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mm-back-btn'));
+      await waitFor(() => {
         expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
       });
+      // localhost never sees the player waiting placeholder; the shell stays intact
+      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
+      expect(screen.getByTestId('sidebar')).toBeInTheDocument();
     });
 
-    it('shows map view directly when non-localhost with active map', async () => {
-      setLocalhost('example.com');
+    it('backs through the POI map history stack: inner map, original map, manager', async () => {
+      clickMaps();
+      fireEvent.click(screen.getByTestId('open-map-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
+      });
 
-      const { loadMaps } = await import('./services/maps/mapsService.js');
+      // Entering a POI opens the inner map with the original on the stack
+      fireEvent.click(screen.getByTestId('map-enter-poi-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('map-name').textContent).toBe('inner-cave');
+      });
+
+      // First back pops the stack: original map, not the manager
+      fireEvent.click(screen.getByTestId('map-back-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
+      });
+
+      // Stack is now empty: back exits to the manager listing
+      fireEvent.click(screen.getByTestId('map-back-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+        expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+      });
+    });
+
+    it('clears the POI history when Maps returns to the manager', async () => {
+      clickMaps();
+      fireEvent.click(screen.getByTestId('open-map-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
+      });
+      fireEvent.click(screen.getByTestId('map-enter-poi-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('map-name').textContent).toBe('inner-cave');
+      });
+
+      // "Maps" exits the stack to the manager — history must not survive
+      clickMaps();
+      await waitFor(() => {
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+      });
+
+      // Fresh open starts a fresh stack: back goes straight to the manager
+      fireEvent.click(screen.getByTestId('open-map-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
+      });
+      fireEvent.click(screen.getByTestId('map-back-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+        expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Player (non-localhost) navigation', () => {
+    it('opens the active map directly, skipping the manager listing', async () => {
       loadMaps.mockResolvedValue({
         maps: [{ fileName: 'dungeon-1.json', isActive: true }],
       });
+      await renderInCampaign('example.com');
 
-      await setupWithCharacters();
-      fireEvent.click(screen.getByTestId('maps-btn'));
+      clickMaps();
       await waitFor(() => {
         expect(screen.getByTestId('map-view')).toBeInTheDocument();
         expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
       });
+      expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
     });
 
-    it('shows the waiting placeholder (no alert) when non-localhost and no active map found', async () => {
-      setLocalhost('example.com');
-
-      const { loadMaps } = await import('./services/maps/mapsService.js');
-      loadMaps.mockResolvedValue({
-        maps: [{ fileName: 'dungeon-1.json', isActive: false }],
-      });
-
-      await setupWithCharacters();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-
-      await waitFor(() => {
-        expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
-      });
-      expect(screen.getByText('Check Again')).toBeInTheDocument();
-      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
-      expect(window.alert).not.toHaveBeenCalled();
-    });
-
-    it('re-opens the map on a second maps-btn click after an earlier waiting placeholder (non-localhost)', async () => {
-      setLocalhost('example.com');
-
-      const { loadMaps } = await import('./services/maps/mapsService.js');
-      loadMaps.mockResolvedValue({
-        maps: [{ fileName: 'dungeon-1.json', isActive: false }],
-      });
-
-      await setupWithCharacters();
-      // First click: no active map → waiting placeholder, no alert
-      fireEvent.click(screen.getByTestId('maps-btn'));
-      await waitFor(() => {
-        expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
-      });
-      expect(window.alert).not.toHaveBeenCalled();
-      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
-
-      // GM activates the map
+    it('does nothing when Maps is clicked while a map is already open', async () => {
       loadMaps.mockResolvedValue({
         maps: [{ fileName: 'dungeon-1.json', isActive: true }],
       });
+      await renderInCampaign('example.com');
+      clickMaps();
+      await waitFor(() => {
+        expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
+      });
 
-      // Second click must re-run the active-map load and render the map
-      fireEvent.click(screen.getByTestId('maps-btn'));
+      const loadCallsBefore = loadMaps.mock.calls.length;
+      clickMaps();
+      await flushEffects();
+
+      // Still on the same map — no reload, no detour to the manager
+      expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
+      expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
+      expect(loadMaps.mock.calls.length).toBe(loadCallsBefore);
+    });
+
+    it('back from a map lands on the waiting placeholder, never the manager', async () => {
+      loadMaps.mockResolvedValue({
+        maps: [{ fileName: 'dungeon-1.json', isActive: true }],
+      });
+      await renderInCampaign('example.com');
+      clickMaps();
+      await waitFor(() => {
+        expect(screen.getByTestId('map-view')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('map-back-btn'));
+      await waitFor(() => {
+        expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
+      expect(window.alert).not.toHaveBeenCalled();
+    });
+
+    it('waits quietly with no active map, then opens the map on a second Maps click once the GM activates it', async () => {
+      loadMaps.mockResolvedValue({
+        maps: [{ fileName: 'dungeon-1.json', isActive: false }],
+      });
+      await renderInCampaign('example.com');
+
+      // First click: no active map → friendly placeholder, never an alert
+      clickMaps();
+      await waitFor(() => {
+        expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
+        expect(screen.getByText('Check Again')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+      expect(window.alert).not.toHaveBeenCalled();
+
+      // GM activates the map — a second Maps click must re-run the load
+      loadMaps.mockResolvedValue({
+        maps: [{ fileName: 'dungeon-1.json', isActive: true }],
+      });
+      clickMaps();
       await waitFor(() => {
         expect(screen.getByTestId('map-view')).toBeInTheDocument();
         expect(screen.getByTestId('map-name').textContent).toBe('dungeon-1');
       });
+      expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
     });
 
-    it('keeps the waiting placeholder when loadMaps fails on non-localhost', async () => {
-      setLocalhost('example.com');
-
-      const { loadMaps } = await import('./services/maps/mapsService.js');
+    it('keeps the waiting placeholder without an alert when the maps load fails', async () => {
       loadMaps.mockRejectedValue(new Error('Network error'));
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      await renderInCampaign('example.com');
 
-      await setupWithCharacters();
-      fireEvent.click(screen.getByTestId('maps-btn'));
-
+      clickMaps();
       await waitFor(() => {
         expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
       });
+      expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
       expect(window.alert).not.toHaveBeenCalled();
+      // Failure is logged, not silently swallowed
       expect(consoleSpy).toHaveBeenCalled();
     });
   });

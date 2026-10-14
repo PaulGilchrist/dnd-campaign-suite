@@ -1,5 +1,21 @@
-
-import { describe, it, expect, vi } from 'vitest';
+// @improved-by-ai
+/**
+ * Contract tests for src/test/mockComponents.jsx.
+ *
+ * The App.*.test.jsx suites replace real components with these mocks via
+ * vi.mock(), then drive the app by clicking mock testids and reading
+ * rendered text. These tests pin that contract at the mock level so a mock
+ * edit fails HERE — locally and with a clear name — instead of surfacing as
+ * a confusing navigation failure inside one of six app suites:
+ *   - every root/element testid a consuming suite queries is rendered
+ *   - every callback fires with the exact payload consumers depend on,
+ *     and fires ONLY its own callback (wiring isolation)
+ *   - mocks never crash when App omits optional props
+ *
+ * These tests describe the MOCKS, not production components — green here
+ * makes no claim about real component behaviour.
+ */
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import {
   MockCharSheet,
@@ -10,397 +26,446 @@ import {
   MockMapsManager,
   MockMap,
   MockEncounterBuilder,
+  MockNotes,
+  MockQuests,
   MockNPCs,
+  MockSettlements,
   MockLog,
+  MockFactions,
   MockCampaignAdmin,
 } from './mockComponents';
 import { mockState } from './appTestState.js';
 
-describe('mockComponents', () => {
-  describe('MockCharSheet', () => {
-    it('renders character name from playerSummary or "no character" when missing', () => {
-      render(<MockCharSheet playerSummary={{ name: 'TestChar' }} />);
-      expect(screen.getByTestId('character-name')).toHaveTextContent('TestChar');
-    });
+// Root testids each App.* suite queries to prove which view is mounted.
+// Consuming suites: App.map-navigation, App.map-unavailable,
+// App.map-activate, App.state-transitions, App.runtime-events,
+// App.post-restore.
+const ROOT_TESTIDS = [
+  ['MockCharSheet', MockCharSheet, 'char-sheet'],
+  ['MockInitiative', MockInitiative, 'initiative'],
+  ['MockCampaignSelection', MockCampaignSelection, 'campaign-selection'],
+  ['MockWizard', MockWizard, 'character-wizard'],
+  ['MockSidebar', MockSidebar, 'sidebar'],
+  ['MockMapsManager', MockMapsManager, 'maps-manager'],
+  ['MockMap', MockMap, 'map-view'],
+  ['MockEncounterBuilder', MockEncounterBuilder, 'encounter-builder'],
+  ['MockNotes', MockNotes, 'notes-view'],
+  ['MockQuests', MockQuests, 'quests-view'],
+  ['MockNPCs', MockNPCs, 'npcs-view'],
+  ['MockSettlements', MockSettlements, 'settlements-view'],
+  ['MockLog', MockLog, 'campaign-log-view'],
+  ['MockFactions', MockFactions, 'factions-view'],
+  ['MockCampaignAdmin', MockCampaignAdmin, 'campaign-admin'],
+];
 
-    it.each([
-      ['missing', undefined],
-      ['has no name', {}],
-    ])('renders "no character" when playerSummary is %s', (_label, playerSummary) => {
-      render(<MockCharSheet playerSummary={playerSummary} />);
-      expect(screen.getByTestId('character-name')).toHaveTextContent('no character');
-    });
+describe('all mocks: mount contract', () => {
+  it.each(ROOT_TESTIDS)(
+    '%s renders its root testid without crashing when App omits every prop',
+    (_name, Component, rootTestid) => {
+      render(<Component />);
+      expect(screen.getByTestId(rootTestid)).toBeInTheDocument();
+    },
+  );
+});
 
-    it.each([
-      ['with character', { name: 'TestChar' }, 'TestChar'],
-      ['without character', {}, undefined],
-    ])('calls onDeleteCharacter with %s when delete is clicked', (_label, playerSummary, expectedArg) => {
-      const onDelete = vi.fn();
-      render(<MockCharSheet playerSummary={playerSummary} onDeleteCharacter={onDelete} />);
-      fireEvent.click(screen.getByTitle('Delete Character'));
-      expect(onDelete).toHaveBeenCalledWith(expectedArg);
-    });
-
-    it.each([
-      ['Upload', 'onUploadClick'],
-      ['Download', 'onSaveClick'],
-      ['Edit', 'onEditCharacter'],
-    ])('invokes the %s callback when the %s button is clicked', (key, propName) => {
-      const cb = vi.fn();
-      render(<MockCharSheet {...{ [propName]: cb }} />);
-      fireEvent.click(screen.getByText(key));
-      expect(cb).toHaveBeenCalledTimes(1);
-    });
+describe('MockCharSheet', () => {
+  it.each([
+    ['summary with a name', { name: 'TestChar' }, 'TestChar'],
+    ['summary without a name', {}, 'no character'],
+    ['no summary at all', undefined, 'no character'],
+  ])('renders the character name from %s', (_label, playerSummary, expected) => {
+    render(<MockCharSheet playerSummary={playerSummary} />);
+    expect(screen.getByTestId('character-name')).toHaveTextContent(expected);
   });
 
-  describe('MockInitiative', () => {
-    it('renders the character count and campaign name', () => {
-      render(<MockInitiative characters={['a', 'b', 'c']} campaignName="my-campaign" />);
-      expect(screen.getByTestId('init-char-count')).toHaveTextContent('3');
-      expect(screen.getByTestId('init-campaign')).toHaveTextContent('my-campaign');
-    });
-
-    it.each([
-      ['undefined', undefined, '0'],
-      ['empty array', [], '0'],
-    ])('renders %s character count when characters is %s', (_label, characters, expected) => {
-      render(<MockInitiative characters={characters} campaignName="test" />);
-      expect(screen.getByTestId('init-char-count')).toHaveTextContent(expected);
-    });
+  // App passes the character name (not the whole summary) to the delete flow.
+  it.each([
+    ['a summary', { name: 'TestChar' }, 'TestChar'],
+    ['no summary', undefined, undefined],
+  ])('fires onDeleteCharacter with the character name for %s', (_label, playerSummary, expectedArg) => {
+    const onDelete = vi.fn();
+    render(<MockCharSheet playerSummary={playerSummary} onDeleteCharacter={onDelete} />);
+    fireEvent.click(screen.getByTitle('Delete Character'));
+    expect(onDelete).toHaveBeenCalledWith(expectedArg);
   });
 
-  describe('MockCampaignSelection', () => {
-    it.each([
-      ['with characters', 'test-campaign', ['char1', 'char2']],
-      ['without characters', 'empty-campaign', []],
-    ])('calls onCampaignSelect with %s when selected', (_label, campaignName, characters) => {
-      mockState.campaignName = campaignName;
-      mockState.characters = characters;
-      const onSelect = vi.fn();
-      render(<MockCampaignSelection onCampaignSelect={onSelect} />);
-      fireEvent.click(screen.getByTestId('select-campaign-btn'));
-      expect(onSelect).toHaveBeenCalledWith(campaignName, characters);
-    });
+  it('delete button is click-safe when onDeleteCharacter is omitted', () => {
+    render(<MockCharSheet />);
+    expect(() => fireEvent.click(screen.getByTitle('Delete Character'))).not.toThrow();
   });
 
-  describe('MockWizard', () => {
-    it('calls onComplete with default data when complete is clicked', () => {
-      const onComplete = vi.fn();
-      render(<MockWizard onComplete={onComplete} onCancel={vi.fn()} />);
-      fireEvent.click(screen.getByTestId('wizard-complete-btn'));
-      expect(onComplete).toHaveBeenCalledWith({ name: 'New Character', level: 1 });
-    });
+  // No testids on these — consuming suites locate them by label, so the
+  // visible label text is part of the contract.
+  it.each([
+    ['Upload', 'onUploadClick'],
+    ['Download', 'onSaveClick'],
+    ['Edit', 'onEditCharacter'],
+  ])('%s button fires %s exactly once', (label, propName) => {
+    const cb = vi.fn();
+    render(<MockCharSheet {...{ [propName]: cb }} />);
+    fireEvent.click(screen.getByText(label));
+    expect(cb).toHaveBeenCalledTimes(1);
+  });
+});
 
-    it('calls onCancel when cancel is clicked', () => {
-      const onCancel = vi.fn();
-      render(<MockWizard onComplete={vi.fn()} onCancel={onCancel} />);
-      fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
-      expect(onCancel).toHaveBeenCalledTimes(1);
-    });
+describe('MockInitiative', () => {
+  it.each([
+    ['three characters', ['a', 'b', 'c'], '3'],
+    ['an empty list', [], '0'],
+    ['no characters prop', undefined, '0'],
+  ])('%s renders the count alongside the campaign name', (_label, characters, expectedCount) => {
+    render(<MockInitiative characters={characters} campaignName="my-campaign" />);
+    expect(screen.getByTestId('init-char-count')).toHaveTextContent(expectedCount);
+    expect(screen.getByTestId('init-campaign')).toHaveTextContent('my-campaign');
+  });
+});
 
-    it.each([
-      ['renders editing character name', { name: 'EditMe' }, 'EditMe'],
-      ['does not render editing character', null, null],
-      ['does not render editing character', undefined, null],
-    ])('when characterData is %s, editing indicator shows %s', (_label, characterData, expected) => {
-      render(<MockWizard characterData={characterData} />);
-      if (expected) {
-        expect(screen.getByTestId('editing-character')).toHaveTextContent(expected);
-      } else {
-        expect(screen.queryByTestId('editing-character')).toBeNull();
-      }
-    });
-
-    it.each([
-      ['true', 'Editing Mode'],
-      ['false', null],
-    ])('editing mode indicator %s when isEditing is %s', (_label, expected) => {
-      render(<MockWizard isEditing={expected === 'Editing Mode'} />);
-      if (expected) {
-        expect(screen.getByTestId('editing-mode')).toHaveTextContent(expected);
-      } else {
-        expect(screen.queryByTestId('editing-mode')).toBeNull();
-      }
-    });
-
-    it('renders both editing character and mode when both props are provided', () => {
-      render(<MockWizard characterData={{ name: 'EditMe' }} isEditing={true} />);
-      expect(screen.getByTestId('editing-character')).toHaveTextContent('EditMe');
-      expect(screen.getByTestId('editing-mode')).toHaveTextContent('Editing Mode');
-    });
-
-    it('calls onComplete with default data even when editing an existing character', () => {
-      const onComplete = vi.fn();
-      render(<MockWizard onComplete={onComplete} characterData={{ name: 'EditMe' }} />);
-      fireEvent.click(screen.getByTestId('wizard-complete-btn'));
-      expect(onComplete).toHaveBeenCalledWith({ name: 'New Character', level: 1 });
-    });
+describe('MockCampaignSelection', () => {
+  // mockState is shared mutable state that consuming suites mutate freely;
+  // never leak edits past this file's suites.
+  const saved = { campaignName: mockState.campaignName, characters: mockState.characters };
+  afterEach(() => {
+    mockState.campaignName = saved.campaignName;
+    mockState.characters = saved.characters;
   });
 
-  describe('MockSidebar', () => {
-    it('renders the campaign name', () => {
-      render(<MockSidebar campaignName="my-campaign" />);
-      expect(screen.getByTestId('sidebar-campaign')).toHaveTextContent('my-campaign');
-    });
+  it('fires onCampaignSelect with the current mockState', () => {
+    mockState.campaignName = 'test-campaign';
+    mockState.characters = ['char1', 'char2'];
+    const onSelect = vi.fn();
+    render(<MockCampaignSelection onCampaignSelect={onSelect} />);
+    fireEvent.click(screen.getByTestId('select-campaign-btn'));
+    expect(onSelect).toHaveBeenCalledWith('test-campaign', ['char1', 'char2']);
+  });
 
-    it.each([
-      ['true', 'true'],
-      ['false', 'false'],
-    ])('renders the isLocalhost prop value as string when it is %s', (expected, isLocalhost) => {
-      render(<MockSidebar campaignName="test" isLocalhost={isLocalhost} />);
-      expect(screen.getByTestId('sidebar-localhost')).toHaveTextContent(expected);
-    });
+  // The mock reads mockState at CLICK time, not render time. Consuming
+  // suites set mockState after render and before clicking — if the mock
+  // ever snapshots at render, every suite breaks at once.
+  it('reports mockState mutated AFTER render (live read, not snapshot)', () => {
+    const onSelect = vi.fn();
+    render(<MockCampaignSelection onCampaignSelect={onSelect} />);
+    mockState.campaignName = 'late-campaign';
+    mockState.characters = [{ name: 'Late' }];
+    fireEvent.click(screen.getByTestId('select-campaign-btn'));
+    expect(onSelect).toHaveBeenCalledWith('late-campaign', [{ name: 'Late' }]);
+  });
+});
 
-    it('renders an active indicator when activeView is provided', () => {
-      render(<MockSidebar activeView="charSheet" campaignName="test" />);
-      expect(screen.getByTestId('sidebar-active-indicator')).toBeInTheDocument();
-    });
+describe('MockWizard', () => {
+  // Consuming suites (App.runtime-events) create a character through this
+  // fixed payload and then expect a "char-btn-New Character" to appear —
+  // the exact shape is the contract, even while editing an existing char.
+  const CREATED = { name: 'New Character', level: 1 };
 
-    it.each([
-      ['Hero', 'charSheet', { name: 'Hero' }],
-      ['Encounters', 'encounter', undefined],
-      ['Factions', 'factions', undefined],
-      ['Initiative', 'initiative', undefined],
-      ['Maps', 'mapsManager', undefined],
-      ['Notes', 'notes', undefined],
-      ['Quests', 'quests', undefined],
-      ['NPCs', 'npcs', undefined],
-      ['Settlements', 'settlements', undefined],
-      ['Log', 'campaignLog', undefined],
-      ['', 'unknownView', undefined],
-    ])('shows "%s" in the active indicator for the %s view', (expected, activeView, activeCharacter) => {
-      const props = { campaignName: 'test', activeView };
-      if (activeCharacter) props.activeCharacter = activeCharacter;
-      render(<MockSidebar {...props} />);
+  it.each([
+    ['creating', undefined],
+    ['editing an existing character', { name: 'EditMe' }],
+  ])('complete fires onComplete with the fixed created-character payload when %s', (_label, characterData) => {
+    const onComplete = vi.fn();
+    render(<MockWizard onComplete={onComplete} characterData={characterData} />);
+    fireEvent.click(screen.getByTestId('wizard-complete-btn'));
+    expect(onComplete).toHaveBeenCalledWith(CREATED);
+  });
+
+  it('cancel fires onCancel exactly once', () => {
+    const onCancel = vi.fn();
+    render(<MockWizard onComplete={vi.fn()} onCancel={onCancel} />);
+    fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('editing-character shows the character name when characterData is provided', () => {
+    render(<MockWizard characterData={{ name: 'EditMe' }} />);
+    expect(screen.getByTestId('editing-character')).toHaveTextContent('EditMe');
+  });
+
+  it.each([null, undefined])('editing-character is absent when characterData is %s', (characterData) => {
+    render(<MockWizard characterData={characterData} />);
+    expect(screen.queryByTestId('editing-character')).toBeNull();
+  });
+
+  it.each([true, false])('editing-mode renders iff isEditing is %s', (isEditing) => {
+    render(<MockWizard isEditing={isEditing} />);
+    if (isEditing) {
+      expect(screen.getByTestId('editing-mode')).toBeInTheDocument();
+    } else {
+      expect(screen.queryByTestId('editing-mode')).toBeNull();
+    }
+  });
+});
+
+// testid → the prop App.jsx wires to it. One shared callback would let a
+// miswired handler pass, so each test asserts its own handler fired and
+// every other nav handler stayed quiet.
+const SIDEBAR_NAV_BUTTONS = [
+  ['back-to-campaigns-btn', 'onBackToCampaigns'],
+  ['add-character-btn', 'onAddCharacter'],
+  ['initiative-btn', 'onInitiativeClick'],
+  ['maps-btn', 'onMapsClick'],
+  ['notes-btn', 'onNotesClick'],
+  ['encounter-btn', 'onEncounterClick'],
+  ['factions-btn', 'onFactionsClick'],
+  ['npcs-btn', 'onNPCsClick'],
+  ['quests-btn', 'onQuestsClick'],
+  ['settlements-btn', 'onSettlementsClick'],
+];
+
+function allSidebarHandlers() {
+  const handlers = {};
+  SIDEBAR_NAV_BUTTONS.forEach(([, prop]) => {
+    handlers[prop] = vi.fn();
+  });
+  return handlers;
+}
+
+describe('MockSidebar', () => {
+  it('renders the campaign name and the localhost flag as a string', () => {
+    render(<MockSidebar campaignName="my-campaign" isLocalhost={true} />);
+    expect(screen.getByTestId('sidebar-campaign')).toHaveTextContent('my-campaign');
+    expect(screen.getByTestId('sidebar-localhost')).toHaveTextContent('true');
+  });
+
+  // Mirrors MOCK_VIEW_LABELS in mockComponents.jsx. App.state-transitions
+  // asserts these exact strings via sidebar-active-indicator.
+  const ACTIVE_VIEW_LABELS = [
+    ['encounter', 'Encounters'],
+    ['factions', 'Factions'],
+    ['initiative', 'Initiative'],
+    ['mapsManager', 'Maps'],
+    ['notes', 'Notes'],
+    ['quests', 'Quests'],
+    ['npcs', 'NPCs'],
+    ['settlements', 'Settlements'],
+    ['campaignLog', 'Log'],
+    ['unknownView', ''], // unknown views get an empty label, not a crash
+  ];
+
+  it.each(ACTIVE_VIEW_LABELS)(
+    'active indicator for the %s view shows "%s"',
+    (activeView, expected) => {
+      render(<MockSidebar campaignName="test" activeView={activeView} />);
       expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent(expected);
-    });
+    },
+  );
 
-    it('does not render an active indicator when activeView is not provided', () => {
-      render(<MockSidebar campaignName="test" />);
-      expect(screen.queryByTestId('sidebar-active-indicator')).toBeNull();
-    });
+  it('charSheet view shows the active character name', () => {
+    render(<MockSidebar campaignName="test" activeView="charSheet" activeCharacter={{ name: 'Hero' }} />);
+    expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Hero');
+  });
 
-    it.each([
-      ['back', 'back-to-campaigns-btn', 'onBackToCampaigns'],
-      ['add character', 'add-character-btn', 'onAddCharacter'],
-      ['initiative', 'initiative-btn', 'onInitiativeClick'],
-    ])('calls %s when the %s button is clicked', (_label, testid, _cbName) => {
-      const cb = vi.fn();
-      render(<MockSidebar campaignName="test" onBackToCampaigns={cb} onAddCharacter={cb} onInitiativeClick={cb} />);
+  it('charSheet view falls back to the generic label without an active character', () => {
+    render(<MockSidebar campaignName="test" activeView="charSheet" />);
+    expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Character');
+  });
+
+  it('omits the active indicator when no activeView is provided', () => {
+    render(<MockSidebar campaignName="test" />);
+    expect(screen.queryByTestId('sidebar-active-indicator')).toBeNull();
+  });
+
+  it.each([
+    [true, 'Maps'],
+    [false, 'Map'],
+  ])('when isLocalhost is %s the maps button reads "%s" (GM vs player)', (isLocalhost, expected) => {
+    render(<MockSidebar campaignName="test" isLocalhost={isLocalhost} onMapsClick={vi.fn()} />);
+    expect(screen.getByTestId('maps-btn')).toHaveTextContent(expected);
+  });
+
+  it.each(SIDEBAR_NAV_BUTTONS)(
+    'clicking %s fires %s and no other navigation callback',
+    (testid, prop) => {
+      const handlers = allSidebarHandlers();
+      render(<MockSidebar campaignName="test" {...handlers} />);
       fireEvent.click(screen.getByTestId(testid));
+      expect(handlers[prop]).toHaveBeenCalledTimes(1);
+      Object.entries(handlers)
+        .filter(([key]) => key !== prop)
+        .forEach(([, otherCb]) => expect(otherCb).not.toHaveBeenCalled());
+    },
+  );
+
+  // The whole character object (not just the name) reaches the handler —
+  // App reads level and other fields from it.
+  it('renders one button per character and fires onCharacterClick with the whole object', () => {
+    const onClick = vi.fn();
+    const characters = [{ name: 'Char1', level: 3 }, { name: 'Char2', level: 1 }];
+    render(<MockSidebar campaignName="test" characters={characters} onCharacterClick={onClick} />);
+    expect(screen.getByTestId('char-btn-Char1')).toHaveTextContent('Char1');
+    expect(screen.getByTestId('char-btn-Char2')).toHaveTextContent('Char2');
+    fireEvent.click(screen.getByTestId('char-btn-Char1'));
+    expect(onClick).toHaveBeenCalledWith({ name: 'Char1', level: 3 });
+  });
+
+  it('marks only the active character button with the active class', () => {
+    render(
+      <MockSidebar
+        campaignName="test"
+        characters={[{ name: 'ActiveChar' }, { name: 'InactiveChar' }]}
+        activeView="charSheet"
+        activeCharacter={{ name: 'ActiveChar' }}
+        onCharacterClick={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('char-btn-ActiveChar')).toHaveClass('active');
+    expect(screen.getByTestId('char-btn-InactiveChar')).not.toHaveClass('active');
+  });
+
+  it.each([true, false])('admin button renders iff isLocalhost is %s, firing onRepairClick', (isLocalhost) => {
+    const cb = vi.fn();
+    render(<MockSidebar campaignName="test" isLocalhost={isLocalhost} onRepairClick={cb} />);
+    if (isLocalhost) {
+      expect(screen.getByTestId('admin-btn')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('admin-btn'));
       expect(cb).toHaveBeenCalledTimes(1);
-    });
+    } else {
+      expect(screen.queryByTestId('admin-btn')).toBeNull();
+    }
+  });
+});
 
-    it('renders character buttons and invokes onCharacterClick with the character', () => {
-      const onClick = vi.fn();
-      render(<MockSidebar campaignName="test" characters={[{ name: 'Char1' }, { name: 'Char2' }]} onCharacterClick={onClick} />);
-      expect(screen.getByTestId('char-btn-Char1')).toHaveTextContent('Char1');
-      expect(screen.getByTestId('char-btn-Char2')).toHaveTextContent('Char2');
-      fireEvent.click(screen.getByTestId('char-btn-Char1'));
-      expect(onClick).toHaveBeenCalledWith({ name: 'Char1' });
-    });
+describe('MockMapsManager', () => {
+  it('echoes the campaign and fires onOpenMap with the fixed "dungeon-1" id', () => {
+    const onOpenMap = vi.fn();
+    const onBack = vi.fn();
+    render(<MockMapsManager campaignName="my-campaign" onOpenMap={onOpenMap} onBack={onBack} />);
+    expect(screen.getByTestId('mm-campaign')).toHaveTextContent('my-campaign');
+    fireEvent.click(screen.getByTestId('open-map-btn'));
+    expect(onOpenMap).toHaveBeenCalledWith('dungeon-1');
+    fireEvent.click(screen.getByTestId('mm-back-btn'));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+});
 
-    it('applies active class to the active character button but not inactive ones', () => {
-      render(<MockSidebar campaignName="test" characters={[{ name: 'ActiveChar' }, { name: 'InactiveChar' }]} activeView="charSheet" activeCharacter={{ name: 'ActiveChar' }} onCharacterClick={vi.fn()} />);
-      expect(screen.getByTestId('char-btn-ActiveChar')).toHaveClass('active');
-      expect(screen.getByTestId('char-btn-InactiveChar')).not.toHaveClass('active');
-    });
+describe('MockMap', () => {
+  it('echoes map name, campaign, counts, and localhost flag', () => {
+    render(
+      <MockMap
+        mapName="dungeon-1"
+        campaignName="my-campaign"
+        characters={['c1', 'c2']}
+        npcs={['n1']}
+        isLocalhost={true}
+        onBack={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('map-name')).toHaveTextContent('dungeon-1');
+    expect(screen.getByTestId('map-campaign')).toHaveTextContent('my-campaign');
+    expect(screen.getByTestId('map-char-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('map-npc-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('map-localhost')).toHaveTextContent('true');
+  });
 
-    it('does not render character buttons when characters is undefined', () => {
-      render(<MockSidebar campaignName="test" onCharacterClick={vi.fn()} />);
-      expect(screen.queryByTestId('char-btn-Char1')).toBeNull();
-    });
+  it('back button fires onBack exactly once', () => {
+    const onBack = vi.fn();
+    render(<MockMap mapName="m" campaignName="t" onBack={onBack} />);
+    fireEvent.click(screen.getByTestId('map-back-btn'));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
 
-    it.each([
-      ['Maps', true],
-      ['Map', false],
-    ])('renders the maps button as "%s" on %s-localhost', (label, isLocalhost) => {
-      render(<MockSidebar campaignName="test" isLocalhost={isLocalhost} onMapsClick={vi.fn()} />);
-      expect(screen.getByTestId('maps-btn')).toHaveTextContent(label);
-    });
+  // App.map-navigation drives the POI stack through this fixed id:
+  // clicking must open "inner-cave" via onPoiEntered.
+  it('POI button fires onPoiEntered with "inner-cave"', () => {
+    const onPoiEntered = vi.fn();
+    render(<MockMap mapName="m" campaignName="t" onBack={vi.fn()} onPoiEntered={onPoiEntered} />);
+    fireEvent.click(screen.getByTestId('map-enter-poi-btn'));
+    expect(onPoiEntered).toHaveBeenCalledWith('inner-cave');
+  });
 
-    it('renders all navigation buttons', () => {
-      render(<MockSidebar campaignName="test" isLocalhost={true}
-        onNotesClick={vi.fn()} onEncounterClick={vi.fn()} onFactionsClick={vi.fn()}
-        onNPCsClick={vi.fn()} onQuestsClick={vi.fn()} onSettlementsClick={vi.fn()} onLogClick={vi.fn()}
-      />);
-      expect(screen.getByTestId('notes-btn')).toBeInTheDocument();
-      expect(screen.getByTestId('encounter-btn')).toBeInTheDocument();
-      expect(screen.getByTestId('factions-btn')).toBeInTheDocument();
-      expect(screen.getByTestId('npcs-btn')).toBeInTheDocument();
-      expect(screen.getByTestId('quests-btn')).toBeInTheDocument();
-      expect(screen.getByTestId('settlements-btn')).toBeInTheDocument();
-      expect(screen.getByTestId('log-btn')).toBeInTheDocument();
-    });
+  it('POI button is click-safe when onPoiEntered is omitted', () => {
+    render(<MockMap mapName="m" campaignName="t" onBack={vi.fn()} />);
+    expect(() => fireEvent.click(screen.getByTestId('map-enter-poi-btn'))).not.toThrow();
+  });
+});
 
-    it.each([
-      ['renders admin button', true],
-      ['does not render admin button', false],
-    ])('admin button %s on localhost', (_label, isLocalhost) => {
-      const cb = vi.fn();
-      render(<MockSidebar campaignName="test" isLocalhost={isLocalhost} onRepairClick={cb} />);
-      if (isLocalhost) {
-        expect(screen.getByTestId('admin-btn')).toBeInTheDocument();
-        fireEvent.click(screen.getByTestId('admin-btn'));
-        expect(cb).toHaveBeenCalledTimes(1);
-      } else {
-        expect(screen.queryByTestId('admin-btn')).toBeNull();
-      }
-    });
+describe('MockEncounterBuilder', () => {
+  it.each([
+    ['0', []],
+    ['3', ['c1', 'c2', 'c3']],
+  ])('renders character count %s and the campaign name', (expectedCount, characters) => {
+    render(<MockEncounterBuilder characters={characters} campaignName="my-campaign" />);
+    expect(screen.getByTestId('eb-char-count')).toHaveTextContent(expectedCount);
+    expect(screen.getByTestId('eb-campaign')).toHaveTextContent('my-campaign');
+  });
+});
 
-    it('invokes all navigation callbacks when their buttons are clicked', () => {
-      const callbacks = {
-        onNotesClick: vi.fn(),
-        onEncounterClick: vi.fn(),
-        onFactionsClick: vi.fn(),
-        onNPCsClick: vi.fn(),
-        onQuestsClick: vi.fn(),
-        onSettlementsClick: vi.fn(),
-        onLogClick: vi.fn(),
+// Notes, Quests, and Factions share one mock shape; consuming suites query
+// them by their prefixed testids.
+describe.each([
+  ['MockNotes', MockNotes, 'notes'],
+  ['MockQuests', MockQuests, 'quests'],
+  ['MockFactions', MockFactions, 'factions'],
+])('%s', (_name, Component, prefix) => {
+  it('echoes campaign and localhost, and back fires onBack', () => {
+    const onBack = vi.fn();
+    render(<Component campaignName="my-campaign" isLocalhost={true} onBack={onBack} />);
+    expect(screen.getByTestId(`${prefix}-campaign`)).toHaveTextContent('my-campaign');
+    expect(screen.getByTestId(`${prefix}-localhost`)).toHaveTextContent('true');
+    fireEvent.click(screen.getByTestId(`${prefix}-back-btn`));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MockNPCs', () => {
+  it('echoes campaign, char count, and back fires onBack', () => {
+    const onBack = vi.fn();
+    render(<MockNPCs campaignName="my-campaign" characters={['c1', 'c2']} onBack={onBack} />);
+    expect(screen.getByTestId('npcs-campaign')).toHaveTextContent('my-campaign');
+    expect(screen.getByTestId('npcs-char-count')).toHaveTextContent('2');
+    fireEvent.click(screen.getByTestId('npcs-back-btn'));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MockSettlements', () => {
+  it('echoes campaign and back fires onBack', () => {
+    const onBack = vi.fn();
+    render(<MockSettlements campaignName="my-campaign" onBack={onBack} />);
+    expect(screen.getByTestId('settlements-campaign')).toHaveTextContent('my-campaign');
+    fireEvent.click(screen.getByTestId('settlements-back-btn'));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MockLog', () => {
+  it.each([
+    ['0', []],
+    ['3', ['c1', 'c2', 'c3']],
+  ])('renders the campaign name and character count %s', (expectedCount, characters) => {
+    render(<MockLog campaignName="my-campaign" characters={characters} />);
+    expect(screen.getByTestId('log-campaign')).toHaveTextContent('my-campaign');
+    expect(screen.getByTestId('log-char-count')).toHaveTextContent(expectedCount);
+  });
+});
+
+describe('MockCampaignAdmin', () => {
+  it('echoes campaign name and theme', () => {
+    render(<MockCampaignAdmin campaignName="my-campaign" theme="dark" onBack={vi.fn()} />);
+    expect(screen.getByTestId('admin-campaign')).toHaveTextContent('my-campaign');
+    expect(screen.getByTestId('admin-theme')).toHaveTextContent('dark');
+  });
+
+  const ADMIN_BUTTONS = [
+    ['admin-back-btn', 'onBack'],
+    ['admin-toggle-theme-btn', 'toggleTheme'],
+    ['admin-rename-btn', 'onRenameCampaign'],
+    ['admin-delete-btn', 'onDeleteCampaign'],
+  ];
+
+  it.each(ADMIN_BUTTONS)(
+    'clicking %s fires %s and no other admin callback',
+    (testid, prop) => {
+      const handlers = {
+        onBack: vi.fn(),
+        toggleTheme: vi.fn(),
+        onRenameCampaign: vi.fn(),
+        onDeleteCampaign: vi.fn(),
       };
-      render(<MockSidebar campaignName="test" isLocalhost={true} {...callbacks} />);
-      fireEvent.click(screen.getByTestId('notes-btn'));
-      fireEvent.click(screen.getByTestId('encounter-btn'));
-      fireEvent.click(screen.getByTestId('factions-btn'));
-      fireEvent.click(screen.getByTestId('npcs-btn'));
-      fireEvent.click(screen.getByTestId('quests-btn'));
-      fireEvent.click(screen.getByTestId('settlements-btn'));
-      fireEvent.click(screen.getByTestId('log-btn'));
-      Object.values(callbacks).forEach((cb) => {
-        expect(cb).toHaveBeenCalledTimes(1);
-      });
-    });
-  });
-
-  describe('MockMapsManager', () => {
-    it('renders the campaign name', () => {
-      render(<MockMapsManager campaignName="my-campaign" onOpenMap={vi.fn()} onBack={vi.fn()} />);
-      expect(screen.getByTestId('mm-campaign')).toHaveTextContent('my-campaign');
-    });
-
-    it('calls onOpenMap with "dungeon-1" when open map button is clicked', () => {
-      const onOpenMap = vi.fn();
-      render(<MockMapsManager campaignName="test" onOpenMap={onOpenMap} onBack={vi.fn()} />);
-      fireEvent.click(screen.getByTestId('open-map-btn'));
-      expect(onOpenMap).toHaveBeenCalledWith('dungeon-1');
-    });
-  });
-
-  describe('MockMap', () => {
-    it.each([
-      ['map name', 'map-name', 'dungeon-1'],
-      ['campaign name', 'map-campaign', 'my-campaign'],
-    ])('renders the %s', (_label, testid, expected) => {
-      const props = _label === 'map name' ? { mapName: expected, campaignName: 'test' } : { mapName: 'm', campaignName: expected };
-      render(<MockMap {...props} onBack={vi.fn()} />);
-      expect(screen.getByTestId(testid)).toHaveTextContent(expected);
-    });
-
-    it.each([
-      ['characters', 'map-char-count', ['a', 'b'], '2'],
-      ['characters empty', 'map-char-count', [], '0'],
-      ['characters undefined', 'map-char-count', undefined, '0'],
-      ['npcs', 'map-npc-count', ['n1', 'n2'], '2'],
-      ['npcs empty', 'map-npc-count', [], '0'],
-      ['npcs undefined', 'map-npc-count', undefined, '0'],
-    ])('renders the %s count correctly', (_label, testid, data, expected) => {
-      const props = { mapName: 'm', campaignName: 't', onBack: vi.fn() };
-      if (_label.startsWith('characters')) props.characters = data;
-      else props.npcs = data;
-      render(<MockMap {...props} />);
-      expect(screen.getByTestId(testid)).toHaveTextContent(expected);
-    });
-
-    it.each([
-      ['true', 'true'],
-      ['false', 'false'],
-    ])('renders the isLocalhost prop value as string when it is %s', (expected, isLocalhost) => {
-      render(<MockMap mapName="m" campaignName="t" isLocalhost={isLocalhost} onBack={vi.fn()} />);
-      expect(screen.getByTestId('map-localhost')).toHaveTextContent(expected);
-    });
-
-    it('calls onBack when back button is clicked', () => {
-      const onBack = vi.fn();
-      render(<MockMap mapName="m" campaignName="t" onBack={onBack} />);
-      fireEvent.click(screen.getByTestId('map-back-btn'));
-      expect(onBack).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('MockEncounterBuilder', () => {
-    it.each([
-      ['characters', 'eb-char-count', ['c1', 'c2', 'c3'], '3'],
-      ['characters empty', 'eb-char-count', [], '0'],
-      ['characters undefined', 'eb-char-count', undefined, '0'],
-      ['campaign name', 'eb-campaign', 'my-campaign', 'my-campaign'],
-    ])('renders the %s correctly', (_label, testid, data, expected) => {
-      const props = { campaignName: 'test' };
-      if (_label.includes('characters')) {
-        props.characters = data;
-      } else {
-        props.campaignName = expected;
-      }
-      render(<MockEncounterBuilder {...props} />);
-      expect(screen.getByTestId(testid)).toHaveTextContent(expected);
-    });
-  });
-
-  describe('MockNPCs', () => {
-    it('renders the campaign name', () => {
-      render(<MockNPCs campaignName="my-campaign" onBack={vi.fn()} />);
-      expect(screen.getByTestId('npcs-campaign')).toHaveTextContent('my-campaign');
-    });
-
-    it.each([
-      ['characters', 'npcs-char-count', ['c1', 'c2'], '2'],
-      ['characters empty', 'npcs-char-count', [], '0'],
-      ['characters undefined', 'npcs-char-count', undefined, '0'],
-    ])('renders the %s count correctly', (_label, testid, data, expected) => {
-      render(<MockNPCs campaignName="test" characters={data} onBack={vi.fn()} />);
-      expect(screen.getByTestId(testid)).toHaveTextContent(expected);
-    });
-  });
-
-  describe('MockLog', () => {
-    it('renders the campaign name', () => {
-      render(<MockLog campaignName="my-campaign" characters={[]} />);
-      expect(screen.getByTestId('log-campaign')).toHaveTextContent('my-campaign');
-    });
-
-    it.each([
-      ['characters', 'log-char-count', ['c1', 'c2', 'c3'], '3'],
-      ['characters empty', 'log-char-count', [], '0'],
-      ['characters undefined', 'log-char-count', undefined, '0'],
-    ])('renders the %s count correctly', (_label, testid, data, expected) => {
-      render(<MockLog campaignName="test" characters={data} />);
-      expect(screen.getByTestId(testid)).toHaveTextContent(expected);
-    });
-  });
-
-  describe('MockCampaignAdmin', () => {
-    it('renders the campaign name and theme', () => {
-      render(<MockCampaignAdmin campaignName="my-campaign" theme="light" onBack={vi.fn()} />);
-      expect(screen.getByTestId('admin-campaign')).toHaveTextContent('my-campaign');
-      expect(screen.getByTestId('admin-theme')).toHaveTextContent('light');
-    });
-
-    it.each(['dark', 'light'])('renders the theme value "%s"', (theme) => {
-      render(<MockCampaignAdmin campaignName="test" theme={theme} onBack={vi.fn()} />);
-      expect(screen.getByTestId('admin-theme')).toHaveTextContent(theme);
-    });
-
-    it.each([
-      ['back', 'admin-back-btn', 'onBack'],
-      ['toggle theme', 'admin-toggle-theme-btn', 'toggleTheme'],
-      ['rename', 'admin-rename-btn', 'onRenameCampaign'],
-      ['delete', 'admin-delete-btn', 'onDeleteCampaign'],
-    ])('calls the %s callback when the %s button is clicked', (_label, testid, cbName) => {
-      const cb = vi.fn();
-      const props = { onBack: vi.fn(), toggleTheme: vi.fn(), onRenameCampaign: vi.fn(), onDeleteCampaign: vi.fn() };
-      props[cbName] = cb;
-      render(<MockCampaignAdmin campaignName="test" theme="light" {...props} />);
+      render(<MockCampaignAdmin campaignName="test" theme="light" {...handlers} />);
       fireEvent.click(screen.getByTestId(testid));
-      expect(cb).toHaveBeenCalledTimes(1);
-    });
-  });
+      expect(handlers[prop]).toHaveBeenCalledTimes(1);
+      Object.entries(handlers)
+        .filter(([key]) => key !== prop)
+        .forEach(([, otherCb]) => expect(otherCb).not.toHaveBeenCalled());
+    },
+  );
 });

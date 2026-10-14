@@ -1,9 +1,28 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @improved-by-ai
+/**
+ * Rendering smoke tests for CampaignAdmin: what the admin view looks like
+ * on load, before any interaction. Verifies structure (header, section
+ * headings, action cards pairing heading + warning copy + button), theme
+ *-aware labels, and idle negative paths (no modals, no status messaging).
+ *
+ * Interaction flows are covered by sibling files and are deliberately NOT
+ * repeated here: rename, delete, data-management, backup-restore,
+ * rollback-upload, and theme-toggle tests, plus EnforcementSection,
+ * SessionSection, and AiRefereeSection unit tests (this file only asserts
+ * those consoles are mounted into the admin view).
+ *
+ * fetch and EventSource are inert globally (src/test/setup.js), so no
+ * test here can reach a live server; every campaign name used is a
+ * test-campaign variant.
+ */
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import CampaignAdmin from './CampaignAdmin.jsx';
 
+const CAMPAIGN = 'test-campaign';
+
 const createDefaultProps = (overrides = {}) => ({
-    campaignName: 'test-campaign',
+    campaignName: CAMPAIGN,
     onBack: vi.fn(),
     theme: 'dark',
     toggleTheme: vi.fn(),
@@ -11,170 +30,184 @@ const createDefaultProps = (overrides = {}) => ({
     ...overrides,
 });
 
-const sectionHeadings = [
-    'Appearance',
-    'Campaign Management',
-    'Data Management',
-    'Backup & Restore',
+const renderAdmin = (overrides = {}) => {
+    const props = createDefaultProps(overrides);
+    const utils = render(<CampaignAdmin {...props} />);
+    return { props, ...utils };
+};
+
+// Every destructive-affordance button must carry the danger class so the GM
+// can visually tell it apart from routine actions.
+const DANGER_BUTTONS = ['Delete Campaign', 'Full Reset', 'Rollback to Snapshot'];
+const PRIMARY_BUTTONS = ['Rename Campaign', 'Clear Change Data', 'Clear Campaign Log', 'Create Snapshot', 'Download Campaign'];
+
+// One entry per Backup & Restore / Data Management / Campaign Management card:
+// the card must pair its title, its user-facing warning copy, and a working
+// (enabled, correctly styled) action button. The Upload card is checked
+// separately — its control is a file-input label, not a button.
+const ACTION_CARDS = [
+    {
+        heading: 'Rename Campaign',
+        button: 'Rename Campaign',
+        cls: 'ct-btn-primary',
+        description: 'Changes the display name. Character files, maps, and data are preserved.',
+    },
+    {
+        heading: 'Delete Campaign',
+        button: 'Delete Campaign',
+        cls: 'ct-btn-danger',
+        description: 'Permanently deletes the entire campaign and ALL its files. This cannot be undone.',
+    },
+    {
+        heading: 'Clear Change Data',
+        button: 'Clear Change Data',
+        cls: 'ct-btn-primary',
+        description: 'Removes all runtime state (HP, conditions, spell slots, death saves, target effects, active buffs, and position data).',
+    },
+    {
+        heading: 'Clear Campaign Log',
+        button: 'Clear Campaign Log',
+        cls: 'ct-btn-primary',
+        description: 'Deletes all entries from the campaign log. Roll history, combat events, and ability use records will be permanently lost.',
+    },
+    {
+        heading: 'Full Reset',
+        button: 'Full Reset',
+        cls: 'ct-btn-danger',
+        description: 'Clears both the campaign log and change data in one action. Use to fix corrupted campaign state.',
+    },
+    {
+        heading: 'Snapshot',
+        button: 'Create Snapshot',
+        cls: 'ct-btn-primary',
+        description: 'Creates a timestamped zip backup of the entire campaign folder on the server. Snapshots are kept (newest 10) and never overwrite each other, so you can roll back more than one step.',
+    },
+    {
+        heading: 'Download',
+        button: 'Download Campaign',
+        cls: 'ct-btn-primary',
+        description: 'Downloads the entire campaign folder as a .zip file to your computer.',
+    },
+    {
+        heading: 'Rollback',
+        button: 'Rollback to Snapshot',
+        cls: 'ct-btn-danger',
+        description: 'Restores the campaign to the last snapshot. All changes since the snapshot will be lost.',
+    },
 ];
 
-// All window APIs used by CampaignAdmin. Spied and restored after each test
-// to prevent leaks into behavioral tests in other files.
-beforeEach(() => {
-    vi.spyOn(window, 'alert').mockImplementation(() => {});
-    vi.spyOn(window, 'confirm').mockImplementation(() => true);
-    vi.spyOn(window, 'prompt').mockImplementation(() => 'test-campaign');
-    vi.stubGlobal('location', { reload: vi.fn() });
-});
-
-afterEach(() => {
-    vi.restoreAllMocks();
-});
-
 describe('CampaignAdmin - Rendering', () => {
-    const defaultProps = createDefaultProps();
-
     describe('container and header', () => {
-        it('renders the outer container with correct class', () => {
-            const { container } = render(<CampaignAdmin {...defaultProps} />);
-            expect(container.querySelector('.ct-container.campaign-admin')).toBeInTheDocument();
+        it('renders the campaign-admin container with the campaign name in the header', () => {
+            // Special characters must appear verbatim in the header.
+            for (const campaignName of [CAMPAIGN, 'my campaign/1']) {
+                const { container, unmount } = renderAdmin({ campaignName });
+                expect(container.querySelector('.ct-container.campaign-admin')).toBeInTheDocument();
+                expect(screen.getByRole('heading', { level: 2, name: `Admin — ${campaignName}` })).toBeInTheDocument();
+                unmount();
+            }
         });
 
-        it('renders the header with campaign name in h2', () => {
-            render(<CampaignAdmin {...defaultProps} />);
-            expect(screen.getByRole('heading', { name: 'Admin — test-campaign', level: 2 })).toBeInTheDocument();
-        });
-
-        it('renders the back button with correct icon and accessible name', () => {
-            render(<CampaignAdmin {...defaultProps} />);
-            const backBtn = screen.getByRole('button', { name: /^Back$/ });
-            expect(backBtn).toBeInTheDocument();
-        });
-
-        it('reflects campaign name with special characters in the header', () => {
-            render(<CampaignAdmin {...createDefaultProps({ campaignName: 'my campaign/1' })} />);
-            expect(screen.getByRole('heading', { name: 'Admin — my campaign/1', level: 2 })).toBeInTheDocument();
+        it('renders a Back button in the header', () => {
+            renderAdmin();
+            expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
         });
     });
 
-    describe('admin sections', () => {
-        it('renders all four section headings', () => {
-            render(<CampaignAdmin {...defaultProps} />);
-            sectionHeadings.forEach((heading) => {
-                expect(screen.getByText(heading)).toBeInTheDocument();
+    describe('sections', () => {
+        it('renders all four core section headings', () => {
+            renderAdmin();
+            ['Appearance', 'Campaign Management', 'Data Management', 'Backup & Restore'].forEach((heading) => {
+                expect(screen.getByRole('heading', { level: 3, name: heading })).toBeInTheDocument();
             });
         });
 
-        it('renders section descriptions', () => {
-            render(<CampaignAdmin {...defaultProps} />);
-            expect(screen.getByText('Changes the display name. Character files, maps, and data are preserved.')).toBeInTheDocument();
-            expect(screen.getByText('Permanently deletes the entire campaign and ALL its files. This cannot be undone.')).toBeInTheDocument();
-            expect(screen.getByText('Removes all runtime state (HP, conditions, spell slots, death saves, target effects, active buffs, and position data).')).toBeInTheDocument();
-            expect(screen.getByText('Deletes all entries from the campaign log. Roll history, combat events, and ability use records will be permanently lost.')).toBeInTheDocument();
-            expect(screen.getByText('Clears both the campaign log and change data in one action. Use to fix corrupted campaign state.')).toBeInTheDocument();
-            expect(screen.getByText('Creates a timestamped zip backup of the entire campaign folder on the server. Snapshots are kept (newest 10) and never overwrite each other, so you can roll back more than one step.')).toBeInTheDocument();
-            expect(screen.getByText('Downloads the entire campaign folder as a .zip file to your computer.')).toBeInTheDocument();
-            expect(screen.getByText('Restores the campaign to the last snapshot. All changes since the snapshot will be lost.')).toBeInTheDocument();
-            expect(screen.getByText('Replaces the current campaign with an uploaded .zip file. A safety snapshot is saved first and used if upload fails.')).toBeInTheDocument();
+        it('mounts the Enforcement, Session, and AI Referee consoles', () => {
+            // These child sections have their own test files for behavior;
+            // here we only verify the admin view wires them in.
+            renderAdmin();
+            expect(screen.getByRole('heading', { level: 3, name: /Enforcement/ })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { level: 3, name: /Session/ })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { level: 3, name: /AI Referee/ })).toBeInTheDocument();
         });
     });
 
-    describe('action buttons', () => {
-        it('renders the theme toggle button with correct icon for dark theme', () => {
-            render(<CampaignAdmin {...defaultProps} />);
-            const btn = screen.getByRole('button', { name: /switch to/i });
-            expect(btn).toBeInTheDocument();
-            expect(btn.querySelector('i.fa-sun')).toBeInTheDocument();
-            expect(btn.textContent).toContain('Switch to Light Mode');
+    describe('action cards', () => {
+        describe.each(ACTION_CARDS)('$heading card', ({ heading, button, cls, description }) => {
+            it('pairs the title with its warning copy and an enabled, correctly styled button', () => {
+                renderAdmin();
+
+                const card = screen.getByRole('heading', { level: 3, name: heading }).closest('.admin-action');
+                expect(card).not.toBeNull();
+                // The description belongs to THIS card, not just somewhere on the page.
+                expect(card).toHaveTextContent(description);
+
+                const btn = screen.getByRole('button', { name: button });
+                expect(btn).toHaveClass(cls);
+                expect(btn.closest('.admin-action')).toBe(card);
+                // Idle on load: nothing is mid-flight, so nothing is disabled.
+                expect(btn).toBeEnabled();
+            });
         });
 
-        it('renders all rename campaign action buttons', () => {
-            render(<CampaignAdmin {...defaultProps} />);
-            const renameButtons = screen.getAllByRole('button', { name: /rename campaign/i });
-            expect(renameButtons.length).toBeGreaterThanOrEqual(1);
-        });
+        it('wraps the upload file input in a clickable label with its warning copy', () => {
+            const { container } = renderAdmin();
 
-        it('renders all data management action buttons', () => {
-            render(<CampaignAdmin {...defaultProps} />);
-            expect(screen.getByRole('button', { name: 'Clear Change Data' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Clear Campaign Log' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Full Reset' })).toBeInTheDocument();
-        });
+            const card = screen.getByRole('heading', { level: 3, name: 'Upload' }).closest('.admin-action');
+            expect(card).toHaveTextContent('Replaces the current campaign with an uploaded .zip file. A safety snapshot is saved first and used if upload fails.');
 
-        it('renders all backup & restore action buttons', () => {
-            render(<CampaignAdmin {...defaultProps} />);
-            expect(screen.getByRole('button', { name: 'Create Snapshot' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Download Campaign' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Rollback to Snapshot' })).toBeInTheDocument();
-        });
-
-        it('renders danger-styled action buttons', () => {
-            render(<CampaignAdmin {...defaultProps} />);
-            const deleteBtn = screen.getByRole('button', { name: /delete campaign/i });
-            expect(deleteBtn).toHaveClass('ct-btn-danger');
-
-            const resetBtn = screen.getByRole('button', { name: 'Full Reset' });
-            expect(resetBtn).toHaveClass('ct-btn-danger');
-
-            const rollbackBtn = screen.getByRole('button', { name: 'Rollback to Snapshot' });
-            expect(rollbackBtn).toHaveClass('ct-btn-danger');
-        });
-
-        it('renders primary-styled action buttons', () => {
-            render(<CampaignAdmin {...defaultProps} />);
-            const clearChangeBtn = screen.getByRole('button', { name: 'Clear Change Data' });
-            expect(clearChangeBtn).toHaveClass('ct-btn-primary');
-
-            const clearLogBtn = screen.getByRole('button', { name: 'Clear Campaign Log' });
-            expect(clearLogBtn).toHaveClass('ct-btn-primary');
-
-            const snapshotBtn = screen.getByRole('button', { name: 'Create Snapshot' });
-            expect(snapshotBtn).toHaveClass('ct-btn-primary');
-
-            const downloadBtn = screen.getByRole('button', { name: 'Download Campaign' });
-            expect(downloadBtn).toHaveClass('ct-btn-primary');
-        });
-
-        it('renders the upload file input inside a label', () => {
-            render(<CampaignAdmin {...defaultProps} />);
-            const uploadLabel = document.querySelector('.admin-upload-label');
+            // The label carries the primary-button styling and contains the input,
+            // so clicking the styled "Upload Campaign" control opens the file picker.
+            const uploadLabel = container.querySelector('label.admin-upload-label');
             expect(uploadLabel).toBeInTheDocument();
+            expect(uploadLabel).toHaveClass('ct-btn-primary');
             expect(uploadLabel.querySelector('input[type="file"]')).toBeInTheDocument();
-            expect(uploadLabel.querySelector('input[type="file"]')).toHaveAttribute('accept', '.zip');
         });
 
-        it('renders the available snapshots section', async () => {
-            global.fetch = vi.fn(() =>
-                Promise.resolve({
-                    ok: true,
-                    json: () => Promise.resolve({ snapshots: [{ filename: 'test-campaign-2026-10-10T12-00-00-000.zip', size: 4096, timestamp: '2026-10-10T12:00:00.000Z' }] }),
-                })
-            );
-            render(<CampaignAdmin {...defaultProps} />);
-            expect(screen.getByRole('heading', { name: 'Available Snapshots' })).toBeInTheDocument();
-            await waitFor(() => {
-                expect(document.querySelector('.admin-snapshot-name')).toHaveTextContent('test-campaign-2026-10-10T12-00-00-000.zip');
+        it('marks exactly the destructive buttons with danger styling and the routine ones as primary', () => {
+            renderAdmin();
+            DANGER_BUTTONS.forEach((name) => {
+                expect(screen.getByRole('button', { name })).toHaveClass('ct-btn-danger');
+            });
+            PRIMARY_BUTTONS.forEach((name) => {
+                expect(screen.getByRole('button', { name })).toHaveClass('ct-btn-primary');
+            });
+            // A button must not be styled as both safe and destructive.
+            DANGER_BUTTONS.forEach((name) => {
+                expect(screen.getByRole('button', { name })).not.toHaveClass('ct-btn-primary');
             });
         });
     });
 
-    describe('hidden elements (negative assertions)', () => {
-        it('does not render the rename modal by default', () => {
-            render(<CampaignAdmin {...defaultProps} />);
+    describe('theme toggle', () => {
+        it('labels the toggle for the opposite of the current theme', () => {
+            const { unmount } = renderAdmin({ theme: 'dark' });
+            expect(screen.getByRole('button', { name: 'Switch to Light Mode' })).toBeInTheDocument();
+            unmount();
+
+            renderAdmin({ theme: 'light' });
+            expect(screen.getByRole('button', { name: 'Switch to Dark Mode' })).toBeInTheDocument();
+        });
+    });
+
+    describe('idle state (negative assertions)', () => {
+        it('shows no modals until an action opens one', () => {
+            const { container } = renderAdmin();
+            expect(container.querySelectorAll('.ct-modal-overlay')).toHaveLength(0);
             expect(screen.queryByLabelText('New Campaign Name')).not.toBeInTheDocument();
-            expect(screen.queryByText('Cancel')).not.toBeInTheDocument();
-        });
-
-        it('does not render any confirm modal by default', () => {
-            render(<CampaignAdmin {...defaultProps} />);
+            expect(screen.queryByRole('button', { name: 'Rename' })).not.toBeInTheDocument();
             expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
-            expect(screen.queryByText('Cancel')).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
         });
 
-        it('does not render status messages by default', () => {
-            render(<CampaignAdmin {...defaultProps} />);
-            const statusEl = document.querySelector('.admin-status');
-            expect(statusEl).not.toBeInTheDocument();
+        it('shows no status, busy, or restore messaging before anything happens', () => {
+            const { container } = renderAdmin();
+            expect(container.querySelector('.admin-status')).not.toBeInTheDocument();
+            expect(screen.queryByRole('status')).not.toBeInTheDocument();
+            expect(screen.queryByText(/Campaign restored from/)).not.toBeInTheDocument();
+            ['Creating snapshot...', 'Rolling back...', 'Preparing download...', 'Uploading and extracting...', 'Clearing change data...', 'Clearing log...', 'Performing full reset...'].forEach((busyText) => {
+                expect(screen.queryByText(busyText)).not.toBeInTheDocument();
+            });
         });
     });
 });

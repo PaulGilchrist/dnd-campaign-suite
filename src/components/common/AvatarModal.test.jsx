@@ -1,116 +1,157 @@
+// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import AvatarModal from './AvatarModal.jsx';
 
-describe('AvatarModal', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
+/** Render the modal with sensible defaults; pass props to override. */
+const renderModal = (props = {}) =>
+  render(<AvatarModal name="Gandalf" onClose={vi.fn()} {...props} />);
 
-  describe('image rendering', () => {
-    it('renders the image with correct src and alt when imagePath is provided', () => {
-      render(<AvatarModal name="Gandalf" imagePath="/images/gandalf.png" onClose={vi.fn()} />);
+describe('AvatarModal', () => {
+  describe('image display', () => {
+    it('displays the image at the given path unchanged when no campaignName is set', () => {
+      renderModal({ imagePath: '/images/gandalf.png' });
 
       const img = screen.getByRole('img');
-      expect(img).toBeInTheDocument();
       expect(img).toHaveAttribute('src', '/images/gandalf.png');
       expect(img).toHaveAttribute('alt', 'Gandalf');
     });
 
-    it('prepends campaignName to the image path when campaignName is provided', () => {
-      render(
-        <AvatarModal name="Gandalf" imagePath="/images/gandalf.png" campaignName="my-campaign" onClose={vi.fn()} />
-      );
+    it('prefers the image over the letter fallback when both are available', () => {
+      renderModal({ imagePath: '/images/gandalf.png' });
 
-      const img = screen.getByRole('img');
-      expect(img).toHaveAttribute('src', 'campaigns/my-campaign//images/gandalf.png');
+      expect(screen.getByRole('img')).toBeInTheDocument();
+      expect(screen.queryByText('G')).not.toBeInTheDocument();
     });
 
-    it('preserves HTTP URLs without transformation regardless of campaignName', () => {
-      render(
-        <AvatarModal
-          name="Gandalf"
-          imagePath="https://example.com/gandalf.png"
-          campaignName="my-campaign"
-          onClose={vi.fn()}
-        />
-      );
+    it.each([
+      ['https://example.com/gandalf.png'],
+      ['http://example.com/gandalf.png'],
+    ])('serves external URLs unchanged even when campaignName is set', (url) => {
+      renderModal({ imagePath: url, campaignName: 'frostfall' });
 
-      const img = screen.getByRole('img');
-      expect(img).toHaveAttribute('src', 'https://example.com/gandalf.png');
+      expect(screen.getByRole('img')).toHaveAttribute('src', url);
     });
 
-    it('does not prepend campaignName when imagePath is a relative path without campaignName', () => {
-      render(<AvatarModal name="Gandalf" imagePath="/images/gandalf.png" onClose={vi.fn()} />);
+    it('prefixes the campaign directory onto relative campaign image paths', () => {
+      renderModal({ imagePath: 'images/npcs/gandalf.png', campaignName: 'frostfall' });
 
-      const img = screen.getByRole('img');
-      expect(img).toHaveAttribute('src', '/images/gandalf.png');
+      expect(screen.getByRole('img')).toHaveAttribute(
+        'src',
+        'campaigns/frostfall/images/npcs/gandalf.png'
+      );
+    });
+
+    // Documents current string-join behaviour: a leading slash on imagePath is
+    // preserved, so the joined URL contains a double slash. Servers normalise
+    // this, but the exact output is pinned here so a join refactor is deliberate.
+    it('preserves a leading slash on the image path when joining the campaign directory', () => {
+      renderModal({ imagePath: '/images/gandalf.png', campaignName: 'frostfall' });
+
+      expect(screen.getByRole('img')).toHaveAttribute(
+        'src',
+        'campaigns/frostfall//images/gandalf.png'
+      );
     });
   });
 
-  describe('fallback rendering', () => {
-    it('renders the initial letter for a name, uppercased', () => {
-      render(<AvatarModal name="gandalf" onClose={vi.fn()} />);
-      expect(screen.getByText('G')).toBeInTheDocument();
-    });
+  describe('letter fallback', () => {
+    it('shows the uppercased initial when no image is available', () => {
+      renderModal({ name: 'gandalf' });
 
-    it('renders "?" when name is empty, null, or undefined', () => {
-      const { rerender } = render(<AvatarModal name="" onClose={vi.fn()} />);
-      expect(screen.getByText('?')).toBeInTheDocument();
-
-      rerender(<AvatarModal name={null} onClose={vi.fn()} />);
-      expect(screen.getByText('?')).toBeInTheDocument();
-
-      rerender(<AvatarModal name={undefined} onClose={vi.fn()} />);
-      expect(screen.getByText('?')).toBeInTheDocument();
-    });
-
-    it('shows initial when imagePath is null or undefined', () => {
-      const { rerender } = render(<AvatarModal name="Gandalf" imagePath={null} onClose={vi.fn()} />);
-      expect(screen.getByText('G')).toBeInTheDocument();
-      expect(screen.queryByRole('img')).not.toBeInTheDocument();
-
-      rerender(<AvatarModal name="Gandalf" imagePath={undefined} onClose={vi.fn()} />);
       expect(screen.getByText('G')).toBeInTheDocument();
       expect(screen.queryByRole('img')).not.toBeInTheDocument();
     });
+
+    it.each([['empty string', ''], ['null', null], ['undefined', undefined]])(
+      'shows "?" when name is %s',
+      (_label, name) => {
+        renderModal({ name });
+
+        expect(screen.getByText('?')).toBeInTheDocument();
+        expect(screen.queryByRole('img')).not.toBeInTheDocument();
+      }
+    );
+
+    it.each([['null', null], ['undefined', undefined]])(
+      'shows the initial instead of an img element when imagePath is %s',
+      (_label, imagePath) => {
+        renderModal({ imagePath });
+
+        expect(screen.getByText('G')).toBeInTheDocument();
+        expect(screen.queryByRole('img')).not.toBeInTheDocument();
+      }
+    );
   });
 
-  describe('close interactions', () => {
-    it('renders a close button that calls onClose when clicked', () => {
+  describe('closing', () => {
+    it('calls onClose when the close button is clicked', () => {
       const handleClose = vi.fn();
-      render(<AvatarModal name="Gandalf" imagePath="/images/gandalf.png" onClose={handleClose} />);
+      renderModal({ imagePath: '/images/gandalf.png', onClose: handleClose });
 
-      const closeButton = screen.getByLabelText('Close');
-      expect(closeButton).toBeInTheDocument();
-
-      fireEvent.click(closeButton);
+      fireEvent.click(screen.getByLabelText('Close'));
       expect(handleClose).toHaveBeenCalledTimes(1);
     });
 
-    it('does not call onClose when overlay is clicked', () => {
+    it('does not close when the overlay background is clicked', () => {
       const handleClose = vi.fn();
-      render(<AvatarModal name="Gandalf" onClose={handleClose} />);
+      renderModal({ onClose: handleClose });
 
       fireEvent.click(screen.getByTestId('avatar-modal-overlay'));
       expect(handleClose).not.toHaveBeenCalled();
-      expect(screen.getByText('G')).toBeInTheDocument();
     });
 
-    it('does not call onClose when the inner modal is clicked', () => {
+    it('does not close when a click bubbles up from the modal body', () => {
       const handleClose = vi.fn();
-      render(<AvatarModal name="Gandalf" onClose={handleClose} />);
+      renderModal({ imagePath: '/images/gandalf.png', onClose: handleClose });
 
-      fireEvent.click(screen.getByText('G'));
+      // Clicking the image bubbles up through the modal to the overlay.
+      fireEvent.click(screen.getByRole('img'));
       expect(handleClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('img')).toBeInTheDocument();
     });
 
     it('calls onClose when Escape is pressed', () => {
       const handleClose = vi.fn();
-      render(<AvatarModal name="Gandalf" onClose={handleClose} />);
+      renderModal({ onClose: handleClose });
 
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(handleClose).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['Enter', 'Tab', 'e'])(
+      'ignores the %s key',
+      (key) => {
+        const handleClose = vi.fn();
+        renderModal({ onClose: handleClose });
+
+        fireEvent.keyDown(document, { key });
+        expect(handleClose).not.toHaveBeenCalled();
+      }
+    );
+
+    it('closes exactly once — repeat presses after the first do not re-fire onClose', () => {
+      const handleClose = vi.fn();
+      renderModal({ onClose: handleClose });
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(handleClose).toHaveBeenCalledTimes(1);
+
+      // Same guard applies after closing via the button.
+      fireEvent.click(screen.getByLabelText('Close'));
+      expect(handleClose).toHaveBeenCalledTimes(2);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(handleClose).toHaveBeenCalledTimes(2);
+    });
+
+    it('no longer responds to Escape after the modal is unmounted', () => {
+      const handleClose = vi.fn();
+      const { unmount } = renderModal({ onClose: handleClose });
+
+      unmount();
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(handleClose).not.toHaveBeenCalled();
     });
   });
 });

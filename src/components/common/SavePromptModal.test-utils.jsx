@@ -1,122 +1,12 @@
 // Shared test utilities for SavePromptModal tests
+//
+// Subscriber event feeders are NOT here: each test lane vi.mock's
+// ./Subscriber.jsx inline with exactly the triggers it exercises
+// (see .rendering / .bonuses / .actions / .rerolls / .dodge-2024).
+// The old generic createMockSubscriber factory had no importers and was
+// removed as dead code.
 
-import React from 'react';
 import { vi } from 'vitest';
-
-// ── Subscriber mock factory ──
-
-export function createMockSubscriber(campaignName) {
-  return function MockSubscriber({ handleEvent }) {
-    return React.createElement(
-      'div',
-      { 'data-testid': 'subscriber' },
-      React.createElement(
-        'button',
-        {
-          'data-testid': 'subscriber-trigger',
-          onClick: () =>
-            handleEvent({
-              key: `change-${campaignName}-savePrompt-testTarget`,
-              data: {
-                promptId: 'test-prompt-1',
-                targetName: 'testTarget',
-                saveType: 'con',
-                saveDc: 12,
-                disadvantage: false,
-              },
-            }),
-        }
-      ),
-      React.createElement(
-        'button',
-        {
-          'data-testid': 'subscriber-trigger-second',
-          onClick: () =>
-            handleEvent({
-              key: `change-${campaignName}-savePrompt-testTarget2`,
-              data: {
-                promptId: 'test-prompt-2',
-                targetName: 'testTarget2',
-                saveType: 'dex',
-                saveDc: 15,
-                disadvantage: true,
-                dcSuccess: 'half',
-              },
-            }),
-        }
-      ),
-      React.createElement(
-        'button',
-        {
-          'data-testid': 'subscriber-trigger-cleared',
-          onClick: () =>
-            handleEvent({
-              key: `change-${campaignName}-savePromptCleared-testTarget`,
-              data: {
-                promptId: 'test-prompt-1',
-              },
-            }),
-        }
-      ),
-      React.createElement(
-        'button',
-        {
-          'data-testid': 'subscriber-trigger-disadvantage',
-          onClick: () =>
-            handleEvent({
-              key: `change-${campaignName}-savePrompt-testTarget3`,
-              data: {
-                promptId: 'test-prompt-disadv',
-                targetName: 'testTarget3',
-                saveType: 'str',
-                saveDc: 14,
-                disadvantage: true,
-                dcSuccess: 'half',
-                sourceName: 'Fireball',
-              },
-            }),
-        }
-      ),
-      React.createElement(
-        'button',
-        {
-          'data-testid': 'subscriber-trigger-dex',
-          onClick: () =>
-            handleEvent({
-              key: `change-${campaignName}-savePrompt-testTarget`,
-              data: {
-                promptId: 'test-prompt-dex',
-                targetName: 'testTarget',
-                saveType: 'dex',
-                saveDc: 17,
-                disadvantage: false,
-                dcSuccess: 'half',
-                sourceName: 'Sacred Flame',
-              },
-            }),
-        }
-      ),
-      React.createElement(
-        'button',
-        {
-          'data-testid': 'subscriber-trigger-none-dc',
-          onClick: () =>
-            handleEvent({
-              key: `change-${campaignName}-savePrompt-testTarget4`,
-              data: {
-                promptId: 'test-prompt-none',
-                targetName: 'testTarget4',
-                saveType: 'wis',
-                saveDc: 16,
-                disadvantage: false,
-                dcSuccess: 'none',
-              },
-            }),
-        }
-      ),
-    );
-  };
-}
 
 // ── EventSource setup ──
 

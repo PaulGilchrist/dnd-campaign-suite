@@ -1,11 +1,15 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+// @improved-by-ai
+// Behavior-focused tests for AllySelectionModal: what the user sees and can do
+// (select via checkbox or row, bulk actions, confirm/cancel payloads), queried
+// through accessible roles rather than CSS class internals.
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AllySelectionModal from './AllySelectionModal.jsx';
 
 describe('AllySelectionModal', () => {
-  const defaultCreatures = [
+  const creatures = [
     { name: 'Goblin', type: 'npc', currentHp: 15, maxHp: 20 },
-    { name: 'Player Character', type: 'player', currentHp: 30, maxHp: 30 },
+    { name: 'Hero', type: 'player', currentHp: 30, maxHp: 30 },
     { name: 'Orc', type: 'npc', currentHp: 0, maxHp: 25 },
   ];
 
@@ -17,168 +21,214 @@ describe('AllySelectionModal', () => {
     onCancel = vi.fn();
   });
 
-  function getProps(overrides = {}) {
-    return {
-      title: 'Select Allies',
-      icon: 'fa-shield-halved',
-      creatures: defaultCreatures,
-      currentAllies: [],
-      onConfirm,
-      onCancel,
-      ...overrides,
-    };
+  function renderModal(overrides = {}) {
+    render(
+      <AllySelectionModal
+        title="Select Allies"
+        icon="fa-shield-halved"
+        creatures={creatures}
+        currentAllies={[]}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+        {...overrides}
+      />
+    );
   }
+
+  const checkboxFor = name => screen.getByRole('checkbox', { name: new RegExp(name, 'i') });
+  const selectedCount = () => screen.getByText(/\d+ selected/);
 
   // ── Rendering ──
 
-  it('renders the modal overlay with the title and icon', () => {
-    render(<AllySelectionModal {...getProps()} />);
+  it('shows the provided title in the header', () => {
+    renderModal();
 
     expect(screen.getByText('Select Allies')).toBeInTheDocument();
-    expect(document.querySelector('.fa-solid.fa-shield-halved')).toBeInTheDocument();
   });
 
-  it('renders all creatures in the list', () => {
-    render(<AllySelectionModal {...getProps()} />);
+  it('falls back to a default title and shield icon when none are provided', () => {
+    renderModal({ title: undefined, icon: undefined });
 
-    expect(screen.getByText('Goblin')).toBeInTheDocument();
-    expect(screen.getByText('Player Character')).toBeInTheDocument();
-    expect(screen.getByText('Orc')).toBeInTheDocument();
+    expect(screen.getByText('Select Allies')).toBeInTheDocument();
+    expect(document.querySelector('.sp-header .fa-shield-halved')).toBeInTheDocument();
   });
 
-  it('labels player creatures with (Player) and NPCs with (NPC)', () => {
-    render(<AllySelectionModal {...getProps()} />);
+  it('lists every creature with its type label', () => {
+    renderModal();
 
-    expect(screen.getByText('(Player)')).toBeInTheDocument();
-    expect(screen.getAllByText('(NPC)').length).toBe(2);
+    expect(checkboxFor('Goblin')).toBeInTheDocument();
+    expect(checkboxFor('Hero')).toBeInTheDocument();
+    expect(checkboxFor('Orc')).toBeInTheDocument();
+    expect(within(checkboxFor('Hero').closest('label')).getByText('(Player)')).toBeInTheDocument();
+    expect(within(checkboxFor('Goblin').closest('label')).getByText('(NPC)')).toBeInTheDocument();
+    expect(within(checkboxFor('Orc').closest('label')).getByText('(NPC)')).toBeInTheDocument();
   });
 
-  it('displays HP percentage for non-player creatures', () => {
-    render(<AllySelectionModal {...getProps()} />);
+  it('shows rounded HP percentage for NPCs', () => {
+    renderModal({ creatures: [{ name: 'Goblin', type: 'npc', currentHp: 15, maxHp: 20 }] });
 
-    expect(screen.getByText('(75% HP)')).toBeInTheDocument();
-    expect(screen.getByText('(0% HP)')).toBeInTheDocument();
+    expect(within(checkboxFor('Goblin').closest('label')).getByText('(75% HP)')).toBeInTheDocument();
   });
 
-  it('does not display HP for player creatures', () => {
-    render(<AllySelectionModal {...getProps()} />);
+  it('rounds fractional HP percentages to whole numbers', () => {
+    renderModal({ creatures: [{ name: 'Third', type: 'npc', currentHp: 1, maxHp: 3 }] });
 
-    const playerCheckbox = screen.getByRole('checkbox', { name: 'Player Character(Player)' });
-    const playerRow = playerCheckbox.closest('.secondary-target-row');
-    expect(playerRow.querySelector('.secondary-target-hp')).toBeNull();
+    expect(within(checkboxFor('Third').closest('label')).getByText('(33% HP)')).toBeInTheDocument();
   });
 
-  it('renders the empty state when no creatures are provided', () => {
-    render(<AllySelectionModal {...getProps({ creatures: [] })} />);
+  it('hides HP for player creatures', () => {
+    renderModal();
+
+    const heroRow = checkboxFor('Hero').closest('label');
+    expect(heroRow).not.toHaveTextContent(/HP/);
+  });
+
+  it('hides HP when currentHp or maxHp is missing', () => {
+    renderModal({
+      creatures: [
+        { name: 'NoCurrent', type: 'npc', maxHp: 20 },
+        { name: 'NoMax', type: 'npc', currentHp: 10 },
+        { name: 'NoHpAtAll', type: 'npc' },
+      ],
+    });
+
+    for (const name of ['NoCurrent', 'NoMax', 'NoHpAtAll']) {
+      expect(checkboxFor(name).closest('label')).not.toHaveTextContent(/HP/);
+    }
+  });
+
+  it('shows an empty-state note when no creatures are provided', () => {
+    renderModal({ creatures: [] });
 
     expect(screen.getByText('No creatures available.')).toBeInTheDocument();
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
   });
 
   // ── Selection ──
 
-  it('toggles creature selection when its row is clicked', () => {
-    render(<AllySelectionModal {...getProps()} />);
+  it('selects a creature when its checkbox is clicked', () => {
+    renderModal();
 
-    const rows = document.querySelectorAll('.secondary-target-row');
-    const checkbox = rows[0].querySelector('input[type="checkbox"]');
+    expect(selectedCount()).toHaveTextContent('0 selected');
 
-    expect(checkbox).not.toBeChecked();
-    expect(screen.getByText('0 selected')).toBeInTheDocument();
+    fireEvent.click(checkboxFor('Goblin'));
 
-    fireEvent.click(rows[0]);
-    expect(checkbox).toBeChecked();
-    expect(rows[0]).toHaveClass('secondary-target-selected');
-    expect(screen.getByText('1 selected')).toBeInTheDocument();
-
-    fireEvent.click(rows[0]);
-    expect(checkbox).not.toBeChecked();
-    expect(rows[0]).not.toHaveClass('secondary-target-selected');
-    expect(screen.getByText('0 selected')).toBeInTheDocument();
+    expect(checkboxFor('Goblin')).toBeChecked();
+    expect(selectedCount()).toHaveTextContent('1 selected');
   });
 
-  it('selects all creatures when Select All is clicked', () => {
-    render(<AllySelectionModal {...getProps()} />);
+  it('deselects a creature when its checkbox is clicked again', () => {
+    renderModal({ currentAllies: ['Orc'] });
 
-    fireEvent.click(screen.getByText('Select All'));
+    fireEvent.click(checkboxFor('Orc'));
 
-    expect(screen.getByText('3 selected')).toBeInTheDocument();
-    const checkboxes = screen.getAllByRole('checkbox');
-    checkboxes.forEach(cb => expect(cb).toBeChecked());
+    expect(checkboxFor('Orc')).not.toBeChecked();
+    expect(selectedCount()).toHaveTextContent('0 selected');
   });
 
-  it('clears all selections when Clear All is clicked', () => {
-    render(<AllySelectionModal {...getProps()} />);
+  it('toggles selection when the creature name text is clicked', () => {
+    renderModal();
 
-    fireEvent.click(screen.getByText('Select All'));
-    expect(screen.getByText('3 selected')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Goblin'));
+    expect(checkboxFor('Goblin')).toBeChecked();
 
-    fireEvent.click(screen.getByText('Clear All'));
-    expect(screen.getByText('0 selected')).toBeInTheDocument();
-    const checkboxes = screen.getAllByRole('checkbox');
-    checkboxes.forEach(cb => expect(cb).not.toBeChecked());
+    fireEvent.click(screen.getByText('Goblin'));
+    expect(checkboxFor('Goblin')).not.toBeChecked();
   });
 
-  it('pre-selects allies from currentAllies prop', () => {
-    render(<AllySelectionModal {...getProps({ currentAllies: ['Goblin', 'Orc'] })} />);
+  it('selects every creature when Select All is clicked', () => {
+    renderModal();
 
-    expect(screen.getByText('2 selected')).toBeInTheDocument();
-    const checkboxes = screen.getAllByRole('checkbox');
-    expect(checkboxes[0]).toBeChecked();
-    expect(checkboxes[1]).not.toBeChecked();
-    expect(checkboxes[2]).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: /Select All/i }));
+
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+    screen.getAllByRole('checkbox').forEach(cb => expect(cb).toBeChecked());
+    expect(selectedCount()).toHaveTextContent('3 selected');
+  });
+
+  it('deselects every creature when Clear All is clicked', () => {
+    renderModal();
+
+    fireEvent.click(screen.getByRole('button', { name: /Select All/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Clear All/i }));
+
+    screen.getAllByRole('checkbox').forEach(cb => expect(cb).not.toBeChecked());
+    expect(selectedCount()).toHaveTextContent('0 selected');
+  });
+
+  it('pre-selects only the allies that appear in the creature list', () => {
+    renderModal({ currentAllies: ['Goblin', 'Orc'] });
+
+    expect(checkboxFor('Goblin')).toBeChecked();
+    expect(checkboxFor('Orc')).toBeChecked();
+    expect(checkboxFor('Hero')).not.toBeChecked();
+    expect(selectedCount()).toHaveTextContent('2 selected');
+  });
+
+  it('ignores stale currentAllies names that are not in the creature list', () => {
+    renderModal({
+      creatures: [{ name: 'Goblin', type: 'npc' }],
+      currentAllies: ['Goblin', 'BanishedGhost'],
+    });
+
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(checkboxFor('Goblin')).toBeChecked();
+    expect(selectedCount()).toHaveTextContent('1 selected');
+
+    fireEvent.click(screen.getByRole('button', { name: /Confirm Allies/i }));
+    expect(onConfirm).toHaveBeenCalledWith(['Goblin']);
   });
 
   // ── Confirm ──
 
-  it('calls onConfirm with selected allies when confirm is clicked', () => {
-    render(<AllySelectionModal {...getProps()} />);
+  it('disables confirm until at least one ally is selected', () => {
+    renderModal();
 
-    fireEvent.click(screen.getByText('Select All'));
-    fireEvent.click(screen.getByRole('button', { name: /Confirm Allies/ }));
+    expect(screen.getByRole('button', { name: /Confirm Allies \(0\)/ })).toBeDisabled();
 
-    expect(onConfirm).toHaveBeenCalledWith(['Goblin', 'Player Character', 'Orc']);
+    fireEvent.click(checkboxFor('Orc'));
+
+    expect(screen.getByRole('button', { name: /Confirm Allies \(1\)/ })).not.toBeDisabled();
   });
 
-  it('does not call onConfirm when no allies are selected', () => {
-    render(<AllySelectionModal {...getProps()} />);
+  it('does not confirm when nothing is selected', () => {
+    renderModal();
 
-    fireEvent.click(screen.getByRole('button', { name: /Confirm Allies/ }));
+    // The button is disabled while empty; clicking it must be a no-op either way.
+    fireEvent.click(screen.getByRole('button', { name: /Confirm Allies \(0\)/ }));
 
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  it('disables confirm button when no allies are selected and enables it when one is selected', () => {
-    render(<AllySelectionModal {...getProps()} />);
+  it('confirms exactly the selected names in list order', () => {
+    renderModal();
 
-    const confirmBtn = screen.getByRole('button', { name: /Confirm Allies \(0\)/ });
-    expect(confirmBtn).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /Select All/i }));
+    fireEvent.click(checkboxFor('Hero')); // deselect one
 
-    const rows = document.querySelectorAll('.secondary-target-row');
-    fireEvent.click(rows[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Confirm Allies \(2\)/ }));
 
-    const updatedBtn = screen.getByRole('button', { name: /Confirm Allies \(1\)/ });
-    expect(updatedBtn).not.toBeDisabled();
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith(['Goblin', 'Orc']);
+  });
+
+  it('confirms the pre-selected allies without any further interaction', () => {
+    renderModal({ currentAllies: ['Orc'] });
+
+    fireEvent.click(screen.getByRole('button', { name: /Confirm Allies \(1\)/ }));
+
+    expect(onConfirm).toHaveBeenCalledWith(['Orc']);
   });
 
   // ── Cancel ──
 
-  it('calls onCancel when cancel button is clicked', () => {
-    render(<AllySelectionModal {...getProps()} />);
+  it('cancels without confirming, even after selecting allies', () => {
+    renderModal();
 
+    fireEvent.click(screen.getByRole('button', { name: /Select All/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    expect(onCancel).toHaveBeenCalledOnce();
-  });
-
-  // ── Edge cases ──
-
-  it('does not display HP when currentHp or maxHp is null', () => {
-    const creatures = [
-      { name: 'Mysterious Creature', type: 'npc' },
-    ];
-    render(<AllySelectionModal {...getProps({ creatures })} />);
-
-    expect(screen.getByText('Mysterious Creature')).toBeInTheDocument();
-    expect(screen.queryByText(/HP/i)).not.toBeInTheDocument();
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 });

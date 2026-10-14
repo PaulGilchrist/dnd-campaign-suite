@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useEntityManagement } from './useEntityManagement.js';
 
@@ -11,171 +12,132 @@ describe('useEntityManagement', () => {
     delete: vi.fn(),
   });
 
+  // Shorthand render: defaults to manual loading so each test states only
+  // the options its behavior actually depends on.
+  const render = (
+    hooks,
+    options = { loadOnMount: false },
+    campaign = campaignName
+  ) => renderHook(() => useEntityManagement(campaign, hooks, options));
+
+  // Let pending load promises from an effect settle.
+  const flush = () =>
+    act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+  let consoleError;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('initial state', () => {
-    it('should initialize with empty items and loading false', async () => {
-      const hooks = createHooks();
-      hooks.load.mockResolvedValue([]);
-
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, {})
-      );
-
-      // loadOnMount triggers async load; wait for it to settle
-      await act(async () => {
-        await new Promise((r) => setTimeout(r, 0));
-      });
+    it('starts with no items, not loading, and exposes the load/save/delete API', () => {
+      const { result } = render(createHooks());
 
       expect(result.current.items).toEqual([]);
       expect(result.current.loading).toBe(false);
-    });
-
-    it('should expose loadItems, saveItems, and deleteItem as functions', () => {
-      const hooks = createHooks();
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
-
       expect(typeof result.current.loadItems).toBe('function');
       expect(typeof result.current.saveItems).toBe('function');
       expect(typeof result.current.deleteItem).toBe('function');
     });
   });
 
-  describe('loadOnMount option', () => {
-    it('should call loadFn on mount when loadOnMount is true (default)', async () => {
+  describe('loading on mount', () => {
+    it('loads items automatically on mount by default', async () => {
       const hooks = createHooks();
       hooks.load.mockResolvedValue([{ id: 1 }]);
 
-      renderHook(() =>
-        useEntityManagement(campaignName, hooks, {})
-      );
+      const { result } = render(hooks, {});
+      await flush();
 
       expect(hooks.load).toHaveBeenCalledWith(campaignName);
+      expect(result.current.items).toEqual([{ id: 1 }]);
     });
 
-    it('should NOT call loadFn on mount when loadOnMount is false', async () => {
+    it('does not touch the backend on mount when loadOnMount is false', () => {
       const hooks = createHooks();
-      hooks.load.mockResolvedValue([{ id: 1 }]);
 
-      renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
+      render(hooks, { loadOnMount: false });
 
       expect(hooks.load).not.toHaveBeenCalled();
     });
 
-    it('should NOT call loadFn on mount when campaignName is falsy', async () => {
+    it('does not attempt to load on mount without a campaign', () => {
       const hooks = createHooks();
-      hooks.load.mockResolvedValue([]);
 
-      renderHook(() =>
-        useEntityManagement(null, hooks, {})
-      );
+      render(hooks, {}, null);
 
       expect(hooks.load).not.toHaveBeenCalled();
     });
   });
 
+  describe('campaign switching', () => {
+    it('reloads when the campaign changes', async () => {
+      const hooks = createHooks();
+      hooks.load.mockResolvedValue([{ id: 1 }]);
+
+      const { result, rerender } = renderHook(
+        ({ campaign }) => useEntityManagement(campaign, hooks, {}),
+        { initialProps: { campaign: campaignName } }
+      );
+      await flush();
+      expect(result.current.items).toEqual([{ id: 1 }]);
+
+      hooks.load.mockResolvedValue([{ id: 2 }]);
+      rerender({ campaign: 'test-campaign-2' });
+      await flush();
+
+      expect(hooks.load).toHaveBeenLastCalledWith('test-campaign-2');
+      expect(result.current.items).toEqual([{ id: 2 }]);
+    });
+  });
+
   describe('loadItems', () => {
-    it('should set items from loadFn response array', async () => {
+    it('populates items from an array response', async () => {
       const hooks = createHooks();
       hooks.load.mockResolvedValue([{ id: 1, name: 'Entity 1' }]);
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
-
+      const { result } = render(hooks);
       await act(async () => {
         await result.current.loadItems();
       });
 
+      expect(hooks.load).toHaveBeenCalledWith(campaignName);
       expect(result.current.items).toEqual([{ id: 1, name: 'Entity 1' }]);
     });
 
-    it('should extract items from response using responseKey', async () => {
-      const hooks = createHooks();
-      hooks.load.mockResolvedValue({ entities: [{ id: 1 }] });
+    it.each([
+      ['the response key is missing', {}],
+      ['the response key holds null', { entities: null }],
+      ['the response key holds a non-array', { entities: 'not an array' }],
+    ])(
+      'falls back to an empty list when %s',
+      async (_label, response) => {
+        const hooks = createHooks();
+        hooks.load.mockResolvedValue(response);
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, {
-          loadOnMount: false,
-          responseKey: 'entities',
-        })
-      );
+        const { result } = render(hooks, { responseKey: 'entities' });
+        await act(async () => {
+          await result.current.loadItems();
+        });
 
-      await act(async () => {
-        await result.current.loadItems();
-      });
+        expect(result.current.items).toEqual([]);
+        expect(result.current.loading).toBe(false);
+      }
+    );
 
-      expect(result.current.items).toEqual([{ id: 1 }]);
-    });
-
-    it('should set items to empty array when responseKey value is missing', async () => {
-      const hooks = createHooks();
-      hooks.load.mockResolvedValue({ otherKey: 'value' });
-
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, {
-          loadOnMount: false,
-          responseKey: 'entities',
-        })
-      );
-
-      await act(async () => {
-        await result.current.loadItems();
-      });
-
-      expect(result.current.items).toEqual([]);
-    });
-
-    it('should set items to empty array when responseKey value is null', async () => {
-      const hooks = createHooks();
-      hooks.load.mockResolvedValue({ entities: null });
-
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, {
-          loadOnMount: false,
-          responseKey: 'entities',
-        })
-      );
-
-      await act(async () => {
-        await result.current.loadItems();
-      });
-
-      expect(result.current.items).toEqual([]);
-    });
-
-    it('should set items to empty array when responseKey value is not an array', async () => {
-      const hooks = createHooks();
-      hooks.load.mockResolvedValue({ entities: 'not an array' });
-
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, {
-          loadOnMount: false,
-          responseKey: 'entities',
-        })
-      );
-
-      await act(async () => {
-        await result.current.loadItems();
-      });
-
-      expect(result.current.items).toEqual([]);
-    });
-
-    it('should set items to empty array when response is not an array and no responseKey', async () => {
+    it('falls back to an empty list when a non-array response has no responseKey', async () => {
       const hooks = createHooks();
       hooks.load.mockResolvedValue('not an array');
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
-
+      const { result } = render(hooks);
       await act(async () => {
         await result.current.loadItems();
       });
@@ -183,13 +145,10 @@ describe('useEntityManagement', () => {
       expect(result.current.items).toEqual([]);
     });
 
-    it('should set items to empty array when campaignName is falsy', async () => {
+    it('clears items without calling the backend when there is no campaign', async () => {
       const hooks = createHooks();
 
-      const { result } = renderHook(() =>
-        useEntityManagement(null, hooks, { loadOnMount: false })
-      );
-
+      const { result } = render(hooks, { loadOnMount: false }, null);
       await act(async () => {
         await result.current.loadItems();
       });
@@ -198,250 +157,143 @@ describe('useEntityManagement', () => {
       expect(hooks.load).not.toHaveBeenCalled();
     });
 
-    it('should set loading to true during load and false after', async () => {
+    it('reports loading while a fetch is in flight and clears it afterwards', async () => {
       const hooks = createHooks();
+      let resolveLoad;
       hooks.load.mockImplementation(
-        () => new Promise((r) => setTimeout(r, 10))
+        () =>
+          new Promise((resolve) => {
+            resolveLoad = resolve;
+          })
       );
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
-
+      const { result } = render(hooks);
       let loadPromise;
       await act(async () => {
         loadPromise = result.current.loadItems();
       });
 
       expect(result.current.loading).toBe(true);
+      expect(result.current.items).toEqual([]);
 
       await act(async () => {
+        resolveLoad([{ id: 7 }]);
         await loadPromise;
       });
 
       expect(result.current.loading).toBe(false);
+      expect(result.current.items).toEqual([{ id: 7 }]);
     });
 
-    it('should set items to empty array and loading to false when loadFn throws', async () => {
+    it('keeps previously loaded items and logs the failure when the backend rejects', async () => {
       const hooks = createHooks();
-      hooks.load.mockRejectedValue(new Error('Network error'));
+      hooks.load
+        .mockResolvedValueOnce([{ id: 1 }])
+        .mockRejectedValueOnce(new Error('Network error'));
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
+      const { result } = render(hooks);
+      await act(async () => {
+        await result.current.loadItems();
+      });
+      expect(result.current.items).toEqual([{ id: 1 }]);
 
       await act(async () => {
         await result.current.loadItems();
       });
 
-      expect(result.current.items).toEqual([]);
+      expect(result.current.items).toEqual([{ id: 1 }]);
       expect(result.current.loading).toBe(false);
-    });
-
-    it('should call console.error when loadFn throws and logError is true (default)', async () => {
-      const spy = vi.spyOn(console, 'error').mockReturnValue();
-      const hooks = createHooks();
-      hooks.load.mockRejectedValue(new Error('Network error'));
-
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
-
-      await act(async () => {
-        await result.current.loadItems();
-      });
-
-      expect(console.error).toHaveBeenCalledWith(
+      expect(consoleError).toHaveBeenCalledWith(
         'Failed to load items list:',
         expect.any(Error)
       );
-      spy.mockRestore();
     });
 
-    it('should NOT call console.error when logError is false', async () => {
-      const spy = vi.spyOn(console, 'error').mockReturnValue();
+    it('silences load failures when logError is false', async () => {
       const hooks = createHooks();
       hooks.load.mockRejectedValue(new Error('Network error'));
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, {
-          loadOnMount: false,
-          logError: false,
-        })
-      );
-
+      const { result } = render(hooks, { logError: false });
       await act(async () => {
         await result.current.loadItems();
       });
 
-      expect(console.error).not.toHaveBeenCalled();
-      spy.mockRestore();
-    });
-
-    it('should use responseKey in the error message when loadFn throws', async () => {
-      const spy = vi.spyOn(console, 'error').mockReturnValue();
-      const hooks = createHooks();
-      hooks.load.mockRejectedValue(new Error('Network error'));
-
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, {
-          loadOnMount: false,
-          responseKey: 'entities',
-        })
-      );
-
-      await act(async () => {
-        await result.current.loadItems();
-      });
-
-      expect(console.error).toHaveBeenCalledWith(
-        'Failed to load entities list:',
-        expect.any(Error)
-      );
-      spy.mockRestore();
+      expect(result.current.loading).toBe(false);
+      expect(consoleError).not.toHaveBeenCalled();
     });
   });
 
   describe('saveItems', () => {
-    it('should call saveFn with campaignName and the array', async () => {
+    it('saves the payload then repopulates items from the server state', async () => {
       const hooks = createHooks();
-      hooks.load.mockResolvedValue([]);
+      const payload = [{ id: 1, name: 'Draft' }];
+      const serverState = [{ id: 1, name: 'Saved' }];
       hooks.save.mockResolvedValue(undefined);
+      hooks.load.mockResolvedValue(serverState);
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
-
-      const payload = [{ id: 1, name: 'Entity 1' }];
+      const { result } = render(hooks);
       await act(async () => {
         await result.current.saveItems(payload);
       });
 
       expect(hooks.save).toHaveBeenCalledWith(campaignName, payload);
+      expect(hooks.load).toHaveBeenCalledTimes(1);
+      expect(hooks.load).toHaveBeenCalledWith(campaignName);
+      expect(result.current.items).toEqual(serverState);
     });
 
-    it('should reload items after successful save', async () => {
+    it('does not call the backend when there is no campaign', async () => {
       const hooks = createHooks();
-      hooks.load
-        .mockResolvedValueOnce([{ id: 1, name: 'Entity 1' }])
-        .mockResolvedValueOnce([{ id: 1, name: 'Entity 1' }]);
-      hooks.save.mockResolvedValue(undefined);
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
-
-      await act(async () => {
-        await result.current.saveItems([{ id: 1, name: 'Entity 1' }]);
-      });
-
-      expect(result.current.items).toEqual([{ id: 1, name: 'Entity 1' }]);
-    });
-
-    it('should NOT call saveFn when campaignName is falsy', async () => {
-      const hooks = createHooks();
-      hooks.save.mockResolvedValue(undefined);
-
-      const { result } = renderHook(() =>
-        useEntityManagement(null, hooks, { loadOnMount: false })
-      );
-
+      const { result } = render(hooks, { loadOnMount: false }, null);
       await act(async () => {
         await result.current.saveItems([{ id: 1 }]);
       });
 
       expect(hooks.save).not.toHaveBeenCalled();
+      expect(hooks.load).not.toHaveBeenCalled();
     });
 
-    it('should rethrow the error when saveFn throws', async () => {
+    it('rethrows, logs, and skips the reload when the save fails', async () => {
       const hooks = createHooks();
       hooks.save.mockRejectedValue(new Error('Save failed'));
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
-
-      await expect(
-        act(async () => {
-          await result.current.saveItems([{ id: 1 }]);
-        })
-      ).rejects.toThrow('Save failed');
-    });
-
-    it('should call console.error when saveFn throws and logError is true (default)', async () => {
-      const spy = vi.spyOn(console, 'error').mockReturnValue();
-      const hooks = createHooks();
-      hooks.save.mockRejectedValue(new Error('Save failed'));
-
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
-
+      const { result } = render(hooks);
       await expect(
         act(async () => {
           await result.current.saveItems([{ id: 1 }]);
         })
       ).rejects.toThrow('Save failed');
 
-      expect(console.error).toHaveBeenCalledWith(
+      expect(hooks.load).not.toHaveBeenCalled();
+      expect(consoleError).toHaveBeenCalledWith(
         'Failed to save items:',
         expect.any(Error)
       );
-      spy.mockRestore();
     });
 
-    it('should NOT call console.error when logError is false', async () => {
-      const spy = vi.spyOn(console, 'error').mockReturnValue();
+    it('rethrows without logging when logError is false', async () => {
       const hooks = createHooks();
       hooks.save.mockRejectedValue(new Error('Save failed'));
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, {
-          loadOnMount: false,
-          logError: false,
-        })
-      );
-
+      const { result } = render(hooks, { logError: false });
       await expect(
         act(async () => {
           await result.current.saveItems([{ id: 1 }]);
         })
       ).rejects.toThrow('Save failed');
 
-      expect(console.error).not.toHaveBeenCalled();
-      spy.mockRestore();
-    });
-
-    it('should use responseKey in the error message when saveFn throws', async () => {
-      const spy = vi.spyOn(console, 'error').mockReturnValue();
-      const hooks = createHooks();
-      hooks.save.mockRejectedValue(new Error('Save failed'));
-
-      renderHook(() =>
-        useEntityManagement(campaignName, hooks, {
-          loadOnMount: false,
-          responseKey: 'entities',
-        })
-      );
-
-      // trigger saveItems which will throw
-      // (can't access result here because renderHook was separate, but the
-      // useEffect mount won't throw since load is mocked to resolve)
-
-      spy.mockRestore();
+      expect(consoleError).not.toHaveBeenCalled();
     });
   });
 
   describe('deleteItem', () => {
-    it('should call deleteFn with campaignName and id', async () => {
+    it('deletes by id then repopulates items from the server state', async () => {
       const hooks = createHooks();
-      hooks.load.mockResolvedValue([]);
       hooks.delete.mockResolvedValue(undefined);
+      hooks.load.mockResolvedValue([]);
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
-
+      const { result } = render(hooks);
       await act(async () => {
         await result.current.deleteItem('entity-id-123');
       });
@@ -450,131 +302,116 @@ describe('useEntityManagement', () => {
         campaignName,
         'entity-id-123'
       );
-    });
-
-    it('should reload items after successful delete', async () => {
-      const hooks = createHooks();
-      hooks.load
-        .mockResolvedValueOnce([{ id: 'entity-id-123' }])
-        .mockResolvedValueOnce([]);
-      hooks.delete.mockResolvedValue(undefined);
-
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, {})
-      );
-
-      // mount triggers first load → [{id: 'entity-id-123'}]
-      await act(async () => {
-        await new Promise((r) => setTimeout(r, 0));
-      });
-
-      expect(result.current.items).toEqual([{ id: 'entity-id-123' }]);
-
-      await act(async () => {
-        await result.current.deleteItem('entity-id-123');
-      });
-
-      // delete triggers second load → []
+      expect(hooks.load).toHaveBeenCalledTimes(1);
       expect(result.current.items).toEqual([]);
     });
 
-    it('should NOT call deleteFn when campaignName is falsy', async () => {
+    it('shows the remaining entities after a successful delete', async () => {
       const hooks = createHooks();
       hooks.delete.mockResolvedValue(undefined);
+      hooks.load
+        .mockResolvedValueOnce([{ id: 'a' }, { id: 'b' }])
+        .mockResolvedValueOnce([{ id: 'b' }]);
 
-      const { result } = renderHook(() =>
-        useEntityManagement(null, hooks, { loadOnMount: false })
-      );
+      const { result } = render(hooks);
+      await act(async () => {
+        await result.current.loadItems();
+      });
+      expect(result.current.items).toEqual([{ id: 'a' }, { id: 'b' }]);
 
+      await act(async () => {
+        await result.current.deleteItem('a');
+      });
+
+      expect(result.current.items).toEqual([{ id: 'b' }]);
+    });
+
+    it('does not call the backend when there is no campaign', async () => {
+      const hooks = createHooks();
+
+      const { result } = render(hooks, { loadOnMount: false }, null);
       await act(async () => {
         await result.current.deleteItem('entity-id-123');
       });
 
       expect(hooks.delete).not.toHaveBeenCalled();
+      expect(hooks.load).not.toHaveBeenCalled();
     });
 
-    it('should rethrow the error when deleteFn throws', async () => {
+    it('rethrows, logs, and skips the reload when the delete fails', async () => {
       const hooks = createHooks();
       hooks.delete.mockRejectedValue(new Error('Delete failed'));
+      hooks.load.mockResolvedValue([{ id: 'a' }]);
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
-
-      await expect(
-        act(async () => {
-          await result.current.deleteItem('entity-id-123');
-        })
-      ).rejects.toThrow('Delete failed');
-    });
-
-    it('should call console.error when deleteFn throws and logError is true (default)', async () => {
-      const spy = vi.spyOn(console, 'error').mockReturnValue();
-      const hooks = createHooks();
-      hooks.delete.mockRejectedValue(new Error('Delete failed'));
-
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, { loadOnMount: false })
-      );
-
+      const { result } = render(hooks);
       await expect(
         act(async () => {
           await result.current.deleteItem('entity-id-123');
         })
       ).rejects.toThrow('Delete failed');
 
-      expect(console.error).toHaveBeenCalledWith(
+      expect(hooks.load).not.toHaveBeenCalled();
+      expect(consoleError).toHaveBeenCalledWith(
         'Failed to delete item:',
         expect.any(Error)
       );
-      spy.mockRestore();
     });
 
-    it('should NOT call console.error when logError is false', async () => {
-      const spy = vi.spyOn(console, 'error').mockReturnValue();
+    it('rethrows without logging when logError is false', async () => {
       const hooks = createHooks();
       hooks.delete.mockRejectedValue(new Error('Delete failed'));
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, {
-          loadOnMount: false,
-          logError: false,
-        })
-      );
-
+      const { result } = render(hooks, { logError: false });
       await expect(
         act(async () => {
           await result.current.deleteItem('entity-id-123');
         })
       ).rejects.toThrow('Delete failed');
 
-      expect(console.error).not.toHaveBeenCalled();
-      spy.mockRestore();
+      expect(consoleError).not.toHaveBeenCalled();
     });
+  });
 
-    it('should use responseKey in the error message when deleteFn throws', async () => {
-      const spy = vi.spyOn(console, 'error').mockReturnValue();
-      const hooks = createHooks();
-      hooks.delete.mockRejectedValue(new Error('Delete failed'));
+  describe('error log messages', () => {
+    // Each operation names failures differently; responseKey should appear
+    // in all of them. Rejection of save/delete is asserted per-operation
+    // above — here we only check what got logged.
+    const messageCases = [
+      {
+        label: 'loadItems',
+        run: (result) => result.loadItems(),
+        expected: 'Failed to load entities list:',
+      },
+      {
+        label: 'saveItems',
+        run: (result) => result.saveItems([{ id: 1 }]),
+        expected: 'Failed to save entities:',
+      },
+      {
+        label: 'deleteItem',
+        run: (result) => result.deleteItem('entity-id-123'),
+        expected: 'Failed to delete entities:',
+      },
+    ];
 
-      const { result } = renderHook(() =>
-        useEntityManagement(campaignName, hooks, {
-          loadOnMount: false,
-          responseKey: 'entities',
-        })
-      );
+    it.each(messageCases)(
+      'names the responseKey when $label fails',
+      async ({ run, expected }) => {
+        const hooks = createHooks();
+        hooks.load.mockRejectedValue(new Error('Network error'));
+        hooks.save.mockRejectedValue(new Error('Save failed'));
+        hooks.delete.mockRejectedValue(new Error('Delete failed'));
 
-      await expect(
-        act(async () => {
-          await result.current.deleteItem('entity-id-123');
-        })
-      ).rejects.toThrow('Delete failed');
+        const { result } = render(hooks, { responseKey: 'entities' });
+        await act(async () => {
+          await run(result.current).catch(() => {});
+        });
 
-      expect(console.error).toHaveBeenCalledWith(
-        'Failed to delete entities:',
-        expect.any(Error)
-      );
-      spy.mockRestore();
-    });
+        expect(consoleError).toHaveBeenCalledWith(
+          expected,
+          expect.any(Error)
+        );
+      }
+    );
   });
 });

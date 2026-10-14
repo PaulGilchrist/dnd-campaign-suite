@@ -1,96 +1,116 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @improved-by-ai
+// Behavior tests for the ally-selection helpers, exercised against the REAL
+// runtime store (server-first pattern) with only the network boundary (fetch)
+// stubbed. This verifies the observable contract — persist/read round trips
+// through the `selectedAllies` key, the self-target default, per-creature
+// isolation, and the server POST — instead of asserting mock delegation args,
+// which passed even when the store path itself was never exercised.
+//
+// Coverage scan: AllySelectionModal.test.jsx tests the modal UI (props in,
+// callbacks out — it never touches the store); the SavePromptModal/handler
+// suites vi.mock() these helpers for their own isolation and never verify
+// their behavior; savePromptUtils.test.js exercises getAllyList only as a
+// collaborator of its own selectors. Nothing there duplicates the direct
+// helper behavior asserted here.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getAllyList, setAllyList } from './useAllySelection.js';
-import * as useRuntimeState from './runtime/useRuntimeState.js';
+import {
+  clearRuntimeState,
+  getAllStoreKeys,
+  getRuntimeValue,
+  getStore,
+} from './runtime/useRuntimeState.js';
 
-describe('useAllySelection', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+const CAMPAIGN = 'test-campaign';
+
+let fetchMock;
+
+beforeEach(() => {
+  for (const key of getAllStoreKeys()) clearRuntimeState(key);
+  fetchMock = vi.fn(() => Promise.resolve());
+  vi.stubGlobal('fetch', fetchMock);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe('setAllyList → getAllyList round trip', () => {
+  it('reads back exactly the allies that were saved', () => {
+    setAllyList('Hero', ['Mia', 'Bran'], CAMPAIGN);
+
+    expect(getAllyList('Hero')).toEqual(['Mia', 'Bran']);
   });
 
-  describe('getAllyList', () => {
-    it('returns stored allies array when it is non-empty', () => {
-      vi.spyOn(useRuntimeState, 'getRuntimeValue').mockReturnValue(['Ally1', 'Ally2']);
+  it('honours a saved single-ally selection instead of the self-target default', () => {
+    setAllyList('Hero', ['Mia'], CAMPAIGN);
 
-      const result = getAllyList('Hero');
-
-      expect(result).toEqual(['Ally1', 'Ally2']);
-    });
-
-    it('returns [creatureName] when stored allies is a single ally', () => {
-      vi.spyOn(useRuntimeState, 'getRuntimeValue').mockReturnValue(['SingleAlly']);
-
-      const result = getAllyList('Hero');
-
-      expect(result).toEqual(['SingleAlly']);
-    });
-
-    it('returns [creatureName] when stored allies is missing (null/undefined)', () => {
-      vi.spyOn(useRuntimeState, 'getRuntimeValue').mockReturnValue(null);
-
-      const result = getAllyList('Goblin');
-
-      expect(result).toEqual(['Goblin']);
-    });
-
-    it('returns [creatureName] when stored allies is an empty array', () => {
-      vi.spyOn(useRuntimeState, 'getRuntimeValue').mockReturnValue([]);
-
-      const result = getAllyList('Orc');
-
-      expect(result).toEqual(['Orc']);
-    });
-
-    it('returns [creatureName] when stored allies is a non-array value', () => {
-      vi.spyOn(useRuntimeState, 'getRuntimeValue')
-        .mockReturnValueOnce('not-an-array')
-        .mockReturnValueOnce('')
-        .mockReturnValueOnce(0);
-
-      expect(getAllyList('Giant')).toEqual(['Giant']);
-      expect(getAllyList('Wraith')).toEqual(['Wraith']);
-      expect(getAllyList('Troll')).toEqual(['Troll']);
-    });
-
-    it('reads from the correct runtime key', () => {
-      vi.spyOn(useRuntimeState, 'getRuntimeValue').mockReturnValue(['Ally1']);
-
-      getAllyList('Hero');
-
-      expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith('Hero', 'selectedAllies');
-    });
+    expect(getAllyList('Hero')).toEqual(['Mia']);
+    expect(getAllyList('Hero')).not.toEqual(['Hero']);
   });
 
-  describe('setAllyList', () => {
-    it('persists the ally list with all parameters', () => {
-      const spy = vi.spyOn(useRuntimeState, 'setRuntimeValue').mockReturnValue(undefined);
+  it('falls back to the creature itself after the selection is cleared', () => {
+    setAllyList('Hero', ['Mia'], CAMPAIGN);
+    setAllyList('Hero', [], CAMPAIGN);
 
-      setAllyList('Hero', ['Ally1', 'Ally2'], 'test-campaign');
+    expect(getAllyList('Hero')).toEqual(['Hero']);
+  });
 
-      expect(spy).toHaveBeenCalledWith('Hero', 'selectedAllies', ['Ally1', 'Ally2'], 'test-campaign');
-    });
+  it('keeps selections isolated per creature', () => {
+    setAllyList('Hero', ['Mia'], CAMPAIGN);
 
-    it('persists an empty ally list', () => {
-      const spy = vi.spyOn(useRuntimeState, 'setRuntimeValue').mockReturnValue(undefined);
+    expect(getAllyList('Hero')).toEqual(['Mia']);
+    expect(getAllyList('Orc')).toEqual(['Orc']);
+  });
+});
 
-      setAllyList('Hero', [], 'test-campaign');
+describe('getAllyList defaults', () => {
+  it('defaults to [creatureName] when nothing has ever been saved', () => {
+    expect(getAllyList('Goblin')).toEqual(['Goblin']);
+  });
 
-      expect(spy).toHaveBeenCalledWith('Hero', 'selectedAllies', [], 'test-campaign');
-    });
+  it('defaults to [creatureName] for stored values that are not a usable array', () => {
+    // Seed the store directly: setAllyList would never write junk like this,
+    // and the store's value-equality guard could skip some equal-value writes.
+    const unusable = [null, [], '', 'not-an-array', 0, {}, false];
+    for (const stored of unusable) {
+      const name = `Creature_${typeof stored}_${stored === null ? 'null' : String(stored)}`;
+      getStore(name).set('selectedAllies', stored);
 
-    it('persists without campaignName when omitted', () => {
-      const spy = vi.spyOn(useRuntimeState, 'setRuntimeValue').mockReturnValue(undefined);
+      expect(getAllyList(name)).toEqual([name]);
+    }
+  });
 
-      setAllyList('Hero', ['Ally1']);
+  it('exposes selections under the selectedAllies key that consumers read', () => {
+    // savePromptUtils.js reads getRuntimeValue(grantorName, 'selectedAllies')
+    // directly — the key name is a public contract between these modules.
+    setAllyList('Cleric', ['Mia'], CAMPAIGN);
 
-      expect(spy).toHaveBeenCalledWith('Hero', 'selectedAllies', ['Ally1'], undefined);
-    });
+    expect(getRuntimeValue('Cleric', 'selectedAllies')).toEqual(['Mia']);
+  });
+});
 
-    it('writes to the correct runtime key', () => {
-      const spy = vi.spyOn(useRuntimeState, 'setRuntimeValue').mockReturnValue(undefined);
+describe('server persistence', () => {
+  it('posts the saved selection to the creature endpoint under the campaign', () => {
+    setAllyList('Hero', ['Mia', 'Bran'], CAMPAIGN);
 
-      setAllyList('Hero', ['Ally1'], 'campaign');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, opts] = fetchMock.mock.calls[0];
+    expect(url).toBe(
+      `/api/campaigns/${encodeURIComponent(CAMPAIGN)}/${encodeURIComponent('Hero')}`
+    );
+    expect(opts.method).toBe('POST');
+    expect(JSON.parse(opts.body).value.selectedAllies).toEqual(['Mia', 'Bran']);
+  });
 
-      expect(spy).toHaveBeenLastCalledWith('Hero', 'selectedAllies', ['Ally1'], 'campaign');
-    });
+  it('still saves the selection locally when campaignName is omitted', () => {
+    // The runtime store logs the missing campaign scope loudly; this test
+    // silences that diagnostic and pins only the hook's own behavior.
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    setAllyList('Hero', ['Mia']);
+
+    expect(getAllyList('Hero')).toEqual(['Mia']);
   });
 });

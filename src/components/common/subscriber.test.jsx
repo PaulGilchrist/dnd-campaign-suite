@@ -1,361 +1,316 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { render } from '@testing-library/react';
 
 import Subscriber from './Subscriber.jsx';
+import { resetSSEClient } from '../../services/ui/sseClient.js';
 
-// Module-level registry for the mocked SSE client.
-var _sseRegistry = new Map();
+// Exercise the REAL Subscriber against the REAL shared SSE client, faking
+// only the browser boundary (EventSource, which jsdom lacks — setup.js
+// installs an inert one; this controllable fake replaces it per-file).
+//
+// The previous version of this file mocked sseClient with a reimplementation
+// of its fan-out logic, so tests of dispatch, parse-error tolerance, and
+// close-on-last-unsubscribe validated the mock instead of the code. That
+// mock is gone: assertions here are observable behavior only — the
+// connection URL, how many connections exist, whether they are closed, and
+// what each handleEvent receives.
+class FakeEventSource {
+  constructor(url) {
+    this.url = url;
+    this.closed = false;
+    this.onmessage = null;
+    this.onerror = null;
+    eventSources.push(this);
+  }
 
-vi.mock('../../services/ui/sseClient.js', () => ({
-  subscribeToSSE: function (campaignName, handler) {
-    var key = campaignName || '';
-    if (!_sseRegistry.has(key)) {
-      _sseRegistry.set(key, {
-        handlers: new Set(),
-        eventSource: {
-          onmessage: function (e) {
-            var parsed;
-            try { parsed = JSON.parse(e.data); }
-            catch (_) { return; }
-            _sseRegistry.get(key).handlers.forEach(function (fn) {
-              try { fn(parsed); }
-              catch (_) { /* handler errors are logged in the real impl */ }
-            });
-          },
-          onerror: function () {},
-          close: function () {},
-        },
-      });
-    }
-    var entry = _sseRegistry.get(key);
-    entry.handlers.add(handler);
-    return function unsubscribe() {
-      entry.handlers.delete(handler);
-      if (entry.handlers.size === 0) {
-        entry.eventSource.close();
-        _sseRegistry.delete(key);
-      }
-    };
-  },
-  resetSSEClient: function () {
-    _sseRegistry.forEach(function (entry) { entry.eventSource.close(); });
-    _sseRegistry.clear();
-  },
-  __getSources: function () { return _sseRegistry; },
-}));
+  close() {
+    this.closed = true;
+  }
 
-// Re-import after mocking so Subscriber gets the mocked module.
-const { resetSSEClient, __getSources } = await import('../../services/ui/sseClient.js');
+  // Deliver a frame the way the browser would (raw SSE data string).
+  emitRaw(data) {
+    this.onmessage({ data });
+  }
+
+  emit(event) {
+    this.emitRaw(JSON.stringify(event));
+  }
+}
+
+let eventSources;
+
+function subscribeUrl(campaignName) {
+  const params = new URLSearchParams();
+  if (campaignName) {
+    params.set('campaign', campaignName);
+  }
+  return `http://localhost/subscribe?${params.toString()}`;
+}
+
+beforeEach(() => {
+  eventSources = [];
+  global.EventSource = FakeEventSource;
+  // Close/forget any connections left over from a previous test file.
+  resetSSEClient();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('Subscriber', () => {
-  beforeEach(() => {
-    resetSSEClient();
-  });
+  describe('subscription lifecycle', () => {
+    it('renders nothing', () => {
+      const { container } = render(
+        <Subscriber handleEvent={vi.fn()} campaignName="test-campaign" />
+      );
 
-  describe('event subscription', () => {
-    it('registers a handler with subscribeToSSE when mounted', () => {
+      expect(container).toBeEmptyDOMElement();
+    });
+
+    it('opens an SSE connection for the campaign on mount', () => {
+      render(
+        <Subscriber handleEvent={vi.fn()} campaignName="test-campaign" />
+      );
+
+      expect(eventSources).toHaveLength(1);
+      expect(eventSources[0].url).toBe(subscribeUrl('test-campaign'));
+      expect(eventSources[0].closed).toBe(false);
+    });
+
+    it('shares one connection between multiple subscribers of the same campaign', () => {
+      // Regression guard for the documented production incident: per-instance
+      // EventSources exhausted the browser's ~6-connection-per-host pool and
+      // starved normal fetches. Subscribers must fan out over one shared
+      // connection via subscribeToSSE, never open their own.
+      render(
+        <Subscriber handleEvent={vi.fn()} campaignName="test-campaign" />
+      );
+      render(
+        <Subscriber handleEvent={vi.fn()} campaignName="test-campaign" />
+      );
+      render(
+        <Subscriber handleEvent={vi.fn()} campaignName="test-campaign" />
+      );
+
+      expect(eventSources).toHaveLength(1);
+    });
+
+    it('subscribes to the campaign-less feed when campaignName is falsy', () => {
       const handleEvent = vi.fn();
-
       render(
-        <Subscriber
-          handleEvent={handleEvent}
-          campaignName="test-campaign"
-        />
+        <Subscriber handleEvent={handleEvent} campaignName={null} />
+      );
+      render(
+        <Subscriber handleEvent={vi.fn()} campaignName="" />
       );
 
-      const entry = __getSources().get('test-campaign');
-      expect(entry).toBeDefined();
-      expect(entry.handlers.size).toBe(1);
+      // null and '' share one anonymous feed with no campaign query param.
+      expect(eventSources).toHaveLength(1);
+      expect(eventSources[0].url).toBe(subscribeUrl());
+
+      const event = { key: 'anon-event', data: 1 };
+      eventSources[0].emit(event);
+      expect(handleEvent).toHaveBeenCalledWith(event);
     });
 
-    it('registers with an empty string key when campaignName is falsy (null, undefined, or empty string)', () => {
-      const nullHandleEvent = vi.fn();
-      const undefinedHandleEvent = vi.fn();
-      const emptyHandleEvent = vi.fn();
-
-      render(
-        <Subscriber
-          handleEvent={nullHandleEvent}
-          campaignName={null}
-        />
-      );
-      render(
-        <Subscriber
-          handleEvent={undefinedHandleEvent}
-          campaignName={undefined}
-        />
-      );
-      render(
-        <Subscriber
-          handleEvent={emptyHandleEvent}
-          campaignName=""
-        />
-      );
-
-      const entry = __getSources().get('');
-      expect(entry).toBeDefined();
-      expect(entry.handlers.size).toBe(3);
-    });
-
-  });
-
-  describe('event handling', () => {
-    it('passes parsed SSE data to the handler', () => {
-      const handleEvent = vi.fn();
-
-      render(
-        <Subscriber
-          handleEvent={handleEvent}
-          campaignName="test-campaign"
-        />
-      );
-
-      // Simulate an SSE message arriving on the shared EventSource
-      const entry = Array.from(__getSources().values())[0];
-      entry.eventSource.onmessage({ data: JSON.stringify({ type: 'test', data: 'value' }) });
-
-      expect(handleEvent).toHaveBeenCalledWith({ type: 'test', data: 'value' });
-    });
-
-    it('dispatches a shared SSE event to all subscribed handlers for the same campaign', () => {
-      const firstHandler = vi.fn();
-      const secondHandler = vi.fn();
-
-      render(
-        <Subscriber
-          handleEvent={firstHandler}
-          campaignName="test-campaign"
-        />
-      );
-      render(
-        <Subscriber
-          handleEvent={secondHandler}
-          campaignName="test-campaign"
-        />
-      );
-
-      const eventData = { key: 'some-event', data: 42 };
-      const entry = Array.from(__getSources().values())[0];
-      entry.eventSource.onmessage({ data: JSON.stringify(eventData) });
-
-      expect(firstHandler).toHaveBeenCalledWith(eventData);
-      expect(secondHandler).toHaveBeenCalledWith(eventData);
-    });
-  });
-
-  describe('handleEvent ref staleness prevention', () => {
-    it('calls the latest handleEvent when props change', () => {
-      const firstHandler = vi.fn();
-      const secondHandler = vi.fn();
-
-      const { rerender } = render(
-        <Subscriber
-          handleEvent={firstHandler}
-          campaignName="test-campaign"
-        />
-      );
-
-      // Capture the EventSource after the first render
-      const entry = Array.from(__getSources().values())[0];
-
-      // Rerender with a new handler — useEffect only depends on campaignName,
-      // so the same EventSource is kept; only the ref is updated in-place.
-      rerender(
-        <Subscriber
-          handleEvent={secondHandler}
-          campaignName="test-campaign"
-        />
-      );
-
-      entry.eventSource.onmessage({ data: JSON.stringify({ type: 'test' }) });
-
-      expect(secondHandler).toHaveBeenCalledWith({ type: 'test' });
-      expect(firstHandler).not.toHaveBeenCalled();
-    });
-
-    it('unsubscribes from the old campaign and subscribes to the new one when campaignName changes', () => {
+    it('closes the old connection and opens one for the new campaign when campaignName changes', () => {
       const handlerA = vi.fn();
       const handlerB = vi.fn();
 
       const { rerender } = render(
-        <Subscriber
-          handleEvent={handlerA}
-          campaignName="campaign-a"
-        />
+        <Subscriber handleEvent={handlerA} campaignName="campaign-a" />
       );
 
-      expect(__getSources().has('campaign-a')).toBe(true);
-      expect(__getSources().has('campaign-b')).toBe(false);
+      rerender(<Subscriber handleEvent={handlerB} campaignName="campaign-b" />);
 
-      rerender(
-        <Subscriber
-          handleEvent={handlerB}
-          campaignName="campaign-b"
-        />
-      );
+      expect(eventSources).toHaveLength(2);
+      expect(eventSources[0].url).toBe(subscribeUrl('campaign-a'));
+      expect(eventSources[0].closed).toBe(true);
+      expect(eventSources[1].url).toBe(subscribeUrl('campaign-b'));
 
-      // After rerender: campaign-a subscription was cleaned up, campaign-b is active.
-      expect(__getSources().has('campaign-a')).toBe(false);
-      expect(__getSources().has('campaign-b')).toBe(true);
-      expect(__getSources().get('campaign-b').handlers.size).toBe(1);
-    });
-  });
+      // Events on the abandoned campaign no longer reach the component.
+      eventSources[0].emit({ key: 'stale' });
+      expect(handlerA).not.toHaveBeenCalled();
 
-  describe('cleanup on unmount', () => {
-    it('unsubscribes the handler from subscribeToSSE on unmount', () => {
-      const handleEvent = vi.fn();
-      const { unmount } = render(
-        <Subscriber
-          handleEvent={handleEvent}
-          campaignName="test-campaign"
-        />
-      );
-
-      const entry = __getSources().get('test-campaign');
-      expect(entry.handlers.size).toBe(1);
-
-      unmount();
-
-      expect(entry.handlers.size).toBe(0);
+      const event = { key: 'fresh' };
+      eventSources[1].emit(event);
+      expect(handlerB).toHaveBeenCalledWith(event);
     });
 
-    it('closes the EventSource only after the last subscriber for a campaign unmounts', () => {
+    it('closes the connection only after the last subscriber for the campaign unmounts', () => {
       const { unmount: unmountFirst } = render(
-        <Subscriber
-          handleEvent={vi.fn()}
-          campaignName="test-campaign"
-        />
+        <Subscriber handleEvent={vi.fn()} campaignName="test-campaign" />
       );
       const { unmount: unmountSecond } = render(
-        <Subscriber
-          handleEvent={vi.fn()}
-          campaignName="test-campaign"
-        />
+        <Subscriber handleEvent={vi.fn()} campaignName="test-campaign" />
       );
-
-      const entry = __getSources().get('test-campaign');
-      let closed = false;
-      entry.eventSource.close = function () { closed = true; };
 
       unmountFirst();
-      expect(closed).toBe(false);
+      expect(eventSources[0].closed).toBe(false);
 
       unmountSecond();
-      expect(closed).toBe(true);
+      expect(eventSources[0].closed).toBe(true);
     });
 
-    it('removing one subscriber does not affect handlers for other campaigns', () => {
-      const handlerA = vi.fn();
-      const handlerB = vi.fn();
-
-      render(
-        <Subscriber
-          handleEvent={handlerA}
-          campaignName="campaign-a"
-        />
-      );
-      render(
-        <Subscriber
-          handleEvent={handlerB}
-          campaignName="campaign-b"
-        />
-      );
-
+    it('leaves other campaigns connected when one campaign unmounts', () => {
       const { unmount } = render(
-        <Subscriber
-          handleEvent={vi.fn()}
-          campaignName="campaign-a"
-        />
+        <Subscriber handleEvent={vi.fn()} campaignName="campaign-a" />
+      );
+      render(
+        <Subscriber handleEvent={vi.fn()} campaignName="campaign-b" />
       );
 
-      const entryA = __getSources().get('campaign-a');
-
-      // Two subscribers for campaign-a; unmounting one leaves one.
-      expect(entryA.handlers.size).toBe(2);
-      expect(__getSources().get('campaign-b').handlers.size).toBe(1);
-
-      // Unmount should not affect campaign-b
+      const [sourceA, sourceB] = eventSources;
       unmount();
-      expect(entryA.handlers.size).toBe(1);
-      expect(__getSources().get('campaign-b').handlers.size).toBe(1);
+
+      expect(sourceA.closed).toBe(true);
+      expect(sourceB.closed).toBe(false);
+
+      // The surviving campaign still receives its events.
+      const handlerB = vi.fn();
+      render(
+        <Subscriber handleEvent={handlerB} campaignName="campaign-b" />
+      );
+      expect(eventSources).toHaveLength(2); // reuses the open connection
+      const event = { key: 'still-live' };
+      sourceB.emit(event);
+      expect(handlerB).toHaveBeenCalledWith(event);
     });
   });
 
-  describe('different campaigns', () => {
-    it('only delivers events to handlers subscribed to the matching campaign', () => {
+  describe('event delivery', () => {
+    it('passes parsed event data to handleEvent', () => {
+      const handleEvent = vi.fn();
+      render(
+        <Subscriber handleEvent={handleEvent} campaignName="test-campaign" />
+      );
+
+      const event = { key: 'some-event', data: { text: 'hello' } };
+      eventSources[0].emit(event);
+
+      expect(handleEvent).toHaveBeenCalledTimes(1);
+      expect(handleEvent).toHaveBeenCalledWith(event);
+    });
+
+    it('delivers each campaign events only to that campaign subscribers', () => {
       const handlerA = vi.fn();
       const handlerB = vi.fn();
 
       render(
-        <Subscriber
-          handleEvent={handlerA}
-          campaignName="campaign-a"
-        />
+        <Subscriber handleEvent={handlerA} campaignName="campaign-a" />
       );
       render(
-        <Subscriber
-          handleEvent={handlerB}
-          campaignName="campaign-b"
-        />
+        <Subscriber handleEvent={handlerB} campaignName="campaign-b" />
       );
 
-      const entryA = __getSources().get('campaign-a');
+      const [sourceA, sourceB] = eventSources;
 
-      const eventData = { key: 'event-x', data: 1 };
-      entryA.eventSource.onmessage({ data: JSON.stringify(eventData) });
-
-      expect(handlerA).toHaveBeenCalledWith(eventData);
+      const eventA = { key: 'event-a', data: 1 };
+      sourceA.emit(eventA);
+      expect(handlerA).toHaveBeenCalledWith(eventA);
       expect(handlerB).not.toHaveBeenCalled();
-    });
-  });
 
-  describe('malformed SSE data', () => {
-    it('does not call the handler when SSE data is not valid JSON', () => {
-      const handleEvent = vi.fn();
+      const eventB = { key: 'event-b', data: 2 };
+      sourceB.emit(eventB);
+      expect(handlerB).toHaveBeenCalledWith(eventB);
+      expect(handlerA).toHaveBeenCalledTimes(1); // not re-delivered
+    });
+
+    it('broadcasts one event to every handler on the shared connection', () => {
+      const handlerA = vi.fn();
+      const handlerB = vi.fn();
 
       render(
-        <Subscriber
-          handleEvent={handleEvent}
-          campaignName="test-campaign"
-        />
+        <Subscriber handleEvent={handlerA} campaignName="test-campaign" />
+      );
+      render(
+        <Subscriber handleEvent={handlerB} campaignName="test-campaign" />
       );
 
-      const entry = Array.from(__getSources().values())[0];
-      entry.eventSource.onmessage({ data: 'not json' });
+      const event = { key: 'broadcast', data: 42 };
+      eventSources[0].emit(event);
 
-      expect(handleEvent).not.toHaveBeenCalled();
+      expect(handlerA).toHaveBeenCalledWith(event);
+      expect(handlerB).toHaveBeenCalledWith(event);
     });
-  });
 
-  describe('handler error tolerance', () => {
-    it('does not prevent other handlers from receiving events when one handler throws', () => {
+    it('stops delivering events to a subscriber after it unmounts', () => {
+      const handleEvent = vi.fn();
+      const { unmount } = render(
+        <Subscriber handleEvent={handleEvent} campaignName="test-campaign" />
+      );
+
+      eventSources[0].emit({ key: 'before' });
+      expect(handleEvent).toHaveBeenCalledTimes(1);
+
+      unmount();
+
+      eventSources[0].emit({ key: 'after' });
+      expect(handleEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores malformed JSON without closing the connection', () => {
+      const handleEvent = vi.fn();
+      render(
+        <Subscriber handleEvent={handleEvent} campaignName="test-campaign" />
+      );
+
+      eventSources[0].emitRaw('not json');
+      expect(handleEvent).not.toHaveBeenCalled();
+
+      // The connection survives a bad frame: later events still flow.
+      const event = { key: 'valid', data: 1 };
+      eventSources[0].emit(event);
+      expect(handleEvent).toHaveBeenCalledWith(event);
+    });
+
+    it('keeps delivering to other subscribers when one handler throws', () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
       const throwingHandler = vi.fn(() => {
         throw new Error('handler error');
       });
       const healthyHandler = vi.fn();
 
       render(
-        <Subscriber
-          handleEvent={throwingHandler}
-          campaignName="test-campaign"
-        />
+        <Subscriber handleEvent={throwingHandler} campaignName="test-campaign" />
       );
       render(
-        <Subscriber
-          handleEvent={healthyHandler}
-          campaignName="test-campaign"
-        />
+        <Subscriber handleEvent={healthyHandler} campaignName="test-campaign" />
       );
 
-      const entry = Array.from(__getSources().values())[0];
-      const eventData = { key: 'test', data: 1 };
+      const event = { key: 'test', data: 1 };
+      eventSources[0].emit(event);
 
-      // The SSE client catches handler errors internally; the event should
-      // still reach the healthy handler.
-      entry.eventSource.onmessage({ data: JSON.stringify(eventData) });
+      expect(throwingHandler).toHaveBeenCalledWith(event);
+      expect(healthyHandler).toHaveBeenCalledWith(event);
+      // The failure is surfaced, not silently swallowed.
+      expect(consoleErrorSpy).toHaveBeenCalled();
+    });
+  });
 
-      expect(healthyHandler).toHaveBeenCalledWith(eventData);
+  describe('latest handleEvent always wins', () => {
+    it('calls the newest handleEvent after a prop change without reopening the connection', () => {
+      // Subscribers re-render constantly; the component must swap handlers
+      // in place rather than churn subscriptions.
+      const firstHandler = vi.fn();
+      const secondHandler = vi.fn();
+
+      const { rerender } = render(
+        <Subscriber handleEvent={firstHandler} campaignName="test-campaign" />
+      );
+      rerender(<Subscriber handleEvent={secondHandler} campaignName="test-campaign" />);
+
+      expect(eventSources).toHaveLength(1); // no reconnect on handler change
+
+      const event = { key: 'test' };
+      eventSources[0].emit(event);
+
+      expect(secondHandler).toHaveBeenCalledWith(event);
+      expect(firstHandler).not.toHaveBeenCalled();
     });
   });
 });

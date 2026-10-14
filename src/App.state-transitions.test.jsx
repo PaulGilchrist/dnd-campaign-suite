@@ -1,11 +1,43 @@
-
+// @improved-by-ai
+/**
+ * App-level contract for view/theme title state transitions (App.jsx).
+ *
+ * This file owns the shell-level state machine that no sibling App test
+ * exercises:
+ *
+ *  - Re-entry reset: leaving a campaign via "Campaigns" and selecting it
+ *    again always lands back on the character sheet, regardless of which
+ *    view was open when leaving (initiative, maps manager, notes).
+ *  - Campaign switching: selecting a DIFFERENT campaign clears the maps
+ *    area state — a player who had a map open in the previous campaign
+ *    must be able to open the new campaign's active map with one "Maps"
+ *    click (a stale mapsView of type 'map' would silently swallow the
+ *    click on the player branch of handleMapsClick).
+ *  - Idempotent sidebar navigation: re-clicking the button for the view
+ *    you are already on keeps you there (view + sidebar indicator intact),
+ *    without crashing.
+ *  - Theme transitions: default dark on a clean slate, restore from stored
+ *    preference (including invalid values), and toggle round-trips that
+ *    persist to localStorage and echo into the Admin readout. Theme is
+ *    display formatting, so localStorage is the sanctioned store here.
+ *  - document.title follows the active view/character.
+ *
+ * Deliberately NOT re-tested here (covered by siblings):
+ *  - Maps-click routing / back stack / manager behavior → App.map-navigation.test.jsx
+ *  - waiting placeholder + "Check Again" → App.map-unavailable.test.jsx
+ *  - map-activate SSE auto-open → App.map-activate.test.jsx
+ *  - SSE dispatch table, character CRUD, roster landing → App.runtime-events.test.jsx
+ *  - post-rollback carry-over landing → App.post-restore.test.jsx
+ */
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App.jsx';
 
 import { mockState, dataLoaderMocks } from './test/appTestState.js';
+import { loadMaps } from './services/maps/mapsService.js';
+import { loadCombatSummary } from './services/encounters/combatData.js';
 
-// --- Core mocks (shared with App.runtime-events.test.jsx and App.map-navigation.test.jsx) ---
+// --- Core mocks (shared with other App test files) ---
 
 vi.mock('./services/ui/dataLoader.js', async () => {
   const { dataLoaderMocks } = await import('./test/appTestState.js');
@@ -33,6 +65,7 @@ vi.mock('./services/ui/storage.js', () => ({
 vi.mock('./services/encounters/combatData.js', async () => ({
   loadCombatSummary: vi.fn(() => Promise.resolve(null)),
   setCombatSummaryCache: vi.fn(),
+  getCombatSummary: vi.fn(() => null),
 }));
 
 vi.mock('./hooks/runtime/useRuntimeState.js', () => ({
@@ -115,16 +148,14 @@ vi.mock('./components/campaign-admin/CampaignAdmin.jsx', async () => {
   return { default: MockCampaignAdmin };
 });
 
-// Subscriber fires events asynchronously via setTimeout to match real SSE timing.
-// This avoids synchronous event dispatch during render which would cause
-// inconsistent state and unreliable tests.
+// Stub the SSE subscriber so tests never open a real EventSource.
 vi.mock('./components/common/Subscriber.jsx', () => ({
   default: function MockSubscriber() { return null; },
 }));
 
 // --- Helpers ---
 
-function setLocalhost(hostname = 'localhost') {
+function setLocalhost(hostname) {
   Object.defineProperty(window, 'location', {
     value: { hostname, reload: vi.fn() },
     writable: true,
@@ -149,13 +180,12 @@ function setupDataLoaderMocks() {
   );
 }
 
-// Helper to wait for all microtasks and useEffects to flush.
-// This ensures state updates from useEffects are visible.
+// Let pending microtasks/effects flush (rules computation, title updates).
 async function flushEffects() {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-// Helper to wait for the campaign selection screen to appear, then click select.
+// Click through the campaign selection screen into the app shell.
 async function selectCampaign() {
   await waitFor(() => {
     expect(screen.getByTestId('campaign-selection')).toBeInTheDocument();
@@ -169,12 +199,34 @@ async function selectCampaign() {
   await flushEffects();
 }
 
+// Click "Campaigns" in the sidebar and wait for the selection screen.
+async function backToCampaigns() {
+  fireEvent.click(screen.getByTestId('back-to-campaigns-btn'));
+  await waitFor(() => {
+    expect(screen.getByTestId('campaign-selection')).toBeInTheDocument();
+  });
+}
+
+// Render the app with a roster and land on the character sheet.
+async function renderInCampaign(hostname = 'localhost', characters = [{ name: 'Aragorn', level: 1 }]) {
+  setLocalhost(hostname);
+  mockState.characters = characters;
+  render(<App />);
+  await selectCampaign();
+  expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+}
+
+// Navigate to a view and assert it actually rendered.
+async function openView(buttonTestId, viewTestId) {
+  fireEvent.click(screen.getByTestId(buttonTestId));
+  await waitFor(() => {
+    expect(screen.getByTestId(viewTestId)).toBeInTheDocument();
+  });
+}
+
 // --- Test suite ---
 
 describe('App - State Transitions', () => {
-  const defaultFetch = () =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -196,12 +248,23 @@ describe('App - State Transitions', () => {
     mockState.campaignName = 'test-campaign';
     mockState.characters = [];
 
+    // Quiet, observable failure channel for flows that must not alert.
     window.alert = vi.fn();
     window.confirm = vi.fn(() => true);
-    window.prompt = vi.fn(() => 'New Campaign Name');
 
     setLocalhost('localhost');
-    global.fetch = vi.fn(defaultFetch);
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve({}) }),
+    );
+
+    // No maps by default; the campaign-switch test re-arms per campaign.
+    // (vi.clearAllMocks does NOT reset implementations, so re-arm here.)
+    loadMaps.mockResolvedValue({ maps: [] });
+    loadCombatSummary.mockResolvedValue(null);
+
+    // Theme tests seed per-test; the shared setup.js localStorage mock
+    // persists across tests in this file, so start from a clean slate.
+    localStorage.clear();
 
     setupDataLoaderMocks();
   });
@@ -209,167 +272,166 @@ describe('App - State Transitions', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     setLocalhost('localhost');
+    localStorage.clear();
+    // App's title effect survives unmount — reset so cross-test bleed
+    // can never satisfy a later title assertion.
+    document.title = '';
   });
 
-  describe('Campaign reset transitions', () => {
-    it('resets activeView when navigating back to campaign selection', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
+  describe('Campaign re-entry resets the active view', () => {
+    // Re-selecting the campaign must always land on the character sheet,
+    // whichever view was open when the user left. One flow per view so a
+    // regression in the shared reset fails loudly for each entry point.
+    it.each([
+      ['initiative', 'initiative-btn', 'initiative'],
+      ['maps manager', 'maps-btn', 'maps-manager'],
+      ['notes', 'notes-btn', 'notes-view'],
+    ])('re-entering the campaign from the %s view lands on the character sheet', async (_label, buttonTestId, viewTestId) => {
+      await renderInCampaign();
 
-      // Navigate into the app
-      await selectCampaign();
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      await openView(buttonTestId, viewTestId);
+      await backToCampaigns();
 
-      // Navigate to a different view
-      fireEvent.click(screen.getByTestId('initiative-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('initiative')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-
-      // Go back to campaign selection
-      fireEvent.click(screen.getByTestId('back-to-campaigns-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('campaign-selection')).toBeInTheDocument();
-      });
-
-      // Select campaign again — activeView should reset (charSheet)
       await act(async () => {
         fireEvent.click(screen.getByTestId('select-campaign-btn'));
       });
 
       await waitFor(() => {
         expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-        expect(screen.queryByTestId('initiative')).not.toBeInTheDocument();
+        expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
       });
+      expect(screen.queryByTestId(viewTestId)).not.toBeInTheDocument();
     });
+  });
 
-    it('resets mapsView when navigating back to campaign selection', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
+  describe('Campaign switching clears stale maps state', () => {
+    it('a player who had a map open can open the new campaign\'s active map with one Maps click', async () => {
+      loadMaps.mockImplementation((campaign) =>
+        Promise.resolve({
+          maps: campaign === 'test-campaign'
+            ? [{ fileName: 'old-map.json', isActive: true }]
+            : [{ fileName: 'new-map.json', isActive: true }],
+        }),
+      );
+      await renderInCampaign('example.com');
 
-      await selectCampaign();
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      // Player opens the first campaign's active map, then leaves.
+      await openView('maps-btn', 'map-view');
+      expect(screen.getByTestId('map-name').textContent).toBe('old-map');
+      await backToCampaigns();
 
-      // Open maps manager
+      // Switch to a different campaign with its own active map.
+      mockState.campaignName = 'test-campaign-two';
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('select-campaign-btn'));
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+        expect(screen.getByTestId('sidebar-campaign').textContent).toBe('test-campaign-two');
+      });
+
+      // The stale 'old-map' view must be gone: one Maps click resolves
+      // and opens the NEW campaign's map (if the old mapsView leaked,
+      // the player branch of handleMapsClick would swallow this click).
       fireEvent.click(screen.getByTestId('maps-btn'));
       await waitFor(() => {
-        expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
+        expect(screen.getByTestId('map-name').textContent).toBe('new-map');
       });
-
-      // Go back to campaign selection
-      fireEvent.click(screen.getByTestId('back-to-campaigns-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('campaign-selection')).toBeInTheDocument();
-      });
-
-      // Re-enter — maps should reset to initial state (charSheet, not maps)
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('select-campaign-btn'));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-        expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
-      });
+      expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
     });
   });
 
-  describe('Maps view state transitions', () => {
-    it('idempotent sidebar clicks do not re-navigate', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
+  describe('Idempotent sidebar navigation', () => {
+    it('re-clicking the active view\'s button keeps the view and selection intact', async () => {
+      await renderInCampaign();
 
-      await selectCampaign();
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-
-      // Navigate to initiative
+      // Move to initiative and click its button again — same view, no crash.
+      await openView('initiative-btn', 'initiative');
       fireEvent.click(screen.getByTestId('initiative-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('initiative')).toBeInTheDocument();
-      });
+      await flushEffects();
+      expect(screen.getByTestId('initiative')).toBeInTheDocument();
+      expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Initiative');
+      expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
 
-      // Click initiative again — should not crash or change state
-      fireEvent.click(screen.getByTestId('initiative-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('initiative')).toBeInTheDocument();
-        expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      });
-
-      // Navigate to notes
+      // Move to notes and click its button again — same view, no crash.
+      await openView('notes-btn', 'notes-view');
       fireEvent.click(screen.getByTestId('notes-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('notes-view')).toBeInTheDocument();
-      });
-
-      // Click notes again — idempotent
-      fireEvent.click(screen.getByTestId('notes-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('notes-view')).toBeInTheDocument();
-        expect(screen.queryByTestId('initiative')).not.toBeInTheDocument();
-      });
+      await flushEffects();
+      expect(screen.getByTestId('notes-view')).toBeInTheDocument();
+      expect(screen.getByTestId('sidebar-active-indicator')).toHaveTextContent('Notes');
+      expect(screen.queryByTestId('initiative')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
     });
   });
 
   describe('Theme state transitions', () => {
-    it('toggles theme and persists to localStorage', async () => {
-      const localStorageMock = {
-        getItem: vi.fn(() => 'dark'),
-        setItem: vi.fn(),
-        removeItem: vi.fn(),
-        clear: vi.fn(),
-      };
-      Object.defineProperty(window, 'localStorage', {
-        value: localStorageMock,
-        writable: true,
-        configurable: true,
-      });
+    async function openAdmin() {
+      await openView('admin-btn', 'campaign-admin');
+    }
 
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
+    it('toggles light and dark from the default, updating the sheet and persisting each choice', async () => {
+      await renderInCampaign();
 
-      await selectCampaign();
+      // Clean localStorage → dark is the default.
       expect(document.body.getAttribute('data-theme')).toBe('dark');
 
-      // Navigate to admin to access theme toggle
-      fireEvent.click(screen.getByTestId('admin-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('campaign-admin')).toBeInTheDocument();
-      });
+      await openAdmin();
 
-      // Toggle theme
       fireEvent.click(screen.getByTestId('admin-toggle-theme-btn'));
       await waitFor(() => {
         expect(document.body.getAttribute('data-theme')).toBe('light');
+        expect(screen.getByTestId('admin-theme')).toHaveTextContent('light');
       });
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('theme', 'light');
+      expect(localStorage.getItem('theme')).toBe('light');
 
-      // Toggle back to dark
       fireEvent.click(screen.getByTestId('admin-toggle-theme-btn'));
       await waitFor(() => {
         expect(document.body.getAttribute('data-theme')).toBe('dark');
+        expect(screen.getByTestId('admin-theme')).toHaveTextContent('dark');
       });
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('theme', 'dark');
+      expect(localStorage.getItem('theme')).toBe('dark');
     });
 
-    it('respects initial theme from localStorage on mount', async () => {
-      const localStorageMock = {
-        getItem: vi.fn((key) => key === 'theme' ? 'light' : null),
-        setItem: vi.fn(),
-        removeItem: vi.fn(),
-        clear: vi.fn(),
-      };
-      Object.defineProperty(window, 'localStorage', {
-        value: localStorageMock,
-        writable: true,
-        configurable: true,
-      });
+    it('restores the stored light theme on mount', async () => {
+      localStorage.setItem('theme', 'light');
 
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
+      await renderInCampaign();
 
-      await selectCampaign();
       expect(document.body.getAttribute('data-theme')).toBe('light');
+    });
+
+    it.each([
+      ['nothing stored', null],
+      ['an unrecognized value', 'neon'],
+    ])('falls back to dark when %s', async (_label, stored) => {
+      if (stored !== null) localStorage.setItem('theme', stored);
+
+      await renderInCampaign();
+
+      expect(document.body.getAttribute('data-theme')).toBe('dark');
+    });
+  });
+
+  describe('document.title follows the active view', () => {
+    it('shows the active character name on the sheet and CharSheets elsewhere', async () => {
+      await renderInCampaign('localhost', [
+        { name: 'Aragorn', level: 1 },
+        { name: 'Legolas', level: 2 },
+      ]);
+
+      expect(document.title).toBe('Aragorn');
+
+      // Any non-sheet view reverts the title to the app name.
+      await openView('initiative-btn', 'initiative');
+      expect(document.title).toBe('CharSheets');
+
+      // Selecting a character brings their name back.
+      fireEvent.click(screen.getByTestId('char-btn-Legolas'));
+      await waitFor(() => {
+        expect(screen.getByTestId('character-name')).toHaveTextContent('Legolas');
+      });
+      expect(document.title).toBe('Legolas');
     });
   });
 });

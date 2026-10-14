@@ -1,11 +1,54 @@
-
+// @improved-by-ai
+/**
+ * App-level contract for SSE runtime events and the character lifecycle.
+ *
+ * This file owns the two things no other App test exercises:
+ *
+ *  1. The SSE dispatch table (App.jsx → handleRuntimeEvent, captured from
+ *     the mocked Subscriber): which event keys mutate what state.
+ *     - `character-delete-*` removes a roster entry by its underscore-
+ *       sanitized file name (roster only — server-first keeps any open
+ *       sheet until the server publishes a new active character).
+ *     - `character-<update>-*` replaces a roster entry by name and swaps
+ *       the active sheet in place; `character-create-*` is ignored (the
+ *       create flow refreshes the roster itself).
+ *     - `pipeline-<campaign>-<key>` mirrors into the runtime store with
+ *       skipSync=true (the SSE echo must never re-POST to the server).
+ *     - `change-<campaign>-<key>` routes campaign keys (isCampaignKey) to
+ *       the campaign store and everything else to the character store,
+ *       also skipSync=true; bardic-inspiration prompts gate other writes
+ *       until cleared.
+ *     - Malformed events (null key/data, foreign campaigns) are ignored.
+ *  2. End-to-end character CRUD through the App shell: the landing after
+ *     campaign selection, wizard create/edit/cancel, and confirmed delete —
+ *     asserted as observable UI outcomes (roster + active sheet), with
+ *     campaignService stubbed at the network boundary.
+ *
+ * Deliberately NOT re-tested here:
+ *  - map-activate SSE auto-open → App.map-activate.test.jsx
+ *  - Maps-click routing / back stack → App.map-navigation.test.jsx
+ *  - waiting placeholder → App.map-unavailable.test.jsx
+ *  - view/theme reset transitions → App.state-transitions.test.jsx
+ *  - post-rollback carry-over → App.post-restore.test.jsx
+ *  - confirm/cancel and service-call internals of delete/create/edit →
+ *    useCharacterManagement.test.js and useCharacterWizard*.test.js
+ *  - HTTP semantics of campaignService → campaignService.test.js
+ */
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App.jsx';
 
-import { mockState, dataLoaderMocks } from './test/appTestState.js';
+import { mockState } from './test/appTestState.js';
+import { setRuntimeObject, getStore, notify } from './hooks/runtime/useRuntimeState.js';
+import * as campaignService from './services/campaign/campaignService.js';
+import { loadMaps } from './services/maps/mapsService.js';
 
-// --- Core mocks ---
+// Test access to the SSE handler wired into the (mocked) app-level Subscriber.
+const subscriberMock = vi.hoisted(() => ({
+  props: { handleEvent: null },
+}));
+
+// --- Core mocks (shared with other App test files) ---
 
 vi.mock('./services/ui/dataLoader.js', async () => {
   const { dataLoaderMocks } = await import('./test/appTestState.js');
@@ -33,6 +76,7 @@ vi.mock('./services/ui/storage.js', () => ({
 vi.mock('./services/encounters/combatData.js', async () => ({
   loadCombatSummary: vi.fn(() => Promise.resolve(null)),
   setCombatSummaryCache: vi.fn(),
+  getCombatSummary: vi.fn(() => null),
 }));
 
 vi.mock('./hooks/runtime/useRuntimeState.js', () => ({
@@ -44,82 +88,17 @@ vi.mock('./hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-// --- Component mocks ---
-
-vi.mock('./components/char-sheet/CharSheet.jsx', async () => {
-  const { MockCharSheet } = await import('./test/mockComponents.jsx');
-  return { default: MockCharSheet };
-});
-
-vi.mock('./components/initiative/Initiative.jsx', async () => {
-  const { MockInitiative } = await import('./test/mockComponents.jsx');
-  return { default: MockInitiative };
-});
-
-vi.mock('./components/campaign-selection/CampaignSelection.jsx', async () => {
-  const { MockCampaignSelection } = await import('./test/mockComponents.jsx');
-  return { default: MockCampaignSelection };
-});
-
-vi.mock('./components/character-creation/CharacterCreationWizard.jsx', async () => {
-  const { MockWizard } = await import('./test/mockComponents.jsx');
-  return { default: MockWizard };
-});
-
-vi.mock('./components/sidebar/Sidebar.jsx', async () => {
-  const { MockSidebar } = await import('./test/mockComponents.jsx');
-  return { default: MockSidebar };
-});
-
-vi.mock('./components/maps-manager/MapsManager.jsx', async () => {
-  const { MockMapsManager } = await import('./test/mockComponents.jsx');
-  return { default: MockMapsManager };
-});
-
-vi.mock('./components/map/Map.jsx', async () => {
-  const { MockMap } = await import('./test/mockComponents.jsx');
-  return { default: MockMap };
-});
-
-vi.mock('./components/encounter/EncounterBuilder.jsx', async () => {
-  const { MockEncounterBuilder } = await import('./test/mockComponents.jsx');
-  return { default: MockEncounterBuilder };
-});
-
-vi.mock('./components/notes/Notes.jsx', async () => {
-  const { MockNotes } = await import('./test/mockComponents.jsx');
-  return { default: MockNotes };
-});
-
-vi.mock('./components/quests/Quests.jsx', async () => {
-  const { MockQuests } = await import('./test/mockComponents.jsx');
-  return { default: MockQuests };
-});
-
-vi.mock('./components/npcs/NPCs.jsx', async () => {
-  const { MockNPCs } = await import('./test/mockComponents.jsx');
-  return { default: MockNPCs };
-});
-
-vi.mock('./components/factions/Factions.jsx', async () => {
-  const { MockFactions } = await import('./test/mockComponents.jsx');
-  return { default: MockFactions };
-});
-
-vi.mock('./components/settlements/Settlements.jsx', async () => {
-  const { MockSettlements } = await import('./test/mockComponents.jsx');
-  return { default: MockSettlements };
-});
-
-vi.mock('./components/log/Log.jsx', async () => {
-  const { MockLog } = await import('./test/mockComponents.jsx');
-  return { default: MockLog };
-});
-
-vi.mock('./components/campaign-admin/CampaignAdmin.jsx', async () => {
-  const { MockCampaignAdmin } = await import('./test/mockComponents.jsx');
-  return { default: MockCampaignAdmin };
-});
+// Network boundary for character CRUD. HTTP semantics are covered by
+// campaignService.test.js; hook-level confirm/callback behavior by the
+// hook tests. Here we only stub so App outcomes are deterministic.
+vi.mock('./services/campaign/campaignService.js', () => ({
+  getCharacterFolders: vi.fn(async () => []),
+  getCharacterFiles: vi.fn(async () => []),
+  loadCharacters: vi.fn(async () => []),
+  deleteCharacter: vi.fn(async () => {}),
+  createCharacter: vi.fn(async (_campaign, characterData) => ({ character: characterData })),
+  updateCharacter: vi.fn(async () => {}),
+}));
 
 // Shared mutable container so the hoisted vi.mock can read the
 // current app data shape without capturing a stale reference.
@@ -129,19 +108,114 @@ vi.mock('./hooks/runtime/useAppData.js', () => ({
   default: vi.fn(() => _appDataRef.value),
 }));
 
-// Subscriber fires events asynchronously via setTimeout to match real SSE timing.
+// --- Component mocks ---
+
+// Local CharSheet double: adds a level readout (beyond the shared mock) so
+// SSE character-* updates to the ACTIVE character are observable — the rest
+// of the surface matches the shared double so CRUD flows behave identically.
+vi.mock('./components/char-sheet/CharSheet.jsx', async () => {
+  const React = await import('react');
+  return {
+    default: function CharSheetDouble({ playerSummary, onDeleteCharacter, onEditCharacter }) {
+      return React.createElement(
+        'div',
+        { 'data-testid': 'char-sheet' },
+        React.createElement(
+          'span',
+          { 'data-testid': 'character-name' },
+          playerSummary?.name || 'no character'
+        ),
+        React.createElement(
+          'span',
+          { 'data-testid': 'character-level' },
+          String(playerSummary?.level ?? 'none')
+        ),
+        React.createElement(
+          'button',
+          { onClick: () => onDeleteCharacter?.(playerSummary?.name) },
+          'Delete Char'
+        ),
+        React.createElement('button', { onClick: () => onEditCharacter?.() }, 'Edit')
+      );
+    },
+  };
+});
+
+vi.mock('./components/initiative/Initiative.jsx', async () => {
+  const { MockInitiative } = await import('./test/mockComponents.jsx');
+  return { default: MockInitiative };
+});
+vi.mock('./components/campaign-selection/CampaignSelection.jsx', async () => {
+  const { MockCampaignSelection } = await import('./test/mockComponents.jsx');
+  return { default: MockCampaignSelection };
+});
+vi.mock('./components/character-creation/CharacterCreationWizard.jsx', async () => {
+  const { MockWizard } = await import('./test/mockComponents.jsx');
+  return { default: MockWizard };
+});
+vi.mock('./components/sidebar/Sidebar.jsx', async () => {
+  const { MockSidebar } = await import('./test/mockComponents.jsx');
+  return { default: MockSidebar };
+});
+vi.mock('./components/maps-manager/MapsManager.jsx', async () => {
+  const { MockMapsManager } = await import('./test/mockComponents.jsx');
+  return { default: MockMapsManager };
+});
+vi.mock('./components/map/Map.jsx', async () => {
+  const { MockMap } = await import('./test/mockComponents.jsx');
+  return { default: MockMap };
+});
+vi.mock('./components/encounter/EncounterBuilder.jsx', async () => {
+  const { MockEncounterBuilder } = await import('./test/mockComponents.jsx');
+  return { default: MockEncounterBuilder };
+});
+vi.mock('./components/notes/Notes.jsx', async () => {
+  const { MockNotes } = await import('./test/mockComponents.jsx');
+  return { default: MockNotes };
+});
+vi.mock('./components/quests/Quests.jsx', async () => {
+  const { MockQuests } = await import('./test/mockComponents.jsx');
+  return { default: MockQuests };
+});
+vi.mock('./components/npcs/NPCs.jsx', async () => {
+  const { MockNPCs } = await import('./test/mockComponents.jsx');
+  return { default: MockNPCs };
+});
+vi.mock('./components/factions/Factions.jsx', async () => {
+  const { MockFactions } = await import('./test/mockComponents.jsx');
+  return { default: MockFactions };
+});
+vi.mock('./components/settlements/Settlements.jsx', async () => {
+  const { MockSettlements } = await import('./test/mockComponents.jsx');
+  return { default: MockSettlements };
+});
+vi.mock('./components/log/Log.jsx', async () => {
+  const { MockLog } = await import('./test/mockComponents.jsx');
+  return { default: MockLog };
+});
+vi.mock('./components/campaign-admin/CampaignAdmin.jsx', async () => {
+  const { MockCampaignAdmin } = await import('./test/mockComponents.jsx');
+  return { default: MockCampaignAdmin };
+});
+
+// Subscriber double that captures the handler so tests can push SSE events
+// through the exact dispatch table the real SSE connection feeds.
 vi.mock('./components/common/Subscriber.jsx', () => ({
-  default: function MockSubscriber() { return null; },
+  default: ({ handleEvent }) => {
+    subscriberMock.props.handleEvent = handleEvent;
+    return null;
+  },
 }));
 
 // --- Helpers ---
 
-function setLocalhost(hostname = 'localhost') {
-  Object.defineProperty(window, 'location', {
-    value: { hostname, reload: vi.fn() },
-    writable: true,
-    configurable: true,
-  });
+const PARTY = [
+  { name: 'Aragorn', level: 1 },
+  { name: 'Legolas', level: 2 },
+];
+
+function jsonResponse(body) {
+  return { ok: true, json: () => Promise.resolve(body) };
 }
 
 async function flushEffects() {
@@ -161,21 +235,25 @@ async function selectCampaign() {
   await flushEffects();
 }
 
-function setupDataLoaderMocks() {
-  dataLoaderMocks.loadAbilityScores.mockResolvedValue([{ full_name: 'Strength' }]);
-  dataLoaderMocks.loadClassData.mockImplementation((v) =>
-    Promise.resolve(v === '2024' ? [{ name: 'Fighter 2024' }] : [{ name: 'Fighter' }]),
-  );
-  dataLoaderMocks.loadEquipment.mockResolvedValue([{ name: 'Longsword' }]);
-  dataLoaderMocks.loadMagicItems.mockImplementation((v) =>
-    Promise.resolve(v === '2024' ? [{ name: 'Wand 2024' }] : [{ name: 'Wand' }]),
-  );
-  dataLoaderMocks.loadRaceData.mockImplementation((v) =>
-    Promise.resolve(v === '2024' ? [{ name: 'Human 2024' }] : [{ name: 'Human' }]),
-  );
-  dataLoaderMocks.loadSpells.mockImplementation((v) =>
-    Promise.resolve(v === '2024' ? [{ name: 'Fireball 2024' }] : [{ name: 'Fireball' }]),
-  );
+// Render the app and select test-campaign with the given roster.
+async function renderInCampaign(characters = PARTY) {
+  mockState.characters = characters;
+  render(<App />);
+  await selectCampaign();
+}
+
+// Push an SSE event through the captured App handler.
+function dispatch(event) {
+  return act(async () => {
+    subscriberMock.props.handleEvent(event);
+    await flushEffects();
+  });
+}
+
+// setRuntimeObject calls scoped to a store key (MapContextSync also writes
+// '__campaign__'/'__map__' on mount — those are unrelated noise here).
+function writesFor(storeKey) {
+  return setRuntimeObject.mock.calls.filter((call) => call[0] === storeKey);
 }
 
 // --- Test suite ---
@@ -183,6 +261,7 @@ function setupDataLoaderMocks() {
 describe('App - Runtime Events & State Management', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    subscriberMock.props.handleEvent = null;
 
     _appDataRef.value = {
       abilityScores: [{ full_name: 'Strength' }],
@@ -206,148 +285,319 @@ describe('App - Runtime Events & State Management', () => {
     window.confirm = vi.fn(() => true);
     window.prompt = vi.fn(() => 'New Campaign Name');
 
-    setLocalhost('localhost');
+    Object.defineProperty(window, 'location', {
+      value: { hostname: 'localhost', reload: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
 
-    global.fetch = vi.fn(() =>
-      Promise.resolve({ ok: true, json: () => Promise.resolve({}) }),
+    global.fetch = vi.fn(() => Promise.resolve(jsonResponse({})));
+
+    // Re-arm service doubles (mockRejectedValueOnce etc. may be spent).
+    campaignService.deleteCharacter.mockImplementation(async () => {});
+    campaignService.createCharacter.mockImplementation(
+      async (_campaign, characterData) => ({ character: characterData }),
     );
-
-    setupDataLoaderMocks();
+    campaignService.updateCharacter.mockImplementation(async () => {});
+    getStore.mockImplementation(() => new Map());
+    loadMaps.mockResolvedValue({ maps: [] });
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  describe('Character wizard', () => {
-    it('shows edit wizard when editing character', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
+  describe('Campaign selection landing', () => {
+    it('lands on the first character sheet and lists the whole roster', async () => {
+      await renderInCampaign([...PARTY, { name: 'Gimli', level: 3 }]);
 
-      await selectCampaign();
-
-      await act(async () => {
-        fireEvent.click(screen.getByText('Edit'));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
-        expect(screen.getByTestId('editing-mode')).toBeInTheDocument();
-        expect(screen.getByTestId('editing-character').textContent).toBe('Aragorn');
-      });
+      expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();
+      expect(screen.getByTestId('char-btn-Legolas')).toBeInTheDocument();
+      expect(screen.getByTestId('char-btn-Gimli')).toBeInTheDocument();
+      expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
     });
 
-    it('completes wizard and hides it', async () => {
-      mockState.characters = [];
-      render(<App />);
+    it('auto-opens the creation wizard when the selected campaign has no characters', async () => {
+      await renderInCampaign([]);
 
-      await selectCampaign();
+      expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
+      expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+    });
+
+    it('switches the active sheet when a different sidebar character is clicked', async () => {
+      await renderInCampaign([...PARTY, { name: 'Gimli', level: 3 }]);
+
+      fireEvent.click(screen.getByTestId('char-btn-Gimli'));
+      await waitFor(() => {
+        expect(screen.getByTestId('character-name')).toHaveTextContent('Gimli');
+        expect(screen.getByTestId('character-level')).toHaveTextContent('3');
+      });
+
+      fireEvent.click(screen.getByTestId('char-btn-Legolas'));
+      await waitFor(() => {
+        expect(screen.getByTestId('character-name')).toHaveTextContent('Legolas');
+      });
+    });
+  });
+
+  describe('Character creation wizard', () => {
+    it('creates the character, closes the wizard, and refreshes the roster from the server', async () => {
+      await renderInCampaign();
+
+      fireEvent.click(screen.getByTestId('add-character-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
+      });
+
+      // Server-side truth for the roster refresh the create flow performs.
+      const created = { name: 'New Character', level: 1 };
+      global.fetch = vi.fn((url) => {
+        if (url === '/api/campaigns/test-campaign') {
+          return Promise.resolve(jsonResponse({ files: ['new-character.json'] }));
+        }
+        if (url.endsWith('/new-character.json')) {
+          return Promise.resolve(jsonResponse(created));
+        }
+        return Promise.resolve(jsonResponse({}));
+      });
 
       await act(async () => {
         fireEvent.click(screen.getByTestId('wizard-complete-btn'));
       });
 
+      expect(campaignService.createCharacter).toHaveBeenCalledWith(
+        'test-campaign',
+        expect.objectContaining({ name: 'New Character' }),
+      );
+      expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
       await waitFor(() => {
-        expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
+        expect(screen.getByTestId('char-btn-New Character')).toBeInTheDocument();
+        expect(screen.getByTestId('character-name')).toHaveTextContent('New Character');
       });
+      expect(window.alert).not.toHaveBeenCalled();
     });
 
-    it('cancels wizard and hides it', async () => {
-      mockState.characters = [];
-      render(<App />);
+    it('keeps the wizard open and alerts when character creation fails', async () => {
+      campaignService.createCharacter.mockRejectedValueOnce(new Error('server offline'));
+      await renderInCampaign();
 
-      await selectCampaign();
-
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
-      });
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Sidebar character list', () => {
-    it('displays all characters in sidebar', async () => {
-      mockState.characters = [
-        { name: 'Aragorn', level: 1 },
-        { name: 'Legolas', level: 2 },
-        { name: 'Gimli', level: 3 },
-      ];
-      render(<App />);
-
-      await selectCampaign();
-
-      expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();
-      expect(screen.getByTestId('char-btn-Legolas')).toBeInTheDocument();
-      expect(screen.getByTestId('char-btn-Gimli')).toBeInTheDocument();
-    });
-  });
-
-  describe('Character actions', () => {
-    it('opens wizard when add character button is clicked', async () => {
-      mockState.characters = [{ name: 'Aragorn', level: 1 }];
-      render(<App />);
-
-      await selectCampaign();
-
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('add-character-btn'));
-      });
-
+      fireEvent.click(screen.getByTestId('add-character-btn'));
       await waitFor(() => {
         expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
       });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('wizard-complete-btn'));
+      });
+
+      expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('server offline'));
+      expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
+      expect(screen.queryByTestId('char-btn-New Character')).not.toBeInTheDocument();
     });
 
-    it('confirms before deleting character', async () => {
-      mockState.characters = [
-        { name: 'Aragorn', level: 1 },
-        { name: 'Legolas', level: 2 },
-      ];
-      render(<App />);
+    it('cancels the wizard without creating anything', async () => {
+      await renderInCampaign();
 
-      await selectCampaign();
+      fireEvent.click(screen.getByTestId('add-character-btn'));
+      await waitFor(() => {
+        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
+      });
 
-      const deleteBtn = screen.getByTitle('Delete Character');
-      fireEvent.click(deleteBtn);
+      fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
+      });
 
-      expect(window.confirm).toHaveBeenCalled();
+      expect(campaignService.createCharacter).not.toHaveBeenCalled();
+      expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();
+      expect(screen.getByTestId('char-btn-Legolas')).toBeInTheDocument();
     });
   });
 
-  describe('Character switching', () => {
-    it('switches active character when clicking a different character in sidebar', async () => {
-      mockState.characters = [
-        { name: 'Aragorn', level: 1 },
-        { name: 'Legolas', level: 2 },
-        { name: 'Gimli', level: 3 },
-      ];
-      render(<App />);
+  describe('Edit wizard', () => {
+    it('opens in editing mode seeded with the active character, and cancel returns to an untouched sheet', async () => {
+      await renderInCampaign();
 
-      await selectCampaign();
+      fireEvent.click(screen.getByText('Edit'));
+      await waitFor(() => {
+        expect(screen.getByTestId('character-wizard')).toBeInTheDocument();
+      });
+      expect(screen.getByTestId('editing-mode')).toBeInTheDocument();
+      expect(screen.getByTestId('editing-character')).toHaveTextContent('Aragorn');
+
+      fireEvent.click(screen.getByTestId('wizard-cancel-btn'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('character-wizard')).not.toBeInTheDocument();
+      });
+      expect(campaignService.updateCharacter).not.toHaveBeenCalled();
+      expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
+    });
+  });
+
+  describe('Character deletion', () => {
+    it('deletes after confirmation, dropping the character from the roster onto the next one', async () => {
+      await renderInCampaign();
+
+      fireEvent.click(screen.getByText('Delete Char'));
+
+      expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Aragorn'));
+      await waitFor(() => {
+        expect(campaignService.deleteCharacter).toHaveBeenCalledWith('test-campaign', 'aragorn.json');
+      });
+      await waitFor(() => {
+        expect(screen.queryByTestId('char-btn-Aragorn')).not.toBeInTheDocument();
+        expect(screen.getByTestId('character-name')).toHaveTextContent('Legolas');
+      });
+      expect(window.alert).not.toHaveBeenCalled();
+    });
+
+    it('alerts and keeps the roster intact when the delete request fails', async () => {
+      campaignService.deleteCharacter.mockRejectedValueOnce(new Error('server offline'));
+      await renderInCampaign();
+
+      fireEvent.click(screen.getByText('Delete Char'));
 
       await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-        expect(screen.getByTestId('character-name').textContent).toBe('Aragorn');
+        expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('server offline'));
+      });
+      expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();
+      expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
+    });
+  });
+
+  describe('SSE runtime events', () => {
+    beforeEach(async () => {
+      await renderInCampaign();
+    });
+
+    it('replaces a roster entry and swaps the active sheet on a character-update event', async () => {
+      await dispatch({
+        key: 'character-update-test-campaign-Aragorn.json',
+        data: { name: 'Aragorn', level: 5 },
       });
 
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('char-btn-Legolas'));
+      expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();
+      expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
+      expect(screen.getByTestId('character-level')).toHaveTextContent('5');
+    });
+
+    it('leaves the active sheet untouched when updating a different character', async () => {
+      await dispatch({
+        key: 'character-update-test-campaign-Legolas.json',
+        data: { name: 'Legolas', level: 9 },
+      });
+      await flushEffects();
+
+      expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
+      expect(screen.getByTestId('character-level')).toHaveTextContent('1');
+    });
+
+    it('removes a character on a delete event echoed from another client, without re-calling the API', async () => {
+      await dispatch({
+        key: 'character-delete-test-campaign-Aragorn.json',
+        data: { file: 'Aragorn.json' },
       });
 
-      await waitFor(() => {
-        expect(screen.getByTestId('character-name').textContent).toBe('Legolas');
+      expect(screen.queryByTestId('char-btn-Aragorn')).not.toBeInTheDocument();
+      expect(screen.getByTestId('char-btn-Legolas')).toBeInTheDocument();
+      // Remote deletes touch the roster only — a sheet another client still
+      // holds open stays rendered until the server publishes a new active
+      // character (the API was already called by the originating client).
+      expect(screen.getByTestId('character-name')).toHaveTextContent('Aragorn');
+      expect(campaignService.deleteCharacter).not.toHaveBeenCalled();
+    });
+
+    it('ignores character-create events — the roster is refreshed by the create flow itself', async () => {
+      await dispatch({
+        key: 'character-create-test-campaign-stranger.json',
+        data: { name: 'Stranger', level: 1 },
+      });
+      await flushEffects();
+
+      expect(screen.queryByTestId('char-btn-Stranger')).not.toBeInTheDocument();
+      expect(screen.getByTestId('char-btn-Aragorn')).toBeInTheDocument();
+    });
+
+    it('mirrors pipeline events into the runtime store with skipSync (never re-posting the SSE echo)', async () => {
+      const data = { total: 14, critical: false };
+
+      await dispatch({ key: 'pipeline-test-campaign-damage:rolled', data });
+
+      expect(setRuntimeObject).toHaveBeenCalledWith('damage:rolled', data, 'test-campaign', true);
+    });
+
+    it('applies character-scoped change events to the character store with skipSync', async () => {
+      const data = { hp: { current: 7, max: 12 } };
+
+      await dispatch({ key: 'change-test-campaign-Aragorn', data });
+
+      expect(writesFor('Aragorn')).toEqual([['Aragorn', data, 'test-campaign', true]]);
+    });
+
+    it('routes campaign-scoped change events into the campaign store and wakes its listeners', async () => {
+      const campaignStore = new Map();
+      getStore.mockImplementation(() => campaignStore);
+
+      const data = [{ target: 'Goblin', effect: 'bless' }];
+      await dispatch({ key: 'change-test-campaign-targetEffects', data });
+
+      expect(campaignStore.get('targetEffects')).toEqual(data);
+      expect(notify).toHaveBeenCalledWith('campaign');
+      expect(writesFor('targetEffects')).toHaveLength(0);
+    });
+
+    it('suppresses character-store writes while a bardic-inspiration prompt is pending, resuming once cleared', async () => {
+      await dispatch({
+        key: 'change-test-campaign-Aragorn',
+        data: { biPrompt: { promptId: 'bi-1' } },
+      });
+      expect(writesFor('Aragorn')).toHaveLength(0);
+
+      // The cleared signal itself is swallowed too — only the gate moves.
+      await dispatch({
+        key: 'change-test-campaign-Aragorn',
+        data: { biPromptCleared: true },
+      });
+      expect(writesFor('Aragorn')).toHaveLength(0);
+
+      // Normal traffic resumes after the prompt window.
+      await dispatch({ key: 'change-test-campaign-Aragorn', data: { hp: 12 } });
+      expect(writesFor('Aragorn')).toEqual([['Aragorn', { hp: 12 }, 'test-campaign', true]]);
+    });
+
+    it.each([
+      ['null key', { key: null, data: { hp: 1 } }],
+      ['null data', { key: 'change-test-campaign-Aragorn', data: null }],
+      ['non-object data', { key: 'change-test-campaign-Aragorn', data: 'corrupt' }],
+      ['another campaign pipeline key', { key: 'pipeline-other-campaign-damage:rolled', data: { total: 1 } }],
+    ])('ignores runtime events with %s without crashing or touching state', async (_label, event) => {
+      const campaignStore = new Map();
+      getStore.mockImplementation(() => campaignStore);
+
+      await dispatch(event);
+      await flushEffects();
+
+      expect(writesFor('Aragorn')).toHaveLength(0);
+      expect(writesFor('damage:rolled')).toHaveLength(0);
+      expect(campaignStore.size).toBe(0);
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      expect(screen.getByTestId('sidebar')).toBeInTheDocument();
+    });
+  });
+
+  // Roster removal contract with a display name whose file name is sanitized
+  // differently (space → underscore). Own describe: renders its own roster.
+  describe('SSE character-delete file name matching', () => {
+    it('matches delete file names by underscore sanitization of the display name', async () => {
+      await renderInCampaign([{ name: 'Sir Basil', level: 4 }, { name: 'Legolas', level: 2 }]);
+
+      await dispatch({
+        key: 'character-delete-other-folder-Sir_Basil.json',
+        data: { file: 'Sir_Basil.json' },
       });
 
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('char-btn-Gimli'));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('character-name').textContent).toBe('Gimli');
-      });
+      expect(screen.queryByTestId('char-btn-Sir Basil')).not.toBeInTheDocument();
+      expect(screen.getByTestId('char-btn-Legolas')).toBeInTheDocument();
     });
   });
 });

@@ -128,7 +128,7 @@ export const MockMapsManager = vi.fn(({ campaignName, onOpenMap, onBack }) => (
   </div>
 ));
 
-export const MockMap = vi.fn(({ mapName, campaignName, characters, npcs, isLocalhost, onBack }) => (
+export const MockMap = vi.fn(({ mapName, campaignName, characters, npcs, isLocalhost, onBack, onPoiEntered }) => (
   <div data-testid="map-view">
     <span data-testid="map-name">{mapName}</span>
     <span data-testid="map-campaign">{campaignName}</span>
@@ -136,6 +136,7 @@ export const MockMap = vi.fn(({ mapName, campaignName, characters, npcs, isLocal
     <span data-testid="map-npc-count">{npcs?.length || 0}</span>
     <span data-testid="map-localhost">{String(isLocalhost)}</span>
     <button data-testid="map-back-btn" onClick={onBack}>Back from Map</button>
+    <button data-testid="map-enter-poi-btn" onClick={() => onPoiEntered?.('inner-cave')}>Enter POI</button>
   </div>
 ));
 

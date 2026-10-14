@@ -9,7 +9,11 @@ export default function AllySelectionModal({
     onConfirm,
     onCancel,
 }) {
-    const [selected, setSelected] = useState(currentAllies || []);
+    // currentAllies is trusted-ish display state, but filter to known names
+    // so stale entries never inflate the count or leak into onConfirm.
+    const [selected, setSelected] = useState(() =>
+        (currentAllies || []).filter(name => creatures.some(c => c.name === name))
+    );
 
     const toggleCreature = (name) => {
         setSelected(prev =>
@@ -63,7 +67,6 @@ export default function AllySelectionModal({
                                 <label
                                     key={i}
                                     className={`secondary-target-row ${isSelected ? 'secondary-target-selected' : ''}`}
-                                    onClick={() => toggleCreature(name)}
                                 >
                                     <input
                                         type="checkbox"

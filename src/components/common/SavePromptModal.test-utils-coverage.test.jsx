@@ -1,68 +1,115 @@
-// SavePromptModal — test-utils exported utility verification
-// Tests the createMockSubscriber factory and fixture functions.
-// These utilities are shared across all SavePromptModal test files.
+// @improved-by-ai
+// SavePromptModal — shared test-utility contract.
+// These fixtures and harness defaults feed EVERY SavePromptModal test lane
+// (rendering / bonuses / actions / rolling / rerolls / evasion). This file
+// pins the *contract* they owe the production code — verified by running the
+// real, unmocked ability-save lookup against the fixtures — so fixture drift
+// is pinpointed here instead of corrupting roll math elsewhere.
 //
-// Cleanup: Removed 14 redundant/brittle/low-value tests (19 → 5):
-//   - Entire "createMockSubscriber integration" describe block (5 tests):
-//     All test SavePromptModal rendering, already covered in rendering.test.jsx
-//   - 3 createCharacter custom-param tests: consolidated into 1 test
-//   - 1 createRageCharacter custom-rage test: consolidated into structure test
-//   - setupDefaults/cleanupDefaults tests: low-value, test test-utility internals
-//   - setupGlobalEventSource/teardownGlobalEventSource tests: trivial setup/teardown
-//   - 2 createMockSubscriber event-dispatch tests: brittle, test internal event key format
+// Removed in this pass (and why):
+//   - createMockSubscriber test: the factory was dead code (every lane mocks
+//     ./Subscriber.jsx inline with its own triggers; nothing imported the
+//     factory). Asserting that a mock renders its own hardcoded testids is a
+//     tautology with zero signal, so the factory was deleted from
+//     SavePromptModal.test-utils.jsx along with this test.
+//   - Object-shape assertions restating the fixture literals: replaced by
+//     behavior through the real getAbilitySaveBonus lookup, including
+//     negative paths (unlisted abilities read 0, empty evasion/modifier
+//     lists keep aura-sharing and Indomitable lanes closed).
+//   - The rage fixture's reroll bonus is already verified end-to-end in
+//     .rerolls.test.jsx; only the read-contract is pinned here.
 
 import { describe, it, expect, vi } from 'vitest';
-import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { createCharacter, createRageCharacter, createMockSubscriber } from './SavePromptModal.test-utils.jsx';
+import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
+import {
+  createCharacter,
+  createRageCharacter,
+  setupDefaults,
+  cleanupDefaults,
+} from './SavePromptModal.test-utils.jsx';
 
-describe('SavePromptModal — test-utils exported functions', () => {
-  it('createCharacter returns expected structure with all defaults', () => {
+describe('createCharacter — contract with the modal save-bonus lookup', () => {
+  it('resolves a distinct expected bonus for each of the six save types', () => {
     const char = createCharacter('TestChar');
-    expect(char.name).toBe('TestChar');
-    expect(char.saveModifiers).toEqual([]);
-    expect(char.computedStats.evasionEffects).toEqual([]);
-    expect(char.computedStats.abilities).toHaveLength(6);
-    expect(char.computedStats.abilities[0].name).toBe('Strength');
-    expect(char.computedStats.abilities[0].bonus).toBe(2);
+
+    // SavePromptModal reads bonuses via getAbilitySaveBonus(computedStats, abbr).
+    // Distinct per-ability values prove the lookup actually discriminates —
+    // a fixture rename or shape drift breaks here, not silently in roll math.
+    expect(getAbilitySaveBonus(char.computedStats, 'str')).toBe(2);
+    expect(getAbilitySaveBonus(char.computedStats, 'dex')).toBe(1);
+    expect(getAbilitySaveBonus(char.computedStats, 'con')).toBe(3);
+    expect(getAbilitySaveBonus(char.computedStats, 'int')).toBe(0);
+    expect(getAbilitySaveBonus(char.computedStats, 'wis')).toBe(1);
+    expect(getAbilitySaveBonus(char.computedStats, 'cha')).toBe(4);
   });
 
-  it('createCharacter accepts custom saveModifiers, evasionEffects, and abilities', () => {
-    const mods = [{ target: 'saving_throw', effect: 'advantage' }];
-    const evasions = [{ saveType: 'DEX', shareable: true }];
-    const abils = [{ name: 'Strength', bonus: 5 }];
-    const char = createCharacter('TestChar', mods, evasions, abils);
+  it('honours custom abilities passed through the same lookup, unlisted reading 0', () => {
+    const char = createCharacter('TestChar', undefined, undefined, [
+      { name: 'Dexterity', bonus: 5 },
+    ]);
+
+    expect(getAbilitySaveBonus(char.computedStats, 'dex')).toBe(5);
+    // Overrides REPLACE the defaults — an unlisted ability must read 0,
+    // never fall back to the default score (lanes rely on this separation).
+    expect(getAbilitySaveBonus(char.computedStats, 'str')).toBe(0);
+  });
+
+  it('defaults modifier and evasion lists so aura-sharing lanes stay closed', () => {
+    const char = createCharacter('TestChar');
+
+    // hasShareableEvasionFor / modifierListGrantsAdvantage iterate these
+    // lists — undefined would throw, so empties (not undefined) are the
+    // contract the component depends on.
+    expect(char.saveModifiers).toEqual([]);
+    expect(char.computedStats.evasionEffects).toEqual([]);
+  });
+
+  it('routes custom saveModifiers and evasionEffects to their consumption sites', () => {
+    const mods = [{ target: 'saving_throw', effect: 'advantage', condition: 'charmed' }];
+    const evasions = [{ saveType: 'DEX', shareable: true, shareRange: 10 }];
+    const char = createCharacter('TestChar', mods, evasions);
+
     expect(char.saveModifiers).toEqual(mods);
     expect(char.computedStats.evasionEffects).toEqual(evasions);
-    expect(char.computedStats.abilities).toEqual(abils);
-  });
-
-  it('createCharacter abilities default has 6 ability scores in standard order', () => {
-    const char = createCharacter('TestChar');
-    const names = char.computedStats.abilities.map(a => a.name);
-    expect(names).toEqual(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']);
-  });
-
-  it('createRageCharacter returns expected structure with custom rage damage', () => {
-    const char = createRageCharacter('Rager', 6);
-    expect(char.name).toBe('Rager');
-    expect(char.level).toBe(1);
-    expect(char.class.class_levels).toEqual([{ rage_damage: 6 }]);
-    expect(char.computedStats.abilities).toEqual([{ name: 'Constitution', bonus: 3 }]);
-    expect(char.computedStats.evasionEffects).toEqual([]);
-    expect(char.computedStats.automation).toEqual({ passives: [] });
-    expect(char.saveModifiers).toEqual([]);
-  });
-
-  it('createMockSubscriber returns a React component that renders trigger buttons', () => {
-    const MockSubscriber = createMockSubscriber('my-campaign');
-    render(React.createElement(MockSubscriber, { handleEvent: vi.fn() }));
-    expect(screen.getByTestId('subscriber-trigger')).toBeInTheDocument();
-    expect(screen.getByTestId('subscriber-trigger-second')).toBeInTheDocument();
-    expect(screen.getByTestId('subscriber-trigger-cleared')).toBeInTheDocument();
-    expect(screen.getByTestId('subscriber-trigger-disadvantage')).toBeInTheDocument();
-    expect(screen.getByTestId('subscriber-trigger-dex')).toBeInTheDocument();
-    expect(screen.getByTestId('subscriber-trigger-none-dc')).toBeInTheDocument();
+    // An unknown character in the same roster keeps neutral defaults.
+    const untouched = createCharacter('OtherChar');
+    expect(untouched.saveModifiers).toEqual([]);
   });
 });
 
+describe('createRageCharacter — contract with reroll-lane reads', () => {
+  it('supplies the values the modal reads for rage reroll bonuses', () => {
+    const char = createRageCharacter('Rager', 6);
+
+    // SavePromptModal resolves the reroll bonus as
+    // class.class_levels[(level || 1) - 1].rage_damage — pin the access
+    // path, not the literal shape.
+    expect(char.class.class_levels[(char.level || 1) - 1].rage_damage).toBe(6);
+    expect(getAbilitySaveBonus(char.computedStats, 'con')).toBe(3);
+    // Empty saveModifiers keeps the Indomitable lane switched off in reroll
+    // suites that reuse this fixture.
+    expect(char.saveModifiers).toEqual([]);
+  });
+});
+
+describe('setupDefaults/cleanupDefaults — shared harness defaults', () => {
+  it('resets consumer mocks to deterministic suite-wide defaults and provides an EventSource', async () => {
+    // Stale-behaving mocks going in: setupDefaults must fully override both
+    // return values and call history, which every lane's assertions assume.
+    const rollD20 = vi.fn(() => 99);
+    const computeAuraBonus = vi.fn(() => Promise.resolve({ bonus: 7, sourceName: 'Stale' }));
+    const getRuntimeValue = vi.fn(() => 'stale');
+
+    setupDefaults(rollD20, computeAuraBonus, getRuntimeValue);
+
+    expect(rollD20()).toBe(15);
+    await expect(computeAuraBonus()).resolves.toEqual({ bonus: 0, sourceName: null });
+    expect(getRuntimeValue('anyTarget', 'anyKey', 'test-campaign')).toBeNull();
+    // jsdom lacks EventSource; the global installed here keeps SSE-connecting
+    // components renderable.
+    expect(() => new EventSource('/subscribe')).not.toThrow();
+
+    cleanupDefaults();
+    expect(globalThis.EventSource).toBeUndefined();
+  });
+});

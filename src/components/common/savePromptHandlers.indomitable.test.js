@@ -1,5 +1,10 @@
-// CLA-195 regression: createIndomitableHandler must consume a use
-// (indomitableUses), submit the reroll with the +fighter level bonus, and log.
+// @improved-by-ai
+// CLA-195 regression: createIndomitableHandler must consume exactly one use
+// (indomitableUses), submit the reroll with the +fighter level bonus threaded
+// through the full save pipeline (save bonus + aura + Indomitable bonus), and
+// log each use to the campaign log. Also pins the reroll submit contract for
+// Indomitable: pass/fail honesty, disadvantage path, and the unavailable /
+// at-max / no-prompt guards.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { createIndomitableHandler } from './savePromptHandlers.js';
@@ -39,7 +44,14 @@ vi.mock('./savePromptUtils.js', () => ({
   getSaveDisadvantage: vi.fn(() => false),
 }));
 
-const current = {
+const CAMPAIGN = 'test-campaign';
+const FIGHTER = { name: 'EvasiveFighter', level: 18, computedStats: { level: 18 } };
+const REROLL_BONUS = 18; // fighter level bonus for Indomitable
+
+// WIS save DC 13. Low natural rolls fail on the die alone — only the
+// threaded bonuses can flip them to a success, discriminating "bonus
+// applied" from "raw d20 + 0".
+const basePrompt = {
   promptId: 'p1',
   targetName: 'EvasiveFighter',
   saveType: 'WIS',
@@ -51,6 +63,25 @@ const current = {
   sourceName: 'Gust of Wind',
 };
 
+function makeIndomitable(overrides = {}) {
+  const submitSaveResult = vi.fn();
+  const setRerollUsedForSave = vi.fn();
+  const handler = createIndomitableHandler({
+    campaignName: CAMPAIGN,
+    characters: [FIGHTER],
+    activeMapName: null,
+    current: basePrompt,
+    indomitableAvailable: true,
+    currentUses: 0,
+    maxUses: 3,
+    rerollBonus: REROLL_BONUS,
+    submitSaveResult,
+    setRerollUsedForSave,
+    ...overrides,
+  });
+  return { handler, submitSaveResult, setRerollUsedForSave };
+}
+
 describe('createIndomitableHandler (CLA-195)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -60,72 +91,164 @@ describe('createIndomitableHandler (CLA-195)', () => {
     getSaveDisadvantage.mockReturnValue(false);
   });
 
-  it('consumes a use, submits success with +fighter level bonus, and logs', async () => {
-    const submitSaveResult = vi.fn();
-    const setRerollUsedForSave = vi.fn();
-    const handler = createIndomitableHandler({
-      campaignName: 'test-campaign',
-      characters: [{ name: 'EvasiveFighter', level: 18, computedStats: { level: 18 } }],
-      activeMapName: null,
-      current,
-      indomitableAvailable: true,
-      currentUses: 0,
-      maxUses: 3,
-      rerollBonus: 18,
-      setRerollUsedForSave,
-      submitSaveResult,
-    });
-
+  it('consumes exactly one use and locks the reroll UI', async () => {
+    const { handler, submitSaveResult, setRerollUsedForSave } = makeIndomitable({ currentUses: 1 });
     await handler();
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'indomitableUses', 1, 'test-campaign');
+    expect(setRerollUsedForSave).toHaveBeenCalledWith(true);
+    // 1 → 2: derived from currentUses, not a hardcoded constant
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'indomitableUses', 2, CAMPAIGN);
+    expect(submitSaveResult).toHaveBeenCalledTimes(1);
+  });
+
+  it('submits the reroll with save bonus, aura, and +fighter level bonus all applied', async () => {
+    // Arg-aware mocks: bonuses are only earned when doReroll threads the
+    // genuine character stats, campaign, and map. Any dropped arg drops the
+    // total below DC 13 and flips success — verified by the outcome.
+    getAbilitySaveBonus.mockImplementation((stats, saveType) => (
+      stats === FIGHTER.computedStats && saveType === 'WIS' ? 5 : 0
+    ));
+    computeAuraBonus.mockImplementation(async ({ campaignName, targetName, characters }) => (
+      campaignName === CAMPAIGN && targetName === 'EvasiveFighter'
+        && Array.isArray(characters) && characters.some(c => c.name === 'EvasiveFighter')
+        ? { bonus: 2, sourceName: 'Guardian Aura' }
+        : { bonus: 0, sourceName: null }
+    ));
+    rollD20.mockReturnValue(1); // 1 + 5 save + 2 aura + 18 Indomitable = 26 ≥ 13
+    const { handler, submitSaveResult } = makeIndomitable();
+    await handler();
+
     expect(submitSaveResult).toHaveBeenCalledWith(expect.objectContaining({
       promptId: 'p1',
       targetName: 'EvasiveFighter',
+      roll: 1,
+      total: 26,
+      saveBonus: 25,
       success: true,
-      total: 38,
-      saveBonus: 23,
+      rawRolls: [1, 1],
+      mode: 'normal',
       bonusDetail: '(+18 Indomitable)',
       note: 'indomitable_reroll',
+      saveType: 'WIS',
+      saveDc: 13,
+      damageFormula: '2d6',
+      damageType: 'Lightning',
+      rawDamage: 10,
+      dcSuccess: 'half',
+      sourceName: 'Gust of Wind',
+      healingName: 'Indomitable',
+      healingNote: 'indomitable_hp_restore',
     }));
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+  });
+
+  it('submits a failed reroll honestly but still consumes the use and logs', async () => {
+    // Force a fail: with rerollBonus 0, 1 + 5 save + 0 aura = 6 < DC 13.
+    rollD20.mockReturnValue(1);
+    const { handler, submitSaveResult } = makeIndomitable({ rerollBonus: 0 });
+    await handler();
+
+    expect(submitSaveResult).toHaveBeenCalledWith(expect.objectContaining({
+      success: false,
+      roll: 1,
+      total: 6,
+      note: 'indomitable_reroll',
+    }));
+    // A wasted reroll still spends the use...
+    expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'indomitableUses', 1, CAMPAIGN);
+    // ...and still reaches the campaign log.
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
       type: 'ability_use',
+      characterName: 'EvasiveFighter',
       abilityName: 'Indomitable',
     }));
   });
 
-  it('does nothing when unavailable or at max uses', async () => {
-    const submitSaveResult = vi.fn();
-    const atMax = createIndomitableHandler({
-      campaignName: 'test-campaign',
-      characters: [],
-      activeMapName: null,
-      current,
-      indomitableAvailable: false,
-      currentUses: 3,
-      maxUses: 3,
-      rerollBonus: 18,
-      setRerollUsedForSave: vi.fn(),
-      submitSaveResult,
-    });
-    await atMax();
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-    expect(submitSaveResult).not.toHaveBeenCalled();
+  it('rolls twice and keeps the lower die when the save has disadvantage', async () => {
+    getSaveDisadvantage.mockReturnValue(true);
+    rollD20.mockReturnValueOnce(15).mockReturnValueOnce(7);
+    const { handler, submitSaveResult } = makeIndomitable();
+    await handler();
 
-    const overMax = createIndomitableHandler({
-      campaignName: 'test-campaign',
-      characters: [],
-      activeMapName: null,
-      current,
-      indomitableAvailable: true,
-      currentUses: 3,
-      maxUses: 3,
-      rerollBonus: 18,
-      setRerollUsedForSave: vi.fn(),
-      submitSaveResult,
+    expect(rollD20).toHaveBeenCalledTimes(2);
+    expect(submitSaveResult).toHaveBeenCalledWith(expect.objectContaining({
+      roll: 7,
+      rawRolls: [15, 7],
+      mode: 'disadvantage',
+      total: 30, // 7 + 5 save + 0 aura + 18 Indomitable
+      success: true,
+    }));
+  });
+
+  it('logs each use with the running total and bonus in the description', async () => {
+    const { handler } = makeIndomitable({ currentUses: 1, maxUses: 3 });
+    await handler();
+
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    const [campaign, entry] = addEntry.mock.calls[0];
+    expect(campaign).toBe(CAMPAIGN);
+    expect(entry).toMatchObject({
+      type: 'ability_use',
+      characterName: 'EvasiveFighter',
+      abilityName: 'Indomitable',
     });
-    await overMax();
+    expect(entry.description).toContain('EvasiveFighter');
+    expect(entry.description).toContain('WIS');
+    expect(entry.description).toContain('18');
+    expect(entry.description).toContain('2/3'); // uses consumed after this one
+    expect(typeof entry.timestamp).toBe('number');
+  });
+
+  it('treats a missing maxUses as one use per rest', async () => {
+    const { handler, submitSaveResult } = makeIndomitable({ maxUses: 0 });
+    await handler();
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'indomitableUses', 1, CAMPAIGN);
+    expect(submitSaveResult).toHaveBeenCalledTimes(1);
+
+    const atOne = makeIndomitable({ maxUses: 0, currentUses: 1 });
+    await atOne.handler();
+
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1); // not consumed a second time
+    expect(atOne.submitSaveResult).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when the feature is unavailable', async () => {
+    const { handler, submitSaveResult, setRerollUsedForSave } =
+      makeIndomitable({ indomitableAvailable: false, currentUses: 0 });
+    await handler();
+
+    expect(setRerollUsedForSave).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(rollD20).not.toHaveBeenCalled();
+    expect(submitSaveResult).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when at or over max uses — never consumes or submits', async () => {
+    const atMax = makeIndomitable({ currentUses: 3, maxUses: 3 });
+    await atMax.handler();
+
+    expect(atMax.submitSaveResult).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+
+    const overMax = makeIndomitable({ currentUses: 5, maxUses: 3 });
+    await overMax.handler();
+
+    expect(overMax.submitSaveResult).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when there is no active save prompt', async () => {
+    const { handler, submitSaveResult, setRerollUsedForSave } =
+      makeIndomitable({ current: null });
+    await handler();
+
+    expect(setRerollUsedForSave).not.toHaveBeenCalled();
     expect(setRuntimeValue).not.toHaveBeenCalled();
     expect(submitSaveResult).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
   });
 });

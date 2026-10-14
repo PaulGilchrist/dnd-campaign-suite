@@ -1,10 +1,31 @@
-  // SavePromptModal — Special Handlers (Bane on attacker, HP restoration, CombatSummary, Storage)
-  //
-  // Cleanup: Consolidated 2 redundant lastAttack storage tests into 1:
-  //   - "updates combatSummary lastAttack when submitSaveResult is called with combatSummary" was
-  //     a near-duplicate of "stores lastAttack when rolling a save with combatSummary present" —
-  //     both test the same storage.set('lastAttack', ...) code path with different triggers but
-  //     identical assertion shapes. Merged into a single test that verifies the core behavior.
+// @improved-by-ai
+/**
+ * SavePromptModal — bane attribution & lastAttack/combatSummary persistence.
+ *
+ * Owned HERE:
+ * - Attacker-side bane_penalty die attribution (the "+N [Bane]" token the
+ *   target-side lane in bonuses.test.jsx never produces), including proving
+ *   attribution by distinct effect-die values in production roll order.
+ * - Quick-roll lastAttack persistence (storage.set('lastAttack', …)) with the
+ *   full arithmetic payload, MA-0079 saveConditions stamping from the prompt
+ *   payload, and the negative path: no combatSummary → nothing persisted.
+ * - Reroll submit → combatSummary.lastAttack restamped via
+ *   storage.set('combatSummary', …) while non-dice fields merge in.
+ *
+ * Covered ELSEWHERE — do not re-add here:
+ * - Target bane/bless dice, Warding Bond, aura, stacking . bonuses.test.jsx
+ * - 2024 Dodge ruleset gate ................ dodge-2024.test.jsx
+ * - Beacon of Hope / cosmic omen / evasion  evasion-effects.test.jsx
+ * - Zealous Presence ........................ zealous-presence.test.jsx
+ * - Holy Aura / Holy Nimbus ............... holy-aura.test.jsx
+ * - Conditional frightened/charmed ........ cla034-conditional-save-advantage.test.jsx
+ * - Prompt copy (half/none/full notes) .... rendering.test.jsx / infernal-wound.test.jsx
+ * - Reroll submit HP restore & wound close  infernal-wound.test.jsx
+ * - Reroll availability/resources ......... rerolls.test.jsx, savePromptHandlers.*.test.js
+ *
+ * History: two near-duplicate quick-roll storage tests were previously
+ * consolidated into one (identical storage.set('lastAttack') assertion shape).
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -14,7 +35,10 @@ import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.j
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import storage from '../../services/ui/storage.js';
-import { setupDefaults, cleanupDefaults } from './SavePromptModal.test-utils.jsx';
+import { setupDefaults, cleanupDefaults, createRageCharacter, createCharacter } from './SavePromptModal.test-utils.jsx';
+
+const CAMPAIGN = 'test-campaign';
+const TARGET = 'testTarget';
 
 // ── Mocks ──
 
@@ -77,142 +101,226 @@ vi.mock('../../services/automation/handlers/buffs/circleOfPowerHandler.js', asyn
   };
 });
 
+// Only the triggers this file exercises; other lanes have their own files.
+// - base: plain CON save DC 12 (quick-roll persistence)
+// - attacker: CON save DC 12 with attackerName (attacker-side bane lane)
+// - rawdamage: CON save DC 12, rawDamage 10, dcSuccess 'half' (reroll →
+//   combatSummary restamp lane)
+// - saveconditions: STR save DC 19, saveConditions ['prone'] (MA-0079)
 vi.mock('./Subscriber.jsx', () => {
   function MockSubscriber({ handleEvent, campaignName }) {
-    return React.createElement(
-      'div',
-      { 'data-testid': 'subscriber', 'data-campaign': campaignName },
-      React.createElement('button', { 'data-testid': 'subscriber-trigger', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget`, data: { promptId: 'test-prompt-1', targetName: 'testTarget', saveType: 'con', saveDc: 12, disadvantage: false } }) }),
-      React.createElement('button', { 'data-testid': 'subscriber-trigger-second', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget2`, data: { promptId: 'test-prompt-2', targetName: 'testTarget2', saveType: 'dex', saveDc: 15, disadvantage: true, dcSuccess: 'half' } }) }),
-      React.createElement('button', { 'data-testid': 'subscriber-trigger-cleared', onClick: () => handleEvent({ key: `change-${campaignName}-savePromptCleared-testTarget`, data: { promptId: 'test-prompt-1' } }) }),
-      React.createElement('button', { 'data-testid': 'subscriber-trigger-disadvantage', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget3`, data: { promptId: 'test-prompt-disadv', targetName: 'testTarget3', saveType: 'str', saveDc: 14, disadvantage: true, dcSuccess: 'half', sourceName: 'Fireball' } }) }),
-      React.createElement('button', { 'data-testid': 'subscriber-trigger-dex', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget`, data: { promptId: 'test-prompt-dex', targetName: 'testTarget', saveType: 'dex', saveDc: 17, disadvantage: false, dcSuccess: 'half', sourceName: 'Sacred Flame' } }) }),
-      React.createElement('button', { 'data-testid': 'subscriber-trigger-none-dc', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget4`, data: { promptId: 'test-prompt-none', targetName: 'testTarget4', saveType: 'wis', saveDc: 16, disadvantage: false, dcSuccess: 'none' } }) }),
-      React.createElement('button', { 'data-testid': 'subscriber-trigger-wis', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget`, data: { promptId: 'test-prompt-wis', targetName: 'testTarget', saveType: 'WIS', saveDc: 13, disadvantage: false, dcSuccess: 'half' } }) }),
-      React.createElement('button', { 'data-testid': 'subscriber-trigger-attacker', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget`, data: { promptId: 'test-prompt-attacker', targetName: 'testTarget', saveType: 'con', saveDc: 12, disadvantage: false, attackerName: 'testAttacker' } }) }),
-      React.createElement('button', { 'data-testid': 'subscriber-trigger-rawdamage', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget`, data: { promptId: 'test-prompt-rd', targetName: 'testTarget', saveType: 'con', saveDc: 12, disadvantage: false, rawDamage: 10, dcSuccess: 'half' } }) }),
-      React.createElement('button', { 'data-testid': 'subscriber-trigger-rawdamage-none', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget`, data: { promptId: 'test-prompt-rd-none', targetName: 'testTarget', saveType: 'con', saveDc: 12, disadvantage: false, rawDamage: 10, dcSuccess: 'none' } }) }),
-      React.createElement('button', { 'data-testid': 'subscriber-trigger-rawdamage-reroll', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget`, data: { promptId: 'test-prompt-rd-reroll', targetName: 'testTarget', saveType: 'con', saveDc: 12, disadvantage: false, rawDamage: 10, dcSuccess: 'half' } }) }),
-      React.createElement('button', { 'data-testid': 'subscriber-trigger-saveconditions', onClick: () => handleEvent({ key: `change-${campaignName}-savePrompt-testTarget5`, data: { promptId: 'test-prompt-saveconditions', targetName: 'testTarget5', saveType: 'str', saveDc: 19, disadvantage: false, dcSuccess: 'none', sourceName: 'Adult Bronze Dragon 1', rawDamage: 0, saveConditions: ['prone'] } }) }),
+    const fire = (key, data) => () => handleEvent({ key: `change-${campaignName}-${key}`, data });
+    const button = (testId, data) =>
+      React.createElement('button', { 'data-testid': testId, onClick: fire(`savePrompt-${data.targetName}`, data) });
+    return React.createElement('div', { 'data-testid': 'subscriber', 'data-campaign': campaignName },
+      button('subscriber-trigger', { promptId: 'test-prompt-1', targetName: TARGET, saveType: 'con', saveDc: 12, disadvantage: false }),
+      button('subscriber-trigger-attacker', { promptId: 'test-prompt-attacker', targetName: TARGET, saveType: 'con', saveDc: 12, disadvantage: false, attackerName: 'testAttacker' }),
+      button('subscriber-trigger-rawdamage', { promptId: 'test-prompt-rd', targetName: TARGET, saveType: 'con', saveDc: 12, disadvantage: false, rawDamage: 10, dcSuccess: 'half', sourceName: 'Fireball' }),
+      button('subscriber-trigger-saveconditions', { promptId: 'test-prompt-saveconditions', targetName: 'testTarget5', saveType: 'str', saveDc: 19, disadvantage: false, dcSuccess: 'none', sourceName: 'Adult Bronze Dragon 1', rawDamage: 0, saveConditions: ['prone'] }),
     );
   }
   return { default: MockSubscriber };
 });
 
+// ── Helpers ──
+
+function renderModal(characters = []) {
+  render(
+    <SavePromptModal
+      campaignName={CAMPAIGN}
+      characters={characters}
+      activeMapName={null}
+    />
+  );
+}
+
+async function triggerPrompt(testId = 'subscriber-trigger') {
+  fireEvent.click(screen.getByTestId(testId));
+  await waitFor(() => {
+    expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+  });
+}
+
+/** Click Roll Save, wait for the result panel, return its visible totals. */
+async function rollSave() {
+  fireEvent.click(screen.getByRole('button', { name: 'Roll Save' }));
+  await waitFor(() => {
+    expect(document.querySelector('.sp-result-total strong')).toBeTruthy();
+  });
+  return {
+    total: document.querySelector('.sp-result-total strong').textContent,
+    breakdown: document.querySelector('.sp-result-breakdown').textContent,
+  };
+}
+
+/** Route only campaign-level targetEffects through; everything else reads null. */
+function mockCampaignTargetEffects(effects) {
+  getRuntimeValue.mockImplementation((name, key) =>
+    name === 'campaign' && key === 'targetEffects' ? effects : null
+  );
+}
+
+/** The lastAttack payload persisted under the given storage key, or undefined. */
+function persisted(key) {
+  const call = vi.mocked(storage.set).mock.calls.find(([k]) => k === key);
+  return call?.[1];
+}
+
 describe('SavePromptModal — Special Handlers', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // setupDefaults clears all mocks and sets neutral defaults:
+    // rollD20→15, computeAuraBonus→{bonus:0}, getRuntimeValue→null.
     setupDefaults(rollD20, computeAuraBonus, getRuntimeValue);
+    // clearAllMocks does not drop implementations — reset the effect-die mock
+    // explicitly so per-test Once/ReturnValue stubs never leak across tests.
+    vi.mocked(rollExpression).mockReset();
+    vi.mocked(getCombatSummary).mockReset().mockReturnValue({ creatures: [] });
   });
   afterEach(cleanupDefaults);
 
-  // ── Bane on attacker ──
+  // ── Attacker-side bane attribution ──
 
-  it('applies bane attacker bonus when attacker has bane_penalty', async () => {
-    rollD20.mockReturnValue(15);
-    getRuntimeValue.mockImplementation((name, key, _campaign) => {
-      if (name === 'campaign' && key === 'targetEffects') return [
-        { target: 'testTarget', effect: 'bane_penalty' },
-        { target: 'testTarget', effect: 'bless_bonus' },
-        { target: 'testTarget', effect: 'warding_bond', saveBonus: 1 },
-        { target: 'testAttacker', effect: 'bane_penalty' },
-      ];
-      return null;
-    });
-    vi.mocked(rollExpression).mockReturnValue({ total: 3 });
+  it('folds the attacker bane die into the total as a positive bonus, distinct from target bane and bless', async () => {
+    mockCampaignTargetEffects([
+      { target: TARGET, effect: 'bane_penalty' },
+      { target: 'testAttacker', effect: 'bane_penalty' },
+      { target: TARGET, effect: 'bless_bonus' },
+    ]);
+    // Effect dice roll in production order: target bane, attacker bane, bless.
+    // Distinct values so each breakdown token is unambiguously attributable.
+    vi.mocked(rollExpression)
+      .mockReturnValueOnce({ total: 2 })
+      .mockReturnValueOnce({ total: 4 })
+      .mockReturnValueOnce({ total: 3 });
 
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
+    renderModal([createCharacter(TARGET)]);
+    await triggerPrompt('subscriber-trigger-attacker');
+    const { total, breakdown } = await rollSave();
 
-    const trigger = screen.getByTestId('subscriber-trigger-attacker');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-
-    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
-    fireEvent.click(rollBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Total:/i)).toBeInTheDocument();
-    });
-
-    expect(screen.getByText(/Bane/i)).toBeInTheDocument();
+    // 15 (d20) + 3 (ability) - 2 (target bane) + 4 (attacker bane) + 3 (bless)
+    expect(rollExpression).toHaveBeenCalledTimes(3);
+    expect(total).toBe('23');
+    expect(breakdown).toContain('-2 [Bane]');
+    expect(breakdown).toContain('+4 [Bane]');
+    expect(breakdown).toContain('+3 [Bless]');
+    expect(screen.getByText('SAVE SUCCESS')).toBeInTheDocument();
   });
 
-  // ── Storage: lastAttack with secondary formula ──
+  it('rolls an attacker bane die even when the target itself is not baned', async () => {
+    mockCampaignTargetEffects([{ target: 'testAttacker', effect: 'bane_penalty' }]);
+    vi.mocked(rollExpression).mockReturnValue({ total: 4 });
 
-  it('stores lastAttack when rolling a save with combatSummary present', async () => {
-    rollD20.mockReturnValue(15);
-    vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] });
+    renderModal([createCharacter(TARGET)]);
+    await triggerPrompt('subscriber-trigger-attacker');
+    const { total, breakdown } = await rollSave();
 
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
+    // Only one effect die (the attacker's) — no target bane or bless dice.
+    expect(rollExpression).toHaveBeenCalledTimes(1);
+    // 15 (d20) + 3 (ability) + 4 (attacker bane). A broken attacker lane
+    // would land on "d20 (15) + 3" with no Bane token at all.
+    expect(breakdown).toBe('d20 (15) + 7 +4 [Bane]');
+    expect(total).toBe('22');
+  });
 
-    const trigger = screen.getByTestId('subscriber-trigger');
-    fireEvent.click(trigger);
+  // ── Quick-roll lastAttack persistence ──
 
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
+  it('stores the full lastAttack payload when rolling a save with combatSummary present', async () => {
+    renderModal([createCharacter(TARGET)]);
+    await triggerPrompt();
+    const { total } = await rollSave();
 
-    const rollBtn = screen.getByRole('button', { name: 'Roll Save' });
-    fireEvent.click(rollBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Total:/i)).toBeInTheDocument();
-    });
-
+    expect(total).toBe('18');
     expect(storage.set).toHaveBeenCalledWith('lastAttack', expect.objectContaining({
       rollType: 'save',
+      // Prompt carries no attackerName — the target stands in for itself.
+      attackerName: TARGET,
+      targetName: TARGET,
+      d20: 15,
+      bonus: 3,
+      total: 18,
       saveType: 'con',
       saveDc: 12,
-    }), 'test-campaign');
+      saveResult: 'success',
+      saveConditions: [],
+    }), CAMPAIGN);
   });
 
   // MA-0079: quick-roll lastAttack keeps the saveConditions carried on the
   // AoE-prompt payload (Repulsion Breath) — previously always [].
   it('quick-roll lastAttack stamps saveConditions from the prompt payload', async () => {
     rollD20.mockReturnValue(11);
-    vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] });
 
-    render(
-      <SavePromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    );
+    renderModal([createCharacter('testTarget5')]);
+    await triggerPrompt('subscriber-trigger-saveconditions');
+    const { total } = await rollSave();
 
-    fireEvent.click(screen.getByTestId('subscriber-trigger-saveconditions'));
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-    });
-    expect(screen.queryByText(/Half damage on successful save/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/No damage on successful save/i)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Roll Save' }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Total:/i)).toBeInTheDocument();
-    });
-
+    // 11 + 3 (ability) = 14 < DC 19 — failed save, prone still recorded.
+    expect(total).toBe('14');
     expect(storage.set).toHaveBeenCalledWith('lastAttack', expect.objectContaining({
+      targetName: 'testTarget5',
       saveType: 'str',
       saveDc: 19,
+      saveResult: 'failure',
       saveConditions: ['prone'],
-    }), 'test-campaign');
+    }), CAMPAIGN);
+  });
+
+  it('does not persist lastAttack when no combatSummary exists', async () => {
+    vi.mocked(getCombatSummary).mockReturnValue(null);
+
+    renderModal([createCharacter(TARGET)]);
+    await triggerPrompt();
+    // The save itself still resolves normally...
+    const { total } = await rollSave();
+    expect(total).toBe('18');
+
+    // ...but with no combat in progress nothing is written to storage.
+    expect(storage.set).not.toHaveBeenCalled();
+  });
+
+  // ── Reroll submit → combatSummary.lastAttack restamp ──
+
+  it('reroll submit restamps combatSummary.lastAttack with the new dice and result, merging prior fields', async () => {
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (name === TARGET && key === 'activeBuffs') return [{ effect: 'rage', damageBonusExpression: 'rage_damage' }];
+      if (name === TARGET && key === 'fanaticalFocusUsed') return false;
+      if (name === TARGET && key === 'hitPoints') return 10;
+      if (name === TARGET && key === 'maxHitPoints') return 20;
+      return null;
+    });
+    vi.mocked(getCombatSummary).mockReturnValue({
+      creatures: [],
+      lastAttack: { attackerName: 'Fireball', targetName: TARGET, rollType: 'spell-save', rawDamage: 10 },
+    });
+    // Initial save fails (4 + 3 < DC 12); Fanatical Focus reroll succeeds
+    // (15 + 3 + 2 >= 12).
+    rollD20.mockReturnValueOnce(4).mockReturnValueOnce(15);
+
+    renderModal([createRageCharacter(TARGET, 2)]);
+    await triggerPrompt('subscriber-trigger-rawdamage');
+    const first = await rollSave();
+    // 4 + 3 = 7 < DC 12 — failed save offers the raging reroll lane.
+    expect(first.total).toBe('7');
+    expect(screen.getByText('SAVE FAILURE')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reroll Save (+2)' }));
+
+    await waitFor(() => {
+      expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.anything(), CAMPAIGN);
+    });
+    // The rerolled dice and result restamp the existing lastAttack record;
+    // non-dice fields (attackerName/rawDamage) merge in untouched.
+    expect(persisted('combatSummary').lastAttack).toEqual(expect.objectContaining({
+      d20: 15,
+      d20Rolls: [15, 15],
+      bonus: 5, // 3 (ability) + 2 (Fanatical Focus)
+      total: 20,
+      saveType: 'con',
+      saveDc: 12,
+      saveResult: 'success',
+      attackerName: 'Fireball',
+      targetName: TARGET,
+    }));
+    expect(screen.getByText('SAVE SUCCESS')).toBeInTheDocument();
   });
 });

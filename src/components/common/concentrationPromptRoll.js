@@ -95,7 +95,9 @@ export function resolveConcentrationRoll({ current, characters, campaignName, au
   const total = roll + saveBonus + auraBonus;
   const success = total >= current.dc;
   const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${auraSourceName ? ' from ' + auraSourceName : ''})` : undefined;
-  const mode = (hasAdvantage || hasDisadvantage) ? (hasAdvantage ? 'advantage' : 'disadvantage') : 'normal';
+  // RAW: advantage and disadvantage offset into a plain roll — mode must match
+  // the single die actually rolled (a lone die is never 'advantage'/'disadvantage').
+  const mode = hasAdvantage === hasDisadvantage ? 'normal' : (hasAdvantage ? 'advantage' : 'disadvantage');
   const disadvantageSource = (hasDisadvantage && teDisadvantage) ? (teDisadvantage.actionName || teDisadvantage.source) : null;
 
   return { saveBonus, roll, rawRolls, total, success, bonusDetail, mode, advantageSources, disadvantageSource };

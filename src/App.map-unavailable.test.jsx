@@ -1,14 +1,29 @@
-
+// @improved-by-ai
+/**
+ * App-level contract for the player "map unavailable" waiting placeholder.
+ *
+ * Production behavior under test (App.jsx → MapsAreaView → MapUnavailable):
+ *  - A player (non-localhost) who opens Maps with no active map sees a
+ *    friendly waiting placeholder — never an alert, never the maps manager,
+ *    whether the campaign has zero maps or only inactive ones.
+ *  - "Check Again" re-runs the active-map load for the CURRENT campaign
+ *    exactly once per click: it keeps the placeholder while no map is
+ *    active, and opens the map the moment the GM has activated one.
+ *  - A failed retry keeps the placeholder quietly (failure logged, no
+ *    alert) and stays retryable — the next click recovers.
+ *  - GM (localhost) always gets the maps manager listing, never the
+ *    placeholder.
+ *
+ * SSE map-activate auto-open is owned by App.map-activate.test.jsx and
+ * Maps-click routing / back navigation by App.map-navigation.test.jsx —
+ * deliberately not re-tested here.
+ */
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App.jsx';
 
 import { mockState, dataLoaderMocks } from './test/appTestState.js';
-
-// Test access to the SSE handler wired into the (mocked) app-level Subscriber
-const subscriberMock = vi.hoisted(() => ({
-  props: { handleEvent: null },
-}));
+import { loadMaps } from './services/maps/mapsService.js';
 
 // --- Core mocks (shared with other App test files) ---
 
@@ -121,16 +136,15 @@ vi.mock('./components/campaign-admin/CampaignAdmin.jsx', async () => {
   return { default: MockCampaignAdmin };
 });
 
+// Stub the SSE subscriber — this suite drives everything through UI clicks.
+// (SSE map-activate auto-open lives in App.map-activate.test.jsx.)
 vi.mock('./components/common/Subscriber.jsx', () => ({
-  default: ({ handleEvent }) => {
-    subscriberMock.props.handleEvent = handleEvent;
-    return null;
-  },
+  default: function MockSubscriber() { return null; },
 }));
 
 // --- Helpers ---
 
-function setLocalhost(hostname = 'localhost') {
+function setHostname(hostname) {
   Object.defineProperty(window, 'location', {
     value: { hostname, reload: vi.fn() },
     writable: true,
@@ -155,25 +169,35 @@ async function selectCampaign() {
   await flushEffects();
 }
 
-function dispatch(event) {
-  return act(async () => {
-    subscriberMock.props.handleEvent(event);
-    await flushEffects();
-  });
-}
-
-async function setupPlayerOnWaitingMapsView() {
-  setLocalhost('example.com');
-  const { loadMaps } = await import('./services/maps/mapsService.js');
-  loadMaps.mockResolvedValue({ maps: [{ fileName: 'battle-arena.json', isActive: false }] });
+// Enter the campaign and click "Maps" with the given maps listing.
+async function renderOnMapsView({ hostname, maps }) {
+  setHostname(hostname);
   mockState.characters = [{ name: 'Aragorn', level: 1 }];
+  loadMaps.mockResolvedValue({ maps });
   render(<App />);
   await selectCampaign();
   fireEvent.click(screen.getByTestId('maps-btn'));
+  await flushEffects();
+  return loadMaps;
+}
+
+async function renderPlayerOnWaitingMapsView(maps = [{ fileName: 'battle-arena.json', isActive: false }]) {
+  await renderOnMapsView({ hostname: 'example.com', maps });
   await waitFor(() => {
     expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
   });
   return loadMaps;
+}
+
+function clickCheckAgain() {
+  fireEvent.click(screen.getByRole('button', { name: 'Check Again' }));
+}
+
+function expectStillWaiting() {
+  expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
+  expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
+  expect(window.alert).not.toHaveBeenCalled();
 }
 
 // --- Test suite ---
@@ -181,7 +205,6 @@ async function setupPlayerOnWaitingMapsView() {
 describe('App - player map-unavailable waiting placeholder', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    subscriberMock.props.handleEvent = null;
 
     _appDataRef.value = {
       abilityScores: [{ full_name: 'Strength' }],
@@ -201,14 +224,16 @@ describe('App - player map-unavailable waiting placeholder', () => {
     mockState.campaignName = 'test-campaign';
     mockState.characters = [];
 
+    // Quiet, observable failure channel — the waiting flow must never alert.
     window.alert = vi.fn();
-    window.confirm = vi.fn(() => true);
-    window.prompt = vi.fn(() => 'New Campaign Name');
 
-    setLocalhost('localhost');
+    setHostname('localhost');
     global.fetch = vi.fn(() =>
       Promise.resolve({ ok: true, json: () => Promise.resolve({}) }),
     );
+
+    // vi.clearAllMocks does NOT reset implementations — re-arm defaults.
+    loadMaps.mockResolvedValue({ maps: [] });
 
     dataLoaderMocks.loadAbilityScores.mockResolvedValue([{ full_name: 'Strength' }]);
     dataLoaderMocks.loadClassData.mockImplementation((v) =>
@@ -228,73 +253,91 @@ describe('App - player map-unavailable waiting placeholder', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    setLocalhost('localhost');
+    setHostname('localhost');
   });
 
-  it('shows the waiting placeholder with icon and retry button instead of an alert', async () => {
-    await setupPlayerOnWaitingMapsView();
+  it.each([
+    ['no maps at all', []],
+    ['only inactive maps', [{ fileName: 'battle-arena.json', isActive: false }]],
+  ])('shows the waiting placeholder (message, icon, retry) instead of an alert when the campaign has %s', async (_label, maps) => {
+    await renderPlayerOnWaitingMapsView(maps);
 
-    expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
-    expect(screen.getByText('Check Again')).toBeInTheDocument();
-    expect(document.querySelector('.map-unavailable i.fa-solid.fa-map')).toBeInTheDocument();
+    // Friendly, actionable message with a retry path — located by content,
+    // scoped under the placeholder container (the hook for its own CSS).
+    const message = screen.getByText(/Waiting for the GM to open a map/);
+    expect(message.closest('.map-unavailable')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Check Again' })).toBeInTheDocument();
+    // Icon is decorative (aria-hidden) — presence is asserted, exact glyph is not.
+    expect(document.querySelector('.map-unavailable i[aria-hidden="true"]')).toBeInTheDocument();
+
     expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('maps-manager')).not.toBeInTheDocument();
     expect(window.alert).not.toHaveBeenCalled();
   });
 
-  it('"Check Again" re-runs the active-map load and keeps the placeholder while no map is active', async () => {
-    const loadMaps = await setupPlayerOnWaitingMapsView();
+  it('"Check Again" re-queries the current campaign exactly once and keeps the placeholder while no map is active', async () => {
+    await renderPlayerOnWaitingMapsView();
 
     const callsBefore = loadMaps.mock.calls.length;
-    fireEvent.click(screen.getByText('Check Again'));
+    clickCheckAgain();
     await flushEffects();
 
-    expect(loadMaps.mock.calls.length).toBeGreaterThan(callsBefore);
-    expect(screen.getByText(/Waiting for the GM to open a map/)).toBeInTheDocument();
-    expect(screen.queryByTestId('map-view')).not.toBeInTheDocument();
+    // One fresh, campaign-scoped load per click — not a stale result, not a hammering loop.
+    expect(loadMaps.mock.calls.length).toBe(callsBefore + 1);
+    expect(loadMaps).toHaveBeenLastCalledWith('test-campaign');
+    expectStillWaiting();
+  });
+
+  it('"Check Again" opens the map once the GM has activated one', async () => {
+    await renderPlayerOnWaitingMapsView();
+
+    loadMaps.mockResolvedValue({ maps: [{ fileName: 'battle-arena.json', isActive: true }] });
+    clickCheckAgain();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('map-view')).toBeInTheDocument();
+      expect(screen.getByTestId('map-name').textContent).toBe('battle-arena');
+    });
+    // The placeholder (message AND retry) is swapped out entirely.
+    expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Check Again' })).not.toBeInTheDocument();
     expect(window.alert).not.toHaveBeenCalled();
   });
 
-  it('"Check Again" renders the map once one is active', async () => {
-    const loadMaps = await setupPlayerOnWaitingMapsView();
+  it('"Check Again" that fails keeps the placeholder quietly and stays retryable', async () => {
+    await renderPlayerOnWaitingMapsView();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
+    // Retry hits a network failure → same quiet placeholder, no crash, no alert.
+    loadMaps.mockRejectedValueOnce(new Error('Network error'));
+    clickCheckAgain();
+    await flushEffects();
+
+    expectStillWaiting();
+    expect(consoleSpy).toHaveBeenCalled(); // failure logged, not swallowed
+
+    // Still retryable: next click after the GM activates opens the map.
     loadMaps.mockResolvedValue({ maps: [{ fileName: 'battle-arena.json', isActive: true }] });
-    fireEvent.click(screen.getByText('Check Again'));
+    clickCheckAgain();
 
     await waitFor(() => {
       expect(screen.getByTestId('map-view')).toBeInTheDocument();
       expect(screen.getByTestId('map-name').textContent).toBe('battle-arena');
     });
-    expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
+    expect(window.alert).not.toHaveBeenCalled();
   });
 
-  it('SSE map-activate replaces the placeholder with the map with zero player clicks', async () => {
-    await setupPlayerOnWaitingMapsView();
-
-    await dispatch({
-      key: 'map-activate-test-campaign',
-      data: { activeMap: 'battle-arena' },
+  it('GM (localhost) gets the maps manager listing, never the placeholder', async () => {
+    await renderOnMapsView({
+      hostname: 'localhost',
+      maps: [{ fileName: 'battle-arena.json', isActive: false }],
     });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('map-view')).toBeInTheDocument();
-      expect(screen.getByTestId('map-name').textContent).toBe('battle-arena');
-    });
-    expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
-  });
-
-  it('GM (localhost) still sees the maps manager, never the placeholder', async () => {
-    setLocalhost('localhost');
-    const { loadMaps } = await import('./services/maps/mapsService.js');
-    loadMaps.mockResolvedValue({ maps: [{ fileName: 'battle-arena.json', isActive: false }] });
-    mockState.characters = [{ name: 'Aragorn', level: 1 }];
-    render(<App />);
-    await selectCampaign();
-    fireEvent.click(screen.getByTestId('maps-btn'));
 
     await waitFor(() => {
       expect(screen.getByTestId('maps-manager')).toBeInTheDocument();
     });
     expect(screen.queryByText(/Waiting for the GM to open a map/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Check Again' })).not.toBeInTheDocument();
     expect(window.alert).not.toHaveBeenCalled();
   });
 });

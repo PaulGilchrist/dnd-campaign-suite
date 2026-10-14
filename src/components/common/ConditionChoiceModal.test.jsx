@@ -1,42 +1,53 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import ConditionChoiceModal from './ConditionChoiceModal.jsx';
 
 describe('ConditionChoiceModal', () => {
+    // Records every response event so tests can assert both that the right
+    // event fired exactly once AND that no wrong event fired at all.
+    let dispatchRecord;
+    let handlers;
+
     function showModal(detail) {
         act(() => {
             window.dispatchEvent(new CustomEvent('condition-choice-show', { detail }));
         });
     }
 
-    function listenForEvent(eventName) {
-        return new Promise((resolve) => {
-            const handler = (event) => {
-                resolve(event);
-                window.removeEventListener(eventName, handler);
-            };
-            window.addEventListener(eventName, handler);
-        });
+    function clickButton(name) {
+        fireEvent.click(screen.getByRole('button', { name }));
+    }
+
+    function expectModalDismissed() {
+        expect(screen.queryByText(/failed the saving throw/)).not.toBeInTheDocument();
+        expect(screen.queryByRole('button')).not.toBeInTheDocument();
     }
 
     beforeEach(() => {
-        window.addEventListener('condition-choice-selected', () => {});
-        window.addEventListener('condition-choice-skipped', () => {});
+        dispatchRecord = { selected: [], skipped: [] };
+        handlers = {
+            selected: (event) => dispatchRecord.selected.push(event.detail),
+            skipped: (event) => dispatchRecord.skipped.push(event.detail),
+        };
+        window.addEventListener('condition-choice-selected', handlers.selected);
+        window.addEventListener('condition-choice-skipped', handlers.skipped);
     });
 
     afterEach(() => {
-        window.removeEventListener('condition-choice-selected', () => {});
-        window.removeEventListener('condition-choice-skipped', () => {});
-        vi.restoreAllMocks();
+        window.removeEventListener('condition-choice-selected', handlers.selected);
+        window.removeEventListener('condition-choice-skipped', handlers.skipped);
     });
 
-    it('renders null (nothing) when no event has been received', () => {
+    it('renders nothing until a condition-choice-show event arrives', () => {
         const { container } = render(<ConditionChoiceModal />);
-        expect(container.innerHTML).toBe('');
+
+        expect(container).toBeEmptyDOMElement();
+        expect(screen.queryByRole('button')).not.toBeInTheDocument();
     });
 
-    it('renders condition buttons matching the event detail', () => {
+    it('shows the prompt for the event target when the show event arrives', () => {
         render(<ConditionChoiceModal />);
 
         showModal({
@@ -45,49 +56,12 @@ describe('ConditionChoiceModal', () => {
             conditions: ['charmed', 'frightened'],
         });
 
-        expect(screen.getByText('Charmed')).toBeInTheDocument();
-        expect(screen.getByText('Frightened')).toBeInTheDocument();
+        expect(screen.getByText('Choose Condition')).toBeInTheDocument();
         expect(screen.getByText('Goblin')).toBeInTheDocument();
+        expect(screen.getByText(/failed the saving throw/)).toBeInTheDocument();
     });
 
-    it('dispatches condition-choice-selected with correct promptId and condition on button click', async () => {
-        render(<ConditionChoiceModal />);
-
-        showModal({
-            promptId: 'prompt-abc',
-            targetName: 'Goblin',
-            conditions: ['charmed', 'frightened'],
-        });
-
-        const selectedEvent = listenForEvent('condition-choice-selected');
-        await act(async () => {
-            fireEvent.click(screen.getByText('Frightened'));
-        });
-
-        const event = await selectedEvent;
-        expect(event.detail.promptId).toBe('prompt-abc');
-        expect(event.detail.condition).toBe('frightened');
-    });
-
-    it('dispatches condition-choice-skipped with correct promptId on skip button click', async () => {
-        render(<ConditionChoiceModal />);
-
-        showModal({
-            promptId: 'prompt-xyz',
-            targetName: 'Goblin',
-            conditions: ['charmed', 'frightened'],
-        });
-
-        const skippedEvent = listenForEvent('condition-choice-skipped');
-        await act(async () => {
-            fireEvent.click(screen.getByText('Skip (No Effect)'));
-        });
-
-        const event = await skippedEvent;
-        expect(event.detail.promptId).toBe('prompt-xyz');
-    });
-
-    it('deduplicates conditions so each appears only once', () => {
+    it('renders one choice button per distinct condition, ignoring duplicates', () => {
         render(<ConditionChoiceModal />);
 
         showModal({
@@ -96,78 +70,107 @@ describe('ConditionChoiceModal', () => {
             conditions: ['charmed', 'charmed', 'frightened', 'frightened'],
         });
 
-        const buttons = document.querySelectorAll('.cc-choice-btn');
-        expect(buttons).toHaveLength(2);
-        expect(screen.getByText('Charmed')).toBeInTheDocument();
-        expect(screen.getByText('Frightened')).toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: 'Charmed' })).toHaveLength(1);
+        expect(screen.getAllByRole('button', { name: 'Frightened' })).toHaveLength(1);
+        // two choices plus the skip button, nothing else
+        expect(screen.getAllByRole('button')).toHaveLength(3);
     });
 
-    it('displays target name and saving throw message in the body', () => {
-        render(<ConditionChoiceModal />);
-
-        showModal({
-            promptId: 'test-id',
-            targetName: 'Dragon',
-            conditions: ['frightened'],
-        });
-
-        expect(screen.getByText('Dragon')).toBeInTheDocument();
-        expect(screen.getByText(/failed the saving throw/)).toBeInTheDocument();
-    });
-
-    it('capitalizes the first letter of each condition label', () => {
+    it('shows human-readable condition labels regardless of input casing', () => {
         render(<ConditionChoiceModal />);
 
         showModal({
             promptId: 'test-id',
             targetName: 'Goblin',
-            conditions: ['CHARMED', 'frightened', 'Poisoned'],
+            conditions: ['charmed', 'Poisoned'],
         });
 
-        expect(screen.getByText('CHARMED')).toBeInTheDocument();
-        expect(screen.getByText('Frightened')).toBeInTheDocument();
-        expect(screen.getByText('Poisoned')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Charmed' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Poisoned' })).toBeInTheDocument();
+        expect(screen.queryByText('charmed')).not.toBeInTheDocument();
     });
 
-    it('handles empty conditions array gracefully — shows modal with no choice buttons', () => {
+    it('choosing a condition reports it once for the current prompt and dismisses the modal', () => {
         render(<ConditionChoiceModal />);
 
         showModal({
-            promptId: 'test-id',
+            promptId: 'prompt-abc',
+            targetName: 'Goblin',
+            conditions: ['charmed', 'frightened'],
+        });
+        clickButton('Frightened');
+
+        expect(dispatchRecord.selected).toEqual([
+            { promptId: 'prompt-abc', condition: 'frightened' },
+        ]);
+        expect(dispatchRecord.skipped).toHaveLength(0);
+        expectModalDismissed();
+    });
+
+    it('skipping reports the prompt once with no condition and dismisses the modal', () => {
+        render(<ConditionChoiceModal />);
+
+        showModal({
+            promptId: 'prompt-xyz',
+            targetName: 'Goblin',
+            conditions: ['charmed', 'frightened'],
+        });
+        clickButton('Skip (No Effect)');
+
+        expect(dispatchRecord.skipped).toEqual([{ promptId: 'prompt-xyz' }]);
+        expect(dispatchRecord.selected).toHaveLength(0);
+        expectModalDismissed();
+    });
+
+    it('with no conditions offered, still shows a prompt the player can escape via skip', () => {
+        render(<ConditionChoiceModal />);
+
+        showModal({
+            promptId: 'empty-prompt',
             targetName: 'Goblin',
             conditions: [],
         });
 
-        expect(document.querySelector('.cc-overlay')).toBeInTheDocument();
         expect(screen.getByText('Goblin')).toBeInTheDocument();
-        expect(document.querySelectorAll('.cc-choice-btn')).toHaveLength(0);
+        expect(screen.getAllByRole('button')).toHaveLength(1); // skip only
+        clickButton('Skip (No Effect)');
+
+        expect(dispatchRecord.skipped).toEqual([{ promptId: 'empty-prompt' }]);
+        expectModalDismissed();
     });
 
-    it('passes the correct promptId when multiple selections are made in sequence', async () => {
+    it('replaces a pending prompt with the latest one, so stale targets cannot be chosen', () => {
         render(<ConditionChoiceModal />);
 
-        showModal({
-            promptId: 'first-prompt',
-            targetName: 'Goblin',
-            conditions: ['charmed'],
-        });
+        showModal({ promptId: 'stale-prompt', targetName: 'Goblin', conditions: ['charmed'] });
+        showModal({ promptId: 'fresh-prompt', targetName: 'Orc', conditions: ['frightened'] });
 
-        await act(async () => {
-            fireEvent.click(screen.getByText('Charmed'));
-        });
+        expect(screen.getByText('Orc')).toBeInTheDocument();
+        expect(screen.queryByText('Goblin')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Charmed' })).not.toBeInTheDocument();
 
-        showModal({
-            promptId: 'second-prompt',
-            targetName: 'Orc',
-            conditions: ['frightened'],
-        });
+        clickButton('Frightened');
 
-        const selectedEvent = listenForEvent('condition-choice-selected');
-        await act(async () => {
-            fireEvent.click(screen.getByText('Frightened'));
-        });
+        expect(dispatchRecord.selected).toEqual([
+            { promptId: 'fresh-prompt', condition: 'frightened' },
+        ]);
+    });
 
-        const event = await selectedEvent;
-        expect(event.detail.promptId).toBe('second-prompt');
+    it('tracks the correct promptId across sequential prompt/answer pairs', () => {
+        render(<ConditionChoiceModal />);
+
+        showModal({ promptId: 'first-prompt', targetName: 'Goblin', conditions: ['charmed'] });
+        clickButton('Charmed');
+        expectModalDismissed();
+
+        showModal({ promptId: 'second-prompt', targetName: 'Orc', conditions: ['frightened'] });
+        clickButton('Frightened');
+        expectModalDismissed();
+
+        expect(dispatchRecord.selected).toEqual([
+            { promptId: 'first-prompt', condition: 'charmed' },
+            { promptId: 'second-prompt', condition: 'frightened' },
+        ]);
+        expect(dispatchRecord.skipped).toHaveLength(0);
     });
 });

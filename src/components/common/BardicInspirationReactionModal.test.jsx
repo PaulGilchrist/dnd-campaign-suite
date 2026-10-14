@@ -1,12 +1,15 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import React from 'react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import BardicInspirationReactionModal from './BardicInspirationReactionModal.jsx';
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { clearBardicInspiration } from '../../services/combat/auras/bardicInspirationState.js';
 import { clearBardicInspirationPrompt } from '../../services/combat/prompts/bardicInspirationPromptUtils.js';
 
-// ── Mock dependencies ──
+// ── Mocks ──
+// The component talks to the world through three services and the SSE
+// Subscriber; tests emit SSE-shaped events through the captured handleEvent
+// and assert on dispatched result events + service calls.
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
@@ -20,108 +23,71 @@ vi.mock('../../services/combat/prompts/bardicInspirationPromptUtils.js', () => (
   clearBardicInspirationPrompt: vi.fn(),
 }));
 
-vi.mock('./Subscriber.jsx', () => {
-  function MockSubscriber({ handleEvent }) {
-    return (
-      <div data-testid="subscriber">
-        <button
-          data-testid="subscriber-defense-prompt"
-          onClick={() =>
-            handleEvent({
-              key: 'change-test-campaign-TargetOne-biPrompt',
-              data: {
-                biPrompt: {
-                  promptId: 'bi-prompt-defense-1',
-                  mode: 'defense',
-                  targetName: 'TargetOne',
-                  attackerName: 'Goblin',
-                  attackRoll: 14,
-                  bonus: 3,
-                  effectiveAc: 16,
-                  dieSize: 6,
-                },
-              },
-            })
-          }
-        />
-        <button
-          data-testid="subscriber-offense-prompt"
-          onClick={() =>
-            handleEvent({
-              key: 'change-test-campaign-TargetTwo-biPrompt',
-              data: {
-                biPrompt: {
-                  promptId: 'bi-prompt-offense-1',
-                  mode: 'offense',
-                  targetName: 'TargetTwo',
-                  attackerName: 'TargetTwo',
-                  dieSize: 4,
-                },
-              },
-            })
-          }
-        />
-        <button
-          data-testid="subscriber-cleared"
-          onClick={() =>
-            handleEvent({
-              key: 'change-test-campaign-TargetOne-biPromptCleared',
-              data: { promptId: 'bi-prompt-defense-1' },
-            })
-          }
-        />
-        <button
-          data-testid="subscriber-second-prompt"
-          onClick={() =>
-            handleEvent({
-              key: 'change-test-campaign-TargetThree-biPrompt',
-              data: {
-                biPrompt: {
-                  promptId: 'bi-prompt-defense-2',
-                  mode: 'defense',
-                  targetName: 'TargetThree',
-                  attackerName: 'Orc',
-                  attackRoll: 17,
-                  bonus: 5,
-                  effectiveAc: 18,
-                  dieSize: 8,
-                },
-              },
-            })
-          }
-        />
-      </div>
-    );
-  }
-  return { default: MockSubscriber };
+const mockSubscriber = vi.hoisted(() => ({ handleEvent: null }));
+
+vi.mock('./Subscriber.jsx', () => ({
+  default: ({ handleEvent }) => {
+    mockSubscriber.handleEvent = handleEvent;
+    return null;
+  },
+}));
+
+// ── Fixtures & helpers ──
+
+const CAMPAIGN = 'test-campaign';
+
+const defensePrompt = (overrides = {}) => ({
+  promptId: 'bi-prompt-defense-1',
+  mode: 'defense',
+  targetName: 'TargetOne',
+  attackerName: 'Goblin',
+  attackRoll: 14,
+  bonus: 3,
+  effectiveAc: 16,
+  dieSize: 6,
+  ...overrides,
 });
 
-// ── EventSource mock (required because component gates Subscriber on EventSource existence) ──
+const offensePrompt = (overrides = {}) => ({
+  promptId: 'bi-prompt-offense-1',
+  mode: 'offense',
+  // Distinct attacker/target so mode-dependent name handling is observable.
+  attackerName: 'TargetOne',
+  targetName: 'Goblin',
+  dieSize: 8,
+  ...overrides,
+});
 
-const MockEventSource = vi.fn();
-MockEventSource.prototype.close = vi.fn();
-
-function setupGlobalEventSource() {
-  Object.defineProperty(globalThis, 'EventSource', {
-    value: MockEventSource,
-    writable: true,
-    configurable: true,
+function emitPrompt(prompt, campaignName = CAMPAIGN) {
+  act(() => {
+    mockSubscriber.handleEvent({
+      key: `change-${campaignName}-${prompt.targetName}-biPrompt`,
+      data: { biPrompt: prompt },
+    });
   });
 }
 
-// ── Helpers ──
+function emitCleared(targetName, promptId, campaignName = CAMPAIGN) {
+  act(() => {
+    mockSubscriber.handleEvent({
+      key: `change-${campaignName}-${targetName}-biPromptCleared`,
+      data: { promptId },
+    });
+  });
+}
 
-function renderModal(campaignName = 'test-campaign') {
+function renderModal(campaignName = CAMPAIGN) {
   return render(<BardicInspirationReactionModal campaignName={campaignName} />);
 }
 
-function listenForEvent(eventName) {
+// Window event listeners are removed automatically after each test.
+let removeListeners = [];
+
+function listenFor(eventName) {
   const handler = vi.fn();
   window.addEventListener(eventName, handler);
-  return {
-    handler,
-    cleanup: () => window.removeEventListener(eventName, handler),
-  };
+  removeListeners.push(() => window.removeEventListener(eventName, handler));
+  return handler;
 }
 
 // ── Tests ──
@@ -129,262 +95,270 @@ function listenForEvent(eventName) {
 describe('BardicInspirationReactionModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setupGlobalEventSource();
     rollExpression.mockReturnValue({ total: 5 });
   });
 
   afterEach(() => {
-    delete globalThis.EventSource;
+    removeListeners.forEach((fn) => fn());
+    removeListeners = [];
   });
 
-  // ── Rendering ──
+  // ── Presentation ──
 
-  it('renders nothing when there are no prompts', () => {
+  it('renders nothing until a prompt arrives', () => {
     renderModal();
     expect(document.querySelector('.sp-overlay')).not.toBeInTheDocument();
   });
 
-  // ── Defense prompt rendering ──
-
-  it('renders defense modal with correct content when a defense prompt is queued', async () => {
+  it('presents a defense prompt with the attack math and both choices', async () => {
     renderModal();
 
-    fireEvent.click(screen.getByTestId('subscriber-defense-prompt'));
+    emitPrompt(defensePrompt());
 
-    await waitFor(() => {
-      expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-    });
-
+    expect(await screen.findByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
     expect(screen.getByText('TargetOne')).toBeInTheDocument();
     expect(screen.getByText('Goblin')).toBeInTheDocument();
+    expect(screen.getByText(/Attack: d20\(14\) \+ 3 = 17 vs AC 16/)).toBeInTheDocument();
     expect(screen.getByText(/roll your Bardic Inspiration die \(d6\) and add to your AC/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Use Reaction & Roll/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+    expect(screen.queryByText(/Combat Inspiration - Offense/)).not.toBeInTheDocument();
   });
 
-  it('renders offense modal with correct content when an offense prompt is queued', async () => {
+  it('presents an offense prompt naming the attacker who hit, offering the damage die', async () => {
     renderModal();
 
-    fireEvent.click(screen.getByTestId('subscriber-offense-prompt'));
+    emitPrompt(offensePrompt());
 
-    await waitFor(() => {
-      expect(screen.getByText(/Combat Inspiration - Offense/)).toBeInTheDocument();
-    });
-
-    expect(screen.getByText(/hit/i)).toBeInTheDocument();
-    expect(screen.getByText(/roll your Bardic Inspiration die \(d4\) and add to the damage/)).toBeInTheDocument();
+    expect(await screen.findByText(/Combat Inspiration - Offense/)).toBeInTheDocument();
+    expect(screen.getByText('TargetOne')).toBeInTheDocument();
+    expect(screen.getByText(/hit/)).toBeInTheDocument();
+    expect(screen.getByText(/roll your Bardic Inspiration die \(d8\) and add to the damage/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Use Reaction & Roll/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+    expect(screen.queryByText(/vs AC/)).not.toBeInTheDocument();
   });
 
-  // ── Use Reaction - Defense ──
+  // ── Use reaction ──
 
-  it('rolls the die and dispatches defense-result event when using reaction on defense', async () => {
+  it('uses reaction on defense: rolls 1d6, reports success, clears defender prompt and consumption, closes modal', async () => {
     rollExpression.mockReturnValue({ total: 4 });
+    const result = listenFor('bardic-inspiration-defense-result');
     renderModal();
 
-    fireEvent.click(screen.getByTestId('subscriber-defense-prompt'));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-    });
-
-    const { handler, cleanup } = listenForEvent('bardic-inspiration-defense-result');
+    emitPrompt(defensePrompt());
+    await screen.findByText(/Combat Inspiration - Defense/);
 
     fireEvent.click(screen.getByRole('button', { name: /Use Reaction & Roll/ }));
 
-    await waitFor(() => {
-      expect(handler).toHaveBeenCalled();
+    expect(result).toHaveBeenCalledTimes(1);
+    expect(result.mock.calls[0][0].detail).toEqual({
+      promptId: 'bi-prompt-defense-1',
+      used: true,
+      biRoll: 4,
     });
-
-    const detail = handler.mock.calls[0][0].detail;
-    expect(detail.promptId).toBe('bi-prompt-defense-1');
-    expect(detail.used).toBe(true);
-    expect(detail.biRoll).toBe(4);
-    expect(clearBardicInspirationPrompt).toHaveBeenCalledWith('test-campaign', 'TargetOne');
-    expect(clearBardicInspiration).toHaveBeenCalledWith('TargetOne', 'test-campaign');
-
-    cleanup();
+    expect(rollExpression).toHaveBeenCalledWith('1d6');
+    expect(clearBardicInspirationPrompt).toHaveBeenCalledWith(CAMPAIGN, 'TargetOne');
+    expect(clearBardicInspiration).toHaveBeenCalledWith('TargetOne', CAMPAIGN);
+    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
   });
 
-  // ── Use Reaction - Offense ──
-
-  it('rolls the die and dispatches offense-result event when using reaction on offense', async () => {
+  it('uses reaction on offense: rolls the die and clears the attacker (not the target)', async () => {
     rollExpression.mockReturnValue({ total: 3 });
+    const result = listenFor('bardic-inspiration-offense-result');
     renderModal();
 
-    fireEvent.click(screen.getByTestId('subscriber-offense-prompt'));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Combat Inspiration - Offense/)).toBeInTheDocument();
-    });
-
-    const { handler, cleanup } = listenForEvent('bardic-inspiration-offense-result');
+    emitPrompt(offensePrompt());
+    await screen.findByText(/Combat Inspiration - Offense/);
 
     fireEvent.click(screen.getByRole('button', { name: /Use Reaction & Roll/ }));
 
-    await waitFor(() => {
-      expect(handler).toHaveBeenCalled();
+    expect(result).toHaveBeenCalledTimes(1);
+    expect(result.mock.calls[0][0].detail).toEqual({
+      promptId: 'bi-prompt-offense-1',
+      used: true,
+      biRoll: 3,
     });
+    expect(rollExpression).toHaveBeenCalledWith('1d8');
+    // The attacker spends their own inspiration — the attacker's prompt/uses clear.
+    expect(clearBardicInspirationPrompt).toHaveBeenCalledWith(CAMPAIGN, 'TargetOne');
+    expect(clearBardicInspirationPrompt).not.toHaveBeenCalledWith(CAMPAIGN, 'Goblin');
+    expect(clearBardicInspiration).toHaveBeenCalledWith('TargetOne', CAMPAIGN);
+    expect(clearBardicInspiration).not.toHaveBeenCalledWith('Goblin', CAMPAIGN);
+    expect(screen.queryByText(/Combat Inspiration - Offense/)).not.toBeInTheDocument();
+  });
 
-    const detail = handler.mock.calls[0][0].detail;
-    expect(detail.promptId).toBe('bi-prompt-offense-1');
-    expect(detail.used).toBe(true);
-    expect(detail.biRoll).toBe(3);
-    expect(clearBardicInspirationPrompt).toHaveBeenCalledWith('test-campaign', 'TargetTwo');
-    expect(clearBardicInspiration).toHaveBeenCalledWith('TargetTwo', 'test-campaign');
+  it.each([
+    ['null', null],
+    ['an object without a total', {}],
+  ])('treats a failed roll (%s) as biRoll 0 but still reports the reaction as used', async (_label, rollResult) => {
+    rollExpression.mockReturnValue(rollResult);
+    const result = listenFor('bardic-inspiration-defense-result');
+    renderModal();
 
-    cleanup();
+    emitPrompt(defensePrompt());
+    await screen.findByText(/Combat Inspiration - Defense/);
+
+    fireEvent.click(screen.getByRole('button', { name: /Use Reaction & Roll/ }));
+
+    expect(result).toHaveBeenCalledTimes(1);
+    expect(result.mock.calls[0][0].detail).toEqual({
+      promptId: 'bi-prompt-defense-1',
+      used: true,
+      biRoll: 0,
+    });
   });
 
   // ── Skip ──
 
-  it('dispatches defense-result with used:false when skipping defense prompt', async () => {
+  it('skipping defense declines without rolling or consuming inspiration', async () => {
+    const result = listenFor('bardic-inspiration-defense-result');
     renderModal();
 
-    fireEvent.click(screen.getByTestId('subscriber-defense-prompt'));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-    });
-
-    const { handler, cleanup } = listenForEvent('bardic-inspiration-defense-result');
+    emitPrompt(defensePrompt());
+    await screen.findByText(/Combat Inspiration - Defense/);
 
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
 
-    await waitFor(() => {
-      expect(handler).toHaveBeenCalled();
+    expect(result).toHaveBeenCalledTimes(1);
+    expect(result.mock.calls[0][0].detail).toEqual({
+      promptId: 'bi-prompt-defense-1',
+      used: false,
     });
-
-    const detail = handler.mock.calls[0][0].detail;
-    expect(detail.promptId).toBe('bi-prompt-defense-1');
-    expect(detail.used).toBe(false);
-    expect(clearBardicInspirationPrompt).toHaveBeenCalledWith('test-campaign', 'TargetOne');
+    expect(rollExpression).not.toHaveBeenCalled();
+    expect(clearBardicInspirationPrompt).toHaveBeenCalledWith(CAMPAIGN, 'TargetOne');
     expect(clearBardicInspiration).not.toHaveBeenCalled();
-
-    cleanup();
+    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
   });
 
-  // ── Overlay click is inert ──
-
-  it('does not clear or advance the prompt when the overlay is clicked', async () => {
+  it('skipping offense declines on the attacker and clears the attacker prompt', async () => {
+    const result = listenFor('bardic-inspiration-offense-result');
     renderModal();
 
-    fireEvent.click(screen.getByTestId('subscriber-defense-prompt'));
+    emitPrompt(offensePrompt());
+    await screen.findByText(/Combat Inspiration - Offense/);
 
-    await waitFor(() => {
-      expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+
+    expect(result).toHaveBeenCalledTimes(1);
+    expect(result.mock.calls[0][0].detail).toEqual({
+      promptId: 'bi-prompt-offense-1',
+      used: false,
     });
+    expect(rollExpression).not.toHaveBeenCalled();
+    expect(clearBardicInspirationPrompt).toHaveBeenCalledWith(CAMPAIGN, 'TargetOne');
+    expect(clearBardicInspirationPrompt).not.toHaveBeenCalledWith(CAMPAIGN, 'Goblin');
+    expect(clearBardicInspiration).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Combat Inspiration - Offense/)).not.toBeInTheDocument();
+  });
 
-    const overlay = document.querySelector('.sp-overlay');
-    fireEvent.click(overlay);
+  // ── Overlay is inert (adjudication prompts wait indefinitely) ──
 
+  it('does nothing when the overlay backdrop is clicked', async () => {
+    const defenseResult = listenFor('bardic-inspiration-defense-result');
+    renderModal();
+
+    emitPrompt(defensePrompt());
+    await screen.findByText(/Combat Inspiration - Defense/);
+
+    fireEvent.click(document.querySelector('.sp-overlay'));
+
+    expect(defenseResult).not.toHaveBeenCalled();
     expect(clearBardicInspirationPrompt).not.toHaveBeenCalled();
-    expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-  });
-
-  it('does not clear bardicInspiration state on overlay click (only on useReaction)', async () => {
-    renderModal();
-
-    fireEvent.click(screen.getByTestId('subscriber-defense-prompt'));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-    });
-
-    const overlay = document.querySelector('.sp-overlay');
-    fireEvent.click(overlay);
-
     expect(clearBardicInspiration).not.toHaveBeenCalled();
     expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
   });
 
-  // ── Queue advancement ──
+  // ── Prompt lifecycle ──
 
-  it('advances to second prompt after dismissing the first', async () => {
+  it('shows one prompt at a time, ignoring later prompts until the active one is dismissed', async () => {
     renderModal();
 
-    fireEvent.click(screen.getByTestId('subscriber-defense-prompt'));
+    emitPrompt(defensePrompt());
+    await screen.findByText(/Combat Inspiration - Defense/);
 
-    await waitFor(() => {
-      expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-    });
+    // A second prompt while one is active must not replace the visible one.
+    emitPrompt(defensePrompt({ promptId: 'bi-prompt-defense-2', targetName: 'TargetThree', attackerName: 'Orc', dieSize: 8 }));
+    expect(screen.getByText('TargetOne')).toBeInTheDocument();
+    expect(screen.queryByText('TargetThree')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('subscriber-second-prompt'));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-    });
-
+    // After dismissal, new prompts are accepted again with fresh content.
+    emitPrompt(defensePrompt({ promptId: 'bi-prompt-defense-2', targetName: 'TargetThree', attackerName: 'Orc', dieSize: 8 }));
+    expect(await screen.findByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
     expect(screen.getByText('TargetThree')).toBeInTheDocument();
-    expect(screen.getByText(/Orc/)).toBeInTheDocument();
     expect(screen.getByText(/roll your Bardic Inspiration die \(d8\) and add to your AC/)).toBeInTheDocument();
   });
 
-  // ── Duplicate prompt prevention ──
-
-  it('does not add duplicate prompts with same promptId', async () => {
+  it('does not queue the same promptId twice — one Skip permanently dismisses it', async () => {
+    const result = listenFor('bardic-inspiration-defense-result');
     renderModal();
+    const prompt = defensePrompt();
 
-    fireEvent.click(screen.getByTestId('subscriber-defense-prompt'));
+    emitPrompt(prompt);
+    await screen.findByText(/Combat Inspiration - Defense/);
 
-    await waitFor(() => {
-      expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-    });
+    emitPrompt(prompt); // duplicate delivery — must be ignored
 
-    // Click same trigger again — should be ignored
-    fireEvent.click(screen.getByTestId('subscriber-defense-prompt'));
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
 
-    expect(screen.getByText('TargetOne')).toBeInTheDocument();
-    expect(screen.queryByText('TargetThree')).not.toBeInTheDocument();
+    expect(result).toHaveBeenCalledTimes(1);
+    // If the duplicate had been queued, a second modal would reappear here.
+    expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
   });
 
-  // ── Clear event ──
-
-  it('removes prompt when biPromptCleared event is received', async () => {
+  it('removes the prompt when a matching biPromptCleared event arrives', async () => {
     renderModal();
 
-    fireEvent.click(screen.getByTestId('subscriber-defense-prompt'));
+    emitPrompt(defensePrompt());
+    await screen.findByText(/Combat Inspiration - Defense/);
 
-    await waitFor(() => {
-      expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('subscriber-cleared'));
+    emitCleared('TargetOne', 'bi-prompt-defense-1');
 
     await waitFor(() => {
       expect(screen.queryByText(/Combat Inspiration - Defense/)).not.toBeInTheDocument();
     });
   });
 
-  // ── Die roll handling ──
-
-  it('defaults biRoll to 0 when rollExpression returns null or object without total', async () => {
-    rollExpression.mockReturnValue(null);
+  it('leaves the prompt visible when biPromptCleared names a different promptId', async () => {
     renderModal();
 
-    fireEvent.click(screen.getByTestId('subscriber-defense-prompt'));
+    emitPrompt(defensePrompt());
+    await screen.findByText(/Combat Inspiration - Defense/);
 
-    await waitFor(() => {
-      expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
+    // Only promptId decides removal — a stale/other promptId must not dismiss it.
+    emitCleared('TargetOne', 'some-other-prompt');
+
+    expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
+  });
+
+  it('ignores a biPromptCleared event from another campaign', async () => {
+    renderModal();
+
+    emitPrompt(defensePrompt());
+    await screen.findByText(/Combat Inspiration - Defense/);
+
+    emitCleared('TargetOne', 'bi-prompt-defense-1', 'other-campaign');
+
+    expect(screen.getByText(/Combat Inspiration - Defense/)).toBeInTheDocument();
+  });
+
+  it.each([
+    ['no key', { data: { biPrompt: defensePrompt() } }],
+    ['no data', { key: 'change-test-campaign-TargetOne-biPrompt' }],
+    ['biPrompt without a promptId', { key: 'change-test-campaign-TargetOne-biPrompt', data: { biPrompt: { mode: 'defense' } } }],
+    ['an unrelated key', { key: 'change-test-campaign-TargetOne-somethingElse', data: { foo: 1 } }],
+    ['a biPromptCleared without promptId', { key: 'change-test-campaign-TargetOne-biPromptCleared', data: {} }],
+  ])('ignores malformed SSE events (%s) without rendering or throwing', async (_label, event) => {
+    const { container } = renderModal();
+
+    act(() => {
+      mockSubscriber.handleEvent(event);
     });
 
-    const { handler, cleanup } = listenForEvent('bardic-inspiration-defense-result');
-
-    fireEvent.click(screen.getByRole('button', { name: /Use Reaction & Roll/ }));
-
-    await waitFor(() => {
-      expect(handler).toHaveBeenCalled();
-    });
-
-    expect(handler.mock.calls[0][0].detail.biRoll).toBe(0);
-
-    cleanup();
+    expect(container.querySelector('.sp-overlay')).not.toBeInTheDocument();
+    expect(clearBardicInspirationPrompt).not.toHaveBeenCalled();
   });
 });

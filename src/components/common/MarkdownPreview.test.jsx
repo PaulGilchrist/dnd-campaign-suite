@@ -1,64 +1,86 @@
+// @improved-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import MarkdownPreview from './MarkdownPreview.jsx';
 
+// Markdown-to-HTML conversion and sanitization are covered exhaustively at the
+// service level in src/services/ui/sanitize.test.js. These tests verify the
+// component's own contract: when it renders, what wrapper it produces, and
+// that unsafe markup never reaches the DOM through its dangerouslySetInnerHTML.
 describe('MarkdownPreview', () => {
-    describe('null/empty rendering', () => {
-        it('returns null for falsy text values', () => {
-            const falsyValues = [null, undefined, ''];
-
-            for (const value of falsyValues) {
-                const { container } = render(<MarkdownPreview text={value} />);
-                expect(container.innerHTML).toBe('');
-            }
+    describe('visibility', () => {
+        it.each([null, undefined, ''])('renders nothing when text is %p', (text) => {
+            const { container } = render(<MarkdownPreview text={text} />);
+            expect(container).toBeEmptyDOMElement();
         });
 
-        it('renders content for zero-length string only when truthy', () => {
-            const { container } = render(<MarkdownPreview text="0" />);
-            expect(container.innerHTML).not.toBe('');
+        it('renders the string "0" rather than treating it as falsy', () => {
+            render(<MarkdownPreview text="0" />);
+            expect(screen.getByText('0')).toBeInTheDocument();
         });
-    });
 
-    describe('className handling', () => {
-        it('applies the default markdown-preview class when no custom className is provided', () => {
-            render(<MarkdownPreview text="hello" />);
-            const div = document.querySelector('.markdown-preview');
+        it('renders an empty wrapper for whitespace-only text without crashing', () => {
+            const { container } = render(<MarkdownPreview text={'   \n  '} />);
+            const div = container.querySelector('.markdown-preview');
             expect(div).toBeInTheDocument();
+            expect(div).toBeEmptyDOMElement();
         });
 
-        it('merges custom className with the default markdown-preview class', () => {
-            render(<MarkdownPreview text="hello" className="custom-class" />);
-            const div = document.querySelector('.markdown-preview');
-            expect(div).toHaveClass('markdown-preview');
-            expect(div).toHaveClass('custom-class');
-        });
-
-        it('handles empty string as custom className', () => {
-            render(<MarkdownPreview text="hello" className="" />);
-            const div = document.querySelector('.markdown-preview');
-            expect(div).toHaveClass('markdown-preview');
-            expect(div.classList.length).toBe(1);
-        });
-
-        it('handles multiple space-separated custom classes', () => {
-            render(<MarkdownPreview text="hello" className="class-a class-b" />);
-            const div = document.querySelector('.markdown-preview');
-            expect(div).toHaveClass('class-a');
-            expect(div).toHaveClass('class-b');
+        it('renders an empty wrapper for a non-string truthy value without crashing', () => {
+            const { container } = render(<MarkdownPreview text={123} />);
+            const div = container.querySelector('.markdown-preview');
+            expect(div).toBeInTheDocument();
+            expect(div).toBeEmptyDOMElement();
         });
     });
 
     describe('markdown rendering', () => {
-        it('renders sanitized markdown content', () => {
-            render(<MarkdownPreview text="**bold text**" />);
-            expect(screen.getByText('bold text')).toBeInTheDocument();
+        it('converts emphasis markdown into semantic elements, not plain text', () => {
+            render(<MarkdownPreview text="**bold text** and *italic text*" />);
+            expect(screen.getByText('bold text').tagName).toBe('STRONG');
+            expect(screen.getByText('italic text').tagName).toBe('EM');
         });
 
-        it('renders an empty div when text is a non-string truthy value', () => {
-            const { container } = render(<MarkdownPreview text={123} />);
+        it('renders block structure such as headings and lists', () => {
+            render(<MarkdownPreview text={'## Tactics\n\n- first\n- second'} />);
+            expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Tactics');
+            const items = screen.getAllByRole('listitem');
+            expect(items).toHaveLength(2);
+            expect(items[0]).toHaveTextContent('first');
+        });
+    });
+
+    describe('security', () => {
+        it('keeps safe content while dropping scripts and javascript: links', () => {
+            const { container } = render(
+                <MarkdownPreview text={'Safe text\n\n[click](javascript:alert(1))\n\n<script>alert(2)</script>'} />
+            );
+            expect(screen.getByText('Safe text')).toBeInTheDocument();
+            expect(container.querySelector('script')).toBeNull();
+            expect(container.querySelector('a[href^="javascript:"]')).toBeNull();
+        });
+
+        it('renders safe links with their href intact', () => {
+            const { container } = render(<MarkdownPreview text="[docs](https://example.com)" />);
+            expect(container.querySelector('a[href="https://example.com"]')).toBeInTheDocument();
+        });
+    });
+
+    describe('className handling', () => {
+        it('applies only the markdown-preview class by default', () => {
+            const { container } = render(<MarkdownPreview text="hello" />);
             const div = container.querySelector('.markdown-preview');
-            expect(div).toBeInTheDocument();
-            expect(div.innerHTML).toBe('');
+            expect(Array.from(div.classList)).toEqual(['markdown-preview']);
+        });
+
+        it.each([
+            ['custom-class', ['markdown-preview', 'custom-class']],
+            ['', ['markdown-preview']],
+            ['class-a class-b', ['markdown-preview', 'class-a', 'class-b']],
+        ])('merges className %p onto the wrapper', (className, expectedClasses) => {
+            const { container } = render(<MarkdownPreview text="hello" className={className} />);
+            const div = container.querySelector('.markdown-preview');
+            expect(Array.from(div.classList).sort()).toEqual([...expectedClasses].sort());
         });
     });
 });

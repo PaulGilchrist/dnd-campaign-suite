@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import React from 'react';
+// @improved-by-ai
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import DeathSavePromptModal from './DeathSavePromptModal.jsx';
 import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import * as deathSaveRules from '../../services/combat/conditions/deathSaveRules.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
-// ── Mock dependencies ──
+// ── Mock dependencies (service/network + rules boundaries only) ──
 
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
   sendDeathSaveResult: vi.fn(),
@@ -22,41 +22,20 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('./Subscriber.jsx', () => {
-  function MockSubscriber({ handleEvent, campaignName }) {
-    return React.createElement(
-      'div',
-      { 'data-testid': 'subscriber-wrapper' },
-      React.createElement('button', {
-        'data-testid': 'trigger-prompt-1',
-        onClick: () =>
-          handleEvent({
-            key: `change-${campaignName}-deathSavePrompt-target1`,
-            data: { promptId: 'prompt-1', targetName: 'target1' },
-          }),
-      }, 'Trigger Prompt 1'),
-      React.createElement('button', {
-        'data-testid': 'trigger-prompt-2',
-        onClick: () =>
-          handleEvent({
-            key: `change-${campaignName}-deathSavePrompt-target2`,
-            data: { promptId: 'prompt-2', targetName: 'target2' },
-          }),
-      }, 'Trigger Prompt 2'),
-      React.createElement('button', {
-        'data-testid': 'trigger-prompt-3',
-        onClick: () =>
-          handleEvent({
-            key: `change-${campaignName}-deathSavePrompt-target3`,
-            data: { promptId: 'prompt-3', targetName: 'target3' },
-          }),
-      }, 'Trigger Prompt 3'),
-    );
-  }
-  return { default: MockSubscriber };
-});
+// Capture the modal's SSE handler so tests can emit events directly,
+// instead of the old mock rendering one trigger button per prompt.
+let emitEvent = null;
+
+vi.mock('./Subscriber.jsx', () => ({
+  default: function MockSubscriber({ handleEvent }) {
+    emitEvent = handleEvent;
+    return null;
+  },
+}));
 
 // ── Helpers ──
+
+const CAMPAIGN = 'test-campaign';
 
 function setupEventSource() {
   const MockEventSource = vi.fn();
@@ -81,131 +60,151 @@ function defaultRollResult(overrides = {}) {
   };
 }
 
-function waitForPromptVisible() {
-  return waitFor(() => {
-    expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+/** Emit an SSE change-key event exactly as the real Subscriber would. */
+function emitPrompt(targetName, promptId = `prompt-${targetName}`) {
+  act(() => {
+    emitEvent({
+      key: `change-${CAMPAIGN}-deathSavePrompt-${targetName}`,
+      data: { promptId },
+    });
   });
 }
 
-function waitForResultVisible() {
-  return waitFor(() => {
-    expect(screen.getByText(/Roll:/i)).toBeInTheDocument();
-  });
+function renderWithPrompt(targetName = 'target1', promptId = `prompt-${targetName}`) {
+  render(<DeathSavePromptModal campaignName={CAMPAIGN} />);
+  emitPrompt(targetName, promptId);
+  return screen.findByText(/must make a/i);
 }
 
-// ── Defaults ──
+async function rollAndWaitForResult() {
+  fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
+  return screen.findByText(/^Roll:/i);
+}
+
+// ── Defaults & cleanup ──
+
+let dispatchedResults;
+const collectResults = (e) => dispatchedResults.push(e.detail);
 
 beforeEach(() => {
   vi.clearAllMocks();
   setupEventSource();
   deathSaveRules.rollDeathSave.mockReturnValue(defaultRollResult());
   getRuntimeValue.mockReturnValue(null);
+  emitEvent = null;
+  dispatchedResults = [];
+  window.addEventListener('death-save-result', collectResults);
+});
+
+afterEach(() => {
+  window.removeEventListener('death-save-result', collectResults);
 });
 
 // ── Tests ──
 
 describe('DeathSavePromptModal', () => {
-  // ── Rendering ──
-
-  it('renders nothing when there are no prompts', () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    expect(document.querySelector('.dsp-overlay')).not.toBeInTheDocument();
+  it('renders nothing until a death-save prompt arrives', () => {
+    render(<DeathSavePromptModal campaignName={CAMPAIGN} />);
+    expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Roll Death Save' })).not.toBeInTheDocument();
   });
 
-  // ── Prompt queuing ──
-
-  it('shows modal with target name and roll button when a prompt arrives', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    expect(screen.getByText('target1')).toBeInTheDocument();
-    expect(document.querySelector('.dsp-header')).toBeInTheDocument();
+  it('shows the target from the event key with a Roll Death Save button', async () => {
+    // data carries only promptId — the displayed name must come from the key
+    await renderWithPrompt('InjuredAlly');
+    expect(screen.getByText('InjuredAlly')).toBeInTheDocument();
+    expect(screen.getByText(/must make a/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Roll Death Save' })).toBeInTheDocument();
   });
 
-  it('prevents advancing when clicking inside the modal body', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    const modal = document.querySelector('.dsp-modal');
-    if (modal) fireEvent.click(modal);
-    // Modal should still be visible — clicking inside does NOT dismiss it
-    expect(screen.getByText(/must make a/i)).toBeInTheDocument();
+  it('ignores SSE events that are not this campaign\'s death-save prompts', async () => {
+    render(<DeathSavePromptModal campaignName={CAMPAIGN} />);
+    const invalidEvents = [
+      { key: undefined, data: { promptId: 'p' } },
+      { key: `change-${CAMPAIGN}-deathSavePrompt-target1`, data: null },
+      { key: `change-${CAMPAIGN}-someOtherKey-target1`, data: { promptId: 'p' } },
+      { key: 'change-other-campaign-deathSavePrompt-target1', data: { promptId: 'p' } },
+      { key: `change-${CAMPAIGN}-deathSavePrompt-`, data: { promptId: 'p' } },
+    ];
+    for (const event of invalidEvents) {
+      act(() => emitEvent(event));
+    }
+    expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
+    // a valid event still opens the modal afterwards
+    emitPrompt('InjuredAlly');
+    expect(await screen.findByText(/must make a/i)).toBeInTheDocument();
   });
 
-  // ── Queue count ──
+  // ── Queue display ──
 
-  it('does not show queue count for a single prompt', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    expect(screen.queryByText(/\(1 of/)).not.toBeInTheDocument();
+  it('shows a queue counter only when a second prompt is waiting', async () => {
+    await renderWithPrompt('target1');
+    expect(screen.queryByText(/\(\d+ of \d+\)/)).not.toBeInTheDocument();
+    emitPrompt('target2');
+    expect(await screen.findByText('(1 of 2)')).toBeInTheDocument();
   });
 
-  it('shows queue count "(1 of 2)" when two prompts are queued', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    fireEvent.click(screen.getByTestId('trigger-prompt-2'));
-    await waitFor(() => {
-      expect(screen.getByText(/\(1 of 2\)/)).toBeInTheDocument();
-    });
-  });
-
-  it('updates queue count when advancing through multiple prompts', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    fireEvent.click(screen.getByTestId('trigger-prompt-2'));
-    fireEvent.click(screen.getByTestId('trigger-prompt-3'));
-    await waitFor(() => {
-      expect(screen.getByText(/\(1 of 3\)/)).toBeInTheDocument();
-    });
-    // Roll, then advance via the Next button
-    fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    await waitFor(() => {
-      expect(screen.getByText(/\(1 of 2\)/)).toBeInTheDocument();
-    });
-  });
-
-  it('prevents duplicate prompts with the same promptId', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    // Trigger the same prompt again
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    // Should still show no queue count (only 1 unique prompt)
+  it('ignores a repeated prompt with the same promptId', async () => {
+    await renderWithPrompt('target1');
+    emitPrompt('target1');
     expect(screen.queryByText(/\(2 of/)).not.toBeInTheDocument();
+    // proving nothing extra was queued: rolling + Done closes the modal entirely
+    await rollAndWaitForResult();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
   });
 
-  // ── Roll death save — basic behavior ──
+  it('drains queued prompts in order, rolling each target with its own payload', async () => {
+    await renderWithPrompt('target1');
+    emitPrompt('target2');
+    await screen.findByText('(1 of 2)');
 
-  it('displays success result text after rolling', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
+    await rollAndWaitForResult();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    // advanced to a fresh prompt for target2 (counter hidden, Roll restored)
+    expect(await screen.findByText('target2')).toBeInTheDocument();
+    expect(screen.queryByText(/\(\d+ of \d+\)/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-    await waitForResultVisible();
-    expect(screen.getByText('DEATH SAVE SUCCESS')).toBeInTheDocument();
+    await screen.findByText('DEATH SAVE SUCCESS');
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
+
+    expect(sendDeathSaveResult).toHaveBeenCalledTimes(2);
+    expect(sendDeathSaveResult.mock.calls[0][1]).toBe('target1');
+    expect(sendDeathSaveResult.mock.calls[1][1]).toBe('target2');
   });
 
-  it('dispatches death-save-result custom event with correct detail after rolling', async () => {
-    const eventHandler = vi.fn();
-    window.addEventListener('death-save-result', eventHandler);
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-    await waitForResultVisible();
-    expect(eventHandler).toHaveBeenCalledOnce();
-    const detail = eventHandler.mock.calls[0][0].detail;
-    expect(detail).toMatchObject({
-      promptId: 'prompt-1',
-      targetName: 'target1',
+  it('cannot be dismissed by clicking the modal or its backdrop', async () => {
+    await renderWithPrompt('target1');
+    emitPrompt('target2');
+    await screen.findByText('(1 of 2)');
+
+    // The overlay/modal are plain divs, so class selectors are the only handles.
+    fireEvent.click(document.querySelector('.dsp-modal'));
+    fireEvent.click(document.querySelector('.dsp-overlay'));
+
+    expect(screen.getByText('target1')).toBeInTheDocument();
+    expect(screen.getByText('(1 of 2)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Roll Death Save' })).toBeInTheDocument();
+  });
+
+  // ── Rolling and committing the result ──
+
+  it('replaces Roll with Done after rolling a single prompt', async () => {
+    await renderWithPrompt('target1');
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+    await rollAndWaitForResult();
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Roll Death Save' })).not.toBeInTheDocument();
+  });
+
+  it('broadcasts a death-save-result event and posts the same payload to the server', async () => {
+    await renderWithPrompt('target1');
+    await rollAndWaitForResult();
+
+    const expectedPayload = {
+      promptId: 'prompt-target1',
       roll: 15,
       isNat20: false,
       isNat1: false,
@@ -214,226 +213,124 @@ describe('DeathSavePromptModal', () => {
       newSaves: [true, false, false],
       newFailures: [false, false, false],
       restoredToHp: null,
+    };
+    expect(dispatchedResults).toHaveLength(1);
+    expect(dispatchedResults[0]).toEqual({ ...expectedPayload, targetName: 'target1' });
+    expect(sendDeathSaveResult).toHaveBeenCalledWith(CAMPAIGN, 'target1', expectedPayload);
+  });
+
+  it('writes new saves and failures to the runtime store and clears the prompt', async () => {
+    await renderWithPrompt('target1');
+    await rollAndWaitForResult();
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('target1', 'deathSaves', [true, false, false], CAMPAIGN);
+    expect(setRuntimeValue).toHaveBeenCalledWith('target1', 'deathFailures', [false, false, false], CAMPAIGN);
+    expect(clearDeathSavePrompt).toHaveBeenCalledWith(CAMPAIGN, 'target1');
+    // a plain success must not kill or heal the target
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('target1', 'isDead', expect.anything(), CAMPAIGN);
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('target1', 'currentHitPoints', expect.anything(), CAMPAIGN);
+  });
+
+  it('reads saved death saves from the runtime store before rolling', async () => {
+    getRuntimeValue.mockImplementation((targetName, prop) => {
+      if (targetName !== 'target1') return null;
+      return prop === 'deathSaves' ? [true, false, false] : [false, true, false];
     });
-    window.removeEventListener('death-save-result', eventHandler);
+    await renderWithPrompt('target1');
+    await rollAndWaitForResult();
+    expect(deathSaveRules.rollDeathSave).toHaveBeenCalledWith([true, false, false], [false, true, false]);
   });
 
-  it('calls sendDeathSaveResult with full payload when rolling', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-    await waitForResultVisible();
-    expect(sendDeathSaveResult).toHaveBeenCalledWith('test-campaign', 'target1', {
-      promptId: 'prompt-1',
-      roll: 15,
-      isNat20: false,
-      isNat1: false,
-      success: true,
-      result: 'success',
-      newSaves: [true, false, false],
-      newFailures: [false, false, false],
-      restoredToHp: null,
-    });
+  it('defaults to three empty save slots when nothing is stored yet', async () => {
+    await renderWithPrompt('target1');
+    await rollAndWaitForResult();
+    expect(deathSaveRules.rollDeathSave).toHaveBeenCalledWith([false, false, false], [false, false, false]);
   });
 
-  it('calls clearDeathSavePrompt when rolling', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-    await waitForResultVisible();
-    expect(clearDeathSavePrompt).toHaveBeenCalledWith('test-campaign', 'target1');
-  });
-
-  it('updates runtime state for deathSaves and deathFailures after rolling', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-    await waitForResultVisible();
-    expect(setRuntimeValue).toHaveBeenCalledWith('target1', 'deathSaves', [true, false, false], 'test-campaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith('target1', 'deathFailures', [false, false, false], 'test-campaign');
-  });
-
-  it('sets isDead in runtime state when the roll results in death', async () => {
+  it('marks the target dead when the roll results in death', async () => {
     deathSaveRules.rollDeathSave.mockReturnValue(defaultRollResult({
       roll: 3,
       result: 'dead',
       newSaves: [false, false, false],
       newFailures: [true, true, true],
     }));
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-    await waitForResultVisible();
-    expect(setRuntimeValue).toHaveBeenCalledWith('target1', 'isDead', 1, 'test-campaign');
+    await renderWithPrompt('target1');
+    await rollAndWaitForResult();
+    expect(setRuntimeValue).toHaveBeenCalledWith('target1', 'isDead', 1, CAMPAIGN);
   });
 
-  it('reads saved death saves from runtime state before rolling', async () => {
-    getRuntimeValue.mockImplementation((targetName, prop) => {
-      if (targetName === 'target1' && prop === 'deathSaves') return [true, false, false];
-      if (targetName === 'target1' && prop === 'deathFailures') return [false, true, false];
-      return null;
-    });
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-    await waitForResultVisible();
-    expect(deathSaveRules.rollDeathSave).toHaveBeenCalledWith(
-      [true, false, false],
-      [false, true, false],
-    );
-  });
-
-  // ── Button states & advancement ──
-
-  it('shows Roll button before rolling, Done after rolling with single prompt', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    expect(screen.getByRole('button', { name: 'Roll Death Save' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Roll Death Save' })).not.toBeInTheDocument();
-    });
-  });
-
-  it('shows Next button when multiple prompts are queued', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    fireEvent.click(screen.getByTestId('trigger-prompt-2'));
-    await waitFor(() => {
-      expect(screen.getByText(/\(1 of 2\)/)).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
-    });
-  });
-
-  it('advances to next prompt when Next button is clicked', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    fireEvent.click(screen.getByTestId('trigger-prompt-2'));
-    await waitFor(() => {
-      expect(screen.getByText(/\(1 of 2\)/)).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    await waitFor(() => {
-      expect(screen.getByText('target2')).toBeInTheDocument();
-      expect(screen.queryByText(/\(1 of/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('does not advance when the overlay is clicked', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    fireEvent.click(screen.getByTestId('trigger-prompt-2'));
-    await waitFor(() => {
-      expect(screen.getByText(/\(1 of 2\)/)).toBeInTheDocument();
-    });
-    const overlay = document.querySelector('.dsp-overlay');
-    if (overlay) fireEvent.click(overlay);
-    expect(screen.getByText(/\(1 of 2\)/)).toBeInTheDocument();
-    expect(screen.getByText('target1')).toBeInTheDocument();
-  });
-
-  it('keeps the modal open when the overlay is clicked with a single prompt', async () => {
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    const overlay = document.querySelector('.dsp-overlay');
-    if (overlay) fireEvent.click(overlay);
-    expect(screen.getByText(/must make a/i)).toBeInTheDocument();
-  });
-
-  // ── Roll result variants ──
-
-  describe('roll result variants', () => {
-    const testCases = [
-      {
-        name: 'natural 20',
-        overrides: { roll: 20, isNat20: true, result: 'nat20', restoredToHp: 1 },
-        expectedLabel: /NATURAL 20 — STABILIZED!/i,
-        showsHp: true,
-      },
-      {
-        name: 'natural 1',
-        overrides: { roll: 1, isNat1: true, result: 'failure', newFailures: [true, true, false] },
-        expectedLabel: /NATURAL 1 — DOUBLE FAILURE/i,
-        showsHp: false,
-      },
-      {
-        name: 'stable',
-        overrides: { roll: 15, result: 'stable' },
-        expectedLabel: /STABILIZED!/i,
-        showsHp: false,
-      },
-      {
-        name: 'dead',
-        overrides: { roll: 5, result: 'dead', newSaves: [false, false, false], newFailures: [false, false, false] },
-        expectedLabel: /DEAD/,
-        showsHp: false,
-      },
-      {
-        name: 'failure',
-        overrides: { roll: 5, result: 'failure', newFailures: [true, false, false] },
-        expectedLabel: /DEATH SAVE FAILURE/,
-        showsHp: false,
-      },
-    ];
-
-    for (const tc of testCases) {
-      it(`displays correct result label for ${tc.name}`, async () => {
-        deathSaveRules.rollDeathSave.mockReturnValue(defaultRollResult(tc.overrides));
-        render(<DeathSavePromptModal campaignName="test-campaign" />);
-        fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-        await waitForPromptVisible();
-        fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-        await waitForResultVisible();
-        expect(screen.getByText(tc.expectedLabel)).toBeInTheDocument();
-      });
-
-      it(`shows HP restoration text for ${tc.name} when applicable`, async () => {
-        deathSaveRules.rollDeathSave.mockReturnValue(defaultRollResult(tc.overrides));
-        render(<DeathSavePromptModal campaignName="test-campaign" />);
-        fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-        await waitForPromptVisible();
-        fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-        await waitForResultVisible();
-        if (tc.showsHp) {
-          expect(screen.getByText(/Restored to 1 HP/)).toBeInTheDocument();
-        } else {
-          expect(screen.queryByText(/Restored to.*HP/)).not.toBeInTheDocument();
-        }
-      });
-    }
-  });
-
-  // ── HP restoration side effects ──
-
-  it('sets currentHitPoints when roll restores HP', async () => {
+  it('restores current hit points when the roll restores HP', async () => {
     deathSaveRules.rollDeathSave.mockReturnValue(defaultRollResult({
       roll: 20, isNat20: true, result: 'nat20', restoredToHp: 1,
     }));
-    render(<DeathSavePromptModal campaignName="test-campaign" />);
-    fireEvent.click(screen.getByTestId('trigger-prompt-1'));
-    await waitForPromptVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
-    await waitForResultVisible();
-    expect(setRuntimeValue).toHaveBeenCalledWith('target1', 'currentHitPoints', 1, 'test-campaign');
+    await renderWithPrompt('target1');
+    await rollAndWaitForResult();
+    expect(setRuntimeValue).toHaveBeenCalledWith('target1', 'currentHitPoints', 1, CAMPAIGN);
   });
 
+  // ── Roll outcome display (label, roll value, HP line, broadcast flag) ──
+
+  describe('roll outcomes', () => {
+    const outcomes = [
+      {
+        name: 'success',
+        roll: { roll: 15, result: 'success' },
+        label: 'DEATH SAVE SUCCESS',
+        success: true,
+      },
+      {
+        name: 'natural 20',
+        roll: { roll: 20, isNat20: true, result: 'nat20', restoredToHp: 1 },
+        label: 'NATURAL 20 — STABILIZED!',
+        success: true,
+        restoredHp: 1,
+      },
+      {
+        name: 'natural 1',
+        roll: { roll: 1, isNat1: true, result: 'failure', newFailures: [true, true, false] },
+        label: 'NATURAL 1 — DOUBLE FAILURE',
+        success: false,
+      },
+      {
+        name: 'stable',
+        roll: { roll: 15, result: 'stable' },
+        label: 'STABILIZED!',
+        success: true,
+      },
+      {
+        name: 'failure',
+        roll: { roll: 5, result: 'failure', newFailures: [true, false, false] },
+        label: 'DEATH SAVE FAILURE',
+        success: false,
+      },
+      {
+        name: 'dead',
+        roll: { roll: 5, result: 'dead', newSaves: [false, false, false], newFailures: [false, false, false] },
+        label: 'DEAD',
+        success: false,
+      },
+    ];
+
+    for (const outcome of outcomes) {
+      it(`displays the ${outcome.name} outcome in full`, async () => {
+        deathSaveRules.rollDeathSave.mockReturnValue(defaultRollResult(outcome.roll));
+        await renderWithPrompt('target1');
+        const resultLine = await rollAndWaitForResult();
+
+        expect(screen.getByText(outcome.label)).toBeInTheDocument();
+        expect(resultLine).toHaveTextContent(String(outcome.roll.roll));
+        if (outcome.restoredHp != null) {
+          expect(screen.getByText(`Restored to ${outcome.restoredHp} HP`)).toBeInTheDocument();
+        } else {
+          expect(screen.queryByText(/Restored to .* HP/)).not.toBeInTheDocument();
+        }
+        expect(dispatchedResults[0]).toMatchObject({
+          promptId: 'prompt-target1',
+          targetName: 'target1',
+          success: outcome.success,
+          result: outcome.roll.result,
+        });
+      });
+    }
+  });
 });

@@ -1,7 +1,10 @@
 import { useEffect, useCallback } from 'react';
 
 function AvatarModal({ name, imagePath, campaignName, onClose }) {
-    const handleOnClose = useCallback(() => {
+    const handleOnClose = useCallback((event) => {
+        // Ignore keydown events for keys other than Escape (button clicks
+        // carry no `key`, so they always close).
+        if (event && event.type === 'keydown' && event.key !== 'Escape') return;
         document.removeEventListener("keydown", handleOnClose);
         onClose();
     }, [onClose]);
