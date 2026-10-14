@@ -33,9 +33,10 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ### 4. Encounters (Encounter Builder)
 - **View state**: `encounter`
 - **Features**: Full encounter builder with monster database
-- **Buttons**: Save encounter, Load encounter, Generate encounter
-- **Components**: Party list (auto-populated from characters), Difficulty selector (Easy/Medium/Hard/Deadly), Monster search and filter (Type, Size, CR Min/Max), Monster table with checkboxes
-- **Identifiers**: `heading:has-text("Encounter Builder")`, `combobox:has-text("Difficulty")`
+- **Buttons**: Save encounter (`button[title="Save encounter"]`), Load encounter (`button[title="Load encounter"]`), Generate (`button[title="Generate encounter from environments"]`)
+- **Components**: Party list (auto-populated from characters), Difficulty selector (Easy/Medium/Hard/Deadly), Monster search and filter (Type, Size, CR Min/Max), Monster table with checkboxes; checked rows get qty steppers `button.qty-btn` (− N +) in the qty cell + a `.encounter-selected` "Selected Monsters (N) <xp> XP" summary card with `.selected-item` rows and × removers
+- **Save/Load round-trip (verified 2026-10-13)**: Save → `.encounter-modal` with name input → POST persists (visible in `GET /api/campaigns/test-campaign/encounters` with `savedAt`+`effectiveXP`); Load → `.encounter-modal-load .encounter-list` rows "<name><X> effective XP" each with buttons [download-load, pen(×), trash(×)]; LOAD button restores checked rows + exact quantities + closes modal; TRASH deletes with NO confirm dialog (inconsistent with every other delete flow). No visible save/load confirmation toast at all (backlog).
+- **Identifiers**: `heading:has-text("Encounter Builder")`, `.encounter-modal-save input`, `.encounter-list > *` rows, `.selected-item`, `button.qty-btn`
 
 ### 5. Factions
 - **View state**: `factions`
@@ -56,9 +57,11 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 - **View state**: `mapsManager`
 - **Features**: Map management, map list with actions
 - **Buttons**: Create Map, Generate Dungeon, Open, Activate, Rename, Edit description, Delete
-- **Behavior**: "Create Map" disabled only while name is empty; duplicate map names rejected inline ("A map with that name already exists"); delete uses a custom in-app modal ("Yes, Delete Permanently"), not `window.confirm`; editor autosaves debounced ~1s with flush on pointerup/unmount/map-switch
+- **Behavior**: "Create Map" disabled only while name is empty; duplicate map names rejected inline ("A map with that name already exists"); delete uses a custom in-app modal ("Yes, Delete Permanently"), not `window.confirm`; editor autosaves debounced ~1s with flush on pointerup/unmount/map-switch; ACTIVE badge shown in list next to active map
 - **Rename (verified 2026-10-10)**: inline row textbox (no modal) prefilled with name; Enter commits; empty rename silently reverts (safe); duplicate rename shows inline "A map with that name already exists" and keeps original; valid rename renames the file (test-map.json → qa-renamed-map.json) within ~12s debounce
-- **Identifiers**: `button:has-text("Create Map")`, `button:has-text("Generate Dungeon")`, rows `li:has-text("<name>")`, delete confirm `.maps-manager-modal-overlay`
+- **Editor + fog (verified 2026-10-13)**: map JSON model = `{displayName, name, gridSize, walls[], placedItems[], paintCells[], items[], players[], fog[], rooms[], terrain{}, pois[], zoom, panX, panY, revealed[]}`. Fog is COMPUTED (`useFogOfWar`): fog = cells neither in persistent `revealed[]` nor currently visible from tokens' line-of-sight; walls[] are the blockers; `revealed` monotonically grows on every client whenever tokens see new cells (auto-saved); "Reset Fog" (GM `button[title="Reset fog of war and view"]`) REFOGS — `revealed = current visible set only`. Grid size is an editable number input in the header (was 40, now 20 on Test Map → 20×20 cells; SVG renders viewBox 800×800). Wall painting persists within ~1.5s of pointerup.
+- **CROSS-TAB SYNC DEFECT (2026-10-13)**: manager-Open passes the raw filename WITH `.json` as `mapName` → editor SSE expectedKey never matches broadcast key → GM editor tabs are permanently deaf to live map updates (see `bug-map-editor-sse-key-mismatch-json-suffix.md`)
+- **Identifiers**: `button:has-text("Create Map")`, `button:has-text("Generate Dungeon")`, rows `li:has-text("<name>")`, delete confirm `.maps-manager-modal-overlay` ("Yes, Delete Permanently"), editor walls `svg.grid-svg rect.wall-cell`, grid extent `svg.grid-svg rect.grid-bg` (use its client rect /20 for cell px — viewBox does NOT span full svg element), tokens `g.creature-group`, `button[title="Reset fog of war and view"]`
 
 ### 8. NPCs
 - **View state**: `npcs`
@@ -77,9 +80,11 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 ### 10. Quests
 - **View state**: `quests`
-- **Features**: Quest tracking; empty-name Save disabled; duplicate names rejected (case-insensitive); special characters in names stored fine (GUID-keyed, not slug); delete = confirm dialog
-- **Buttons**: New Quest, Edit quest, Save, Cancel
-- **Identifiers**: `button:has-text("New Quest")`, `input:has-text("Search Quests")`
+- **Features**: Quest tracking; empty/whitespace-name Save disabled; duplicate names rejected case-insensitively (inline `.sessions-form-error`-style error inside `.ct-modal quests-modal`); special characters in names stored fine (GUID-keyed); delete = `window.confirm("Delete quest \"<name>\"?")` (cancel respected, row stays)
+- **Status**: Active/Completed/Failed select; row badge updates immediately after save; list preview shows RAW markdown (`**text**`) unstyled
+- **Delete defect (2026-10-13)**: accepting delete removes the row but leaves the Edit modal open with the deleted quest's data — see `bug-quest-edit-modal-stays-open-after-delete.md`
+- **Buttons**: New Quest, Edit quest, Save, Cancel, Delete (`button.ct-btn-danger` in `.ct-modal-footer`)
+- **Identifiers**: `button:has-text("New Quest")`, `input[placeholder="Quest name"]`, rows `button[aria-label="Edit quest: <name>"]`, search `input[placeholder*="Search Quests"]`, empty state `No quests found matching “<q>”`
 
 ### 11. Settlements
 - **View state**: `settlements` (GM/localhost)
@@ -114,14 +119,16 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 ### 15b. Music Panel
 - **Location**: Sidebar, above dice tray
 - **Moods**: Town / Outdoors / Combat / Dungeon / Tavern (mood chip highlights when selected)
-- **Behavior**: Selecting a mood AUTO-STARTS playback (Play flips to Pause with no Play click); embedded YouTube iframe player (`YouTube Video Player` generic, real YouTube videos e.g. "Village | D&D/TTRPG Ambience"); Pause/Stop + Volume slider; "Edit tracks for this mood" per-mood track editor
+- **Behavior**: Selecting a mood AUTO-STARTS playback (Play flips to Pause with no Play click); embedded YouTube iframe player (`YouTube Video Player` generic, real YouTube videos e.g. "Village | D&D/TTRPG Ambience"); Pause/Stop + Volume slider; play/stop actions WRITE to campaign log (`type:'music'`, "GM stopped ambience")
+- **Track editor (verified 2026-10-13)**: pencil button opens an INLINE `.music-editor` panel in the sidebar (NOT a modal — earlier "modal unexplored" note reframed) with Mood select `#music-editor-mood`, textarea `#music-editor-urls` pre-filled with video IDs (one per line), Save/Reset/Cancel. Save with no parseable lines = silent no-op, console-only error (bug filed).
 - **Note**: depends on external YouTube — offline tables get silence; autoplay may vary by browser policy
 
 ### 16. Sessions (GM planner)
 - **View state**: `sessions`; sidebar button "Sessions"
 - **Features**: session planning — list of plans with status badge (`planned`/`played`), search, checkbox progress, linked-resource chips
-- **Modal** (`.sessions-modal`, heading "New Session" / "Plan Session — <name>"): Name* (whitespace blocked, duplicate-name inline guard), Date, **Suggest XP Budget** + **Generate Rumors** (copy AI prompts to clipboard — button flips to "Prompt copied"), Linked Resources pickers (maps/encounters/npcs/quests/settlements/notes via `select[aria-label^="Link "]`, linked chip `.sessions-link-row` with quick actions: map→"Activate", npc→"To Initiative"), Contingencies (if/then + branch select), auto+custom Session Checklist (auto items scale with linked resources), Notes
-- **Row**: `button[aria-label="Edit session: <name>"]`; "Mark as Played" (recap prompt → `session-played` log entry); progressbar `aria-label="Checklist N of M complete"`; delete via row → modal Delete → confirm
+- **Modal** (`.sessions-modal`, heading "New Session" / "Plan Session — <name>"): Name* `#session-name` (whitespace blocked, duplicate-name inline guard), Date, **Suggest XP Budget** + **Generate Rumors** (copy AI prompts to clipboard — button flips to "Prompt copied"), Linked Resources pickers (maps/encounters/npcs/quests/settlements/notes via `select[aria-label^="Link "]`, linked chip `.sessions-link-row` with quick actions: map→"Activate", npc→"To Initiative"), Contingencies (`input[aria-label="Contingency N trigger"]`/`"…outcome"` + `select[aria-label="Contingency N branch"]` Negotiation/Alternate route/Failure-consequence), auto+custom Session Checklist (auto items scale with linked resources, `input[aria-label="New checklist item"]` + exact-text `button:text-is("Add")`), Notes
+- **Row**: `button[aria-label="Edit session: <name>"]`; "Mark as Played" (opens inside EDIT modal — fires `prompt` dialog "Session recap (optional)…" → `session-played` log entry "Session \"X\" marked as played"; recap may be left empty); progressbar `aria-label="Checklist N of M complete"` shows "N/M ready"; delete via row → modal Delete → confirm — modal CLOSES cleanly (contrast with Quests bug)
+- **Deep-verified 2026-10-13**: checklist ticks persist across modal close/reopen (auto + custom); contingencies persist incl. branch select value (`alternate`); linked items are REMOVED from their picker dropdowns once linked; quick "Activate" writes `__map__.activeMapName` silently; quick "To Initiative" on a statless NPC shows inline `.sessions-form-error` AND throws console "Failed to run session quick action" (button is not gated like NPCs view — backlog)
 
 ## Key UI Patterns
 
@@ -182,7 +189,7 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 | Dice buttons | `button:has-text("d20")`, `button:has-text("d4")`, etc. |
 | Short Rest | `button:has-text("Short Rest")` |
 | Long Rest | `button:has-text("Long Rest")` |
-| Map editor canvas | `svg.grid-svg` (viewBox 800×800 at CELL_SIZE 40); grid→client via `getScreenCTM()` + `DOMPoint(gx*40+20, gy*40+20)` |
+| Map editor canvas | `svg.grid-svg` viewBox 800×800 BUT content spans only inner square — for cell px use `rect.grid-bg` client rect ÷ gridCols; wall cells `rect.wall-cell`; tokens `g.creature-group`; grid→client via `getScreenCTM()` + `DOMPoint(gx*CELL+CELL/2, …)` where CELL=viewBox/cols |
 | Map tools | `button:has-text("Paint"|"Erase"|"Select"|"Spell"|"Ruler"|"3D"|"Items")`; fog reset `button[title="Reset fog of war and view"]` (GM) / `"Reset view"` (player) |
 | Items panel | `button.items-panel-close`; draggable char chips in panel "Characters" section (`character:<name>` drag payload) |
 | Maps list rows | `li:has-text("<name>")` with `button:has-text("Open"|"Activate"|"Rename"|"Delete")`; delete confirm `.maps-manager-modal-overlay` ("Yes, Delete Permanently") |
@@ -195,16 +202,21 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 | EB join | `.encounter-btn-join` (enabled with ≥1 checked); qty cell `td[data-testid="qty-<rowIndex>"]` (no numeric input exists at qty 0; renumbers on filter) |
 | Combat | `[data-testid="target-select"]` (arm target), `.mc-overlay` (monster card, stays open after attack — close via ×), `.mc-action:has-text("<Attack>")` |
 | Admin rollback | custom `.ct-modal-overlay` ("Cancel"/"Confirm") — not `window.confirm`; re-select campaign after reload |
+| Quests | name `input[placeholder="Quest name"]`; rows `button[aria-label="Edit quest: <name>"]`; footer delete `button.ct-btn-danger` (confirm dialog, but modal stays open after accept — bug); empty-state `No quests found matching “<q>”` |
+| EB save/load | `button[title="Save encounter"]` → `.encounter-modal-save input`; `button[title="Load encounter"]` → `.encounter-list > *` rows (buttons: `Load`, pen, trash — trash deletes WITHOUT confirm); qty `button.qty-btn`; selection card `.encounter-selected`/`.selected-item` |
+| Music editor | pencil `button[title="Edit tracks for this mood"]` opens INLINE `.music-editor` (`#music-editor-mood`, `#music-editor-urls`, `.music-editor-actions` Save/Reset/Cancel) — not a modal |
+| Inventory add-item | party `button:has-text("Add Item")` → `.pi-modal` `#pi-item-name`/`#pi-item-qty`/`#pi-item-desc`; equipment desc autofill currently inert (wrong-key bug) |
+| Sessions additions | `#session-name`; `input[aria-label="New checklist item"]` + `button:text-is("Add")` (exact, avoid "Add Contingency"); `input[aria-label="Contingency N trigger"|"Contingency N outcome"]`, `select[aria-label="Contingency N branch"]` (values `negotiation|alternate|failure`-style slugs); linked pickers drop already-linked options |
 
 ## Known Quirks & Gotchas
 
 1. **Duplicate accessible names** — Multiple "Add to Initiative" buttons (one per NPC) and many "Add" buttons (one per effect slot per creature) share identical accessible names, causing ambiguity.
 
-2. **Character wizard step numbering** — Edit mode starts at step 2 (Basic Information), missing step 1 (Ruleset).
+2. **Character wizard step numbering** — EDIT mode renumbers from 1 (indicator "1 Basic Information…11 Languages", content heading "Step 1: Basic Information" — indicator and content AGREE in edit mode, verified 2026-10-13; the disagree-from-Feats numbering is CREATE-mode only). Edit opens prefilled (name etc.) and Cancel discards cleanly.
 
 3. **Two Save buttons** — NPC form has both "Save & Add to Initiative" and "Save" buttons. Use exact text match to distinguish.
 
-4. **SSE connection reuse** — ONE shared `/subscribe?campaign=<name>` connection per tab via `subscribeToSSE()`; never create additional EventSources (exhausts the browser's ~6-connection-per-host pool).
+4. **SSE connection reuse** — ONE shared `/subscribe?campaign=<name>` connection per tab via `subscribeToSSE()`; never create additional EventSources (exhausts the browser's ~6-connection-per-host pool). Debug tip: `import('/src/services/ui/sseClient.js')` in page context → `__getSources().get(campaign)` exposes `{eventSource, handlers}` — inspect readyState, attach probe listeners, or wrap handlers to trace delivery (used to prove the map-editor key-mismatch bug).
 
 5. **change-data polling** — The `change-data` endpoint is polled frequently (every ~10s) for real-time sync.
 
@@ -216,14 +228,31 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 
 9. **Synthetic clicks absorbed** — Some icon buttons (e.g. `.npc-remove-btn`) silently ignore `evaluate`-driven `.click()`; use real mouse clicks in automation.
 
+10. **Playwright mouse events do NOT reach background tabs** — wall-painting / qty-stepper drags on a hidden tab are silently lost (2026-10-13). `bringToFront()` the acting tab first; verify state afterwards, never assume the dispatch landed.
+
+11. **Playwright auto-accepts `window.confirm`/`prompt`** — a dialog vanishes instantly and `browser_handle_dialog` then reports "no modal state". To prove whether a delete uses confirm at all, override `window.confirm` in page context to record+return false (then true) before clicking.
+
+12. **EB qty `+` clicks** — `page.mouse.click` at a freshly-computed rect can be absorbed while `locator.click()` on `button.qty-btn` increments reliably (2026-10-13); the same button on a DIFFERENT row absorbed-then-worked — diff the row text by exact `td[1]` name match, not `tr:has-text`, "Wolf" also matches Dire/Winter Wolf rows.
+
+13. **run_code_unsafe needs `async (page) => {}` function form** and ABSOLUTE URLs in `page.evaluate(fetch)` (relative paths throw "Failed to parse URL").
+
 ## Not Yet Verified / Untested Areas
 
 - **Admin Download / Upload Campaign:** buttons present; upload replaces the whole folder, untested.
-- **Encounter save/load/generate round-trips:** not covered this run.
-- **Map editor fog-of-war + token interplay across tabs:** not covered this run.
-- **Sessions deep flows (checklist persistence, mark-as-played):** only structure known.
+- **EB "Generate encounter from environments":** button known; never exercised.
+- **True player-view (non-localhost) fog rendering + player token drag:** cannot be exercised from a localhost-only session (all tabs are GM) — fog math verified GM-side + in source only.
+- **Inventory currency "Give" transfer to a player + per-character inventory:** party add/remove item verified; currency chips/Give not exercised.
+- **Music Reset button + YouTube playback with saved override:** editor Save of a valid override not exercised (would swap real tracks).
 
 ## Improvement Backlog
+
+- **2026-10-13 — Sessions quick-action "To Initiative" not stat-gated:** button is always clickable; a statless NPC throws a raw `Error` to console ("Failed to run session quick action") and dumps the service message into `.sessions-form-error`. Pre-validate (disable chip like the NPCs-view `.npcs-init-btn` gate) and surface a toast instead of a throw. Files: `src/components/sessions/Sessions.jsx` (`handleQuickAction`), reuse `npcCombatService` pre-check.
+- **2026-10-13 — Delete-guard inconsistency:** saved ENCOUNTER deletion (trash button in EB Load modal) and party-inventory item deletion fire with NO confirm, while Quests/Factions/NPCs use `window.confirm`, Maps uses a custom modal, Admin rollback uses `.ct-modal-overlay`. Pick one destructive-action guard convention (or at least confirm anything that deletes authored content). Files: EncounterBuilder load-modal, `PartyInventory.jsx`.
+- **2026-10-13 — Duplicate-name error banner never clears while typing (Quests, and Factions per prior run):** after fixing the name the inline "…already exists" error stays visible until Save is pressed again. Clear the error on name change. Files: Quests + Factions edit modals.
+- **2026-10-13 — Quest list preview prints RAW markdown** (`**bold**`, `[link](…)` literally) — render or strip markdown in row previews (unclamped open view already renders it). File: Quests list row.
+- **2026-10-13 — Silent save/load confirmations:** encounter save/load, session quick-"Activate", music stop etc. produce no visible toast ("Saved"/"Loaded"/"Activated") — feedback is only the state change itself (+log entry). Add lightweight toasts; helps first-time GMs trust the app.
+- **2026-10-13 — Map editor grid math exposed as raw viewBox:** painting cells requires measuring `rect.grid-bg` client rect (viewBox 800 does not span the svg element box; preserveAspectRatio none stretches). Expose a `data-cell` attribute or stable `aria-label` per cell for testability of paint/fog/token automation.
+- **2026-10-13 — `revealed` array can balloon:** Test Map carried 31,200 stale revealed strings (from an old larger grid) until Reset Fog compacted it to 400 — every save/SSE payload ships the whole array. Prune cells outside the current grid bounds on load or on grid-size change. File: `src/components/map/Map.jsx` merge path + server maps route.
 
 
 ## Coverage
@@ -232,25 +261,26 @@ D&D Character Sheet is a full-stack React 19 + Express 5 app for managing D&D 5e
 |---|---|---|
 | Campaign selection | deep | select/deselect, reload re-select, multi-tab |
 | Character sheet | deep | prior sessions + rest/ally/HP seams |
-| Character wizard (create) | deep | full 17-step walk 2026-10-10: ruleset-skip, dup-name overwrite (bug), skill over-cap (bug), point-buy clamp, numbering; edit-mode not re-covered |
+| Character wizard (create) | deep | full 17-step walk 2026-10-10: ruleset-skip, dup-name overwrite (bug), skill over-cap (bug), point-buy clamp, numbering |
+| Character wizard (edit) | medium | 2026-10-13: opens at renumbered step 1, indicator/content agree, prefilled, cancel clean; destructive edit-save not exercised |
 | NPCs | deep | create/edit/save/delete/dupe-guard, two-tab concurrent lost-update verified 2026-10-10 |
-| Quests | shallow | validation known from prior runs; not re-exercised this run |
+| Quests | deep | 2026-10-13: create w/ special chars, whitespace-block, case-insensitive dupe guard (banner-stickiness noted), status badge edit persists, search + empty-state, delete confirm+cancel+accept paths — delete-leaves-modal-open bug filed |
 | Factions | deep | flat CRUD 2026-10-10: create+dupe guard, influence slider bounds (min 1), cancel-discard, delete confirm+persist; list rows |
-| Encounters (EB) | shallow this run | monster join/attack deeply covered by MA suite; encounter save/load not touched |
-| Maps manager | deep | create/list/activate/rename validation matrix (empty/dup/valid) 2026-10-10; editor paint covered by prior runs |
-| Map editor fog of war | shallow | tool affordances known; cross-tab fog sync not re-tested this run |
+| Encounters (EB) | medium | 2026-10-13: monster check/qty stepper/selected-card, SAVE round-trip (server list w/ XP), mutate, LOAD restores exact quantities, trash-delete (no confirm); Generate + Join covered by MA suite |
+| Maps manager | deep | create/list/activate/rename validation matrix (empty/dup/valid) 2026-10-10; ACTIVE badge; editor paint 2026-10-13 |
+| Map editor fog of war | deep | 2026-10-13: fog model (revealed memory + LoS), wall paint persist, Reset Fog re-fog semantics, cross-tab SSE probe → manager-open SSE key-mismatch bug filed (`bug-map-editor-sse-key-mismatch-json-suffix.md`); token-move live reveal not proven (blocked by that bug) |
 | Initiative tracking | deep | prior runs (+NPC statless, walk, loot) |
-| Inventory | shallow | selectors documented; not re-exercised this run |
-| Notes | shallow | prior coverage |
-| Sessions | shallow | structure documented |
+| Inventory | shallow-medium | 2026-10-13: party add item (modal fields), equipment autofill DEAD (wrong-key bug filed), edit modal prefill, row delete; currency chips/Give NOT tried |
+| Notes | deep | 2026-10-13: create (title+markdown body), list preview, markdown renders in open view, delete via detail-view `.ct-btn-danger` with confirm "Delete this note?" |
+| Sessions | deep | 2026-10-13 full cycle: create w/ 3 linked resources (auto checklist scales 6+custom→7), checklist tick persistence across reopen, contingencies persist, XP/rumor clipboard flips, quick Activate writes __map__, quick To-Initiative statless-error path, Mark as Played (prompt+`session-played` log+PLAYED badge), delete closes cleanly |
 | Settlements | shallow | prior coverage |
-| SSE sync | deep | verified GM-management views are mount-fetch-only (no live create/delete sync) 2026-10-10; map/combat SSE from prior runs |
+| SSE sync | deep | verified GM-management views are mount-fetch-only (no live create/delete sync) 2026-10-10; map-data broadcast fires but manager-opened editor drops it (key mismatch bug 2026-10-13); probe recipe via sseClient `__getSources` |
 | Dice roller | deep | client-local only, no log/SSE (bug filed) 2026-10-10 |
-| Music panel | medium | first contact 2026-10-10: mood select auto-plays YouTube, pause/stop; track editor modal unexplored |
-| Admin | deep | clears verified 2026-10-10; snapshot/rollback from prior runs; upload/download untested |
+| Music panel | medium | mood auto-play, pause/stop (+`music` log entry), track editor OPENED inline (`#music-editor-urls` prefill) 2026-10-13; invalid-save silent bug filed; valid override save/Reset not exercised |
+| Admin | deep | clears verified 2026-10-10 + 2026-10-13 (cd{} log{} two-pass); snapshot/rollback from prior runs; upload/download untested |
 
 ## Blocked / Not Verified
 
-- (2026-10-10) Music "Edit tracks for this mood" modal — not opened (time). YouTube playback verified; offline/embed-failure path untested.
-- (2026-10-10) Character wizard EDIT mode re-verification — create mode was destructive-tested this run (overwrote then restored AasimarTest); edit mode numbering unchanged from doc.
-- (2026-10-10) Admin Campaign Upload — intentionally not exercised (replaces whole folder).
+- (2026-10-13) True player-view fog rendering / non-localhost read-only mode — all Playwright tabs run on localhost (GM); no second host available. Fog logic was verified via GM canvas + source reading instead.
+- (2026-10-13) Live token-drag reveal sync across tabs — untestable end-to-end because manager-opened editors never receive SSE updates (the filed key-mismatch bug swallows the `players` merges too); single-tab drag+reveal autosave path also skipped to keep board untouched.
+- (2026-10-13) EB "Generate encounter from environments", Admin upload/download, Inventory currency Give, Music Save of a valid override — not exercised this session (time/benign-risk triage).
