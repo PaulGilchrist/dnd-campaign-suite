@@ -1,3 +1,7 @@
+// @maintained-by-ai — deterministic unit tests for the sacredWeaponHandler.js public contract
+// (handle / applyDamageTypeChoice / cancelSacredWeapon). Every side-effect seam (runtime
+// store, expirations, log service) is mocked, so the suite is stable as the app moves.
+// CLA-301 prose assertions pin the specified activation-log content by design.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -57,66 +61,59 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
+function mockRuntime(map = {}) {
+  getRuntimeValue.mockImplementation((name, key) => (key in map ? map[key] : null));
+}
+
 describe('sacredWeaponHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe('handle', () => {
-    it('should show damage type modal when activating with options and charges available', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'channelDivinityCharges') return 2;
-        return null;
-      });
+    it('opens the damage-type picker and spends the Channel Divinity charge before returning', async () => {
+      mockRuntime({ activeBuffs: [], channelDivinityCharges: 2 });
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
+      const action = makeAction();
+      const playerStats = makePlayerStats();
+      const result = await handle(action, playerStats, campaignName);
 
       expect(result.type).toBe('modal');
       expect(result.modalName).toBe('sacredWeaponDamageType');
-      expect(result.payload.action).toEqual(makeAction());
-      expect(result.payload.playerStats).toEqual(makePlayerStats());
+      expect(result.payload.action).toEqual(action);
+      expect(result.payload.playerStats).toEqual(playerStats);
       expect(result.payload.campaignName).toBe(campaignName);
+      // Charge is spent BEFORE the picker opens (CLA-301 refund pairs with this write)
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 1, campaignName);
+      // Buff is not granted un-typed while the picker is still open
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'activeBuffs', expect.anything(), campaignName);
     });
 
-    it('should show no-charges popup when channel divinity charges are insufficient', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'channelDivinityCharges') return 0;
-        return null;
-      });
+    it('activates immediately (no picker) when options are empty, spending the charge and logging the activation', async () => {
+      mockRuntime({ activeBuffs: [], channelDivinityCharges: 3 });
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.automationType).toBe('temp_buff');
-    });
-
-    it('should activate immediately and decrement charges when options array is empty', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'channelDivinityCharges') return 3;
-        return null;
-      });
-
-      const action = makeAction({ automation: { ...makeAction().automation, options: [] } });
-
+      const action = makeAction({ automation: { options: [] } });
       const result = await handle(action, makePlayerStats(), campaignName);
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('Sacred Weapon activated');
       expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 2, campaignName);
+      expect(addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({ type: 'ability_use', abilityName: 'Sacred Weapon' }),
+      );
     });
 
-    it('should toggle off when already active and remove only that buff', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [
+    it('toggles off: removes only the Sacred Weapon buff, clears its queued expiry, and logs the end', async () => {
+      mockRuntime({
+        activeBuffs: [
           { name: 'Other Buff', effect: 'other' },
           { name: 'Sacred Weapon', effect: 'sacred_weapon' },
-        ];
-        return null;
+        ],
+        pendingExpirations: [
+          { target: 'TestHero', effects: [{ type: 'remove_active_buff', buffName: 'Sacred Weapon' }], appliedRound: 1, expiryRounds: 100 },
+          { target: 'TestHero', effects: [{ type: 'remove_active_buff', buffName: 'Other Buff' }], appliedRound: 2, expiryRounds: 10 },
+        ],
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName);
@@ -130,16 +127,23 @@ describe('sacredWeaponHandler', () => {
         [{ name: 'Other Buff', effect: 'other' }],
         campaignName,
       );
+      // Queued remove_active_buff expiry must not survive to kill a future re-activation
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestHero',
+        'pendingExpirations',
+        [expect.objectContaining({ effects: [{ type: 'remove_active_buff', buffName: 'Other Buff' }] })],
+        campaignName,
+      );
+      expect(addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({ type: 'ability_use', description: expect.stringContaining('ended Sacred Weapon') }),
+      );
     });
 
-    it('should use class_specific.channel_divinity_charges fallback when stored is null', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'channelDivinityCharges') return null;
-        return null;
-      });
+    it('uses class_specific.channel_divinity_charges fallback when stored charges are null', async () => {
+      mockRuntime({ activeBuffs: [], channelDivinityCharges: null });
 
-      const action = makeAction({ automation: { ...makeAction().automation, options: [] } });
+      const action = makeAction({ automation: { options: [] } });
       const playerStats = makePlayerStats({
         level: 3,
         class: {
@@ -155,14 +159,24 @@ describe('sacredWeaponHandler', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'channelDivinityCharges', 2, campaignName);
     });
 
+    it('refuses at zero charges: popup, no spend, no expiry, no log (CLA-301)', async () => {
+      mockRuntime({ activeBuffs: [], channelDivinityCharges: 0 });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.automationType).toBe('temp_buff');
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(addExpiration).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+    });
   });
 
   describe('applyDamageTypeChoice', () => {
-    it('should apply chosen damage type and update buff', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Sacred Weapon', effect: 'sacred_weapon', damageTypeChoice: null }];
-        return null;
-      });
+    it('activates with the chosen damage type: writes the buff, registers the 100-round expiry, logs prose (CLA-301)', async () => {
+      mockRuntime({ activeBuffs: [], channelDivinityCharges: 2 });
 
       const result = await applyDamageTypeChoice(makeAction(), makePlayerStats(), campaignName, 'Radiant Damage');
 
@@ -171,88 +185,10 @@ describe('sacredWeaponHandler', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestHero',
         'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ damageTypeChoice: 'Radiant' }),
-        ]),
+        [expect.objectContaining({ name: 'Sacred Weapon', effect: 'sacred_weapon', damageTypeChoice: 'Radiant', duration: '10_minutes' })],
         campaignName,
       );
-    });
-
-    it('should preserve other buffs when updating sacred weapon', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [
-          { name: 'Other Buff', effect: 'other' },
-          { name: 'Sacred Weapon', effect: 'sacred_weapon', damageTypeChoice: null },
-        ];
-        return null;
-      });
-
-      await applyDamageTypeChoice(makeAction(), makePlayerStats(), campaignName, 'Radiant Damage');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ name: 'Other Buff', effect: 'other' }),
-          expect.objectContaining({ damageTypeChoice: 'Radiant' }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('should set damageTypeChoice to null when no option chosen', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Sacred Weapon', effect: 'sacred_weapon', damageTypeChoice: 'Radiant' }];
-        return null;
-      });
-
-      const result = await applyDamageTypeChoice(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).not.toContain('Damage type set to');
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ damageTypeChoice: null }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('should replace (not duplicate) an existing Sacred Weapon buff on double activate', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Sacred Weapon', effect: 'sacred_weapon', damageTypeChoice: 'normal' }];
-        return null;
-      });
-
-      await applyDamageTypeChoice(makeAction(), makePlayerStats(), campaignName, 'Radiant Damage');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        'activeBuffs',
-        [expect.objectContaining({ name: 'Sacred Weapon', damageTypeChoice: 'Radiant' })],
-        campaignName,
-      );
-    });
-
-    it('should register a 10-minute (100 round) expiration on activation (CLA-301)', async () => {
-      getRuntimeValue.mockReturnValue([]);
-
-      await applyDamageTypeChoice(makeAction(), makePlayerStats(), campaignName, 'Radiant Damage');
-
       expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestHero', targetName: 'TestHero', effects: [{ type: 'remove_active_buff', buffName: 'Sacred Weapon' }], campaignName, rounds: 100 });
-    });
-
-    it('should emit an ability_use activation log with CD spend and light prose (CLA-301)', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'channelDivinityCharges') return 2;
-        return null;
-      });
-
-      await applyDamageTypeChoice(makeAction(), makePlayerStats(), campaignName, 'Radiant Damage');
-
       expect(addEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({
@@ -268,45 +204,46 @@ describe('sacredWeaponHandler', () => {
       expect(desc).toContain('Radiant');
     });
 
-    it('should emit an ability_use log on direct (no-options) activation too (CLA-301)', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'channelDivinityCharges') return 3;
-        return null;
+    it('replaces an existing Sacred Weapon buff without duplicating it, preserving other buffs', async () => {
+      mockRuntime({
+        activeBuffs: [
+          { name: 'Other Buff', effect: 'other' },
+          { name: 'Sacred Weapon', effect: 'sacred_weapon', damageTypeChoice: 'normal' },
+        ],
       });
 
-      const action = makeAction({ automation: { ...makeAction().automation, options: [] } });
-      await handle(action, makePlayerStats(), campaignName);
+      await applyDamageTypeChoice(makeAction(), makePlayerStats(), campaignName, 'Radiant Damage');
 
-      const logged = addEntry.mock.calls.some(([, e]) => e.type === 'ability_use' && e.abilityName === 'Sacred Weapon');
-      expect(logged).toBe(true);
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestHero',
+        'activeBuffs',
+        [
+          expect.objectContaining({ name: 'Other Buff', effect: 'other' }),
+          expect.objectContaining({ name: 'Sacred Weapon', damageTypeChoice: 'Radiant' }),
+        ],
+        campaignName,
+      );
     });
-  });
 
-  describe('zero-charge refusal (CLA-301)', () => {
-    it('spends nothing, registers nothing and logs nothing when charges are 0', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'channelDivinityCharges') return 0;
-        return null;
-      });
+    it('sets damageTypeChoice to null when no option chosen', async () => {
+      mockRuntime({ activeBuffs: [{ name: 'Sacred Weapon', effect: 'sacred_weapon', damageTypeChoice: 'Radiant' }] });
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
+      const result = await applyDamageTypeChoice(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(addExpiration).not.toHaveBeenCalled();
-      expect(addEntry).not.toHaveBeenCalled();
+      expect(result.payload.description).not.toContain('Damage type set to');
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestHero',
+        'activeBuffs',
+        [expect.objectContaining({ damageTypeChoice: null })],
+        campaignName,
+      );
     });
   });
 
   describe('cancelSacredWeapon (CLA-301 refund)', () => {
     it('refunds the charge spent before the picker opened', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'channelDivinityCharges') return 1;
-        return null;
-      });
+      mockRuntime({ channelDivinityCharges: 1 });
 
       await cancelSacredWeapon(makeAction(), makePlayerStats(), campaignName);
 
@@ -314,38 +251,11 @@ describe('sacredWeaponHandler', () => {
     });
 
     it('does not write when charges store is untouched (nothing was spent)', async () => {
-      getRuntimeValue.mockReturnValue(null);
+      mockRuntime({});
 
       await cancelSacredWeapon(makeAction(), makePlayerStats(), campaignName);
 
       expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('toggle off cleanup (CLA-301)', () => {
-    it('removes the queued remove_active_buff expiration when ending the buff', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Sacred Weapon', effect: 'sacred_weapon' }];
-        if (key === 'pendingExpirations') return [
-          { target: 'TestHero', effects: [{ type: 'remove_active_buff', buffName: 'Sacred Weapon' }], appliedRound: 1, expiryRounds: 100 },
-          { target: 'TestHero', effects: [{ type: 'remove_active_buff', buffName: 'Other Buff' }], appliedRound: 2, expiryRounds: 10 },
-        ];
-        return null;
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.description).toBe('Sacred Weapon ended');
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        'pendingExpirations',
-        [expect.objectContaining({ effects: [{ type: 'remove_active_buff', buffName: 'Other Buff' }] })],
-        campaignName,
-      );
-      expect(addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({ type: 'ability_use', description: expect.stringContaining('ended Sacred Weapon') }),
-      );
     });
   });
 });

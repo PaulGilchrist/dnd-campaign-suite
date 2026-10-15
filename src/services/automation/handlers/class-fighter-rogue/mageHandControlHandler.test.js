@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './mageHandControlHandler.js';
 
@@ -29,7 +30,9 @@ function makeAction(overrides = {}) {
         name: 'Mage Hand Control',
         automation: {
             type: 'mage_hand_control',
-            range: '30',
+            // Real data format per spells/features JSON — numeric feet must be
+            // rendered from '30_ft' (CLA-218).
+            range: '30_ft',
             ...overrides.automation,
         },
         ...overrides,
@@ -37,7 +40,7 @@ function makeAction(overrides = {}) {
 }
 
 describe('mageHandControlHandler', () => {
-    it('returns popup with automation_info payload and logs the ability use', async () => {
+    it('returns popup with automation_info payload, logs the ability use, and arms the Sleight of Hand advantage flag', async () => {
         const result = await handle(
             makeAction(),
             makePlayerStats(),
@@ -45,6 +48,8 @@ describe('mageHandControlHandler', () => {
             null
         );
 
+        // Full-string pin proves numeric feet rendering from the stored
+        // '30_ft' range format (CLA-218).
         expect(result).toEqual({
             type: 'popup',
             payload: expect.objectContaining({
@@ -52,31 +57,22 @@ describe('mageHandControlHandler', () => {
                 name: 'Mage Hand Control',
                 automationType: 'mage_hand_control',
                 description: 'Mage Hand Control: Move the spectral hand up to <strong>30</strong> feet. While you control it, Dexterity (Sleight of Hand) checks through it have <strong>Advantage</strong>.',
-                automation: { type: 'mage_hand_control', range: '30' },
+                automation: { type: 'mage_hand_control', range: '30_ft' },
             }),
         });
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', {
             type: 'ability_use',
             characterName: 'TestWizard',
             abilityName: 'Mage Hand Control',
-        }));
+            description: 'TestWizard used Mage Hand Control to move the spectral hand up to 30 feet. Dexterity (Sleight of Hand) checks through the hand have advantage until the start of TestWizard\'s next turn.',
+        });
         // CLA-218: controlling the hand arms the Sleight of Hand advantage flag
         expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'mageHandControlled', true, 'test-campaign');
     });
 
-    it('renders numeric feet from the data range format (30_ft) — CLA-218', async () => {
-        const result = await handle(
-            makeAction({ automation: { type: 'mage_hand_control', range: '30_ft' } }),
-            makePlayerStats(),
-            'test-campaign',
-            null
-        );
-        expect(result.payload.description).toContain('up to <strong>30</strong> feet');
-        expect(result.payload.description).not.toContain('30_ft');
-    });
-
     it('gracefully handles log failure without throwing', async () => {
         vi.mocked(addEntry).mockRejectedValueOnce(new Error('network error'));
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
         const result = await handle(
             makeAction(),
@@ -87,6 +83,9 @@ describe('mageHandControlHandler', () => {
 
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
+        // Errors are logged, not silently swallowed.
+        expect(consoleError).toHaveBeenCalledWith('[mageHandControlHandler:log-error]', expect.any(Error));
+        consoleError.mockRestore();
     });
 
     it('returns popup with empty automationType and default range when action has no automation', async () => {

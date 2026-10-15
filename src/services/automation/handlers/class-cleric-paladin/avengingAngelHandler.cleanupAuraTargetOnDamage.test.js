@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Unit lane for cleanupAuraTargetOnDamage (aura tracking-list removal + log on damage).
+// Condition removal itself lives in applyDamage.js; the applyDamage call-site
+// (cleanupAvengingAngelAuras) is covered by applyDamage tests, not here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -79,9 +83,20 @@ describe('avengingAngelHandler.cleanupAuraTargetOnDamage', () => {
       expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(addEntry).not.toHaveBeenCalled();
     });
+  });
 
-    it('should be a no-op when aura targets list is empty', async () => {
-      mockAuraTargets([]);
+  describe('aura targets key unset (|| [] guard)', () => {
+    it('should be a no-op when the aura targets value is null', async () => {
+      mockAuraTargets(null);
+
+      await cleanupAuraTargetOnDamage(playerName, 'Goblin', campaignName);
+
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+    });
+
+    it('should be a no-op when the aura targets value is undefined', async () => {
+      mockAuraTargets(undefined);
 
       await cleanupAuraTargetOnDamage(playerName, 'Goblin', campaignName);
 

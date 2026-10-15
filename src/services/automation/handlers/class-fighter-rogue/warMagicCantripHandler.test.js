@@ -1,3 +1,6 @@
+// @maintained-by-ai — deterministic: all dependencies mocked at module
+// boundaries, exact-string popup pins for this handler's own composition,
+// no timers/DOM; no churn required when the app changes.
 // CLA-381: War Magic cantrip half now live-resolves (mirrors the verified
 // warMagicSpellHandler.confirmWarMagicSpell template) — the old tests asserted
 // the popup+log stub shape and have been rewritten against the real flow.
@@ -151,6 +154,7 @@ async function mods() {
         applyDamageToTarget: (await import('../../../rules/combat/applyDamage.js')).applyDamageToTarget,
         isWithinRange: (await import('../../../rules/combat/rangeCheck.js')).isWithinRange,
         createSaveListener: (await import('../../common/savePrompt.js')).createSaveListener,
+        endInvisibilityOnHostileAction: (await import('../../../rules/features/invisibilityService.js')).endInvisibilityOnHostileAction,
     }
 }
 
@@ -231,7 +235,7 @@ describe('warMagicCantripHandler', () => {
             const result = await handle(makeAction(), makePlayerStats({ spells: [] }), mockCampaignName)
 
             expect(result.type).toBe('popup')
-            expect(result.payload.description).toContain('No known Wizard cantrips available')
+            expect(result.payload.description).toBe('War Magic — No known Wizard cantrips available.')
             const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'war_magic_refused')
             expect(refusal).toBeDefined()
             expect(refusal.type).toBe('automation')
@@ -246,16 +250,12 @@ describe('warMagicCantripHandler', () => {
             const result = await handle(makeAction(), makePlayerStats(), mockCampaignName)
 
             expect(result.type).toBe('popup')
-            expect(result.payload.description).toContain('Once per turn')
+            expect(result.payload.description).toBe('War Magic — Once per turn — attack already replaced with a cantrip this turn.')
             expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'war_magic_refused')).toBe(true)
         })
     })
 
     describe('confirmWarMagicCantrip', () => {
-        beforeEach(() => {
-            vi.clearAllMocks()
-        })
-
         it('returns an error popup when no cantrip is selected', async () => {
             const { applyDamageToTarget, setRuntimeValue } = await mods()
 
@@ -270,10 +270,12 @@ describe('warMagicCantripHandler', () => {
         })
 
         it('returns an error popup when the selected cantrip cannot be found', async () => {
-            const { loadSpellData } = await mods()
+            const { loadSpellData, applyDamageToTarget, setRuntimeValue } = await mods()
             loadSpellData.mockResolvedValue([])
             const result = await confirmWarMagicCantrip(makeAction(), makePlayerStats(), mockCampaignName, 'Unknown Cantrip')
-            expect(result.payload.description).toContain('not found')
+            expect(result.payload.description).toBe('Cantrip "Unknown Cantrip" not found.')
+            expect(applyDamageToTarget).not.toHaveBeenCalled()
+            expect(setRuntimeValue).not.toHaveBeenCalled()
         })
 
         it('refuses an unknown (not-prepared) cantrip with a log and no resolution', async () => {
@@ -282,7 +284,7 @@ describe('warMagicCantripHandler', () => {
 
             const result = await confirmWarMagicCantrip(makeAction(), makePlayerStats(), mockCampaignName, 'Acid Splash')
 
-            expect(result.payload.description).toContain('not a cantrip you have prepared')
+            expect(result.payload.description).toBe('War Magic — Acid Splash is not a cantrip you have prepared.')
             expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'war_magic_refused')).toBe(true)
             expect(applyDamageToTarget).not.toHaveBeenCalled()
             expect(setRuntimeValue).not.toHaveBeenCalled()
@@ -294,7 +296,7 @@ describe('warMagicCantripHandler', () => {
 
             const result = await confirmWarMagicCantrip(makeAction(), makePlayerStats(), mockCampaignName, 'Fire Bolt')
 
-            expect(result.payload.description).toContain('Once per turn')
+            expect(result.payload.description).toBe('War Magic — Once per turn — attack already replaced with a cantrip this turn.')
             expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'war_magic_refused')).toBe(true)
             expect(applyDamageToTarget).not.toHaveBeenCalled()
             expect(setRuntimeValue).not.toHaveBeenCalled()
@@ -307,7 +309,7 @@ describe('warMagicCantripHandler', () => {
 
             const result = await confirmWarMagicCantrip(makeAction(), makePlayerStats(), mockCampaignName, 'Fire Bolt')
 
-            expect(result.payload.description).toContain('requires a target')
+            expect(result.payload.description).toBe('War Magic — requires a target — set the Target dropdown on your initiative card first.')
             expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'war_magic_refused')).toBe(true)
             expect(applyDamageToTarget).not.toHaveBeenCalled()
             expect(setRuntimeValue).not.toHaveBeenCalled()
@@ -320,7 +322,7 @@ describe('warMagicCantripHandler', () => {
 
             const result = await confirmWarMagicCantrip(makeAction(), makePlayerStats(), mockCampaignName, 'Fire Bolt')
 
-            expect(result.payload.description).toContain('out of range')
+            expect(result.payload.description).toBe('War Magic — Wight 1 is out of range for Fire Bolt (120 feet).')
             expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'war_magic_refused')).toBe(true)
             expect(applyDamageToTarget).not.toHaveBeenCalled()
             expect(setRuntimeValue).not.toHaveBeenCalled()
@@ -328,14 +330,16 @@ describe('warMagicCantripHandler', () => {
 
         it('rolls the spell attack vs the armed target, applies damage, and writes lastAttack via applyDamageToTarget', async () => {
             await setupConfirmMocks()
-            const { getCombatSummary, rollExpression, applyDamageToTarget, addEntry } = await mods()
+            const { getCombatSummary, rollExpression, applyDamageToTarget, addEntry, endInvisibilityOnHostileAction } = await mods()
             getCombatSummary.mockReturnValue(combatSummary)
 
-            const result = await confirmWarMagicCantrip(makeAction(), makePlayerStats(), mockCampaignName, 'Fire Bolt')
+            const action = makeAction()
+            const result = await confirmWarMagicCantrip(action, makePlayerStats(), mockCampaignName, 'Fire Bolt')
 
             // d20(15)+10=25 vs AC 11 → hit; cantrip die scales at lv18 → 4d10
             expect(rollExpression).toHaveBeenCalledWith('4d10')
             expect(applyDamageToTarget).toHaveBeenCalledWith(combatSummary, 'Wight 1', 22, ['Fire'], { campaignName: mockCampaignName, characters: [], ignoreResistance: false, attackerName: 'TestFighter' })
+            expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestFighter', mockCampaignName)
             const entries = addEntry.mock.calls.map(c => c[1])
             const attackLog = entries.find(e => e.rollType === 'attack')
             expect(attackLog).toBeDefined()
@@ -347,8 +351,13 @@ describe('warMagicCantripHandler', () => {
             expect(damageLog).toBeDefined()
             expect(damageLog.damageType).toBe('Fire')
             expect(damageLog.finalDamage).toBe(22)
-            expect(result.payload.description).toContain('HIT')
-            expect(result.payload.description).toContain('No spell slot consumed')
+            // result popup carries the automation config round-trip (cantrip-only lane)
+            expect(result.type).toBe('popup')
+            expect(result.payload.type).toBe('automation_info')
+            expect(result.payload.name).toBe('War Magic')
+            expect(result.payload.automationType).toBe('war_magic_cantrip')
+            expect(result.payload.automation).toEqual(action.automation)
+            expect(result.payload.description).toBe('<b>War Magic</b>: Cast <b>Fire Bolt</b> at <b>Wight 1</b>. 15 + 10 = 25 vs AC 11 — HIT. Dealt <b>22</b> Fire damage.<br/>No spell slot consumed (cantrip).')
         })
 
         it('scales the cantrip die by character level (lv1 → 1d10)', async () => {
@@ -363,7 +372,7 @@ describe('warMagicCantripHandler', () => {
 
         it('logs miss without damage on a natural miss', async () => {
             await setupConfirmMocks()
-            const { getCombatSummary, rollD20, applyDamageToTarget, addEntry } = await mods()
+            const { getCombatSummary, rollD20, applyDamageToTarget, addEntry, endInvisibilityOnHostileAction } = await mods()
             getCombatSummary.mockReturnValue(combatSummary)
             rollD20.mockReturnValue(1)
 
@@ -372,7 +381,8 @@ describe('warMagicCantripHandler', () => {
             const attackLog = addEntry.mock.calls.map(c => c[1]).find(e => e.rollType === 'attack')
             expect(attackLog.hit).toBe(false)
             expect(applyDamageToTarget).not.toHaveBeenCalled()
-            expect(result.payload.description).toContain('MISS')
+            expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled()
+            expect(result.payload.description).toBe('<b>War Magic</b>: Cast <b>Fire Bolt</b> at <b>Wight 1</b>. 1 + 10 = 11 vs AC 11 — MISS. No damage dealt.<br/>No spell slot consumed (cantrip).')
         })
 
         it('stamps the once-per-turn latch at the trigger and logs ability_use with no slot spend', async () => {
@@ -402,7 +412,7 @@ describe('warMagicCantripHandler', () => {
             expect(order).toEqual(['latch', 'apply'])
         })
 
-        it('runs the save path for save cantrips: no damage on success, half damage on a failed half save', async () => {
+        it('runs the save path for save cantrips — no damage and no attack roll on a successful save', async () => {
             await setupConfirmMocks({ spells: [sacredFlame] })
             const { getCombatSummary, createSaveListener, applyDamageToTarget, addEntry } = await mods()
             getCombatSummary.mockReturnValue(combatSummary)
@@ -415,7 +425,7 @@ describe('warMagicCantripHandler', () => {
                 saveType: 'DEX',
             }))
             expect(applyDamageToTarget).not.toHaveBeenCalled()
-            expect(result.payload.description).toContain('saved')
+            expect(result.payload.description).toBe('<b>War Magic</b>: Cast <b>Sacred Flame</b> at <b>Wight 1</b>. Wight 1 saved — no damage. No damage dealt.<br/>No spell slot consumed (cantrip).')
             expect(addEntry.mock.calls.map(c => c[1]).some(e => e.rollType === 'attack')).toBe(false)
         })
 
@@ -429,20 +439,21 @@ describe('warMagicCantripHandler', () => {
 
             // rollExpression total 22 → half 11 applied
             expect(applyDamageToTarget).toHaveBeenCalledWith(combatSummary, 'Wight 1', 11, ['Radiant'], { campaignName: mockCampaignName, characters: [], ignoreResistance: false, attackerName: 'TestFighter' })
-            expect(result.payload.description).toContain('failed the save')
+            expect(result.payload.description).toBe('<b>War Magic</b>: Cast <b>Sacred Flame</b> at <b>Wight 1</b>. Wight 1 failed the save. Dealt <b>11</b> Radiant damage.<br/>No spell slot consumed (cantrip).')
         })
 
-        it('returns a popup with the automation config', async () => {
-            await setupConfirmMocks()
-            const { getCombatSummary } = await mods()
+        it('handles a dismissed save prompt gracefully — no damage, latch stays spent', async () => {
+            await setupConfirmMocks({ spells: [sacredFlame] })
+            const { getCombatSummary, createSaveListener, applyDamageToTarget, endInvisibilityOnHostileAction, setRuntimeValue } = await mods()
             getCombatSummary.mockReturnValue(combatSummary)
-            const action = makeAction({ automation: { type: 'war_magic_cantrip', spellList: 'wizard_cantrips' } })
-            const result = await confirmWarMagicCantrip(action, makePlayerStats(), mockCampaignName, 'Fire Bolt')
+            createSaveListener.mockReturnValue({ promptId: 'p3', promise: Promise.reject(new Error('dismissed')) })
 
-            expect(result.type).toBe('popup')
-            expect(result.payload.name).toBe('War Magic')
-            expect(result.payload.automationType).toBe('war_magic_cantrip')
-            expect(result.payload.automation).toEqual(action.automation)
+            const result = await confirmWarMagicCantrip(makeAction(), makePlayerStats({ spells: ['Sacred Flame'] }), mockCampaignName, 'Sacred Flame')
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_War_Magic_usedRound', 1, mockCampaignName)
+            expect(applyDamageToTarget).not.toHaveBeenCalled()
+            expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled()
+            expect(result.payload.description).toBe('<b>War Magic</b>: Cast <b>Sacred Flame</b> at <b>Wight 1</b>. Save prompt dismissed. No damage dealt.<br/>No spell slot consumed (cantrip).')
         })
 
         it('does not throw when addEntry rejects', async () => {

@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// CLA-379: War Bond (Eldritch Knight lv3, 2024).
+// Owns the warBondHandler contract: handle() routing (refusal popup / auto-summon /
+// warBondSummon chooser payload), handleSummon() persist + popup strings, handleBond()
+// bonded-pool writes (cap, dedupe, inventory guard), and the CLA-379 campaign-log
+// entries (ability_use + war_bond_refused). Adjacent layers own their own tests:
+// chooser modal registration (useCharActionsAutomation), chooser rendering
+// (WarBondChooserModal.test.jsx), automation type registry (automationCollector.types.test.js).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, handleSummon, handleBond } from './warBondHandler.js';
 
@@ -15,7 +23,7 @@ const { getRuntimeValue, setRuntimeValue } = await import(
 );
 const { addEntry } = await import('../../../ui/logService.js');
 
-const SEASON_KEY = 'warBondWeapons';
+const BONDED_KEY = 'warBondWeapons';
 const SUMMONED_KEY = 'warBondSummoned';
 
 function makeAction(overrides = {}) {
@@ -39,147 +47,89 @@ function makePlayerStats(overrides = {}) {
     };
 }
 
+function makeInventoryStats(overrides = {}) {
+    return makePlayerStats({
+        inventory: {
+            equipped: ['Scimitar', 'Longsword'],
+            backpack: ['Shortbow'],
+            ...overrides,
+        },
+    });
+}
+
+// Runtime router: only warBondWeapons is ever populated; everything else reads empty.
+function bondedRouter(value) {
+    return (_name, key) => (key === BONDED_KEY ? value : undefined);
+}
+
 describe('warBondHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
     describe('handle', () => {
-        describe('no bonded weapons', () => {
-            it('returns popup when stored value is empty array', async () => {
-                getRuntimeValue.mockReturnValue([]);
+        it('refuses when nothing is bonded: exact popup, nothing persisted, war_bond_refused logged', async () => {
+            getRuntimeValue.mockImplementation(bondedRouter([]));
 
-                const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+            const action = makeAction();
+            const result = await handle(action, makePlayerStats(), 'test-campaign');
 
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'War Bond',
-                        automationType: 'war_bond_summon',
-                        description: 'No bonded weapons. Use "Bond Weapon:" to bond a weapon first (up to 2).',
-                        automation: makeAction().automation,
-                    },
-                });
+            expect(getRuntimeValue).toHaveBeenCalledWith('TestFighter', BONDED_KEY, 'test-campaign');
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'War Bond',
+                    automationType: 'war_bond_summon',
+                    description: 'No bonded weapons. Use "Bond Weapon:" to bond a weapon first (up to 2).',
+                    automation: action.automation,
+                },
             });
-
-            it('uses custom maxBonded in description when bondedWeaponCount is set', async () => {
-                getRuntimeValue.mockReturnValue([]);
-
-                const result = await handle(
-                    makeAction({ automation: { bondedWeaponCount: 5 } }),
-                    makePlayerStats(),
-                    'test-campaign'
-                );
-
-                expect(result.payload.description).toContain('up to 5');
-            });
-
-            it('uses default maxBonded of 2 when bondedWeaponCount is missing', async () => {
-                getRuntimeValue.mockReturnValue([]);
-
-                const result = await handle(
-                    makeAction({ automation: {} }),
-                    makePlayerStats(),
-                    'test-campaign'
-                );
-
-                expect(result.payload.description).toContain('up to 2');
-            });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'automation',
+                automationType: 'war_bond_refused',
+                characterName: 'TestFighter',
+            }));
         });
 
-        describe('single bonded weapon', () => {
-            it('summons the weapon and returns popup on success', async () => {
-                getRuntimeValue.mockImplementation((_name, key) =>
-                    key === SEASON_KEY ? ['Longsword'] : undefined
-                );
+        it('interpolates custom maxBonded into the refusal description', async () => {
+            getRuntimeValue.mockImplementation(bondedRouter([]));
 
-                const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-                expect(setRuntimeValue).toHaveBeenCalledWith(
-                    'TestFighter',
-                    SUMMONED_KEY,
-                    'Longsword',
-                    'test-campaign'
-                );
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'War Bond',
-                        automationType: 'war_bond_summon',
-                        description: 'War Bond: Longsword is summoned to your hand.',
-                        automation: makeAction().automation,
-                    },
-                });
-            });
-        });
-
-        describe('multiple bonded weapons', () => {
-            it('returns modal with weapon selection when two weapons bonded', async () => {
-                getRuntimeValue.mockImplementation((_name, key) =>
-                    key === SEASON_KEY ? ['Longsword', 'Battleaxe'] : undefined
-                );
-
-                const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-                expect(result.type).toBe('modal');
-                expect(result.modalName).toBe('warBondSummon');
-                expect(result.payload.bondedWeapons).toEqual(['Longsword', 'Battleaxe']);
-                expect(result.payload.maxBonded).toBe(2);
-                expect(result.payload.campaignName).toBe('test-campaign');
-                expect(result.payload.action).toBeDefined();
-                expect(result.payload.playerStats).toBeDefined();
-            });
-
-            it('respects custom bondedWeaponCount from automation', async () => {
-                getRuntimeValue.mockImplementation((_name, key) =>
-                    key === SEASON_KEY ? ['Longsword', 'Battleaxe', 'Spear'] : undefined
-                );
-
-                const result = await handle(
-                    makeAction({ automation: { bondedWeaponCount: 3 } }),
-                    makePlayerStats(),
-                    'test-campaign'
-                );
-
-                expect(result.type).toBe('modal');
-                expect(result.payload.maxBonded).toBe(3);
-                expect(result.payload.bondedWeapons).toHaveLength(3);
-            });
-
-            it('passes all weapons to modal even when more than maxBonded', async () => {
-                getRuntimeValue.mockImplementation((_name, key) =>
-                    key === SEASON_KEY ? ['A', 'B', 'C', 'D'] : undefined
-                );
-
-                const result = await handle(
-                    makeAction({ automation: { bondedWeaponCount: 2 } }),
-                    makePlayerStats(),
-                    'test-campaign'
-                );
-
-                expect(result.type).toBe('modal');
-                expect(result.payload.bondedWeapons).toEqual(['A', 'B', 'C', 'D']);
-                expect(result.payload.maxBonded).toBe(2);
-            });
-        });
-    });
-
-    describe('handleSummon', () => {
-        it('summons a weapon and returns popup on success', async () => {
-            const result = await handleSummon(
-                makeAction(),
+            const result = await handle(
+                makeAction({ automation: { bondedWeaponCount: 5 } }),
                 makePlayerStats(),
-                'test-campaign',
-                'Longsword'
+                'test-campaign'
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestFighter',
-                SUMMONED_KEY,
-                'Longsword',
+            expect(result.payload.description).toBe(
+                'No bonded weapons. Use "Bond Weapon:" to bond a weapon first (up to 5).'
+            );
+        });
+
+        it('defaults maxBonded to 2 when automation omits bondedWeaponCount and storage is missing', async () => {
+            getRuntimeValue.mockImplementation(bondedRouter(undefined));
+
+            const result = await handle(
+                { name: 'War Bond', automation: { type: 'war_bond_summon' } },
+                makePlayerStats(),
                 'test-campaign'
+            );
+
+            expect(result.payload.description).toBe(
+                'No bonded weapons. Use "Bond Weapon:" to bond a weapon first (up to 2).'
+            );
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
+
+        it('auto-summons the only bonded weapon: persists, exact popup, ability_use logged', async () => {
+            getRuntimeValue.mockImplementation(bondedRouter(['Longsword']));
+
+            const action = makeAction();
+            const result = await handle(action, makePlayerStats(), 'test-campaign');
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter', SUMMONED_KEY, 'Longsword', 'test-campaign'
             );
             expect(result).toEqual({
                 type: 'popup',
@@ -188,12 +138,122 @@ describe('warBondHandler', () => {
                     name: 'War Bond',
                     automationType: 'war_bond_summon',
                     description: 'War Bond: Longsword is summoned to your hand.',
-                    automation: makeAction().automation,
+                    automation: action.automation,
+                },
+            });
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'War Bond',
+                description: "War Bond: Longsword is summoned to TestFighter's hand.",
+            }));
+        });
+
+        it('returns the full warBondSummon chooser payload for two bonded weapons, persisting nothing', async () => {
+            getRuntimeValue.mockImplementation(bondedRouter(['Longsword', 'Battleaxe']));
+
+            const action = makeAction();
+            const playerStats = makePlayerStats();
+            const result = await handle(action, playerStats, 'test-campaign');
+
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(result).toEqual({
+                type: 'modal',
+                modalName: 'warBondSummon',
+                payload: {
+                    action,
+                    playerStats,
+                    campaignName: 'test-campaign',
+                    bondedWeapons: ['Longsword', 'Battleaxe'],
+                    maxBonded: 2,
                 },
             });
         });
 
-        it('returns error popup when no weapon selected', async () => {
+        it('passes every bonded weapon to the modal, even beyond a custom maxBonded', async () => {
+            getRuntimeValue.mockImplementation(bondedRouter(['A', 'B', 'C', 'D']));
+
+            const result = await handle(
+                makeAction({ automation: { bondedWeaponCount: 3 } }),
+                makePlayerStats(),
+                'test-campaign'
+            );
+
+            expect(result.type).toBe('modal');
+            expect(result.payload.bondedWeapons).toEqual(['A', 'B', 'C', 'D']);
+            expect(result.payload.maxBonded).toBe(3);
+        });
+
+        it('chooser confirm redispatches through the modal payload: persists the chosen weapon and logs ability_use', async () => {
+            getRuntimeValue.mockImplementation(bondedRouter(['Scimitar', 'Longsword']));
+
+            const modalResult = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+            const chosen = modalResult.payload.bondedWeapons[1];
+            expect(chosen).toBe('Longsword');
+
+            const summonResult = await handleSummon(
+                modalResult.payload.action,
+                modalResult.payload.playerStats,
+                modalResult.payload.campaignName,
+                chosen
+            );
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter', SUMMONED_KEY, 'Longsword', 'test-campaign'
+            );
+            expect(summonResult.type).toBe('popup');
+            expect(summonResult.payload.description).toBe('War Bond: Longsword is summoned to your hand.');
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                description: "War Bond: Longsword is summoned to TestFighter's hand.",
+            }));
+        });
+    });
+
+    describe('handleSummon', () => {
+        it('persists the selected weapon: exact popup, ability_use logged', async () => {
+            const action = makeAction();
+            const result = await handleSummon(action, makePlayerStats(), 'test-campaign', 'Mace');
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter', SUMMONED_KEY, 'Mace', 'test-campaign'
+            );
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'War Bond',
+                    automationType: 'war_bond_summon',
+                    description: 'War Bond: Mace is summoned to your hand.',
+                    automation: action.automation,
+                },
+            });
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'War Bond',
+                description: "War Bond: Mace is summoned to TestFighter's hand.",
+            }));
+        });
+
+        it('forwards a custom action name and campaign through popup and runtime write', async () => {
+            const result = await handleSummon(
+                makeAction({ name: 'War Bond (Variant)' }),
+                makePlayerStats(),
+                'distinct-campaign',
+                'Shortbow'
+            );
+
+            expect(result.payload.name).toBe('War Bond (Variant)');
+            expect(result.payload.description).toBe(
+                'War Bond (Variant): Shortbow is summoned to your hand.'
+            );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter', SUMMONED_KEY, 'Shortbow', 'distinct-campaign'
+            );
+        });
+
+        it('refuses null, undefined, and empty selections: popup, nothing persisted, refusal logged', async () => {
             for (const weapon of [null, undefined, '']) {
                 const result = await handleSummon(
                     makeAction(),
@@ -202,187 +262,88 @@ describe('warBondHandler', () => {
                     weapon
                 );
 
-                expect(setRuntimeValue).not.toHaveBeenCalled();
                 expect(result.type).toBe('popup');
                 expect(result.payload.description).toBe('No weapon selected.');
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+                expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                    automationType: 'war_bond_refused',
+                    description: 'War Bond refused — No weapon selected.',
+                }));
             }
         });
-
-        it('uses custom action name in success description', async () => {
-            const result = await handleSummon(
-                makeAction({ name: 'War Bond (Variant)' }),
-                makePlayerStats(),
-                'test-campaign',
-                'Shortbow'
-            );
-
-            expect(result.payload.description).toBe(
-                'War Bond (Variant): Shortbow is summoned to your hand.'
-            );
-        });
-
-        it('calls setRuntimeValue with campaignName on success', async () => {
-            await handleSummon(
-                makeAction(),
-                makePlayerStats(),
-                'distinct-campaign',
-                'Mace'
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestFighter',
-                SUMMONED_KEY,
-                'Mace',
-                'distinct-campaign'
-            );
-        });
-    });
-});
-
-describe('CLA-379 logging + bond flow', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    function makeInventoryStats() {
-        return makePlayerStats({
-            inventory: {
-                equipped: ['Scimitar', 'Longsword'],
-                backpack: ['Shortbow'],
-            },
-        });
-    }
-
-    it('guard refusal logs a war_bond_refused entry and spends nothing', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-        expect(result.type).toBe('popup');
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-            automationType: 'war_bond_refused',
-            characterName: 'TestFighter',
-        }));
-    });
-
-    it('single bonded summon logs ability_use with the weapon name', async () => {
-        getRuntimeValue.mockReturnValue(['Scimitar']);
-
-        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-        expect(result.type).toBe('popup');
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'TestFighter', SUMMONED_KEY, 'Scimitar', 'test-campaign'
-        );
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-            type: 'ability_use',
-            characterName: 'TestFighter',
-            abilityName: 'War Bond',
-        }));
-        const entry = addEntry.mock.calls.at(-1)[1];
-        expect(entry.description).toContain('Scimitar');
-    });
-
-    it('two bonded weapons return the registered warBondSummon chooser modal', async () => {
-        getRuntimeValue.mockReturnValue(['Scimitar', 'Longsword']);
-
-        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('warBondSummon');
-        expect(result.payload.bondedWeapons).toEqual(['Scimitar', 'Longsword']);
-    });
-
-    it('chooser confirm dispatches to handleSummon: persists and logs ability_use', async () => {
-        getRuntimeValue.mockReturnValue(['Scimitar', 'Longsword']);
-
-        const modalResult = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-        const chosen = modalResult.payload.bondedWeapons[1];
-        const summonResult = await handleSummon(
-            modalResult.payload.action, modalResult.payload.playerStats,
-            modalResult.payload.campaignName, chosen
-        );
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'TestFighter', SUMMONED_KEY, 'Longsword', 'test-campaign'
-        );
-        expect(summonResult.type).toBe('popup');
-        const abilityEntry = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use').at(-1);
-        expect(abilityEntry.description).toContain('Longsword');
-    });
-
-    it('summon refusal without selection logs refusal and persists nothing', async () => {
-        const result = await handleSummon(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-        expect(result.type).toBe('popup');
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-            automationType: 'war_bond_refused',
-        }));
     });
 
     describe('handleBond', () => {
-        it('writes warBondWeapons (cap 2) and logs ability_use', async () => {
-            const stats = makeInventoryStats();
-
-            const result = await handleBond(['Scimitar', 'Longsword'], stats, 'test-campaign', 2);
+        it('persists the bonded pool: exact popup, ability_use logged', async () => {
+            const result = await handleBond(
+                ['Scimitar', 'Longsword'], makeInventoryStats(), 'test-campaign', 2
+            );
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestFighter', SEASON_KEY, ['Scimitar', 'Longsword'], 'test-campaign'
+                'TestFighter', BONDED_KEY, ['Scimitar', 'Longsword'], 'test-campaign'
             );
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Scimitar, Longsword');
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'War Bond',
+                    description: 'Bonded Scimitar, Longsword (2/2). Summon a bonded weapon as a Bonus Action.',
+                },
+            });
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 type: 'ability_use',
                 abilityName: 'War Bond',
+                description: 'War Bond: bonded Scimitar, Longsword (2/2).',
             }));
         });
 
         it('caps the bonded pool at maxBonded', async () => {
             const stats = makeInventoryStats();
-            stats.inventory = { equipped: ['Scimitar', 'Longsword', 'Mace'], backpack: [] };
+            stats.inventory.equipped = ['Scimitar', 'Longsword', 'Mace'];
 
-            const result = await handleBond(['Scimitar', 'Longsword', 'Mace'], stats, 'test-campaign', 2);
+            const result = await handleBond(
+                ['Scimitar', 'Longsword', 'Mace'], stats, 'test-campaign', 2
+            );
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestFighter', SEASON_KEY, ['Scimitar', 'Longsword'], 'test-campaign'
+                'TestFighter', BONDED_KEY, ['Scimitar', 'Longsword'], 'test-campaign'
             );
             expect(result.payload.description).toContain('(2/2)');
         });
 
-        it('dedupes repeated selections', async () => {
-            const stats = makeInventoryStats();
-
-            await handleBond(['Scimitar', 'Scimitar'], stats, 'test-campaign', 2);
+        it('trims and dedupes repeated selections, defaulting the cap to 2', async () => {
+            await handleBond([' Scimitar ', 'Scimitar'], makeInventoryStats(), 'test-campaign');
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestFighter', SEASON_KEY, ['Scimitar'], 'test-campaign'
+                'TestFighter', BONDED_KEY, ['Scimitar'], 'test-campaign'
             );
         });
 
-        it('refuses an empty selection, persisting nothing and logging refusal', async () => {
-            const stats = makeInventoryStats();
-
-            const result = await handleBond([], stats, 'test-campaign', 2);
+        it('refuses an empty selection: persists nothing and logs refusal', async () => {
+            const result = await handleBond([], makeInventoryStats(), 'test-campaign', 2);
 
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(result.type).toBe('popup');
+            expect(result.payload.description).toBe('No weapon selected to bond.');
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 automationType: 'war_bond_refused',
+                description: 'War Bond refused — No weapon selected to bond.',
             }));
         });
 
-        it('refuses weapons not in inventory/equipped, persisting nothing', async () => {
-            const stats = makeInventoryStats();
-
-            const result = await handleBond(['Scimitar', 'Greataxe'], stats, 'test-campaign', 2);
+        it('refuses weapons not in inventory, naming them, persisting nothing, logging refusal', async () => {
+            const result = await handleBond(
+                ['Scimitar', 'Greataxe'], makeInventoryStats(), 'test-campaign', 2
+            );
 
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Greataxe');
+            expect(result.payload.description).toBe(
+                'Not in inventory: Greataxe. Bond only weapons you carry.'
+            );
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 automationType: 'war_bond_refused',
+                description: 'War Bond refused — Not in inventory: Greataxe. Bond only weapons you carry.',
             }));
         });
     });

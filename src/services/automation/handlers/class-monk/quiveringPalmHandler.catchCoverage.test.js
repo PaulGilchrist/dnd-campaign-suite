@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Catch-branch coverage for quiveringPalmHandler: pins that each addEntry(...).catch()
+// call site swallows log rejections AND logs '[quiveringPalmHandler:log-error]'.
+// Seam map for the cluster: handle() success-path catch → successCatch.test.js;
+// applyShockwave() catches → errorPaths.test.js; refusal/validation branch messages
+// (without rejection injection) → handle.test.js and quiveringPalmHandler.test.js.
+// All refusal branches share one .catch in refusal(), so one representative covers it.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────
@@ -80,9 +87,12 @@ function makeAction(automation = {}) {
 // ── Tests: handle() — addEntry rejection (silent .catch) ───────
 
 describe('quiveringPalmHandler.handle — addEntry rejection', () => {
+  let consoleSpy;
+
   beforeEach(() => {
     vi.clearAllMocks();
     addEntry.mockResolvedValue(undefined);
+    consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   it('does not throw when addEntry rejects (modal path - vibrations already active)', async () => {
@@ -100,15 +110,18 @@ describe('quiveringPalmHandler.handle — addEntry rejection', () => {
       return undefined;
     });
 
-    // Should not throw - the .catch(() => {}) swallows the error
+    // Should not throw - the .catch() swallows the error
     const result = await handle(action, ps, campaignName, null);
 
     expect(result.type).toBe('modal');
     expect(result.modalName).toBe('quiveringPalm');
     expect(result.payload.targetName).toBe('Ogre');
+    await vi.waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith('[quiveringPalmHandler:log-error]', expect.any(Error));
+    }, { timeout: 5000 });
   });
 
-  it('does not throw when addEntry rejects (last attack not by monk)', async () => {
+  it('does not throw when addEntry rejects (refusal path via refusal() helper)', async () => {
     const ps = makePlayerStats();
     const action = makeAction();
 
@@ -126,125 +139,26 @@ describe('quiveringPalmHandler.handle — addEntry rejection', () => {
 
     const result = await handle(action, ps, campaignName, null);
 
+    // Refusal popup still returned despite failed log; pins popup-vs-log
+    // description divergence owned by refusal(). Branch messages for the other
+    // refusal reasons are pinned in handle.test.js / quiveringPalmHandler.test.js.
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Last attack was not made by you');
-  });
-
-  it('does not throw when addEntry rejects (last attack not Unarmed Strike)', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction();
-
-    addEntry.mockRejectedValueOnce(new Error('log error'));
-
-    getCombatContext.mockResolvedValue({
-      creatures: [{ name: 'Goblin', type: 'monster' }],
-    });
-    getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-    getRuntimeValue.mockImplementation((_a, b, _c) => {
-      if (_a === 'campaign' && b === 'quivering_palm') return null;
-      if (_a === 'campaign' && b === 'lastAttack') return {
-        attackerName: 'TestMonk',
-        attackName: 'Longsword',
-        total: 15,
-        targetAc: 12,
-      };
-      return undefined;
-    });
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Unarmed Strike');
-  });
-
-  it('does not throw when addEntry rejects (Unarmed Strike did not hit)', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction();
-
-    addEntry.mockRejectedValueOnce(new Error('log error'));
-
-    getCombatContext.mockResolvedValue({
-      creatures: [{ name: 'Goblin', type: 'monster' }],
-    });
-    getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-    getRuntimeValue.mockImplementation((_a, b, _c) => {
-      if (_a === 'campaign' && b === 'quivering_palm') return null;
-      if (_a === 'campaign' && b === 'lastAttack') return {
-        attackerName: 'TestMonk',
-        attackName: 'Unarmed Strike',
-        total: 8,
-        targetAc: 15,
-      };
-      return undefined;
-    });
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('did not hit');
-  });
-
-  it('does not throw when addEntry rejects (no target selected)', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction();
-
-    addEntry.mockRejectedValueOnce(new Error('log error'));
-
-    getCombatContext.mockResolvedValue({
-      creatures: [{ name: 'Goblin', type: 'monster' }],
-    });
-    getTargetFromAttacker.mockReturnValue(null);
-    getRuntimeValue.mockImplementation((_a, b, _c) => {
-      if (_a === 'campaign' && b === 'quivering_palm') return null;
-      if (_a === 'campaign' && b === 'lastAttack') return {
-        attackerName: 'TestMonk',
-        attackName: 'Unarmed Strike',
-        saveResult: 'success',
-      };
-      if (b === 'kiPoints') return 5;
-      return undefined;
-    });
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('No target selected');
-  });
-
-  it('does not throw when addEntry rejects (not enough resources)', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction();
-
-    addEntry.mockRejectedValueOnce(new Error('log error'));
-
-    getCombatContext.mockResolvedValue({
-      creatures: [{ name: 'Goblin', type: 'monster' }],
-    });
-    getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-    getRuntimeValue.mockImplementation((_a, b, _c) => {
-      if (_a === 'campaign' && b === 'quivering_palm') return null;
-      if (_a === 'campaign' && b === 'lastAttack') return {
-        attackerName: 'TestMonk',
-        attackName: 'Unarmed Strike',
-        saveResult: 'success',
-      };
-      if (b === 'kiPoints') return 1;
-      return undefined;
-    });
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Not enough');
+    expect(result.payload.description).toBe('Quivering Palm — Last attack was not made by you.');
+    await vi.waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith('[quiveringPalmHandler:log-error]', expect.any(Error));
+    }, { timeout: 5000 });
   });
 });
 
 // ── Tests: applyRelease() — addEntry rejection ─────────────────
 
 describe('quiveringPalmHandler.applyRelease — addEntry rejection', () => {
+  let consoleSpy;
+
   beforeEach(() => {
     vi.clearAllMocks();
     addEntry.mockResolvedValue(undefined);
+    consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   it('does not throw when addEntry rejects', async () => {
@@ -260,10 +174,14 @@ describe('quiveringPalmHandler.applyRelease — addEntry rejection', () => {
 
     addEntry.mockRejectedValueOnce(new Error('log error'));
 
-    // Should not throw - the .catch(() => {}) swallows the error
+    // Should not throw - the .catch() swallows the error
     const result = await applyRelease(action, ps, campaignName, 'Goblin');
 
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('harmlessly');
+    expect(result.payload.description).toBe('Vibrations released harmlessly against Goblin.');
+    expect(result.payload.isRelease).toBe(true);
+    await vi.waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith('[quiveringPalmHandler:log-error]', expect.any(Error));
+    }, { timeout: 5000 });
   });
 });

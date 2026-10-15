@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Deterministic unit tests for the Soul of Vengeance reaction handler.
+// All side-effecting dependencies (runtime store, log service, attack lookup)
+// are mocked, so this suite pins the handler's input→output contract
+// (guard popups, attack selection, attack_roll payload, ability_use logging)
+// and needs no churn as the rest of the app evolves.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './soulOfVengeanceHandler.js';
@@ -31,7 +37,6 @@ function makeAction(overrides = {}) {
 function makePlayerStats(overrides = {}) {
   return {
     name: 'TestHero',
-    level: 15,
     attacks: [
       { name: 'Longsword', type: 'Action', range: 5, hitBonus: 6, damage: '1d8+3', damageType: 'Slashing' },
     ],
@@ -39,15 +44,14 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function setupVowOfEnmityActive(vowTarget = 'Orc') {
-  getRuntimeValue.mockImplementation((_name, key) => {
-    if (key === 'activeBuffs') return [{ effect: 'vow_of_enmity' }];
-    if (key === 'vowOfEnmityTarget') return vowTarget;
-    return null;
-  });
+// The handler only reads 'vowOfEnmityTarget' from the runtime store.
+function setActiveVowTarget(vowTarget) {
+  getRuntimeValue.mockImplementation((_name, key) =>
+    key === 'vowOfEnmityTarget' ? vowTarget : null
+  );
 }
 
-function setupLastAttack(attackerName = 'Orc') {
+function setupLastAttack(attackerName) {
   findLastAttack.mockResolvedValue({
     attackEvent: {
       attackerName,
@@ -74,11 +78,7 @@ function setupLastAttack(attackerName = 'Orc') {
 describe('soulOfVengeanceHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getRuntimeValue.mockImplementation((_name, key) => {
-      if (key === 'activeBuffs') return [];
-      if (key === 'vowOfEnmityTarget') return null;
-      return null;
-    });
+    setActiveVowTarget(null);
     findLastAttack.mockResolvedValue({
       attackEvent: null,
       attackerName: null,
@@ -90,13 +90,8 @@ describe('soulOfVengeanceHandler', () => {
     });
   });
 
-  describe('vow of enmity checks', () => {
-    it('should return popup when Vow of Enmity is not active', async () => {
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-
+  describe('guard popups', () => {
+    it('should return popup when Vow of Enmity target is not set', async () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.type).toBe('popup');
@@ -106,28 +101,9 @@ describe('soulOfVengeanceHandler', () => {
       expect(result.payload.description).toContain('Vow of Enmity is not active');
     });
 
-    it('should return popup when Vow of Enmity target is missing', async () => {
-      setupVowOfEnmityActive(null);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Vow of Enmity is not active');
-    });
-  });
-
-  describe('lastAttack checks', () => {
-    it('should return popup when no lastAttack found', async () => {
-      setupVowOfEnmityActive('Orc');
-      findLastAttack.mockResolvedValue({
-        attackEvent: null,
-        attackerName: null,
-        targetName: null,
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
+    it('should return popup when no recent attack was found', async () => {
+      setActiveVowTarget('Orc');
+      // findLastAttack resolves with no attack event (beforeEach default)
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
@@ -135,8 +111,8 @@ describe('soulOfVengeanceHandler', () => {
       expect(result.payload.description).toContain('No recent attack found');
     });
 
-    it('should return popup when last attacker is not the Vow target', async () => {
-      setupVowOfEnmityActive('Orc');
+    it('should return popup naming both parties when last attacker is not the Vow target', async () => {
+      setActiveVowTarget('Orc');
       setupLastAttack('Goblin');
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName);
@@ -147,21 +123,8 @@ describe('soulOfVengeanceHandler', () => {
       expect(result.payload.description).toContain('last attacker');
     });
 
-    it('should return popup when last attacker is not the Vow target (different names)', async () => {
-      setupVowOfEnmityActive('Dragon');
-      setupLastAttack('Bandit');
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Bandit');
-      expect(result.payload.description).toContain('Dragon');
-    });
-  });
-
-  describe('attack selection', () => {
     it('should return popup when no attacks are available', async () => {
-      setupVowOfEnmityActive('Orc');
+      setActiveVowTarget('Orc');
       setupLastAttack('Orc');
       const stats = makePlayerStats({ attacks: [] });
 
@@ -170,7 +133,9 @@ describe('soulOfVengeanceHandler', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No melee attack available');
     });
+  });
 
+  describe('attack selection', () => {
     it.each([
       {
         name: 'prefers melee over ranged',
@@ -188,7 +153,7 @@ describe('soulOfVengeanceHandler', () => {
         expectedAttack: 'Crossbow',
       },
     ])('should $name', async ({ attacks, expectedAttack }) => {
-      setupVowOfEnmityActive('Orc');
+      setActiveVowTarget('Orc');
       setupLastAttack('Orc');
       const stats = makePlayerStats({ attacks });
 
@@ -199,9 +164,9 @@ describe('soulOfVengeanceHandler', () => {
     });
   });
 
-  describe('successful attack_roll path', () => {
-    it('should return attack_roll targeting the Vow target and log ability_use', async () => {
-      setupVowOfEnmityActive('Orc');
+  describe('successful counterattack', () => {
+    it('should return attack_roll against the Vow target and log ability_use', async () => {
+      setActiveVowTarget('Orc');
       setupLastAttack('Orc');
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName);
@@ -228,9 +193,9 @@ describe('soulOfVengeanceHandler', () => {
       }));
     });
 
-    it('should use the custom action name from the automation', async () => {
-      setupVowOfEnmityActive('Goblin');
-      setupLastAttack('Goblin');
+    it('should derive sourceName from the custom action name', async () => {
+      setActiveVowTarget('Orc');
+      setupLastAttack('Orc');
 
       const result = await handle(makeAction({ name: 'My Soul of Vengeance' }), makePlayerStats(), campaignName);
 

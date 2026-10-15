@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Deterministic unit tests for the Oceanic Gift automation handler: pure control
+// flow over fully-mocked runtime/log/combat boundaries. Pins the exact server-first
+// runtime keys and full popup/log strings that form the stable contract consumed by
+// the Wrath of the Sea lane and the modal wiring (tested separately at that layer
+// in useCharActionsModalHandlers.oceanicGift.test.js / SecondaryTargetModals).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -65,666 +71,297 @@ function makeEnemy(overrides = {}) {
     };
 }
 
+// Router over getRuntimeValue so tests never depend on call order.
+function mockRuntime(values = {}) {
+    getRuntimeValue.mockImplementation((name, key) => values[`${name}.${key}`]);
+}
+
+function confirmArgs(overrides = {}) {
+    return {
+        action: makeAction(),
+        playerStats: makePlayerStats(),
+        campaignName,
+        selectedAllyName: 'AllyOne',
+        spellSaveDc: 13,
+        wisMod: 1,
+        doubleEmanation: false,
+        ...overrides,
+    };
+}
+
 describe('oceanicGiftHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
     describe('handle', () => {
-        it('returns popup when not enough Wild Shape uses remaining', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 0;
-                return undefined;
-            });
+        it('blocks with a popup and touches nothing when no Wild Shape uses remain', async () => {
+            mockRuntime({ [`${playerName}.wildShapeUses`]: 0 });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('Not enough Wild Shape uses remaining');
-            expect(result.payload.description).toContain('1 use required');
-            expect(result.payload.automation).toEqual(makeAction().automation);
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Oceanic Gift',
+                    description: 'Oceanic Gift: Not enough Wild Shape uses remaining. 1 use required.',
+                    automation: { type: 'oceanic_gift' },
+                },
+            });
+            expect(loadCombatSummary).not.toHaveBeenCalled();
+            expect(buildSaveDc).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('returns popup with "uses" plural when doubleEmanation requires 2', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 1;
-                return undefined;
-            });
+        it('blocks the double variant with a plural popup when only 1 use remains', async () => {
+            mockRuntime({ [`${playerName}.wildShapeUses`]: 1 });
 
             const result = await handle(makeAction({ doubleEmanation: true }), makePlayerStats(), campaignName);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('2 uses required');
+            expect(result.payload.description).toBe(
+                'Oceanic Gift: Not enough Wild Shape uses remaining. 2 uses required.'
+            );
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('returns modal with ally targets when enough Wild Shape uses', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
+        it('returns the oceanicGiftTarget modal with the full strict payload, filtering allies only', async () => {
+            mockRuntime({ [`${playerName}.wildShapeUses`]: 3 });
             loadCombatSummary.mockResolvedValue({
                 creatures: [
                     { name: playerName, type: 'player' },
                     makeAlly(),
                     makeAlly({ name: 'AllyTwo' }),
                     makeEnemy(),
-                ],
-            });
-            buildSaveDc.mockReturnValue(13);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('oceanicGiftTarget');
-            expect(result.payload.creatureTargets).toHaveLength(2);
-            expect(result.payload.creatureTargets[0].name).toBe('AllyOne');
-            expect(result.payload.creatureTargets[1].name).toBe('AllyTwo');
-        });
-
-        it('excludes the player themselves from ally targets', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { name: playerName, type: 'player' },
-                    makeAlly(),
-                ],
-            });
-            buildSaveDc.mockReturnValue(13);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.payload.creatureTargets).toHaveLength(1);
-            expect(result.payload.creatureTargets[0].name).toBe('AllyOne');
-        });
-
-        it('excludes NPCs from ally targets', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    makeEnemy(),
                     makeEnemy({ name: 'Orc' }),
                 ],
             });
-            buildSaveDc.mockReturnValue(13);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.payload.creatureTargets).toHaveLength(0);
-        });
-
-        it('handles null combatSummary gracefully', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-            loadCombatSummary.mockResolvedValue(null);
-            buildSaveDc.mockReturnValue(13);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('modal');
-            expect(result.payload.creatureTargets).toEqual([]);
-        });
-
-        it('handles combatSummary with no creatures property', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-            loadCombatSummary.mockResolvedValue({});
-            buildSaveDc.mockReturnValue(13);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.payload.creatureTargets).toEqual([]);
-        });
-
-        it('passes spellSaveDc from buildSaveDc into payload', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-            loadCombatSummary.mockResolvedValue({ creatures: [makeAlly()] });
-            buildSaveDc.mockReturnValue(15);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.payload.spellSaveDc).toBe(15);
-        });
-
-        it('passes wisMod from playerStats Wisdom ability into payload', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-            loadCombatSummary.mockResolvedValue({ creatures: [] });
-            buildSaveDc.mockReturnValue(13);
+            buildSaveDc.mockReturnValue(17);
 
             const stats = makePlayerStats({ abilities: [{ name: 'Wisdom', bonus: 3 }] });
             const result = await handle(makeAction(), stats, campaignName);
 
-            expect(result.payload.wisMod).toBe(3);
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('oceanicGiftTarget');
+            expect(buildSaveDc).toHaveBeenCalledWith({ type: 'oceanic_gift' }, stats);
+            expect(result.payload).toEqual({
+                action: makeAction(),
+                playerStats: stats,
+                campaignName,
+                creatureTargets: [makeAlly(), makeAlly({ name: 'AllyTwo' })],
+                spellSaveDc: 17,
+                wisMod: 3,
+                doubleEmanation: false,
+                cost: 1,
+                availableUses: 3,
+            });
         });
 
-        it('uses fallback wisMod of 1 when Wisdom ability is missing', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
+        it('returns an empty target list when combatSummary is null or has no creatures', async () => {
+            mockRuntime({ [`${playerName}.wildShapeUses`]: 2 });
+            buildSaveDc.mockReturnValue(13);
+
+            loadCombatSummary.mockResolvedValue(null);
+            const nullResult = await handle(makeAction(), makePlayerStats(), campaignName);
+            expect(nullResult.type).toBe('modal');
+            expect(nullResult.payload.creatureTargets).toEqual([]);
+
+            loadCombatSummary.mockResolvedValue({});
+            const emptyResult = await handle(makeAction(), makePlayerStats(), campaignName);
+            expect(emptyResult.payload.creatureTargets).toEqual([]);
+        });
+
+        it('falls back to class_levels wild_shape when the runtime value is undefined or null', async () => {
             loadCombatSummary.mockResolvedValue({ creatures: [] });
             buildSaveDc.mockReturnValue(13);
 
-            const emptyStats = { name: playerName };
-            const result = await handle(makeAction(), emptyStats, campaignName);
-
-            expect(result.payload.wisMod).toBe(1);
-        });
-
-        it('passes doubleEmanation flag into payload', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-            loadCombatSummary.mockResolvedValue({ creatures: [makeAlly()] });
-            buildSaveDc.mockReturnValue(13);
-
-            const result = await handle(makeAction({ doubleEmanation: true }), makePlayerStats(), campaignName);
-
-            expect(result.payload.doubleEmanation).toBe(true);
-            expect(result.payload.cost).toBe(2);
-        });
-
-        it('passes cost=1 when doubleEmanation is not set', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-            loadCombatSummary.mockResolvedValue({ creatures: [makeAlly()] });
-            buildSaveDc.mockReturnValue(13);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.payload.doubleEmanation).toBe(false);
-            expect(result.payload.cost).toBe(1);
-        });
-
-        it('uses wild_shape from class_levels as fallback when wildShapeUses runtime value is undefined (via ??)', async () => {
-            // getRuntimeValue returns undefined, ?? falls back to maxWS (2), so it passes
-            getRuntimeValue.mockReturnValue(undefined);
-
+            mockRuntime({});
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
             expect(result.type).toBe('modal');
+            expect(result.payload.availableUses).toBe(2);
+
+            mockRuntime({ [`${playerName}.wildShapeUses`]: null });
+            const nullResult = await handle(makeAction(), makePlayerStats(), campaignName);
+
+            expect(nullResult.type).toBe('modal');
+            expect(nullResult.payload.availableUses).toBe(2);
         });
 
-        it('uses wild_shape from class_levels as fallback when wildShapeUses runtime value is null (via ??)', async () => {
-            // getRuntimeValue returns null, ?? falls back to maxWS (2), so it passes
-            getRuntimeValue.mockReturnValue(null);
+        it('blocks when class_levels provides no wild_shape and the runtime value is unset', async () => {
+            mockRuntime({});
+            const stats = { name: playerName, level: 3, abilities: [] };
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
+            const result = await handle(makeAction(), stats, campaignName);
 
-            expect(result.type).toBe('modal');
+            expect(result.type).toBe('popup');
+            expect(loadCombatSummary).not.toHaveBeenCalled();
         });
 
-        it('allows activation when currentWS exactly equals cost', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 1;
-                return undefined;
-            });
+        it.each([
+            { doubleEmanation: false, uses: 1 },
+            { doubleEmanation: true, uses: 2 },
+        ])('allows activation when uses exactly equal cost (double=$doubleEmanation)', async ({ doubleEmanation, uses }) => {
+            mockRuntime({ [`${playerName}.wildShapeUses`]: uses });
             loadCombatSummary.mockResolvedValue({ creatures: [makeAlly()] });
             buildSaveDc.mockReturnValue(13);
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
+            const result = await handle(makeAction({ doubleEmanation }), makePlayerStats(), campaignName);
 
             expect(result.type).toBe('modal');
+            expect(result.payload.cost).toBe(uses);
+            expect(result.payload.availableUses).toBe(uses);
         });
 
-        it('passes action and playerStats into modal payload', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-            loadCombatSummary.mockResolvedValue({ creatures: [makeAlly()] });
+        it('uses Wisdom bonus from abilities and falls back to 1 when the ability is missing', async () => {
+            mockRuntime({ [`${playerName}.wildShapeUses`]: 2 });
+            loadCombatSummary.mockResolvedValue({ creatures: [] });
             buildSaveDc.mockReturnValue(13);
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
+            const withWis = await handle(makeAction(), makePlayerStats({ abilities: [{ name: 'Wisdom', bonus: 5 }] }), campaignName);
+            expect(withWis.payload.wisMod).toBe(5);
 
-            expect(result.payload.action).toEqual(makeAction());
-            expect(result.payload.playerStats).toEqual(makePlayerStats());
-            expect(result.payload.campaignName).toBe(campaignName);
+            const withoutWis = await handle(makeAction(), { name: playerName }, campaignName);
+            expect(withoutWis.payload.wisMod).toBe(1);
         });
     });
 
     describe('confirmOceanicGift', () => {
-        it('grants wrathOfTheSeaActive to selected ally', async () => {
-            const result = await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 13,
-                wisMod: 1,
-                doubleEmanation: false,
-            })
+        it('single variant: spends 1 use, writes exactly the four ally wrath keys, and pops the grant message', async () => {
+            mockRuntime({ [`${playerName}.wildShapeUses`]: 3 });
 
+            const result = await confirmOceanicGift(confirmArgs({ spellSaveDc: 14, wisMod: 2 }));
+
+            expect(setRuntimeValue.mock.calls).toEqual([
+                [playerName, 'wildShapeUses', 2, campaignName],
+                ['AllyOne', 'wrathOfTheSeaActive', true, campaignName],
+                ['AllyOne', 'wrathOfTheSeaDc', 14, campaignName],
+                ['AllyOne', 'wrathOfTheSeaWisMod', 2, campaignName],
+                ['AllyOne', 'wrathOfTheSeaSource', playerName, campaignName],
+            ]);
+            expect(addEntry).toHaveBeenCalledTimes(1);
+            expect(addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: 'Oceanic Gift',
+                description: 'Maribelle used Oceanic Gift to grant Wrath of the Sea to AllyOne.',
+                timestamp: expect.any(Number),
+            });
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Oceanic Gift',
+                    automationType: 'oceanic_gift',
+                    description: 'Oceanic Gift — Wrath of the Sea granted to AllyOne. ',
+                    automation: { type: 'oceanic_gift' },
+                },
+            });
+        });
+
+        it('treats a null wildShapeUses runtime value as 0 and writes -1', async () => {
+            mockRuntime({ [`${playerName}.wildShapeUses`]: null });
+
+            await confirmOceanicGift(confirmArgs());
+
+            expect(setRuntimeValue.mock.calls[0]).toEqual([playerName, 'wildShapeUses', -1, campaignName]);
+        });
+
+        it.each([null, ''])('skips ally grants and the log when selectedAllyName is %s', async (selectedAllyName) => {
+            mockRuntime({ [`${playerName}.wildShapeUses`]: 2 });
+
+            const result = await confirmOceanicGift(confirmArgs({ selectedAllyName }));
+
+            expect(setRuntimeValue.mock.calls).toEqual([
+                [playerName, 'wildShapeUses', 1, campaignName],
+            ]);
+            expect(addEntry).not.toHaveBeenCalled();
+            expect(result.payload.description).toBe('Oceanic Gift skipped.');
+        });
+
+        it('returns the popup even when addEntry rejects', async () => {
+            mockRuntime({ [`${playerName}.wildShapeUses`]: 2 });
+            addEntry.mockRejectedValueOnce(new Error('log error'));
+
+            const result = await confirmOceanicGift(confirmArgs());
+
+            expect(result.payload.description).toContain('Wrath of the Sea granted to AllyOne');
             expect(setRuntimeValue).toHaveBeenCalledWith('AllyOne', 'wrathOfTheSeaActive', true, campaignName);
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('Wrath of the Sea granted to AllyOne');
-        });
-
-        it('sets wrathOfTheSeaDc on the ally', async () => {
-            await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyTwo',
-                spellSaveDc: 15,
-                wisMod: 3,
-                doubleEmanation: false,
-            })
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('AllyTwo', 'wrathOfTheSeaDc', 15, campaignName);
-        });
-
-        it('sets wrathOfTheSeaWisMod on the ally', async () => {
-            await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyTwo',
-                spellSaveDc: 15,
-                wisMod: 3,
-                doubleEmanation: false,
-            })
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('AllyTwo', 'wrathOfTheSeaWisMod', 3, campaignName);
-        });
-
-        it('sets wrathOfTheSeaSource on the ally', async () => {
-            await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyTwo',
-                spellSaveDc: 15,
-                wisMod: 3,
-                doubleEmanation: false,
-            })
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('AllyTwo', 'wrathOfTheSeaSource', playerName, campaignName);
-        });
-
-        it('logs an ability_use entry when ally is selected', async () => {
-            await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 13,
-                wisMod: 1,
-                doubleEmanation: false,
-            })
-
-            expect(addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: playerName,
-                    abilityName: 'Oceanic Gift',
-                }),
-            );
-        });
-
-        it('grants wrathOfTheSeaActive to the player when doubleEmanation is true', async () => {
-            await confirmOceanicGift({
-                action: makeAction({ doubleEmanation: true }),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 13,
-                wisMod: 1,
-                doubleEmanation: true,
-            })
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wrathOfTheSeaActive', true, campaignName);
-        });
-
-        it('logs with combined message when doubleEmanation is true', async () => {
-            await confirmOceanicGift({
-                action: makeAction({ doubleEmanation: true }),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 13,
-                wisMod: 1,
-                doubleEmanation: true,
-            })
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                description: expect.stringContaining('both themselves and AllyOne'),
-            }));
-        });
-
-        it('deducts cost from wildShapeUses', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 3;
-                return undefined;
-            });
-
-            await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 13,
-                wisMod: 1,
-                doubleEmanation: false,
-            })
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wildShapeUses', 2, campaignName);
-        });
-
-        it('deducts 2 from wildShapeUses when doubleEmanation', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 3;
-                return undefined;
-            });
-
-            await confirmOceanicGift({
-                action: makeAction({ doubleEmanation: true }),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 13,
-                wisMod: 1,
-                doubleEmanation: true,
-            })
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wildShapeUses', 1, campaignName);
-        });
-
-        it('handles null wildShapeUses runtime value (treats as 0)', async () => {
-            getRuntimeValue.mockReturnValue(null);
-
-            await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 13,
-                wisMod: 1,
-                doubleEmanation: false,
-            })
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wildShapeUses', -1, campaignName);
-        });
-
-        it('skips ally grants when selectedAllyName is null', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-
-            const result = await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: null,
-                spellSaveDc: 13,
-                wisMod: 1,
-                doubleEmanation: false,
-            })
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wildShapeUses', 1, campaignName);
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('AllyOne', 'wrathOfTheSeaActive', true, campaignName);
-            expect(result.payload.description).toContain('skipped');
-        });
-
-        it('skips ally grants when selectedAllyName is empty string', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-
-            const result = await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: '',
-                spellSaveDc: 13,
-                wisMod: 1,
-                doubleEmanation: false,
-            })
-
-            expect(result.payload.description).toContain('skipped');
-        });
-
-        it('includes automationType in popup when doubleEmanation', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 3;
-                return undefined;
-            });
-
-            const result = await confirmOceanicGift({
-                action: makeAction({ doubleEmanation: true }),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 13,
-                wisMod: 1,
-                doubleEmanation: true,
-            })
-
-            expect(result.payload.description).toContain('You also gain the Emanation');
-        });
-
-        it('does not include Emanation text when doubleEmanation is false', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-
-            const result = await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 13,
-                wisMod: 1,
-                doubleEmanation: false,
-            })
-
-            expect(result.payload.description).not.toContain('You also gain the Emanation');
-            expect(result.payload.description).toContain('Wrath of the Sea granted to AllyOne');
-        });
-
-        it('passes action.automation into popup payload', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-
-            const result = await confirmOceanicGift({
-                action: makeAction({ doubleEmanation: true }),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 13,
-                wisMod: 1,
-                doubleEmanation: true,
-            })
-
-            expect(result.payload.automation).toEqual(makeAction({ doubleEmanation: true }).automation);
-        });
-
-        it('handles addEntry rejection gracefully', async () => {
-            addEntry.mockRejectedValue(new Error('log error'));
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-
-            const result = await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 13,
-                wisMod: 1,
-                doubleEmanation: false,
-            })
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Wrath of the Sea granted to AllyOne');
-        });
-
-        it('sets all four wrathOfTheSea runtime values on the ally', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-
-            await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 14,
-                wisMod: 2,
-                doubleEmanation: false,
-            })
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('AllyOne', 'wrathOfTheSeaActive', true, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith('AllyOne', 'wrathOfTheSeaDc', 14, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith('AllyOne', 'wrathOfTheSeaWisMod', 2, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith('AllyOne', 'wrathOfTheSeaSource', playerName, campaignName);
         });
     });
 
     describe('CLA-240 double-emanation variant', () => {
-        it('passes availableUses (current Wild Shape uses) into the modal payload', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 3;
-                return undefined;
-            });
+        it('passes availableUses into the modal payload', async () => {
+            mockRuntime({ [`${playerName}.wildShapeUses`]: 3 });
             loadCombatSummary.mockResolvedValue({ creatures: [makeAlly()] });
             buildSaveDc.mockReturnValue(17);
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
+            const result = await handle(makeAction({ doubleEmanation: true }), makePlayerStats(), campaignName);
 
             expect(result.payload.availableUses).toBe(3);
+            expect(result.payload.doubleEmanation).toBe(true);
+            expect(result.payload.cost).toBe(2);
         });
 
         it('blocks the double variant with a popup and spends nothing when only 1 use remains', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 1;
-                return undefined;
+            mockRuntime({ [`${playerName}.wildShapeUses`]: 1 });
+
+            const result = await confirmOceanicGift(confirmArgs({ doubleEmanation: true, spellSaveDc: 17, wisMod: 3 }));
+
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Oceanic Gift',
+                    description: 'Oceanic Gift: Not enough Wild Shape uses remaining. 2 uses required.',
+                    automation: { type: 'oceanic_gift' },
+                },
             });
-
-            const result = await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 17,
-                wisMod: 3,
-                doubleEmanation: true,
-            })
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Not enough Wild Shape uses remaining');
-            expect(result.payload.description).toContain('2 uses required');
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(playerName, 'wildShapeUses', 0, campaignName);
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('AllyOne', 'wrathOfTheSeaActive', true, campaignName);
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('spends 2 uses and grants both druid and ally when 2 uses remain', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
+        it('spends 2 uses, grants druid and ally in full, and logs both entries', async () => {
+            mockRuntime({ [`${playerName}.wildShapeUses`]: 2 });
 
-            const result = await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
+            const result = await confirmOceanicGift(confirmArgs({
+                action: makeAction({ doubleEmanation: true }),
+                doubleEmanation: true,
                 spellSaveDc: 17,
                 wisMod: 3,
-                doubleEmanation: true,
-            })
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wildShapeUses', 0, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith('AllyOne', 'wrathOfTheSeaActive', true, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wrathOfTheSeaActive', true, campaignName);
-            expect(result.payload.description).toContain('You also gain the Emanation');
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'ability_use',
-                description: expect.stringContaining('both themselves and AllyOne'),
             }));
-        });
 
-        it('sets wrathOfTheSeaDc and wrathOfTheSeaWisMod on the druid for the double variant', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
+            expect(setRuntimeValue.mock.calls).toEqual([
+                [playerName, 'wildShapeUses', 0, campaignName],
+                ['AllyOne', 'wrathOfTheSeaActive', true, campaignName],
+                ['AllyOne', 'wrathOfTheSeaDc', 17, campaignName],
+                ['AllyOne', 'wrathOfTheSeaWisMod', 3, campaignName],
+                ['AllyOne', 'wrathOfTheSeaSource', playerName, campaignName],
+                [playerName, 'wrathOfTheSeaActive', true, campaignName],
+                [playerName, 'wrathOfTheSeaDc', 17, campaignName],
+                [playerName, 'wrathOfTheSeaWisMod', 3, campaignName],
+            ]);
+            expect(addEntry).toHaveBeenCalledTimes(2);
+            expect(addEntry).toHaveBeenNthCalledWith(2, campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: 'Oceanic Gift',
+                description: 'Maribelle manifested Wrath of the Sea around both themselves and AllyOne.',
+                timestamp: expect.any(Number),
             });
-
-            await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 17,
-                wisMod: 3,
-                doubleEmanation: true,
-            })
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wrathOfTheSeaDc', 17, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wrathOfTheSeaWisMod', 3, campaignName);
-        });
-
-        it('does NOT write wrathOfTheSea keys on the druid for the verified single variant', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wildShapeUses') return 2;
-                return undefined;
-            });
-
-            await confirmOceanicGift({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                selectedAllyName: 'AllyOne',
-                spellSaveDc: 17,
-                wisMod: 3,
-                doubleEmanation: false,
-            })
-
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(playerName, 'wrathOfTheSeaActive', true, campaignName);
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(playerName, 'wrathOfTheSeaDc', 17, campaignName);
+            expect(result.payload.description).toBe(
+                'Oceanic Gift — Wrath of the Sea granted to AllyOne. You also gain the Emanation.'
+            );
         });
     });
 
     describe('clearOceanicGiftAllies', () => {
-        it('clears oceanic gift allies by setting to null', () => {
+        it('delegates a single null write of the oceanicGiftAllies key', () => {
             clearOceanicGiftAllies(playerName, campaignName);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'oceanicGiftAllies', null, campaignName);
-        });
-
-        it('uses the correct key constant for oceanic gift allies', () => {
-            clearOceanicGiftAllies(playerName, campaignName);
-
-            const call = setRuntimeValue.mock.calls[0];
-            expect(call[1]).toBe('oceanicGiftAllies');
+            expect(setRuntimeValue.mock.calls).toEqual([
+                [playerName, 'oceanicGiftAllies', null, campaignName],
+            ]);
         });
     });
 });

@@ -1,3 +1,14 @@
+// @maintained-by-ai
+// Deterministic unit tests for bardicInspirationUseHandler.handle — the sole execution
+// coverage for the 'bardic_inspiration_use' automation (dispatched via
+// src/services/automation/index.js registry; invoked from CharSheet). Focus is this
+// handler's divergent core: the ability-check popup wording (full exact-payload pin)
+// and the consumption shape — exactly two runtime clears (die + grantedBy), unlike the
+// Offense/Defense siblings which also clear bardicInspirationCombatOptions. The refuse
+// / roll-fail preamble is verbatim-identical to those siblings and pinned there; both
+// early-return branches are covered here once, compactly, to keep this handler's own
+// guard side-effect-free contract exercised. All deps mocked; no app churn should
+// require rework beyond message-string updates.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────
@@ -22,29 +33,18 @@ import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 const campaignName = 'TestCampaign';
 const playerName = 'TestHero';
 
-function makePlayerStats(overrides = {}) {
-  return {
-    name: playerName,
-    ...overrides,
-  };
-}
-
-function makeAction(overrides = {}) {
+function makeAction() {
   return {
     name: 'Use Bardic Inspiration',
-    automation: {
-      type: 'bardic_inspiration_use',
-      ...overrides.automation,
-    },
-    ...overrides,
+    automation: { type: 'bardic_inspiration_use' },
   };
 }
 
-function mockNoDie() {
-  runtimeState.getRuntimeValue.mockReturnValue(null);
+function playerStats() {
+  return { name: playerName };
 }
 
-function mockWithDie(dieSize, grantedBy) {
+function mockRuntime(dieSize, grantedBy) {
   runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
     if (key === 'bardicInspirationDie') return dieSize;
     if (key === 'bardicInspirationGrantedBy') return grantedBy;
@@ -57,149 +57,84 @@ function mockWithDie(dieSize, grantedBy) {
 describe('bardicInspirationUseHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    runtimeState.getRuntimeValue.mockReset();
-    diceRoller.rollExpression.mockReset();
   });
 
-  // ── No bardic inspiration die ────────────────────────────────
+  it('refuses without rolling or consuming state when no die is available or the roll fails', async () => {
+    // No die in the runtime store.
+    mockRuntime(null, null);
+    const refused = await handle(makeAction(), playerStats(), campaignName);
 
-  describe('no bardic inspiration die', () => {
-    it('returns info popup when no die is available', async () => {
-      mockNoDie();
-      const action = makeAction();
-
-      const result = await handle(action, makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe(action.name);
-      expect(result.payload.description).toBe('You do not have a Bardic Inspiration die.');
+    expect(refused).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Use Bardic Inspiration',
+        description: 'You do not have a Bardic Inspiration die.',
+      },
     });
 
-    it('does not roll dice or set runtime state when there is no die', async () => {
-      mockNoDie();
+    // Die present but the roll itself fails — the die must NOT be consumed.
+    mockRuntime(8, 'Ally Bard');
+    diceRoller.rollExpression.mockReturnValue(null);
+    const failed = await handle(makeAction(), playerStats(), campaignName);
 
-      await handle(makeAction(), makePlayerStats(), campaignName);
+    expect(failed).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Use Bardic Inspiration',
+        description: 'Roll failed.',
+      },
+    });
 
-      expect(diceRoller.rollExpression).not.toHaveBeenCalled();
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(diceRoller.rollExpression).toHaveBeenCalledTimes(1);
+    expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d8');
+    expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('rolls the die and returns the ability-check popup with roll details and grantor', async () => {
+    mockRuntime(8, 'Bard College Member');
+    diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [3, 2] });
+
+    const result = await handle(makeAction(), playerStats(), campaignName);
+
+    // Full exact payload pins the ability-check variant wording unique to this handler
+    // (siblings say "attack's damage" / "your AC"), plus roll breakdown and grantor.
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Use Bardic Inspiration',
+        description:
+          'Bardic Inspiration (1d8): rolled **5** (3, 2). Add this to an ability check. Die granted by Bard College Member.',
+        automation: { type: 'bardic_inspiration_use' },
+      },
     });
   });
 
-  // ── Roll expression fails ────────────────────────────────────
+  it('scales the roll expression with die size and falls back to an "unknown" grantor', async () => {
+    mockRuntime(10, null);
+    diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [7] });
 
-  describe('roll expression fails', () => {
-    it('returns info popup when rollExpression returns null', async () => {
-      mockWithDie(8, null);
-      diceRoller.rollExpression.mockReturnValue(null);
+    const result = await handle(makeAction(), playerStats(), campaignName);
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Use Bardic Inspiration');
-      expect(result.payload.description).toBe('Roll failed.');
-    });
-
-    it('does not clear runtime state when roll fails', async () => {
-      mockWithDie(8, 'Ally Bard');
-      diceRoller.rollExpression.mockReturnValue(null);
-
-      await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
+    expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d10');
+    expect(result.payload.description).toContain('Bardic Inspiration (1d10)');
+    expect(result.payload.description).toContain('rolled **7** (7)');
+    expect(result.payload.description).toContain('Die granted by unknown');
   });
 
-  // ── Successful roll ──────────────────────────────────────────
+  it('consumes the inspiration by clearing exactly die and grantedBy', async () => {
+    mockRuntime(12, 'Bard NPC');
+    diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10] });
 
-  describe('successful roll', () => {
-    function mockSuccess(dieSize, grantedBy, rollResult) {
-      mockWithDie(dieSize, grantedBy);
-      diceRoller.rollExpression.mockReturnValue(rollResult);
-    }
+    await handle(makeAction(), playerStats(), campaignName);
 
-    it('reads both bardicInspirationDie and bardicInspirationGrantedBy from runtime state', async () => {
-      mockSuccess(8, 'Bard NPC', { total: 5, rolls: [5] });
-
-      await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        'bardicInspirationDie',
-        campaignName,
-      );
-      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        'bardicInspirationGrantedBy',
-        campaignName,
-      );
-    });
-
-    it('clears both runtime state values after a successful roll', async () => {
-      mockSuccess(8, 'Bard NPC', { total: 5, rolls: [5] });
-
-      await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        'bardicInspirationDie',
-        null,
-        campaignName,
-      );
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        'bardicInspirationGrantedBy',
-        null,
-        campaignName,
-      );
-    });
-
-    it('includes action.automation in the returned payload', async () => {
-      mockSuccess(8, null, { total: 5, rolls: [5] });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.automation).toEqual({ type: 'bardic_inspiration_use' });
-    });
-
-    it('returns a description with roll details and grantedBy', async () => {
-      mockSuccess(8, 'Bard College Member', { total: 5, rolls: [3, 2] });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.description).toContain('1d8');
-      expect(result.payload.description).toContain('**5**');
-      expect(result.payload.description).toContain('3, 2');
-      expect(result.payload.description).toContain('Add this to an ability check');
-      expect(result.payload.description).toContain('Die granted by Bard College Member');
-    });
-
-    it('falls back to "unknown" when grantedBy is null or undefined', async () => {
-      mockSuccess(8, null, { total: 4, rolls: [4] });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.description).toContain('Die granted by unknown');
-    });
-
-    it('works with different die sizes (d6, d10, d12)', async () => {
-      const dice = [
-        { size: 6, total: 3 },
-        { size: 10, total: 7 },
-        { size: 12, total: 10 },
-      ];
-
-      for (const { size, total } of dice) {
-        vi.clearAllMocks();
-        mockSuccess(size, null, { total, rolls: [total] });
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-        expect(diceRoller.rollExpression).toHaveBeenCalledWith(`1d${size}`);
-        expect(result.payload.description).toContain(`1d${size}`);
-        expect(result.payload.description).toContain(`**${total}**`);
-      }
-    });
+    // Divergent from Offense/Defense siblings: this handler clears TWO keys, not three
+    // (no bardicInspirationCombatOptions on the ability-check lane).
+    const calls = runtimeState.setRuntimeValue.mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toEqual([playerName, 'bardicInspirationDie', null, campaignName]);
+    expect(calls[1]).toEqual([playerName, 'bardicInspirationGrantedBy', null, campaignName]);
   });
 });

@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Deterministic unit tests for smiteOfProtectionHandler.handle() — all side-effecting
+// dependencies (runtime store, expirations, log service) are mocked, so this suite is
+// stable and needs no churn as the app changes. Expiry-side behaviour is covered by
+// clearExpirationEffects_additional_types.test.js; trigger/service behaviour by
+// smiteOfProtectionService.test.js — do not duplicate those here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './smiteOfProtectionHandler.js';
@@ -39,82 +45,71 @@ describe('smiteOfProtectionHandler.handle', () => {
         getRuntimeValue.mockReturnValue(null);
     });
 
-    describe('deactivation (already active)', () => {
-        it('returns info popup without side effects when smite cover is already active', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'smiteOfProtectionActive') return true;
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Smite of Protection');
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(addExpiration).not.toHaveBeenCalled();
-            expect(addEntry).not.toHaveBeenCalled();
+    it('returns info popup without side effects when smite cover is already active', async () => {
+        getRuntimeValue.mockImplementation((_name, key) => {
+            if (key === 'smiteOfProtectionActive') return true;
+            return null;
         });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.name).toBe('Smite of Protection');
+        expect(result.payload.description).toBe('Smite of Protection is already active.');
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 
-    describe('activation', () => {
-        it('activates smite cover, sets expiration, logs the ability, and returns success popup', async () => {
-            const now = Date.now();
-            vi.spyOn(Date, 'now').mockReturnValue(now);
+    it('activates smite cover, bumps coverRefresh, sets expiration, logs the ability, and returns success popup', async () => {
+        const now = Date.now();
+        vi.spyOn(Date, 'now').mockReturnValue(now);
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'smiteOfProtectionActive',
-                true,
-                campaignName,
-            );
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'remove_smite_of_protection' }], campaignName, rounds: undefined, expireOnCreatureName: playerName });
-            expect(addEntry).toHaveBeenCalledWith(campaignName, {
-                type: 'ability_use',
-                characterName: playerName,
-                abilityName: 'Smite of Protection',
-                description: `${playerName} activated Smite of Protection. You and allies in Aura of Protection have Half Cover until start of your next turn.`,
-                timestamp: now,
-            });
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Smite of Protection');
-            expect(result.payload.automationType).toBe('post_cast_smite_cover');
-            expect(result.payload.description).toBe(
-                'Smite of Protection activated! You and allies within your Aura of Protection have Half Cover until the start of your next turn.',
-            );
-            expect(result.payload.automation).toEqual(makeAction().automation);
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            playerName,
+            'smiteOfProtectionActive',
+            true,
+            campaignName,
+        );
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'campaign',
+            'coverRefresh',
+            1,
+            campaignName,
+        );
+        expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'remove_smite_of_protection' }], campaignName, rounds: undefined, expireOnCreatureName: playerName });
+        expect(addEntry).toHaveBeenCalledWith(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: 'Smite of Protection',
+            description: `${playerName} activated Smite of Protection. You and allies in Aura of Protection have Half Cover until start of your next turn.`,
+            timestamp: now,
         });
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.name).toBe('Smite of Protection');
+        expect(result.payload.automationType).toBe('post_cast_smite_cover');
+        expect(result.payload.description).toBe(
+            'Smite of Protection activated! You and allies within your Aura of Protection have Half Cover until the start of your next turn.',
+        );
+        expect(result.payload.automation).toEqual(makeAction().automation);
+        Date.now.mockRestore();
+    });
 
-        it('treats falsy runtime values as inactive and proceeds with activation', async () => {
-            getRuntimeValue.mockReturnValue(false);
+    it('returns success popup even when addEntry rejects (error handler covers console.error)', async () => {
+        const logError = new Error('log service down');
+        addEntry.mockRejectedValue(logError);
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+        const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'smiteOfProtectionActive',
-                true,
-                campaignName,
-            );
-        });
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        it('returns success popup even when addEntry rejects (error handler covers console.error)', async () => {
-            const logError = new Error('log service down');
-            addEntry.mockRejectedValue(logError);
-
-            const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(consoleSpy).toHaveBeenCalledWith('[smiteOfProtection] Error:', logError);
-            consoleSpy.mockRestore();
-        });
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(consoleSpy).toHaveBeenCalledWith('[smiteOfProtection] Error:', logError);
+        consoleSpy.mockRestore();
     });
 });

@@ -1,11 +1,25 @@
+// @maintained-by-ai: 2026-10-15
+// combatSuperiorityHandler.js barrel — executeActionManeuvers.js executor contracts.
+// This suite is the ONLY executor lane for the bonus-action die-size fallback
+// (rollExpression null → die size pays) and both executeSkillCheckManeuver
+// description branches (Tactical Assessment, Ambush). Riposte / Parry / Rally /
+// Evasive-Footwork happy path / Grant Attack / Movement / Commanding Presence
+// executors are pinned in their dedicated suites (executeActionManeuvers.riposte,
+// executeActionManeuvers.parry.mn013, executeActionManeuvers.rally,
+// executeActionManeuvers.test, combatSuperiorityGrantAttack.mn003,
+// combatSuperiorityMovementManeuvers, commandingPresenceReaction.mn004) and are
+// deliberately NOT duplicated here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     executeBonusActionManeuver,
+    executeGrantAttackManeuver,
+    executeMovementManeuver,
     executeSkillCheckManeuver,
     executeReactionManeuver,
     executeCommandingPresenceReaction,
 } from './combatSuperiorityHandler.js';
-import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { rollExpression } from '../../../../services/dice/diceRoller.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -15,26 +29,9 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../../services/ui/dataLoader.js', () => ({
     loadManeuvers: vi.fn(async (_rules) => [
-        { name: 'Trip Attack', effect: 'prone', trigger: 'weapon_attack_hit', saveType: 'STR', damageBonus: true, actionType: 'attack_rider' },
-        { name: 'Pushing Attack', effect: 'push', trigger: 'weapon_attack_hit', saveType: 'STR', value: 15, damageBonus: true, actionType: 'attack_rider' },
-        { name: 'Goading Attack', effect: 'goad', trigger: 'weapon_attack_hit', saveType: 'WIS', damageBonus: true, actionType: 'attack_rider' },
-        { name: 'Disarming Attack', effect: 'disarm', trigger: 'weapon_attack_hit', saveType: 'STR', damageBonus: true, actionType: 'attack_rider' },
-        { name: 'Menacing Attack', effect: 'frightened', trigger: 'weapon_attack_hit', saveType: 'WIS', damageBonus: true, actionType: 'attack_rider' },
-        { name: 'Distracting Strike', effect: 'distracting_strike_advantage', trigger: 'weapon_attack_hit', damageBonus: true, actionType: 'attack_rider' },
-        { name: 'Maneuvering Attack', effect: 'ally_movement', trigger: 'weapon_attack_hit', damageBonus: true, actionType: 'attack_rider' },
-        { name: 'Precision Attack', effect: 'attack_roll_bonus', trigger: 'attack_roll_miss', actionType: 'attack_rider' },
-        { name: 'Sweeping Attack', effect: 'secondary_damage', trigger: 'melee_weapon_attack_hit', damageBonus: false, actionType: 'attack_rider' },
-        { name: 'Evasive Footwork', effect: 'ac_bonus_disengage', actionType: 'bonus_action' },
-        { name: 'Feinting Attack', effect: 'advantage_and_damage', actionType: 'bonus_action' },
-        { name: 'Lunging Attack', effect: 'dash_and_damage', actionType: 'bonus_action' },
-        { name: 'Rally', effect: 'temp_hp', actionType: 'bonus_action', extraHpExpression: '1d4' },
-        { name: "Commander's Strike", effect: null, actionType: 'grant_attack' },
-        { name: 'Bait and Switch', effect: 'ac_bonus_and_swap', actionType: 'movement' },
-        { name: 'Ambush', actionType: 'skill_check', skills: ['Stealth'], initiativeBonus: true, dieExpression: 'superiority_die' },
-        { name: 'Tactical Assessment', actionType: 'skill_check', skills: ['Insight'], ability: 'Wisdom', dieExpression: 'superiority_die' },
-        { name: 'Commanding Presence', actionType: 'skill_check', reactionSaveType: 'WIS', reactionEffect: 'disadvantage_next_attack', reactionDuration: 'until_end_of_next_turn' },
-        { name: 'Parry', effect: 'damage_reduction', actionType: 'reaction' },
-        { name: 'Riposte', effect: 'melee_attack_reaction', actionType: 'reaction' },
+        { name: 'Evasive Footwork', description: 'Take the Disengage action and gain a bonus to AC.', effect: 'ac_bonus_disengage', actionType: 'bonus_action', dieExpression: 'superiority_die' },
+        { name: 'Tactical Assessment', description: 'Add the die to a Wisdom check.', actionType: 'skill_check', skills: ['Insight'], ability: 'Wisdom', dieExpression: 'superiority_die' },
+        { name: 'Ambush', description: 'Add the die to an Initiative or Stealth check.', actionType: 'skill_check', skills: ['Stealth'], initiativeBonus: true, dieExpression: 'superiority_die' },
     ]),
     loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
@@ -56,10 +53,11 @@ vi.mock('../../../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn().mockReturnValue({ total: 4 }),
 }));
 
+// playerIsImmuneToCondition is required by conditionSaveService (real, loaded
+// via combatSuperiorityUtils) importing from the mocked automationService.
 vi.mock('../../../../services/combat/automation/automationService.js', () => ({
     evaluateAutoExpression: vi.fn((expr) => {
         if (expr === 'superiority_die') return 8;
-        if (expr === '1d6') return 6;
         return expr;
     }),
     playerIsImmuneToCondition: vi.fn(() => false),
@@ -82,11 +80,7 @@ vi.mock('../../../../services/rules/combat/applyDamage.js', () => ({
 
 vi.mock('../../../../services/rules/combat/rangeValidation.js', () => ({
     getDistanceFeet: vi.fn(() => 5),
-    rangeToFeet: vi.fn((range) => {
-        if (range === '5_ft') return 5;
-        if (range === '8_ft') return 8;
-        return 5;
-    }),
+    rangeToFeet: vi.fn(() => 30),
 }));
 
 vi.mock('../../../../services/rules/combat/rangeCheck.js', () => ({
@@ -101,42 +95,49 @@ vi.mock('../../../../services/automation/handlers/buffs/tempHpService.js', () =>
     setTempHp: vi.fn(async () => {}),
 }));
 
-const SELECTION_KEY = 'BattleMasterManeuvers_selection';
-
-const makePlayerStats = (overrides = {}) => ({
+const makePlayerStats = () => ({
     name: 'TestFighter',
-    proficiency: 3,
-    abilities: [
-        { name: 'STR', bonus: 4 },
-        { name: 'DEX', bonus: 2 },
-        { name: 'CON', bonus: 1 },
-        { name: 'INT', bonus: 0 },
-        { name: 'WIS', bonus: 0 },
-        { name: 'CHA', bonus: 0 },
-    ],
     level: 5,
     rules: '2024',
-    attacks: [{ name: 'Longsword', weaponType: 'melee', damage: '1d8+4', damageType: 'slashing' }],
-    automation: { passives: [], actions: [], bonusActions: [], reactions: [], specialActions: [] },
-    ...overrides,
+    automation: { passives: [] },
 });
 
-// ── executeBonusActionManeuver ─────────────────────────────────────────
+const mockRuntime = (overrides = {}) => {
+    getRuntimeValue.mockImplementation((name, key) => {
+        const routed = overrides[`${name}.${key}`];
+        if (routed !== undefined) return routed;
+        if (key === 'superiorityDice') return 4;
+        return null;
+    });
+};
 
-describe('executeBonusActionManeuver', () => {
+// ── Barrel contract ──────────────────────────────────────────────────────
+
+describe('combatSuperiorityHandler barrel', () => {
+    it('re-exports every action-maneuver executor through the compat barrel', () => {
+        [
+            executeBonusActionManeuver,
+            executeGrantAttackManeuver,
+            executeMovementManeuver,
+            executeSkillCheckManeuver,
+            executeReactionManeuver,
+            executeCommandingPresenceReaction,
+        ].forEach(fn => expect(typeof fn).toBe('function'));
+    });
+});
+
+// ── executeBonusActionManeuver — die-size fallback ─────────────────────
+
+describe('executeBonusActionManeuver — die-size fallback', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockRuntime();
     });
 
-    it('falls back to die size when rollExpression returns null', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Evasive Footwork'];
-            return undefined;
-        });
-
-        const diceRoller = await import('../../../../services/dice/diceRoller.js');
-        diceRoller.rollExpression.mockReturnValue(null);
+    it('falls back to the die size when rollExpression returns null — value pays the state writes, not just the text', async () => {
+        // dieExpression 'superiority_die' evaluates to d8 (evaluateAutoExpression);
+        // a null roll must fall back to 8 for dieValue AND every runtime write.
+        rollExpression.mockReturnValueOnce(null);
 
         const result = await executeBonusActionManeuver(
             { name: 'Test', automation: { type: 'combat_superiority' } },
@@ -146,24 +147,24 @@ describe('executeBonusActionManeuver', () => {
         );
 
         expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Rolled d8 for 8');
+        expect(rollExpression).toHaveBeenCalledWith('1d8');
+        expect(result.payload.description).toBe('<b>Evasive Footwork</b> (Bonus Action)<br/>Rolled d8 for 8. You take the Disengage action and gain +8 AC until the start of your next turn.');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'superiorityDice', 3, 'test-campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchBonus', 8, 'test-campaign');
+        expect(result.logEntries).toHaveLength(1);
+        expect(result.logEntries[0].description).toBe('Used Evasive Footwork as a bonus action. Rolled d8 for 8. Take the Disengage action and gain a bonus to AC.');
     });
 });
 
-// ── executeSkillCheckManeuver ──────────────────────────────────────────
+// ── executeSkillCheckManeuver ────────────────────────────────────────────
 
 describe('executeSkillCheckManeuver', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockRuntime();
     });
 
-    it('references ability and skill list for non-initiative maneuvers', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Tactical Assessment'];
-            return undefined;
-        });
-
+    it('non-initiative arms pendingSkillCheckBonus and names ability + skill in popup and log', async () => {
         const result = await executeSkillCheckManeuver(
             { name: 'Test', automation: { type: 'combat_superiority' } },
             makePlayerStats(),
@@ -171,78 +172,27 @@ describe('executeSkillCheckManeuver', () => {
             'Tactical Assessment'
         );
 
-        expect(result.payload.description).toContain('Wisdom');
-        expect(result.payload.description).toContain('Insight');
-    });
-});
-
-// ── executeReactionManeuver ────────────────────────────────────────────
-
-describe('executeReactionManeuver', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+        expect(result.type).toBe('popup');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'pendingSkillCheckBonus', 4, 'test-campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'superiorityDice', 3, 'test-campaign');
+        expect(result.payload.description).toBe('<b>Tactical Assessment</b><br/>Rolled d8 for 4. Add 4 to your next Wisdom (Insight).');
+        expect(result.logEntries).toHaveLength(1);
+        expect(result.logEntries[0].description).toBe('Used Tactical Assessment. Rolled d8 for 4. Added 4 to the next Insight check.');
     });
 
-    it('returns attack_roll type for melee_attack_reaction when attacks exist', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Riposte'];
-            // MN-017: valid miss trigger — Goblin melee attack missed TestFighter
-            if (key === 'lastAttack') return { attackerName: 'Goblin', targetName: 'TestFighter', hit: false, weaponType: 'melee', d20: 3, bonus: 5 };
-            return undefined;
-        });
-
-        const result = await executeReactionManeuver(
-            { name: 'Riposte', automation: { type: 'combat_superiority' } },
+    it('initiativeBonus variant uses the Initiative-or-Stealth wording (no ability prefix)', async () => {
+        const result = await executeSkillCheckManeuver(
+            { name: 'Test', automation: { type: 'combat_superiority' } },
             makePlayerStats(),
             'test-campaign',
-            'Riposte'
+            'Ambush'
         );
 
-        expect(result.type).toBe('attack_roll');
-        expect(result.payload.attack).toBeDefined();
-        expect(result.payload.targetName).toBe('Goblin');
-        // MN-017 Defect 1 fix: die + latches land in ONE merged batch write.
-        expect(setRuntimeBatch).toHaveBeenCalledWith('TestFighter', {
-            pendingRiposteDieValue: expect.any(Number),
-            _Riposte_appliedAttack: expect.any(String),
-            _Riposte_usedRound: 1,
-        }, 'test-campaign');
-        expect(result.logEntries[0].description).toContain('Goblin');
-    });
-});
-
-// ── executeCommandingPresenceReaction ──────────────────────────────────
-
-describe('executeCommandingPresenceReaction', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    it('returns modal when targetName is not provided', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Commanding Presence'];
-            return undefined;
-        });
-
-        const result = await executeCommandingPresenceReaction(
-            {
-                name: 'Test',
-                automation: {
-                    type: 'combat_superiority',
-                    reactionEffect: 'disadvantage_next_attack',
-                },
-            },
-            makePlayerStats(),
-            'test-campaign',
-            'Commanding Presence'
-        );
-
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('commandingPresenceReaction');
-        expect(result.payload.onTargetSelected).toBeDefined();
-        expect(result.payload.onSkip).toBeDefined();
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(expect.any(String), 'activeConditions', expect.anything(), expect.any(String));
+        expect(result.type).toBe('popup');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'pendingSkillCheckBonus', 4, 'test-campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'superiorityDice', 3, 'test-campaign');
+        expect(result.payload.description).toBe('<b>Ambush</b><br/>Rolled d8 for 4. Add 4 to your next Initiative roll or Dexterity (Stealth) check.');
+        expect(result.logEntries).toHaveLength(1);
+        expect(result.logEntries[0].description).toBe('Used Ambush. Rolled d8 for 4. Added 4 to the next Initiative or Stealth check.');
     });
 });

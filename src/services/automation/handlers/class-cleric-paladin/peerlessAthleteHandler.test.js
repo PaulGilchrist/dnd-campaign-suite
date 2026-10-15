@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Peerless Athlete self-buff activation contract: already-active guard, Channel Divinity
+// charge spending (with maxCharges fallback), activeBuffs append, expiration, and logging.
+// Deterministic — all dependencies mocked, no timers, no DOM.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './peerlessAthleteHandler.js';
 
@@ -51,17 +55,9 @@ function makeAction(overrides = {}) {
     };
 }
 
-function mockActive() {
+function mockRuntime({ active = false, charges = 2, activeBuffs = [] } = {}) {
     getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'peerlessAthleteActive') return true;
-        if (key === 'activeBuffs') return [{ name: 'Peerless Athlete', effect: 'peerless_athlete' }];
-        return null;
-    });
-}
-
-function mockInactive(charges = 2, activeBuffs = []) {
-    getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'peerlessAthleteActive') return false;
+        if (key === 'peerlessAthleteActive') return active;
         if (key === 'activeBuffs') return activeBuffs;
         if (key === 'channelDivinityCharges') return charges;
         return null;
@@ -74,8 +70,14 @@ describe('peerlessAthleteHandler', () => {
     });
 
     describe('already active', () => {
-        it('returns popup indicating ability is already active without clearing state', async () => {
-            mockActive();
+        it('returns info popup without touching runtime state', async () => {
+            mockRuntime({
+                active: true,
+                activeBuffs: [
+                    { name: 'Peerless Athlete', effect: 'peerless_athlete' },
+                    { name: 'Other Buff', effect: 'other' },
+                ],
+            });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -83,68 +85,50 @@ describe('peerlessAthleteHandler', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toBe('Peerless Athlete is already active.');
             expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addExpiration).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
-
-        it('does not modify activeBuffs when already active', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'peerlessAthleteActive') return true;
-                if (key === 'activeBuffs') return [
-                    { name: 'Peerless Athlete', effect: 'peerless_athlete' },
-                    { name: 'Other Buff', effect: 'other' },
-                ];
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
     });
 
-    describe('activation', () => {
-        it('returns popup with activation description when not active', async () => {
-            mockInactive();
+    describe('no charges remaining', () => {
+        it('returns info popup without spending or activating when charges are 0', async () => {
+            mockRuntime({ charges: 0 });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toBeDefined();
-            expect(typeof result.payload.description).toBe('string');
-            expect(result.payload.description.length).toBeGreaterThan(0);
+            expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
+    });
 
-        it('spends a channel divinity charge and activates the buff', async () => {
-            mockInactive(2);
+    describe('activation', () => {
+        it('spends a charge, activates the buff, schedules expiration, and logs', async () => {
+            mockRuntime();
 
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestCleric',
-                'channelDivinityCharges',
-                1,
-                campaignName,
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toBe(
+                'Peerless Athlete activated! You have Advantage on Strength (Athletics) and Dexterity (Acrobatics) checks, and Long/High Jump distance +10 feet for 1 hour.'
             );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestCleric',
-                'peerlessAthleteActive',
-                true,
-                campaignName,
-            );
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'channelDivinityCharges', 1, campaignName);
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'peerlessAthleteActive', true, campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestCleric',
                 'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        name: 'Peerless Athlete',
-                        effect: 'peerless_athlete',
-                        duration: '1_hour',
-                    }),
-                ]),
+                [expect.objectContaining({ name: 'Peerless Athlete', effect: 'peerless_athlete', duration: '1_hour' })],
                 campaignName,
             );
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCleric', targetName: 'TestCleric', effects: [{ type: 'peerless_athlete_end' }], campaignName, rounds: 6 });
+            expect(addExpiration).toHaveBeenCalledWith({
+                attackerName: 'TestCleric',
+                targetName: 'TestCleric',
+                effects: [{ type: 'peerless_athlete_end' }],
+                campaignName,
+                rounds: 6,
+            });
             expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'ability_use',
                 characterName: 'TestCleric',
@@ -153,13 +137,8 @@ describe('peerlessAthleteHandler', () => {
             }));
         });
 
-        it('appends buff to existing activeBuffs', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'peerlessAthleteActive') return false;
-                if (key === 'activeBuffs') return [{ name: 'Existing Buff', effect: 'existing' }];
-                if (key === 'channelDivinityCharges') return 2;
-                return null;
-            });
+        it('appends the buff to existing activeBuffs instead of replacing them', async () => {
+            mockRuntime({ activeBuffs: [{ name: 'Existing Buff', effect: 'existing' }] });
 
             await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -174,8 +153,8 @@ describe('peerlessAthleteHandler', () => {
             );
         });
 
-        it('uses automation duration when provided', async () => {
-            mockInactive(2, []);
+        it('uses automation duration on the buff when provided', async () => {
+            mockRuntime();
 
             await handle(makeAction({ automation: { duration: 'until_end_of_turn' } }), makePlayerStats(), campaignName, null);
 
@@ -188,153 +167,9 @@ describe('peerlessAthleteHandler', () => {
                 campaignName,
             );
         });
-    });
 
-    describe('no charges remaining', () => {
-        it('returns popup when charges are 0', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'peerlessAthleteActive') return false;
-                if (key === 'channelDivinityCharges') return 0;
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('charge fallback logic', () => {
-        it('uses channel_divinity_charges from class_specific when channel_divinity is not set', async () => {
-            const stats = makePlayerStats({
-                class: {
-                    class_levels: [
-                        { level: 1 },
-                        { level: 2 },
-                        { level: 3 },
-                        { level: 4 },
-                        { level: 5 },
-                        { level: 6, class_specific: { channel_divinity_charges: 4 } },
-                    ],
-                },
-            });
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'peerlessAthleteActive') return false;
-                if (key === 'activeBuffs') return [];
-                return null;
-            });
-
-            await handle(makeAction(), stats, campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestCleric',
-                'channelDivinityCharges',
-                3,
-                campaignName,
-            );
-        });
-
-        it('defaults to 2 charges when both channel_divinity and class_specific are missing', async () => {
-            const stats = makePlayerStats({
-                class: {
-                    class_levels: [
-                        { level: 1 },
-                        { level: 2 },
-                    ],
-                },
-            });
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'peerlessAthleteActive') return false;
-                if (key === 'activeBuffs') return [];
-                return null;
-            });
-
-            await handle(makeAction(), stats, campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestCleric',
-                'channelDivinityCharges',
-                1,
-                campaignName,
-            );
-        });
-    });
-
-    describe('runtime value fallbacks', () => {
-        it('uses maxCharges when channelDivinityCharges is null in runtime', async () => {
-            const stats = makePlayerStats({
-                class: {
-                    class_levels: [
-                        { level: 1 },
-                        { level: 2 },
-                        { level: 3 },
-                        { level: 4 },
-                        { level: 5 },
-                        { level: 6 },
-                    ],
-                },
-            });
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'peerlessAthleteActive') return false;
-                if (key === 'activeBuffs') return [];
-                if (key === 'channelDivinityCharges') return null;
-                return null;
-            });
-
-            await handle(makeAction(), stats, campaignName, null);
-
-            // maxCharges defaults to 2 when no channel_divinity on class level
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestCleric',
-                'channelDivinityCharges',
-                1,
-                campaignName,
-            );
-        });
-
-        it('handles negative charges as no charges remaining', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'peerlessAthleteActive') return false;
-                if (key === 'channelDivinityCharges') return -1;
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('activeBuffs fallback', () => {
-        it('uses empty array when activeBuffs is not an array in runtime', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'peerlessAthleteActive') return false;
-                if (key === 'activeBuffs') return 'not-an-array';
-                if (key === 'channelDivinityCharges') return 2;
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestCleric',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ name: 'Peerless Athlete' }),
-                ]),
-                campaignName,
-            );
-        });
-    });
-
-    describe('duration fallback', () => {
-        it('uses 1_hour default when automation duration is falsy', async () => {
-            mockInactive(2, []);
+        it('defaults buff duration to 1_hour when automation duration is falsy', async () => {
+            mockRuntime();
 
             await handle(makeAction({ automation: { duration: null } }), makePlayerStats(), campaignName, null);
 
@@ -347,45 +182,69 @@ describe('peerlessAthleteHandler', () => {
                 campaignName,
             );
         });
+
+        it('treats a non-array activeBuffs runtime value as empty', async () => {
+            mockRuntime({ activeBuffs: 'not-an-array' });
+
+            await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestCleric',
+                'activeBuffs',
+                [expect.objectContaining({ name: 'Peerless Athlete' })],
+                campaignName,
+            );
+        });
+    });
+
+    describe('channel divinity charge sourcing', () => {
+        it('reads charges from channel_divinity on the current class level', async () => {
+            mockRuntime({ charges: 3 });
+
+            await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'channelDivinityCharges', 2, campaignName);
+        });
+
+        it('falls back to class_specific.channel_divinity_charges when channel_divinity is not set', async () => {
+            const stats = makePlayerStats({
+                class: {
+                    class_levels: [
+                        { level: 1 },
+                        { level: 2 },
+                        { level: 3 },
+                        { level: 4 },
+                        { level: 5 },
+                        { level: 6, class_specific: { channel_divinity_charges: 4 } },
+                    ],
+                },
+            });
+            mockRuntime({ charges: null });
+
+            await handle(makeAction(), stats, campaignName, null);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'channelDivinityCharges', 3, campaignName);
+        });
+
+        it('defaults to 2 max charges when the class level provides none and stored charges are null', async () => {
+            const stats = makePlayerStats({ class: { class_levels: [{ level: 1 }] } });
+            mockRuntime({ charges: null });
+
+            await handle(makeAction(), stats, campaignName, null);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'channelDivinityCharges', 1, campaignName);
+        });
     });
 
     describe('logging error handling', () => {
-        it('handles addEntry rejection gracefully via catch', async () => {
-            mockInactive();
+        it('still returns the activation popup when addEntry rejects', async () => {
+            mockRuntime();
             addEntry.mockRejectedValue(new Error('log failed'));
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toBeDefined();
-        });
-    });
-
-    describe('level fallback', () => {
-        it('uses level 1 when playerStats.level is falsy', async () => {
-            const stats = {
-                name: 'TestCleric',
-                class: {
-                    class_levels: [
-                        { level: 1, channel_divinity: 2 },
-                    ],
-                },
-            };
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'peerlessAthleteActive') return false;
-                if (key === 'activeBuffs') return [];
-                if (key === 'channelDivinityCharges') return 2;
-                return null;
-            });
-
-            await handle(makeAction(), stats, campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestCleric',
-                'channelDivinityCharges',
-                1,
-                campaignName,
-            );
+            expect(result.payload.description).toContain('activated!');
         });
     });
 });

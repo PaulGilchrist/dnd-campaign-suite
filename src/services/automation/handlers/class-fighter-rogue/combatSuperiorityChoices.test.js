@@ -1,3 +1,14 @@
+// @maintained-by-ai
+// combatSuperiorityChoices.test.js — chooser-confirm lane contracts for the
+// combat_superiority modal confirms: executeSweepingAttack, executeBaitAndSwitchChoice,
+// executeCommanderStrikeChoice, executeRallyChoice (combatSuperiorityUtils.js) and
+// validateSizeLimit (executeManeuver.js). Fully mocked, deterministic, turn-based.
+// Sweeping-attack hit/miss/pending-clear vs the second AC is covered by
+// combatSuperiorityUtils.sweeping.test.js (MN-018); large_or_smaller acceptance and
+// monsters.json size resolution by validateSizeLimit.mn015.test.js. This file pins the
+// CHOOSER-specific behaviour: guard popups, runtime-key writes, expiration payloads,
+// finalDamage precedence, targetEffects registration, and the medium_or_smaller /
+// one_size_larger size-limit branches.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     executeSweepingAttack,
@@ -129,70 +140,6 @@ describe('executeSweepingAttack', () => {
         expect(result.type).toBe('popup');
         expect(result.payload.name).toBe('Sweeping Attack');
         expect(result.payload.description).toContain('Goblin is not a valid secondary target');
-    });
-
-    it('reuses the original attack roll vs the second AC, applies damage on hit, clears pending', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'pendingSweepingAttack') return {
-                dieValue: 4,
-                damageType: 'slashing',
-                primaryTarget: 'Goblin',
-                targetName: 'Goblin',
-                originalTotal: 15,
-                originalD20Roll: 11,
-                attackBonus: 4,
-                secondaryTargets: [{ name: 'Skeleton', ac: 11 }],
-            };
-            if (key === 'targetEffects') return [];
-            return undefined;
-        });
-
-        damageUtils.getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Skeleton', ac: 11 }],
-        });
-
-        const result = await executeSweepingAttack(
-            { name: 'Test', automation: { type: 'combat_superiority' } },
-            makePlayerStats(),
-            'test-campaign',
-            'Skeleton'
-        );
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.name).toBe('Sweeping Attack');
-        expect(result.payload.description).toContain('hits Skeleton');
-        expect(result.payload.description).toContain('slashing');
-        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: [{ name: 'Skeleton', ac: 11 }] }), 'Skeleton', 4, ['slashing'], { campaignName: 'test-campaign', characters: [], ignoreResistance: false, attackerName: 'TestFighter' });
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'pendingSweepingAttack', null, 'test-campaign');
-    });
-
-    it('MISSES (no damage) when the original roll is below the second AC', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'pendingSweepingAttack') return {
-                dieValue: 4,
-                damageType: 'slashing',
-                primaryTarget: 'Goblin',
-                targetName: 'Goblin',
-                originalTotal: 8,
-                originalD20Roll: 4,
-                attackBonus: 4,
-                secondaryTargets: [{ name: 'Skeleton', ac: 11 }],
-            };
-            if (key === 'targetEffects') return [];
-            return undefined;
-        });
-
-        damageUtils.getCombatContext.mockResolvedValue({ creatures: [{ name: 'Skeleton', ac: 11 }] });
-
-        const result = await executeSweepingAttack(
-            { name: 'Test', automation: { type: 'combat_superiority' } },
-            makePlayerStats(),
-            'test-campaign',
-            'Skeleton'
-        );
-
-        expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
-        expect(result.payload.description).toMatch(/misses Skeleton/i);
     });
 
     it('uses applyDamageToTarget finalDamage as the applied amount', async () => {
@@ -509,20 +456,8 @@ describe('validateSizeLimit', () => {
         vi.clearAllMocks();
     });
 
-    it('returns valid when maneuver has no sizeLimit', async () => {
-        const result = await validateSizeLimit(
-            {},
-            'Goblin',
-            'test-campaign',
-            makePlayerStats()
-        );
-
-        expect(result).toEqual({ valid: true });
-    });
-
-    it('returns valid when target size is within limit', async () => {
+    it('returns valid when target size is within limit (medium_or_smaller / one_size_larger)', async () => {
         const scenarios = [
-            { sizeLimit: 'large_or_smaller', targetSize: 'Small', expected: true },
             { sizeLimit: 'medium_or_smaller', targetSize: 'Small', expected: true },
             { sizeLimit: 'one_size_larger', targetSize: 'Large', expected: true },
         ];

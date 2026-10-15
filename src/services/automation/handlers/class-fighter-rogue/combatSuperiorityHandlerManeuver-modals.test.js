@@ -1,6 +1,20 @@
+// @maintained-by-ai: 2026-10-15
+// executeManeuver.js modals lane — the pending-prompt executor's own
+// builder/response branches: baitAndSwitchChoice + rallyChoice modals and the
+// rally no-allies popup (private buildBaitAndSwitchModal/buildRallyModal in
+// executeManeuver.js — the executeActionManeuvers.js twins are pinned in
+// combatSuperiorityMovementManeuvers + executeActionManeuvers.rally),
+// damage_reduction text + HP restore (runDamageReduction; the
+// executeReactionManeuver economy lives in executeActionManeuvers.parry.mn013),
+// the Riposte attack_roll envelope + no-attack popup (runRiposte; the reaction
+// gates live in executeActionManeuvers.riposte), the skill_check RUNNER_STEP
+// text, and the MN-015 size gate refusing through this executor with NO die
+// expend (the executeAttackRiderManeuver twin lives in executeAttackRider.mn015).
+// grant_attack is NOT re-pinned here — MN-003 funnels it to the gated
+// executor, owned by combatSuperiorityGrantAttack.mn003 via executeManeuver.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeManeuver } from './combatSuperiorityHandler.js';
-import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -9,7 +23,8 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../../services/ui/dataLoader.js', () => ({
     loadManeuvers: vi.fn(async (_rules) => [
-        { name: 'Trip Attack', effect: 'prone', trigger: 'weapon_attack_hit', saveType: 'STR', damageBonus: true, actionType: 'attack_rider' },
+        // MN-015 real-data shape carries sizeLimit ("large_or_smaller") for Trip Attack
+        { name: 'Trip Attack', effect: 'prone', trigger: 'weapon_attack_hit', saveType: 'STR', damageBonus: true, sizeLimit: 'large_or_smaller', actionType: 'attack_rider' },
         { name: 'Pushing Attack', effect: 'push', trigger: 'weapon_attack_hit', saveType: 'STR', value: 15, damageBonus: true, actionType: 'attack_rider' },
         { name: 'Goading Attack', effect: 'goad', trigger: 'weapon_attack_hit', saveType: 'WIS', damageBonus: true, actionType: 'attack_rider' },
         { name: 'Disarming Attack', effect: 'disarm', trigger: 'weapon_attack_hit', saveType: 'STR', damageBonus: true, actionType: 'attack_rider' },
@@ -31,6 +46,9 @@ vi.mock('../../../../services/ui/dataLoader.js', () => ({
         { name: 'Riposte', effect: 'melee_attack_reaction', actionType: 'reaction' },
     ]),
     loadWildMagicSurgeTable: vi.fn(async () => []),
+    // validateSizeLimit consults getMonsterData (monsters.json ground truth);
+    // empty cache → falls back to combatSummary target.size.
+    loadMonsters: vi.fn(async () => []),
 }));
 
 vi.mock('../../../../services/encounters/combatData.js', () => ({
@@ -117,35 +135,6 @@ const makePlayerStats = (overrides = {}) => ({
 describe('executeManeuver — modal/reaction/skill_check effects', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-    });
-
-    it('handles grant_attack by showing ally selection modal', async () => {
-        const combatContext = {
-            creatures: [
-                { name: 'TestFighter' },
-                { name: 'Ally1' },
-            ],
-        };
-
-        const damageUtils = await import('../../../../services/rules/combat/damageUtils.js');
-        damageUtils.getCombatContext.mockResolvedValue(combatContext);
-
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ["Commander's Strike"];
-            return undefined;
-        });
-
-        const result = await executeManeuver(
-            { name: "Commander's Strike", automation: { type: 'combat_superiority' } },
-            makePlayerStats(),
-            'test-campaign',
-            "Commander's Strike"
-        );
-
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('commanderStrikeChoice');
-        expect(result.payload.options).toHaveLength(1);
     });
 
     it('handles ac_bonus_and_swap by showing bait and switch modal', async () => {
@@ -304,27 +293,45 @@ describe('executeManeuver — modal/reaction/skill_check effects', () => {
         expect(result.payload.description).toContain('Add 4 to the ability check');
     });
 
-    it('handles sizeLimit validation - target too large', async () => {
+    it('MN-015: size gate refuses an oversized target BEFORE the die is rolled or spent', async () => {
         getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
             if (key === 'superiorityDice') return 4;
             if (key === SELECTION_KEY) return ['Trip Attack'];
             return undefined;
         });
 
+        // resolveTarget yields 'Goblin'; combatSummary carries its size (empty
+        // monsters.json cache in this suite → validateSizeLimit falls back here).
         const combatContext = {
-            creatures: [{ name: 'Ogre', size: 'Large' }],
+            creatures: [{ name: 'Goblin', size: 'Huge' }],
         };
 
         const damageUtils = await import('../../../../services/rules/combat/damageUtils.js');
         damageUtils.getCombatContext.mockResolvedValue(combatContext);
 
+        const diceRoller = await import('../../../../services/dice/diceRoller.js');
+        const savePrompt = await import('../../../../services/automation/common/savePrompt.js');
+
         const result = await executeManeuver(
-            { name: 'Test', automation: { type: 'combat_superiority' } },
+            { name: 'Trip Attack', automation: { type: 'combat_superiority' } },
             makePlayerStats({ size: 'Medium' }),
             'test-campaign',
             'Trip Attack'
         );
 
         expect(result.type).toBe('popup');
+        expect(result.refused).toBe(true);
+        expect(result.payload.description).toContain('Huge');
+        expect(result.payload.description).toContain('too large');
+        expect(result.payload.description).toContain('Large or smaller');
+        // Refusal never rolls, spends, or prompts a save (gate runs first).
+        expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+        expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', 'superiorityDice', expect.anything(), expect.anything());
+        expect(result.logEntries?.[0]).toMatchObject({
+            type: 'ability_use',
+            characterName: 'TestFighter',
+            abilityName: 'Trip Attack',
+        });
     });
 });

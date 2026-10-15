@@ -1,3 +1,17 @@
+// @maintained-by-ai
+// Deterministic: mocks the runtime-state, combat-context, and log seams at
+// module boundaries; no timers/DOM/network. Pins the stable handle() entry
+// contract: no-charges guard popup, target-selection modal (null combat
+// context / null attacker target) with payload shape, paid activation
+// (channelDivinityCharges / vowOfEnmityTarget / vowOfEnmityCostPaid writes,
+// full target activeBuffs object shape, campaign-log entry), paid transfer,
+// and free reactivation on currentHp:0 or a removed previous target.
+// falsy `||` quirk (channel_divinity: 0 falls through to class_specific) is
+// pinned here — listeners.test.js covers the other chain shapes.
+// Sibling lanes: vowOfEnmityHandler.applyTargetChoice.test.js owns
+// applyTargetChoice; vowOfEnmityHandler.listeners.test.js owns
+// setupVowTransferListener + shared fallbacks (level||1, terminal default 2,
+// hit_points.current/missing HP shapes).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './vowOfEnmityHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -92,32 +106,8 @@ describe('vowOfEnmityHandler.handle', () => {
         );
     });
 
-    it('defaults to 2 charges when no channel_divinity metadata exists', async () => {
-        mockRuntimeValues({});
-        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
-            creatures: [{ name: 'Goblin' }],
-        });
-        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Goblin' });
-
-        const ps = makePlayerStats({
-            level: 3,
-            class: {
-                class_levels: [undefined, undefined, {}],
-            },
-        });
-
-        await handle(makeAction(), ps, campaignName);
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Paladin1',
-            'channelDivinityCharges',
-            1,
-            campaignName,
-        );
-    });
-
     it('returns modal when combat target is unavailable', async () => {
-        // null combat context
+        // null combat context: getTargetFromAttacker is never consulted
         mockRuntimeValues({});
         vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue(null);
         vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue(null);
@@ -128,17 +118,7 @@ describe('vowOfEnmityHandler.handle', () => {
         vi.clearAllMocks();
         mockRuntimeValues({});
 
-        // empty creatures list
-        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({ creatures: [] });
-        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue(null);
-        result = await handle(makeAction(), makePlayerStats(), campaignName);
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('vowOfEnmityTarget');
-
-        vi.clearAllMocks();
-        mockRuntimeValues({});
-
-        // getTargetFromAttacker returns null
+        // attacker has no selected target despite live combat
         vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
             creatures: [{ name: 'Goblin' }],
         });

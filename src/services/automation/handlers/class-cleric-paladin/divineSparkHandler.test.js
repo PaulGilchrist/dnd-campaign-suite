@@ -1,3 +1,7 @@
+// @maintained-by-ai: 2026-10-15
+// Deterministic contract test for divineSparkHandler: all seams (runtime store,
+// target resolver, log service) are mocked; assertions pin the handler's in/out
+// behaviour (charge validation/deduction, modal payload contract, logging).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -159,7 +163,7 @@ describe('divineSparkHandler.handle', () => {
       targetResolver.resolveTarget.mockResolvedValue(null);
     });
 
-    it('returns a modal with correct structure and fields', async () => {
+    it('returns the full modal payload for default inputs', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -168,12 +172,17 @@ describe('divineSparkHandler.handle', () => {
       expect(result).toEqual({
         type: 'modal',
         modalName: 'divineSpark',
-        payload: expect.objectContaining({
+        payload: {
           featureName: action.name,
           attackerName: ps.name,
           targetName: ps.name,
           campaignName,
-        }),
+          healExpression: '1d8 + 2',
+          damageExpression: '1d8 + 2',
+          damageTypes: ['Necrotic', 'Radiant'],
+          saveType: 'CON',
+          wisModifier: 2,
+        },
       });
     });
 
@@ -193,40 +202,19 @@ describe('divineSparkHandler.handle', () => {
       expect(result.payload.damageExpression).toBe(expectedExpression);
     });
 
-    it('handles damageTypes from auto or defaults', async () => {
+    it.each`
+      label                                    | automation                                          | expectedDamageTypes       | expectedSaveType
+      ${'passes through auto values'}        | ${{ damageTypes: ['Fire', 'Cold'], saveType: 'WIS' }} | ${['Fire', 'Cold']} | ${'WIS'}
+      ${'falls back to defaults when null'}  | ${{ damageTypes: null, saveType: null }}              | ${['Necrotic', 'Radiant']} | ${'CON'}
+      ${'preserves empty damageTypes array'} | ${{ damageTypes: [] }}                              | ${[]}                   | ${'CON'}
+    `('damageTypes/saveType: $label', async ({ automation, expectedDamageTypes, expectedSaveType }) => {
       const ps = makePlayerStats();
-      const action = makeAction({ damageTypes: ['Fire', 'Cold'] });
+      const action = makeAction(automation);
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.damageTypes).toEqual(['Fire', 'Cold']);
-    });
-
-    it('falls back to default damageTypes when auto.damageTypes is null or missing', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ damageTypes: null });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.damageTypes).toEqual(['Necrotic', 'Radiant']);
-    });
-
-    it('uses auto.damageTypes when it is an empty array', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ damageTypes: [] });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.damageTypes).toEqual([]);
-    });
-
-    it('handles saveType from auto or defaults to CON', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ saveType: 'WIS' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.saveType).toBe('WIS');
+      expect(result.payload.damageTypes).toEqual(expectedDamageTypes);
+      expect(result.payload.saveType).toBe(expectedSaveType);
     });
   });
 

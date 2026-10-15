@@ -1,7 +1,17 @@
+// @maintained-by-ai
+// Canonical home for combatSuperiorityUtils internals: rollManeuverDie Relentless
+// latch / fixed-d8 free roll / paid d12 (combatSuperiorityHandlerUtils.test.js
+// explicitly defers these here — do NOT shrink), checkSuperiorityDice re-arm
+// consistency, and the utils-owned popup string builders (buildNoDiceRemainingPopup
+// and buildManeuverNotFoundPopup — consumer suites may contain-check these strings
+// but the full-shape contract is pinned here). Deterministic: mock runtime router,
+// fixed rollExpression returns, controlled combat-summary cache, turn-based rounds.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     rollManeuverDie,
     checkSuperiorityDice,
+    buildNoDiceRemainingPopup,
+    buildManeuverNotFoundPopup,
 } from './combatSuperiorityUtils.js';
 import { setCombatSummaryCache } from '../../../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -55,19 +65,6 @@ describe('rollManeuverDie — Relentless free roll die size', () => {
         expect(result.dieValue).toBe(5);
     });
 
-    it('paid rolls still use the lv18 d12 superiority die', () => {
-        setCombatSummaryCache({ round: 1 }, CAMPAIGN);
-        mockStoredRound(null);
-        rollManeuverDie({ dieExpression: 'superiority_die' }, relentlessStats(), CAMPAIGN);
-
-        mockStoredRound(1);
-        const paid = rollManeuverDie({ dieExpression: 'superiority_die' }, relentlessStats(), CAMPAIGN);
-
-        expect(rollExpression).toHaveBeenLastCalledWith('1d12');
-        expect(paid.expendedDie).toBe(true);
-        expect(paid.dieDescription).toBe('Rolled d12 for 5.');
-    });
-
     it('defaults free roll value to 8 when rollExpression returns null', () => {
         setCombatSummaryCache({ round: 1 }, CAMPAIGN);
         mockStoredRound(null);
@@ -91,7 +88,7 @@ describe('rollManeuverDie — self-re-arming round latch', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'relentlessUsedRound', 2, CAMPAIGN);
     });
 
-    it('second maneuver in the SAME round pays with the superiority die', () => {
+    it('second maneuver in the SAME round pays with the lv18 d12 superiority die', () => {
         setCombatSummaryCache({ round: 2 }, CAMPAIGN);
         mockStoredRound(2);
 
@@ -100,6 +97,7 @@ describe('rollManeuverDie — self-re-arming round latch', () => {
         expect(result.expendedDie).toBe(true);
         expect(result.relentlessUsed).toBe(true);
         expect(rollExpression).toHaveBeenCalledWith('1d12');
+        expect(result.dieDescription).toBe('Rolled d12 for 5.');
     });
 
     it('re-arms in a NEW round — stale stamp 1 vs round 2 grants a free d8', () => {
@@ -143,7 +141,6 @@ describe('rollManeuverDie — self-re-arming round latch', () => {
 describe('checkSuperiorityDice — re-arm consistency', () => {
     it('grants remaining availability when the latch round is older than the current round', () => {
         setCombatSummaryCache({ round: 2 }, CAMPAIGN);
-        mockStoredRound(1);
         getRuntimeValue.mockImplementation((_name, key) => {
             if (key === 'relentlessUsedRound') return 1;
             if (key === 'superiorityDice') return 0;
@@ -168,5 +165,33 @@ describe('checkSuperiorityDice — re-arm consistency', () => {
 
         expect(result.relentlessUsed).toBe(true);
         expect(result.hasDiceRemaining).toBe(false);
+    });
+});
+
+// ── Utils-owned popup string builders (canonical full-shape pins) ─────
+
+describe('buildNoDiceRemainingPopup — canonical full-string contract', () => {
+    it('builds the exact no-dice popup (consumers: twins may contain-check only)', () => {
+        expect(buildNoDiceRemainingPopup('Riposte')).toStrictEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Riposte',
+                description: 'Riposte: No Superiority Dice remaining. Recharges on a Short or Long Rest.',
+            },
+        });
+    });
+});
+
+describe('buildManeuverNotFoundPopup — canonical full-string contract', () => {
+    it('builds the exact maneuver-not-found popup', () => {
+        expect(buildManeuverNotFoundPopup('Attack Action', 'Nonexistent Maneuver')).toStrictEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Attack Action',
+                description: 'Maneuver "Nonexistent Maneuver" not found.',
+            },
+        });
     });
 });

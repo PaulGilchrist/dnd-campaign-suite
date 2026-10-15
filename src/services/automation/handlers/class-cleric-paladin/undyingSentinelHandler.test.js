@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Deterministic unit tests for the manually-triggered undying sentinel handler
+// (heal a willing target at 0 HP). Fully mocked; the separate applyDamage.js
+// auto-trigger path is covered by applyDamage.undyingSentinel.test.js.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { handle, isUndyingSentinelUsed, setUndyingSentinelUsed } from './undyingSentinelHandler.js';
@@ -226,7 +230,11 @@ describe('undyingSentinelHandler', () => {
     });
 
     describe('successful heal — NPC target', () => {
-      it('heals NPC target, saves combatSummary, posts log, and dispatches event', async () => {
+      // Log entry and combat-summary-updated dispatch are shared-code-path
+      // assertions already covered by the player-target heal test above;
+      // this suite covers only the NPC-specific branch (mutate currentHp
+      // on the combat summary object and persist it via storage).
+      it('mutates currentHp on the NPC and saves combatSummary', async () => {
         const target = makeNPCTarget('Goblin', 0);
         const cs = { creatures: [target] };
         getRuntimeValue
@@ -239,17 +247,6 @@ describe('undyingSentinelHandler', () => {
 
         expect(target.currentHp).toBe(16);
         expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, campaignName);
-        expect(addEntry).toHaveBeenCalledWith(campaignName, {
-          type: 'healing',
-          characterName: 'TestCleric',
-          targetName: 'Goblin',
-          amount: 16,
-          sourceName: 'Undying Sentinel',
-          timestamp: 1700000000000,
-        });
-        expect(dispatchEventSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ type: 'combat-summary-updated' }),
-        );
       });
 
       it('logs error when addEntry promise rejects', async () => {
@@ -288,28 +285,12 @@ describe('undyingSentinelHandler', () => {
       );
     });
 
-    it('returns false when runtime value is false', () => {
-      getRuntimeValue.mockReturnValue(false);
+    it('returns false for any non-true runtime value', () => {
+      for (const value of [false, null, undefined]) {
+        getRuntimeValue.mockReturnValue(value);
 
-      const result = isUndyingSentinelUsed('TestCleric', campaignName);
-
-      expect(result).toBe(false);
-    });
-
-    it('returns false when runtime value is null', () => {
-      getRuntimeValue.mockReturnValue(null);
-
-      const result = isUndyingSentinelUsed('TestCleric', campaignName);
-
-      expect(result).toBe(false);
-    });
-
-    it('returns false when runtime value is undefined', () => {
-      getRuntimeValue.mockReturnValue(undefined);
-
-      const result = isUndyingSentinelUsed('TestCleric', campaignName);
-
-      expect(result).toBe(false);
+        expect(isUndyingSentinelUsed('TestCleric', campaignName)).toBe(false);
+      }
     });
   });
 

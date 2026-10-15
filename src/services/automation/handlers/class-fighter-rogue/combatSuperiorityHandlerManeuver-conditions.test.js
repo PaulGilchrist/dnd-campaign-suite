@@ -1,6 +1,18 @@
+// @maintained-by-ai: 2026-10-15
+// executeManeuver.js save/condition lane — the processManeuverSaveResult
+// branches reached through the pending-prompt executor: prone (condition write
+// via applyConditionToTarget→addCondition), goad (taunting_step te), frightened
+// (condition + rounds-2 addExpiration), push (text + mandatory addEntry log),
+// disarm (text), plus the RUNNER_STEPS distracting_strike_advantage step
+// (applyNextAttackAdvantage te write) and the popup+logEntries+expend envelope
+// (pinned once, on Trip). The other RUNNER_STEPS branches live in
+// combatSuperiorityHandlerManeuver-attack/-modals; the same effects driven
+// through executeAttackRiderManeuver live in combatSuperiorityAttackRider —
+// different executor functions, so no overlap here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeManeuver } from './combatSuperiorityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../../services/ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -349,8 +361,17 @@ describe('executeManeuver — condition/save effects', () => {
 
         if (expectPushed) {
             expect(result.payload.description).toContain('was pushed 15 feet');
+            // Every automation must log to the campaign log when triggered.
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Pushing Attack',
+                description: 'TestFighter pushed Goblin 15 feet away.',
+                targetName: 'Goblin',
+            });
         } else {
             expect(result.payload.description).not.toContain('was pushed');
+            expect(addEntry).not.toHaveBeenCalled();
         }
     });
 

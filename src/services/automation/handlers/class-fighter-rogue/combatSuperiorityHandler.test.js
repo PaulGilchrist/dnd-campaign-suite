@@ -1,3 +1,15 @@
+// @maintained-by-ai: 2026-10-15
+// combatSuperiorityHandler.test.js — the ONLY lane that calls handle() (the
+// dispatchers.js router barrel). Owns the routing-table contract: maneuverName
+// short-circuit, ACTION_TYPE_DISPATCH / REACTION_TYPE_DISPATCH / TRIGGER_DISPATCH
+// delegation, and the showCombatSuperioritySelection payload contract (empty-data
+// popup, superiority-dice + relentless gate, selectionMode incl. the MN-003
+// "known maneuvers open the USE flow" pins referenced by grantAttack.mn003,
+// maxOptions + level scaling, save/die defaults & overrides, ruleset fallback).
+// Sub-handler/executor internals live in the sibling lanes (HandlerManeuver-*,
+// HandlerNonManeuver, HandlerQuery, HandlerUtils, ActionManeuvers, AttackRider,
+// Choices, MovementManeuvers) — this file only pins WHICH lane handle() routes to.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './combatSuperiorityHandler.js';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -67,9 +79,9 @@ describe('combatSuperiorityHandler.handle', () => {
         getRuntimeValue.mockImplementation(defaultGetRuntimeValue);
     });
 
-    // ── No maneuver data ────────────────────────────────────────────────
+    // ── Data + dice gates ───────────────────────────────────────────────
 
-    describe('no maneuver data', () => {
+    describe('data and dice gates', () => {
         it('returns popup when loadManeuvers resolves to empty array', async () => {
             dataLoader.loadManeuvers.mockResolvedValue([]);
 
@@ -86,11 +98,7 @@ describe('combatSuperiorityHandler.handle', () => {
             expect(result.payload.name).toBe('Combat Superiority');
             expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('2024');
         });
-    });
 
-    // ── No superiority dice ─────────────────────────────────────────────
-
-    describe('no superiority dice', () => {
         it('returns popup when superiority dice is zero and no relentless', async () => {
             dataLoader.loadManeuvers.mockResolvedValue([
                 { name: 'Trip Attack', effect: 'knock_prone' },
@@ -110,13 +118,10 @@ describe('combatSuperiorityHandler.handle', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Combat Superiority');
             expect(result.payload.description).toBe('No Superiority Dice remaining. Recharges on a Short or Long Rest.');
         });
-    });
 
-    // ── Relentless interaction ──────────────────────────────────────────
-
-    describe('relentless interaction', () => {
         it('returns modal when relentless passive exists and dice are zero but not used this round', async () => {
             dataLoader.loadManeuvers.mockResolvedValue([
                 { name: 'Trip Attack', effect: 'knock_prone' },
@@ -140,6 +145,8 @@ describe('combatSuperiorityHandler.handle', () => {
             );
 
             expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('combatSuperiority');
+            expect(result.payload.selectionMode).toBe(true);
         });
 
         it('returns popup when relentless passive exists but already used this round', async () => {
@@ -165,13 +172,14 @@ describe('combatSuperiorityHandler.handle', () => {
             );
 
             expect(result.type).toBe('popup');
+            expect(result.payload.name).toBe('Combat Superiority');
             expect(result.payload.description).toBe('No Superiority Dice remaining. Recharges on a Short or Long Rest.');
         });
     });
 
-    // ── Modal with maneuver selection ───────────────────────────────────
+    // ── Selection modal payload ─────────────────────────────────────────
 
-    describe('modal with maneuver selection', () => {
+    describe('selection modal payload', () => {
         it('returns modal with all maneuvers when none known', async () => {
             dataLoader.loadManeuvers.mockResolvedValue([
                 { name: 'Trip Attack', effect: 'knock_prone', saveType: 'STR' },
@@ -335,13 +343,13 @@ describe('combatSuperiorityHandler.handle', () => {
             expect(result.payload.maxOptions).toBe(2);
         });
 
-        it('passes saveDc and saveType from automation into payload', async () => {
+        it('passes saveDc, saveType and dieExpression overrides from automation into payload', async () => {
             dataLoader.loadManeuvers.mockResolvedValue([
                 { name: 'Trip Attack', effect: 'knock_prone' },
             ]);
 
             const result = await handle(
-                makeAction({ saveDc: 16, saveType: 'DEX' }),
+                makeAction({ saveDc: 16, saveType: 'DEX', dieExpression: '2d6' }),
                 makePlayerStats(),
                 'test-campaign',
                 null
@@ -349,95 +357,7 @@ describe('combatSuperiorityHandler.handle', () => {
 
             expect(result.payload.saveDc).toBe(16);
             expect(result.payload.saveType).toBe('DEX');
-        });
-
-        it('passes dieExpression from automation into payload', async () => {
-            dataLoader.loadManeuvers.mockResolvedValue([
-                { name: 'Trip Attack', effect: 'knock_prone' },
-            ]);
-
-            const result = await handle(
-                makeAction({ dieExpression: '2d6' }),
-                makePlayerStats(),
-                'test-campaign',
-                null
-            );
-
             expect(result.payload.dieExpression).toBe('2d6');
-        });
-    });
-
-    // ── Ruleset handling ────────────────────────────────────────────────
-
-    describe('ruleset handling', () => {
-        it.each([
-            [null, '2024'],
-            [undefined, '2024'],
-        ])('defaults to %s ruleset when playerStats.rules is %s', async (rulesValue, expectedRules) => {
-            dataLoader.loadManeuvers.mockResolvedValue([]);
-
-            await handle(
-                makeAction(),
-                makePlayerStats({ rules: rulesValue }),
-                'test-campaign',
-                null
-            );
-
-            expect(dataLoader.loadManeuvers).toHaveBeenCalledWith(expectedRules);
-        });
-
-        it('defaults to 2024 ruleset when playerStats.rules is missing', async () => {
-            dataLoader.loadManeuvers.mockResolvedValue([]);
-
-            const stats = makePlayerStats();
-            delete stats.rules;
-
-            await handle(
-                makeAction(),
-                stats,
-                'test-campaign',
-                null
-            );
-
-            expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('2024');
-        });
-
-        it('loads maneuvers for 5e ruleset', async () => {
-            dataLoader.loadManeuvers.mockResolvedValue([]);
-
-            await handle(
-                makeAction(),
-                makePlayerStats({ rules: '5e' }),
-                'test-campaign',
-                null
-            );
-
-            expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('5e');
-        });
-    });
-
-    // ── Known maneuvers tracking ────────────────────────────────────────
-
-    describe('known maneuvers tracking', () => {
-        it('returns known maneuver names from runtime storage', async () => {
-            dataLoader.loadManeuvers.mockResolvedValue([
-                { name: 'Trip Attack', effect: 'knock_prone' },
-                { name: 'Pushing Attack', effect: 'push' },
-            ]);
-            getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'superiorityDice') return 4;
-                if (key === SELECTION_KEY) return ['Trip Attack'];
-                return undefined;
-            });
-
-            const result = await handle(
-                makeAction(),
-                makePlayerStats(),
-                'test-campaign',
-                null
-            );
-
-            expect(result.payload.knownManeuvers).toEqual(['Trip Attack']);
         });
 
         it('filters known maneuvers to only those available in the maneuver list', async () => {
@@ -462,34 +382,62 @@ describe('combatSuperiorityHandler.handle', () => {
         });
     });
 
-    // ── Early return paths via automation routing ───────────────────────
+    // ── Ruleset handling ────────────────────────────────────────────────
 
-    describe('early return paths via automation routing', () => {
-        it('delegates to dispatcher when actionType is bonus_action', async () => {
-            const result = await handle(
-                { name: 'Test', automation: { actionType: 'bonus_action' } },
-                makePlayerStats(),
+    describe('ruleset handling', () => {
+        // null, undefined and a deleted rules property all hit the same
+        // falsy branch of `playerStats.rules || '2024'` — one pin suffices.
+        it('defaults to 2024 ruleset when playerStats.rules is undefined', async () => {
+            dataLoader.loadManeuvers.mockResolvedValue([]);
+
+            await handle(
+                makeAction(),
+                makePlayerStats({ rules: undefined }),
                 'test-campaign',
                 null
             );
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
+            expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('2024');
         });
 
-        it('delegates to dispatcher when actionType is reaction', async () => {
-            const result = await handle(
-                { name: 'Test', automation: { actionType: 'reaction' } },
-                makePlayerStats(),
+        it('loads maneuvers for 5e ruleset', async () => {
+            dataLoader.loadManeuvers.mockResolvedValue([]);
+
+            await handle(
+                makeAction(),
+                makePlayerStats({ rules: '5e' }),
                 'test-campaign',
                 null
             );
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
+            expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('5e');
         });
+    });
 
-        it('delegates to dispatcher when actionType is sweeping_attack', async () => {
+    // ── Routing dispatch ────────────────────────────────────────────────
+
+    describe('routing dispatch', () => {
+        // Each guard-routed actionType lands on its dedicated dispatcher, whose
+        // maneuverName guard emits this exact popup — and never falls through to
+        // showCombatSuperioritySelection (loadManeuvers stays untouched).
+        it.each(['bonus_action', 'reaction', 'movement', 'skill_check'])(
+            'routes actionType %s to its dispatcher without loading maneuvers',
+            async (actionType) => {
+                const result = await handle(
+                    { name: 'Test', automation: { actionType } },
+                    makePlayerStats(),
+                    'test-campaign',
+                    null
+                );
+
+                expect(result.type).toBe('popup');
+                expect(result.payload.type).toBe('automation_info');
+                expect(result.payload.description).toBe('No maneuver specified.');
+                expect(dataLoader.loadManeuvers).not.toHaveBeenCalled();
+            }
+        );
+
+        it('routes actionType sweeping_attack to the sweeping dispatcher without loading maneuvers', async () => {
             const result = await handle(
                 { name: 'Test', automation: { actionType: 'sweeping_attack' } },
                 makePlayerStats(),
@@ -498,34 +446,11 @@ describe('combatSuperiorityHandler.handle', () => {
             );
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No secondary target selected');
+            expect(result.payload.description).toBe('Sweeping Attack: No secondary target selected.');
+            expect(dataLoader.loadManeuvers).not.toHaveBeenCalled();
         });
 
-        it('delegates to dispatcher when actionType is movement', async () => {
-            const result = await handle(
-                { name: 'Test', automation: { actionType: 'movement' } },
-                makePlayerStats(),
-                'test-campaign',
-                null
-            );
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-        });
-
-        it('delegates to dispatcher when actionType is skill_check', async () => {
-            const result = await handle(
-                { name: 'Test', automation: { actionType: 'skill_check' } },
-                makePlayerStats(),
-                'test-campaign',
-                null
-            );
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-        });
-
-        it('delegates to handleAttackRiderPrompt when trigger is attack_rider', async () => {
+        it('routes trigger attack_rider to handleAttackRiderPrompt', async () => {
             const result = await handle(
                 { name: 'Test', automation: { trigger: 'attack_rider' } },
                 makePlayerStats(),
@@ -534,10 +459,11 @@ describe('combatSuperiorityHandler.handle', () => {
             );
 
             expect(queries.handleAttackRiderPrompt).toHaveBeenCalledTimes(1);
+            expect(dataLoader.loadManeuvers).not.toHaveBeenCalled();
             expect(result).toBeNull();
         });
 
-        it('delegates to handleSkillCheckPrompt when trigger is skill_check', async () => {
+        it('routes trigger skill_check to handleSkillCheckPrompt', async () => {
             const result = await handle(
                 { name: 'Test', automation: { trigger: 'skill_check' } },
                 makePlayerStats(),
@@ -546,6 +472,7 @@ describe('combatSuperiorityHandler.handle', () => {
             );
 
             expect(queries.handleSkillCheckPrompt).toHaveBeenCalledTimes(1);
+            expect(dataLoader.loadManeuvers).not.toHaveBeenCalled();
             expect(result).toBeNull();
         });
 
@@ -569,26 +496,6 @@ describe('combatSuperiorityHandler.handle', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Trip Attack');
-        });
-
-        it('does not load maneuvers when delegating via actionType or trigger', async () => {
-            await handle(
-                { name: 'Test', automation: { actionType: 'bonus_action' } },
-                makePlayerStats(),
-                'test-campaign',
-                null
-            );
-
-            expect(dataLoader.loadManeuvers).not.toHaveBeenCalled();
-
-            await handle(
-                { name: 'Test', automation: { trigger: 'attack_rider' } },
-                makePlayerStats(),
-                'test-campaign',
-                null
-            );
-
-            expect(dataLoader.loadManeuvers).not.toHaveBeenCalled();
         });
     });
 });

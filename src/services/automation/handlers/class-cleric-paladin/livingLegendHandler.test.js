@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Contract tests for the living_legend activation handler: popup shape,
+// runtime-store write, campaign-log entry, already-active guard, and the
+// setUnerringStrikeUsed pass-through. Deterministic — boundaries fully mocked.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -68,7 +72,7 @@ describe('livingLegendHandler', () => {
       expect(result.payload.description).toContain('missed weapon attacks hit once per turn');
     });
 
-    it('activates living legend by setting runtime value to true', async () => {
+    it('activates living legend: sets runtime value and logs ability_use', async () => {
       getRuntimeValue.mockReturnValue(undefined);
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -79,13 +83,6 @@ describe('livingLegendHandler', () => {
         true,
         campaignName,
       );
-    });
-
-    it('records an ability_use log entry on activation', async () => {
-      getRuntimeValue.mockReturnValue(undefined);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',
         characterName: playerName,
@@ -104,7 +101,7 @@ describe('livingLegendHandler', () => {
       expect(result.type).toBe('popup');
     });
 
-    it('returns warning popup when Living Legend is already active', async () => {
+    it('returns warning popup and does not write state or log when already active', async () => {
       getRuntimeValue.mockReturnValue(true);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -115,19 +112,10 @@ describe('livingLegendHandler', () => {
       expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(addEntry).not.toHaveBeenCalled();
     });
-
-    it('does not set runtime value or log when already active', async () => {
-      getRuntimeValue.mockReturnValue(true);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(addEntry).not.toHaveBeenCalled();
-    });
   });
 
   describe('setUnerringStrikeUsed', () => {
-    it('sets the runtime value to true', async () => {
+    it('passes the used flag through to the runtime store', async () => {
       await setUnerringStrikeUsed(playerName, campaignName, true);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -136,9 +124,7 @@ describe('livingLegendHandler', () => {
         true,
         campaignName,
       );
-    });
 
-    it('sets the runtime value to false', async () => {
       await setUnerringStrikeUsed(playerName, campaignName, false);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(

@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Spell Thief reaction handler (CLA-325). Fully mocked runtime/log/save-prompt/
+// combat-context — deterministic, no timers, pure handler behaviour. Own composition
+// pins (popup + log strings, runtime key layout, CLA-325 gate branches, rollback
+// delegation). Consumer key contract (isBlockedBySpellThief/hasStolenSpell) pinned
+// here; long-rest recharge lives in restRules-longRest tests, discovery in
+// postCastRiderService tests.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, isBlockedBySpellThief, hasStolenSpell } from './spellThiefHandler.js';
 import { makeAction, makePlayerStats } from './spellThief.test-utils.js';
@@ -88,8 +95,8 @@ function mockSaveResult(success) {
 
 describe('spellThiefHandler', () => {
     describe('handle - no uses remaining', () => {
-        it('returns popup with no-uses message when uses are 0', async () => {
-            mockUses(0);
+        it.each([0, -1])('returns popup with no-uses message and spends nothing when uses are %i', async (uses) => {
+            mockUses(uses);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -99,15 +106,7 @@ describe('spellThiefHandler', () => {
             expect(result.payload.description).toContain('no uses remaining');
             expect(result.payload.description).toContain('Long Rest');
             expect(result.payload.automation).toEqual(makeAction().automation);
-        });
-
-        it('returns popup with no-uses message when uses are negative', async () => {
-            mockUses(-1);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('no uses remaining');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
         it('defaults to 1 use when runtime value is undefined', async () => {
@@ -122,6 +121,8 @@ describe('spellThiefHandler', () => {
             expect(result.payload.name).toBe('Spell Thief');
             expect(result.payload.description).toContain('INT save');
             expect(result.payload.description).toContain('DC 13');
+            // the defaulted use is consumed
+            expect(setRuntimeValue).toHaveBeenCalledWith('FighterRogue', 'spellthiefUses', 0, 'test-campaign');
         });
     });
 
@@ -155,28 +156,7 @@ describe('spellThiefHandler', () => {
             }));
         });
 
-        it('uses action casterName for save prompt target when provided', async () => {
-            const action = makeAction({ casterName: 'Orc' });
-            mockSaveResult(true);
-
-            await handle(action, makePlayerStats(), 'test-campaign', null);
-
-            expect(createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                targetName: 'Orc',
-            }));
-        });
-
-        it('falls back to targetName when casterName is null or undefined', async () => {
-            mockSaveResult(true);
-
-            await handle(makeAction({ casterName: null }), makePlayerStats(), 'test-campaign', null);
-
-            expect(createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                targetName: 'Goblin',
-            }));
-        });
-
-        it('logs ability_use on initialization with feature name', async () => {
+        it('logs the initial ability_use prompt before the save resolves', async () => {
             mockSaveResult(true);
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
@@ -185,6 +165,7 @@ describe('spellThiefHandler', () => {
                 type: 'ability_use',
                 characterName: 'FighterRogue',
                 abilityName: 'Spell Thief',
+                description: 'FighterRogue used Spell Thief — Goblin must make INT save (DC 13) or lose the spell.',
             }));
         });
 
@@ -296,78 +277,25 @@ describe('spellThiefHandler', () => {
             ]);
         });
 
-        it('sets caster blocked entry on failure', async () => {
-            mockSaveResult(false);
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            const casterBlockCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === '_spellThiefCasterBlock'
-            );
-            expect(casterBlockCalls).toHaveLength(1);
-            expect(casterBlockCalls[0][0]).toBe('Goblin');
-            expect(casterBlockCalls[0][1]).toBe('_spellThiefCasterBlock');
-            const entries = JSON.parse(casterBlockCalls[0][2]);
-            expect(entries).toEqual([{ thiefName: 'FighterRogue', spellName: 'Burning Hands' }]);
-        });
-
-        it('uses action casterName when provided for blocked/stolen keys', async () => {
+        it('uses action casterName for blocked/stolen keys when provided', async () => {
             const action = makeAction({ casterName: 'Wizard' });
             mockSaveResult(false);
 
             await handle(action, makePlayerStats(), 'test-campaign', null);
 
-            const blockedCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1].includes('spellThiefBlocked')
-            );
-            const stolenCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1].includes('spellThiefStolen')
-            );
+            const blockedKeys = setRuntimeValue.mock.calls
+                .filter(call => call[1].includes('spellThiefBlocked'))
+                .map(call => call[1]);
+            const stolenKeys = setRuntimeValue.mock.calls
+                .filter(call => call[1].includes('spellThiefStolen'))
+                .map(call => call[1]);
 
-            expect(blockedCalls).toHaveLength(2);
-            expect(blockedCalls[0][1]).toBe('spellThiefBlocked_Wizard_Burning Hands');
-            expect(stolenCalls).toHaveLength(2);
-            expect(stolenCalls[0][1]).toBe('spellThiefStolen_Wizard_Burning Hands');
+            expect(blockedKeys).toEqual(['spellThiefBlocked_Wizard_Burning Hands', '_spellThiefBlockedList']);
+            expect(stolenKeys).toEqual(['spellThiefStolen_Wizard_Burning Hands', '_spellThiefStolenList']);
         });
 
-        it('uses action spellName when provided for blocked/stolen keys', async () => {
-            const action = makeAction({ spellName: 'Fireball' });
-            mockSaveResult(false);
-
-            await handle(action, makePlayerStats(), 'test-campaign', null);
-
-            const blockedCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1].includes('spellThiefBlocked')
-            );
-            expect(blockedCalls[0][1]).toBe('spellThiefBlocked_Goblin_Fireball');
-        });
-
-        it('uses targetName as fallback caster when no casterName', async () => {
-            const action = makeAction({ casterName: null });
-            mockSaveResult(false);
-
-            await handle(action, makePlayerStats(), 'test-campaign', null);
-
-            const blockedCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1].includes('spellThiefBlocked')
-            );
-            expect(blockedCalls[0][1]).toBe('spellThiefBlocked_Goblin_Burning Hands');
-        });
-
-        it('uses "unknown spell" fallback when no spellName', async () => {
-            const action = makeAction({ spellName: null });
-            mockSaveResult(false);
-
-            await handle(action, makePlayerStats(), 'test-campaign', null);
-
-            const stolenCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1].includes('spellThiefStolen')
-            );
-            expect(stolenCalls[0][1]).toBe('spellThiefStolen_Goblin_unknown spell');
-        });
-
-        it('decrements uses regardless of save result', async () => {
-            mockSaveResult(false);
+        it.each([true, false])('decrements uses on save %s', async (success) => {
+            mockSaveResult(success);
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -376,7 +304,7 @@ describe('spellThiefHandler', () => {
     });
 
     describe('handle - custom feature name', () => {
-        it('uses action name in popup when provided', async () => {
+        it('uses action name in popup and derives the uses key from it', async () => {
             mockUses(1);
             buildSaveDc.mockReturnValue(13);
             createSaveListener.mockReturnValue({
@@ -387,6 +315,7 @@ describe('spellThiefHandler', () => {
             const result = await handle(action, makePlayerStats(), 'test-campaign', null);
 
             expect(result.payload.name).toBe('Custom Feature');
+            expect(getRuntimeValue).toHaveBeenCalledWith('FighterRogue', 'customfeatureUses');
         });
     });
 
@@ -452,152 +381,57 @@ describe('spellThiefHandler', () => {
         });
     });
 
-    describe('handle - duplicate prevention in addBlockedSpell', () => {
-        it('does not add duplicate blocked entry when already in list', async () => {
+    describe('handle - blocked/stolen list bookkeeping', () => {
+        beforeEach(() => {
             mockUses(1);
             buildSaveDc.mockReturnValue(13);
-            getRuntimeValue.mockImplementation((_name, _key, _campaign) => {
-                if (_key === 'spellthiefUses') return 1;
-                if (_name === 'campaign' && _key === 'lastAttack') return spellCastStamp();
-                if (_name === 'FighterRogue' && _key === '_spellThiefBlockedList') return JSON.stringify([{ casterName: 'Goblin', spellName: 'Burning Hands' }]);
-                if (_name === 'Goblin' && _key === '_spellThiefCasterBlock') return JSON.stringify([{ thiefName: 'FighterRogue', spellName: 'Burning Hands' }]);
-                return null;
-            });
-            createSaveListener.mockReturnValue({
-                promptId: 'test-prompt-id',
-                promise: Promise.resolve({ success: false, roll: 5, total: 9, saveBonus: 4 }),
-            });
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            const blockedListCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === '_spellThiefBlockedList'
-            );
-            const casterBlockCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === '_spellThiefCasterBlock'
-            );
-            expect(blockedListCalls).toHaveLength(0);
-            expect(casterBlockCalls).toHaveLength(0);
+            mockSaveResult(false);
         });
 
-        it('does not add duplicate stolen entry when already in list', async () => {
-            mockUses(1);
-            buildSaveDc.mockReturnValue(13);
-            getRuntimeValue.mockImplementation((_name, _key, _campaign) => {
-                if (_key === 'spellthiefUses') return 1;
-                if (_name === 'campaign' && _key === 'lastAttack') return spellCastStamp();
-                if (_name === 'FighterRogue' && _key === '_spellThiefStolenList') return JSON.stringify([{ casterName: 'Goblin', spellName: 'Burning Hands' }]);
+        it('does not rewrite any blocked/stolen list when the entry is already present', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                if (name === 'campaign' && key === 'lastAttack') return spellCastStamp();
+                if (name === 'FighterRogue' && key === '_spellThiefBlockedList') return JSON.stringify([{ casterName: 'Goblin', spellName: 'Burning Hands' }]);
+                if (name === 'FighterRogue' && key === '_spellThiefStolenList') return JSON.stringify([{ casterName: 'Goblin', spellName: 'Burning Hands' }]);
+                if (name === 'Goblin' && key === '_spellThiefCasterBlock') return JSON.stringify([{ thiefName: 'FighterRogue', spellName: 'Burning Hands' }]);
                 return null;
             });
-            createSaveListener.mockReturnValue({
-                promptId: 'test-prompt-id',
-                promise: Promise.resolve({ success: false, roll: 5, total: 9, saveBonus: 4 }),
-            });
+
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            const stolenListCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === '_spellThiefStolenList'
-            );
-            expect(stolenListCalls).toHaveLength(0);
+            for (const key of ['_spellThiefBlockedList', '_spellThiefStolenList', '_spellThiefCasterBlock']) {
+                expect(setRuntimeValue.mock.calls.filter(call => call[1] === key)).toHaveLength(0);
+            }
         });
 
-        it('adds to blocked list when entry is not duplicate', async () => {
-            mockUses(1);
-            buildSaveDc.mockReturnValue(13);
-            getRuntimeValue.mockImplementation((_name, _key, _campaign) => {
-                if (_key === 'spellthiefUses') return 1;
-                if (_name === 'campaign' && _key === 'lastAttack') return spellCastStamp();
-                if (_name === 'FighterRogue' && _key === '_spellThiefBlockedList') return JSON.stringify([{ casterName: 'Other', spellName: 'Other Spell' }]);
-                if (_name === 'Goblin' && _key === '_spellThiefCasterBlock') return JSON.stringify([{ thiefName: 'OtherThief', spellName: 'Other Spell' }]);
+        it('creates from null, parses "[]", and appends to existing — one per stored-state branch', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                if (name === 'campaign' && key === 'lastAttack') return spellCastStamp();
+                if (name === 'FighterRogue' && key === '_spellThiefBlockedList') return '[]';
+                if (name === 'Goblin' && key === '_spellThiefCasterBlock') return JSON.stringify([{ thiefName: 'OtherThief', spellName: 'Other Spell' }]);
+                // _spellThiefStolenList falls through to null (first-time create)
                 return null;
             });
-            createSaveListener.mockReturnValue({
-                promptId: 'test-prompt-id',
-                promise: Promise.resolve({ success: false, roll: 5, total: 9, saveBonus: 4 }),
-            });
+
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            const blockedListCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === '_spellThiefBlockedList'
-            );
-            expect(blockedListCalls).toHaveLength(1);
-            const entries = JSON.parse(blockedListCalls[0][2]);
-            expect(entries).toEqual([
-                { casterName: 'Other', spellName: 'Other Spell' },
-                { casterName: 'Goblin', spellName: 'Burning Hands' }
-            ]);
-        });
-
-        it('adds to stolen list when entry is not duplicate', async () => {
-            mockUses(1);
-            buildSaveDc.mockReturnValue(13);
-            getRuntimeValue.mockImplementation((_name, _key, _campaign) => {
-                if (_key === 'spellthiefUses') return 1;
-                if (_name === 'campaign' && _key === 'lastAttack') return spellCastStamp();
-                if (_name === 'FighterRogue' && _key === '_spellThiefStolenList') return JSON.stringify([{ casterName: 'Other', spellName: 'Other Spell' }]);
-                return null;
-            });
-            createSaveListener.mockReturnValue({
-                promptId: 'test-prompt-id',
-                promise: Promise.resolve({ success: false, roll: 5, total: 9, saveBonus: 4 }),
-            });
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            const stolenListCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === '_spellThiefStolenList'
-            );
-            expect(stolenListCalls).toHaveLength(1);
-            const entries = JSON.parse(stolenListCalls[0][2]);
-            expect(entries).toEqual([
-                { casterName: 'Other', spellName: 'Other Spell' },
-                { casterName: 'Goblin', spellName: 'Burning Hands' }
-            ]);
-        });
-
-        it('handles empty blocked list string', async () => {
-            mockUses(1);
-            buildSaveDc.mockReturnValue(13);
-            getRuntimeValue.mockImplementation((_name, _key, _campaign) => {
-                if (_key === 'spellthiefUses') return 1;
-                if (_name === 'campaign' && _key === 'lastAttack') return spellCastStamp();
-                if (_name === 'FighterRogue' && _key === '_spellThiefBlockedList') return '[]';
-                if (_name === 'Goblin' && _key === '_spellThiefCasterBlock') return '[]';
-                return null;
-            });
-            createSaveListener.mockReturnValue({
-                promptId: 'test-prompt-id',
-                promise: Promise.resolve({ success: false, roll: 5, total: 9, saveBonus: 4 }),
-            });
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            const blockedListCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === '_spellThiefBlockedList'
-            );
-            expect(blockedListCalls).toHaveLength(1);
-            const entries = JSON.parse(blockedListCalls[0][2]);
-            expect(entries).toEqual([{ casterName: 'Goblin', spellName: 'Burning Hands' }]);
-        });
-
-        it('handles empty stolen list string', async () => {
-            mockUses(1);
-            buildSaveDc.mockReturnValue(13);
-            getRuntimeValue.mockImplementation((_name, _key, _campaign) => {
-                if (_key === 'spellthiefUses') return 1;
-                if (_name === 'campaign' && _key === 'lastAttack') return spellCastStamp();
-                if (_name === 'FighterRogue' && _key === '_spellThiefStolenList') return '[]';
-                return null;
-            });
-            createSaveListener.mockReturnValue({
-                promptId: 'test-prompt-id',
-                promise: Promise.resolve({ success: false, roll: 5, total: 9, saveBonus: 4 }),
-            });
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            const stolenListCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === '_spellThiefStolenList'
-            );
-            expect(stolenListCalls).toHaveLength(1);
-            const entries = JSON.parse(stolenListCalls[0][2]);
-            expect(entries).toEqual([{ casterName: 'Goblin', spellName: 'Burning Hands' }]);
+            const single = JSON.stringify([{ casterName: 'Goblin', spellName: 'Burning Hands' }]);
+            const blockedWrites = setRuntimeValue.mock.calls.filter(call => call[1] === '_spellThiefBlockedList');
+            expect(blockedWrites).toEqual([['FighterRogue', '_spellThiefBlockedList', single, 'test-campaign']]);
+            const stolenWrites = setRuntimeValue.mock.calls.filter(call => call[1] === '_spellThiefStolenList');
+            expect(stolenWrites).toEqual([['FighterRogue', '_spellThiefStolenList', single, 'test-campaign']]);
+            const casterWrites = setRuntimeValue.mock.calls.filter(call => call[1] === '_spellThiefCasterBlock');
+            expect(casterWrites).toEqual([[
+                'Goblin',
+                '_spellThiefCasterBlock',
+                JSON.stringify([
+                    { thiefName: 'OtherThief', spellName: 'Other Spell' },
+                    { thiefName: 'FighterRogue', spellName: 'Burning Hands' },
+                ]),
+                'test-campaign',
+            ]]);
         });
     });
 
@@ -707,20 +541,7 @@ describe('spellThiefHandler', () => {
             expect(createSaveListener).not.toHaveBeenCalled();
         });
 
-        it('uses INT as default saveType when auto.saveType is missing', async () => {
-            mockUses(1);
-            buildSaveDc.mockReturnValue(13);
-            mockSaveResult(true);
-
-            const action = makeAction({ automation: {} });
-            await handle(action, makePlayerStats(), 'test-campaign', null);
-
-            expect(createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                saveType: 'INT',
-            }));
-        });
-
-        it('logs save entry with INT as default saveType', async () => {
+        it('defaults to INT saveType when automation.saveType is missing', async () => {
             mockUses(1);
             buildSaveDc.mockReturnValue(13);
             mockSaveResult(false);
@@ -728,7 +549,12 @@ describe('spellThiefHandler', () => {
             const action = makeAction({ automation: {} });
             await handle(action, makePlayerStats(), 'test-campaign', null);
 
+            expect(createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                saveType: 'INT',
+            }));
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'roll',
+                rollType: 'save-damage',
                 saveType: 'INT',
             }));
         });

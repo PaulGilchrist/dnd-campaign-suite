@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-15
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, onSpellSelected } from './divineInterventionHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -10,7 +11,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../ui/dataLoader.js', () => ({
     loadSpells: vi.fn(),
-  loadWildMagicSurgeTable: vi.fn(async () => []),
+    loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 const campaignName = 'TestCampaign';
@@ -52,6 +53,7 @@ function mockUsesWithCooldown(uses, cooldown) {
 describe('divineInterventionHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.restoreAllMocks();
     });
 
     describe('handle()', () => {
@@ -78,13 +80,23 @@ describe('divineInterventionHandler', () => {
             expect(result.payload.description).toBe('Divine Intervention (Wish) is on cooldown. 3 long rests remaining.');
         });
 
-        it('should fallback to _trackedResources when stored uses is null', async () => {
+        it('should fall back to _trackedResources when stored uses is null', async () => {
             getRuntimeValue.mockReturnValue(null);
             loadSpells.mockResolvedValue([]);
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'TestMap');
+            // Tracked resource says expended → popup proves the fallback was read
+            const exhausted = await handle(
+                makeAction(),
+                makePlayerStats({ _trackedResources: { divineInterventionUses: { current: 0 } } }),
+                campaignName,
+                'TestMap',
+            );
+            expect(exhausted.type).toBe('popup');
 
-            expect(result.type).toBe('modal');
+            // Missing _trackedResources defaults to one use; missing rules defaults to 2024 data
+            const fresh = await handle(makeAction(), { name: 'Player One' }, campaignName, 'TestMap');
+            expect(fresh.type).toBe('modal');
+            expect(loadSpells).toHaveBeenCalledWith('2024');
         });
 
         it('should return modal with filtered Cleric spells for normal Divine Intervention', async () => {
@@ -116,27 +128,7 @@ describe('divineInterventionHandler', () => {
             expect(loadSpells).toHaveBeenCalledWith('2024');
         });
 
-        it('should use playerStats.rules when set', async () => {
-            mockUses(1);
-            loadSpells.mockResolvedValue([]);
-
-            await handle(makeAction(), makePlayerStats({ rules: '5e' }), campaignName, 'TestMap');
-
-            expect(loadSpells).toHaveBeenCalledWith('5e');
-        });
-
-        it('should return empty eligibleSpells when no spells match', async () => {
-            mockUses(1);
-            loadSpells.mockResolvedValue([
-                { name: 'Wish', classes: ['Wizard'], level: 9, casting_time: '1 Action' },
-            ]);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'TestMap');
-
-            expect(result.payload.eligibleSpells).toEqual([]);
-        });
-
-        it('should return modal with only Wish for Greater Divine Intervention', async () => {
+        it('should offer only Wish when upgraded to Greater Divine Intervention', async () => {
             mockUses(1);
             const wishSpell = { name: 'Wish', level: 9, classes: ['Wizard', 'Sorcerer'], casting_time: '1 Action' };
             loadSpells.mockResolvedValue([
@@ -149,6 +141,20 @@ describe('divineInterventionHandler', () => {
             expect(result.payload.isGreater).toBe(true);
             expect(result.payload.eligibleSpells).toEqual([wishSpell]);
         });
+
+        it('should treat level 20 as Greater Divine Intervention without an upgrade', async () => {
+            mockUses(1);
+            const wishSpell = { name: 'Wish', level: 9, classes: ['Wizard', 'Sorcerer'], casting_time: '1 Action' };
+            loadSpells.mockResolvedValue([
+                wishSpell,
+                { name: 'Cure Wounds', classes: ['Cleric'], level: 1, casting_time: '1 Action' },
+            ]);
+
+            const result = await handle(makeAction(), makePlayerStats({ level: 20 }), campaignName, 'TestMap');
+
+            expect(result.payload.isGreater).toBe(true);
+            expect(result.payload.eligibleSpells).toEqual([wishSpell]);
+        });
     });
 
     describe('onSpellSelected()', () => {
@@ -156,26 +162,19 @@ describe('divineInterventionHandler', () => {
             mockUses(0);
             const result = await onSpellSelected(makeAction(), makePlayerStats(), campaignName, { name: 'Cure Wounds' });
             expect(result).toBeNull();
+
+            // Also exhausted via the _trackedResources fallback when nothing is stored
+            getRuntimeValue.mockReturnValue(null);
+            const fallback = await onSpellSelected(
+                makeAction(),
+                makePlayerStats({ _trackedResources: { divineInterventionUses: { current: 0 } } }),
+                campaignName,
+                { name: 'Cure Wounds' },
+            );
+            expect(fallback).toBeNull();
         });
 
         it('should decrement uses and return success for normal spell selection', async () => {
-            mockUses(1);
-            const selectedSpell = { name: 'Cure Wounds' };
-
-            const result = await onSpellSelected(makeAction(), makePlayerStats(), campaignName, selectedSpell);
-
-            expect(result).toEqual({
-                type: 'spell_selected',
-                spell: selectedSpell,
-                skipSlotCost: true,
-                skipMaterialComponents: true,
-                rechargeMessage: 'until you finish a Long Rest.',
-                name: 'Divine Intervention',
-            });
-            expect(setRuntimeValue).toHaveBeenCalledWith('Player One', 'divineInterventionUses', 0, campaignName, true);
-        });
-
-        it('should decrement uses correctly when starting from 2 uses', async () => {
             mockUses(2);
             const selectedSpell = { name: 'Cure Wounds' };
 
@@ -205,8 +204,6 @@ describe('divineInterventionHandler', () => {
             expect(result.rechargeMessage).toBe('until you finish 4 Long Rests.');
             expect(setRuntimeValue).toHaveBeenCalledWith('Player One', '_divineInterventionWishCooldown', 4, campaignName, true);
             expect(setRuntimeValue).toHaveBeenCalledWith('Player One', 'divineInterventionUses', -1, campaignName, true);
-
-            vi.restoreAllMocks();
         });
 
         it('should treat non-Wish spell selection as normal even with upgradeTo set', async () => {

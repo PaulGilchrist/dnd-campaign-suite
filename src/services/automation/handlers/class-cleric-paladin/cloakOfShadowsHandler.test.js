@@ -1,3 +1,16 @@
+// @maintained-by-ai: 2026-10-15
+// Unit lane for the Cloak of Shadows handler (monk Way of Shadow, 3-focus toggle).
+// Pins the toggle semantics: activation deducts 3 focus (runtime focusPoints takes
+// precedence over class_levels.focus_points, with getClassFeatures().maxFocusPoints
+// then 0 as fallbacks), stamps the cloak_of_shadows buff (exact key incl. duration
+// passthrough vs '1_minute' default), and this handler's OWN invisibility stamps —
+// invisible condition and the campaign '_activeInvisibility_<player>' tracking key —
+// plus addExpiration shape and campaign-log entries. Deactivation removes the buff by
+// action name, strips invisible without touching other conditions, clears the tracking
+// key, and logs. This handler does NOT delegate to invisibilityShared; the shared
+// invisibility lanes live in buffs/invisibilityHandler suites (canonical there).
+// Consumers (stale-effect expiry, CharSummary badge rendering, automationCollector
+// typing, automationInfoBuilder temp handlers) are covered in their own suites.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './cloakOfShadowsHandler.js';
@@ -27,10 +40,11 @@ const { addExpiration } = await import('../../../rules/effects/expirations.js');
 const { addEntry } = await import('../../../ui/logService.js');
 
 const campaignName = 'TestCampaign';
+const playerName = 'TestMonk';
 
 function makePlayerStats(overrides = {}) {
     return {
-        name: 'TestMonk',
+        name: playerName,
         level: 17,
         class: {
             class_levels: [{ level: 17, focus_points: 4 }],
@@ -52,21 +66,28 @@ function makeAction(overrides = {}) {
     };
 }
 
+// getRuntimeValue router: resolves the player's stored keys (activeBuffs /
+// activeConditions / focusPoints) from the given values; anything else is null.
+function mockRuntime(playerValues = {}) {
+    getRuntimeValue.mockImplementation((name, key) => {
+        if (name === playerName) return playerValues[key] ?? null;
+        return null;
+    });
+}
+
 describe('cloakOfShadowsHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
     describe('deactivation (toggle off)', () => {
+        const active = {
+            activeBuffs: [{ name: 'Cloak of Shadows', effect: 'cloak_of_shadows' }],
+        };
+
         it('removes the buff and returns info popup when feature is active', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') {
-                    return [
-                        { name: 'Cloak of Shadows', effect: 'cloak_of_shadows' },
-                        { name: 'Other Buff' },
-                    ];
-                }
-                return null;
+            mockRuntime({
+                activeBuffs: [...active.activeBuffs, { name: 'Other Buff' }],
             });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
@@ -78,7 +99,7 @@ describe('cloakOfShadowsHandler', () => {
             expect(result.payload.automationType).toBe('cloak_of_shadows');
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
+                playerName,
                 'activeBuffs',
                 [{ name: 'Other Buff' }],
                 campaignName,
@@ -86,91 +107,64 @@ describe('cloakOfShadowsHandler', () => {
         });
 
         it('removes invisible condition on deactivation', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') {
-                    return [{ name: 'Cloak of Shadows', effect: 'cloak_of_shadows' }];
-                }
-                if (key === 'activeConditions') {
-                    return ['invisible', 'frightened'];
-                }
-                return null;
+            mockRuntime({
+                ...active,
+                activeConditions: ['invisible', 'frightened'],
             });
 
             await handle(makeAction(), makePlayerStats(), campaignName);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
+                playerName,
                 'activeConditions',
                 ['frightened'],
                 campaignName,
             );
         });
 
+        it('does not modify conditions if invisible is not present', async () => {
+            mockRuntime({ ...active, activeConditions: ['frightened'] });
+
+            await handle(makeAction(), makePlayerStats(), campaignName);
+
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                playerName,
+                'activeConditions',
+                expect.anything(),
+                campaignName,
+            );
+        });
+
         it('clears invisibility tracking key on deactivation', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') {
-                    return [{ name: 'Cloak of Shadows', effect: 'cloak_of_shadows' }];
-                }
-                return null;
-            });
+            mockRuntime(active);
 
             await handle(makeAction(), makePlayerStats(), campaignName);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign',
-                '_activeInvisibility_TestMonk',
+                `_activeInvisibility_${playerName}`,
                 null,
                 campaignName,
             );
         });
 
         it('logs deactivation to campaign log', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') {
-                    return [{ name: 'Cloak of Shadows', effect: 'cloak_of_shadows' }];
-                }
-                return null;
-            });
+            mockRuntime(active);
 
             await handle(makeAction(), makePlayerStats(), campaignName);
 
             expect(addEntry).toHaveBeenCalledWith(campaignName, {
                 type: 'ability_use',
-                characterName: 'TestMonk',
+                characterName: playerName,
                 abilityName: 'Cloak of Shadows',
                 description: 'TestMonk ended Cloak of Shadows.',
             });
-        });
-
-        it('does not modify conditions if invisible is not present', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') {
-                    return [{ name: 'Cloak of Shadows', effect: 'cloak_of_shadows' }];
-                }
-                if (key === 'activeConditions') {
-                    return ['frightened'];
-                }
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                'TestMonk',
-                'activeConditions',
-                expect.anything(),
-                campaignName,
-            );
         });
     });
 
     describe('focus point validation', () => {
         it('returns error when focus points are below 3', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return 2;
-                return null;
-            });
+            mockRuntime({ activeBuffs: [], focusPoints: 2 });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
@@ -183,30 +177,29 @@ describe('cloakOfShadowsHandler', () => {
     });
 
     describe('focus point fallback', () => {
+        const noFocus = { activeBuffs: [], focusPoints: null };
+
         it('uses getClassFeatures maxFocusPoints when class_levels is missing', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return null;
-                return null;
-            });
+            mockRuntime(noFocus);
             getClassFeatures.mockReturnValue({ maxFocusPoints: 3 });
 
-            const result = await handle(
-                makeAction(),
-                makePlayerStats({ class: null }),
-                campaignName,
-            );
+            const stats = makePlayerStats({ class: null });
+            const result = await handle(makeAction(), stats, campaignName);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('activated');
+            expect(getClassFeatures).toHaveBeenCalledWith(stats);
+            // maxFocus 3 (fallback) minus 3 cost — proves the fallback funded the cast
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                playerName,
+                'focusPoints',
+                0,
+                campaignName,
+            );
         });
 
         it('defaults to 0 focus when no class data or fallback available', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return null;
-                return null;
-            });
+            mockRuntime(noFocus);
             getClassFeatures.mockReturnValue({});
 
             const result = await handle(
@@ -224,22 +217,19 @@ describe('cloakOfShadowsHandler', () => {
 
     describe('activation', () => {
         it('spends 3 focus points and adds buff to empty buffs', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return 5;
-                return null;
-            });
+            mockRuntime({ activeBuffs: [], focusPoints: 5 });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
+            // runtime focusPoints (5→2) wins over class_levels focus_points (4→1)
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
+                playerName,
                 'focusPoints',
                 2,
                 campaignName,
             );
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
+                playerName,
                 'activeBuffs',
                 expect.arrayContaining([
                     expect.objectContaining({
@@ -258,16 +248,12 @@ describe('cloakOfShadowsHandler', () => {
         });
 
         it('appends buff to existing buffs', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [{ name: 'Existing Buff' }];
-                if (key === 'focusPoints') return 5;
-                return null;
-            });
+            mockRuntime({ activeBuffs: [{ name: 'Existing Buff' }], focusPoints: 5 });
 
             await handle(makeAction(), makePlayerStats(), campaignName);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
+                playerName,
                 'activeBuffs',
                 expect.arrayContaining([
                     expect.objectContaining({ name: 'Existing Buff' }),
@@ -277,97 +263,25 @@ describe('cloakOfShadowsHandler', () => {
             );
         });
 
-        it('sets invisible condition on activation', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return 5;
-                if (key === 'activeConditions') return [];
-                return null;
-            });
+        it('treats non-array activeBuffs as empty array', async () => {
+            mockRuntime({ activeBuffs: 'not-an-array', focusPoints: 5 });
 
-            await handle(makeAction(), makePlayerStats(), campaignName);
+            const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('activated');
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeConditions',
-                ['invisible'],
+                playerName,
+                'activeBuffs',
+                expect.arrayContaining([
+                    expect.objectContaining({ name: 'Cloak of Shadows' }),
+                ]),
                 campaignName,
             );
-        });
-
-        it('does not duplicate invisible if already present', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return 5;
-                if (key === 'activeConditions') return ['invisible', 'frightened'];
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName);
-
-            // Should not call setRuntimeValue with activeConditions since invisible is already there
-            const activeCondCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'activeConditions'
-            );
-            expect(activeCondCalls).toHaveLength(0);
-        });
-
-        it('sets invisibility tracking key on activation', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return 5;
-                if (key === 'activeConditions') return [];
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                '_activeInvisibility_TestMonk',
-                'TestMonk',
-                campaignName,
-            );
-        });
-
-        it('registers initiative expiration via addExpiration', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return 5;
-                if (key === 'activeConditions') return [];
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestMonk', targetName: 'TestMonk', effects: [{ type: 'condition', condition: 'invisible' }], campaignName, rounds: undefined, expireOnCreatureName: 'TestMonk' });
-        });
-
-        it('logs activation to campaign log', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return 5;
-                if (key === 'activeConditions') return [];
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, {
-                type: 'ability_use',
-                characterName: 'TestMonk',
-                abilityName: 'Cloak of Shadows',
-                description: 'TestMonk activated Cloak of Shadows. You gain Invisibility, can move through occupied spaces, and Flurry of Blows costs no Focus Points.',
-            });
         });
 
         it('uses custom duration from automation config', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return 5;
-                if (key === 'activeConditions') return [];
-                return null;
-            });
+            mockRuntime({ activeBuffs: [], focusPoints: 5 });
 
             await handle(
                 makeAction({ automation: { duration: 'until_end_of_turn' } }),
@@ -376,7 +290,7 @@ describe('cloakOfShadowsHandler', () => {
             );
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
+                playerName,
                 'activeBuffs',
                 expect.arrayContaining([
                     expect.objectContaining({ duration: 'until_end_of_turn' }),
@@ -386,12 +300,7 @@ describe('cloakOfShadowsHandler', () => {
         });
 
         it('uses default duration when automation has no duration', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return 5;
-                if (key === 'activeConditions') return [];
-                return null;
-            });
+            mockRuntime({ activeBuffs: [], focusPoints: 5 });
 
             await handle(
                 makeAction({ automation: {} }),
@@ -400,7 +309,7 @@ describe('cloakOfShadowsHandler', () => {
             );
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
+                playerName,
                 'activeBuffs',
                 expect.arrayContaining([
                     expect.objectContaining({ duration: '1_minute' }),
@@ -409,46 +318,66 @@ describe('cloakOfShadowsHandler', () => {
             );
         });
 
-        it('treats non-array activeBuffs as empty array', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return 'not-an-array';
-                if (key === 'focusPoints') return 5;
-                if (key === 'activeConditions') return [];
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('activated');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ name: 'Cloak of Shadows' }),
-                ]),
-                campaignName,
-            );
-        });
-
-        it('uses runtime focusPoints over class focus_points when both exist', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'activeBuffs') return [];
-                if (key === 'focusPoints') return 10;
-                if (key === 'activeConditions') return [];
-                return null;
-            });
+        it('sets invisible condition on activation', async () => {
+            mockRuntime({ activeBuffs: [], focusPoints: 5, activeConditions: [] });
 
             await handle(makeAction(), makePlayerStats(), campaignName);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'focusPoints',
-                7,
+                playerName,
+                'activeConditions',
+                ['invisible'],
                 campaignName,
             );
         });
+
+        it('does not duplicate invisible if already present', async () => {
+            mockRuntime({
+                activeBuffs: [],
+                focusPoints: 5,
+                activeConditions: ['invisible', 'frightened'],
+            });
+
+            await handle(makeAction(), makePlayerStats(), campaignName);
+
+            const activeCondCalls = setRuntimeValue.mock.calls.filter(
+                call => call[1] === 'activeConditions'
+            );
+            expect(activeCondCalls).toHaveLength(0);
+        });
+
+        it('sets invisibility tracking key on activation', async () => {
+            mockRuntime({ activeBuffs: [], focusPoints: 5, activeConditions: [] });
+
+            await handle(makeAction(), makePlayerStats(), campaignName);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'campaign',
+                `_activeInvisibility_${playerName}`,
+                playerName,
+                campaignName,
+            );
+        });
+
+        it('registers initiative expiration via addExpiration', async () => {
+            mockRuntime({ activeBuffs: [], focusPoints: 5, activeConditions: [] });
+
+            await handle(makeAction(), makePlayerStats(), campaignName);
+
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'condition', condition: 'invisible' }], campaignName, rounds: undefined, expireOnCreatureName: playerName });
+        });
+
+        it('logs activation to campaign log', async () => {
+            mockRuntime({ activeBuffs: [], focusPoints: 5, activeConditions: [] });
+
+            await handle(makeAction(), makePlayerStats(), campaignName);
+
+            expect(addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: 'Cloak of Shadows',
+                description: 'TestMonk activated Cloak of Shadows. You gain Invisibility, can move through occupied spaces, and Flurry of Blows costs no Focus Points.',
+            });
+        });
     });
-
-
 });

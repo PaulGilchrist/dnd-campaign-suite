@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-15
 // MN-004: Commanding Presence reaction executor rule deviations — the die was
 // spent twice (once on the check, again here), disadvantage went down a phantom
 // `activeConditions 'disadvantage'` channel no consumer folded into attacks,
@@ -5,6 +6,9 @@
 // round reaction latch. Pinned here: free reaction economy (zero die spend),
 // real WIS save (DC = 8 + CHA + PB at prompt time, MN-020), te channel grant
 // only on save fail + one expiration clock, round latch with refusal tokens.
+// Canonical lane for the chooser-modal pins (no-target modal + modal skip
+// decline) — combatSuperiorityActionManeuvers deliberately does not duplicate
+// this executor; handler-level delegation lives in ...NonManeuver.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeCommandingPresenceReaction } from './executeActionManeuvers.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -119,14 +123,17 @@ beforeEach(() => {
     getCurrentCombatRound.mockReturnValue(1);
 });
 
-async function flush(ms = 0) {
-    await new Promise(r => setTimeout(r, ms));
+// The executor reaches createSaveListener after a few awaited mocks
+// (findManeuver, the latch stamp, the log). Gate on the observed listener
+// registration instead of a fixed sleep — no arbitrary timer races.
+async function armed() {
+    await vi.waitFor(() => expect(saveListenerCalls).toHaveLength(1));
 }
 
 async function confirm(saveOk) {
     const promise = executeCommandingPresenceReaction(
         { automation: { ...AUTO, targetName: 'Bandit' } }, STATS, CAMPAIGN, 'Commanding Presence');
-    await flush(5);
+    await armed();
     resolveSave({ success: saveOk, promptId: 'p1' });
     return promise;
 }
@@ -144,8 +151,7 @@ describe('MN-004 executeCommandingPresenceReaction', () => {
     it('confirm offers a forced WIS save at DC 19 and stamps the round latch before the save resolves', async () => {
         const promise = executeCommandingPresenceReaction(
             { automation: { ...AUTO, targetName: 'Bandit' } }, STATS, CAMPAIGN, 'Commanding Presence');
-        await flush(5);
-        expect(saveListenerCalls).toHaveLength(1);
+        await armed();
         expect(saveListenerCalls[0]).toMatchObject({ targetName: 'Bandit', saveType: 'WIS', saveDc: 19 });
         expect(store[`${PLAYER}.${LATCH_KEY}`]).toBe(1);
         resolveSave({ success: true, promptId: 'p1' });
@@ -190,7 +196,8 @@ describe('MN-004 executeCommandingPresenceReaction', () => {
             { automation: { ...AUTO, targetName: 'Bandit' } }, STATS, CAMPAIGN, 'Commanding Presence');
         expect(result.type).toBe('popup');
         expect(createSaveListener).not.toHaveBeenCalled();
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(PLAYER, LATCH_KEY, 1, CAMPAIGN);
+        // No stamp at any round — exact-key pin with wildcard round catches a mis-stamp.
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(PLAYER, LATCH_KEY, expect.any(Number), CAMPAIGN);
         const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'commanding_presence_refused');
         expect(refusal).toBeDefined();
         expect(refusal.reason).toBe('already_used_this_round');
@@ -201,8 +208,7 @@ describe('MN-004 executeCommandingPresenceReaction', () => {
         seedStore({ [`${PLAYER}.${LATCH_KEY}`]: 1 });
         const promise = executeCommandingPresenceReaction(
             { automation: { ...AUTO, targetName: 'Bandit' } }, STATS, CAMPAIGN, 'Commanding Presence');
-        await flush(5);
-        expect(saveListenerCalls).toHaveLength(1);
+        await armed();
         resolveSave({ success: true, promptId: 'p1' });
         await promise;
         expect(store[`${PLAYER}.${LATCH_KEY}`]).toBe(2);
@@ -214,8 +220,9 @@ describe('MN-004 executeCommandingPresenceReaction', () => {
             { automation: { ...AUTO, targetName: 'Bandit' } }, STATS, CAMPAIGN, 'Commanding Presence');
         expect(result.type).toBe('popup');
         expect(createSaveListener).not.toHaveBeenCalled();
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(PLAYER, LATCH_KEY, 1, CAMPAIGN);
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(PLAYER, LATCH_KEY, expect.any(Number), CAMPAIGN);
         const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'commanding_presence_refused');
+        expect(refusal).toBeDefined();
         expect(refusal.reason).toBe('no_target_in_range');
     });
 
@@ -224,6 +231,8 @@ describe('MN-004 executeCommandingPresenceReaction', () => {
         await result.payload.onSkip();
         expect(createSaveListener).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(rollManeuverDie).not.toHaveBeenCalled();
+        expect(expendSuperiorityDie).not.toHaveBeenCalled();
         const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'commanding_presence_refused');
         expect(refusal.reason).toBe('declined');
     });

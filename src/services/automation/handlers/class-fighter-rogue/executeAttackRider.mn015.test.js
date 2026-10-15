@@ -1,11 +1,18 @@
+// @maintained-by-ai: 2026-10-15
 // MN-015 regression: Pushing Attack save DC must come from the forwarded
 // combat_superiority automation (8 + STR + PB), never the buildSaveDc DC-10
-// fallback; oversized (Huge) targets are refused BEFORE the die is expended.
+// fallback; oversized (Huge) targets are refused BEFORE the die is rolled or
+// expended. Canonical owner of the attackRider-lane size-gate refusal; the
+// executeManeuver.js executor's own copy of this invariant lives in
+// combatSuperiorityHandlerManeuver-modals.test.js, validateSizeLimit's unit
+// lane in validateSizeLimit.mn015.test.js, and the canonical popup strings in
+// combatSuperiorityUtils.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeAttackRiderManeuver } from './combatSuperiorityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { buildSaveDc, createSaveListener } from '../../../../services/automation/common/savePrompt.js';
 import * as damageUtils from '../../../../services/rules/combat/damageUtils.js';
+import * as diceRoller from '../../../../services/dice/diceRoller.js';
 import { resolveTarget } from '../../../../services/automation/common/targetResolver.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -69,8 +76,10 @@ vi.mock('../../../../services/automation/handlers/buffs/tempHpService.js', () =>
 const makePlayerStats = (overrides = {}) => ({
     name: 'EvasiveFighter',
     proficiency: 6,
+    // STR +2 / DEX +0 discriminates the three MN-015 failure modes:
+    // STR picked (16) vs DEX picked (14) vs DC-10 fallback (10).
     abilities: [
-        { name: 'Strength', bonus: 0 },
+        { name: 'Strength', bonus: 2 },
         { name: 'Dexterity', bonus: 0 },
     ],
     level: 18,
@@ -96,11 +105,11 @@ describe('MN-015 executeAttackRiderManeuver — Pushing Attack', () => {
         resolveTarget.mockResolvedValue(null);
     });
 
-    it('buildSaveDc resolves the STR save DC as 8 + STR mod + PB = 14', () => {
-        expect(buildSaveDc(RIDER_ACTION.automation, makePlayerStats())).toBe(14);
+    it('buildSaveDc resolves the STR save DC as 8 + STR mod + PB = 16', () => {
+        expect(buildSaveDc(RIDER_ACTION.automation, makePlayerStats())).toBe(16);
     });
 
-    it('offers the STR save at DC 14 for a Medium target', async () => {
+    it('offers the STR save at DC 16 for a Medium target', async () => {
         damageUtils.getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Gibbering Mouther 1', type: 'npc', monsterType: 'Aberration', size: 'Medium' }],
         });
@@ -118,7 +127,7 @@ describe('MN-015 executeAttackRiderManeuver — Pushing Attack', () => {
         expect(createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
             targetName: 'Gibbering Mouther 1',
             saveType: 'STR',
-            saveDc: 14,
+            saveDc: 16,
         }));
         // paid expend happened (pool 4 -> 3)
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'superiorityDice', 3, 'test-campaign');
@@ -142,6 +151,8 @@ describe('MN-015 executeAttackRiderManeuver — Pushing Attack', () => {
         expect(result.payload.description).toContain('Huge');
         expect(result.payload.description).toContain('too large');
         expect(result.payload.description).toContain('Large or smaller');
+        // NO die expend: never rolled, never spent, never prompted.
+        expect(diceRoller.rollExpression).not.toHaveBeenCalled();
         expect(createSaveListener).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalledWith('EvasiveFighter', 'superiorityDice', expect.anything(), expect.anything());
         expect(result.logEntries?.[0]).toMatchObject({
@@ -149,6 +160,8 @@ describe('MN-015 executeAttackRiderManeuver — Pushing Attack', () => {
             characterName: 'EvasiveFighter',
             abilityName: 'Pushing Attack',
         });
+        // The refusal text reaches the log byte-identical to the popup.
+        expect(result.logEntries[0].description).toBe(result.payload.description);
         expect(result.logEntries[0].description).toContain('too large');
     });
 });

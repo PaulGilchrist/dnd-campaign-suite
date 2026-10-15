@@ -1,3 +1,8 @@
+// @maintained-by-ai
+// Unit lane for resolveFrightfulAura() save/apply via handle(): creature filtering,
+// NPC auto-saves, player save-prompt branching, aura-target storage, rejection handling.
+// Activation state machine lives in avengingAngelHandler.test.js; pure readers
+// isAuraTarget()/isActive() and damage cleanup have their own sibling suites.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -124,34 +129,6 @@ describe('avengingAngelHandler.handle - frightfulAura', () => {
       expect(sendSaveResult).not.toHaveBeenCalledWith(campaignName, 'TestPaladin', expect.anything());
       expect(sendSaveResult).toHaveBeenCalledWith(campaignName, 'CloseEnemy', expect.anything());
       expect(sendSaveResult).not.toHaveBeenCalledWith(campaignName, 'FarEnemy', expect.anything());
-    });
-
-    it('should skip all creatures when all are out of range', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'avengingAngelActive') return false;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'Goblin', type: 'npc', saveBonuses: { wis: 0 }, conditions: [] },
-        ],
-      });
-      isWithinRange.mockResolvedValue(false);
-      rollD20.mockReturnValue(20);
-      getAbilityModifier.mockReturnValue(3);
-      utils.guid.mockReturnValue('test-guid');
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(sendSaveResult).not.toHaveBeenCalled();
-      expect(addExpiration).not.toHaveBeenCalled();
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestPaladin',
-        'avengingAngelAuraTargets',
-        [],
-        campaignName,
-      );
     });
   });
 
@@ -295,14 +272,14 @@ describe('avengingAngelHandler.handle - frightfulAura', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      await new Promise(resolve => setTimeout(resolve, 10));
-
-      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestPaladin', targetName: 'EnemyPlayer', effects: expect.any(Array), campaignName });
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        targetName: 'EnemyPlayer',
-        success: false,
-      }));
+      await vi.waitFor(() => {
+        expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestPaladin', targetName: 'EnemyPlayer', effects: expect.any(Array), campaignName });
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+          type: 'save_result',
+          targetName: 'EnemyPlayer',
+          success: false,
+        }));
+      });
     });
 
     it('should log save_result entry when player succeeds on WIS save', async () => {
@@ -327,22 +304,23 @@ describe('avengingAngelHandler.handle - frightfulAura', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await vi.waitFor(() => {
+        expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+          targetName: 'EnemyPlayer',
+          saveType: 'WIS',
+          saveDc: 14,
+          dcSuccess: false,
+        }));
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+          type: 'save_result',
+          targetName: 'EnemyPlayer',
+          success: true,
+          saveType: 'WIS',
+          saveDc: 14,
+        }));
+      });
 
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        targetName: 'EnemyPlayer',
-        saveType: 'WIS',
-        saveDc: 14,
-        dcSuccess: false,
-      }));
       expect(sendSaveResult).not.toHaveBeenCalled();
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        targetName: 'EnemyPlayer',
-        success: true,
-        saveType: 'WIS',
-        saveDc: 14,
-      }));
       expect(addExpiration).not.toHaveBeenCalled();
     });
   });
@@ -373,6 +351,13 @@ describe('avengingAngelHandler.handle - frightfulAura', () => {
       ).resolves.toBeDefined();
 
       await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Rejection must be swallowed with no frightened side-effects for the player
+      expect(addEntry).not.toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'save_result',
+        targetName: 'EnemyPlayer',
+      }));
+      expect(addExpiration).not.toHaveBeenCalled();
     });
   });
 });

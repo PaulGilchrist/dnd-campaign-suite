@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai — deterministic unit tests for the pure stealth_attack handler:
+// modal/popup payload contracts consumed by StealthAttackModal and the exact-key
+// runtime pin ('stealthAttackCost'). No timers, no real I/O (mocked at the boundary).
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handle, applyStealthAttack } from './stealthAttackHandler.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -30,14 +33,11 @@ function makePlayerStats(overrides = {}) {
     };
 }
 
+// automation overrides REPLACE the whole automation object (not merged).
 function makeAction(overrides = {}) {
     return {
         name: 'Stealth Attack',
-        automation: {
-            type: 'stealth_attack',
-            cost: '1d6',
-            ...overrides.automation,
-        },
+        automation: { type: 'stealth_attack', cost: '1d6' },
         ...overrides,
     };
 }
@@ -78,34 +78,24 @@ describe('stealthAttackHandler', () => {
             expect(result.payload.availableDice).toBe(5);
         });
 
-        it('returns error popup when sneak attack dice are insufficient', async () => {
+        it.each([
+            ['insufficient dice', 1, '2d6', { cost: '2d6' }],
+            ['zero dice (falsy normalization)', 0, '1d6', undefined],
+        ])('returns error popup when sneak attack dice are %s', async (_label, availableDice, expectedCostText, automation) => {
             const stats = makePlayerStats({
-                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 1 }] },
+                class: { class_levels: [{ level: 1, sneak_attack_num_d6: availableDice }] },
             });
+            const action = makeAction(automation ? { automation } : {});
 
-            const result = await handle(
-                makeAction({ automation: { cost: '2d6' } }),
-                stats,
-                'test-campaign'
-            );
+            const result = await handle(action, stats, 'test-campaign');
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Stealth Attack');
-            expect(result.payload.description).toContain('Not enough Sneak Attack dice');
-            expect(result.payload.description).toContain('Need 2d6, have 1d6');
-            expect(result.payload.automation).toEqual({ cost: '2d6' });
-        });
-
-        it('returns error popup when sneak attack dice are zero', async () => {
-            const stats = makePlayerStats({
-                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 0 }] },
-            });
-
-            const result = await handle(makeAction(), stats, 'test-campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Need 1d6, have 0d6');
+            expect(result.payload.description).toBe(
+                `Not enough Sneak Attack dice to use Stealth Attack. Need ${expectedCostText}, have ${availableDice}d6.`
+            );
+            expect(result.payload.automation).toEqual(action.automation);
         });
     });
 
@@ -136,6 +126,25 @@ describe('stealthAttackHandler', () => {
             );
         });
 
+        it('returns error popup without side effects when dice are insufficient at apply time', async () => {
+            const stats = makePlayerStats({
+                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 2 }] },
+            });
+
+            const result = await applyStealthAttack(makeAction(), stats, 'test-campaign', 3);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Stealth Attack');
+            // apply-time guard text differs from handle()'s guard — pinned in full
+            expect(result.payload.description).toBe(
+                'Not enough Sneak Attack dice. Need 3d6, have 2d6.'
+            );
+            expect(result.payload.automation).toEqual(makeAction().automation);
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+        });
+
         it('calls addEntry with ability_use log on success', async () => {
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1, sneak_attack_num_d6: 3 }] },
@@ -148,6 +157,39 @@ describe('stealthAttackHandler', () => {
                 characterName: 'TestRogue',
                 abilityName: 'Stealth Attack',
                 description: expect.stringContaining('Stealth Attack enabled'),
+            });
+        });
+
+        describe('log resilience', () => {
+            let consoleError;
+            beforeEach(() => {
+                consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+            });
+            afterEach(() => {
+                consoleError.mockRestore();
+            });
+
+            it('still applies stealth attack when the log write rejects', async () => {
+                addEntry.mockRejectedValueOnce(new Error('log down'));
+                const stats = makePlayerStats({
+                    class: { class_levels: [{ level: 1, sneak_attack_num_d6: 3 }] },
+                });
+
+                const result = await applyStealthAttack(makeAction(), stats, 'test-campaign', 2);
+
+                expect(result.type).toBe('popup');
+                expect(result.payload.description).toContain('Stealth Attack active');
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    'TestRogue',
+                    'stealthAttackCost',
+                    2,
+                    'test-campaign',
+                    true
+                );
+                expect(consoleError).toHaveBeenCalledWith(
+                    '[stealthAttackHandler:log-error]',
+                    expect.any(Error)
+                );
             });
         });
     });

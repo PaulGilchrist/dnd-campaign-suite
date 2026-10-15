@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Deterministic contract pins for the Wild Shape activate/cleanup orchestrator.
+// Every service dependency is mocked; no timers, dice, DOM, or wall-clock logic.
+// Update only when the wildShapeCreatureBuilder.js contract genuinely changes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -37,7 +41,7 @@ vi.mock('../../../encounters/encounterToInitiative.js', () => ({
 import { activateWildShape, cleanupWildShape } from './wildShapeCreatureBuilder.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import storage from '../../../ui/storage.js';
-import { getCombatSummary } from '../../../encounters/combatData.js';
+import { getCombatSummary, setCombatSummaryCache } from '../../../encounters/combatData.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { setTempHp } from '../buffs/tempHpService.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -87,7 +91,7 @@ describe('wildShapeCreatureBuilder', () => {
 
     describe('activateWildShape', () => {
         it('marks the druid player creature and does not add a beast creature', async () => {
-            const cs = { creatures: [{ name: 'Maribelle', type: 'player', initiative: '20' }] };
+            const cs = { creatures: [{ name: 'Maribelle', type: 'player', initiative: '20', saveBonuses: { str: 1, dex: 2, con: 0, int: 3, wis: 4, cha: 1 } }] };
             getCombatContext.mockResolvedValue(cs);
 
             const result = await activateWildShape('Maribelle', giantSpider, druidStats, campaignName);
@@ -98,7 +102,12 @@ describe('wildShapeCreatureBuilder', () => {
             expect(cs.creatures[0].wildShapeSource).toBe('Maribelle');
             expect(cs.creatures[0].beastIndex).toBe('giant-spider');
             expect(cs.creatures[0].beastName).toBe('Giant Spider');
+            // non-Moon druids get no bestial save retrofit even when saveBonuses exist
+            expect(cs.creatures[0].wildShapeConSaveBonus).toBeUndefined();
+            expect(cs.creatures[0].saving_throws).toBeUndefined();
             expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, campaignName);
+            expect(setCombatSummaryCache).toHaveBeenCalledWith(cs, campaignName);
+            expect(setRuntimeValue).toHaveBeenCalledWith('Maribelle', 'activeConditions', [], campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [
                 { target: 'Maribelle', source: 'Maribelle', effect: 'wild_shape', beastName: 'Giant Spider' },
             ], campaignName);
@@ -145,15 +154,6 @@ describe('wildShapeCreatureBuilder', () => {
                 wis: { modifier: 0 },
                 cha: { modifier: 0 },
             });
-        });
-
-        it('does not set wildShapeConSaveBonus for non-Moon Druid', async () => {
-            const cs = { creatures: [{ name: 'Maribelle', type: 'player', initiative: '20', saveBonuses: { str: 1, dex: 2, con: 0, int: 3, wis: 4, cha: 1 } }] };
-            getCombatContext.mockResolvedValue(cs);
-
-            await activateWildShape('Maribelle', giantSpider, druidStats, campaignName);
-
-            expect(cs.creatures[0].wildShapeConSaveBonus).toBeUndefined();
         });
 
         it('removes leftover beast creatures from previous versions', async () => {
@@ -295,14 +295,19 @@ describe('wildShapeCreatureBuilder', () => {
             expect(log.description).toBe('Maribelle activated Wild Shape as Giant Spider (CR 1).');
         });
 
-        it('does not add lunarFormAction when no monsters loaded', async () => {
+        it('skips the save retrofit and lunarFormAction when no monsters loaded', async () => {
             const cs = { creatures: [{ name: 'Maribelle', type: 'player', initiative: '20' }] };
             getCombatContext.mockResolvedValue(cs);
             loadMonsters.mockResolvedValue([]);
 
             await activateWildShape('Maribelle', giantSpider, level14MoonDruidStats, campaignName);
 
+            // bestiary lookup misses early: no con-save retrofit, no lunar form...
             expect(cs.creatures[0].lunarFormAction).toBeUndefined();
+            expect(cs.creatures[0].wildShapeConSaveBonus).toBeUndefined();
+            expect(cs.creatures[0].saving_throws).toBeUndefined();
+            // ...but circleFormsAC is written before the lookup (max(beast AC 11, 13 + 4))
+            expect(setRuntimeValue).toHaveBeenCalledWith('Maribelle', 'circleFormsAC', 17, campaignName);
         });
     });
 
@@ -333,16 +338,17 @@ describe('wildShapeCreatureBuilder', () => {
             expect(cs.creatures[0].beastIndex).toBeUndefined();
             expect(cs.creatures[0].beastName).toBeUndefined();
             expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, campaignName);
+            expect(setCombatSummaryCache).toHaveBeenCalledWith(cs, campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [], campaignName, true);
             expect(setRuntimeValue).toHaveBeenCalledWith('Maribelle', 'activeBuffs', [], campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith('Maribelle', 'tempHp', 0, campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith('Maribelle', 'circleFormsAC', null, campaignName);
         });
 
-        it('clears wildShapeConSaveBonus and saving_throws when cleaning up Moon Druid wild shape', () => {
+        it('clears Moon Druid keys (con-save retrofit and lunar form) when cleaning up', () => {
             const cs = {
                 creatures: [
-                    { name: 'Maribelle', type: 'player', wildShapeSource: 'Maribelle', beastIndex: 'wolf', beastName: 'Wolf', wildShapeConSaveBonus: 7, saveBonuses: { str: 1, dex: 2, con: 0, int: 3, wis: 4, cha: 1 }, saving_throws: { str: { modifier: 2 }, dex: { modifier: 1 }, con: { modifier: 7 }, int: { modifier: 3 }, wis: { modifier: 4 }, cha: { modifier: 1 } } },
+                    { name: 'Maribelle', type: 'player', wildShapeSource: 'Maribelle', beastIndex: 'wolf', beastName: 'Wolf', wildShapeConSaveBonus: 7, saveBonuses: { str: 1, dex: 2, con: 0, int: 3, wis: 4, cha: 1 }, saving_throws: { str: { modifier: 2 }, dex: { modifier: 1 }, con: { modifier: 7 }, int: { modifier: 3 }, wis: { modifier: 4 }, cha: { modifier: 1 } }, lunarFormAction: { name: 'Lunar Form', damage_dice_primary: '2d10', damage_type_primary: 'Radiant', description: 'Once per turn on a hit with a Wild Shape form attack, you can deal an extra 2d10 Radiant damage to the target.' } },
                 ],
             };
             getCombatSummary.mockReturnValue(cs);
@@ -360,28 +366,32 @@ describe('wildShapeCreatureBuilder', () => {
 
             expect(cs.creatures[0].wildShapeConSaveBonus).toBeUndefined();
             expect(cs.creatures[0].saving_throws).toBeUndefined();
+            expect(cs.creatures[0].lunarFormAction).toBeUndefined();
         });
 
-        it('clears lunarFormAction when cleaning up Moon Druid wild shape', () => {
-            const cs = {
-                creatures: [
-                    { name: 'Maribelle', type: 'player', wildShapeSource: 'Maribelle', beastIndex: 'wolf', beastName: 'Wolf', lunarFormAction: { name: 'Lunar Form', damage_dice_primary: '2d10', damage_type_primary: 'Radiant', description: 'Once per turn on a hit with a Wild Shape form attack, you can deal an extra 2d10 Radiant damage to the target.' } },
-                ],
-            };
-            getCombatSummary.mockReturnValue(cs);
+        it('does not write targetEffects when there is no wild_shape effect from this druid to remove', () => {
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'Maribelle', type: 'player' }] });
             getRuntimeValue.mockImplementation((name, key) => {
                 if (name === 'campaign' && key === 'targetEffects') {
-                    return [{ target: 'Maribelle', source: 'Maribelle', effect: 'wild_shape', beastName: 'Wolf' }];
-                }
-                if (name === 'Maribelle' && key === 'activeBuffs') {
-                    return [{ name: 'Wild Shape', effect: 'shape_shift' }];
+                    return [{ target: 'Maribelle', source: 'Other', effect: 'other_effect' }];
                 }
                 return undefined;
             });
 
             cleanupWildShape('Maribelle', campaignName);
 
-            expect(cs.creatures[0].lunarFormAction).toBeUndefined();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), campaignName, true);
+        });
+
+        it('still resets runtime keys when there is no combat summary', () => {
+            getCombatSummary.mockReturnValue(null);
+
+            cleanupWildShape('Maribelle', campaignName);
+
+            expect(storage.set).not.toHaveBeenCalled();
+            expect(setCombatSummaryCache).not.toHaveBeenCalled();
+            expect(setRuntimeValue).toHaveBeenCalledWith('Maribelle', 'tempHp', 0, campaignName);
+            expect(setRuntimeValue).toHaveBeenCalledWith('Maribelle', 'circleFormsAC', null, campaignName);
         });
     });
 });

@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Deterministic contract tests for tacticalMindHandler: mocked runtime store +
+// log service, RNG pinned via mockRandom. Stable unless the handler's refusal
+// strings, +1d10 bonus formula, or Second Wind spend semantics change.
 import { handle } from './tacticalMindHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -48,6 +52,27 @@ const mockCheck = (overrides = {}) => ({
     ...overrides,
 });
 
+// The handler composes its own popup + refusal-log strings; pin them in full.
+const expectRefusal = (result, reason) => {
+    expect(result).toEqual({
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: 'Tactical Mind',
+            description: reason,
+            automation: makeAction().automation,
+        },
+    });
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+        type: 'ability_use',
+        characterName: 'TestFighter',
+        abilityName: 'Tactical Mind',
+        description: `TestFighter attempted Tactical Mind — refused: ${reason}`,
+        timestamp: expect.any(Number),
+    });
+};
+
 describe('tacticalMindHandler.handle', () => {
     describe('early exit — no valid ability check', () => {
         it.each([
@@ -62,42 +87,25 @@ describe('tacticalMindHandler.handle', () => {
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Tactical Mind');
-            expect(result.payload.description).toContain('No recent ability check found');
-            expect(result.payload.description).toContain('TestFighter');
-            expect(result.payload.automation).toEqual(makeAction().automation);
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'ability_use',
-                description: expect.stringContaining('refused'),
-            }));
+            expectRefusal(result, 'No recent ability check found for TestFighter. This feature can only be used shortly after an ability check.');
         });
     });
 
     describe('early exit — natural 20', () => {
-        it('returns popup indicating natural 20 needs no bonus', async () => {
+        it('refuses without spending a Second Wind use', async () => {
             getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') return { rollType: 'check', attackerName: 'TestFighter', d20: 20, bonus: 3, checkName: 'Insight' };
+                if (name === 'campaign' && key === 'lastAttack') return mockCheck({ d20: 20 });
                 return undefined;
             });
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.name).toBe('Tactical Mind');
-            expect(result.payload.description).toContain('Natural 20');
-            expect(result.payload.automation).toEqual(makeAction().automation);
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                description: expect.stringContaining('refused'),
-            }));
+            expectRefusal(result, 'Tactical Mind: Natural 20 — no bonus needed.');
         });
     });
 
     describe('CLA-352 early exit — secondWindUses exhausted or null (no phantom refill)', () => {
-        it.each([0, -1, null])('refuses, spends nothing and writes nothing when secondWindUses is %s', async (uses) => {
+        it.each([0, -1, null, undefined])('refuses, spends nothing and writes nothing when secondWindUses is %s', async (uses) => {
             getRuntimeValue.mockImplementation((name, key, _campaign) => {
                 if (name === 'campaign' && key === 'lastAttack') return mockCheck({ d20: 8 });
                 if (name === 'TestFighter' && key === 'secondWindUses') return uses;
@@ -106,36 +114,35 @@ describe('tacticalMindHandler.handle', () => {
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No Second Wind uses remaining');
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                description: expect.stringContaining('refused'),
-            }));
+            expectRefusal(result, 'Tactical Mind: No Second Wind uses remaining.');
         });
     });
 
     describe('successful application', () => {
-        it('returns popup with original and modified totals and expends one Second Wind use', async () => {
+        it.each([
+            { label: 'two uses remain', uses: 2, spent: 1, d20: 5, d10: 7 },
+            { label: 'only the last use remains', uses: 1, spent: 0, d20: 8, d10: 1 },
+        ])('returns popup with original and modified totals and spends one Second Wind use when $label', async ({ uses, spent, d20, d10 }) => {
             getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') return mockCheck({ d20: 5 });
-                if (name === 'TestFighter' && key === 'secondWindUses') return 2;
+                if (name === 'campaign' && key === 'lastAttack') return mockCheck({ d20 });
+                if (name === 'TestFighter' && key === 'secondWindUses') return uses;
                 return undefined;
             });
-            const randomSpy = mockRandom(7);
+            const randomSpy = mockRandom(d10);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.name).toBe('Tactical Mind');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('Tactical Mind');
-            expect(result.payload.description).toContain('Insight');
-            expect(result.payload.description).toContain('5');
-            expect(result.payload.description).toContain('15');
-            expect(result.payload.description).toContain('7');
-            expect(result.payload.automation).toEqual(makeAction().automation);
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'secondWindUses', 1, 'test-campaign');
+            const originalTotal = d20 + 3;
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Tactical Mind',
+                    description: `<b>Tactical Mind</b><br/>Insight: d20(${d20}) + 3 = ${originalTotal} → +1d10(${d10}) = <b>${originalTotal + d10}</b>`,
+                    automation: makeAction().automation,
+                },
+            });
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'secondWindUses', spent, 'test-campaign');
 
             randomSpy.mockRestore();
         });
@@ -150,33 +157,33 @@ describe('tacticalMindHandler.handle', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', {
                 type: 'ability_use',
                 characterName: 'TestFighter',
                 abilityName: 'Tactical Mind',
-                timestamp: expect.any(Number),
-                description: expect.stringContaining('+7'),
+                description: 'TestFighter used Tactical Mind: +7 to Insight (d20 5 + 3 = 8 → 15). Second Wind use expended; if the check still fails the GM restores the use.',
                 d10Roll: 7,
-            }));
+                timestamp: expect.any(Number),
+            });
 
             randomSpy.mockRestore();
         });
 
-        it('returns popup even when addEntry rejects', async () => {
+        it('still spends the use and returns popup when addEntry rejects', async () => {
             getRuntimeValue.mockImplementation((name, key, _campaign) => {
                 if (name === 'campaign' && key === 'lastAttack') return mockCheck({ d20: 5 });
                 if (name === 'TestFighter' && key === 'secondWindUses') return 2;
                 return undefined;
             });
             const testError = new Error('log failed');
-            addEntry.mockRejectedValue(testError);
+            addEntry.mockRejectedValueOnce(testError);
             const randomSpy = mockRandom(7);
             const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(result.type).toBe('popup');
-            expect(addEntry).toHaveBeenCalled();
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'secondWindUses', 1, 'test-campaign');
             expect(consoleSpy).toHaveBeenCalledWith('[tacticalMind] Error:', testError);
 
             randomSpy.mockRestore();
@@ -184,38 +191,19 @@ describe('tacticalMindHandler.handle', () => {
         });
     });
 
-    describe('edge cases', () => {
-        it('uses level 1 as default when playerStats.level is falsy', async () => {
+    describe('roll type acceptance', () => {
+        it('accepts rollType "skill" in addition to "check"', async () => {
             getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') return mockCheck({ d20: 5 });
-                if (name === 'TestFighter' && key === 'secondWindUses') return 1;
-                return undefined;
-            });
-            const randomSpy = mockRandom(1);
-
-            const stats = makePlayerStats({ level: undefined });
-
-            const result = await handle(makeAction(), stats, 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'secondWindUses', 0, 'test-campaign');
-
-            randomSpy.mockRestore();
-        });
-
-        it('handles skill rollType in addition to check', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') return { rollType: 'skill', attackerName: 'TestFighter', d20: 12, bonus: 3, checkName: 'Athletics' };
+                if (name === 'campaign' && key === 'lastAttack') return mockCheck({ rollType: 'skill', d20: 12, checkName: 'Athletics' });
                 if (name === 'TestFighter' && key === 'secondWindUses') return 2;
                 return undefined;
             });
-            const randomSpy = mockRandom(6);
+            const randomSpy = mockRandom(10);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Athletics');
-            expect(result.payload.description).toContain('21');
+            expect(result.payload.description).toBe('<b>Tactical Mind</b><br/>Athletics: d20(12) + 3 = 15 → +1d10(10) = <b>25</b>');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'secondWindUses', 1, 'test-campaign');
 
             randomSpy.mockRestore();
         });

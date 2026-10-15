@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Unique lane: the ONLY suite exercising the cs === null short-circuit of
+// `cs ? getTargetFromAttacker(cs, playerName) : null` (handler line 57) —
+// handle.test.js covers the other ternary arm (cs non-null, target null).
+// Pins: getTargetFromAttacker never called, exact no-target refusal string,
+// and refusal inertia (nothing written) on the null-combat-context route.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────
@@ -36,7 +42,7 @@ vi.mock('../../../rules/combat/applyDamage.js', () => ({
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './quiveringPalmHandler.js';
-import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -103,7 +109,11 @@ describe('quiveringPalmHandler.handle — null combat context', () => {
 
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.description).toContain('No target selected');
+    // Full-string pin: refusal falls back popupDescription ?? logDescription here.
+    expect(result.payload.description).toBe('Quivering Palm — No target selected.');
+    // Unique guard: cs is null, so the ternary short-circuits — never resolve a target.
     expect(getTargetFromAttacker).not.toHaveBeenCalled();
+    // Route inertia: refusal happens before the resource check — nothing written.
+    expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 });

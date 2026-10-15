@@ -1,9 +1,13 @@
-// CLA-200 regression — once-per-Divine-Smite latch.
+// @maintained-by-ai
+// CLA-200 regression — once-per-Divine-Smite latch (token lane only).
 // A single Divine Smite cast arms ONE 2d8+level Channel Divinity THP pool.
 // After the distributor is CONFIRMED (inspiringSmiteUsedToken stamped == the
 // cast's inspiringSmiteCastToken), re-clicking the gated "Inspiring Smite:"
 // row must be REFUSED — no fresh roll, no modal, no second Channel Divinity
-// spend. A NEW Divine Smite cast (fresh castToken via the service) re-arms.
+// spend. Covered here, one test per handler branch: refuse-on-confirm,
+// re-arm on fresh castToken, stamp-on-missing (legacy rows). The plain
+// success-path modal dispatch (first click, payload contract) lives in
+// inspiringSmiteRowActivation.test.js and inspiringSmiteHandler.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -76,18 +80,6 @@ beforeEach(() => {
 });
 
 describe('Inspiring Smite once-per-cast latch (CLA-200)', () => {
-    it('first click after a fresh Divine Smite cast opens the distributor', async () => {
-        divineSmiteRuntime({ castToken: 1000, usedToken: undefined });
-
-        const result = await handle(makeAction(), makeStats(), campaignName, null);
-
-        expect(result).toBeNull();
-        const event = dispatchedEvents['inspiring-smite-pending'];
-        expect(event).toBeDefined();
-        expect(event.detail.castToken).toBe(1000);
-        expect(event.detail.channelDivinityCharges).toBe(3);
-    });
-
     it('re-click after CONFIRM (usedToken === castToken) is refused — no modal, no re-roll', async () => {
         divineSmiteRuntime({ castToken: 1000, usedToken: 1000 });
 

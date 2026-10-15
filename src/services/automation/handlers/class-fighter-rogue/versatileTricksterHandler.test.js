@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// Canonical home for versatileTricksterHandler.applyVersatileTrickster's own
+// behaviour: popup/log composition, inline size-order guard, targetEffects
+// append, CLA-376 secondary-target DEX save, and no-side-effect guards.
+// Full-string pins here are this handler's own composition — the shared
+// validateSizeLimit validator lives in validateSizeLimit.mn015.test.js and the
+// modal wiring (which mocks this handler) lives in
+// AttackRiderModal.versatileTrickster.test.jsx; neither belongs in this suite.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -65,51 +73,55 @@ function makeCombatContext(creatures) {
 
 describe('versatileTricksterHandler', () => {
     describe('applyVersatileTrickster', () => {
-        describe('no secondary target', () => {
-            it('returns an automation_info popup with default name and description', async () => {
-                const result = await applyVersatileTrickster(
-                    makeAction(),
-                    makePlayerStats(),
-                    'test-campaign',
-                    null
-                );
+        it('returns an automation_info popup with default name and no side effects when no secondary target is selected', async () => {
+            const result = await applyVersatileTrickster(
+                makeAction(),
+                makePlayerStats(),
+                'test-campaign',
+                null
+            );
 
-                expect(result.type).toBe('popup');
-                expect(result.payload.type).toBe('automation_info');
-                expect(result.payload.name).toBe('Versatile Trickster');
-                expect(result.payload.automationType).toBe('versatile_trickster');
-                expect(result.payload.description).toBe(
-                    'Versatile Trickster: No secondary target selected.'
-                );
-                expect(result.payload.automation).toEqual({
-                    type: 'versatile_trickster',
-                });
-                expect(setRuntimeValue).not.toHaveBeenCalled();
-                expect(addEntry).not.toHaveBeenCalled();
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Versatile Trickster',
+                    automationType: 'versatile_trickster',
+                    description: 'Versatile Trickster: No secondary target selected.',
+                    automation: { type: 'versatile_trickster' },
+                },
             });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+        });
 
-            it('uses custom action name and automation type when provided', async () => {
-                const result = await applyVersatileTrickster(
-                    makeAction({
-                        name: 'MyFeature',
-                        automation: { type: 'custom_type', extra: 'data' },
-                    }),
-                    makePlayerStats(),
-                    'test-campaign',
-                    null
-                );
+        it('propagates a custom action name to the popup fields and the effect source', async () => {
+            getCombatContext.mockResolvedValue(
+                makeCombatContext([{ name: 'Goblin', size: 'Small' }])
+            );
 
-                expect(result.payload.name).toBe('MyFeature');
-                expect(result.payload.automationType).toBe('custom_type');
-                expect(result.payload.automation).toEqual({
-                    type: 'custom_type',
-                    extra: 'data',
-                });
+            const result = await applyVersatileTrickster(
+                makeAction({
+                    name: 'MyFeature',
+                    automation: { type: 'custom_type', extra: 'data' },
+                }),
+                makePlayerStats(),
+                'test-campaign',
+                'Goblin'
+            );
+
+            expect(result.payload.name).toBe('MyFeature');
+            expect(result.payload.automationType).toBe('custom_type');
+            expect(result.payload.automation).toEqual({
+                type: 'custom_type',
+                extra: 'data',
             });
+            expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+            expect(setRuntimeValue.mock.calls[0][2][0].source).toBe('MyFeature');
         });
 
         describe('size validation', () => {
-            it('applies Trip to targets up to Large size', async () => {
+            it('applies Trip to Tiny–Large targets: full popup, effect, and log composition; succeeds; writes no conditions', async () => {
                 const sizes = [
                     { name: 'TinyCreature', size: 'Tiny' },
                     { name: 'SmallGoblin', size: 'Small' },
@@ -118,6 +130,8 @@ describe('versatileTricksterHandler', () => {
                 ];
 
                 for (const creature of sizes) {
+                    setRuntimeValue.mockClear();
+                    addEntry.mockClear();
                     getCombatContext.mockResolvedValue(
                         makeCombatContext([creature])
                     );
@@ -129,33 +143,56 @@ describe('versatileTricksterHandler', () => {
                         creature.name
                     );
 
-                    expect(result.type).toBe('popup');
-                    expect(result.payload.type).toBe('automation_info');
-                    expect(result.payload.description).toContain(
-                        `Trip also applied to ${creature.name}`
-                    );
-                    expect(result.payload.description).toContain('Dexterity');
+                    expect(result).toEqual({
+                        type: 'popup',
+                        payload: {
+                            type: 'automation_info',
+                            name: 'Versatile Trickster',
+                            automationType: 'versatile_trickster',
+                            description: `Versatile Trickster: Trip also applied to ${creature.name} — succeeded its Dexterity save (DC 16) — no effect.`,
+                            automation: { type: 'versatile_trickster' },
+                        },
+                    });
+
+                    // Exactly one write: the targetEffects append. No
+                    // activeConditions write on a succeeded save.
+                    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
                     expect(setRuntimeValue).toHaveBeenCalledWith(
                         'campaign',
                         'targetEffects',
-                        expect.arrayContaining([
-                            expect.objectContaining({
+                        [
+                            {
                                 target: creature.name,
+                                source: 'Versatile Trickster',
+                                option: 'Trip',
                                 effect: 'prone',
-                                sizeLimit: 'large_or_smaller',
+                                value: null,
+                                noOpportunityAttacks: false,
+                                duration: 'until_start_of_next_turn',
                                 saveType: 'DEX',
-                            }),
-                        ]),
+                                saveDc: 'ability',
+                                saveAbility: 'DEX',
+                                condition: 'prone',
+                                repeatingSave: false,
+                                requires: null,
+                                sizeLimit: 'large_or_smaller',
+                                movement: null,
+                                cost: null,
+                                ignoreResistance: false,
+                                restoreCost: null,
+                            },
+                        ],
                         'test-campaign'
                     );
+
+                    expect(addEntry).toHaveBeenCalledTimes(1);
                     expect(addEntry).toHaveBeenCalledWith(
                         'test-campaign',
                         expect.objectContaining({
                             type: 'ability_use',
+                            characterName: 'TestRogue',
                             abilityName: 'Versatile Trickster',
-                            description: expect.stringContaining(
-                                `Trip applied to ${creature.name}`
-                            ),
+                            description: `Trip applied to ${creature.name} (secondary target via Versatile Trickster) — ${creature.name} rolled 20 on DEX save (DC 16), succeeded — no effect`,
                         })
                     );
                 }
@@ -164,7 +201,7 @@ describe('versatileTricksterHandler', () => {
             it.each([
                 { name: 'T-Rex', size: 'Huge' },
                 { name: 'Titan', size: 'Gargantuan' },
-            ])('blocks Trip on $size targets ($name)', async ({ name, size }) => {
+            ])('blocks Trip on $size targets ($name) with no writes and no log', async ({ name, size }) => {
                 getCombatContext.mockResolvedValue(
                     makeCombatContext([{ name, size }])
                 );
@@ -178,163 +215,104 @@ describe('versatileTricksterHandler', () => {
 
                 expect(result.type).toBe('popup');
                 expect(result.payload.type).toBe('automation_info');
-                expect(result.payload.description).toContain(
-                    `<b>Trip</b> cannot be used on ${name}`
-                );
-                expect(result.payload.description).toContain(
-                    `${size} (too large for Trip`
+                expect(result.payload.description).toBe(
+                    `<b>Trip</b> cannot be used on ${name}: Target is ${size} (too large for Trip — only Large or smaller affected).`
                 );
                 expect(setRuntimeValue).not.toHaveBeenCalled();
                 expect(addEntry).not.toHaveBeenCalled();
             });
         });
 
-        describe('missing or unknown target in combat context', () => {
-            it('applies Trip when target is not found in creatures array', async () => {
-                getCombatContext.mockResolvedValue(
-                    makeCombatContext([
-                        { name: 'OtherCreature', size: 'Small' },
-                    ])
-                );
+        describe('target lookup fallbacks', () => {
+            it.each([
+                {
+                    label: 'target is not found in creatures array',
+                    context: makeCombatContext([{ name: 'OtherCreature', size: 'Small' }]),
+                    target: 'UnknownCreature',
+                },
+                {
+                    label: 'combat context is null',
+                    context: null,
+                    target: 'UnknownTarget',
+                },
+                {
+                    label: 'target has an unrecognised size string',
+                    context: makeCombatContext([{ name: 'MysteryBlob', size: 'Medium-ish' }]),
+                    target: 'MysteryBlob',
+                },
+            ])('applies Trip when $label', async ({ context, target }) => {
+                getCombatContext.mockResolvedValue(context);
 
                 const result = await applyVersatileTrickster(
                     makeAction(),
                     makePlayerStats(),
                     'test-campaign',
-                    'UnknownCreature'
+                    target
                 );
 
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain(
-                    'Trip also applied to UnknownCreature'
+                expect(result.payload.description).toBe(
+                    `Versatile Trickster: Trip also applied to ${target} — succeeded its Dexterity save (DC 16) — no effect.`
                 );
-                expect(setRuntimeValue).toHaveBeenCalled();
-            });
-
-            it('applies Trip when combat context is null or creatures array is missing', async () => {
-                getCombatContext.mockResolvedValue(null);
-
-                const result = await applyVersatileTrickster(
-                    makeAction(),
-                    makePlayerStats(),
-                    'test-campaign',
-                    'UnknownTarget'
+                expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    'campaign',
+                    'targetEffects',
+                    expect.arrayContaining([
+                        expect.objectContaining({ target, effect: 'prone' }),
+                    ]),
+                    'test-campaign'
                 );
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain(
-                    'Trip also applied to UnknownTarget'
-                );
-                expect(setRuntimeValue).toHaveBeenCalled();
             });
         });
 
-        describe('targetEffects persistence', () => {
-            it('appends the Trip effect to existing targetEffects', async () => {
-                const existingEffect = {
-                    target: 'OldTarget',
-                    effect: 'blinded',
-                };
-                getRuntimeValue.mockReturnValue([existingEffect]);
-                getCombatContext.mockResolvedValue(
-                    makeCombatContext([
-                        { name: 'NewTarget', size: 'Medium' },
-                    ])
-                );
+        it('appends the Trip effect after existing targetEffects', async () => {
+            const existingEffect = {
+                target: 'OldTarget',
+                effect: 'blinded',
+            };
+            getRuntimeValue.mockReturnValue([existingEffect]);
+            getCombatContext.mockResolvedValue(
+                makeCombatContext([{ name: 'NewTarget', size: 'Medium' }])
+            );
 
-                await applyVersatileTrickster(
-                    makeAction(),
-                    makePlayerStats(),
-                    'test-campaign',
-                    'NewTarget'
-                );
+            await applyVersatileTrickster(
+                makeAction(),
+                makePlayerStats(),
+                'test-campaign',
+                'NewTarget'
+            );
 
-                const effectCalls = setRuntimeValue.mock.calls.filter(
-                    (c) => c[1] === 'targetEffects'
-                );
-                expect(effectCalls).toHaveLength(1);
-                const newEffects = effectCalls[0][2];
-                expect(newEffects).toHaveLength(2);
-                expect(newEffects[0]).toEqual(existingEffect);
-                expect(newEffects[1]).toEqual(
-                    expect.objectContaining({
-                        target: 'NewTarget',
-                        effect: 'prone',
-                    })
-                );
-            });
-
-            it('uses custom source name from action in the effect', async () => {
-                getCombatContext.mockResolvedValue(
-                    makeCombatContext([
-                        { name: 'Goblin', size: 'Small' },
-                    ])
-                );
-
-                await applyVersatileTrickster(
-                    makeAction({ name: 'Trickster Maneuver' }),
-                    makePlayerStats(),
-                    'test-campaign',
-                    'Goblin'
-                );
-
-                const effectCalls = setRuntimeValue.mock.calls.filter(
-                    (c) => c[1] === 'targetEffects'
-                );
-                expect(effectCalls[0][2][0].source).toBe('Trickster Maneuver');
-            });
+            const effectCalls = setRuntimeValue.mock.calls.filter(
+                (c) => c[1] === 'targetEffects'
+            );
+            expect(effectCalls).toHaveLength(1);
+            const newEffects = effectCalls[0][2];
+            expect(newEffects).toHaveLength(2);
+            expect(newEffects[0]).toEqual(existingEffect);
+            expect(newEffects[1]).toEqual(
+                expect.objectContaining({
+                    target: 'NewTarget',
+                    option: 'Trip',
+                    effect: 'prone',
+                })
+            );
         });
 
-        describe('logging', () => {
-            it('logs ability_use entry with correct fields', async () => {
-                getCombatContext.mockResolvedValue(
-                    makeCombatContext([
-                        { name: 'Goblin', size: 'Small' },
-                    ])
-                );
+        it('gracefully handles log failure without throwing', async () => {
+            addEntry.mockRejectedValueOnce(new Error('network error'));
+            getCombatContext.mockResolvedValue(
+                makeCombatContext([{ name: 'Goblin', size: 'Small' }])
+            );
 
-                await applyVersatileTrickster(
-                    makeAction(),
-                    makePlayerStats(),
-                    'test-campaign',
-                    'Goblin'
-                );
+            const result = await applyVersatileTrickster(
+                makeAction(),
+                makePlayerStats(),
+                'test-campaign',
+                'Goblin'
+            );
 
-                expect(addEntry).toHaveBeenCalledWith(
-                    'test-campaign',
-                    expect.objectContaining({
-                        type: 'ability_use',
-                        characterName: 'TestRogue',
-                        abilityName: 'Versatile Trickster',
-                        description: expect.stringContaining(
-                            'Trip applied to Goblin'
-                        ),
-                    })
-                );
-            });
-
-            it('gracefully handles log failure without throwing', async () => {
-                addEntry.mockRejectedValueOnce(new Error('network error'));
-                createSaveListener.mockReturnValue({
-                    promptId: 'p-test',
-                    promise: Promise.resolve({ success: true, roll: 20, saveBonus: 2, total: 22 }),
-                });
-                getCombatContext.mockResolvedValue(
-                    makeCombatContext([
-                        { name: 'Goblin', size: 'Small' },
-                    ])
-                );
-
-                const result = await applyVersatileTrickster(
-                    makeAction(),
-                    makePlayerStats(),
-                    'test-campaign',
-                    'Goblin'
-                );
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.type).toBe('automation_info');
-            });
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
         });
 
         describe('CLA-376 secondary-target save', () => {
@@ -368,7 +346,7 @@ describe('versatileTricksterHandler', () => {
                 );
             });
 
-            it('applies prone condition to the secondary target on a failed save and logs the roll', async () => {
+            it('applies prone on a failed save, deduping existing conditions case-insensitively, and logs the roll', async () => {
                 createSaveListener.mockReturnValue({
                     promptId: 'p-test',
                     promise: Promise.resolve({ success: false, roll: 5, saveBonus: 2, total: 7 }),
@@ -378,7 +356,7 @@ describe('versatileTricksterHandler', () => {
                 );
                 getRuntimeValue.mockImplementation((key, prop) => {
                     if (prop === 'targetEffects') return [];
-                    if (key === 'Thug 2' && prop === 'activeConditions') return [];
+                    if (key === 'Thug 2' && prop === 'activeConditions') return ['restrained', 'Prone'];
                     return null;
                 });
 
@@ -393,9 +371,10 @@ describe('versatileTricksterHandler', () => {
                     (c) => c[0] === 'Thug 2' && c[1] === 'activeConditions'
                 );
                 expect(proneWrites).toHaveLength(1);
-                expect(proneWrites[0][2]).toContain('prone');
-                expect(result.payload.description).toContain('failed');
-                expect(result.payload.description).toContain('Prone');
+                expect(proneWrites[0][2]).toEqual(['restrained', 'prone']);
+                expect(result.payload.description).toBe(
+                    'Versatile Trickster: Trip also applied to Thug 2 — failed its Dexterity save (DC 16) and gained the Prone condition.'
+                );
                 expect(addEntry).toHaveBeenCalledWith(
                     'test-campaign',
                     expect.objectContaining({
@@ -404,25 +383,6 @@ describe('versatileTricksterHandler', () => {
                         description: expect.stringContaining('rolled 5 on DEX save (DC 16)'),
                     })
                 );
-            });
-
-            it('does NOT write prone condition on a succeeded save', async () => {
-                getCombatContext.mockResolvedValue(
-                    makeCombatContext([{ name: 'Thug 2', size: 'Medium' }])
-                );
-
-                const result = await applyVersatileTrickster(
-                    makeAction(),
-                    makePlayerStats(),
-                    'test-campaign',
-                    'Thug 2'
-                );
-
-                const proneWrites = setRuntimeValue.mock.calls.filter(
-                    (c) => c[0] === 'Thug 2' && c[1] === 'activeConditions'
-                );
-                expect(proneWrites).toHaveLength(0);
-                expect(result.payload.description).toContain('succeeded');
             });
         });
     });

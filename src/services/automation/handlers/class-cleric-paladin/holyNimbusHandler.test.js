@@ -1,7 +1,14 @@
+// @maintained-by-ai
+// Deterministic contract tests for holyNimbusHandler.handle: toggle on/off runtime
+// writes (exact order), Channel Divinity charge spend and max-charge fallback, buff
+// dedup, popup payload copy, campaign log, and log-failure resilience.
+// Downstream consumers of holyNimbusActive (auraDamageService, expirations,
+// SavePromptModal, savePromptUtils) own their own suites — this file pins the handler only.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './holyNimbusHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -121,7 +128,7 @@ describe('holyNimbusHandler.handle', () => {
       );
     });
 
-    it('appends the buff to existing buffs without duplicating', async () => {
+    it('does not duplicate the buff when a stale Holy Nimbus buff is still listed (flag off)', async () => {
       mockActive(2, [
         { name: 'Other Buff', effect: 'other' },
         { name: 'Holy Nimbus', effect: 'sunlight_aura', duration: '10_minutes', distance: '10_ft' },
@@ -129,13 +136,14 @@ describe('holyNimbusHandler.handle', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+      // Exact array: pins that the stale buff is neither duplicated nor replaced.
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestCleric',
         'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({ name: 'Other Buff' }),
-          expect.objectContaining({ name: 'Holy Nimbus' }),
-        ]),
+        [
+          { name: 'Other Buff', effect: 'other' },
+          { name: 'Holy Nimbus', effect: 'sunlight_aura', duration: '10_minutes', distance: '10_ft' },
+        ],
         campaignName,
       );
     });
@@ -150,6 +158,53 @@ describe('holyNimbusHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('falls back to class max charges when nothing is stored yet', async () => {
+      mockActive(null);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(setRuntimeValue).toHaveBeenNthCalledWith(
+        1,
+        'TestCleric',
+        'channelDivinityCharges',
+        1,
+        campaignName,
+      );
+    });
+  });
+
+  describe('campaign log', () => {
+    it('logs an ability_use entry on activation', async () => {
+      mockActive(2);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'TestCleric',
+        abilityName: 'Holy Nimbus',
+        description: 'TestCleric activated Holy Nimbus. Aura of Protection gains holy power for 10 minutes.',
+      }));
+    });
+
+    it('still returns the popup and activates when the log service fails', async () => {
+      mockActive(2);
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
+
+      addEntry.mockRejectedValueOnce(new Error('Log service down'));
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toBe(
+        'Holy Nimbus activated! Aura of Protection is imbued with holy power for 10 minutes.',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalled();
+
+      consoleErrorSpy.mockRestore();
     });
   });
 });

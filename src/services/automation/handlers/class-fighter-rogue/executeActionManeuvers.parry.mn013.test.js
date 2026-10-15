@@ -1,4 +1,5 @@
 // MN-013: Parry reaction economy latch + server-fresh heal read-modify-write
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { executeReactionManeuver } from './executeActionManeuvers.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -188,12 +189,17 @@ describe('executeReactionManeuver — MN-013 Parry reaction economy', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', '_Parry_usedRound', 2, 'test-campaign');
     });
 
-    it('exhaustion refusal stays verbatim and consults no trigger data', async () => {
+    it('exhaustion refusal rides the canonical no-dice popup and consults no trigger data', async () => {
         mockKeys({ superiorityDice: 0 });
 
         const result = await executeReactionManeuver({ name: 'Parry' }, makePlayerStats(), 'test-campaign', 'Parry');
 
-        expect(result.payload.description).toBe('Parry: No Superiority Dice remaining. Recharges on a Short or Long Rest.');
+        // Full-shape string contract lives in combatSuperiorityUtils.test.js
+        // (buildNoDiceRemainingPopup canonical pin) — here pin the consumer
+        // wiring only: correct popup for the correct maneuver, dice gate
+        // fires BEFORE trigger consultation, zero spend.
+        expect(result.payload.name).toBe('Parry');
+        expect(result.payload.description).toContain('No Superiority Dice remaining');
         expect(findLastAttack).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
     });

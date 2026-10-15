@@ -1,3 +1,13 @@
+// @maintained-by-ai: 2026-10-15
+// executeManeuver.js lane — the pending-prompt executor's own RUNNER_STEPS
+// effect branches: ally_movement / attack_roll_bonus / secondary_damage
+// (no-candidates popup; chooser + stash pinned in executeManeuver.mn018) /
+// ac_bonus_disengage / dash_and_damage / advantage_and_damage (MN-008) and
+// the executor-level Relentless free-roll wiring (rollManeuverDie internals
+// pinned in combatSuperiorityUtils + combatSuperiorityHandlerUtils).
+// Condition/save outcomes and the popup+logEntries+expend envelope are NOT
+// duplicated here — combatSuperiorityHandlerManeuver-conditions owns them via
+// the same entry. AttackRider string twins live in that lane's own file.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeManeuver } from './combatSuperiorityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -190,24 +200,6 @@ describe('executeManeuver — attack/bonus action effects', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchActive', true, 'test-campaign');
     });
 
-    it('handles advantage_and_damage effect', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Feinting Attack'];
-            return undefined;
-        });
-
-        const result = await executeManeuver(
-            { name: 'Test', automation: { type: 'combat_superiority' } },
-            makePlayerStats(),
-            'test-campaign',
-            'Feinting Attack'
-        );
-
-        expect(result.payload.description).toContain('Advantage on your next attack roll');
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'feintingAttackDieValue', 4, 'test-campaign');
-    });
-
     it('handles dash_and_damage effect', async () => {
         getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
             if (key === 'superiorityDice') return 4;
@@ -224,44 +216,6 @@ describe('executeManeuver — attack/bonus action effects', () => {
 
         expect(result.payload.description).toContain('Dash action');
         expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'lungingAttackDieValue', 4, 'test-campaign');
-    });
-
-    it('returns popup with logEntries for basic maneuver', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            return undefined;
-        });
-
-        const result = await executeManeuver(
-            { name: 'Test', automation: { type: 'combat_superiority' } },
-            makePlayerStats(),
-            'test-campaign',
-            'Trip Attack'
-        );
-
-        expect(result.type).toBe('popup');
-        expect(result.logEntries).toHaveLength(1);
-        expect(result.logEntries[0].type).toBe('ability_use');
-        expect(result.logEntries[0].characterName).toBe('TestFighter');
-    });
-
-    it('uses custom uses_max from automation config', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 3;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            return undefined;
-        });
-
-        const result = await executeManeuver(
-            { name: 'Test', automation: { type: 'combat_superiority', uses_max: 5 } },
-            makePlayerStats(),
-            'test-campaign',
-            'Trip Attack'
-        );
-
-        expect(result.type).toBe('popup');
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'superiorityDice', 2, 'test-campaign');
     });
 
     it('uses Relentless when passive exists and not used this round', async () => {

@@ -1,6 +1,15 @@
+// @maintained-by-ai
 // MN-015 regression: validateSizeLimit must resolve monster SIZE from
 // monsters.json via getMonsterData (suffix-strip 'Hill Giant 1' -> 'Hill Giant')
 // because EB combatSummary creatures historically carried no size field.
+//
+// Canonical shared-validator home for validateSizeLimit: the monster-data resolution
+// path, the combatSummary fallback (accept + refuse), and the no-sizeLimit skip,
+// all for the 'large_or_smaller' limit. Full-string pins below are the validator's
+// own refusal composition. The choices lane (combatSuperiorityChoices.test.js) owns
+// the medium_or_smaller / one_size_larger arithmetic via the fallback path; the
+// executor-wrapper refusals live in executeAttackRider.mn015.test.js and
+// combatSuperiorityHandlerManeuver-modals.test.js — neither belongs in this suite.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { validateSizeLimit } from './executeManeuver.js';
 import * as damageUtils from '../../../../services/rules/combat/damageUtils.js';
@@ -74,9 +83,7 @@ describe('MN-015 validateSizeLimit — monster-data size resolution', () => {
         const result = await validateSizeLimit(PUSHING, 'Hill Giant 1', 'test-campaign', makePlayerStats());
 
         expect(result.valid).toBe(false);
-        expect(result.description).toContain('Huge');
-        expect(result.description).toContain('too large');
-        expect(result.description).toContain('Large or smaller');
+        expect(result.description).toBe('Pushing Attack: Target is Huge (too large — only Large or smaller affected).');
         expect(getMonsterData).toHaveBeenCalledWith('Hill Giant 1', null);
     });
 
@@ -100,19 +107,19 @@ describe('MN-015 validateSizeLimit — monster-data size resolution', () => {
         const result = await validateSizeLimit(PUSHING, 'Bob', 'test-campaign', makePlayerStats());
 
         expect(result.valid).toBe(false);
-        expect(result.description).toContain('Huge');
-        expect(result.description).toContain('Large or smaller');
+        expect(result.description).toBe('Pushing Attack: Target is Huge (too large — only Large or smaller affected).');
     });
 
-    it('accepts combatSummary target.size within the limit', async () => {
+    it('falls back to combatSummary target.size and accepts at the inclusive Large boundary', async () => {
         damageUtils.getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Ogre 1', type: 'npc', size: 'Large' }],
+            creatures: [{ name: 'Custom Ogre', type: 'npc', size: 'Large' }],
         });
-        getMonsterData.mockResolvedValue({ name: 'Ogre', size: 'Large' });
+        getMonsterData.mockResolvedValue(null);
 
-        const result = await validateSizeLimit(PUSHING, 'Ogre 1', 'test-campaign', makePlayerStats());
+        const result = await validateSizeLimit(PUSHING, 'Custom Ogre', 'test-campaign', makePlayerStats());
 
         expect(result.valid).toBe(true);
+        expect(getMonsterData).toHaveBeenCalledWith('Custom Ogre', null);
     });
 
     it('skips monster lookup entirely when the maneuver has no sizeLimit', async () => {

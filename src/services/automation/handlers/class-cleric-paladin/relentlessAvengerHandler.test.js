@@ -1,3 +1,14 @@
+// @maintained-by-ai: 2026-10-15
+// Unit lane for the Relentless Avenger handler (paladin Oath of Vengeance reaction).
+// Pins the full contract of handle(): the ability_use log entry (exact description,
+// with ' against <target>' suffix or bare when no target), the campaign targetEffects
+// append (exact new-effect shape, duration passthrough vs 'until_end_of_current_turn'
+// default, preserved ordering of stored effects), the target's activeConditions stamp of
+// 'speed_zero' and its already-applied guard (no second write when speed_zero is live),
+// and the automation_info popup payload for both branches.
+// The automationInfoBuilder display defaults and collector typing registrations for this
+// automation type are covered in their own suites (core-handlers.test.js,
+// automationCollector.types.test.js) — canonical there, not duplicated here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './relentlessAvengerHandler.js';
 
@@ -20,6 +31,16 @@ const { addEntry } = await import('../../../ui/logService.js');
 const { getCombatContext, getTargetFromAttacker } = await import('../../../rules/combat/damageUtils.js');
 
 const CAMPAIGN_NAME = 'test-campaign';
+const TARGET_NAME = 'Goblin';
+
+const SPEED_ZERO_EFFECT = {
+    target: TARGET_NAME,
+    source: 'Relentless Avenger',
+    option: 'Relentless Avenger',
+    effect: 'speed_zero',
+    value: null,
+    duration: 'until_end_of_current_turn',
+};
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -44,104 +65,106 @@ function makeAction(overrides = {}) {
     };
 }
 
+// getRuntimeValue router: serves the two reads this handler performs
+// (campaign targetEffects, target activeConditions) independently.
+function mockRuntime({ targetEffects = [], activeConditions = [] } = {}) {
+    getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'targetEffects') return targetEffects;
+        if (key === 'activeConditions') return activeConditions;
+        return null;
+    });
+}
+
+function targetEffectWrites() {
+    return setRuntimeValue.mock.calls.filter((c) => c[1] === 'targetEffects');
+}
+
+function conditionWrites() {
+    return setRuntimeValue.mock.calls.filter((c) => c[1] === 'activeConditions');
+}
+
 describe('relentlessAvengerHandler', () => {
     describe('no target', () => {
-        it('logs ability use and returns popup when no target is available', async () => {
+        it('logs ability use and returns info popup without writing any state', async () => {
             getCombatContext.mockResolvedValue(null);
 
             const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
 
-            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
+            expect(addEntry).toHaveBeenCalledTimes(1);
+            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, {
                 type: 'ability_use',
                 characterName: 'TestPaladin',
                 abilityName: 'Relentless Avenger',
-            }));
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Relentless Avenger');
-            expect(result.payload.automationType).toBe('relentless_avenger');
-            expect(result.payload.description).toContain('No target selected');
+                description: 'Relentless Avenger used',
+            });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Relentless Avenger',
+                    automationType: 'relentless_avenger',
+                    description: 'Relentless Avenger — <i>No target selected — effect noted for manual application.</i>',
+                    automation: makeAction().automation,
+                },
+            });
         });
     });
 
     describe('with target', () => {
-        it('logs ability use with target name', async () => {
+        beforeEach(() => {
             getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            getTargetFromAttacker.mockReturnValue({ name: TARGET_NAME });
+        });
 
-            await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
+        it('logs the log entry, appends speed_zero target effect, stamps condition, returns popup', async () => {
+            mockRuntime();
 
-            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
+            const action = makeAction();
+            const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null);
+
+            expect(addEntry).toHaveBeenCalledTimes(1);
+            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, {
                 type: 'ability_use',
                 characterName: 'TestPaladin',
                 abilityName: 'Relentless Avenger',
                 description: 'Relentless Avenger used against Goblin',
-            }));
+            });
+            expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+            expect(targetEffectWrites()).toEqual([
+                ['campaign', 'targetEffects', [SPEED_ZERO_EFFECT], CAMPAIGN_NAME],
+            ]);
+            expect(conditionWrites()).toEqual([
+                ['Goblin', 'activeConditions', ['speed_zero'], CAMPAIGN_NAME],
+            ]);
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Relentless Avenger',
+                    automationType: 'relentless_avenger',
+                    description: "Goblin's Speed is reduced to 0 until end of current turn. You may move up to half your Speed as part of this Reaction.",
+                    automation: action.automation,
+                },
+            });
         });
 
-        it('applies target effects and condition, then returns popup', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', conditions: [] }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            getRuntimeValue.mockReturnValue([]);
+        it('skips the activeConditions write when target already has speed_zero', async () => {
+            mockRuntime({ activeConditions: ['speed_zero'] });
 
             const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        target: 'Goblin',
-                        source: 'Relentless Avenger',
-                        option: 'Relentless Avenger',
-                        effect: 'speed_zero',
-                        value: null,
-                        duration: 'until_end_of_current_turn',
-                    }),
-                ]),
-                CAMPAIGN_NAME
+            expect(conditionWrites()).toEqual([]);
+            expect(targetEffectWrites()).toEqual([
+                ['campaign', 'targetEffects', [SPEED_ZERO_EFFECT], CAMPAIGN_NAME],
+            ]);
+            expect(result.payload.description).toBe(
+                "Goblin's Speed is reduced to 0 until end of current turn. You may move up to half your Speed as part of this Reaction."
             );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'activeConditions',
-                ['speed_zero'],
-                CAMPAIGN_NAME
-            );
-            expect(result.type).toBe('popup');
-            expect(result.payload.name).toBe('Relentless Avenger');
-            expect(result.payload.automationType).toBe('relentless_avenger');
-            expect(result.payload.description).toContain("Goblin's Speed is reduced to 0");
-            expect(result.payload.description).toContain('half your Speed');
-            expect(result.payload.automation).toEqual(makeAction().automation);
         });
 
-        it('skips activeConditions when creature already has speed_zero', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', conditions: [{ key: 'speed_zero' }] }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            getRuntimeValue.mockReturnValue(['speed_zero']);
-
-            const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
-
-            const targetEffectCalls = setRuntimeValue.mock.calls.filter(
-                (c) => c[1] === 'targetEffects'
-            );
-            const conditionCalls = setRuntimeValue.mock.calls.filter(
-                (c) => c[1] === 'activeConditions'
-            );
-            expect(targetEffectCalls.length).toBe(1);
-            expect(conditionCalls.length).toBe(0);
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain("Goblin's Speed is reduced to 0");
-        });
-
-        it('uses custom duration when provided', async () => {
-            getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            getRuntimeValue.mockReturnValue([]);
+        it('passes a custom duration through to the stored effect', async () => {
+            mockRuntime();
 
             await handle(
                 makeAction({ automation: { duration: '1_round' } }),
@@ -150,34 +173,20 @@ describe('relentlessAvengerHandler', () => {
                 null
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({ duration: '1_round' }),
-                ]),
-                CAMPAIGN_NAME
-            );
+            expect(targetEffectWrites()).toEqual([
+                ['campaign', 'targetEffects', [{ ...SPEED_ZERO_EFFECT, duration: '1_round' }], CAMPAIGN_NAME],
+            ]);
         });
 
-        it('appends to existing target effects', async () => {
-            getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            getRuntimeValue.mockReturnValue([
-                { target: 'PreviousTarget', effect: 'blinded' },
-            ]);
+        it('appends the new effect after existing stored target effects', async () => {
+            const previous = { target: 'PreviousTarget', effect: 'blinded' };
+            mockRuntime({ targetEffects: [previous] });
 
             await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({ target: 'PreviousTarget', effect: 'blinded' }),
-                    expect.objectContaining({ target: 'Goblin', effect: 'speed_zero' }),
-                ]),
-                CAMPAIGN_NAME
-            );
+            expect(targetEffectWrites()).toEqual([
+                ['campaign', 'targetEffects', [previous, SPEED_ZERO_EFFECT], CAMPAIGN_NAME],
+            ]);
         });
     });
 });

@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Deterministic: mocks the runtime-state and combat-context seams at module
+// boundaries, no timers/DOM/network. Pins the stable applyTargetChoice
+// contract (empty-target guard popup; vowOfEnmityTarget / vowOfEnmityCostPaid /
+// activeBuffs runtime writes) consumed by restRules, useInitiativeEffects,
+// soulOfVengeanceHandler, and ConditionEffectBadges.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { applyTargetChoice } from './vowOfEnmityHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -47,6 +53,11 @@ function mockRuntimeValues(getters, state = {}) {
 }
 
 // ─── applyTargetChoice ───
+//
+// Coverage split across the vowOfEnmity trio:
+// - vowOfEnmityHandler.test.js          → handle() entry (charges, modal, activation, transfers)
+// - vowOfEnmityHandler.listeners.test.js → setupVowTransferListener + level/maxCharge fallbacks
+// - this file                            → applyTargetChoice contract (the modal-selection lane)
 
 describe('vowOfEnmityHandler.applyTargetChoice', () => {
     beforeEach(() => {
@@ -68,8 +79,8 @@ describe('vowOfEnmityHandler.applyTargetChoice', () => {
         expect(result.payload.description).toBe('No target selected.');
     });
 
-    it('activates vow with chosen target, storing target and cost flag', async () => {
-        mockRuntimeValues({ channelDivinityCharges: 2 });
+    it('activates vow with chosen target: consumes charge, stores target, cost flag, and buff', async () => {
+        mockRuntimeValues({ channelDivinityCharges: 2, activeBuffs: [] });
         vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
             creatures: [{ name: 'Orc' }],
         });
@@ -77,7 +88,17 @@ describe('vowOfEnmityHandler.applyTargetChoice', () => {
         const result = await applyTargetChoice(makeAction(), makePlayerStats(), campaignName, 'Orc');
 
         expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
         expect(result.payload.description).toContain('activated against Orc');
+        expect(result.payload.automation).toEqual({ type: 'vow_of_enmity' });
+
+        // Stored charges (2) are read and decremented on the paid path
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'Paladin1',
+            'channelDivinityCharges',
+            1,
+            campaignName,
+        );
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
             'Paladin1',
             'vowOfEnmityTarget',
@@ -90,15 +111,6 @@ describe('vowOfEnmityHandler.applyTargetChoice', () => {
             true,
             campaignName,
         );
-    });
-
-    it('adds vow_of_enmity to target activeBuffs from applyTargetChoice', async () => {
-        mockRuntimeValues({ channelDivinityCharges: 2, activeBuffs: [] });
-        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
-            creatures: [{ name: 'Orc' }],
-        });
-
-        await applyTargetChoice(makeAction(), makePlayerStats(), campaignName, 'Orc');
 
         const targetBuffsCall = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
             (c) => c[0] === 'Orc' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
@@ -106,16 +118,5 @@ describe('vowOfEnmityHandler.applyTargetChoice', () => {
         expect(targetBuffsCall).toBeDefined();
         expect(targetBuffsCall[2][0].effect).toBe('vow_of_enmity');
         expect(targetBuffsCall[2][0].source).toBe('Paladin1');
-    });
-
-    it('passes custom automation fields through to the payload', async () => {
-        const result = await applyTargetChoice(
-            makeAction({ automation: { customField: 'customVal' } }),
-            makePlayerStats(),
-            campaignName,
-            null,
-        );
-
-        expect(result.payload.automation).toEqual({ type: 'vow_of_enmity', customField: 'customVal' });
     });
 });

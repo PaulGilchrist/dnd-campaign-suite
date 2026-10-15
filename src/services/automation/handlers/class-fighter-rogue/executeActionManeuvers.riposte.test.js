@@ -1,4 +1,7 @@
+// @maintained-by-ai
 // MN-017: Riposte trigger gates — gated arm-then-row (CLA-297/CLA-310 house standard)
+// Canonical riposte executor suite: gates, latches, economy, no-side-effect refusals.
+// Popup copy is canonically pinned in combatSuperiorityUtils.test.js — assert fragments here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeReactionManeuver } from './executeActionManeuvers.js';
 import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -220,13 +223,13 @@ describe('executeReactionManeuver — MN-017 Riposte gates', () => {
         expect(setRuntimeBatch).toHaveBeenCalledWith('EvasiveFighter', expect.objectContaining({ _Riposte_usedRound: 2 }), 'test-campaign');
     });
 
-    it('pool-0 gate keeps the exact verified popup and consults no trigger data', async () => {
+    it('pool-0 gate popups before any trigger data is consulted: no findLastAttack, no spend', async () => {
         mockKeys({ superiorityDice: 0 });
 
         const result = await executeReactionManeuver({ name: 'Riposte' }, makePlayerStats(), 'test-campaign', 'Riposte');
 
         expect(result.type).toBe('popup');
-        expect(result.payload.description).toBe('Riposte: No Superiority Dice remaining. Recharges on a Short or Long Rest.');
+        expect(result.payload.description).toContain('No Superiority Dice remaining');
         expect(findLastAttack).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
     });

@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Know Your Enemy (CLA-286): popup composition, superiority-dice accounting
+// (knowEnemy owns uses_max reading on the maneuver-attack lane), round-keyed
+// relentless latch, and target→IRV display glue. IRV schema resolution itself
+// is covered canonically in monsterIrvUtils.test.js — only the display glue
+// is tested here. Popup strings use toContain tolerance; full-string pins for
+// the shared no-dice warning live in combatSuperiorityUtils.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './knowEnemyHandler.js';
 
@@ -64,6 +71,16 @@ function makeAction(overrides = {}) {
     };
 }
 
+function makePlayerWithRelentless() {
+    return makePlayerStats({
+        automation: {
+            passives: [
+                { type: 'passive_rule', effect: 'relentless' },
+            ],
+        },
+    });
+}
+
 describe('knowEnemyHandler', () => {
     describe('superiority dice checks', () => {
         it('returns error popup when no superiority dice remaining', async () => {
@@ -74,9 +91,7 @@ describe('knowEnemyHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Know Enemy');
-            expect(result.payload.description).toBe(
-                'Know Enemy: No Superiority Dice remaining. Recharges on a Short or Long Rest.'
-            );
+            expect(result.payload.description).toContain('No Superiority Dice remaining');
             expect(result.payload.automation).toEqual(makeAction().automation);
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(addEntry).not.toHaveBeenCalled();
@@ -104,7 +119,7 @@ describe('knowEnemyHandler', () => {
             }));
         });
 
-        it('uses defaultMax or custom uses_max from action when stored value is null', async () => {
+        it('uses uses_max from action when stored value is null', async () => {
             getRuntimeValue.mockReturnValue(null);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
@@ -136,10 +151,30 @@ describe('knowEnemyHandler', () => {
                 'test-campaign'
             );
         });
+
+        it('defaults uses_max to 4 and range to 30 ft when automation omits them', async () => {
+            getRuntimeValue.mockReturnValue(null);
+            getCombatContext.mockResolvedValue(null);
+
+            const result = await handle(
+                { name: 'Know Enemy', automation: { type: 'know_enemy' } },
+                makePlayerStats(),
+                'test-campaign',
+                null
+            );
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter',
+                'superiorityDice',
+                3,
+                'test-campaign'
+            );
+            expect(result.payload.description).toContain('Range: 30 ft');
+        });
     });
 
-    describe('target lookup', () => {
-        it('looks up monster data for combat target and includes immunities/resistances/vulnerabilities/condition immunities (2024 damage_* schema)', async () => {
+    describe('target lookup and IRV display glue', () => {
+        it('looks up monster data for combat target and renders IRV lines (2024 damage_* schema)', async () => {
             getRuntimeValue.mockReturnValue(3);
             getCombatContext.mockResolvedValue({});
             getTargetFromAttacker.mockReturnValue({ name: 'Adult Blue Dracolich' });
@@ -169,61 +204,6 @@ describe('knowEnemyHandler', () => {
             }));
         });
 
-        it('reveals IRV for legacy-schema monsters storing immunities/resistances/vulnerabilities (CLA-207 Shadow shape)', async () => {
-            getRuntimeValue.mockReturnValue(3);
-            getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue({ name: 'Shadow 1' });
-            // Real monsters.json "Shadow" entry — no damage_* keys at all;
-            // conditions and damage types are mixed inside `immunities`.
-            getMonsterData.mockResolvedValue({
-                name: 'Shadow',
-                immunities: ['Necrotic', 'Poison', 'Exhaustion', 'Frightened', 'Grappled',
-                    'Paralyzed', 'Petrified', 'Poisoned', 'Prone', 'Restrained', 'Unconscious'],
-                resistances: ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'],
-                vulnerabilities: ['Radiant'],
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', 'test-map');
-
-            expect(result.payload.description).toContain('Target: Shadow 1');
-            expect(result.payload.description).toContain('Immunities: Necrotic, Poison');
-            expect(result.payload.description).toContain('Resistances: Acid, Cold, Fire, Lightning, Thunder');
-            expect(result.payload.description).toContain('Vulnerabilities: Radiant');
-            expect(result.payload.description).toContain('Condition Immunities: Exhaustion, Frightened, Grappled, Paralyzed, Petrified, Poisoned, Prone, Restrained, Unconscious');
-            expect(result.payload.description).not.toContain('No immunities, resistances, vulnerabilities, or condition immunities.');
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'ability_use',
-                characterName: 'TestFighter',
-                abilityName: 'Know Enemy',
-                description: expect.stringContaining('Immunities: Necrotic, Poison'),
-            }));
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                description: expect.stringContaining('Vulnerabilities: Radiant'),
-            }));
-        });
-
-        it('falls back to legacy immunities when damage_immunities key exists but is empty', async () => {
-            getRuntimeValue.mockReturnValue(3);
-            getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue({ name: 'Draconic Spirit' });
-            // Real monsters.json "Draconic Spirit" — damage_* keys present but empty,
-            // legacy immunities populated with condition names.
-            getMonsterData.mockResolvedValue({
-                name: 'Draconic Spirit',
-                damage_immunities: [],
-                damage_resistances: ['acid', 'cold', 'fire', 'lightning', 'poison'],
-                damage_vulnerabilities: [],
-                condition_immunities: [],
-                immunities: ['charmed', 'frightened', 'poisoned'],
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', 'test-map');
-
-            expect(result.payload.description).toContain('Resistances: acid, cold, fire, lightning, poison');
-            expect(result.payload.description).toContain('Condition Immunities: charmed, frightened, poisoned');
-            expect(result.payload.description).not.toContain('No immunities, resistances, vulnerabilities, or condition immunities.');
-        });
-
         it('handles target not in combat', async () => {
             getRuntimeValue.mockReturnValue(3);
             getCombatContext.mockResolvedValue(null);
@@ -240,7 +220,18 @@ describe('knowEnemyHandler', () => {
             );
         });
 
-        it('handles monster data lookup failure', async () => {
+        it('handles combat context existing but no target found', async () => {
+            getRuntimeValue.mockReturnValue(3);
+            getCombatContext.mockResolvedValue({});
+            getTargetFromAttacker.mockReturnValue(null);
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            expect(result.payload.description).toContain('Target: None (not in combat)');
+            expect(result.payload.description).toContain('No monster data found for target');
+        });
+
+        it('handles monster data lookup returning null', async () => {
             getRuntimeValue.mockReturnValue(3);
             getCombatContext.mockResolvedValue({});
             getTargetFromAttacker.mockReturnValue({ name: 'PlayerCharacter' });
@@ -252,7 +243,7 @@ describe('knowEnemyHandler', () => {
             expect(result.payload.description).toContain('player character');
         });
 
-        it('handles monster with no immunities/resistances/vulnerabilities/condition immunities', async () => {
+        it('handles monster with no IRV data', async () => {
             getRuntimeValue.mockReturnValue(3);
             getCombatContext.mockResolvedValue({});
             getTargetFromAttacker.mockReturnValue({ name: 'Human' });
@@ -273,7 +264,7 @@ describe('knowEnemyHandler', () => {
 
         it('handles combat context error and still expends dice', async () => {
             getRuntimeValue.mockReturnValue(3);
-            getCombatContext.mockRejectedValue(new Error('fail'));
+            getCombatContext.mockRejectedValueOnce(new Error('fail'));
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -287,11 +278,11 @@ describe('knowEnemyHandler', () => {
             );
         });
 
-        it('handles monster data lookup error', async () => {
+        it('handles monster data lookup rejection', async () => {
             getRuntimeValue.mockReturnValue(3);
             getCombatContext.mockResolvedValue({});
             getTargetFromAttacker.mockReturnValue({ name: 'MysteryCreature' });
-            getMonsterData.mockRejectedValue(new Error('not found'));
+            getMonsterData.mockRejectedValueOnce(new Error('not found'));
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', 'test-map');
 
@@ -299,10 +290,8 @@ describe('knowEnemyHandler', () => {
             expect(result.payload.description).toContain('No monster data found for target');
             expect(result.payload.description).toContain('player character');
         });
-    });
 
-    describe('result format', () => {
-        it('uses custom range when provided, defaults to 30 ft otherwise', async () => {
+        it('uses custom range when provided', async () => {
             getRuntimeValue.mockReturnValue(3);
             getCombatContext.mockResolvedValue(null);
 
@@ -316,10 +305,33 @@ describe('knowEnemyHandler', () => {
             expect(result.payload.description).toContain('Range: 60 ft');
         });
 
+        it('handles playerStats without automation property', async () => {
+            getRuntimeValue.mockReturnValue(3);
+            getCombatContext.mockResolvedValue(null);
+
+            const result = await handle(makeAction(), { name: 'TestFighter' }, 'test-campaign', null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Expend 1 Superiority Die');
+        });
+    });
+
+    describe('edge cases', () => {
         it('throws when automation is null', async () => {
             await expect(
                 handle({ name: 'Know Enemy', automation: null }, makePlayerStats(), 'test-campaign', null)
             ).rejects.toThrow();
+        });
+
+        it('handles addEntry rejection gracefully', async () => {
+            getRuntimeValue.mockReturnValue(3);
+            getCombatContext.mockResolvedValue(null);
+            addEntry.mockRejectedValueOnce(new Error('log failed'));
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.name).toBe('Know Enemy');
         });
     });
 
@@ -329,15 +341,7 @@ describe('knowEnemyHandler', () => {
                 .mockReturnValueOnce(1)
                 .mockReturnValueOnce(null);
 
-            const playerWithRelentless = makePlayerStats({
-                automation: {
-                    passives: [
-                        { type: 'passive_rule', effect: 'relentless' },
-                    ],
-                },
-            });
-
-            const result = await handle(makeAction(), playerWithRelentless, 'test-campaign', null);
+            const result = await handle(makeAction(), makePlayerWithRelentless(), 'test-campaign', null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Expend 1 Superiority Die');
@@ -356,26 +360,20 @@ describe('knowEnemyHandler', () => {
             );
         });
 
-        it('detects relentless passive when present in automation.passives', async () => {
+        it('detects relentless passive when latch is empty and arms the latch', async () => {
             getRuntimeValue
-                .mockReturnValueOnce(0)
-                .mockReturnValueOnce(null);
+                .mockReturnValueOnce(0)   // superiorityDice
+                .mockReturnValueOnce(null); // relentlessUsedRound — never used
             getCurrentCombatRound.mockReturnValue(3);
+            evaluateAutoExpression.mockReturnValue(4);
+            rollExpression.mockReturnValue({ total: 4, rolls: [4] });
             getCombatContext.mockResolvedValue(null);
 
-            const playerWithRelentless = makePlayerStats({
-                automation: {
-                    passives: [
-                        { type: 'passive_rule', effect: 'relentless' },
-                    ],
-                },
-            });
-
-            const result = await handle(makeAction(), playerWithRelentless, 'test-campaign', null);
+            const result = await handle(makeAction(), makePlayerWithRelentless(), 'test-campaign', null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Expend 1 Superiority Die');
-            expect(result.payload.description).toContain('Rolled d');
+            expect(result.payload.description).toContain('Rolled d4 for 4');
             expect(result.payload.description).toContain('(Relentless)');
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestFighter',
@@ -393,49 +391,46 @@ describe('knowEnemyHandler', () => {
 
         it('does not allow relentless more than once per round', async () => {
             getRuntimeValue
-                .mockReturnValueOnce(0)
-                .mockReturnValueOnce(3);
+                .mockReturnValueOnce(0)  // superiorityDice
+                .mockReturnValueOnce(3); // relentlessUsedRound — already spent this round
             getCurrentCombatRound.mockReturnValue(3);
-            getCombatContext.mockResolvedValue(null);
 
-            const playerWithRelentless = makePlayerStats({
-                automation: {
-                    passives: [
-                        { type: 'passive_rule', effect: 'relentless' },
-                    ],
-                },
-            });
-
-            const result = await handle(makeAction(), playerWithRelentless, 'test-campaign', null);
+            const result = await handle(makeAction(), makePlayerWithRelentless(), 'test-campaign', null);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe(
-                'Know Enemy: No Superiority Dice remaining. Recharges on a Short or Long Rest.'
-            );
+            expect(result.payload.description).toContain('No Superiority Dice remaining');
+            expect(result.payload.description).not.toContain('Relentless');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(rollExpression).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('allows relentless in a new round', async () => {
+        it('allows relentless in a new round and re-arms at the new round', async () => {
             getRuntimeValue
-                .mockReturnValueOnce(0)
-                .mockReturnValueOnce(null);
+                .mockReturnValueOnce(0)  // superiorityDice
+                .mockReturnValueOnce(2); // relentlessUsedRound — latched last round
             getCurrentCombatRound.mockReturnValue(5);
             evaluateAutoExpression.mockReturnValue(4);
-            rollExpression.mockReturnValue({ total: 3, rolls: [3] });
+            rollExpression.mockReturnValue({ total: 4, rolls: [4] });
             getCombatContext.mockResolvedValue(null);
 
-            const playerWithRelentless = makePlayerStats({
-                automation: {
-                    passives: [
-                        { type: 'passive_rule', effect: 'relentless' },
-                    ],
-                },
-            });
-
-            const result = await handle(makeAction(), playerWithRelentless, 'test-campaign', null);
+            const result = await handle(makeAction(), makePlayerWithRelentless(), 'test-campaign', null);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Rolled d');
+            expect(result.payload.description).toContain('Rolled d4 for 4');
             expect(result.payload.description).toContain('(Relentless)');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter',
+                'relentlessUsedRound',
+                5,
+                'test-campaign'
+            );
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'TestFighter',
+                'superiorityDice',
+                expect.any(Number),
+                'test-campaign'
+            );
         });
 
         it('uses dieExpression from action when available for relentless', async () => {
@@ -447,17 +442,9 @@ describe('knowEnemyHandler', () => {
             rollExpression.mockReturnValue({ total: 3, rolls: [3] });
             getCombatContext.mockResolvedValue(null);
 
-            const playerWithRelentless = makePlayerStats({
-                automation: {
-                    passives: [
-                        { type: 'passive_rule', effect: 'relentless' },
-                    ],
-                },
-            });
-
             const result = await handle(
                 makeAction({ automation: { dieExpression: '1d4' } }),
-                playerWithRelentless,
+                makePlayerWithRelentless(),
                 'test-campaign',
                 null
             );
@@ -476,15 +463,7 @@ describe('knowEnemyHandler', () => {
             rollExpression.mockReturnValue({ total: 2, rolls: [2] });
             getCombatContext.mockResolvedValue(null);
 
-            const playerWithRelentless = makePlayerStats({
-                automation: {
-                    passives: [
-                        { type: 'passive_rule', effect: 'relentless' },
-                    ],
-                },
-            });
-
-            const result = await handle(makeAction(), playerWithRelentless, 'test-campaign', null);
+            const result = await handle(makeAction(), makePlayerWithRelentless(), 'test-campaign', null);
 
             expect(evaluateAutoExpression).toHaveBeenCalledWith('superiority_die', expect.any(Object));
             expect(rollExpression).toHaveBeenCalledWith('1d4');
@@ -500,53 +479,9 @@ describe('knowEnemyHandler', () => {
             rollExpression.mockReturnValue(null);
             getCombatContext.mockResolvedValue(null);
 
-            const playerWithRelentless = makePlayerStats({
-                automation: {
-                    passives: [
-                        { type: 'passive_rule', effect: 'relentless' },
-                    ],
-                },
-            });
-
-            const result = await handle(makeAction(), playerWithRelentless, 'test-campaign', null);
+            const result = await handle(makeAction(), makePlayerWithRelentless(), 'test-campaign', null);
 
             expect(result.payload.description).toContain('Rolled d4 for 4');
-        });
-    });
-
-    describe('logging', () => {
-        it('handles addEntry rejection gracefully', async () => {
-            getRuntimeValue.mockReturnValue(3);
-            getCombatContext.mockResolvedValue(null);
-            addEntry.mockReturnValue(Promise.reject(new Error('log failed')));
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.name).toBe('Know Enemy');
-        });
-    });
-
-    describe('combat context edge cases', () => {
-        it('handles combat context existing but no target found', async () => {
-            getRuntimeValue.mockReturnValue(3);
-            getCombatContext.mockResolvedValue({});
-            getTargetFromAttacker.mockReturnValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.description).toContain('Target: None (not in combat)');
-            expect(result.payload.description).toContain('No monster data found for target');
-        });
-
-        it('handles playerStats without automation property', async () => {
-            getRuntimeValue.mockReturnValue(3);
-            getCombatContext.mockResolvedValue(null);
-
-            const result = await handle(makeAction(), { name: 'TestFighter' }, 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Expend 1 Superiority Die');
         });
     });
 });

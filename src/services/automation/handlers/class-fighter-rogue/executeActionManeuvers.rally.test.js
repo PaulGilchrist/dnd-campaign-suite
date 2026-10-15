@@ -1,3 +1,14 @@
+// @maintained-by-ai: 2026-10-15
+// MN-016 Rally lane for executeActionManeuvers.js ONLY — the executeBonusActionManeuver
+// temp_hp path: gateRallyAllies refusal (popup + refusal log, zero roll/spend/stamp),
+// buildRallyModal payload (allyOptions, extraHp via extraHpExpression, totalHp), the
+// rallyChoice envelope, die expend, and Relentless free-roll wiring through this executor.
+// Source-dup flags (continuation only, NOT fixed here): buildRallyModal/gateRallyAllies
+// twins live in executeManeuver.js — pinned by combatSuperiorityHandlerManeuver-modals;
+// the confirm side (executeRallyChoice) is owned by combatSuperiorityChoices — no
+// confirm-side coverage here by design. Relentless latch internals are canonical in
+// combatSuperiorityUtils.test.js — this lane pins the caller-side wiring only.
+// Deterministic: mock runtime router, fixed rollExpression returns, turn-based rounds.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeBonusActionManeuver } from './executeActionManeuvers.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -76,16 +87,12 @@ describe('executeBonusActionManeuver — MN-016 Rally', () => {
         expect(rollExpression).toHaveBeenCalledWith('1d12');
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'superiorityDice', 5, 'test-campaign');
         expect(result.logEntries).toHaveLength(1);
-        expect(result.logEntries[0].description).toContain('Choose an ally to gain temporary hit points.');
+        expect(result.logEntries[0].description).toBe('Rally: Choose an ally to gain temporary hit points.');
+        expect(result.payload.description).toBe('<b>Rally</b> (Bonus Action)<br/>Rolled d12 for 7.');
         expect(addEntry).not.toHaveBeenCalled();
     });
 
     it('rolls a free Relentless d8 without expending a die and still returns the picker', async () => {
-        getRuntimeValue.mockImplementation((_name, key) => {
-            if (key === 'superiorityDice') return 6;
-            if (key === 'relentlessUsedRound') return null;
-            return null;
-        });
         rollExpression.mockReturnValue({ total: 5 });
         const playerStats = makePlayerStats([{ type: 'passive_rule', effect: 'relentless' }]);
         const result = await executeBonusActionManeuver({ name: 'Rally' }, playerStats, 'test-campaign', 'Rally');
@@ -93,6 +100,8 @@ describe('executeBonusActionManeuver — MN-016 Rally', () => {
         expect(result.type).toBe('modal');
         expect(result.modalName).toBe('rallyChoice');
         expect(rollExpression).toHaveBeenCalledWith('1d8');
+        expect(result.payload.dieValue).toBe(5);
+        expect(result.payload.description).toBe('<b>Rally</b> (Bonus Action)<br/>Rolled d8 for 5 (Relentless).');
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'relentlessUsedRound', 1, 'test-campaign');
         expect(setRuntimeValue).not.toHaveBeenCalledWith('EvasiveFighter', 'superiorityDice', 5, 'test-campaign');
     });
@@ -100,19 +109,16 @@ describe('executeBonusActionManeuver — MN-016 Rally', () => {
     it('with no allies: no roll, no die spend, no Relentless latch — popup + refusal log entry only', async () => {
         const damageUtils = await import('../../../rules/combat/damageUtils.js');
         damageUtils.getCombatContext.mockResolvedValueOnce({ creatures: [{ name: 'EvasiveFighter' }] });
-        getRuntimeValue.mockImplementation((_name, key) => {
-            if (key === 'superiorityDice') return 6;
-            if (key === 'relentlessUsedRound') return null;
-            return null;
-        });
         const playerStats = makePlayerStats([{ type: 'passive_rule', effect: 'relentless' }]);
         const result = await executeBonusActionManeuver({ name: 'Rally' }, playerStats, 'test-campaign', 'Rally');
 
         expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('No allies available to receive Rally');
+        expect(result.payload).toMatchObject({ type: 'automation_info', name: 'Rally' });
+        expect(result.payload.description).toBe('Rally: No allies available to receive Rally.');
         expect(rollExpression).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();
-        expect(result.logEntries[0].description).toContain('No allies available to receive Rally');
+        expect(result.logEntries).toHaveLength(1);
+        expect(result.logEntries[0].description).toBe('Rally: No allies available to receive Rally.');
     });
 });

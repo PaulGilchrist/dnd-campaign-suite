@@ -1,13 +1,32 @@
-// MN-020: Trip Attack save DC must resolve at prompt time (8 + STR + PB = 17 for
-// a STR +3 PB +6 host), never the build-time baked DC 14 / DC 10 fallback, and the
-// rider ability_use log must carry the save outcome + prone text.
+// @maintained-by-ai: 2026-10-15
+// MN-020 downstream DC lane for executeAttackRiderManeuver: the Trip Attack save
+// must resolve at prompt time via the REAL buildSaveDc (8 + STR + PB = 17 for a
+// STR +3 PB +6 host), never the build-time baked DC 14 / DC 10 fallback, and the
+// rider ability_use log must carry the save outcome + prone text on BOTH branches.
+//
+// Ownership (this file = sole prompt-time DC-17 + MN-020 log owner):
+//   - Token-passthrough rebuild of the rider action ('ability' / 'STR','DEX'
+//     tokens) lives in combatSuperiorityQueries.mn020.test.js; the info builder's
+//     own "never bakes a number" contract (incl. its buildSaveDc→17 cross-check)
+//     in automationInfoBuilder/combatSuperiority.test.js; the size-gate refusal +
+//     DC-16 STR+2 discrimination in executeAttackRider.mn015.test.js; die roll +
+//     expend and the per-effect payload-description branches in
+//     combatSuperiorityAttackRider.test.js; canonical popup strings in
+//     combatSuperiorityUtils.test.js.
+//
+// Trim notes (2026-10-15): removed the info-builder 'ability'-token test and the
+// isolated buildSaveDc-unit test — both byte-equivalent in coverage to
+// automationInfoBuilder/combatSuperiority.test.js (its MN-020 tests) and the
+// latter also to this file's end-to-end DC-17 offer test, which runs the real
+// buildSaveDc through the handler. Dropped the expend assertion (4→3) from the
+// offer test: the expend contract is pinned verbatim in
+// combatSuperiorityAttackRider.test.js and executeAttackRider.mn015.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeAttackRiderManeuver } from './combatSuperiorityHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { buildSaveDc, createSaveListener } from '../../../../services/automation/common/savePrompt.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { createSaveListener } from '../../../../services/automation/common/savePrompt.js';
 import * as damageUtils from '../../../../services/rules/combat/damageUtils.js';
 import { resolveTarget } from '../../../../services/automation/common/targetResolver.js';
-import { combatSuperiorityHandlers } from '../../../combat/automation/automationInfoBuilder/combatSuperiority.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -76,6 +95,7 @@ vi.mock('../../../../services/automation/common/savePrompt.js', async (importOri
 }));
 
 // STR +3, PB +6 host (EvasiveFighter lv18) — computed abilities WITH `.bonus`.
+// The baked-build DC-14 / fallback DC-10 failure modes are dead against DC 17.
 const makePlayerStats = (overrides = {}) => ({
     name: 'EvasiveFighter',
     proficiency: 6,
@@ -95,7 +115,7 @@ const RIDER_ACTION = {
     automation: { type: 'combat_superiority', saveDc: 'ability', saveAbility: ['STR', 'DEX'] },
 };
 
-describe('MN-020 Trip Attack — token passthrough, DC 17, full log', () => {
+describe('MN-020 Trip Attack — prompt-time DC 17 + full log', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getRuntimeValue.mockImplementation((_name, key) => {
@@ -106,18 +126,6 @@ describe('MN-020 Trip Attack — token passthrough, DC 17, full log', () => {
         damageUtils.getCombatContext.mockResolvedValue({
             creatures: [{ name: 'Knight 1', type: 'npc', monsterType: 'Humanoid', size: 'Medium' }],
         });
-    });
-
-    it('info builder emits the "ability" token, never a baked number', () => {
-        const result = combatSuperiorityHandlers.combat_superiority(
-            { name: 'Combat Superiority', automation: { type: 'combat_superiority', saveDc: 'ability', saveAbility: ['STR', 'DEX'] } },
-            { level: 18, proficiency: 6, abilities: [{ name: 'Strength' }, { name: 'Dexterity' }] }
-        );
-        expect(result.saveDc).toBe('ability');
-    });
-
-    it('buildSaveDc resolves DC 17 for the STR +3 PB +6 host', () => {
-        expect(buildSaveDc(RIDER_ACTION.automation, makePlayerStats())).toBe(17);
     });
 
     it('offers the STR save at DC 17 (not 14)', async () => {
@@ -136,7 +144,6 @@ describe('MN-020 Trip Attack — token passthrough, DC 17, full log', () => {
             saveType: 'STR',
             saveDc: 17,
         }));
-        expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'superiorityDice', 3, 'test-campaign');
     });
 
     it('rider ability_use log carries the save outcome AND the prone text', async () => {

@@ -1,6 +1,18 @@
+// @maintained-by-ai: 2026-10-15
+// executeAttackRider.js lane — executeAttackRiderManeuver() direct contracts:
+// guard short-circuits (not-found / no-dice), die roll + expend, each save-outcome
+// effect branch (prone / push / goad / frightened / disarm / distracting /
+// ally_movement), the Brutal Strike attack_rider-options branch, the Sweeping
+// Attack chooser (modal + no-candidates popup), and the null-combatSummary guard.
+// Deliberately NOT duplicated here: the size gate (executeAttackRider.mn015 +
+// validateSizeLimit.mn015), save-DC resolution and the MN-020 success-branch log
+// (executeAttackRider.mn020), the Maneuvering grant internals
+// (executeAttackRider.maneuveringGrant), and the executeManeuver router's own
+// effect implementations (combatSuperiorityHandlerManeuver-attack).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeAttackRiderManeuver } from './combatSuperiorityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -9,7 +21,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../../services/ui/dataLoader.js', () => ({
     loadManeuvers: vi.fn(async (_rules) => [
-        { name: 'Trip Attack', effect: 'prone', trigger: 'weapon_attack_hit', saveType: 'STR', damageBonus: true, actionType: 'attack_rider' },
+        { name: 'Trip Attack', effect: 'prone', trigger: 'weapon_attack_hit', saveType: 'STR', conditionInflicted: 'Prone', damageBonus: true, actionType: 'attack_rider' },
         { name: 'Pushing Attack', effect: 'push', trigger: 'weapon_attack_hit', saveType: 'STR', value: 15, damageBonus: true, actionType: 'attack_rider' },
         { name: 'Goading Attack', effect: 'goad', trigger: 'weapon_attack_hit', saveType: 'WIS', damageBonus: true, actionType: 'attack_rider' },
         { name: 'Disarming Attack', effect: 'disarm', trigger: 'weapon_attack_hit', saveType: 'STR', damageBonus: true, actionType: 'attack_rider' },
@@ -18,6 +30,11 @@ vi.mock('../../../../services/ui/dataLoader.js', () => ({
         { name: 'Maneuvering Attack', effect: 'ally_movement', trigger: 'weapon_attack_hit', damageBonus: true, actionType: 'attack_rider' },
         { name: 'Precision Attack', effect: 'attack_roll_bonus', trigger: 'attack_roll_miss', actionType: 'attack_rider' },
         { name: 'Sweeping Attack', effect: 'secondary_damage', trigger: 'melee_weapon_attack_hit', damageBonus: false, actionType: 'attack_rider' },
+        // MN-015 real-data shape carries sizeLimit ("large_or_smaller") — omitted here
+        // so these lane's Trip/Push tests never hit the size gate (getMonsterData is
+        // unmocked); the gate itself is pinned in executeAttackRider.mn015 /
+        // validateSizeLimit.mn015.
+        { name: 'Brutal Strike', effect: 'secondary_damage', trigger: 'strength_attack_hit_after_reckless', damageBonus: true, actionType: 'attack_rider', automation: { type: 'attack_rider', damageType: 'same_as_weapon', options: [{ name: 'Forceful Blow', effect: 'push_15ft' }] } },
         { name: 'Evasive Footwork', effect: 'ac_bonus_disengage', actionType: 'bonus_action' },
         { name: 'Feinting Attack', effect: 'advantage_and_damage', actionType: 'bonus_action' },
         { name: 'Lunging Attack', effect: 'dash_and_damage', actionType: 'bonus_action' },
@@ -115,11 +132,28 @@ const makePlayerStats = (overrides = {}) => ({
     ...overrides,
 });
 
+const withDice = (selection, extra = {}) =>
+    (_playerName, key, _campaignName) => {
+        if (key === 'superiorityDice') return extra.superiorityDice ?? 4;
+        if (key === SELECTION_KEY) return [selection];
+        if (key === 'targetEffects' || key === 'activeConditions') return [];
+        return extra[key];
+    };
+
+// clearAllMocks does not restore mockResolvedValue implementations, so tests
+// that mutate getCombatContext (null combatSummary, sweeping candidates) would
+// leak into later tests — re-arm the default combat context before every test.
+const resetCombatContext = async () => {
+    const damageUtils = await import('../../../../services/rules/combat/damageUtils.js');
+    damageUtils.getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
+};
+
 // ── executeAttackRiderManeuver ─────────────────────────────────────────
 
 describe('executeAttackRiderManeuver', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.clearAllMocks();
+        await resetCombatContext();
     });
 
     it('returns error popup when maneuver not found', async () => {
@@ -137,11 +171,7 @@ describe('executeAttackRiderManeuver', () => {
     });
 
     it('returns error popup when no dice and no relentless', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 0;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            return undefined;
-        });
+        getRuntimeValue.mockImplementation(withDice('Trip Attack', { superiorityDice: 0 }));
 
         const result = await executeAttackRiderManeuver(
             { name: 'Test', automation: { type: 'combat_superiority' } },
@@ -156,11 +186,7 @@ describe('executeAttackRiderManeuver', () => {
     });
 
     it('rolls die, deducts superiority die, and returns popup with description', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            return undefined;
-        });
+        getRuntimeValue.mockImplementation(withDice('Trip Attack'));
 
         const result = await executeAttackRiderManeuver(
             { name: 'Test', automation: { type: 'combat_superiority' } },
@@ -179,12 +205,7 @@ describe('executeAttackRiderManeuver', () => {
     });
 
     it('handles save failure with prone effect', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            if (key === 'activeConditions') return [];
-            return undefined;
-        });
+        getRuntimeValue.mockImplementation(withDice('Trip Attack'));
 
         const result = await executeAttackRiderManeuver(
             { name: 'Test', automation: { type: 'combat_superiority' } },
@@ -200,12 +221,7 @@ describe('executeAttackRiderManeuver', () => {
     });
 
     it('handles save failure with push effect', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Pushing Attack'];
-            if (key === 'targetEffects') return [];
-            return undefined;
-        });
+        getRuntimeValue.mockImplementation(withDice('Pushing Attack'));
 
         const result = await executeAttackRiderManeuver(
             { name: 'Test', automation: { type: 'combat_superiority' } },
@@ -222,12 +238,7 @@ describe('executeAttackRiderManeuver', () => {
     });
 
     it('handles save failure with goad effect', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Goading Attack'];
-            if (key === 'targetEffects') return [];
-            return undefined;
-        });
+        getRuntimeValue.mockImplementation(withDice('Goading Attack'));
 
         const result = await executeAttackRiderManeuver(
             { name: 'Test', automation: { type: 'combat_superiority' } },
@@ -241,12 +252,7 @@ describe('executeAttackRiderManeuver', () => {
     });
 
     it('handles save failure with frightened effect and expiration', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Menacing Attack'];
-            if (key === 'activeConditions') return [];
-            return undefined;
-        });
+        getRuntimeValue.mockImplementation(withDice('Menacing Attack'));
 
         const result = await executeAttackRiderManeuver(
             { name: 'Test', automation: { type: 'combat_superiority' } },
@@ -258,15 +264,15 @@ describe('executeAttackRiderManeuver', () => {
 
         expect(result.payload.description).toContain('Frightened');
         expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', expect.arrayContaining(['frightened']), 'test-campaign');
+        expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
+            targetName: 'Goblin',
+            effects: [{ type: 'condition', condition: 'frightened' }],
+            rounds: 2,
+        }));
     });
 
     it('handles distracting_strike_advantage effect', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Distracting Strike'];
-            if (key === 'targetEffects') return [];
-            return undefined;
-        });
+        getRuntimeValue.mockImplementation(withDice('Distracting Strike'));
 
         const result = await executeAttackRiderManeuver(
             { name: 'Test', automation: { type: 'combat_superiority' } },
@@ -278,14 +284,13 @@ describe('executeAttackRiderManeuver', () => {
 
         expect(result.payload.description).toContain('next attack against Goblin');
         expect(result.payload.description).toContain('Advantage');
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.arrayContaining([
+            expect.objectContaining({ effect: 'distracting_strike_advantage', target: 'Goblin' }),
+        ]), 'test-campaign');
     });
 
-    it('handles secondary_damage (sweeping attack) by setting pending state', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Sweeping Attack'];
-            return undefined;
-        });
+    it('returns sweeping chooser modal for secondary_damage effect', async () => {
+        getRuntimeValue.mockImplementation(withDice('Sweeping Attack'));
 
         const combatContext = {
             creatures: [
@@ -310,11 +315,7 @@ describe('executeAttackRiderManeuver', () => {
     });
 
     it('handles disarm effect description', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Disarming Attack'];
-            return undefined;
-        });
+        getRuntimeValue.mockImplementation(withDice('Disarming Attack'));
 
         const result = await executeAttackRiderManeuver(
             { name: 'Test', automation: { type: 'combat_superiority' } },
@@ -327,12 +328,8 @@ describe('executeAttackRiderManeuver', () => {
         expect(result.payload.description).toContain('dropped the object');
     });
 
-    it('returns modal for ally_movement effect', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Maneuvering Attack'];
-            return undefined;
-        });
+    it('appends ally movement reaction text for ally_movement effect', async () => {
+        getRuntimeValue.mockImplementation(withDice('Maneuvering Attack'));
 
         const result = await executeAttackRiderManeuver(
             { name: 'Test', automation: { type: 'combat_superiority' } },
@@ -342,19 +339,15 @@ describe('executeAttackRiderManeuver', () => {
             { weaponType: 'melee', hit: true, targetName: 'Goblin' }
         );
 
+        expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('Reaction to move');
     });
 
-    it('calls applyConditionToTarget with null combatSummary when getCombatContext returns null', async () => {
+    it('logs console error but still resolves when getCombatContext returns null', async () => {
         const damageUtils = await import('../../../../services/rules/combat/damageUtils.js');
         damageUtils.getCombatContext.mockResolvedValue(null);
 
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            if (key === 'activeConditions') return [];
-            return undefined;
-        });
+        getRuntimeValue.mockImplementation(withDice('Trip Attack'));
 
         const consoleSpy = vi.spyOn(console, 'error');
 
@@ -373,184 +366,67 @@ describe('executeAttackRiderManeuver', () => {
         );
         consoleSpy.mockRestore();
     });
+
+    it('saveType with no target appends the save prompt description with conditionInflicted', async () => {
+        getRuntimeValue.mockImplementation(withDice('Trip Attack'));
+
+        const result = await executeAttackRiderManeuver(
+            { name: 'Test', automation: { type: 'combat_superiority' } },
+            makePlayerStats(),
+            'test-campaign',
+            'Trip Attack',
+            { weaponType: 'melee', hit: true }
+        );
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('Target must make a STR save DC 15 or gain Prone condition');
+        expect(result.payload.description).toContain('Added 4 to the damage roll');
+    });
 });
 
 // ── executeAttackRiderManeuver - attack_rider options (Brutal Strike) ─
 
 describe('executeAttackRiderManeuver - attack_rider options', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.clearAllMocks();
+        await resetCombatContext();
     });
 
-    it('handles attack_rider options with secondary_damage effect and targetEffects', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            if (key === 'targetEffects') return [];
-            return undefined;
-        });
-
-        const combatContext = {
-            creatures: [{ name: 'Goblin' }],
-        };
-
-        const damageUtils = await import('../../../../services/rules/combat/damageUtils.js');
-        damageUtils.getCombatContext.mockResolvedValue(combatContext);
+    it('Brutal Strike: writes secondary_damage targetEffect and applies rider damage', async () => {
+        getRuntimeValue.mockImplementation(withDice('Brutal Strike'));
 
         const result = await executeAttackRiderManeuver(
             { name: 'Test', automation: { type: 'combat_superiority' } },
             makePlayerStats(),
             'test-campaign',
-            'Trip Attack',
-            { weaponType: 'melee', hit: true, targetName: 'Goblin' }
+            'Brutal Strike',
+            { weaponType: 'melee', hit: true, targetName: 'Goblin', damageType: 'slashing' }
         );
 
         expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Added 4 to the damage roll');
-    });
-
-    it('returns popup with description when no targetName for sizeLimit check', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            return undefined;
+        expect(result.payload.description).toContain('Rolled d8 for 4');
+        expect(result.payload.description).toContain('Goblin takes 4 force damage');
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.arrayContaining([
+            expect.objectContaining({ effect: 'secondary_damage', target: 'Goblin', value: 4 }),
+        ]), 'test-campaign');
+        expect(result.logEntries?.[0]).toMatchObject({
+            type: 'ability_use',
+            characterName: 'TestFighter',
+            abilityName: 'Brutal Strike',
         });
-
-        const result = await executeAttackRiderManeuver(
-            { name: 'Test', automation: { type: 'combat_superiority' } },
-            makePlayerStats(),
-            'test-campaign',
-            'Trip Attack',
-            { weaponType: 'melee', hit: true }
-        );
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Added 4 to the damage roll');
-    });
-
-    it('returns size limit error popup when target is too large', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            return undefined;
-        });
-
-        const combatContext = {
-            creatures: [{ name: 'Ogre', size: 'Large' }],
-        };
-
-        const damageUtils = await import('../../../../services/rules/combat/damageUtils.js');
-        damageUtils.getCombatContext.mockResolvedValue(combatContext);
-
-        const result = await executeAttackRiderManeuver(
-            { name: 'Test', automation: { type: 'combat_superiority' } },
-            makePlayerStats({ size: 'Medium' }),
-            'test-campaign',
-            'Trip Attack',
-            { weaponType: 'melee', hit: true, targetName: 'Ogre' }
-        );
-
-        expect(result.type).toBe('popup');
-    });
-});
-
-// ── executeAttackRiderManeuver - saveType without target ───────────────
-
-describe('executeAttackRiderManeuver - saveType without target', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    it('shows save description when maneuver has saveType but no target', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            return undefined;
-        });
-
-        const result = await executeAttackRiderManeuver(
-            { name: 'Test', automation: { type: 'combat_superiority' } },
-            makePlayerStats(),
-            'test-campaign',
-            'Trip Attack',
-            { weaponType: 'melee', hit: true }
-        );
-
-        expect(result.type).toBe('popup');
-    });
-});
-
-// ── executeAttackRiderManeuver - conditionInflicted ────────────────────
-
-describe('executeAttackRiderManeuver - conditionInflicted', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    it('handles conditionInflicted on save failure', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            if (key === 'activeConditions') return [];
-            return undefined;
-        });
-
-        const result = await executeAttackRiderManeuver(
-            { name: 'Test', automation: { type: 'combat_superiority' } },
-            makePlayerStats(),
-            'test-campaign',
-            'Trip Attack',
-            { weaponType: 'melee', hit: true, targetName: 'Goblin' }
-        );
-
-        expect(result.payload.description).toContain('Target made STR save DC 15: Failure');
-    });
-});
-
-// ── executeAttackRiderManeuver - save success ──────────────────────────
-
-describe('executeAttackRiderManeuver - save success', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    it('handles save success (no effect applied)', async () => {
-        const savePrompt = await import('../../../../services/automation/common/savePrompt.js');
-        savePrompt.createSaveListener.mockReturnValue({
-            promise: Promise.resolve({ success: true }),
-        });
-
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Trip Attack'];
-            return undefined;
-        });
-
-        const result = await executeAttackRiderManeuver(
-            { name: 'Test', automation: { type: 'combat_superiority' } },
-            makePlayerStats(),
-            'test-campaign',
-            'Trip Attack',
-            { weaponType: 'melee', hit: true, targetName: 'Goblin' }
-        );
-
-        expect(result.payload.description).toContain('Target made STR save DC 15: Success');
     });
 });
 
 // ── executeAttackRiderManeuver - no secondary targets ──────────────────
 
 describe('executeAttackRiderManeuver - no secondary targets', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.clearAllMocks();
+        await resetCombatContext();
     });
 
     it('returns popup when no secondary targets available', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 4;
-            if (key === SELECTION_KEY) return ['Sweeping Attack'];
-            return undefined;
-        });
+        getRuntimeValue.mockImplementation(withDice('Sweeping Attack'));
 
         const combatContext = {
             creatures: [

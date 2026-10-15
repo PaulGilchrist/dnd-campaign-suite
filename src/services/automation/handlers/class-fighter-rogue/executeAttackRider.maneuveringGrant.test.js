@@ -1,3 +1,15 @@
+// @maintained-by-ai: 2026-10-15
+// MN-011 lane — applyManeuveringAllyGrant() direct contracts ONLY (the sole
+// direct coverage of this function; every other suite mocks it at the caller):
+// exact-key runtime flag writes on the ally (maneuveringStepGranted /
+// maneuveringStepNoOA / maneuveringStepNoOASource — the server-first contract
+// consumed by ConditionEffectBadges and clearExpirationEffects'
+// maneuvering_step_granted handler), the caster-keyed expiration registration,
+// the ability_use grant log entry + half-speed math, the missing-ally speed
+// fallback, and the log-rejection resilience guard.
+// Deliberately NOT duplicated here: the executeAttackRiderManeuver ally_movement
+// rider text (combatSuperiorityAttackRider), the size gate (mn015), save-DC
+// math (mn020), and caller wiring (useAttackDamageResolution.maneuveringAlly).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { applyManeuveringAllyGrant } from './executeAttackRider.js';
 import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -83,5 +95,17 @@ describe('applyManeuveringAllyGrant (MN-011)', () => {
         const grant = await applyManeuveringAllyGrant('UnknownAlly', 'GoliathFireGiant', 'Goblin', 'test-campaign');
         expect(grant.halfSpeed).toBe(15);
         expect(setRuntimeValue).toHaveBeenCalledWith('UnknownAlly', 'maneuveringStepNoOASource', 'Goblin', 'test-campaign');
+    });
+
+    it('resolves the grant and logs the error when the log write rejects', async () => {
+        addEntry.mockRejectedValueOnce(new Error('log down'));
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const grant = await applyManeuveringAllyGrant('HeroesFeastBard', 'GoliathFireGiant', 'Animated Rug of Smothering 1', 'test-campaign');
+
+        expect(grant.halfSpeed).toBe(15);
+        expect(setRuntimeValue).toHaveBeenCalledWith('HeroesFeastBard', 'maneuveringStepNoOA', true, 'test-campaign');
+        expect(consoleSpy).toHaveBeenCalledWith('[maneuveringAttack:grant-log-error]', expect.any(Error));
+        consoleSpy.mockRestore();
     });
 });

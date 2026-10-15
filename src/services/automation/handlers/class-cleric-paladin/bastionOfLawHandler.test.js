@@ -1,3 +1,11 @@
+// @maintained-by-ai: 2026-10-15
+// Unit lane for the Bastion of Law handler (sorcery-point-funded ward cast on an ally).
+// Pins the runtime-key write contract (exact keys: bastionOfLawActive/WardDice/WardSource/
+// WardUsed/LastAttackDamage/WardTarget), modal/popup shapes, SP clamp/deduct semantics,
+// spend-dice guards, dice-pool clamping, pre-roll pass-through, heal clamping (remaining
+// unwarded damage and max HP), ward-used accumulation, and full deactivation cleanup.
+// Long-rest cleanup of these keys is covered by restRules-longRest.test.js; modal UI
+// wiring lives in CharActionModals/CharReactions suites (handler mocked there).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, handleApply, handleSpendDice, handleClearWard } from './bastionOfLawHandler.js';
 
@@ -57,6 +65,20 @@ function makeAction(overrides = {}) {
     };
 }
 
+function makeLastAttack(overrides = {}) {
+    return { targetName: playerName, primaryDamage: 10, secondaryDamage: 0, actualDamage: 50, ...overrides };
+}
+
+// getRuntimeValue router for handleSpendDice scenarios: campaign.lastAttack plus the
+// player's ward keys (anything unlisted resolves to null; target-side keys to null too).
+function mockRuntime({ lastAttack = makeLastAttack(), ...playerValues } = {}) {
+    getRuntimeValue.mockImplementation((name, key) => {
+        if (name === 'campaign' && key === 'lastAttack') return lastAttack;
+        if (name === playerName) return playerValues[key] ?? null;
+        return null;
+    });
+}
+
 function setupDefaultMocks() {
     getAllyList.mockReturnValue([playerName, targetName]);
     getCombatContext.mockResolvedValue({
@@ -106,6 +128,16 @@ describe('bastionOfLawHandler', () => {
             expect(result.payload.minSP).toBe(1);
             expect(result.payload.campaignName).toBe(campaignName);
             expect(result.payload.auto).toEqual(makeAction().automation);
+        });
+
+        it('filters ally names that are not present in the combat context', async () => {
+            getAllyList.mockReturnValue([playerName, 'GhostAlly']);
+
+            const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+            expect(result.type).toBe('modal');
+            expect(result.payload.creatureTargets).toHaveLength(1);
+            expect(result.payload.creatureTargets[0].name).toBe(playerName);
         });
 
         it('returns popup when no allies available', async () => {
@@ -191,18 +223,6 @@ describe('bastionOfLawHandler', () => {
                 ['1d8'],
                 campaignName
             );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                targetName,
-                'bastionOfLawWardUsed',
-                0,
-                campaignName
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                targetName,
-                'bastionOfLawLastAttackDamage',
-                0,
-                campaignName
-            );
         });
 
         it('clamps SP to maxSP when above maximum', async () => {
@@ -242,12 +262,7 @@ describe('bastionOfLawHandler', () => {
 
     describe('handleSpendDice', () => {
         it('returns popup when lastAttack is null', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') {
-                    return null;
-                }
-                return null;
-            });
+            mockRuntime({ lastAttack: null });
 
             const result = await handleSpendDice(makeAction({ numDice: 1 }), makePlayerStats(), campaignName);
 
@@ -256,14 +271,18 @@ describe('bastionOfLawHandler', () => {
             expect(result.payload.description).toContain('did not target you');
         });
 
+        it('returns popup when lastAttack targeted another creature', async () => {
+            mockRuntime({ lastAttack: makeLastAttack({ targetName: targetName }) });
+
+            const result = await handleSpendDice(makeAction({ numDice: 1 }), makePlayerStats(), campaignName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('did not target you');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
+
         it('returns popup when no ward active', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') {
-                    return { targetName: playerName, primaryDamage: 10, secondaryDamage: 0, actualDamage: 10 };
-                }
-                if (key === 'bastionOfLawActive') return false;
-                return [];
-            });
+            mockRuntime({ bastionOfLawActive: false, bastionOfLawWardDice: [] });
 
             const result = await handleSpendDice(makeAction({ numDice: 1 }), makePlayerStats(), campaignName);
 
@@ -272,14 +291,20 @@ describe('bastionOfLawHandler', () => {
             expect(result.payload.description).toContain('No ward active');
         });
 
+        it('returns popup when ward is active but dice pool is empty', async () => {
+            mockRuntime({ bastionOfLawActive: true, bastionOfLawWardDice: [] });
+
+            const result = await handleSpendDice(makeAction({ numDice: 1 }), makePlayerStats(), campaignName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No ward active');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
+
         it('returns modal when no dice count specified and initializes tracking', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') {
-                    return { targetName: playerName, primaryDamage: 10, secondaryDamage: 0, actualDamage: 50 };
-                }
-                if (key === 'bastionOfLawActive') return true;
-                if (key === 'bastionOfLawWardDice') return ['1d8', '1d8', '1d8'];
-                return null;
+            mockRuntime({
+                bastionOfLawActive: true,
+                bastionOfLawWardDice: ['1d8', '1d8', '1d8'],
             });
 
             const result = await handleSpendDice(makeAction(), makePlayerStats(), campaignName, undefined);
@@ -302,15 +327,11 @@ describe('bastionOfLawHandler', () => {
         });
 
         it('rolls dice and returns reduction with remaining count', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') {
-                    return { targetName: playerName, primaryDamage: 10, secondaryDamage: 0, actualDamage: 50 };
-                }
-                if (key === 'bastionOfLawActive') return true;
-                if (key === 'bastionOfLawWardDice') return ['1d8', '1d8', '1d8'];
-                if (key === 'bastionOfLawLastAttackDamage') return 50;
-                if (key === 'bastionOfLawWardUsed') return 0;
-                return null;
+            mockRuntime({
+                bastionOfLawActive: true,
+                bastionOfLawWardDice: ['1d8', '1d8', '1d8'],
+                bastionOfLawLastAttackDamage: 50,
+                bastionOfLawWardUsed: 0,
             });
             rollExpression.mockReturnValue({ total: 12 });
 
@@ -320,18 +341,20 @@ describe('bastionOfLawHandler', () => {
             expect(result.damageReduction).toBe(12);
             expect(result.remainingDice).toBe(1);
             expect(result.actualHeal).toBe(12);
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                playerName,
+                'bastionOfLawWardDice',
+                ['1d8'],
+                campaignName
+            );
         });
 
         it('tracks ward usage across multiple spends', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') {
-                    return { targetName: playerName, primaryDamage: 10, secondaryDamage: 0, actualDamage: 50 };
-                }
-                if (key === 'bastionOfLawActive') return true;
-                if (key === 'bastionOfLawWardDice') return ['1d8', '1d8', '1d8'];
-                if (key === 'bastionOfLawLastAttackDamage') return 50;
-                if (key === 'bastionOfLawWardUsed') return 0;
-                return null;
+            mockRuntime({
+                bastionOfLawActive: true,
+                bastionOfLawWardDice: ['1d8', '1d8', '1d8'],
+                bastionOfLawLastAttackDamage: 50,
+                bastionOfLawWardUsed: 0,
             });
             rollExpression.mockReturnValue({ total: 10 });
 
@@ -339,15 +362,11 @@ describe('bastionOfLawHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'bastionOfLawWardUsed', 10, campaignName);
 
             vi.clearAllMocks();
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') {
-                    return { targetName: playerName, primaryDamage: 10, secondaryDamage: 0, actualDamage: 50 };
-                }
-                if (key === 'bastionOfLawActive') return true;
-                if (key === 'bastionOfLawWardDice') return ['1d8', '1d8'];
-                if (key === 'bastionOfLawLastAttackDamage') return 50;
-                if (key === 'bastionOfLawWardUsed') return 10;
-                return null;
+            mockRuntime({
+                bastionOfLawActive: true,
+                bastionOfLawWardDice: ['1d8', '1d8'],
+                bastionOfLawLastAttackDamage: 50,
+                bastionOfLawWardUsed: 10,
             });
             rollExpression.mockReturnValue({ total: 8 });
 
@@ -356,15 +375,12 @@ describe('bastionOfLawHandler', () => {
         });
 
         it('clamps healing to remaining unwarded damage', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') {
-                    return { targetName: playerName, primaryDamage: 10, secondaryDamage: 0, actualDamage: 15 };
-                }
-                if (key === 'bastionOfLawActive') return true;
-                if (key === 'bastionOfLawWardDice') return ['1d8', '1d8', '1d8'];
-                if (key === 'bastionOfLawLastAttackDamage') return 15;
-                if (key === 'bastionOfLawWardUsed') return 10;
-                return null;
+            mockRuntime({
+                lastAttack: makeLastAttack({ actualDamage: 15 }),
+                bastionOfLawActive: true,
+                bastionOfLawWardDice: ['1d8', '1d8', '1d8'],
+                bastionOfLawLastAttackDamage: 15,
+                bastionOfLawWardUsed: 10,
             });
             rollExpression.mockReturnValue({ total: 10 });
 
@@ -375,17 +391,13 @@ describe('bastionOfLawHandler', () => {
         });
 
         it('updates HP when healing is applied', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') {
-                    return { targetName: playerName, primaryDamage: 10, secondaryDamage: 0, actualDamage: 50 };
-                }
-                if (key === 'bastionOfLawActive') return true;
-                if (key === 'bastionOfLawWardDice') return ['1d8'];
-                if (key === 'bastionOfLawLastAttackDamage') return 50;
-                if (key === 'bastionOfLawWardUsed') return 0;
-                if (key === 'currentHitPoints') return 30;
-                if (key === 'hitPoints') return 50;
-                return null;
+            mockRuntime({
+                bastionOfLawActive: true,
+                bastionOfLawWardDice: ['1d8'],
+                bastionOfLawLastAttackDamage: 50,
+                bastionOfLawWardUsed: 0,
+                currentHitPoints: 30,
+                hitPoints: 50,
             });
             rollExpression.mockReturnValue({ total: 10 });
 
@@ -394,17 +406,31 @@ describe('bastionOfLawHandler', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'currentHitPoints', 40, campaignName);
         });
 
+        it('caps healing so HP never exceeds max HP', async () => {
+            mockRuntime({
+                bastionOfLawActive: true,
+                bastionOfLawWardDice: ['1d8'],
+                bastionOfLawLastAttackDamage: 50,
+                bastionOfLawWardUsed: 0,
+                currentHitPoints: 45,
+                hitPoints: 50,
+            });
+            rollExpression.mockReturnValue({ total: 10 });
+
+            const result = await handleSpendDice(makeAction({ numDice: 1 }), makePlayerStats(), campaignName);
+
+            expect(result.damageReduction).toBe(10);
+            expect(result.actualHeal).toBe(5);
+            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'currentHitPoints', 50, campaignName);
+        });
+
         it('deactivates ward when no dice remain after spending', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') {
-                    return { targetName: playerName, primaryDamage: 10, secondaryDamage: 0, actualDamage: 10 };
-                }
-                if (key === 'bastionOfLawActive') return true;
-                if (key === 'bastionOfLawWardDice') return ['1d8', '1d8'];
-                if (key === 'bastionOfLawLastAttackDamage') return 50;
-                if (key === 'bastionOfLawWardUsed') return 0;
-                if (key === 'bastionOfLawWardTarget') return targetName;
-                return null;
+            mockRuntime({
+                bastionOfLawActive: true,
+                bastionOfLawWardDice: ['1d8', '1d8'],
+                bastionOfLawLastAttackDamage: 50,
+                bastionOfLawWardUsed: 0,
+                bastionOfLawWardTarget: targetName,
             });
             rollExpression.mockReturnValue({ total: 9 });
 
@@ -418,15 +444,11 @@ describe('bastionOfLawHandler', () => {
         });
 
         it('handles pre-rolled result', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') {
-                    return { targetName: playerName, primaryDamage: 10, secondaryDamage: 0, actualDamage: 10 };
-                }
-                if (key === 'bastionOfLawActive') return true;
-                if (key === 'bastionOfLawWardDice') return ['1d8', '1d8', '1d8'];
-                if (key === 'bastionOfLawLastAttackDamage') return 50;
-                if (key === 'bastionOfLawWardUsed') return 0;
-                return null;
+            mockRuntime({
+                bastionOfLawActive: true,
+                bastionOfLawWardDice: ['1d8', '1d8', '1d8'],
+                bastionOfLawLastAttackDamage: 50,
+                bastionOfLawWardUsed: 0,
             });
 
             const preRoll = { total: 99 };
@@ -439,15 +461,11 @@ describe('bastionOfLawHandler', () => {
         });
 
         it('clamps numDice to available dice count', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') {
-                    return { targetName: playerName, primaryDamage: 10, secondaryDamage: 0, actualDamage: 10 };
-                }
-                if (key === 'bastionOfLawActive') return true;
-                if (key === 'bastionOfLawWardDice') return ['1d8', '1d8'];
-                if (key === 'bastionOfLawLastAttackDamage') return 50;
-                if (key === 'bastionOfLawWardUsed') return 0;
-                return null;
+            mockRuntime({
+                bastionOfLawActive: true,
+                bastionOfLawWardDice: ['1d8', '1d8'],
+                bastionOfLawLastAttackDamage: 50,
+                bastionOfLawWardUsed: 0,
             });
             rollExpression.mockReturnValue({ total: 10 });
 
@@ -460,19 +478,14 @@ describe('bastionOfLawHandler', () => {
                 [],
                 campaignName
             );
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'bastionOfLawActive', false, campaignName);
         });
 
         it('logs ability use on spend', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') {
-                    return { targetName: playerName, primaryDamage: 10, secondaryDamage: 0, actualDamage: 10 };
-                }
-                if (key === 'bastionOfLawActive') return true;
-                if (key === 'bastionOfLawWardDice') return ['1d8', '1d8'];
-                if (key === 'bastionOfLawLastAttackDamage') return 50;
-                if (key === 'bastionOfLawWardUsed') return 0;
-                return null;
+            mockRuntime({
+                bastionOfLawActive: true,
+                bastionOfLawWardDice: ['1d8', '1d8'],
+                bastionOfLawLastAttackDamage: 50,
+                bastionOfLawWardUsed: 0,
             });
             rollExpression.mockReturnValue({ total: 6 });
 

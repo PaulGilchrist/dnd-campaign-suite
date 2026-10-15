@@ -1,6 +1,11 @@
+// @maintained-by-ai: 2026-10-15
 // MN-018: executeManeuver (the LIVE pending-prompt executor for Sweeping Attack)
 // must open a secondary-target chooser, stash pendingSweepingAttack (RAW combatants),
 // and never claim phantom damage on the second creature.
+// Lane seam: this file owns the executeManeuver.js runSweepingAttack chooser/stash/
+// anti-phantom-damage pins. The no-candidates popup exact string contract lives in
+// combatSuperiorityHandlerManeuver-attack.test.js; the confirm-side hit/miss/gate
+// pins live in combatSuperiorityUtils.sweeping.test.js — do not absorb them here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeManeuver } from './combatSuperiorityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -113,6 +118,10 @@ describe('executeManeuver — MN-018 Sweeping Attack chooser + stash', () => {
         expect(pending.primaryTarget).toBe('Thug 1');
         expect(pending.damageType).toBe('slashing');
         expect(pending.originalTotal).toBe(22);
+        // Consumer fallback fields (executeSweepingAttack reconstructs the roll
+        // from originalTotal, or originalD20Roll + attackBonus).
+        expect(pending.originalD20Roll).toBe(15);
+        expect(pending.attackBonus).toBe(7);
         expect(pending.dieValue).toBe(12);
         expect(pending.secondaryTargets.map(t => t.name)).toEqual(['Thug 2']);
         // RAW combatants (no [undefined] — CLA-326 crash lesson)
@@ -131,14 +140,16 @@ describe('executeManeuver — MN-018 Sweeping Attack chooser + stash', () => {
         expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
 
-    it('returns a popup (no chooser) when no creature is within 5 feet', async () => {
-        isWithinRange.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+    it('does not open a chooser or stash pendingSweepingAttack when no creature is within 5 feet', async () => {
+        // Thug 2 is a candidate but fails the 5 ft gate — runSweepingAttack must
+        // not open the chooser and must not leave phantom pending state behind.
+        // The popup itself (type + exact wording) is pinned by the -attack lane.
+        isWithinRange.mockResolvedValueOnce(false);
         const result = await executeManeuver(
             { name: 'Combat Superiority', automation: { type: 'combat_superiority' } },
             stats(), CAMPAIGN, 'Sweeping Attack'
         );
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toMatch(/within 5 feet/);
+        expect(result.modalName).toBeUndefined();
         const stash = setRuntimeValue.mock.calls.find(c => c[1] === 'pendingSweepingAttack');
         expect(stash).toBeFalsy();
     });

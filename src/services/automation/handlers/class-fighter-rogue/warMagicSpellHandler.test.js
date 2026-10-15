@@ -1,3 +1,7 @@
+// @maintained-by-ai — deterministic: all dependencies mocked at module
+// boundaries, exact-string popup pins for this handler's own composition
+// (slot expenditure, weapon-attack rider, 'No spell selected.'), no
+// timers/DOM; no churn required when the app changes.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { handle, confirmWarMagicSpell } from './warMagicSpellHandler.js'
 import { addEntry } from '../../../ui/logService.js'
@@ -353,7 +357,14 @@ describe('warMagicSpellHandler', () => {
         it('resolves Magic Missile auto-hit spell damage against the card target', async () => {
             setupConfirmMocks()
 
-            const result = await confirmWarMagicSpell(makeAction({ name: 'Improved War Magic' }), makePlayerStats(), mockCampaignName, 'Magic Missile')
+            const action = makeAction({ automation: { type: 'war_magic_spell', maxSpellLevel: 3, spellList: 'wizard_spells' } })
+            const result = await confirmWarMagicSpell(action, makePlayerStats(), mockCampaignName, 'Magic Missile')
+
+            // final popup echoes the full automation config
+            expect(result.type).toBe('popup')
+            expect(result.payload.name).toBe('War Magic')
+            expect(result.payload.automationType).toBe('war_magic_spell')
+            expect(result.payload.automation).toEqual(action.automation)
 
             // 3 darts × (1d4+1 → 5) = 15 raw spell damage applied to the card target
             expect(applyDamageToTarget).toHaveBeenCalledWith(combatSummary, 'Wight 1', 15, ['Force'], { campaignName: mockCampaignName, characters: [], ignoreResistance: false, attackerName: 'TestFighter' })
@@ -408,17 +419,6 @@ describe('warMagicSpellHandler', () => {
             // No spell damage on a save success — only the weapon attack applies damage
             expect(applyDamageToTarget).toHaveBeenCalledTimes(1)
             expect(result.type).toBe('popup')
-        })
-
-        it('returns a popup with the automation config', async () => {
-            setupConfirmMocks()
-            const action = makeAction({ automation: { type: 'war_magic_spell', maxSpellLevel: 3, spellList: 'wizard_spells' } })
-            const result = await confirmWarMagicSpell(action, makePlayerStats(), mockCampaignName, 'Magic Missile')
-
-            expect(result.type).toBe('popup')
-            expect(result.payload.name).toBe('War Magic')
-            expect(result.payload.automationType).toBe('war_magic_spell')
-            expect(result.payload.automation).toEqual(action.automation)
         })
 
         it('does not throw when addEntry rejects', async () => {

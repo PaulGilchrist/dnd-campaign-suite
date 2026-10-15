@@ -1,11 +1,29 @@
+// @maintained-by-ai: 2026-10-15
 // MN-014: Precision Attack (trigger attack_roll_miss) was offered on HITS
 // because the hit-branch query only gated weapon/melee TYPE, never hit/miss.
-// Both entry points must now share the trigger matcher, and miss-context
-// options must carry effect/damageBonus so the consumer can route them.
+// These pins lock the two halves of the fix on the LIVE consumer lanes
+// (attackRollRiders.js): the HIT chooser must exclude the miss-triggered rider,
+// and the MISS chooser must carry effect/damageBonus so the consumer can route it.
+//
+// Ownership (this file = hit-exclude + miss-passthrough on the two live lanes):
+//   - getAttackRiderOptions (HIT chooser, live)  → excludes Precision on a hit
+//   - getAvailableAttackRiderManeuvers (shared)   → excludes Precision on a hit,
+//                                                    offers it on a miss
+//   - getAttackRiderOptionsByContext('miss')      → miss options carry effect/
+//                                                    damageBonus for handleAttackRiderManeuverUse
+//   - ByTrigger offer-gate (Sweeping/Menacing/Precision/Mystery hit & miss, and the
+//     unknown-trigger default) lives in combatSuperiorityQueries.mn018.test.js — the
+//     sole ByTrigger owner. save/die token passthrough lives in mn020.
+//
+// Trim notes (2026-10-15): removed the ByTrigger half of the miss-offer pin
+// (getAvailableAttackRiderManeuversByTrigger offering Precision on a melee miss was
+// triple-covered by mn018 'still offers Precision Attack on a miss') and dropped
+// 'hit-context options exclude Precision Attack' — a third level of the same
+// Precision-on-hit exclusion (already pinned at the live chooser + shared query)
+// on a context the consumer never builds.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     getAvailableAttackRiderManeuvers,
-    getAvailableAttackRiderManeuversByTrigger,
     getManeuversForRules,
 } from './combatSuperiorityQueries.js';
 import {
@@ -56,8 +74,7 @@ describe('MN-014 — Precision Attack trigger routing', () => {
         expect(names(hit)).toEqual(expect.arrayContaining(['Menacing Attack', 'Sweeping Attack']));
     });
 
-    it('still offers Precision Attack on a MISS (both entry points)', () => {
-        expect(names(getAvailableAttackRiderManeuversByTrigger(stats(), CAMPAIGN, { weaponType: 'melee', hit: false }))).toEqual(['Precision Attack']);
+    it('still offers Precision Attack on a MISS (shared query)', () => {
         expect(names(getAvailableAttackRiderManeuvers(stats(), CAMPAIGN, { weaponType: 'melee', hit: false }))).toEqual(['Precision Attack']);
     });
 
@@ -70,10 +87,5 @@ describe('MN-014 — Precision Attack trigger routing', () => {
             damageBonus: false,
             context: 'miss',
         }));
-    });
-
-    it('hit-context options exclude Precision Attack', async () => {
-        const options = await getAttackRiderOptionsByContext(stats(), CAMPAIGN, { weaponType: 'melee', hit: true }, 'hit');
-        expect(names(options)).not.toContain('Precision Attack');
     });
 });

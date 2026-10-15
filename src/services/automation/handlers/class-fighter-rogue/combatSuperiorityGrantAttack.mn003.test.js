@@ -1,15 +1,18 @@
-// MN-003: Commander's Strike was inert end-to-end — no clickable row, the
-// "Combat Superiority:" row was pinned to Select-View (selectionMode stayed
-// true because known(9) < all(20)), and the grant executor had no once-per-
-// turn latch nor 30-ft range gate (die even spent before the no-allies check).
-// These tests pin the fixed lanes: use-mode reachable, gated spend, refusal
-// zero-spend, stamp on confirm, turn-end lapse.
+// @maintained-by-ai
+// MN-003: Commander's Strike was inert end-to-end — the grant executor had no
+// once-per-turn latch nor 30-ft range gate (die even spent before the no-allies
+// check). These tests pin the MN-003 fixed lanes unique to this file: the
+// handleCombatSuperiorityGrantAttack row lane (gated spend + chooser, refusal
+// zero-spend, once-per-turn latch + round re-arm), the executeManeuver
+// grant_attack funnel through that gated executor, and applyCommanderStrikeTurnEnd
+// lapse hygiene. Fully mocked, deterministic, turn-based.
+// Selection-mode reachability pins live in combatSuperiorityHandler.test.js
+// (with its own MN-003 pins); the executeCommanderStrikeChoice chooser-confirm
+// contract is pinned by combatSuperiorityChoices.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-    handle,
     handleCombatSuperiorityGrantAttack,
     executeManeuver,
-    executeCommanderStrikeChoice,
     applyCommanderStrikeTurnEnd,
 } from './combatSuperiorityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -19,31 +22,12 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(async () => {}),
 }));
 
-const ALL_MANEUVERS = [
-    { name: 'Trip Attack', effect: 'prone', trigger: 'weapon_attack_hit', saveType: 'STR', damageBonus: true, actionType: 'attack_rider' },
-    { name: 'Pushing Attack', effect: 'push', trigger: 'weapon_attack_hit', saveType: 'STR', value: 15, damageBonus: true, actionType: 'attack_rider' },
-    { name: 'Goading Attack', effect: 'goad', trigger: 'weapon_attack_hit', saveType: 'WIS', damageBonus: true, actionType: 'attack_rider' },
-    { name: 'Disarming Attack', effect: 'disarm', trigger: 'weapon_attack_hit', saveType: 'STR', damageBonus: true, actionType: 'attack_rider' },
-    { name: 'Menacing Attack', effect: 'frightened', trigger: 'weapon_attack_hit', saveType: 'WIS', damageBonus: true, actionType: 'attack_rider' },
-    { name: 'Distracting Strike', effect: 'distracting_strike_advantage', trigger: 'weapon_attack_hit', damageBonus: true, actionType: 'attack_rider' },
-    { name: 'Maneuvering Attack', effect: 'ally_movement', trigger: 'weapon_attack_hit', damageBonus: true, actionType: 'attack_rider' },
-    { name: 'Precision Attack', effect: 'attack_roll_bonus', trigger: 'attack_roll_miss', actionType: 'attack_rider' },
-    { name: 'Sweeping Attack', effect: 'secondary_damage', trigger: 'melee_weapon_attack_hit', actionType: 'attack_rider' },
-    { name: 'Evasive Footwork', effect: 'ac_bonus_disengage', actionType: 'bonus_action' },
-    { name: 'Feinting Attack', effect: 'advantage_and_damage', actionType: 'bonus_action' },
-    { name: 'Lunging Attack', effect: 'dash_and_damage', actionType: 'bonus_action' },
-    { name: 'Rally', effect: 'temp_hp', actionType: 'bonus_action', extraHpExpression: '1d4' },
+const MANEUVERS = [
     { name: "Commander's Strike", effect: null, actionType: 'grant_attack', trigger: 'replace_attack', dieExpression: 'superiority_die', range: '30_ft' },
-    { name: 'Bait and Switch', effect: 'ac_bonus_and_swap', actionType: 'movement' },
-    { name: 'Ambush', actionType: 'skill_check', skills: ['Stealth'], initiativeBonus: true, dieExpression: 'superiority_die' },
-    { name: 'Tactical Assessment', actionType: 'skill_check', skills: ['Insight'], ability: 'Wisdom', dieExpression: 'superiority_die' },
-    { name: 'Commanding Presence', actionType: 'skill_check', reactionSaveType: 'WIS', reactionEffect: 'disadvantage_next_attack', reactionDuration: 'until_end_of_next_turn' },
-    { name: 'Parry', effect: 'damage_reduction', actionType: 'reaction' },
-    { name: 'Riposte', effect: 'melee_attack_reaction', actionType: 'reaction' },
 ];
 
 vi.mock('../../../../services/ui/dataLoader.js', () => ({
-    loadManeuvers: vi.fn(async () => ALL_MANEUVERS),
+    loadManeuvers: vi.fn(async () => MANEUVERS),
     loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
@@ -153,50 +137,6 @@ const CS_ROW_ACTION = {
     },
 };
 
-// ── Use-mode reachability (selectionMode gating, dispatchers.js) ─────────
-
-describe('MN-003 Combat Superiority row opens the USE flow for known maneuvers', () => {
-    it('selectionMode is FALSE when maneuvers are known (known < all no longer pins Select-View)', async () => {
-        seedStore({
-            'EvasiveFighter.BattleMasterManeuvers_selection': ["Commander's Strike", 'Rally', 'Riposte'],
-        });
-        const result = await handle(
-            { name: 'Combat Superiority', automation: { type: 'combat_superiority' } },
-            makePlayerStats(),
-            'test-campaign',
-            null
-        );
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('combatSuperiority');
-        expect(result.payload.selectionMode).toBe(false);
-        expect(result.payload.knownManeuvers).toContain("Commander's Strike");
-    });
-
-    it('selectionMode is TRUE when nothing is known yet (selection still required first)', async () => {
-        seedStore({ 'EvasiveFighter.BattleMasterManeuvers_selection': [] });
-        const result = await handle(
-            { name: 'Combat Superiority', automation: { type: 'combat_superiority' } },
-            makePlayerStats(),
-            'test-campaign',
-            null
-        );
-        expect(result.payload.selectionMode).toBe(true);
-    });
-
-    it('forceSelectionMode still opens Select-View (Manage Maneuvers)', async () => {
-        seedStore({
-            'EvasiveFighter.BattleMasterManeuvers_selection': ["Commander's Strike"],
-        });
-        const result = await handle(
-            { name: 'Combat Superiority', automation: { type: 'combat_superiority', forceSelectionMode: true } },
-            makePlayerStats(),
-            'test-campaign',
-            null
-        );
-        expect(result.payload.selectionMode).toBe(true);
-    });
-});
-
 // ── Row-click use lane: gated spend + chooser ─────────────────────────────
 
 describe('MN-003 handleCombatSuperiorityGrantAttack row lane', () => {
@@ -293,24 +233,10 @@ describe('MN-003 executeManeuver funnels grant_attack through the gated executor
     });
 });
 
-// ── Chooser confirm → stamp on ally → turn-end lapse ─────────────────────
+// ── Turn-end lapse hygiene ─────────────────────────────────────────────────
 
-describe('MN-003 chooser confirm + turn-end hygiene', () => {
-    it('executeCommanderStrikeChoice arms commanderStrikeBonus on the chosen ally', async () => {
-        const result = await executeCommanderStrikeChoice(
-            { dieValue: 7, maneuverName: "Commander's Strike" },
-            makePlayerStats(),
-            'test-campaign',
-            'Bandit'
-        );
-        expect(result.type).toBe('popup');
-        expect(store['Bandit.commanderStrikeActive']).toBe(true);
-        expect(store['Bandit.commanderStrikeBonus']).toBe(7);
-        expect(store['Bandit.commanderStrikeSource']).toBe("Commander's Strike");
-        expect(result.logEntries[0].description).toContain('Bandit');
-    });
-
-    it('applyCommanderStrikeTurnEnd lapses an unconsumed bonus at the ally turn end + logs', async () => {
+describe('MN-003 applyCommanderStrikeTurnEnd hygiene', () => {
+    it('lapses an unconsumed bonus at the ally turn end + logs', async () => {
         store['Bandit.commanderStrikeBonus'] = 7;
         store['Bandit.commanderStrikeActive'] = true;
         store['Bandit.commanderStrikeSource'] = "Commander's Strike";
@@ -326,7 +252,7 @@ describe('MN-003 chooser confirm + turn-end hygiene', () => {
         }));
     });
 
-    it('applyCommanderStrikeTurnEnd is a no-op when no bonus is armed', async () => {
+    it('is a no-op when no bonus is armed', async () => {
         await applyCommanderStrikeTurnEnd('test-campaign', 'Goblin');
         expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();

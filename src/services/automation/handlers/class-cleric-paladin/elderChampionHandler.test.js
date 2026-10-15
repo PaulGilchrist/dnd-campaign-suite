@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-15
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -37,7 +38,12 @@ function makeAction(overrides = {}) {
     };
 }
 
-function mockActivationState(active, restUsed, activeBuffs, level5Slots) {
+// NOTE: handle() determines "already active" solely from an 'Elder Champion'
+// entry in activeBuffs — the elderChampionActive flag is never read there.
+function mockState(config = {}) {
+    const { active = false, restUsed = false, activeBuffs = [] } = config;
+    // level5Slots may be explicitly null/undefined — read it without a destructuring default.
+    const level5Slots = 'level5Slots' in config ? config.level5Slots : 1;
     getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'elderChampionActive') return active;
         if (key === 'elderChampionRestUsed') return restUsed;
@@ -53,92 +59,74 @@ beforeEach(() => {
 
 describe('elderChampionHandler', () => {
     describe('handle - already active', () => {
-        it('returns popup saying already active when Elder Champion is active', async () => {
-            mockActivationState(true, false, [{ name: 'Elder Champion', effect: 'elder_champion' }], 1);
+        it('returns already-active popup without writing when buff is in activeBuffs, even if the flag is stale', async () => {
+            mockState({ active: false, restUsed: false, activeBuffs: [{ name: 'Elder Champion', effect: 'elder_champion' }] });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toBe('Elder Champion is already active.');
+            expect(result.payload.name).toBe('Elder Champion');
             expect(result.payload.automationType).toBe('elder_champion');
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('returns popup when Elder Champion buff is present even if flag is false', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return false;
-                if (key === 'elderChampionRestUsed') return false;
-                if (key === 'activeBuffs') return [{ name: 'Elder Champion', effect: 'elder_champion' }];
-                if (key === 'spell_slots_level_5') return 1;
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
             expect(result.payload.description).toBe('Elder Champion is already active.');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
     });
 
     describe('handle - already used since long rest', () => {
-        it('returns popup when no level 5 spell slots available', async () => {
-            mockActivationState(false, true, [], 0);
+        it('returns blocked popup without writing when no level 5 spell slots are available', async () => {
+            for (const level5Slots of [0, null, undefined]) {
+                vi.clearAllMocks();
+                mockState({ restUsed: true, level5Slots });
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+                const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toBe('Elder Champion cannot be used again until a long rest or level 5 spell slot becomes available.');
-            expect(setRuntimeValue).not.toHaveBeenCalled();
+                expect(result.type).toBe('popup');
+                expect(result.payload.type).toBe('automation_info');
+                expect(result.payload.description).toBe('Elder Champion cannot be used again until a long rest or level 5 spell slot becomes available.');
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+            }
         });
 
-        it('spends a level 5 spell slot and activates when slots are available', async () => {
-            mockActivationState(false, true, [], 3);
+        it('spends a level 5 spell slot and re-activates when slots are available', async () => {
+            mockState({ restUsed: true, level5Slots: 3 });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toBe('Elder Champion activated by expending a level 5 spell slot.');
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'spell_slots_level_5', 2, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'elderChampionActive', true, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ name: 'Elder Champion', effect: 'elder_champion' }),
-                ]),
-                campaignName,
-            );
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(1, playerName, 'spell_slots_level_5', 2, campaignName);
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(2, playerName, 'elderChampionActive', true, campaignName);
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(3, playerName, 'activeBuffs', expect.arrayContaining([
+                expect.objectContaining({ name: 'Elder Champion', effect: 'elder_champion', duration: '1_minute' }),
+            ]), campaignName);
             expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'ability_use',
                 characterName: playerName,
                 abilityName: 'Elder Champion',
+                description: expect.stringContaining('expending a level 5 spell slot'),
             }));
         });
 
-        it('reduces slot count to zero when exactly 1 slot available', async () => {
-            mockActivationState(false, true, [], 1);
+        it('treats non-array activeBuffs as empty when expending a slot', async () => {
+            mockState({ restUsed: true, activeBuffs: 'not-an-array', level5Slots: 2 });
 
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'spell_slots_level_5', 0, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'elderChampionActive', true, campaignName);
-        });
-
-        it('does not spend slots or activate when no slots available', async () => {
-            mockActivationState(false, true, [], 0);
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(result.payload.description).toContain('expending a level 5 spell slot');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                playerName,
+                'activeBuffs',
+                [expect.objectContaining({ name: 'Elder Champion', effect: 'elder_champion' })],
+                campaignName,
+            );
         });
     });
 
-    describe('handle - activation', () => {
-        it('sets elderChampionActive to true and adds buff on activation', async () => {
-            mockActivationState(false, false, [], 1);
+    describe('handle - first activation', () => {
+        it('sets flag and rest-used, adds buff, and logs on activation', async () => {
+            mockState();
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -150,7 +138,7 @@ describe('elderChampionHandler', () => {
             expect(setRuntimeValue).toHaveBeenNthCalledWith(1, playerName, 'elderChampionActive', true, campaignName);
             expect(setRuntimeValue).toHaveBeenNthCalledWith(2, playerName, 'elderChampionRestUsed', true, campaignName);
             expect(setRuntimeValue).toHaveBeenNthCalledWith(3, playerName, 'activeBuffs', expect.arrayContaining([
-                expect.objectContaining({ name: 'Elder Champion', effect: 'elder_champion' }),
+                expect.objectContaining({ name: 'Elder Champion', effect: 'elder_champion', duration: '1_minute' }),
             ]), campaignName);
             expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'ability_use',
@@ -159,10 +147,8 @@ describe('elderChampionHandler', () => {
             }));
         });
 
-        it('appends Elder Champion buff to existing buffs', async () => {
-            mockActivationState(false, false, [
-                { name: 'Mage Armor', effect: 'mage_armor' },
-            ], 1);
+        it('appends Elder Champion buff without clobbering existing buffs', async () => {
+            mockState({ activeBuffs: [{ name: 'Mage Armor', effect: 'mage_armor' }] });
 
             await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -177,8 +163,8 @@ describe('elderChampionHandler', () => {
             );
         });
 
-        it('uses custom duration from automation config', async () => {
-            mockActivationState(false, false, [], 1);
+        it('uses custom duration from automation config for the buff entry', async () => {
+            mockState();
 
             const action = makeAction({ automation: { duration: '10_minutes' } });
             await handle(action, makePlayerStats(), campaignName, null);
@@ -192,209 +178,9 @@ describe('elderChampionHandler', () => {
                 campaignName,
             );
         });
-    });
 
-
-    describe('hasActionSpells', () => {
-        it('returns true when player has a spell with "1 action" casting time', () => {
-            const stats = makePlayerStats({
-                spells: [
-                    { name: 'Guiding Bolt', casting_time: '1 action' },
-                    { name: 'Healing Word', casting_time: '1 bonus action' },
-                ],
-            });
-
-            expect(hasActionSpells(stats)).toBe(true);
-        });
-
-        it('returns true when player has a spell with "action" casting time', () => {
-            const stats = makePlayerStats({
-                spells: [{ name: 'Cantrip', casting_time: 'action' }],
-            });
-
-            expect(hasActionSpells(stats)).toBe(true);
-        });
-
-        it('returns false when spells have non-action casting times', () => {
-            const stats = makePlayerStats({
-                spells: [
-                    { name: 'Healing Word', casting_time: '1 bonus action' },
-                    { name: 'Reaction Shield', casting_time: '1 reaction' },
-                ],
-            });
-
-            expect(hasActionSpells(stats)).toBe(false);
-        });
-
-        it('returns false when spells array is empty or missing', () => {
-            expect(hasActionSpells(makePlayerStats({ spells: [] }))).toBe(false);
-            expect(hasActionSpells(makePlayerStats({}))).toBe(false);
-        });
-
-        it('returns false when casting_time is falsy or non-action', () => {
-            const stats = makePlayerStats({
-                spells: [
-                    { name: 'Mystery Spell', casting_time: undefined },
-                    { name: 'Null Spell', casting_time: null },
-                    { name: 'Action Spell', casting_time: '1 ACTION' },
-                ],
-            });
-
-            expect(hasActionSpells(stats)).toBe(true);
-        });
-
-        it('returns false when casting_time is missing from spell object', () => {
-            const stats = makePlayerStats({
-                spells: [
-                    { name: 'Incomplete Spell' },
-                ],
-            });
-
-            expect(hasActionSpells(stats)).toBe(false);
-        });
-    });
-
-    describe('isElderChampionActive', () => {
-        it('returns true when elderChampionActive is true', () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return true;
-                return null;
-            });
-
-            expect(isElderChampionActive(playerName, campaignName)).toBe(true);
-        });
-
-        it('returns false when elderChampionActive is false', () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return false;
-                return null;
-            });
-
-            expect(isElderChampionActive(playerName, campaignName)).toBe(false);
-        });
-
-        it('returns false when elderChampionActive is null', () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return null;
-                return null;
-            });
-
-            expect(isElderChampionActive(playerName, campaignName)).toBe(false);
-        });
-
-        it('returns false when elderChampionActive is undefined', () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return undefined;
-                return null;
-            });
-
-            expect(isElderChampionActive(playerName, campaignName)).toBe(false);
-        });
-
-        it('returns false when elderChampionActive is 0', () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return 0;
-                return null;
-            });
-
-            expect(isElderChampionActive(playerName, campaignName)).toBe(false);
-        });
-    });
-
-    describe('handle - edge cases', () => {
-        it('handles activeBuffs as non-array (string) on activation', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return false;
-                if (key === 'elderChampionRestUsed') return false;
-                if (key === 'activeBuffs') return 'not-an-array';
-                if (key === 'spell_slots_level_5') return 1;
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ name: 'Elder Champion' }),
-                ]),
-                campaignName,
-            );
-        });
-
-        it('handles activeBuffs as non-array (null) on activation', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return false;
-                if (key === 'elderChampionRestUsed') return false;
-                if (key === 'activeBuffs') return null;
-                if (key === 'spell_slots_level_5') return 1;
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('activated');
-        });
-
-        it('handles activeBuffs as non-array (string) when already used', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return false;
-                if (key === 'elderChampionRestUsed') return true;
-                if (key === 'activeBuffs') return 'not-an-array';
-                if (key === 'spell_slots_level_5') return 2;
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('expending a level 5 spell slot');
-        });
-
-        it('handles spell_slots_level_5 returning null (uses ?? 0 fallback)', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return false;
-                if (key === 'elderChampionRestUsed') return true;
-                if (key === 'activeBuffs') return [];
-                if (key === 'spell_slots_level_5') return null;
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('Elder Champion cannot be used again until a long rest or level 5 spell slot becomes available.');
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('does not duplicate buff when already in activeBuffs list on activation', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return false;
-                if (key === 'elderChampionRestUsed') return false;
-                if (key === 'activeBuffs') return [{ name: 'Elder Champion', effect: 'elder_champion' }];
-                if (key === 'spell_slots_level_5') return 1;
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('Elder Champion is already active.');
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('uses default duration when automation.duration is falsy on activation', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return false;
-                if (key === 'elderChampionRestUsed') return false;
-                if (key === 'activeBuffs') return [];
-                if (key === 'spell_slots_level_5') return 1;
-                return null;
-            });
+        it('falls back to default 1_minute duration when automation.duration is null', async () => {
+            mockState();
 
             const action = makeAction({ automation: { duration: null } });
             await handle(action, makePlayerStats(), campaignName, null);
@@ -409,52 +195,82 @@ describe('elderChampionHandler', () => {
             );
         });
 
-        it('uses default duration when automation.duration is undefined on activation', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return false;
-                if (key === 'elderChampionRestUsed') return false;
-                if (key === 'activeBuffs') return [];
-                if (key === 'spell_slots_level_5') return 1;
-                return null;
-            });
-
-            const action = makeAction({ automation: {} });
-            await handle(action, makePlayerStats(), campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ duration: '1_minute' }),
-                ]),
-                campaignName,
-            );
-        });
-
-        it('does not duplicate buff when already in activeBuffs list when already used', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'elderChampionActive') return false;
-                if (key === 'elderChampionRestUsed') return true;
-                if (key === 'activeBuffs') return [{ name: 'Elder Champion', effect: 'elder_champion' }];
-                if (key === 'spell_slots_level_5') return 2;
-                return null;
-            });
+        it('treats non-array activeBuffs as empty on first activation', async () => {
+            mockState({ activeBuffs: 'not-an-array' });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('Elder Champion is already active.');
-            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(result.payload.description).toContain('activated');
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(
+                3,
+                playerName,
+                'activeBuffs',
+                [expect.objectContaining({ name: 'Elder Champion' })],
+                campaignName,
+            );
         });
+    });
 
-        it('handles castingTime as empty string in isActionSpell', () => {
+    describe('hasActionSpells', () => {
+        it('returns true for action casting times, case and whitespace insensitive', () => {
             const stats = makePlayerStats({
                 spells: [
+                    { name: 'Guiding Bolt', casting_time: '1 action' },
+                    { name: 'Healing Word', casting_time: '1 bonus action' },
+                    { name: 'Cantrip', casting_time: 'action' },
+                    { name: 'Shouty Spell', casting_time: '1 ACTION' },
+                    { name: 'Spaced Spell', casting_time: ' 1 Action ' },
+                ],
+            });
+
+            expect(hasActionSpells(stats)).toBe(true);
+        });
+
+        it('returns false when all spells have non-action casting times', () => {
+            const stats = makePlayerStats({
+                spells: [
+                    { name: 'Healing Word', casting_time: '1 bonus action' },
+                    { name: 'Reaction Shield', casting_time: '1 reaction' },
+                    { name: 'Ritual Spell', casting_time: '1 minute' },
                     { name: 'Empty Casting Time', casting_time: '' },
                 ],
             });
 
             expect(hasActionSpells(stats)).toBe(false);
+        });
+
+        it('returns false when casting_time is missing or null on every spell', () => {
+            const stats = makePlayerStats({
+                spells: [
+                    { name: 'Incomplete Spell' },
+                    { name: 'Null Spell', casting_time: null },
+                    { name: 'Undefined Spell', casting_time: undefined },
+                ],
+            });
+
+            expect(hasActionSpells(stats)).toBe(false);
+        });
+
+        it('returns false when spells array is empty or missing', () => {
+            expect(hasActionSpells(makePlayerStats({ spells: [] }))).toBe(false);
+            expect(hasActionSpells(makePlayerStats({}))).toBe(false);
+        });
+    });
+
+    describe('isElderChampionActive', () => {
+        it('returns true only when elderChampionActive is strictly true', () => {
+            mockState({ active: true });
+
+            expect(isElderChampionActive(playerName, campaignName)).toBe(true);
+        });
+
+        it('returns false for any non-true stored value', () => {
+            for (const value of [false, null, undefined, 0, 'yes']) {
+                vi.clearAllMocks();
+                mockState({ active: value });
+
+                expect(isElderChampionActive(playerName, campaignName)).toBe(false);
+            }
         });
     });
 });

@@ -1,3 +1,12 @@
+// @maintained-by-ai: 2026-10-15
+// Deterministic unit tests for the Wrath of the Sea automation handler: pure control
+// flow over fully-mocked runtime/log/combat/dice boundaries (rangeToFeet is REAL —
+// the 5-ft Emanation / 15-ft push defaults resolve through it). Pins the exact
+// server-first runtime keys (wildShapeUses, wrathOfTheSeaActive, _Wrath_of_the_Sea_usedRound),
+// refusal side-effect guards, HTML strings, prompt shapes, and the CLA-393 latch/push/
+// expiration clock contract. The grant/write side of these keys lives in
+// oceanicGiftHandler.test.js; expiry clear in clearExpirationEffects; resistance gate in
+// automationPassives.stormbornResistance.test.js — no overlap here by design.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../dice/diceRoller.js', () => ({
@@ -109,7 +118,8 @@ function setupBaseMocks() {
     addExpiration.mockReturnValue(undefined);
 }
 
-function setupSavePath(wisMod = 1, dc = 12, saveBonus = 0, saveRoll = 5, finalDamage = 6) {
+// Ally-attack save lane: stored wisMod/dc drive the roll, target is an NPC.
+function setupSavePath(wisMod = 1, dc = 12, saveBonus = 0, saveRoll = 5, applyFinalDamage = 6) {
     getRuntimeValue.mockImplementation((name, key) => {
         if (name === playerName && key === 'wrathOfTheSeaWisMod') return wisMod;
         if (name === playerName && key === 'wrathOfTheSeaDc') return dc;
@@ -120,14 +130,14 @@ function setupSavePath(wisMod = 1, dc = 12, saveBonus = 0, saveRoll = 5, finalDa
         creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
     });
     getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: saveBonus } });
-    applyDamageToTarget.mockReturnValue({ finalDamage, newHp: 10 });
+    applyDamageToTarget.mockReturnValue({ finalDamage: applyFinalDamage, newHp: 10 });
     rollD20.mockReturnValue(saveRoll);
 }
 
-function setupWrathActivePath(statsOverride = makePlayerStats()) {
+// Wrath already active, NPC target fails its CON save for 12 damage.
+function setupWrathActivePath() {
     getRuntimeValue.mockImplementation((name, key) => {
         if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-        if (name === playerName && key === 'wrathOfTheSeaWisMod') return 2;
         return undefined;
     });
     rollExpression.mockReturnValue({ total: 12, rolls: [4, 4, 4], modifier: 0 });
@@ -137,46 +147,18 @@ function setupWrathActivePath(statsOverride = makePlayerStats()) {
     getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 0 } });
     applyDamageToTarget.mockReturnValue({ finalDamage: 12, newHp: 0 });
     rollD20.mockReturnValue(3);
-    return statsOverride;
-}
-
-function setupNoTarget() {
-    getRuntimeValue.mockImplementation((name, key) => {
-        if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-        return undefined;
-    });
-    rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-    loadCombatSummary.mockResolvedValue({
-        creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
-    });
-    getTargetFromAttacker.mockReturnValue(null);
 }
 
 function setupPlayerTarget() {
     getRuntimeValue.mockImplementation((name, key) => {
         if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-        if (name === playerName && key === 'wrathOfTheSeaWisMod') return 1;
-        if (name === playerName && key === 'wrathOfTheSeaDc') return 12;
         return undefined;
     });
-    rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
+    rollExpression.mockReturnValue({ total: 12, rolls: [4, 4, 4], modifier: 0 });
     loadCombatSummary.mockResolvedValue({
         creatures: [{ name: playerName, targetName: 'AllyPlayer' }, { name: 'AllyPlayer', type: 'player' }],
     });
     getTargetFromAttacker.mockReturnValue({ name: 'AllyPlayer', type: 'player' });
-}
-
-function setupStorageSave(combatSummary = { creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }] }) {
-    getRuntimeValue.mockImplementation((name, key) => {
-        if (name === playerName && key === 'wrathOfTheSeaWisMod') return 1;
-        if (name === playerName && key === 'wrathOfTheSeaDc') return 12;
-        return undefined;
-    });
-    rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-    loadCombatSummary.mockResolvedValue(combatSummary);
-    getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 0 } });
-    applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 10 });
-    rollD20.mockReturnValue(5);
 }
 
 describe('wrathOfTheSeaHandler', () => {
@@ -185,13 +167,17 @@ describe('wrathOfTheSeaHandler', () => {
     });
 
     describe('ally attack path (isAllyAttack === true)', () => {
-        it('uses stored wrathWisMod and wrathOfTheSeaDc from runtime state', async () => {
-            setupSavePath(3, 13, 3, 12, 18);
+        it('reads stored wrathOfTheSeaWisMod/wrathOfTheSeaDc and trusts applyDamage finalDamage over the rolled total', async () => {
+            // Stored wis 3 → 3d6; rolled total is 6 but applyDamage reports 18 —
+            // the handler must surface applyDamage's authoritative number.
+            setupSavePath(3, 13, 0, 5, 18);
 
             const result = await handle(mockAllyAttack(), makePlayerStats(), campaignName);
 
             expect(rollExpression).toHaveBeenCalledWith('3d6');
             expect(result.type).toBe('popup');
+            expect(result.payload.results[0].saveSuccess).toBe(false);
+            expect(result.payload.description).toContain('DC 13');
             expect(result.payload.results[0].damage).toBe(18);
         });
 
@@ -239,15 +225,6 @@ describe('wrathOfTheSeaHandler', () => {
             expect(result.payload.results[0].damage).toBe(0);
         });
 
-        it('deals full damage on failed save for NPC', async () => {
-            setupSavePath(1, 12, 0, 5, 6);
-
-            const result = await handle(mockAllyAttack(), makePlayerStats(), campaignName);
-
-            expect(result.payload.results[0].saveSuccess).toBe(false);
-            expect(result.payload.results[0].damage).toBe(6);
-        });
-
         it('calls endInvisibilityOnHostileAction when NPC takes damage', async () => {
             setupSavePath(1, 12, 0, 5, 6);
 
@@ -264,19 +241,8 @@ describe('wrathOfTheSeaHandler', () => {
             expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
         });
 
-        it('handles player targets by sending save prompt', async () => {
-            setupPlayerTarget();
-
-            const result = await handle(mockAllyAttack(), makePlayerStats(), campaignName);
-
-            expect(registerPendingSavePrompt).toHaveBeenCalled();
-            expect(sendSavePrompt).toHaveBeenCalled();
-            expect(result.payload.results).toEqual([]);
-            expect(result.payload.description).toContain('rolling saves');
-        });
-
         it('saves combatSummary to storage and dispatches event', async () => {
-            setupStorageSave();
+            setupSavePath();
 
             await handle(mockAllyAttack(), makePlayerStats(), campaignName);
 
@@ -284,10 +250,13 @@ describe('wrathOfTheSeaHandler', () => {
             expect(global.window.dispatchEvent).toHaveBeenCalledWith(new CustomEvent('combat-summary-updated'));
         });
 
-        it('skips storage save when combatSummary is null', async () => {
+        it('skips storage save and dispatch when combatSummary is null', async () => {
             getRuntimeValue.mockReturnValue(undefined);
             rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
             loadCombatSummary.mockResolvedValue(null);
+            getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 0 } });
+            applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 10 });
+            rollD20.mockReturnValue(5);
 
             const result = await handle(mockAllyAttack(), makePlayerStats(), campaignName);
 
@@ -296,7 +265,7 @@ describe('wrathOfTheSeaHandler', () => {
             expect(result.type).toBe('popup');
         });
 
-        it('uses damageResult.total for NPC damage when applyDamage returns no finalDamage', async () => {
+        it('falls back to the rolled total when applyDamage returns no finalDamage', async () => {
             setupSavePath(1, 12, 0, 5, 0);
             applyDamageToTarget.mockReturnValue({});
 
@@ -304,19 +273,10 @@ describe('wrathOfTheSeaHandler', () => {
 
             expect(result.payload.results[0].damage).toBe(6);
         });
-
-        it('uses applyDamage finalDamage when available', async () => {
-            setupSavePath(1, 12, 0, 5, 0);
-            applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 6 });
-
-            const result = await handle(mockAllyAttack(), makePlayerStats(), campaignName);
-
-            expect(result.payload.results[0].damage).toBe(4);
-        });
     });
 
-    describe('non-ally attack path (isAllyAttack !== true)', () => {
-        it('returns popup when no Wild Shape uses remaining', async () => {
+    describe('manifest leg (not active — spend a Wild Shape use)', () => {
+        it('refuses with zero spend when no Wild Shape uses remain and never rolls dice', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (name === playerName && key === 'wrathOfTheSeaActive') return false;
                 if (name === playerName && key === 'wildShapeUses') return 0;
@@ -329,9 +289,25 @@ describe('wrathOfTheSeaHandler', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('No Wild Shape uses remaining');
             expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(rollExpression).not.toHaveBeenCalled();
         });
 
-        it('decrements wildShapeUses and activates wrathOfTheSeaActive on first use', async () => {
+        it('derives max uses from class_levels when wildShapeUses runtime value is missing', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (name === playerName && key === 'wrathOfTheSeaActive') return false;
+                if (name === playerName && key === 'wildShapeUses') return undefined;
+                return undefined;
+            });
+
+            // level: 3 matches class_levels[].level so the wild_shape: 1 budget resolves.
+            const result = await handle(mockNonAllyAttack(), makePlayerStats({ level: 3 }), campaignName);
+
+            expect(result.payload.description).toContain('activated');
+            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wildShapeUses', 0, campaignName);
+            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wrathOfTheSeaActive', true, campaignName);
+        });
+
+        it('decrements wildShapeUses, activates wrathOfTheSeaActive, and logs ability_use on first use', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (name === playerName && key === 'wrathOfTheSeaActive') return false;
                 if (name === playerName && key === 'wildShapeUses') return 1;
@@ -350,58 +326,11 @@ describe('wrathOfTheSeaHandler', () => {
                 abilityName: 'Wrath of the Sea',
             }));
         });
+    });
 
-        it('uses wild_shape from class_levels when wildShapeUses runtime value is undefined', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return false;
-                if (name === playerName && key === 'wildShapeUses') return undefined;
-                return undefined;
-            });
-
-            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No Wild Shape uses remaining');
-        });
-
-        it('uses maxWS when wildShapeUses runtime value is null', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return false;
-                if (name === playerName && key === 'wildShapeUses') return null;
-                return undefined;
-            });
-
-            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No Wild Shape uses remaining');
-        });
-
-        it('calculates DC from Wisdom bonus + proficiency + 8 for first-time activation', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return false;
-                if (name === playerName && key === 'wildShapeUses') return 1;
-                return undefined;
-            });
-
-            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wrathOfTheSeaActive', true, campaignName);
-        });
-
-        it('returns popup when wrath is already active (second use without no uses)', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-                return undefined;
-            });
-            rollExpression.mockReturnValue({ total: 12, rolls: [4, 4, 4], modifier: 0 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 0 } });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 12, newHp: 0 });
-            rollD20.mockReturnValue(1);
+    describe('attack trigger leg (wrath already active)', () => {
+        it('does not spend Wild Shape uses when wrath is already active', async () => {
+            setupWrathActivePath();
 
             const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
 
@@ -410,40 +339,25 @@ describe('wrathOfTheSeaHandler', () => {
             expect(setRuntimeValue).not.toHaveBeenCalledWith(playerName, 'wildShapeUses', expect.any(Number), campaignName);
         });
 
-        it('uses Wisdom bonus from playerStats for DC calculation when not ally attack', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return false;
-                if (name === playerName && key === 'wildShapeUses') return 1;
-                return undefined;
-            });
-
-            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'wrathOfTheSeaActive', true, campaignName);
-        });
-
         it('uses fallback WisMod of 1 for dice count when Wisdom ability is missing', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-                return undefined;
-            });
-            rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 0 } });
+            setupWrathActivePath();
             applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 10 });
-            rollD20.mockReturnValue(5);
 
-            const emptyStats = { name: playerName };
-            const _result = await handle(mockNonAllyAttack(), emptyStats, campaignName);
+            const _result = await handle(mockNonAllyAttack(), { name: playerName }, campaignName);
 
             expect(rollExpression).toHaveBeenCalledWith('1d6');
             expect(_result.payload.results[0].damage).toBe(6);
         });
 
         it('uses fallback DC of 8 when Wisdom bonus and proficiency are missing', async () => {
+            setupWrathActivePath();
+
+            const _result = await handle(mockNonAllyAttack(), { name: playerName }, campaignName);
+
+            expect(_result.payload.description).toContain('DC 8');
+        });
+
+        it('refuses with no damage when no target is selected', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (name === playerName && key === 'wrathOfTheSeaActive') return true;
                 return undefined;
@@ -452,58 +366,13 @@ describe('wrathOfTheSeaHandler', () => {
             loadCombatSummary.mockResolvedValue({
                 creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
             });
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 0 } });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 10 });
-            rollD20.mockReturnValue(5);
-
-            const emptyStats = { name: playerName };
-            const _result = await handle(mockNonAllyAttack(), emptyStats, campaignName);
-
-            expect(_result.payload.description).toContain('DC 8');
-        });
-
-        it('returns popup when no target is selected', async () => {
-            setupNoTarget();
+            getTargetFromAttacker.mockReturnValue(null);
 
             const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('No current target selected');
-        });
-
-        it('returns early with no-uses popup when wrath is not active and no wild shape uses remain', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return false;
-                if (name === playerName && key === 'wildShapeUses') return 0;
-                return undefined;
-            });
-            rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-
-            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No Wild Shape uses remaining');
-            expect(rollExpression).not.toHaveBeenCalled();
-        });
-
-        it('calculates dice count as max(1, wisMod) for damage formula', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-                return undefined;
-            });
-            rollExpression.mockReturnValue({ total: 18, rolls: [6, 6, 6], modifier: 0 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 0 } });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 18, newHp: 0 });
-            rollD20.mockReturnValue(1);
-
-            const highWisStats = { name: playerName, abilities: [{ name: 'Wisdom', bonus: 3 }] };
-            const result = await handle(mockNonAllyAttack(), highWisStats, campaignName);
-
-            expect(rollExpression).toHaveBeenCalledWith('3d6');
-            expect(result.payload.results[0].damage).toBe(18);
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
 
         it('generates correct HTML output for NPC damage results', async () => {
@@ -519,14 +388,7 @@ describe('wrathOfTheSeaHandler', () => {
         });
 
         it('generates correct HTML for NPC save success', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-                return undefined;
-            });
-            rollExpression.mockReturnValue({ total: 12, rolls: [4, 4, 4], modifier: 0 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
-            });
+            setupWrathActivePath();
             getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 5 } });
             applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 10 });
             rollD20.mockReturnValue(8);
@@ -565,21 +427,14 @@ describe('wrathOfTheSeaHandler', () => {
             consoleSpy.mockRestore();
         });
 
-        it('registers and sends save prompt for player targets', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-                return undefined;
-            });
-            rollExpression.mockReturnValue({ total: 12, rolls: [4, 4, 4], modifier: 0 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: playerName, targetName: 'AllyPlayer' }, { name: 'AllyPlayer', type: 'player' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'AllyPlayer', type: 'player' });
+        it('registers and sends an exact CON save prompt for player targets', async () => {
+            setupPlayerTarget();
 
-            await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
+            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
 
             expect(registerPendingSavePrompt).toHaveBeenCalled();
             const promptArgs = registerPendingSavePrompt.mock.calls[0];
+            expect(promptArgs[0]).toMatch(/^Wrath_of_the_Sea_AllyPlayer_\d+$/);
             expect(promptArgs[1].targetName).toBe('AllyPlayer');
             expect(promptArgs[1].saveDc).toBe(12);
             expect(promptArgs[1].saveType).toBe('CON');
@@ -591,61 +446,14 @@ describe('wrathOfTheSeaHandler', () => {
                 saveDc: 12,
                 sourceName: playerName,
             }));
-        });
-
-        it('uses stored wisdom mod for dice count on second activation (ally attack path)', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-                if (name === playerName && key === 'wrathOfTheSeaWisMod') return 4;
-                return undefined;
-            });
-            rollExpression.mockReturnValue({ total: 24, rolls: [4, 4, 4, 4, 4, 4], modifier: 0 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 0 } });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 24, newHp: 0 });
-            rollD20.mockReturnValue(1);
-
-            await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
-
-            expect(rollExpression).toHaveBeenCalledWith('2d6');
-        });
-
-        it('uses stored wisdom mod for ally attack path', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaWisMod') return 2;
-                if (name === playerName && key === 'wrathOfTheSeaDc') return 12;
-                return undefined;
-            });
-            rollExpression.mockReturnValue({ total: 12, rolls: [4, 4, 4], modifier: 0 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 0 } });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 12, newHp: 0 });
-            rollD20.mockReturnValue(1);
-
-            const result = await handle(mockAllyAttack(), makePlayerStats(), campaignName);
-
-            expect(rollExpression).toHaveBeenCalledWith('2d6');
-            expect(result.type).toBe('popup');
+            expect(result.payload.results).toEqual([]);
+            expect(result.payload.description).toContain('rolling saves');
         });
     });
 
     describe('edge cases', () => {
-        it('handles negative wisdom mod by using at least 1d6', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-                return undefined;
-            });
-            rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 0 } });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 10 });
-            rollD20.mockReturnValue(5);
+        it('clamps negative wisdom mod to at least 1d6', async () => {
+            setupWrathActivePath();
 
             const negativeWisStats = { name: playerName, abilities: [{ name: 'Wisdom', bonus: -2 }] };
             await handle(mockNonAllyAttack(), negativeWisStats, campaignName);
@@ -657,44 +465,7 @@ describe('wrathOfTheSeaHandler', () => {
             await expect(handle(mockAllyAttack(), undefined, campaignName)).rejects.toThrow();
         });
 
-        it('handles undefined campaignName gracefully', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-                return undefined;
-            });
-            rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: { con: 0 } });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 10 });
-            rollD20.mockReturnValue(5);
-
-            const result = await handle(mockNonAllyAttack(), makePlayerStats(), undefined);
-
-            expect(result.type).toBe('popup');
-        });
-
-        it('returns a refusal popup when action has no automation field and wrath is already active', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-                return undefined;
-            });
-            rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
-            });
-            getTargetFromAttacker.mockReturnValue(null);
-
-            const actionWithoutAutomation = { name: 'Wrath of the Sea' };
-            const result = await handle(actionWithoutAutomation, makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No current target selected');
-            expect(applyDamageToTarget).not.toHaveBeenCalled();
-        });
-
-        it('returns a refusal popup when action has null automation field and wrath is already active', async () => {
+        it('returns a refusal popup when action has null automation field', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (name === playerName && key === 'wrathOfTheSeaActive') return true;
                 return undefined;
@@ -713,18 +484,9 @@ describe('wrathOfTheSeaHandler', () => {
             expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
 
-        it('handles NPC with missing saveBonuses', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-                return undefined;
-            });
-            rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
-            });
+        it('defaults a missing NPC saveBonuses map to +0', async () => {
+            setupWrathActivePath();
             getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc' });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 10 });
-            rollD20.mockReturnValue(5);
 
             const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
 
@@ -732,29 +494,8 @@ describe('wrathOfTheSeaHandler', () => {
             expect(result.payload.results[0].saveBonus).toBe(0);
         });
 
-        it('handles NPC with null saveBonuses', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-                return undefined;
-            });
-            rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0 });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: playerName, targetName: 'Enemy' }, { name: 'Enemy' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Enemy', type: 'npc', saveBonuses: null });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 10 });
-            rollD20.mockReturnValue(5);
-
-            const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-        });
-
         it('returns null when rollExpression returns no result', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === playerName && key === 'wrathOfTheSeaActive') return true;
-                return undefined;
-            });
+            setupWrathActivePath();
             rollExpression.mockReturnValue(null);
 
             const result = await handle(mockNonAllyAttack(), makePlayerStats(), campaignName);
@@ -917,20 +658,22 @@ describe('wrathOfTheSeaHandler', () => {
             expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'wrath_of_the_sea_end' }], campaignName, rounds: 100 });
         });
 
-        it('manifest leg honors the fixed 10_minutes data duration token', async () => {
+        it('parses the minutes token from automation.duration instead of defaulting', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (name === playerName && key === 'wrathOfTheSeaActive') return false;
                 if (name === playerName && key === 'wildShapeUses') return 2;
                 return undefined;
             });
 
+            // Non-default token: distinguishes the parse branch from the 10-minute
+            // default fallback (which would also produce rounds 100).
             const action = {
                 name: 'Wrath of the Sea',
-                automation: { type: 'wrath_of_the_sea', duration: '10_minutes' },
+                automation: { type: 'wrath_of_the_sea', duration: '5_minutes' },
             };
             await handle(action, makePlayerStats(), campaignName);
 
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'wrath_of_the_sea_end' }], campaignName, rounds: 100 });
+            expect(addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: playerName, effects: [{ type: 'wrath_of_the_sea_end' }], campaignName, rounds: 50 });
         });
     });
 });
