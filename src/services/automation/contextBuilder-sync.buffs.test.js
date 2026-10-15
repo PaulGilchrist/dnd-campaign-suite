@@ -1,3 +1,13 @@
+// @maintained-by-ai
+// contextBuilder-sync activeBuffs lane — canonical owner of the buff-scan
+// advantage paths (advantage_attacks_advantage_against / advantage_attacks_and_saves
+// / create_illusion), vow-of-enmity positive, rage stance-damage accumulation,
+// Ram flag, Dodge disadvantage, sacred weapon, blessed warrior, clairvoyant
+// combatant, and avenging angel single-source behaviour.
+// The forced-mode PRIORITY chain (who wins) lives in
+// contextBuilder-sync.advantage-priority.test.js — do not re-add ordering tests here.
+// saveDc/saveType passthrough canonical home: contextBuilder-sync.test.js.
+// Deterministic: all externals mocked → stable contract, flag kept.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -131,15 +141,14 @@ const mockAttack = {
   weaponType: 'melee',
 };
 
-function defaultBaseAttackContext(targetName = 'Orc', target = null) {
+// Every adv/dis source OFF — each test switches on exactly the sources it needs.
+function neutralSources() {
   buildBaseAttackContext.mockResolvedValue({
-    target: target ?? { name: targetName },
-    targetName,
+    target: { name: 'Orc' },
+    targetName: 'Orc',
     resistanceNotice: null,
   });
-}
-
-function defaultAuraMocks() {
+  getRuntimeValue.mockReturnValue(undefined);
   getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
   getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
   getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
@@ -149,14 +158,12 @@ function defaultAuraMocks() {
   isAuraTarget.mockReturnValue(false);
 }
 
-describe('contextBuilder-sync: innate sorcery bonus', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    defaultBaseAttackContext();
-    getRuntimeValue.mockReturnValue(undefined);
-    defaultAuraMocks();
-  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  neutralSources();
+});
 
+describe('contextBuilder-sync: innate sorcery bonus', () => {
   it('sets forcedMode to advantage and adds saveDcBonus when innate sorcery is active', async () => {
     getInnateSorceryBonus.mockReturnValue({ spellAdvantage: true, saveDcBonus: 2 });
     const attack = { ...mockAttack, saveDc: 13 };
@@ -169,13 +176,6 @@ describe('contextBuilder-sync: innate sorcery bonus', () => {
 });
 
 describe('contextBuilder-sync: activeBuffs — stance damage (rage)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    defaultBaseAttackContext();
-    getRuntimeValue.mockReturnValue(undefined);
-    defaultAuraMocks();
-  });
-
   it('accumulates stance damage from multiple rage buffs and uses class_levels rage_damage value', async () => {
     const stats = {
       ...mockStats,
@@ -195,24 +195,6 @@ describe('contextBuilder-sync: activeBuffs — stance damage (rage)', () => {
     const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
 
     expect(result.autoDamageFormula).toBe('1d8+4 plus 10');
-  });
-
-  it('uses rage_damage from class_levels when buff expression is rage_damage', async () => {
-    const stats = {
-      ...mockStats,
-      level: 2,
-      class: {
-        class_levels: [undefined, { rage_damage: 5 }],
-      },
-    };
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeBuffs') return [{ damageBonusExpression: 'rage_damage' }];
-      return undefined;
-    });
-
-    const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal');
-
-    expect(result.autoDamageFormula).toBe('1d8+4 plus 5');
   });
 
   it('defaults to 2 for rage_damage when class_levels entry is undefined', async () => {
@@ -246,37 +228,21 @@ describe('contextBuilder-sync: activeBuffs — stance damage (rage)', () => {
 });
 
 describe('contextBuilder-sync: activeBuffs — advantage buffs (reckless attack, advantage_attacks_and_saves, create_illusion)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    defaultBaseAttackContext();
-    getRuntimeValue.mockReturnValue(undefined);
-    defaultAuraMocks();
-  });
+  it.each(['advantage_attacks_advantage_against', 'advantage_attacks_and_saves', 'create_illusion'])(
+    'sets forcedMode to advantage when %s buff is active', async (effect) => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [{ effect }];
+        return undefined;
+      });
 
-  it.each([
-    { effect: 'advantage_attacks_advantage_against', name: 'reckless attack' },
-    { effect: 'advantage_attacks_and_saves', name: 'advantage_attacks_and_saves' },
-    { effect: 'create_illusion', name: 'create_illusion' },
-  ])('sets forcedMode to advantage when %s buff is active', async ({ effect }) => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeBuffs') return [{ effect }];
-      return undefined;
-    });
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
-
-    expect(result.forcedMode).toBe('advantage');
-  });
+      expect(result.forcedMode).toBe('advantage');
+    }
+  );
 });
 
 describe('contextBuilder-sync: activeBuffs — Ram', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    defaultBaseAttackContext();
-    getRuntimeValue.mockReturnValue(undefined);
-    defaultAuraMocks();
-  });
-
   it('sets ramActive true when Ram buff is present', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'activeBuffs') return [{ optionName: 'Ram' }];
@@ -290,13 +256,6 @@ describe('contextBuilder-sync: activeBuffs — Ram', () => {
 });
 
 describe('contextBuilder-sync: Dodge action', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    defaultBaseAttackContext();
-    getRuntimeValue.mockReturnValue(undefined);
-    defaultAuraMocks();
-  });
-
   it('sets forcedMode to disadvantage when target has Dodge active', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'activeBuffs' && name === 'Orc') return [{ name: 'Dodge', effect: 'dodge', duration: 'until_start_of_next_turn' }];
@@ -323,13 +282,6 @@ describe('contextBuilder-sync: Dodge action', () => {
 });
 
 describe('contextBuilder-sync: activeBuffs — sacred weapon', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    defaultBaseAttackContext();
-    getRuntimeValue.mockReturnValue(undefined);
-    defaultAuraMocks();
-  });
-
   it('adds Charisma bonus to sacredWeaponBonus and hitBonus for melee and unarmed attacks', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'activeBuffs') return [{ effect: 'sacred_weapon' }];
@@ -373,13 +325,6 @@ describe('contextBuilder-sync: activeBuffs — sacred weapon', () => {
 });
 
 describe('contextBuilder-sync: activeBuffs — vow of enmity', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    defaultBaseAttackContext();
-    getRuntimeValue.mockReturnValue(undefined);
-    defaultAuraMocks();
-  });
-
   it('sets advantage when vow_of_enmity is on target activeBuffs', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'activeBuffs') return [{ effect: 'vow_of_enmity' }];
@@ -393,13 +338,6 @@ describe('contextBuilder-sync: activeBuffs — vow of enmity', () => {
 });
 
 describe('contextBuilder-sync: activeBuffs — clairvoyant combatant', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    defaultBaseAttackContext();
-    getRuntimeValue.mockReturnValue(undefined);
-    defaultAuraMocks();
-  });
-
   it('sets advantage when clairvoyant_combatant is active and target matches', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'activeBuffs') return [{ effect: 'clairvoyant_combatant' }];
@@ -411,16 +349,21 @@ describe('contextBuilder-sync: activeBuffs — clairvoyant combatant', () => {
 
     expect(result.forcedMode).toBe('advantage');
   });
+
+  it('does not set advantage when the bonded target does not match the attack target', async () => {
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'activeBuffs') return [{ effect: 'clairvoyant_combatant' }];
+      if (key === 'clairvoyantCombatantTarget') return 'Troll';
+      return undefined;
+    });
+
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
+
+    expect(result.forcedMode).toBeUndefined();
+  });
 });
 
 describe('contextBuilder-sync: activeBuffs — avenging angel', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    defaultBaseAttackContext();
-    getRuntimeValue.mockReturnValue(undefined);
-    defaultAuraMocks();
-  });
-
   it('sets advantage when avenging angel active and target is in aura', async () => {
     isAvengingAngelActive.mockReturnValue(true);
     isAuraTarget.mockReturnValue(true);
@@ -432,13 +375,6 @@ describe('contextBuilder-sync: activeBuffs — avenging angel', () => {
 });
 
 describe('contextBuilder-sync: activeBuffs — blessed warrior', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    defaultBaseAttackContext();
-    getRuntimeValue.mockReturnValue(undefined);
-    defaultAuraMocks();
-  });
-
   it('adds +2 to hitBonus and hitBonusFormula for melee and unarmed attacks', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'activeBuffs') return [{ effect: 'blessed_warrior' }];

@@ -1,3 +1,13 @@
+// @maintained-by-ai
+// Seam (test-suite trim, 2026-10):
+// - Engine `useWizardConfig.test.js` owns generic config behaviour (slot state,
+//   warnings, preSelect auto-merge mechanics incl. hasItems guards, error logging).
+// - `useWizardTools.test.js` owns mock-engine wiring: the config object shape passed
+//   to useWizardConfig and unit behaviour of the preSelect merge closure.
+// - THIS file only smokes that the wrapper's config RUNS through the real engine +
+//   real toolValidation service (dataLoader mocked): one 2024 end-to-end smoke plus
+//   the wrapper-specific 5e short-circuit. Merge/dedup semantics and engine
+//   mechanics are asserted there, not here.
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -40,7 +50,7 @@ const createFormData5e = (overrides = {}) => ({
   ...overrides,
 });
 
-describe('useWizardTools - integration', () => {
+describe('useWizardTools - wiring smoke through the real engine', () => {
   const mockSetFormData = vi.fn();
 
   beforeEach(() => {
@@ -56,214 +66,51 @@ describe('useWizardTools - integration', () => {
     return renderHook(() => useWizardTools(formData, setFormDataFn));
   }
 
-  describe('2024 ruleset - tool proficiency flow', () => {
-    it('pre-selects background tool proficiencies and calls setFormData with merged tools', async () => {
-      const { result } = renderTools();
+  it('2024: loads 2024 data, exposes limits and pre-selected tools, and merges them via setFormData', async () => {
+    const { result } = renderTools();
 
-      await waitFor(() => {
-        expect(result.current.preSelectedTools).toContain("Calligrapher's Supplies");
-      });
-
-      expect(fetchBackgroundData).toHaveBeenCalledWith('Acolyte', '2024');
-      expect(fetchClassData).toHaveBeenCalledWith('Bard', '2024');
-      expect(loadFeatData).toHaveBeenCalledWith('2024');
-
-      expect(mockSetFormData).toHaveBeenCalled();
-      const mergeCall = mockSetFormData.mock.calls[0][0];
-      expect(typeof mergeCall).toBe('function');
-      const mergedResult = mergeCall({ toolProficiencies: [] });
-      expect(mergedResult.toolProficiencies).toContain("Calligrapher's Supplies");
+    // Slot path: class choose-string parsed to category limits by the real
+    // toolValidation service and surfaced through the engine's slot state.
+    await waitFor(() => {
+      expect(result.current.toolLimits).not.toBeNull();
     });
+    expect(result.current.toolLimits.categoryLimits).toBeInstanceOf(Map);
+    expect(result.current.toolLimits.categoryLimits.get('Musical Instrument')).toBe(3);
 
-    it('returns preSelectedTools as an array of tool names from background and class choices', async () => {
-      const { result } = renderTools();
-
-      await waitFor(() => {
-        expect(Array.isArray(result.current.preSelectedTools)).toBe(true);
-        expect(result.current.preSelectedTools.length).toBeGreaterThan(0);
-      });
-
+    // Pre-select path: fixed background tool reaches preSelectedTools and the
+    // engine invokes setFormData with the wrapper's merge.
+    await waitFor(() => {
       expect(result.current.preSelectedTools).toContain("Calligrapher's Supplies");
+      expect(mockSetFormData).toHaveBeenCalled();
     });
 
-    it('returns toolLimits with categoryLimits Map, preSelected array, and skilledUsesAvailable number', async () => {
-      const { result } = renderTools();
+    expect(fetchBackgroundData).toHaveBeenCalledWith('Acolyte', '2024');
+    expect(fetchClassData).toHaveBeenCalledWith('Bard', '2024');
 
-      await waitFor(() => {
-        expect(result.current.toolLimits).not.toBeNull();
-        expect(result.current.toolLimits).not.toBeUndefined();
-      });
+    const mergeCall = mockSetFormData.mock.calls[mockSetFormData.mock.calls.length - 1][0];
+    expect(typeof mergeCall).toBe('function');
+    const merged = mergeCall({ toolProficiencies: ['Herbalism Kit'] });
+    expect(merged.toolProficiencies).toContain('Herbalism Kit');
+    expect(merged.toolProficiencies).toContain("Calligrapher's Supplies");
 
-      expect(result.current.toolLimits).toHaveProperty('categoryLimits');
-      expect(result.current.toolLimits.categoryLimits).toBeInstanceOf(Map);
-      expect(result.current.toolLimits).toHaveProperty('preSelected');
-      expect(Array.isArray(result.current.toolLimits.preSelected)).toBe(true);
-      expect(result.current.toolLimits).toHaveProperty('skilledUsesAvailable');
-      expect(typeof result.current.toolLimits.skilledUsesAvailable).toBe('number');
-    });
-
-    it('returns toolWarnings as an array', async () => {
-      const { result } = renderTools();
-
-      await waitFor(() => {
-        expect(result.current.toolWarnings).toBeDefined();
-      });
-
-      expect(Array.isArray(result.current.toolWarnings)).toBe(true);
-    });
-
-    it('does not call setFormData when preSelectedTools is empty', async () => {
-      fetchBackgroundData.mockResolvedValue(null);
-      fetchClassData.mockResolvedValue(null);
-      loadFeatData.mockResolvedValue([]);
-
-      const { result } = renderTools();
-
-      await waitFor(() => {
-        expect(result.current.preSelectedTools).toEqual([]);
-      });
-
-      expect(mockSetFormData).not.toHaveBeenCalled();
-    });
+    // Wrapper output envelope.
+    expect(Object.keys(result.current).sort()).toEqual(['preSelectedTools', 'toolLimits', 'toolWarnings']);
   });
 
-  describe('5e ruleset - no tool proficiency processing', () => {
-    it('returns empty preSelectedTools for 5e ruleset', async () => {
-      const { result } = renderTools(createFormData5e());
+  it('5e: short-circuits — no dataLoader calls, empty limits, no setFormData', async () => {
+    const { result } = renderTools(createFormData5e());
 
-      await waitFor(() => {
-        expect(result.current.preSelectedTools).toEqual([]);
-      });
-
-      expect(fetchBackgroundData).not.toHaveBeenCalled();
-      expect(fetchClassData).not.toHaveBeenCalled();
-      expect(loadFeatData).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(result.current.toolLimits).not.toBeNull();
     });
 
-    it('returns empty toolLimits for 5e ruleset', async () => {
-      const { result } = renderTools(createFormData5e());
-
-      await waitFor(() => {
-        expect(result.current.toolLimits).not.toBeNull();
-        expect(result.current.toolLimits).not.toBeUndefined();
-      });
-
-      expect(result.current.toolLimits.categoryLimits).toBeInstanceOf(Map);
-      expect(result.current.toolLimits.categoryLimits.size).toBe(0);
-      expect(result.current.toolLimits.preSelected).toEqual([]);
-      expect(result.current.toolLimits.skilledUsesAvailable).toBe(0);
-    });
-
-    it('returns empty warnings for 5e ruleset', async () => {
-      const { result } = renderTools(createFormData5e());
-
-      await waitFor(() => {
-        expect(result.current.toolWarnings).toEqual([]);
-      });
-    });
-  });
-
-  describe('missing data handling', () => {
-    it('returns empty preSelectedTools when background returns null', async () => {
-      fetchBackgroundData.mockResolvedValue(null);
-
-      const { result } = renderTools(createFormData2024({ background: 'NonExistent' }));
-
-      await waitFor(() => {
-        expect(result.current.preSelectedTools).toEqual([]);
-      });
-    });
-
-    it('returns empty preSelectedTools when class returns null', async () => {
-      fetchClassData.mockResolvedValue(null);
-
-      const { result } = renderTools(createFormData2024({ class: { name: 'NonExistentClass' } }));
-
-      await waitFor(() => {
-        expect(result.current.preSelectedTools).toEqual([]);
-      });
-  });
-
-    it('returns empty preSelectedTools when both background and class return null', async () => {
-      fetchBackgroundData.mockResolvedValue(null);
-      fetchClassData.mockResolvedValue(null);
-
-      const { result } = renderTools();
-
-      await waitFor(() => {
-        expect(result.current.preSelectedTools).toEqual([]);
-      });
-    });
-
-    it('handles missing feats gracefully', async () => {
-      loadFeatData.mockResolvedValue([]);
-
-      const { result } = renderTools(createFormData2024({ feats: ['NonExistentFeat'] }));
-
-      await waitFor(() => {
-        expect(result.current.preSelectedTools).toBeDefined();
-      });
-
-      expect(fetchBackgroundData).toHaveBeenCalled();
-      expect(fetchClassData).toHaveBeenCalled();
-    });
-  });
-
-  describe('merge behavior via setFormData', () => {
-    it('does not duplicate tools already in toolProficiencies', async () => {
-      const existingTools = ["Calligrapher's Supplies"];
-      const existingSetFormData = vi.fn((updater) => {
-        const result = updater({ toolProficiencies: existingTools });
-        return result;
-      });
-
-      renderTools(createFormData2024(), existingSetFormData);
-
-      await waitFor(() => {
-        expect(existingSetFormData).toHaveBeenCalled();
-      });
-
-      const lastCall = existingSetFormData.mock.calls[existingSetFormData.mock.calls.length - 1][0];
-      const merged = lastCall({ toolProficiencies: existingTools });
-      const count = merged.toolProficiencies.filter(t => t === "Calligrapher's Supplies").length;
-      expect(count).toBe(1);
-    });
-
-    it('appends new pre-selected tools to existing toolProficiencies', async () => {
-      const existingTools = ['Herbalism Kit'];
-      const existingSetFormData = vi.fn((updater) => {
-        const result = updater({ toolProficiencies: existingTools });
-        return result;
-      });
-
-      renderTools(createFormData2024(), existingSetFormData);
-
-      await waitFor(() => {
-        expect(existingSetFormData).toHaveBeenCalled();
-      });
-
-      const lastCall = existingSetFormData.mock.calls[existingSetFormData.mock.calls.length - 1][0];
-      const merged = lastCall({ toolProficiencies: existingTools });
-      expect(merged.toolProficiencies).toContain('Herbalism Kit');
-      expect(merged.toolProficiencies).toContain("Calligrapher's Supplies");
-      expect(merged.toolProficiencies).toHaveLength(2);
-    });
-  });
-
-  describe('return value structure', () => {
-    it('returns an object with exactly toolLimits, toolWarnings, and preSelectedTools', async () => {
-      const { result } = renderTools();
-
-      await waitFor(() => {
-        expect(result.current).toBeDefined();
-      });
-
-      expect(result.current).toHaveProperty('toolLimits');
-      expect(result.current).toHaveProperty('toolWarnings');
-      expect(result.current).toHaveProperty('preSelectedTools');
-
-      const keys = Object.keys(result.current);
-      expect(keys).toEqual(['toolLimits', 'toolWarnings', 'preSelectedTools']);
-    });
+    expect(result.current.toolLimits.categoryLimits).toBeInstanceOf(Map);
+    expect(result.current.toolLimits.categoryLimits.size).toBe(0);
+    expect(result.current.preSelectedTools).toEqual([]);
+    expect(result.current.toolWarnings).toEqual([]);
+    expect(fetchBackgroundData).not.toHaveBeenCalled();
+    expect(fetchClassData).not.toHaveBeenCalled();
+    expect(loadFeatData).not.toHaveBeenCalled();
+    expect(mockSetFormData).not.toHaveBeenCalled();
   });
 });

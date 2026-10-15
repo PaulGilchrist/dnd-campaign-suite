@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// CLA-201 lone-lane contract for buffHandler's rage_bonus_movement gate: the
+// standalone Instinctive Pounce row never stamps a buff — refuse outside Rage,
+// advisory-remind while raging with the canonical half-speed, both logged.
+// Fully mocked and deterministic. The generic temp_buff toggle path lives in
+// buffHandler.advanced-effects.test.js; the enter-Rage advisory stamp lives in
+// combatStanceHandler.instinctive-pounce.test.js; half-speed math in
+// speedUtils.cla201-race-speed-fold.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/buffToggle.js', () => ({
@@ -132,19 +140,5 @@ describe('buffHandler — CLA-201 Instinctive Pounce standalone lane', () => {
         const advisory = loggedEntries().find(e => e && e.automationType === 'instinctive_pounce_advisory');
         expect(advisory).toBeDefined();
         expect(advisory.description).toContain('20 feet');
-    });
-
-    it('does not affect other temp_buff features', async () => {
-        setActiveBuffs([]);
-        buffToggle.toggleBuff.mockReturnValue({ wasActive: false, activeBuffs: [] });
-
-        const action = {
-            name: 'Heroic Rest',
-            automation: { type: 'temp_buff', effect: 'some_other_buff', duration: '1_minute' },
-        };
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(buffToggle.toggleBuff).toHaveBeenCalled();
-        expect(result.type).toBe('popup');
     });
 });

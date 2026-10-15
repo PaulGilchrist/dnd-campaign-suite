@@ -1,3 +1,8 @@
+// @maintained-by-ai
+// Deterministic passive-flag contract tests for buildAttackContextSync:
+// hunter lore notice, critical range, glorious defense (retroactive — absent by design),
+// stroke of luck / boon of fate / boon of combat prowess availability, and Graze mastery.
+// Context fields are a stable output contract; vi.mock boilerplate is frozen (see cluster).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -382,17 +387,13 @@ describe('contextBuilder-sync: graze damage', () => {
     expect(result.grazeAbilityMod).toBe(4);
   });
 
-  it('uses attack.abilityName when provided, defaults to Strength when omitted', async () => {
+  it('uses attack.abilityName when provided (default Strength covered above)', async () => {
     collectWeaponMastery.mockReturnValue({ baseMastery: 'Graze', extraMasteries: [] });
 
     const dexAttack = { ...mockAttack, abilityName: 'Dexterity' };
-    let result = await buildAttackContextSync(dexAttack, mockStats, 'camp', 'normal');
+    const result = await buildAttackContextSync(dexAttack, mockStats, 'camp', 'normal');
     expect(result.grazeAbilityName).toBe('Dexterity');
     expect(result.grazeAbilityMod).toBe(3);
-
-    const undefAttack = { ...mockAttack, abilityName: undefined };
-    result = await buildAttackContextSync(undefAttack, mockStats, 'camp', 'normal');
-    expect(result.grazeAbilityName).toBe('Strength');
   });
 
   it('excludes grazeDamage when no Graze mastery', async () => {
@@ -415,10 +416,7 @@ describe('contextBuilder-sync: boon of combat prowess', () => {
   });
 
   it('sets boonOfCombatProwess true when auto_reroll passive exists and not used', async () => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY) return undefined;
-      return undefined;
-    });
+    // latch unset (getRuntimeValue default undefined) = not locked
     const stats = {
       ...mockStats,
       automation: {
@@ -431,10 +429,7 @@ describe('contextBuilder-sync: boon of combat prowess', () => {
   });
 
   it('sets boonOfCombatProwess true when auto_reroll exists in reactions', async () => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY) return undefined;
-      return undefined;
-    });
+    // latch unset (getRuntimeValue default undefined) = not locked
     const stats = {
       ...mockStats,
       automation: {

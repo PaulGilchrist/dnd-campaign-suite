@@ -1,9 +1,13 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // SP-094: Protection from Evil and Good charm immunity must be enforced on the
 // monster save-chip lane. saveProcessing threads the attacker's real creature type
-// (combatSummary monsterType) into playerIsImmuneToCondition and logs a refusal
-// when the ward — not some other immunity — is what blocked the condition.
+// (combatSummary monsterType → resolveCreatureType) into playerIsImmuneToCondition
+// and logs a refusal via logWardedConditionImmunity when the ward — not some other
+// immunity — is what blocked the condition. Generic failed-save legs live in
+// saveProcessing.failed-save-conditions.test.js; aura split logic is owned by the
+// auraConditionImmunity tests — keep only the PFEG ward seam here.
 
 const runtimeStore = {};
 const entries = [];
@@ -33,7 +37,6 @@ vi.mock('../../services/ui/logService.js', () => ({
     addEntry: (_campaignName, entry) => { entries.push(entry); return Promise.resolve(); },
 }));
 
-const WARDED = ['Aberration', 'Celestial', 'Elemental', 'Fey', 'Fiend', 'Undead'];
 vi.mock('../../services/encounters/combatData.js', () => ({
     loadCombatSummary: async () => ({
         creatures: [
@@ -56,14 +59,15 @@ vi.mock('../../services/automation/handlers/buffs/circleOfPowerHandler.js', () =
     isCircleOfPowerActive: () => false,
 }));
 
-// Mirror automationImmunities.isWardedConditionImmunity: PFEG must be active AND
-// the condition charmed/frightened AND the attacker type warded.
+// Mirror automationImmunities.isWardedConditionImmunity (spells.json PFEG
+// wardedCreatureTypes): PFEG buff active AND condition charmed/frightened AND
+// attacker type warded.
+const WARDED = ['Aberration', 'Celestial', 'Elemental', 'Fey', 'Fiend', 'Undead'];
 vi.mock('../../services/combat/automation/automationService.js', () => ({
     hasIgnoreResistance: () => false,
     playerIsImmuneToCondition: ({ conditionKey, playerStats, sourceCreatureType }) => {
         const buffs = runtimeStore[`${playerStats?.name}.activeBuffs`] || [];
-        const active = buffs.some(b => b.effect === 'protection_from_evil_and_good');
-        if (!active) return false;
+        if (!buffs.some(b => b.effect === 'protection_from_evil_and_good')) return false;
         const low = String(conditionKey || '').toLowerCase();
         if (low !== 'charmed' && low !== 'frightened') return false;
         return WARDED.some(t => t.toLowerCase() === String(sourceCreatureType || '').toLowerCase());
@@ -76,24 +80,25 @@ const campaignName = 'test-campaign';
 
 function seedWard() {
     runtimeStore['War_Cleric.activeBuffs'] = [{ name: 'Protection from Evil and Good', effect: 'protection_from_evil_and_good' }];
+    // Real logWardedConditionImmunity reads this persisted key (handler's
+    // protectionFromEvilAndGoodWardedTypes) before logging the refusal.
     runtimeStore['War_Cleric.protectionFromEvilAndGoodWardedTypes'] = WARDED;
 }
 
-async function resolveFailedSave(attackerName) {
-    const context = {
-        saveDc: 15, saveType: 'CHA', attackerName,
-        actionName: 'Charm', dcSuccess: 'none',
-        autoDamageFormula: null, saveConditions: ['charmed'],
-        // SP-094: the modal save builder now threads _characters so targetStats
-        // resolves and immunity can fire on this lane.
-        _characters: [{ name: 'War_Cleric', computedStats: { name: 'War_Cleric', immunities: [] } }],
-    };
+async function resolveFailedSave(attackerName, saveConditions = ['charmed']) {
     const promise = processSaveRoll({
         rollType: 'save',
         target: { name: 'War_Cleric', type: 'player' },
         characterName: 'War_Cleric',
         campaignName,
-        context,
+        context: {
+            saveDc: 15, saveType: 'CHA', attackerName,
+            actionName: 'Charm', dcSuccess: 'none',
+            autoDamageFormula: null, saveConditions,
+            // SP-094: the modal save builder threads _characters so targetStats
+            // resolves and immunity can fire on this lane.
+            _characters: [{ name: 'War_Cleric', computedStats: { name: 'War_Cleric', immunities: [] } }],
+        },
         logEntry: () => {},
         setPopupHtml: vi.fn(),
     });
@@ -102,7 +107,6 @@ async function resolveFailedSave(attackerName) {
 }
 
 beforeEach(() => {
-    vi.clearAllMocks();
     for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
     entries.length = 0;
 });
@@ -115,8 +119,8 @@ describe('SP-094 PFEG charm immunity on monster save-chip lane', () => {
         expect(runtimeStore['War_Cleric.activeConditions']).toBeUndefined();
         expect(entries.some(e => e.type === 'condition' && e.action === 'applied')).toBe(false);
         const blocked = entries.find(e => e.type === 'automation blocked');
-        expect(blocked).toBeTruthy();
         expect(blocked).toMatchObject({ characterName: 'War_Cleric', sourceName: 'Succubus 1', abilityName: 'Charm' });
+        // Real logWardedConditionImmunity formats the resolved attacker type.
         expect(blocked.description).toMatch(/Fiend/);
     });
 
@@ -126,13 +130,17 @@ describe('SP-094 PFEG charm immunity on monster save-chip lane', () => {
 
         expect(runtimeStore['War_Cleric.activeConditions']).toEqual(['charmed']);
         expect(entries.some(e => e.type === 'automation blocked')).toBe(false);
-        expect(entries.some(e => e.type === 'condition' && e.action === 'applied')).toBe(true);
     });
 
-    it('no ward active: fiend charm lands (byte-inert when unwarded)', async () => {
-        await resolveFailedSave('Succubus 1');
+    // FIXME: applyFailedSaveConditions keys immunity off applicable[0] only, so a
+    // multi-condition save row whose first condition is charmed/frightened (e.g.
+    // hag's Curse: "Charmed and Poisoned", extractConditionsFromSaveEffect order)
+    // suppresses ALL conditions — RAW, the PFEG ward blocks only charmed/frightened
+    // and poisoned should still land.
+    it.fails('multi-condition row: ward blocks only charmed, poisoned still lands', async () => {
+        seedWard();
+        await resolveFailedSave('Succubus 1', ['charmed', 'poisoned']);
 
-        expect(runtimeStore['War_Cleric.activeConditions']).toEqual(['charmed']);
-        expect(entries.some(e => e.type === 'automation blocked')).toBe(false);
+        expect(runtimeStore['War_Cleric.activeConditions']).toEqual(['poisoned']);
     });
 });

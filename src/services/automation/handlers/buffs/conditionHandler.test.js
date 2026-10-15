@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Canonical primary suite for conditionHandler.handle (set_condition / channel_divinity seam).
+// Fully mocked and deterministic: buildSaveDc defaulting (CLA-238 CHA vs WIS), Channel Divinity
+// charge gate (CLA-303), maxTargets cap, duration parsing, map/attacker position, payload shape,
+// and the activation log. Data ground-truth lives in conditionHandler.abjureFoesCD.test.js;
+// the CLA-239 Necrotic Shroud unit contract lives in conditionHandler-necroticShroud.test.js —
+// neither behaviour is repeated here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -107,18 +114,6 @@ describe('conditionHandler.handle', () => {
       expect(result.type).toBe('modal');
       expect(result.payload.saveDc).toBe(15);
       expect(getAbilityModifier).toHaveBeenCalledWith(ps.abilities, 'STR');
-    });
-
-    it('uses handler default WIS when saveAbility is absent', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ saveDc: 'ability' });
-
-      getAbilityModifier.mockReturnValue(2);
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.saveDc).toBe(13);
-      expect(getAbilityModifier).toHaveBeenCalledWith(ps.abilities, 'WIS');
     });
 
     it('uses first element when saveAbility is an array', async () => {
@@ -234,42 +229,21 @@ describe('conditionHandler.handle', () => {
   });
 
   describe('charge handling', () => {
-    it('returns popup with no charges (0)', async () => {
+    it('returns popup when stored charges deny use (0, negative, string "0")', async () => {
       const ps = makePlayerStats();
       const action = makeAction({});
 
-      getRuntimeValue.mockReturnValue(0);
+      for (const stored of [0, -1, '0']) {
+        getRuntimeValue.mockReturnValue(stored);
 
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
+        const result = await handle(action, ps, CAMPAIGN_NAME, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
-      expect(result.payload.name).toBe('Divine Smite');
-      expect(result.payload.automationType).toBe('channel_divinity');
-    });
-
-    it('returns popup with negative charges', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({});
-
-      getRuntimeValue.mockReturnValue(-1);
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('returns popup when stored charges are string "0"', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({});
-
-      getRuntimeValue.mockReturnValue('0');
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.type).toBe('popup');
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
+        expect(result.payload.name).toBe('Divine Smite');
+        expect(result.payload.automationType).toBe('channel_divinity');
+      }
     });
 
     it('returns modal with charges > 0', async () => {
@@ -349,28 +323,19 @@ describe('conditionHandler.handle', () => {
   });
 
   describe('range handling', () => {
-    it('uses default range 60 when rangeToFeet returns falsy', async () => {
+    it('uses default range 60 when rangeToFeet returns falsy (null or 0)', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({});
 
       getRuntimeValue.mockReturnValue(2);
-      rangeToFeet.mockReturnValue(null);
 
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
+      for (const mapped of [null, 0]) {
+        const action = makeAction(mapped === 0 ? { range: '0ft' } : {});
+        rangeToFeet.mockReturnValue(mapped);
 
-      expect(result.payload.rangeFeet).toBe(60);
-    });
+        const result = await handle(action, ps, CAMPAIGN_NAME, null);
 
-    it('uses zero as default range when rangeToFeet returns 0', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ range: '0ft' });
-
-      getRuntimeValue.mockReturnValue(2);
-      rangeToFeet.mockReturnValue(0);
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.rangeFeet).toBe(60);
+        expect(result.payload.rangeFeet).toBe(60);
+      }
     });
 
     it('uses custom range from rangeToFeet', async () => {
@@ -514,6 +479,9 @@ describe('conditionHandler.handle', () => {
 
       const result4 = await handle({ ...action, automation: { ...action.automation, duration: '0_rounds' } }, ps, CAMPAIGN_NAME, null);
       expect(result4.payload.durationRounds).toBe(0);
+
+      const result5 = await handle({ ...action, automation: { ...action.automation, duration: 'until_end_of_next_turn' } }, ps, CAMPAIGN_NAME, null);
+      expect(result5.payload.durationRounds).toBe(2);
     });
 
     it('returns undefined durationRounds when no matching pattern', async () => {
@@ -536,21 +504,6 @@ describe('conditionHandler.handle', () => {
       const result = await handle(action, ps, CAMPAIGN_NAME, null);
 
       expect(result.payload.additionalCondition).toBe('prone');
-    });
-
-    it('includes saveDc, rangeFeet, conditionName, and saveType in payload', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({});
-
-      getRuntimeValue.mockReturnValue(2);
-      getAbilityModifier.mockReturnValue(2);
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.saveDc).toBe(13);
-      expect(result.payload.rangeFeet).toBe(60);
-      expect(result.payload.conditionName).toBe('frightened');
-      expect(result.payload.saveType).toBe('WIS');
     });
 
     it('includes monsters array from loadMonsters', async () => {
@@ -580,73 +533,20 @@ describe('conditionHandler.handle', () => {
   });
 
   describe('maxTargets handling', () => {
-    it('passes maxTargets based on CHA modifier', async () => {
-      const ps = makePlayerStats({
-        abilities: [
-          { name: 'Charisma', bonus: 3 },
-          { name: 'Wisdom', bonus: 2 },
-        ],
-      });
+    it('caps maxTargets at CHA modifier with a floor of 1', async () => {
+      const ps = makePlayerStats();
       const action = makeAction({});
 
       getRuntimeValue.mockReturnValue(2);
-      getAbilityModifier.mockReturnValue(3);
 
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
+      for (const [chaMod, expected] of [[3, 3], [0, 1], [-1, 1]]) {
+        getAbilityModifier.mockReturnValue(chaMod);
 
-      expect(result.payload.maxTargets).toBe(3);
+        const result = await handle(action, ps, CAMPAIGN_NAME, null);
+
+        expect(result.payload.maxTargets).toBe(expected);
+      }
       expect(getAbilityModifier).toHaveBeenCalledWith(ps.abilities, 'CHA');
-    });
-
-    it('uses minimum 1 when CHA modifier is negative', async () => {
-      const ps = makePlayerStats({
-        abilities: [
-          { name: 'Charisma', bonus: -1 },
-          { name: 'Wisdom', bonus: 2 },
-        ],
-      });
-      const action = makeAction({});
-
-      getRuntimeValue.mockReturnValue(2);
-      getAbilityModifier.mockReturnValue(-1);
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.maxTargets).toBe(1);
-    });
-
-    it('uses 1 when CHA modifier is 0', async () => {
-      const ps = makePlayerStats({
-        abilities: [
-          { name: 'Charisma', bonus: 0 },
-          { name: 'Wisdom', bonus: 2 },
-        ],
-      });
-      const action = makeAction({});
-
-      getRuntimeValue.mockReturnValue(2);
-      getAbilityModifier.mockReturnValue(0);
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.maxTargets).toBe(1);
-    });
-
-    it('uses CHA modifier when positive', async () => {
-      const ps = makePlayerStats({
-        abilities: [
-          { name: 'Charisma', bonus: 5 },
-          { name: 'Wisdom', bonus: 2 },
-        ],
-      });
-      const action = makeAction({});
-
-      getRuntimeValue.mockReturnValue(2);
-      getAbilityModifier.mockReturnValue(5);
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.maxTargets).toBe(5);
     });
 
     it('CLA-303: maxTargets "all" (Turn Undead RAW) opens the cap to Infinity', async () => {

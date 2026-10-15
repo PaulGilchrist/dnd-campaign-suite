@@ -1,3 +1,7 @@
+// @maintained-by-ai — deterministic modal-delegation contract pins for buffHandler:
+// modal names/payload shapes consumed by the char-sheet router, self-exclusion semantics
+// per lane, and confirmTelepathicSpeech (CHA miles, level minutes, awakenedMindTarget key,
+// expiration, log). All IO mocked; only breaks when a lane's contract intentionally changes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/buffToggle.js', () => ({
@@ -117,11 +121,11 @@ describe('buffHandler.handle - modal delegation', () => {
       expect(result.payload.description).toContain('already active');
     });
 
-    it('handles empty creatures list', async () => {
+    it('handles null combatSummary gracefully', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ effect: 'advantage_on_stealth' });
       runtimeState.getRuntimeValue.mockReturnValue([]);
-      combatData.loadCombatSummary.mockResolvedValue({ creatures: [] });
+      combatData.loadCombatSummary.mockResolvedValue(null);
 
       const result = await handle(action, ps, campaignName, null);
 
@@ -129,16 +133,18 @@ describe('buffHandler.handle - modal delegation', () => {
       expect(result.payload.creatureTargets).toEqual([]);
     });
 
-    it('uses default feature name when action.name is missing', async () => {
+    it('matches default feature name against stored buffs when action.name is missing', async () => {
+      // Pins the `action.name || 'Blessing of the Trickster'` default: with no
+      // action name, the stored-buff name match (and popup text) must still land.
       const ps = makePlayerStats();
-      const action = { automation: { effect: 'advantage_on_stealth' } };
-      runtimeState.getRuntimeValue.mockReturnValue([]);
-      combatData.loadCombatSummary.mockResolvedValue({ creatures: [] });
+      const action = { automation: { type: 'buff', effect: 'advantage_on_stealth' } };
+      runtimeState.getRuntimeValue.mockReturnValue([{ name: 'Blessing of the Trickster' }]);
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.type).toBe('modal');
-      expect(result.modalName).toBe('tricksterBlessing');
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('Blessing of the Trickster');
+      expect(result.payload.description).toContain('already active');
     });
   });
 
@@ -222,24 +228,6 @@ describe('buffHandler.handle - modal delegation', () => {
 
       expect(result.type).toBe('modal');
       expect(result.modalName).toBe('telepathicSpeech');
-      expect(result.payload.creatureTargets).toEqual([
-        { name: 'Ally1', currentHp: 10, maxHp: 10, size: 'Medium', type: 'player' },
-      ]);
-    });
-
-    it('excludes self from creature targets', async () => {
-      const ps = makePlayerStats({ name: 'TestHero' });
-      const action = makeAction({ effect: 'telepathic_speech' });
-      runtimeState.getRuntimeValue.mockReturnValue([]);
-      combatData.loadCombatSummary.mockResolvedValue({
-        creatures: [
-          { name: 'TestHero', type: 'player', currentHp: 15, maxHp: 15, size: 'Medium' },
-          { name: 'Ally1', type: 'player', currentHp: 10, maxHp: 10, size: 'Medium' },
-        ],
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
       expect(result.payload.creatureTargets).toEqual([
         { name: 'Ally1', currentHp: 10, maxHp: 10, size: 'Medium', type: 'player' },
       ]);
@@ -358,7 +346,7 @@ describe('buffHandler.confirmTelepathicSpeech', () => {
       level: 10,
       abilities: [{ name: 'Charisma', bonus: 4, save: 7 }],
     });
-    const action = makeAction({ effect: 'telepathic_speech', name: 'Telepathic Speech' });
+    const action = { name: 'Telepathic Bond', automation: { type: 'buff', effect: 'telepathic_speech' } };
     abilityLookup.getAbilityModifier.mockReturnValue(4);
     buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 

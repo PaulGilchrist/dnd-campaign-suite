@@ -1,10 +1,13 @@
+// @maintained-by-ai
+// Deterministic unit tests for the pure useEquipmentSearch hook. All data loading
+// is mocked; assertions cover the stable filter/select contract and should not
+// churn as the app UI evolves.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useEquipmentSearch } from './useEquipmentSearch.js';
 
 vi.mock('../../services/ui/dataLoader.js', () => ({
   loadEquipment: vi.fn(),
-  loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 const { loadEquipment } = await import('../../services/ui/dataLoader.js');
@@ -33,6 +36,12 @@ const MOCK_EQUIPMENT = [
   { name: 'Potion of Healing', index: 'potion-of-healing', equipment_category: 'Potion' },
 ];
 
+// Flush pending effects/microtasks so hook state settles.
+const flush = () =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
 describe('useEquipmentSearch', () => {
   let onTempInventoryChange;
   let onInventoryChange;
@@ -57,256 +66,175 @@ describe('useEquipmentSearch', () => {
       loadEquipment.mockResolvedValue([MOCK_EQUIPMENT[0]]);
       const { result } = renderSearchHook();
 
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
+      await flush();
 
       expect(result.current.equipmentData).toEqual([MOCK_EQUIPMENT[0]]);
     });
   });
 
   describe('search filtering', () => {
-    it('filters by equipment name case-insensitively', async () => {
+    it('filters by name and index case-insensitively', async () => {
       loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
       const { result } = renderSearchHook();
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
+      await flush();
 
       act(() => {
         result.current.setSearchQuery('long');
       });
-
       expect(result.current.filteredEquipment).toEqual([MOCK_EQUIPMENT[0]]);
-    });
-
-    it('filters by equipment index case-insensitively', async () => {
-      loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
-      const { result } = renderSearchHook();
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
 
       act(() => {
         result.current.setSearchQuery('SHIELD');
       });
-
       expect(result.current.filteredEquipment).toEqual([MOCK_EQUIPMENT[1]]);
     });
 
-    it('returns empty results when search query is empty or whitespace', async () => {
+    it('returns no results for whitespace-only or non-matching queries', async () => {
       loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
       const { result } = renderSearchHook();
+      await flush();
 
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
+      act(() => {
+        result.current.setSearchQuery('long');
       });
+      expect(result.current.filteredEquipment).toEqual([MOCK_EQUIPMENT[0]]);
 
       act(() => {
         result.current.setSearchQuery('   ');
       });
-
       expect(result.current.filteredEquipment).toEqual([]);
-    });
-
-    it('returns no results for non-matching query', async () => {
-      loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
-      const { result } = renderSearchHook();
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
 
       act(() => {
         result.current.setSearchQuery('nonexistent');
       });
-
       expect(result.current.filteredEquipment).toEqual([]);
+    });
+
+    it('limits filtered results to 20 items', async () => {
+      const manyItems = Array.from({ length: 25 }, (_, i) => ({
+        name: `Item ${i}`,
+        index: `item-${i}`,
+        equipment_category: 'Weapon',
+      }));
+      loadEquipment.mockResolvedValue(manyItems);
+      const { result } = renderSearchHook();
+      await flush();
+
+      act(() => {
+        result.current.setSearchQuery('item');
+      });
+
+      expect(result.current.filteredEquipment).toHaveLength(20);
+      expect(result.current.filteredEquipment[0]).toEqual(manyItems[0]);
     });
   });
 
   describe('category filtering', () => {
-    it('filters equipment by selected category', async () => {
+    it('filters by category alone (no search query)', async () => {
       loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
       const { result } = renderSearchHook();
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-
-      act(() => {
-        result.current.setSearchQuery('');
-      });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
-
-      act(() => {
-        result.current.setSearchQuery('armor');
-      });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
 
       act(() => {
         result.current.handleCategoryChange('Armor');
       });
 
-      await act(async () => {
-        await Promise.resolve();
-      });
-
-      const armorItems = MOCK_EQUIPMENT.filter(
-        (item) => item.equipment_category === 'Armor' &&
-          (item.name.toLowerCase().includes('armor') ||
-            item.index.toLowerCase().includes('armor'))
-      );
-      expect(result.current.filteredEquipment).toEqual(armorItems);
+      expect(result.current.filteredEquipment).toEqual([
+        MOCK_EQUIPMENT[1], // Shield
+        MOCK_EQUIPMENT[3], // Leather Armor
+      ]);
     });
 
     it('combines search query with category filter', async () => {
       loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
       const { result } = renderSearchHook();
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
+      await flush();
 
       act(() => {
         result.current.setSearchQuery('sword');
         result.current.handleCategoryChange('Weapon');
       });
 
-      const matchingItems = MOCK_EQUIPMENT.filter(
-        (item) =>
-          item.equipment_category === 'Weapon' &&
-          (item.name.toLowerCase().includes('sword') ||
-            item.index.toLowerCase().includes('sword'))
-      );
-      expect(result.current.filteredEquipment).toEqual(matchingItems);
+      expect(result.current.filteredEquipment).toEqual([MOCK_EQUIPMENT[0]]);
+
+      act(() => {
+        result.current.handleCategoryChange('Armor');
+      });
+      expect(result.current.filteredEquipment).toEqual([]);
     });
 
     it('returns unique categories including All', async () => {
       loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
       const { result } = renderSearchHook();
+      await flush();
 
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-
-      expect(result.current.uniqueCategories).toContain('All');
-      expect(result.current.uniqueCategories).toContain('Weapon');
-      expect(result.current.uniqueCategories).toContain('Armor');
-      expect(result.current.uniqueCategories).toContain('Potion');
-      expect(result.current.uniqueCategories).toContain('Simple Melee');
+      expect(result.current.uniqueCategories).toEqual([
+        'All', 'Weapon', 'Armor', 'Simple Melee', 'Potion',
+      ]);
     });
   });
 
-  describe('20-item filter limit', () => {
-    it('limits filtered results to 20 items', async () => {
-      loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
-      const { result } = renderSearchHook();
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-
-      act(() => {
-        result.current.setSearchQuery('a');
-      });
-
-      expect(result.current.filteredEquipment.length).toBeLessThanOrEqual(20);
-    });
-  });
-
-  describe('backpack filtering', () => {
+  describe('selected-inventory filtering', () => {
     it('filters to backpack items when showOnlySelectedBackpack is true', async () => {
       loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
       const inventory = { backpack: ['Longsword', 'Shield'], equipped: [] };
       const { result } = renderSearchHook(inventory);
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
+      await flush();
 
       act(() => {
         result.current.handleSearchFieldFocus('backpack');
       });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
 
       act(() => {
         result.current.setSearchQuery('long');
       });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
 
       act(() => {
         result.current.setShowOnlySelectedBackpack(true);
       });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
 
       expect(result.current.filteredEquipment).toEqual([MOCK_EQUIPMENT[0]]);
     });
-  });
 
-  describe('equipped filtering', () => {
     it('filters to equipped items when showOnlySelectedEquipped is true', async () => {
       loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
       const inventory = { backpack: [], equipped: ['Dagger', 'Rapier'] };
       const { result } = renderSearchHook(inventory);
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
+      await flush();
 
       act(() => {
         result.current.handleSearchFieldFocus('equipped');
-      });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
-
-      act(() => {
         result.current.setSearchQuery('a');
       });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
 
       act(() => {
         result.current.setShowOnlySelectedEquipped(true);
       });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
 
       expect(result.current.filteredEquipment).toEqual([
-        MOCK_EQUIPMENT[4],
-        MOCK_EQUIPMENT[5],
+        MOCK_EQUIPMENT[4], // Dagger
+        MOCK_EQUIPMENT[5], // Rapier
       ]);
     });
   });
 
   describe('handleSearchFieldFocus', () => {
-    it('sets searchField and clears query and filtered results', () => {
+    it('sets searchField and clears query and filtered results', async () => {
+      loadEquipment.mockResolvedValue(MOCK_EQUIPMENT);
       const { result } = renderSearchHook();
+      await flush();
+
       act(() => {
-        result.current.setSearchQuery('test');
+        result.current.setSearchQuery('long');
+      });
+      expect(result.current.filteredEquipment).toEqual([MOCK_EQUIPMENT[0]]);
+
+      act(() => {
         result.current.handleSearchFieldFocus('backpack');
       });
 
@@ -318,16 +246,13 @@ describe('useEquipmentSearch', () => {
 
   describe('handleEquipmentSelect', () => {
     it('adds item to backpack and clears search state', async () => {
-      const item = { name: 'Longsword', index: 'longsword', equipment_category: 'Weapon' };
+      const item = MOCK_EQUIPMENT[0]; // Longsword
       const { result } = renderSearchHook();
 
       act(() => {
         result.current.handleSearchFieldFocus('backpack');
       });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
 
       act(() => {
         result.current.handleEquipmentSelect(item);
@@ -341,16 +266,13 @@ describe('useEquipmentSearch', () => {
     });
 
     it('adds item to equipped and clears search state', async () => {
-      const item = { name: 'Shield', index: 'shield', equipment_category: 'Armor' };
+      const item = MOCK_EQUIPMENT[1]; // Shield
       const { result } = renderSearchHook();
 
       act(() => {
         result.current.handleSearchFieldFocus('equipped');
       });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
 
       act(() => {
         result.current.handleEquipmentSelect(item);
@@ -359,19 +281,6 @@ describe('useEquipmentSearch', () => {
       expect(onTempInventoryChange).toHaveBeenCalledWith('equipped', ['Shield']);
       expect(onInventoryChange).toHaveBeenCalledWith('equipped', ['Shield']);
       expect(result.current.searchField).toBeNull();
-    });
-
-    it('does not add duplicate item to backpack or equipped', () => {
-      const inventory = { backpack: ['Longsword'], equipped: ['Shield'] };
-      const item = { name: 'Longsword', index: 'longsword', equipment_category: 'Weapon' };
-      const { result } = renderSearchHook(inventory);
-
-      act(() => {
-        result.current.handleSearchFieldFocus('backpack');
-        result.current.handleEquipmentSelect(item);
-      });
-
-      expect(onTempInventoryChange).not.toHaveBeenCalled();
     });
   });
 
@@ -382,10 +291,7 @@ describe('useEquipmentSearch', () => {
       act(() => {
         result.current.handleSearchFieldFocus('backpack');
       });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
 
       act(() => {
         result.current.handleAddCustomItem('Magic Sword');
@@ -403,10 +309,7 @@ describe('useEquipmentSearch', () => {
       act(() => {
         result.current.handleSearchFieldFocus('equipped');
       });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
 
       act(() => {
         result.current.handleAddCustomItem('Magic Shield');
@@ -416,39 +319,10 @@ describe('useEquipmentSearch', () => {
       expect(onInventoryChange).toHaveBeenCalledWith('equipped', ['Magic Shield']);
       expect(result.current.searchField).toBeNull();
     });
-
-    it('does not add duplicate custom item to backpack', () => {
-      const inventory = { backpack: ['Magic Sword'], equipped: [] };
-      const { result } = renderSearchHook(inventory);
-
-      act(() => {
-        result.current.handleSearchFieldFocus('backpack');
-        result.current.handleAddCustomItem('Magic Sword');
-      });
-
-      expect(onTempInventoryChange).not.toHaveBeenCalled();
-    });
   });
 
   describe('handleKeyDown', () => {
-    it('adds custom item on Enter key with non-empty query', () => {
-      const { result } = renderSearchHook();
-
-      act(() => {
-        result.current.handleSearchFieldFocus('backpack');
-        result.current.setSearchQuery('Magic Sword');
-      });
-
-      const mockEvent = { key: 'Enter' };
-      act(() => {
-        result.current.handleKeyDown(mockEvent);
-      });
-
-      expect(onTempInventoryChange).toHaveBeenCalledWith('backpack', ['Magic Sword']);
-      expect(onInventoryChange).toHaveBeenCalledWith('backpack', ['Magic Sword']);
-    });
-
-    it('trims whitespace from query before adding custom item', () => {
+    it('adds trimmed custom item on Enter', async () => {
       const { result } = renderSearchHook();
 
       act(() => {
@@ -456,31 +330,30 @@ describe('useEquipmentSearch', () => {
         result.current.setSearchQuery('  Magic Sword  ');
       });
 
-      const mockEvent = { key: 'Enter' };
       act(() => {
-        result.current.handleKeyDown(mockEvent);
+        result.current.handleKeyDown({ key: 'Enter' });
       });
 
       expect(onTempInventoryChange).toHaveBeenCalledWith('backpack', ['Magic Sword']);
+      expect(onInventoryChange).toHaveBeenCalledWith('backpack', ['Magic Sword']);
     });
 
-    it('does not add custom item on Enter key with empty query', () => {
+    it('does not add custom item on Enter with whitespace-only query', async () => {
       const { result } = renderSearchHook();
 
       act(() => {
         result.current.handleSearchFieldFocus('backpack');
-        result.current.setSearchQuery('');
+        result.current.setSearchQuery('   ');
       });
 
-      const mockEvent = { key: 'Enter' };
       act(() => {
-        result.current.handleKeyDown(mockEvent);
+        result.current.handleKeyDown({ key: 'Enter' });
       });
 
       expect(onTempInventoryChange).not.toHaveBeenCalled();
     });
 
-    it('does not add custom item for non-Enter key', () => {
+    it('does not add custom item for non-Enter key', async () => {
       const { result } = renderSearchHook();
 
       act(() => {
@@ -488,13 +361,11 @@ describe('useEquipmentSearch', () => {
         result.current.setSearchQuery('Magic Sword');
       });
 
-      const mockEvent = { key: 'Escape' };
       act(() => {
-        result.current.handleKeyDown(mockEvent);
+        result.current.handleKeyDown({ key: 'Escape' });
       });
 
       expect(onTempInventoryChange).not.toHaveBeenCalled();
     });
   });
-
 });

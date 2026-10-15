@@ -1,90 +1,82 @@
+// @maintained-by-ai
+// Canonical home for the useSyncedState HOOK contract — the preferred read/write
+// hook of the server-first architecture (AGENTS.md). Covers the hook's own
+// behaviour: defaultValue resolution vs store.has(), the local write path
+// (store update + re-render + POST to server), functional updaters against the
+// ref, external subscription, identity/re-render guards, unmount cleanup, and
+// prop switching. Deterministic: fetch is mocked, no timers, no app coupling.
+// Scope split: raw store API (get/setRuntimeValue/seed/clear, campaign-level URL
+// routing, valuesEqual store guards) lives in useRuntimeState.core.test.js;
+// setRuntimeObject in useRuntimeState.setRuntimeObject.test.js; the useRuntimeValue
+// hook in useRuntimeState.useRuntimeValue.test.jsx; guard valuesEqual semantics in
+// useSSEEqualityGuard.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import {
   clearRuntimeState,
+  getAllStoreKeys,
   seedTrackedResources,
   getRuntimeValue,
   setRuntimeValue,
   getStore,
+  listeners,
 } from './useRuntimeState.js';
 import { useSyncedState } from './useSyncedState.js';
 
 function clearAll() {
-  const keys = ['test-char', 'cleanup-char', 'synced-char', 'synced-campaign'];
-  for (const key of keys) {
+  for (const key of getAllStoreKeys()) {
     clearRuntimeState(key);
   }
+  listeners.clear();
 }
 
 describe('useSyncedState', () => {
   beforeEach(() => {
     clearAll();
     vi.restoreAllMocks();
+    vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
   });
 
   describe('initialization', () => {
-    it('returns defaultValue when no value exists in store', () => {
-      const { result } = renderHook(() => useSyncedState('test-char', 'hp', 20));
-      expect(result.current).toEqual([20, expect.any(Function)]);
-    });
+    it('uses defaultValue only when the store lacks the key; any stored value (incl. null, 0, empty structures) wins', () => {
+      seedTrackedResources('test-char', {
+        nullVal: null,
+        hp: 0,
+        count: -1,
+        spells: [],
+        stats: { str: 18, dex: 14 },
+        name: 'Gandalf',
+        off: false,
+      });
 
-    it('returns seeded value from store instead of defaultValue', () => {
-      seedTrackedResources('test-char', { hp: 15 });
-      const { result } = renderHook(() => useSyncedState('test-char', 'hp', 20));
-      expect(result.current[0]).toBe(15);
-    });
-
-    it('returns null from store instead of defaultValue when value is null', () => {
-      seedTrackedResources('test-char', { value: null });
-      const { result } = renderHook(() =>
-        useSyncedState('test-char', 'value', 'default'),
+      // Absent key -> defaultValue, and the returned tuple is [value, function].
+      const { result: unset } = renderHook(() =>
+        useSyncedState('test-char', 'missing', 20),
       );
-      expect(result.current[0]).toBeNull();
+      expect(unset.current).toEqual([20, expect.any(Function)]);
+
+      // Stored falsy/complex values are NOT replaced by defaultValue.
+      const cases = [
+        ['nullVal', 'default'],
+        ['hp', 20],
+        ['count', 0],
+        ['spells', ['fireball']],
+        ['stats', {}],
+        ['name', 'Unknown'],
+        ['off', true],
+      ];
+      for (const [prop, defaultValue] of cases) {
+        const { result } = renderHook(() =>
+          useSyncedState('test-char', prop, defaultValue),
+        );
+        expect(result.current[0]).toEqual(
+          getRuntimeValue('test-char', prop),
+        );
+      }
     });
 
-    it('returns 0 instead of defaultValue', () => {
-      seedTrackedResources('test-char', { hp: 0 });
-      const { result } = renderHook(() => useSyncedState('test-char', 'hp', 20));
-      expect(result.current[0]).toBe(0);
-    });
-
-    it('returns negative numbers instead of defaultValue', () => {
-      seedTrackedResources('test-char', { count: -1 });
-      const { result } = renderHook(() => useSyncedState('test-char', 'count', 0));
-      expect(result.current[0]).toBe(-1);
-    });
-
-    it('returns empty array instead of defaultValue', () => {
-      seedTrackedResources('test-char', { spells: [] });
-      const { result } = renderHook(() =>
-        useSyncedState('test-char', 'spells', ['fireball']),
-      );
-      expect(result.current[0]).toEqual([]);
-    });
-
-    it('returns seeded object instead of defaultValue', () => {
-      seedTrackedResources('test-char', { stats: { str: 18, dex: 14 } });
-      const { result } = renderHook(() =>
-        useSyncedState('test-char', 'stats', {}),
-      );
-      expect(result.current[0]).toEqual({ str: 18, dex: 14 });
-    });
-
-    it('returns seeded string and boolean instead of defaultValue', () => {
-      seedTrackedResources('test-char', { name: 'Gandalf', active: true });
-      const { result: nameResult } = renderHook(() =>
-        useSyncedState('test-char', 'name', 'Unknown'),
-      );
-      const { result: activeResult } = renderHook(() =>
-        useSyncedState('test-char', 'active', false),
-      );
-      expect(nameResult.current[0]).toBe('Gandalf');
-      expect(activeResult.current[0]).toBe(true);
-    });
-
-    it('returns undefined as a stored value', () => {
-      const store = getStore('test-char');
-      store.set('value', undefined);
+    it('returns a stored undefined as a present value instead of defaultValue', () => {
+      getStore('test-char').set('value', undefined);
       const { result } = renderHook(() =>
         useSyncedState('test-char', 'value', 'default'),
       );
@@ -92,98 +84,48 @@ describe('useSyncedState', () => {
     });
   });
 
-  describe('setValue behavior', () => {
-    it('updates the store when setValue is called', () => {
+  describe('setValue write path', () => {
+    it('updates the store and hook state through sequential, null, and rapid direct writes', async () => {
       seedTrackedResources('test-char', { hp: 15 });
-      const { result } = renderHook(() => useSyncedState('test-char', 'hp', 20));
-      expect(result.current[0]).toBe(15);
-
-      const setValue = result.current[1];
-      act(() => {
-        setValue(25);
-      });
-
-      expect(getRuntimeValue('test-char', 'hp')).toBe(25);
-    });
-
-    it('updates the hook state when setValue is called', async () => {
-      seedTrackedResources('test-char', { hp: 15 });
-      const { result } = renderHook(() => useSyncedState('test-char', 'hp', 20));
+      const { result } = renderHook(() =>
+        useSyncedState('test-char', 'hp', 20, 'test-campaign'),
+      );
       expect(result.current[0]).toBe(15);
 
       const setValue = result.current[1];
       await act(async () => {
         setValue(25);
       });
-
       expect(result.current[0]).toBe(25);
-    });
+      expect(getRuntimeValue('test-char', 'hp')).toBe(25);
 
-    it('updates through multiple sequential changes', async () => {
-      seedTrackedResources('test-char', { hp: 20 });
-      const { result } = renderHook(() => useSyncedState('test-char', 'hp', 30));
-
-      expect(result.current[0]).toBe(20);
-
-      const setValue = result.current[1];
-      await act(async () => {
-        setValue(15);
-      });
-      expect(result.current[0]).toBe(15);
-
-      await act(async () => {
-        setValue(0);
-      });
-      expect(result.current[0]).toBe(0);
-    });
-
-    it('updates when value changes from null to a number and back', async () => {
-      seedTrackedResources('test-char', { hp: null });
-      const { result } = renderHook(() => useSyncedState('test-char', 'hp', 10));
-      expect(result.current[0]).toBeNull();
-
-      const setValue = result.current[1];
-      await act(async () => {
-        setValue(15);
-      });
-      expect(result.current[0]).toBe(15);
-
+      // null round-trip: null is a real value, not "absent".
       await act(async () => {
         setValue(null);
       });
       expect(result.current[0]).toBeNull();
-    });
+      expect(getRuntimeValue('test-char', 'hp')).toBeNull();
 
-    it('handles rapid sequential updates', async () => {
-      seedTrackedResources('test-char', { hp: 10 });
-      const { result } = renderHook(() => useSyncedState('test-char', 'hp', 20));
+      await act(async () => {
+        setValue(15);
+      });
+      expect(result.current[0]).toBe(15);
 
-      const setValue = result.current[1];
+      // Rapid sequential writes in one act land on the last value.
       await act(async () => {
         setValue(20);
         setValue(30);
-        setValue(40);
+        setValue(0);
       });
-
-      expect(result.current[0]).toBe(40);
+      expect(result.current[0]).toBe(0);
+      expect(getRuntimeValue('test-char', 'hp')).toBe(0);
     });
 
-    it('uses function updater pattern to compute new value', async () => {
+    it('resolves functional updaters against the current value, tracking it between calls', async () => {
       seedTrackedResources('test-char', { hp: 15 });
-      const { result } = renderHook(() => useSyncedState('test-char', 'hp', 20));
-      expect(result.current[0]).toBe(15);
-
-      const setValue = result.current[1];
-      await act(async () => {
-        setValue((prev) => prev + 10);
-      });
-
-      expect(result.current[0]).toBe(25);
-    });
-
-    it('uses function updater with sequential calls reading correct prev value', async () => {
-      seedTrackedResources('test-char', { hp: 15 });
-      const { result } = renderHook(() => useSyncedState('test-char', 'hp', 20));
+      const { result } = renderHook(() =>
+        useSyncedState('test-char', 'hp', 20, 'test-campaign'),
+      );
 
       const setValue = result.current[1];
       await act(async () => {
@@ -195,31 +137,41 @@ describe('useSyncedState', () => {
         setValue((prev) => prev * 2);
       });
       expect(result.current[0]).toBe(40);
+
+      // Two updaters in one act must each see the ref the previous write moved.
+      await act(async () => {
+        setValue((prev) => prev + 1);
+        setValue((prev) => prev + 1);
+      });
+      expect(result.current[0]).toBe(42);
+      expect(getRuntimeValue('test-char', 'hp')).toBe(42);
     });
 
-    it('does not re-render when setValue sets the same value via identity', async () => {
-      const renders = { count: 0 };
+    it('does not re-render when setValue sets the same value (identity guard)', async () => {
+      let renders = 0;
       seedTrackedResources('test-char', { hp: 15 });
       const { result } = renderHook(() => {
-        renders.count++;
-        return useSyncedState('test-char', 'hp', 20);
+        renders++;
+        return useSyncedState('test-char', 'hp', 20, 'test-campaign');
       });
       expect(result.current[0]).toBe(15);
-      const initialRenders = renders.count;
+      const initialRenders = renders;
 
-      const setValue = result.current[1];
       await act(async () => {
-        setValue(15);
+        result.current[1](15);
       });
 
-      expect(renders.count).toBe(initialRenders);
+      expect(renders).toBe(initialRenders);
+      expect(result.current[0]).toBe(15);
     });
   });
 
   describe('external updates', () => {
     it('updates when the value changes via setRuntimeValue from another source', async () => {
       seedTrackedResources('test-char', { hp: 15 });
-      const { result } = renderHook(() => useSyncedState('test-char', 'hp', 20));
+      const { result } = renderHook(() =>
+        useSyncedState('test-char', 'hp', 20, 'test-campaign'),
+      );
       expect(result.current[0]).toBe(15);
 
       await act(async () => {
@@ -228,31 +180,14 @@ describe('useSyncedState', () => {
 
       expect(result.current[0]).toBe(30);
     });
-
-    it('does not update when setRuntimeValue sets the same value (valuesEqual guard)', async () => {
-      const renders = { count: 0 };
-      seedTrackedResources('test-char', { hp: 15 });
-      const { result } = renderHook(() => {
-        renders.count++;
-        return useSyncedState('test-char', 'hp', 20);
-      });
-      expect(result.current[0]).toBe(15);
-      const initialRenders = renders.count;
-
-      await act(async () => {
-        setRuntimeValue('test-char', 'hp', 15, 'test-campaign');
-      });
-
-      expect(renders.count).toBe(initialRenders);
-    });
   });
 
   describe('lifecycle', () => {
-    it('removes listener on unmount so subsequent external changes are ignored', async () => {
+    it('removes its listener on unmount so subsequent external changes are ignored', async () => {
       const captured = { value: null };
       seedTrackedResources('cleanup-char', { hp: 15 });
       const { unmount } = renderHook(() => {
-        const [val] = useSyncedState('cleanup-char', 'hp', 20);
+        const [val] = useSyncedState('cleanup-char', 'hp', 20, 'test-campaign');
         captured.value = val;
         return [val];
       });
@@ -266,41 +201,41 @@ describe('useSyncedState', () => {
       expect(captured.value).toBe(15);
     });
 
-    it('works after unmount and re-mount with a different character', () => {
-      seedTrackedResources('cleanup-char', { hp: 15 });
-      const { result, unmount } = renderHook(
-        ({ charKey }) => useSyncedState(charKey, 'hp', 20),
-        { initialProps: { charKey: 'cleanup-char' } },
-      );
-      expect(result.current[0]).toBe(15);
+    it('switches tracked store/property when characterKey or propertyName changes on rerender', () => {
+      seedTrackedResources('char-a', { hp: 10, sp: 7 });
+      seedTrackedResources('char-b', { hp: 20 });
 
-      unmount();
-      clearRuntimeState('cleanup-char');
-      clearRuntimeState('new-char');
-      seedTrackedResources('new-char', { hp: 25 });
-
-      const { result: result2 } = renderHook(() =>
-        useSyncedState('new-char', 'hp', 30),
+      const { result, rerender } = renderHook(
+        ({ charKey, prop }) => useSyncedState(charKey, prop, 99, 'test-campaign'),
+        { initialProps: { charKey: 'char-a', prop: 'hp' } },
       );
-      expect(result2.current[0]).toBe(25);
+      expect(result.current[0]).toBe(10);
+
+      rerender({ charKey: 'char-b', prop: 'hp' });
+      expect(result.current[0]).toBe(20);
+
+      rerender({ charKey: 'char-a', prop: 'sp' });
+      expect(result.current[0]).toBe(7);
+
+      // Switching to an absent property falls back to defaultValue.
+      rerender({ charKey: 'char-b', prop: 'missing' });
+      expect(result.current[0]).toBe(99);
     });
   });
 
   describe('server persistence', () => {
-    it('POSTs to the server API with campaignName when setValue is called', () => {
+    it('POSTs the store payload to the character endpoint when setValue is called', () => {
       seedTrackedResources('test-char', { hp: 15 });
-      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
 
       const { result } = renderHook(() =>
         useSyncedState('test-char', 'hp', 20, 'test-campaign'),
       );
 
-      const setValue = result.current[1];
       act(() => {
-        setValue(25);
+        result.current[1](25);
       });
 
-      expect(fetchSpy).toHaveBeenCalledWith(
+      expect(global.fetch).toHaveBeenCalledWith(
         '/api/campaigns/test-campaign/test-char',
         expect.objectContaining({
           method: 'POST',
@@ -308,28 +243,8 @@ describe('useSyncedState', () => {
           headers: { 'Content-Type': 'application/json' },
         }),
       );
-      const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      const body = JSON.parse(global.fetch.mock.calls.at(-1)[1].body);
       expect(body.value).toHaveProperty('hp', 25);
-    });
-
-    it('POSTs with campaign-level characterKey format', () => {
-      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(undefined);
-
-      const { result } = renderHook(() =>
-        useSyncedState('campaign', 'gameMode', 'dm', 'my-campaign'),
-      );
-
-      act(() => {
-        result.current[1]('player');
-      });
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        '/api/campaigns/my-campaign/gameMode',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ value: 'player' }),
-        }),
-      );
     });
   });
 });

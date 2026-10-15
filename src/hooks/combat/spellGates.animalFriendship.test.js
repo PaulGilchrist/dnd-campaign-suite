@@ -1,4 +1,6 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import spells2024 from '../../../public/data/2024/spells.json';
 
 vi.mock('../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(),
@@ -19,18 +21,10 @@ import { getMonsterData } from '../../services/npcs/monsterUtils.js';
 
 const CAMPAIGN = 'test-campaign';
 
-const UPCAST_DATA = { 1: '1 target', 2: '2 targets', 3: '3 targets' };
-
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Animal Friendship',
-    level: 1,
-    range: '30 feet',
-    casting_time: 'Action',
-    upcast_at_slot_level: UPCAST_DATA,
-    ...overrides,
-  };
-}
+// Data authority: 2024 Essentials row (the only spells.json carrying the
+// upcast_at_slot_level ladder for Animal Friendship; 5e row has none —
+// covered by the missing-data fallback test below).
+const AF = spells2024.find(s => s.name === 'Animal Friendship');
 
 function makeCs() {
   return {
@@ -55,37 +49,49 @@ async function gate(spell) {
   return { handled, pending: cfSetPending.mock.calls[0]?.[1] };
 }
 
-describe('SP-002 gateAnimalFriendship — upcast maxTargets threading', () => {
+describe('SP-002 gateAnimalFriendship — beast-only picker + upcast maxTargets threading', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getCombatSummary.mockReturnValue(makeCs());
     getMonsterData.mockResolvedValue({ type: 'beast' });
   });
 
-  it('base lv1 caps the picker at 1 target', async () => {
-    const { handled, pending } = await gate(makeSpell());
+  it('base lv1 offers beasts only (caster excluded) capped at 1, 30 ft', async () => {
+    const { handled, pending } = await gate({ ...AF });
 
     expect(handled).toBe(true);
     expect(pending.creatureTargets).toEqual(['Wolf 1', 'Wolf 2']);
     expect(pending.maxTargets).toBe(1);
-    expect(pending.spellLevel).toBe(1);
+    expect(pending.range).toBe('30 feet');
+    expect(pending.rangeFt).toBe(30);
   });
 
-  it('lv2 upcast radio threads upcastLevel and caps at 2 targets', async () => {
-    const { handled, pending } = await gate(makeSpell({ isUpcast: true, upcastLevel: 2 }));
+  it.each([2, 3, 9])('lv%d upcast threads the RAW +1/slot ladder (extractMaxTargets)', async (lv) => {
+    const { handled, pending } = await gate({ ...AF, isUpcast: true, upcastLevel: lv });
 
     expect(handled).toBe(true);
-    expect(pending.spell.upcastLevel).toBe(2);
-    expect(pending.maxTargets).toBe(2);
+    expect(pending.maxTargets).toBe(lv);
   });
 
-  it('lv3 upcast caps at 3 targets', async () => {
-    const { pending } = await gate(makeSpell({ isUpcast: true, upcastLevel: 3 }));
+  it('excludes non-beast monsters from the picker', async () => {
+    getMonsterData.mockImplementation(async (name) =>
+      name === 'Wolf 1' ? { type: 'beast' } : { type: 'humanoid' });
 
-    expect(pending.maxTargets).toBe(3);
+    const { pending } = await gate({ ...AF });
+
+    expect(pending.creatureTargets).toEqual(['Wolf 1']);
   });
 
-  it('falls back to a cap of 1 when upcast data is missing', async () => {
+  it('returns false when no beasts are in combat (cast falls through to generic path)', async () => {
+    getMonsterData.mockResolvedValue({ type: 'humanoid' });
+
+    const { handled, pending } = await gate({ ...AF });
+
+    expect(handled).toBe(false);
+    expect(pending).toBeUndefined();
+  });
+
+  it('falls back to a cap of 1 when upcast data is missing (5e data row shape)', async () => {
     const { pending } = await gate({ name: 'Animal Friendship', level: 1, range: '30 feet', casting_time: 'Action' });
 
     expect(pending.maxTargets).toBe(1);

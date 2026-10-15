@@ -1,5 +1,8 @@
+// @maintained-by-ai: 2026-10-14
+// Base lane: hook mount/state basics and the isBonusSorcerer metamagic gate only.
+// Behaviour lanes own the paths: castClick, attackClick, aoeClick, confirm, skip, modalRouting.
 import { describe, it, expect, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { useActionSpellMetamagic } from './useActionSpellMetamagic.js';
 import {
   makeHookProps,
@@ -34,226 +37,30 @@ vi.mock('../../services/rules/spells/spellCastService.js', () => ({
   executeSpellCast: vi.fn(() => Promise.resolve(null)),
 }));
 
-describe('useActionSpellMetamagic', () => {
+describe('useActionSpellMetamagic (base)', () => {
   setupBeforeEach();
 
-  describe('return value', () => {
-    it('returns an object with all expected properties', () => {
-      const props = makeHookProps();
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
+  it('mounts with null pending state and the full handler API', () => {
+    const { result } = renderHook(() => useActionSpellMetamagic(makeHookProps()));
 
-      expect(result.current).toHaveProperty('pendingActionMetamagic');
-      expect(result.current).toHaveProperty('isBonusSorcerer');
-      expect(result.current).toHaveProperty('handleActionMetamagicConfirm');
-      expect(result.current).toHaveProperty('handleActionMetamagicSkip');
-      expect(result.current).toHaveProperty('handleActionSpellDamageClick');
-      expect(result.current).toHaveProperty('handleSpellAttackClick');
-    });
-
-    it('returns functions for all action handlers', () => {
-      const props = makeHookProps();
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      expect(typeof result.current.handleActionMetamagicConfirm).toBe('function');
-      expect(typeof result.current.handleActionMetamagicSkip).toBe('function');
-      expect(typeof result.current.handleActionSpellDamageClick).toBe('function');
-      expect(typeof result.current.handleSpellAttackClick).toBe('function');
-    });
-
-    it('returns null for pendingActionMetamagic initially', () => {
-      const props = makeHookProps();
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      expect(result.current.pendingActionMetamagic).toBeNull();
-    });
-
-    it('sets isBonusSorcerer to true when class is Sorcerer', () => {
-      const props = makeHookProps({ playerStats: makePlayerStats() });
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      expect(result.current.isBonusSorcerer).toBe(true);
-    });
-
-    it('sets isBonusSorcerer to false when class is not Sorcerer', () => {
-      const props = makeHookProps({ playerStats: makeNonSorcererStats() });
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      expect(result.current.isBonusSorcerer).toBe(false);
-    });
-
-    it('sets isBonusSorcerer to false when playerStats.class is undefined', () => {
-      const props = makeHookProps({ playerStats: { name: 'TestChar' } });
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      expect(result.current.isBonusSorcerer).toBe(false);
+    expect(result.current.pendingActionMetamagic).toBeNull();
+    expect(result.current).toMatchObject({
+      handleActionMetamagicConfirm: expect.any(Function),
+      handleActionMetamagicSkip: expect.any(Function),
+      handleActionSpellDamageClick: expect.any(Function),
+      handleSpellAttackClick: expect.any(Function),
     });
   });
 
-  describe('handleActionMetamagicConfirm', () => {
-    it('clears pending state and no-ops when called without pending action', async () => {
-      const props = makeHookProps();
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
+  it.each([
+    ['Sorcerer', makePlayerStats(), true],
+    ['Wizard', makeNonSorcererStats(), false],
+    ['class-less character', { name: 'TestChar' }, false],
+  ])('isBonusSorcerer gate: %s → %s', (_label, playerStats, expected) => {
+    const { result } = renderHook(() =>
+      useActionSpellMetamagic(makeHookProps({ playerStats })),
+    );
 
-      await act(async () => {
-        result.current.handleActionMetamagicConfirm({});
-      });
-
-      expect(result.current.pendingActionMetamagic).toBeNull();
-    });
-
-    it('no-ops when called with null result and no pending action', async () => {
-      const props = makeHookProps();
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      await act(async () => {
-        result.current.handleActionMetamagicConfirm(null);
-      });
-
-      expect(result.current.pendingActionMetamagic).toBeNull();
-    });
-
-    it('no-ops when called with undefined result and no pending action', async () => {
-      const props = makeHookProps();
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      await act(async () => {
-        result.current.handleActionMetamagicConfirm(undefined);
-      });
-
-      expect(result.current.pendingActionMetamagic).toBeNull();
-    });
-  });
-
-  describe('handleActionMetamagicSkip', () => {
-    it('clears pending state and no-ops when called without pending action', async () => {
-      const props = makeHookProps();
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      await act(async () => {
-        result.current.handleActionMetamagicSkip();
-      });
-
-      expect(result.current.pendingActionMetamagic).toBeNull();
-    });
-  });
-
-  describe('handleActionSpellDamageClick', () => {
-    it('returns early for non-sorcerer without area effect when no spell found', async () => {
-      const { prepareSpellCast } = await import(
-        '../../services/rules/spells/spellPreparationService.js'
-      );
-      const { executeSpellCast } = await import(
-        '../../services/rules/spells/spellCastService.js'
-      );
-
-      const props = makeHookProps({
-        playerStats: makeNonSorcererStats({ spellAbilities: { spells: [] } }),
-      });
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      const attack = { name: 'UnknownSpell', area_of_effect: null };
-
-      await act(async () => {
-        result.current.handleActionSpellDamageClick(attack);
-      });
-
-      expect(prepareSpellCast).toHaveBeenCalled();
-      expect(executeSpellCast).toHaveBeenCalled();
-    });
-
-    it('delegates to handleAttackClick for sorcerer when no spell found and no area effect', async () => {
-      const handleAttackClick = vi.fn();
-      const props = makeHookProps({
-        playerStats: makePlayerStats({ spellAbilities: { spells: [] } }),
-        handleAttackClick,
-      });
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      const attack = { name: 'UnknownSpell', area_of_effect: null };
-
-      await act(async () => {
-        result.current.handleActionSpellDamageClick(attack);
-      });
-
-      expect(handleAttackClick).toHaveBeenCalledWith(attack);
-    });
-
-    it('does not set pendingActionMetamagic for non-sorcerer without spell', async () => {
-      const props = makeHookProps({
-        playerStats: makeNonSorcererStats({ spellAbilities: { spells: [] } }),
-      });
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      const attack = { name: 'Fireball', area_of_effect: null };
-
-      await act(async () => {
-        result.current.handleActionSpellDamageClick(attack);
-      });
-
-      expect(result.current.pendingActionMetamagic).toBeNull();
-    });
-  });
-
-  describe('handleSpellAttackClick', () => {
-    it('returns early without any action when cannotAct is true', async () => {
-      const handleAttackClick = vi.fn();
-      const { executeSpellCast } = await import(
-        '../../services/rules/spells/spellCastService.js'
-      );
-      const { prepareSpellCast } = await import(
-        '../../services/rules/spells/spellPreparationService.js'
-      );
-
-      const props = makeHookProps({
-        cannotAct: true,
-        handleAttackClick,
-        playerStats: makePlayerStats({ spellAbilities: { spells: [] } }),
-      });
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      const attack = { name: 'Fireball' };
-
-      await act(async () => {
-        result.current.handleSpellAttackClick(attack);
-      });
-
-      expect(handleAttackClick).not.toHaveBeenCalled();
-      expect(executeSpellCast).not.toHaveBeenCalled();
-      expect(prepareSpellCast).not.toHaveBeenCalled();
-    });
-
-    it('delegates to handleAttackClick for sorcerer when no spell found', async () => {
-      const handleAttackClick = vi.fn();
-      const props = makeHookProps({
-        playerStats: makePlayerStats({ spellAbilities: { spells: [] } }),
-        handleAttackClick,
-      });
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      const attack = { name: 'UnknownSpell' };
-
-      await act(async () => {
-        result.current.handleSpellAttackClick(attack);
-      });
-
-      expect(handleAttackClick).toHaveBeenCalledWith(attack);
-    });
-
-    it('delegates to handleAttackClick for non-sorcerer when no spell found', async () => {
-      const handleAttackClick = vi.fn();
-      const props = makeHookProps({
-        playerStats: makeNonSorcererStats({ spellAbilities: { spells: [] } }),
-        handleAttackClick,
-      });
-      const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-      const attack = { name: 'UnknownSpell' };
-
-      await act(async () => {
-        result.current.handleSpellAttackClick(attack);
-      });
-
-      expect(handleAttackClick).toHaveBeenCalledWith(attack);
-    });
+    expect(result.current.isBonusSorcerer).toBe(expected);
   });
 });

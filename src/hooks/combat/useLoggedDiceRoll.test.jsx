@@ -1,17 +1,12 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import React from 'react';
 import useLoggedDiceRoll from './useLoggedDiceRoll.js';
 import { DiceRollContext } from './DiceRollContext.js';
-import { clearRuntimeState, seedTrackedResources } from '../runtime/useRuntimeState.js';
 
 vi.mock('./useDiceRoll.js', () => ({
   default: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn() })),
-}));
-
-vi.mock('../../services/dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(() => ({ total: 7, rolls: [3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 14, rolls: [7, 7], modifier: 0 })),
 }));
 
 vi.mock('./useLoggedDiceRollAttack.js', () => ({
@@ -33,11 +28,11 @@ vi.mock('./useLoggedDiceRollEventHandlers.js', () => ({
   setupEventListeners: vi.fn(),
 }));
 
-const { default: useDiceRoll } = await import('./useDiceRoll.js');
-const { createLogAndShow } = await import('./useLoggedDiceRollAttack.js');
-const { createLogDamageAndShow } = await import('./useLoggedDiceRollDamage.js');
-const { createSaves } = await import('./useLoggedDiceRollSaves.js');
-const { setupEventListeners } = await import('./useLoggedDiceRollEventHandlers.js');
+import useDiceRoll from './useDiceRoll.js';
+import { createLogAndShow } from './useLoggedDiceRollAttack.js';
+import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
+import { createSaves } from './useLoggedDiceRollSaves.js';
+import { setupEventListeners } from './useLoggedDiceRollEventHandlers.js';
 
 describe('useLoggedDiceRoll', () => {
   const characterName = 'TestFighter';
@@ -51,178 +46,113 @@ describe('useLoggedDiceRoll', () => {
       quickRollPlayerSave: vi.fn(),
       triggerGloriousDefenseCounterAttack: vi.fn(),
     });
-    setupEventListeners.mockReturnValue(undefined);
-    clearRuntimeState(campaignName);
-    seedTrackedResources(campaignName, { pendingSavePrompts: {} });
   });
 
-  describe('initial return value', () => {
-    it('returns popupHtml, setPopupHtml, and all roll functions', () => {
-      const { result } = renderHook(() =>
-        useLoggedDiceRoll(characterName, campaignName)
-      );
-      expect(result.current.popupHtml).toBeNull();
-      expect(typeof result.current.setPopupHtml).toBe('function');
-      expect(typeof result.current.rollAbilityCheck).toBe('function');
-      expect(typeof result.current.rollSavingThrow).toBe('function');
-      expect(typeof result.current.rollSkillCheck).toBe('function');
-      expect(typeof result.current.rollInitiative).toBe('function');
-      expect(typeof result.current.rollAttack).toBe('function');
-      expect(typeof result.current.rollDamage).toBe('function');
-      expect(typeof result.current.quickRollPlayerSave).toBe('function');
-      expect(typeof result.current.triggerGloriousDefenseCounterAttack).toBe('function');
-    });
+  it('exposes the documented public API surface', () => {
+    const { result } = renderHook(() => useLoggedDiceRoll(characterName, campaignName));
+    expect(Object.keys(result.current).sort()).toEqual([
+      'popupHtml',
+      'quickRollPlayerSave',
+      'rollAbilityCheck',
+      'rollAttack',
+      'rollDamage',
+      'rollInitiative',
+      'rollSavingThrow',
+      'rollSkillCheck',
+      'setPopupHtml',
+      'triggerGloriousDefenseCounterAttack',
+    ]);
   });
 
   describe('roll delegation', () => {
+    const ctx = { target: 'Goblin' };
     const delegationTests = [
-      ['rollAbilityCheck', 'check', ['Athletics', 5], { target: 'Goblin' }],
-      ['rollSavingThrow', 'save', ['Constitution', 3], { target: 'Fireball' }],
-      ['rollSkillCheck', 'skill', ['Stealth', 4], {}],
-      ['rollAttack', 'attack', ['Longsword', 7], { target: 'Goblin' }],
+      ['rollAbilityCheck', ['Athletics', 5, ctx], ['Athletics', 5, 'check', ctx]],
+      ['rollSavingThrow', ['Constitution', 3, ctx], ['Constitution', 3, 'save', ctx]],
+      ['rollSkillCheck', ['Stealth', 4, ctx], ['Stealth', 4, 'skill', ctx]],
+      ['rollAttack', ['Longsword', 7, ctx], ['Longsword', 7, 'attack', ctx]],
+      ['rollInitiative', [2, ctx], ['Initiative', 2, 'initiative', ctx]],
     ];
 
-    for (const [fnName, rollType, callArgs, context] of delegationTests) {
-      it(`delegates ${fnName} to createLogAndShow with type "${rollType}"`, () => {
+    for (const [fnName, callArgs, expectedArgs] of delegationTests) {
+      it(`${fnName} delegates to logAndShow`, () => {
         const mockLogAndShow = vi.fn();
         createLogAndShow.mockReturnValue(mockLogAndShow);
-        const { result } = renderHook(() =>
-          useLoggedDiceRoll(characterName, campaignName)
-        );
-        act(() => {
-          result.current[fnName](...callArgs, context);
-        });
-        expect(mockLogAndShow).toHaveBeenCalledWith(...callArgs, rollType, context);
+        const { result } = renderHook(() => useLoggedDiceRoll(characterName, campaignName));
+        result.current[fnName](...callArgs);
+        expect(mockLogAndShow).toHaveBeenCalledWith(...expectedArgs);
       });
     }
 
-    it('delegates rollInitiative to createLogAndShow with name "Initiative" and type "initiative"', () => {
-      const mockLogAndShow = vi.fn();
-      createLogAndShow.mockReturnValue(mockLogAndShow);
-      const { result } = renderHook(() =>
-        useLoggedDiceRoll(characterName, campaignName)
-      );
-      act(() => {
-        result.current.rollInitiative(2, {});
-      });
-      expect(mockLogAndShow).toHaveBeenCalledWith('Initiative', 2, 'initiative', {});
-    });
-
-    it('delegates rollDamage to createLogDamageAndShow with all arguments', () => {
+    it('rollDamage passes the payload straight to logDamageAndShow', () => {
       const mockLogDamageAndShow = vi.fn();
       createLogDamageAndShow.mockReturnValue(mockLogDamageAndShow);
-      const { result } = renderHook(() =>
-        useLoggedDiceRoll(characterName, campaignName)
-      );
-      act(() => {
-        result.current.rollDamage({ name: 'Longsword', formula: '2d6+3', total: 10, rolls: [3, 7], modifier: 3, context: { targetName: 'Goblin' } });
-      });
-      expect(mockLogDamageAndShow).toHaveBeenCalledWith(
-        { name: 'Longsword', formula: '2d6+3', total: 10, rolls: [3, 7], modifier: 3, context: { targetName: 'Goblin' } }
-      );
+      const { result } = renderHook(() => useLoggedDiceRoll(characterName, campaignName));
+      const payload = {
+        name: 'Longsword', formula: '2d6+3', total: 10, rolls: [3, 7],
+        modifier: 3, context: { targetName: 'Goblin' },
+      };
+      result.current.rollDamage(payload);
+      expect(mockLogDamageAndShow).toHaveBeenCalledWith(payload);
     });
   });
 
-  describe('event listeners setup', () => {
-    it('calls setupEventListeners with characterName, campaignName, logEntry function, and charactersRef', () => {
-      const characters = [{ name: 'TestFighter' }];
-      renderHook(() => useLoggedDiceRoll(characterName, campaignName, { characters }));
-      expect(setupEventListeners).toHaveBeenCalledWith({
-        characterName,
-        campaignName,
-        logEntry: expect.any(Function),
-        charactersRef: expect.any(Object),
-      });
+  it('wires helper factories with campaign context and shared refs', () => {
+    const characters = [{ name: 'TestFighter' }];
+    renderHook(() => useLoggedDiceRoll(characterName, campaignName, { characters }));
+    expect(setupEventListeners).toHaveBeenCalledWith({
+      characterName,
+      campaignName,
+      logEntry: expect.any(Function),
+      charactersRef: expect.any(Object),
     });
+    expect(createLogAndShow).toHaveBeenCalledWith(expect.objectContaining({
+      characterName, campaignName, characters, logEntry: expect.any(Function),
+    }));
+    expect(createLogDamageAndShow).toHaveBeenCalledWith(expect.objectContaining({
+      characterName, campaignName, characters, pendingSaves: {},
+    }));
+    expect(createSaves).toHaveBeenCalledWith(expect.objectContaining({
+      characterName, campaignName, logAndShow: expect.any(Function),
+    }));
   });
 
-  describe('autoDamage via dice-roll-done custom event', () => {
-    it('triggers autoDamage when hit is true, autoDamage exists, and source matches', async () => {
-      const mockAutoDamage = vi.fn();
-      const autoDamageData = { formula: '2d6+3', damageType: 'fire', source: 'TestFighter' };
-      useDiceRoll.mockReturnValue({
-        popupHtml: { hit: true, autoDamage: autoDamageData },
-        setPopupHtml: vi.fn(),
-      });
-      vi.useFakeTimers();
-      renderHook(
-        () => useLoggedDiceRoll(characterName, campaignName, { autoDamageRoll: mockAutoDamage, autoDamageSource: 'TestFighter' })
-      );
-      window.dispatchEvent(new CustomEvent('dice-roll-done', { detail: { autoDamage: autoDamageData, isCrit: undefined } }));
-      await vi.runAllTimersAsync();
-      vi.useRealTimers();
-      expect(mockAutoDamage).toHaveBeenCalledWith(autoDamageData, undefined);
-    });
+  describe('autoDamage via dice-roll-done event', () => {
+    const autoDamage = { formula: '2d6+3', damageType: 'fire', source: characterName };
+    const autoDamageTests = [
+      ['rolls auto damage on a hit by this character', { autoDamageSource: characterName },
+        { hit: true, autoDamage }, [autoDamage, undefined]],
+      ['passes isCrit through to autoDamageRoll', { autoDamageSource: characterName },
+        { hit: true, isCrit: true, autoDamage }, [autoDamage, true]],
+      ['ignores auto damage from another source', { autoDamageSource: characterName },
+        { hit: true, autoDamage: { ...autoDamage, source: 'OtherCharacter' } }, null],
+      ['ignores auto damage when hit is false', { autoDamageSource: characterName },
+        { hit: false, autoDamage }, null],
+      ['ignores auto damage when no autoDamageSource option is provided', {},
+        { hit: true, autoDamage }, null],
+      ['ignores events without autoDamage detail', { autoDamageSource: characterName },
+        { hit: true }, null],
+    ];
 
-    it('passes isCrit to autoDamageRoll when present in the event detail', async () => {
-      const mockAutoDamage = vi.fn();
-      const autoDamageData = { formula: '2d6+3', damageType: 'fire', source: 'TestFighter' };
-      useDiceRoll.mockReturnValue({
-        popupHtml: { hit: true, autoDamage: autoDamageData, isCrit: true },
-        setPopupHtml: vi.fn(),
+    for (const [label, options, detail, expected] of autoDamageTests) {
+      it(label, () => {
+        const autoDamageRoll = vi.fn();
+        renderHook(() =>
+          useLoggedDiceRoll(characterName, campaignName, { autoDamageRoll, ...options })
+        );
+        window.dispatchEvent(new CustomEvent('dice-roll-done', { detail }));
+        if (expected) {
+          expect(autoDamageRoll).toHaveBeenCalledWith(...expected);
+        } else {
+          expect(autoDamageRoll).not.toHaveBeenCalled();
+        }
       });
-      vi.useFakeTimers();
-      renderHook(
-        () => useLoggedDiceRoll(characterName, campaignName, { autoDamageRoll: mockAutoDamage, autoDamageSource: 'TestFighter' })
-      );
-      window.dispatchEvent(new CustomEvent('dice-roll-done', { detail: { autoDamage: autoDamageData, isCrit: true } }));
-      await vi.runAllTimersAsync();
-      vi.useRealTimers();
-      expect(mockAutoDamage).toHaveBeenCalledWith(autoDamageData, true);
-    });
+    }
 
-    it('does not trigger autoDamage when source does not match', async () => {
-      const mockAutoDamage = vi.fn();
-      useDiceRoll.mockReturnValue({
-        popupHtml: { hit: true, autoDamage: { formula: '2d6', source: 'OtherCharacter' } },
-        setPopupHtml: vi.fn(),
-      });
-      vi.useFakeTimers();
-      renderHook(
-        () => useLoggedDiceRoll(characterName, campaignName, { autoDamageRoll: mockAutoDamage, autoDamageSource: 'ThisCharacter' })
-      );
-      await vi.runAllTimersAsync();
-      vi.useRealTimers();
-      expect(mockAutoDamage).not.toHaveBeenCalled();
-    });
-
-    it('does not trigger autoDamage when hit is false', async () => {
-      const mockAutoDamage = vi.fn();
-      useDiceRoll.mockReturnValue({
-        popupHtml: { hit: false, autoDamage: { formula: '2d6', source: 'TestFighter' } },
-        setPopupHtml: vi.fn(),
-      });
-      vi.useFakeTimers();
-      renderHook(
-        () => useLoggedDiceRoll(characterName, campaignName, { autoDamageRoll: mockAutoDamage, autoDamageSource: 'TestFighter' })
-      );
-      await vi.runAllTimersAsync();
-      vi.useRealTimers();
-      expect(mockAutoDamage).not.toHaveBeenCalled();
-    });
-
-    it('does not trigger autoDamage when autoDamageSource is not provided in options', async () => {
-      const mockAutoDamage = vi.fn();
-      useDiceRoll.mockReturnValue({
-        popupHtml: { hit: true, autoDamage: { formula: '2d6', source: 'TestFighter' } },
-        setPopupHtml: vi.fn(),
-      });
-      vi.useFakeTimers();
-      renderHook(
-        () => useLoggedDiceRoll(characterName, campaignName, { autoDamageRoll: mockAutoDamage })
-      );
-      window.dispatchEvent(new CustomEvent('dice-roll-done', { detail: { autoDamage: { formula: '2d6', source: 'TestFighter' } } }));
-      await vi.runAllTimersAsync();
-      vi.useRealTimers();
-      expect(mockAutoDamage).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('event listener cleanup', () => {
-    it('removes the dice-roll-done event listener on unmount', () => {
+    it('removes the dice-roll-done listener on unmount', () => {
       const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-      const { unmount } = renderHook(
-        () => useLoggedDiceRoll(characterName, campaignName, { autoDamageSource: 'TestFighter' })
+      const { unmount } = renderHook(() =>
+        useLoggedDiceRoll(characterName, campaignName, { autoDamageRoll: vi.fn(), autoDamageSource: characterName })
       );
       unmount();
       expect(removeEventListenerSpy).toHaveBeenCalledWith('dice-roll-done', expect.any(Function));
@@ -230,47 +160,28 @@ describe('useLoggedDiceRoll', () => {
     });
   });
 
-  describe('shared context (_isShared)', () => {
-    it('uses context setPopupHtml when _isShared is true', () => {
-      const contextSetPopupHtml = vi.fn();
-      const internalSetPopupHtml = vi.fn();
-      useDiceRoll.mockReturnValue({ popupHtml: null, setPopupHtml: internalSetPopupHtml });
+  describe('shared popup context (_isShared)', () => {
+    for (const isShared of [true, false, undefined]) {
+      it(`uses ${isShared ? 'context' : 'internal'} setPopupHtml when _isShared is ${isShared}`, () => {
+        const contextSetPopupHtml = vi.fn();
+        const internalSetPopupHtml = vi.fn();
+        useDiceRoll.mockReturnValue({ popupHtml: null, setPopupHtml: internalSetPopupHtml });
+        const { result } = renderHook(
+          () => useLoggedDiceRoll(characterName, campaignName),
+          {
+            wrapper: ({ children }) => (
+              <DiceRollContext.Provider value={{ popupHtml: { type: 'd20' }, setPopupHtml: contextSetPopupHtml, _isShared: isShared }}>
+                {children}
+              </DiceRollContext.Provider>
+            ),
+          }
+        );
+        expect(result.current.setPopupHtml).toBe(isShared ? contextSetPopupHtml : internalSetPopupHtml);
+      });
+    }
 
-      const { result } = renderHook(
-        () => useLoggedDiceRoll(characterName, campaignName),
-        {
-          wrapper: ({ children }) => (
-            <DiceRollContext.Provider value={{ popupHtml: { type: 'd20' }, setPopupHtml: contextSetPopupHtml, _isShared: true }}>
-              {children}
-            </DiceRollContext.Provider>
-          ),
-        }
-      );
-      expect(result.current.setPopupHtml).toBe(contextSetPopupHtml);
-    });
-
-    it('uses internal setPopupHtml when _isShared is false or absent', () => {
-      const contextSetPopupHtml = vi.fn();
-      const internalSetPopupHtml = vi.fn();
-      useDiceRoll.mockReturnValue({ popupHtml: null, setPopupHtml: internalSetPopupHtml });
-
-      const { result } = renderHook(
-        () => useLoggedDiceRoll(characterName, campaignName),
-        {
-          wrapper: ({ children }) => (
-            <DiceRollContext.Provider value={{ popupHtml: { type: 'd20' }, setPopupHtml: contextSetPopupHtml }}>
-              {children}
-            </DiceRollContext.Provider>
-          ),
-        }
-      );
-      expect(result.current.setPopupHtml).toBe(internalSetPopupHtml);
-    });
-
-    it('always returns internal popupHtml regardless of context value', () => {
-      const internalSetPopupHtml = vi.fn();
-      useDiceRoll.mockReturnValue({ popupHtml: 'internal-value', setPopupHtml: internalSetPopupHtml });
-
+    it('always exposes the internal popupHtml, even when shared', () => {
+      useDiceRoll.mockReturnValue({ popupHtml: 'internal-value', setPopupHtml: vi.fn() });
       const { result } = renderHook(
         () => useLoggedDiceRoll(characterName, campaignName),
         {

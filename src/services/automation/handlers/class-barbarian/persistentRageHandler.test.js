@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// persistentRageHandler.handle — deterministic contract tests for the
+// Barbarian "Persistent Rage" passive rule: validation branches (no rages
+// at level, already at max, already used since long rest), the successful
+// restore path (writes ragePoints + persistentRageUsed to the runtime
+// store, logs an ability_use entry), and graceful handling of log-service
+// failures. All dependencies are mocked; no timers, DOM, or network.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './persistentRageHandler.js';
 
@@ -43,11 +50,8 @@ describe('persistentRageHandler', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        getRuntimeValue.mockImplementation((_name, key) => {
-            if (key === 'ragePoints') return null;
-            if (key === 'persistentRageUsed') return null;
-            return null;
-        });
+        getRuntimeValue.mockImplementation(() => null);
+        addEntry.mockResolvedValue({ id: 1, timestamp: Date.now() });
     });
 
     describe('validation', () => {
@@ -58,9 +62,8 @@ describe('persistentRageHandler', () => {
                     class_levels: [{ level: 1, rages: 0 }],
                 },
             });
-            const action = makeAction();
 
-            const result = await handle(action, stats, campaignName, null);
+            const result = await handle(makeAction(), stats, campaignName, null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
@@ -87,6 +90,18 @@ describe('persistentRageHandler', () => {
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(addEntry).not.toHaveBeenCalled();
         });
+
+        it('treats unset ragePoints as full and blocks the feature', async () => {
+            // ragePoints missing from the store defaults to the class max
+            // (nothing to restore), so the feature must not consume its
+            // once-per-long-rest use.
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('already at maximum');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+        });
     });
 
     describe('already used this long rest', () => {
@@ -108,7 +123,7 @@ describe('persistentRageHandler', () => {
     });
 
     describe('successful restoration', () => {
-        it('restores rage points to max when below max', async () => {
+        it('restores rage points to max, marks the feature used, and logs the use', async () => {
             getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'ragePoints') return 1;
                 return null;
@@ -140,26 +155,6 @@ describe('persistentRageHandler', () => {
                 description: expect.stringContaining('1 -> 4'),
             }));
         });
-
-        it('restores from partial rage with different values', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'ragePoints') return 2;
-                return null;
-            });
-            const stats = makePlayerStats({
-                level: 10,
-                class: { name: 'Barbarian', class_levels: [{ level: 10, rages: 3 }] },
-            });
-
-            const result = await handle(makeAction(), stats, campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(setRuntimeValue).toHaveBeenNthCalledWith(1, playerName, 'ragePoints', 3, campaignName);
-            expect(setRuntimeValue).toHaveBeenNthCalledWith(2, playerName, 'persistentRageUsed', true, campaignName);
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                description: expect.stringContaining('2 -> 3'),
-            }));
-        });
     });
 
     describe('error handling', () => {
@@ -168,7 +163,7 @@ describe('persistentRageHandler', () => {
                 if (key === 'ragePoints') return 1;
                 return null;
             });
-            addEntry.mockRejectedValue(new Error('Log service unavailable'));
+            addEntry.mockRejectedValueOnce(new Error('Log service unavailable'));
 
             const spy = vi.spyOn(console, 'error').mockReturnValue(undefined);
 
@@ -179,6 +174,7 @@ describe('persistentRageHandler', () => {
             // setRuntimeValue calls happen before addEntry, so they should still be called
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'ragePoints', 4, campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'persistentRageUsed', true, campaignName);
+            expect(spy).toHaveBeenCalled();
 
             spy.mockRestore();
         });

@@ -1,10 +1,24 @@
+// @maintained-by-ai: 2026-10-15 — see lane map below
+// Multi-stage state-machine lane — unique seams only:
+//  * True Polymorph path-storage: path-select persists the chosen path on the open
+//    pending machine (object-path resolution → confirm-payloads / complex-handlers.spells;
+//    no-pending guards → handler-guards).
+//  * Animal Shapes stage-2→3 handoff: the beast map threads to applyAnimalShapes and the
+//    beast-picker popup closes even when the apply is rejected (ok:false).
+//  * Animal Shapes concentration runtime seam: ok:true + caster in the combat summary stamps
+//    animalShapesConcentrationActive / animalShapesConcentrationDc (8 + prof + CON); an
+//    off-summary caster stamps nothing.
+// Deliberately NOT here: Resistance / Protection from Energy / Enhance Ability two-stage
+// chains (gate-two-stage), Magic Missile arm/pay/execute (sp075 + spellConfirm),
+// Greater Restoration no-effects refund (special-paths), no-pending guards (handler-guards).
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
-import { addEntry } from '../../services/ui/logService.js';
-import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js';
+import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
+import { applyAnimalShapes } from '../../services/automation/handlers/spells/animalShapesService.js';
 
-// ── Minimal mocks (only what this file's tests actually exercise) ──────────────
+// ── Minimal mocks (only what this lane's state machines exercise) ──────────────
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
@@ -205,484 +219,121 @@ function makeSpell(overrides = {}) {
   };
 }
 
-// ── handleMagicMissileConfirm with distribution ──────────────────────────────
+function renderFlow(playerStats = makePlayerStats()) {
+  const setPopupHtml = vi.fn();
+  const { result } = renderHook(() =>
+    useSpellMetamagicFlow({
+      playerStats,
+      campaignName: 'test-campaign',
+      onExecute: vi.fn(),
+      setSecondaryTargetModal: null,
+      characters: [],
+      setPopupHtml,
+    })
+  );
+  return { result, setPopupHtml };
+}
 
-describe('useSpellMetamagicFlow — handleMagicMissileConfirm', () => {
+// Gate a spell and drive the Animal Shapes machine to the beast-picker stage:
+// gate → target-select opens the stage-2 popup, whose choice lands in beast-confirm.
+async function openAnimalShapesBeastPicker(result, casterName = 'Goblin A') {
+  await act(async () => {
+    await result.current.gateMetamagic(makeSpell({ name: 'Animal Shapes', level: 8 }));
+  });
+  await act(async () => {
+    await result.current.handleAnimalShapesTargetConfirm([casterName]);
+  });
+}
+
+// ── True Polymorph — path-storage on the open machine ─────────────────────────
+
+describe('useSpellMetamagicFlow — multi-stage path storage (True Polymorph)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
   });
 
-  it('calls onExecute with magicMissileDistribution when targets selected', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: onExecute })
-    );
+  it('path-select persists the chosen path on the still-open pending machine', async () => {
+    const { result } = renderFlow();
 
     await act(async () => {
-      await result.current.gateMetamagic(makeSpell({ name: 'Magic Missile', level: 1 }));
+      await result.current.gateMetamagic(makeSpell({ name: 'True Polymorph', level: 9 }));
     });
+    expect(result.current.pendingTruePolymorph).not.toBeNull();
 
     await act(async () => {
-      await result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 1, 'Goblin B': 1 } });
+      await result.current.handleTruePolymorphPathSelect('creature_to_creature');
     });
 
-    expect(onExecute).toHaveBeenCalledWith(
-      expect.any(Object),
-      expect.objectContaining({ magicMissileDistribution: { 'Goblin A': 1, 'Goblin B': 1 } })
-    );
-    expect(result.current.pendingMagicMissile).toBeNull();
-  });
-
-  it('passes slotLevel derived from spell level in distribution', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: onExecute })
-    );
-
-    await act(async () => {
-      await result.current.gateMetamagic(makeSpell({ name: 'Magic Missile', level: 2 }));
-    });
-
-    await act(async () => {
-      await result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 2 } });
-    });
-
-    expect(onExecute).toHaveBeenCalledWith(
-      expect.any(Object),
-      expect.objectContaining({ slotLevel: 2 })
-    );
-  });
-
-  it('pays the spell slot via prepareSpellCast before executing', async () => {
-    const { prepareSpellCast, isFreeCastAuthorized } = await import('../../services/rules/spells/spellPreparationService.js');
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: onExecute })
-    );
-
-    await act(async () => {
-      await result.current.gateMetamagic(makeSpell({ name: 'Magic Missile', level: 1 }));
-    });
-
-    await act(async () => {
-      await result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 3 } });
-    });
-
-    expect(isFreeCastAuthorized).toHaveBeenCalledWith('TestSorcerer', 'Magic Missile', 1, expect.any(Object), 'test-campaign');
-    expect(prepareSpellCast).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Magic Missile', level: 1 }),
-      expect.objectContaining({ magicMissileDistribution: { 'Goblin A': 3 }, slotLevel: 1 }),
-      expect.objectContaining({ playerName: 'TestSorcerer', campaignName: 'test-campaign' })
-    );
-    expect(onExecute).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Magic Missile' }),
-      expect.objectContaining({ magicMissileDistribution: { 'Goblin A': 3 }, slotLevel: 1 })
-    );
-  });
-
-  it('does nothing when all distribution values are 0', async () => {
-    const onExecute = vi.fn();
-    const { prepareSpellCast } = await import('../../services/rules/spells/spellPreparationService.js');
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: onExecute })
-    );
-
-    await act(async () => {
-      await result.current.gateMetamagic(makeSpell({ name: 'Magic Missile', level: 1 }));
-    });
-
-    await act(async () => {
-      await result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 0, 'Goblin B': 0 } });
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(prepareSpellCast).not.toHaveBeenCalled();
-    expect(result.current.pendingMagicMissile).toBeNull();
-  });
-
-  it('does nothing when there is no pending magicMissile', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: onExecute })
-    );
-
-    await act(async () => {
-      await result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 1 } });
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-});
-
-// ── handleEnhanceAbilityAbilitySelect ───────────────────────────────────────
-
-describe('useSpellMetamagicFlow — handleEnhanceAbilityAbilitySelect', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('sets enhanceAbilityStage to target and stores the selected ability', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.handleEnhanceAbilityAbilitySelect('Strength');
-    });
-
-    expect(result.current.enhanceAbilityStage).toBe('target');
-  });
-
-  it('updates stored ability on subsequent calls', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.handleEnhanceAbilityAbilitySelect('Strength');
-    });
-    expect(result.current.enhanceAbilityStage).toBe('target');
-
-    act(() => {
-      result.current.handleEnhanceAbilityAbilitySelect('Dexterity');
-    });
-    expect(result.current.enhanceAbilityStage).toBe('target');
-  });
-});
-
-// ── handleProtectionFromEnergyTargetSelect ──────────────────────────────────
-
-describe('useSpellMetamagicFlow — handleProtectionFromEnergyTargetSelect', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('sets protectionFromEnergyStage to type and stores the selected target', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.handleProtectionFromEnergyTargetSelect('Goblin A');
-    });
-
-    expect(result.current.protectionFromEnergyStage).toBe('type');
-  });
-});
-
-// ── handleProtectionFromEnergyTypeSelect ────────────────────────────────────
-
-describe('useSpellMetamagicFlow — handleProtectionFromEnergyTypeSelect', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('clears pending and applies effect on type select after target select', async () => {
-    const setPopupHtml = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Protection from Energy', level: 3 }));
-    });
-
-    act(() => {
-      result.current.handleProtectionFromEnergyTargetSelect('Goblin A');
-    });
-
-    expect(result.current.protectionFromEnergyStage).toBe('type');
-
-    await act(async () => {
-      await result.current.handleProtectionFromEnergyTypeSelect('fire');
-    });
-
-    expect(result.current.pendingProtectionFromEnergy).toBeNull();
-    expect(result.current.protectionFromEnergyStage).toBeNull();
-  });
-
-  it('does nothing when there is no pending protectionFromEnergy', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.handleProtectionFromEnergyTypeSelect('fire');
-    });
-
-    expect(result.current.protectionFromEnergyStage).toBeNull();
-  });
-});
-
-// ── handleResistanceTargetSelect ────────────────────────────────────────────
-
-describe('useSpellMetamagicFlow — handleResistanceTargetSelect', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('sets resistanceStage to type and stores the selected target', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.handleResistanceTargetSelect('Goblin A');
-    });
-
-    expect(result.current.resistanceStage).toBe('type');
-  });
-});
-
-// ── handleResistanceTypeSelect ──────────────────────────────────────────────
-
-describe('useSpellMetamagicFlow — handleResistanceTypeSelect', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('clears pending and applies effect on type select after target select', async () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Resistance', level: 0 }));
-    });
-
-    act(() => {
-      result.current.handleResistanceTargetSelect('Goblin A');
-    });
-
-    expect(result.current.resistanceStage).toBe('type');
-
-    await act(async () => {
-      await result.current.handleResistanceTypeSelect('fire');
-    });
-
-    expect(result.current.pendingResistance).toBeNull();
-    expect(result.current.resistanceStage).toBeNull();
-  });
-
-  it('does nothing when there is no pending resistance', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.handleResistanceTypeSelect('fire');
-    });
-
-    expect(result.current.resistanceStage).toBeNull();
-  });
-});
-
-// ── handleGreaterRestorationNoEffects ───────────────────────────────────────
-
-describe('useSpellMetamagicFlow — handleGreaterRestorationNoEffects', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('logs entry when no effects to remove', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Greater Restoration', level: 5 }));
-    });
-
-    act(() => {
-      result.current.handleGreaterRestorationNoEffects();
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Greater Restoration',
-      targetName: null,
-      targets: [],
-    }));
-  });
-
-  it('does nothing when there is no pending greaterRestoration', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.handleGreaterRestorationNoEffects();
-    });
-
-    expect(result.current.pendingGreaterRestoration).toBeNull();
-  });
-});
-
-// ── handleTruePolymorphPathSelect object_into_creature ──────────────────────
-
-describe('useSpellMetamagicFlow — handleTruePolymorphPathSelect object_into_creature', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('clears pending and applies true polymorph when path is object_into_creature', async () => {
-    const setPopupHtml = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'True Polymorph', level: 9 }));
-    });
-
-    await act(async () => {
-      await result.current.handleTruePolymorphPathSelect('object_into_creature');
-    });
-
-    expect(result.current.pendingTruePolymorph).toBeNull();
-  });
-
-  it('sets path on pending when path is not object_into_creature', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'True Polymorph', level: 9 }));
-    });
-
-    act(() => {
-      result.current.handleTruePolymorphPathSelect('creature_to_creature');
-    });
-
+    // Machine stays open, remembering the path for the terminal target-confirm.
     expect(result.current.pendingTruePolymorph).not.toBeNull();
     expect(result.current.pendingTruePolymorph.path).toBe('creature_to_creature');
   });
-
-  it('does nothing when there is no pending truePolymorph', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.handleTruePolymorphPathSelect('creature_to_creature');
-    });
-
-    expect(result.current.pendingTruePolymorph).toBeNull();
-  });
 });
 
-// ── handleAnimalShapesBeastConfirm ──────────────────────────────────────────
+// ── Animal Shapes — stage-2→3 handoff + concentration runtime ─────────────────
 
-describe('useSpellMetamagicFlow — handleAnimalShapesBeastConfirm', () => {
+describe('useSpellMetamagicFlow — Animal Shapes beast-picker handoff', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
   });
 
-  it('clears popup and sets concentration state when result.ok is true and caster is in combat', async () => {
-    const automation = await import('../../services/automation/handlers/spells/animalShapesService.js');
-    automation.applyAnimalShapes.mockResolvedValueOnce({ ok: true });
+  it('beast-confirm threads the beast map to applyAnimalShapes and closes the popup even when rejected', async () => {
+    const { result, setPopupHtml } = renderFlow();
 
-    const setPopupHtml = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Animal Shapes', level: 8 }));
-    });
-
-    await act(async () => {
-      await result.current.handleAnimalShapesTargetConfirm(['Goblin A']);
-    });
+    await openAnimalShapesBeastPicker(result);
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'animal_shapes_target_selection',
+      targets: ['Goblin A'],
+    }));
 
     await act(async () => {
       await result.current.handleAnimalShapesBeastConfirm({ 'Goblin A': 'Wolf' });
     });
 
-    expect(setPopupHtml).toHaveBeenCalledWith(null);
+    expect(applyAnimalShapes).toHaveBeenCalledWith(expect.objectContaining({
+      targetBeastMap: { 'Goblin A': 'Wolf' },
+      casterName: 'TestSorcerer',
+      campaignName: 'test-campaign',
+    }));
+    // Rejection must still tear the picker down — a stuck popup blocks the turn.
+    expect(setPopupHtml).toHaveBeenLastCalledWith(null);
+    // Rejected apply never stamps concentration.
+    expect(setRuntimeValue).not.toHaveBeenCalledWith(
+      'TestSorcerer', 'animalShapesConcentrationActive', true, 'test-campaign');
   });
 
-  it('clears popup when result.ok is false', async () => {
-    const automation = await import('../../services/automation/handlers/spells/animalShapesService.js');
-    automation.applyAnimalShapes.mockResolvedValueOnce({ ok: false });
-
-    const setPopupHtml = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
+  it('ok:true with the caster in the combat summary stamps concentration active + DC 8+prof+CON', async () => {
+    applyAnimalShapes.mockResolvedValueOnce({ ok: true });
+    const { result, setPopupHtml } = renderFlow(
+      makePlayerStats({ name: 'Goblin A', abilities: { CON: { bonus: 2 } } })
     );
 
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Animal Shapes', level: 8 }));
-    });
-
-    await act(async () => {
-      await result.current.handleAnimalShapesTargetConfirm(['Goblin A']);
-    });
+    await openAnimalShapesBeastPicker(result, 'Goblin A');
 
     await act(async () => {
       await result.current.handleAnimalShapesBeastConfirm({ 'Goblin A': 'Wolf' });
     });
 
-    expect(setPopupHtml).toHaveBeenCalledWith(null);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin A', 'animalShapesConcentrationActive', true, 'test-campaign');
+    // 8 + proficiency(2) + CON bonus(2)
+    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin A', 'animalShapesConcentrationDc', 12, 'test-campaign');
+    expect(setPopupHtml).toHaveBeenLastCalledWith(null);
   });
 
-  it('does nothing when there is no pending animalShapes', async () => {
-    const automation = await import('../../services/automation/handlers/spells/animalShapesService.js');
-    automation.applyAnimalShapes.mockResolvedValueOnce({ ok: false });
+  it('ok:true but caster absent from the combat summary stamps no concentration', async () => {
+    applyAnimalShapes.mockResolvedValueOnce({ ok: true });
+    const { result, setPopupHtml } = renderFlow();
 
-    const setPopupHtml = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-    );
-
-    await act(async () => {
-      await result.current.handleAnimalShapesBeastConfirm({});
-    });
-
-    expect(result.current.pendingAnimalShapes).toBeNull();
-  });
-});
-
-// ── handleAnimalShapesBeastConfirm concentration state (caster in combat) ─
-
-describe('useSpellMetamagicFlow — handleAnimalShapesBeastConfirm concentration caster', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('sets concentration runtime values when caster name matches a creature in combat summary', async () => {
-    const automation = await import('../../services/automation/handlers/spells/animalShapesService.js');
-    automation.applyAnimalShapes.mockResolvedValueOnce({ ok: true });
-
-    const setPopupHtml = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: { ...makePlayerStats(), name: 'Goblin A', abilities: { CON: { bonus: 2 } } }, campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Animal Shapes', level: 8 }));
-    });
-
-    await act(async () => {
-      await result.current.handleAnimalShapesTargetConfirm(['Goblin A']);
-    });
+    await openAnimalShapesBeastPicker(result);
 
     await act(async () => {
       await result.current.handleAnimalShapesBeastConfirm({ 'Goblin A': 'Wolf' });
     });
 
-    expect(setPopupHtml).toHaveBeenCalledWith(null);
+    // TestSorcerer is not in the combat summary (Goblin A/B/C) — no caster, no DC.
+    expect(getRuntimeValue).not.toHaveBeenCalledWith('TestSorcerer', 'animalShapesConcentrationDc', 'test-campaign');
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('TestSorcerer', 'animalShapesConcentrationActive', true, 'test-campaign');
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('TestSorcerer', 'animalShapesConcentrationDc', expect.any(Number), 'test-campaign');
+    expect(setPopupHtml).toHaveBeenLastCalledWith(null);
   });
 });

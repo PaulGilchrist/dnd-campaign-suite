@@ -1,11 +1,18 @@
-// SP-125: Warding Bond burned the lv2 slot before the handler's no-target
-// guard (pay-no-effect, §CLA-208 / SP-080 maze-refused family). When neither
-// the chooser gate nor a metaCtx/armed/candidate target exists, gateMetamagic
-// must refuse UNPAID: zero prepareSpellCast, popup refusal face, and an honest
-// warding_bond_refused automation log.
+// @maintained-by-ai: 2026-10-15
+// SP-125 no-spend family (§CLA-208 pay-no-effect) gate-wiring lane: after
+// gateWardingBond declines (its own refusal contract lives in
+// spellGates.wardingBond.test.js — never re-run the chooser here),
+// refuseUntargetedWardingBondGate inside gateMetamagic must refuse UNPAID:
+// zero prepareSpellCast, automation_info refusal face, one warding_bond_refused
+// log ending "Nothing spent." Pins the RAW "another creature" mirror filter —
+// a solo roster (caster only) still refuses — and the two no-refusal lanes:
+// metaCtx.wardingBondTargetName threaded and candidates present (chooser owns
+// the cast). Ordinary-spell paid-lane control lives in sp079 — not repeated.
+// Shared no-spend family pattern (twins: sp079-mass-suggestion, sp080-maze):
+// fixtures mirror public/data/2024/spells.json, table-drive cases, one gate().
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { gateMetamagic } from './useSpellMetamagicGates.js';
-import { prepareSpellCast, isFreeCastAuthorized } from '../../services/rules/spells/spellPreparationService.js';
+import { prepareSpellCast } from '../../services/rules/spells/spellPreparationService.js';
 import { consumeMaterial } from '../../services/rules/spells/materialComponents.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { getCreatureTargets } from './useSpellMetamagicHelpers.js';
@@ -26,7 +33,7 @@ vi.mock('../../services/rules/spells/materialComponents.js', () => ({
 }));
 
 vi.mock('../../services/rules/spells/spellPreparationService.js', () => ({
-  prepareSpellCast: vi.fn(() => Promise.resolve({ modifiedSpell: {}, metaCtx: {}, slotConsumed: true })),
+  prepareSpellCast: vi.fn(),
   isFreeCastAuthorized: vi.fn(() => false),
   isWizardRitualAdeptSpell: vi.fn(() => false),
   incrementFreeCastResource: vi.fn(),
@@ -59,16 +66,21 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
 }));
 
 const CAMPAIGN = 'test-campaign';
+const CASTER = 'War_Cleric';
 
 function makeCleric() {
   return {
-    name: 'War_Cleric',
+    name: CASTER,
     class: { name: 'Cleric' },
     level: 8,
     spellAbilities: { spell_slots_level_2: 3 },
   };
 }
 
+// Fixture mirrors public/data/2024/spells.json Warding Bond (lv2, Action,
+// Touch, no concentration, automation { type: 'warding_bond', target:
+// 'willing_creature' }). The 5e row shares the same automation block; the
+// gate keys off lowercase name or automation.type.
 function makeWardingBond(overrides = {}) {
   return {
     name: 'Warding Bond',
@@ -82,9 +94,10 @@ function makeWardingBond(overrides = {}) {
   };
 }
 
-async function gate(spell, metaCtx = {}, setPopupHtml = vi.fn()) {
+async function gate(spell, { metaCtx = {} } = {}) {
   const playerStats = makeCleric();
   const onExecute = vi.fn();
+  const setPopupHtml = vi.fn();
   await gateMetamagic(spell, metaCtx, {
     hasMaterial: () => true,
     setPopupHtml,
@@ -99,75 +112,76 @@ async function gate(spell, metaCtx = {}, setPopupHtml = vi.fn()) {
   return { onExecute, setPopupHtml };
 }
 
-function refusalLogs() {
-  return addEntry.mock.calls
-    .map(c => c[1])
-    .filter(e => e?.automationType === 'warding_bond_refused');
-}
-
-describe('SP-125 Warding Bond untargeted cast — refuse unpaid', () => {
+describe('SP-125 Warding Bond untargeted cast — refuse unpaid before any payment lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    prepareSpellCast.mockResolvedValue({ modifiedSpell: {}, metaCtx: {}, slotConsumed: true });
-    isFreeCastAuthorized.mockReturnValue(false);
+    // Snapshot semantics of the real prepareSpellCast (used by the paid-lane lanes).
+    prepareSpellCast.mockImplementation(async (spell, passedCtx) => ({
+      modifiedSpell: { ...spell },
+      metaCtx: { ...passedCtx, slotConsumed: true },
+      slotConsumed: true,
+    }));
     consumeMaterial.mockResolvedValue(true);
     getCreatureTargets.mockReturnValue([]);
   });
 
-  it('no target resolvable: prepareSpellCast never called, onExecute never called, slot untouched', async () => {
-    const { onExecute } = await gate(makeWardingBond());
+  const REFUSAL_CASES = [
+    {
+      name: 'no picker candidates',
+      targets: [],
+    },
+    {
+      name: 'solo caster roster (RAW bonds ANOTHER creature)',
+      targets: [CASTER],
+    },
+  ];
 
-    expect(prepareSpellCast).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
+  describe.each(REFUSAL_CASES)('$name — refuse face verbatim, nothing spent', ({ targets }) => {
+    it('spends nothing (no slot, no material, no cast) and emits the handler refusal face', async () => {
+      getCreatureTargets.mockReturnValue(targets);
 
-  it('no target resolvable: refusal popup names the spell and says nothing spent', async () => {
-    const { setPopupHtml } = await gate(makeWardingBond());
+      const { onExecute, setPopupHtml } = await gate(makeWardingBond());
 
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'automation_info',
-      name: 'Warding Bond',
-      automationType: 'warding_bond_refused',
-    }));
-    expect(setPopupHtml.mock.calls[0][0].description).toContain('Nothing spent.');
-  });
+      expect(prepareSpellCast).not.toHaveBeenCalled();
+      expect(consumeMaterial).not.toHaveBeenCalled();
+      expect(onExecute).not.toHaveBeenCalled();
 
-  it('no target resolvable: warding_bond_refused automation log with reason no_target', async () => {
-    await gate(makeWardingBond());
-
-    const logs = refusalLogs();
-    expect(logs).toHaveLength(1);
-    expect(logs[0]).toMatchObject({
-      type: 'automation',
-      automationType: 'warding_bond_refused',
-      reason: 'no_target',
-      characterName: 'War_Cleric',
-      abilityName: 'Warding Bond',
+      expect(setPopupHtml).toHaveBeenCalledWith({
+        type: 'automation_info',
+        name: 'Warding Bond',
+        automationType: 'warding_bond_refused',
+        description: 'No target selected. Warding Bond has no effect. Nothing spent.',
+      });
+      expect(addEntry).toHaveBeenCalledTimes(1);
+      const refused = addEntry.mock.calls[0][1];
+      expect(refused).toMatchObject({
+        type: 'automation',
+        automationType: 'warding_bond_refused',
+        reason: 'no_target',
+        characterName: CASTER,
+        abilityName: 'Warding Bond',
+      });
+      expect(refused.description).toBe('Warding Bond refused: no willing creature available to bond with. Nothing spent.');
     });
   });
 
-  it('metaCtx.wardingBondTargetName threaded: paid lane runs once, no refusal', async () => {
-    const { onExecute } = await gate(makeWardingBond(), { wardingBondTargetName: 'AasimarTest' });
+  it('control: metaCtx.wardingBondTargetName threaded — paid lane pays once, zero refusals', async () => {
+    const { onExecute, setPopupHtml } = await gate(makeWardingBond(), { metaCtx: { wardingBondTargetName: 'AasimarTest' } });
 
     expect(prepareSpellCast).toHaveBeenCalledTimes(1);
     expect(onExecute).toHaveBeenCalledTimes(1);
-    expect(refusalLogs()).toHaveLength(0);
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(setPopupHtml).not.toHaveBeenCalled();
   });
 
-  it('picker candidates exist: no refusal (chooser lane owns the cast)', async () => {
-    getCreatureTargets.mockReturnValue(['AasimarTest']);
+  it('control: picker candidates exist — no refusal, cast proceeds to the paid lane (mirror of gateWardingBond\'s list)', async () => {
+    getCreatureTargets.mockReturnValue(['AasimarTest', 'Bandit 1']);
 
-    const { setPopupHtml } = await gate(makeWardingBond());
-
-    expect(refusalLogs()).toHaveLength(0);
-    expect(setPopupHtml).not.toHaveBeenCalledWith(expect.objectContaining({ automationType: 'warding_bond_refused' }));
-  });
-
-  it('control: an ordinary non-sorcerer spell is unaffected by the warding-bond gate', async () => {
-    const { onExecute } = await gate({ name: 'Fireball', level: 3, casting_time: 'Action', range: '150 feet', damage: { damage_dice: '8d6' } });
+    const { onExecute, setPopupHtml } = await gate(makeWardingBond());
 
     expect(prepareSpellCast).toHaveBeenCalledTimes(1);
     expect(onExecute).toHaveBeenCalledTimes(1);
-    expect(refusalLogs()).toHaveLength(0);
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(setPopupHtml).not.toHaveBeenCalled();
   });
 });

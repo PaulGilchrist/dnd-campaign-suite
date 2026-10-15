@@ -1,16 +1,24 @@
-// @created-by-ai
-// CLA-389: the metamagic cast lanes of useActionSpellMetamagic previously had
-// an empty branch that DISCARDED modal-type cast results (Wild Magic Surge
-// chooser). The payloads must route into sheet modal state through the same
-// key map the verified useSpellCastExecutor lane uses.
+// @maintained-by-ai: 2026-10-14
+// CLA-389 routeCastModal decision table for THIS lane only: how showCastPopup
+// unwraps a castResult shape and picks a sink. This file owns the top-level
+// unwrap branches (runPostCastTriggers returns modal/popup results at the TOP
+// level of castResult) plus the setModalState-less fallback and unknown-modal
+// discard — shapes no sibling exercises.
+//
+// Covered elsewhere (NOT re-tested here): automationPopup-wrapped popup/modal
+// results and getTargetInfo threading (castClick), forcedMode threading and
+// attack-click dispatch (attackClick), confirm payment/metaCtx semantics
+// (confirm), skip logging (skip), AoE modal guards (aoeClick), and the full
+// MODAL_STATE_KEYS key map + payload pass-through
+// (useSpellCastExecutor.modalRouting.test.js).
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useActionSpellMetamagic } from './useActionSpellMetamagic.js';
 import {
   makeHookProps,
-  makePlayerStats,
-  makeNonSorcererStats,
+  makeAttack,
   makeSpell,
+  makePlayerStats,
   setupBeforeEach,
 } from './useActionSpellMetamagic.test-utils.js';
 
@@ -40,129 +48,68 @@ vi.mock('../../services/rules/spells/spellCastService.js', () => ({
   executeSpellCast: vi.fn(() => Promise.resolve(null)),
 }));
 
-const SURGE_MODAL_PAYLOAD = {
-  featureName: 'Wild Magic Surge',
-  surgeTable: [{ min: 1, max: 100, effect: 'Teleport 60 ft' }],
-  campaignName: 'test-campaign',
-  mode: 'roll',
-  roll: 42,
-};
+const { executeSpellCast } = await import('../../services/rules/spells/spellCastService.js');
 
-describe('useActionSpellMetamagic CLA-389 modal routing', () => {
+const SURGE_PAYLOAD = { featureName: 'Wild Magic Surge', campaignName: 'test-campaign' };
+
+// Sorcerer queues metamagic from a damage click, then confirms with no-cost
+// options — the CLA-389 lane where a post-cast trigger surfaces its result at
+// the TOP level of castResult. Returns the props so tests read their sinks.
+async function castWith(castResult, propOverrides = {}) {
+  executeSpellCast.mockResolvedValue(castResult);
+  const props = makeHookProps({
+    playerStats: makePlayerStats({ spellAbilities: { spells: [makeSpell()] } }),
+    ...propOverrides,
+  });
+  const { result } = renderHook(() => useActionSpellMetamagic(props));
+
+  await act(async () => {
+    await result.current.handleActionSpellDamageClick(makeAttack());
+  });
+  expect(result.current.pendingActionMetamagic).not.toBeNull();
+  await act(async () => {
+    result.current.handleActionMetamagicConfirm({ options: [], totalCost: 0 });
+  });
+  return props;
+}
+
+describe('useActionSpellMetamagic CLA-389 routeCastModal decision table', () => {
   setupBeforeEach();
 
-  it('routes a top-level wildMagicSurge modal result into setModalState (sorcerer spell-attack lane)', async () => {
-    const { executeSpellCast } = await import('../../services/rules/spells/spellCastService.js');
-    executeSpellCast.mockResolvedValue({
-      type: 'modal',
-      modalName: 'wildMagicSurge',
-      payload: SURGE_MODAL_PAYLOAD,
-    });
+  it.each([
+    ['top-level type modal', { type: 'modal', modalName: 'wildMagicSurge', payload: SURGE_PAYLOAD }],
+    ['top-level modalName (no type)', { modalName: 'wildMagicSurge', payload: SURGE_PAYLOAD }],
+  ])('routes a %s castResult into setModalState, never as a popup', async (_label, castResult) => {
+    const props = await castWith(castResult);
 
-    const setModalState = vi.fn();
-    const setPopupHtml = vi.fn();
-    const spell = makeSpell({ level: 1 });
-    const playerStats = makePlayerStats({
-      spellAbilities: { spells: [spell] },
-    });
-    const props = makeHookProps({ playerStats, setModalState, setPopupHtml });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    await act(async () => {
-      await result.current.handleSpellAttackClick({ name: spell.name, spellLevel: 1 });
-    });
-    await act(async () => {
-      result.current.handleActionMetamagicConfirm({ options: [], totalCost: 0 });
-    });
-
-    expect(executeSpellCast).toHaveBeenCalled();
-    expect(setModalState).toHaveBeenCalledWith({ wildMagicSurgeModal: SURGE_MODAL_PAYLOAD });
-    expect(setPopupHtml).not.toHaveBeenCalled();
+    expect(props.setModalState).toHaveBeenCalledWith({ wildMagicSurgeModal: SURGE_PAYLOAD });
+    expect(props.setPopupHtml).not.toHaveBeenCalled();
   });
 
-  it('routes an automationPopup-wildMagicSurge modal result into setModalState (non-sorcerer known-spell lane)', async () => {
-    const { executeSpellCast } = await import('../../services/rules/spells/spellCastService.js');
-    executeSpellCast.mockResolvedValue({
-      automationPopup: {
-        type: 'modal',
-        modalName: 'wildMagicSurge',
-        payload: SURGE_MODAL_PAYLOAD,
-      },
-    });
+  it('shows a top-level popup castResult (d20-gate info) via setPopupHtml, never as a modal', async () => {
+    const gate = { type: 'automation_info', name: 'Wild Magic Surge', description: 'Rolled 11 (not a 20).' };
+    const props = await castWith({ type: 'popup', payload: gate });
 
-    const setModalState = vi.fn();
-    const spell = makeSpell({ level: 1 });
-    const playerStats = makeNonSorcererStats({
-      spellAbilities: { spells: [spell] },
-    });
-    const props = makeHookProps({ playerStats, setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    await act(async () => {
-      await result.current.handleSpellAttackClick({ name: spell.name, spellLevel: 1 });
-    });
-
-    expect(executeSpellCast).toHaveBeenCalled();
-    expect(setModalState).toHaveBeenCalledWith({ wildMagicSurgeModal: SURGE_MODAL_PAYLOAD });
+    expect(props.setPopupHtml).toHaveBeenCalledWith(gate);
+    expect(props.setModalState).not.toHaveBeenCalled();
   });
 
-  it('shows a top-level d20-gate info popup (not discarded) via setPopupHtml', async () => {
-    const gatePopup = {
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Wild Magic Surge',
-        description: 'Wild Magic Surge: Rolled 11 (not a 20). No surge occurs.',
-      },
-    };
-    const { executeSpellCast } = await import('../../services/rules/spells/spellCastService.js');
-    executeSpellCast.mockResolvedValue(gatePopup);
+  it('discards an unknown modalName without a popup fallback', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const props = await castWith({ type: 'modal', modalName: 'notAModal', payload: SURGE_PAYLOAD });
 
-    const setModalState = vi.fn();
-    const setPopupHtml = vi.fn();
-    const spell = makeSpell({ level: 1 });
-    const playerStats = makePlayerStats({
-      spellAbilities: { spells: [spell] },
-    });
-    const props = makeHookProps({ playerStats, setModalState, setPopupHtml });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    await act(async () => {
-      await result.current.handleSpellAttackClick({ name: spell.name, spellLevel: 1 });
-    });
-    await act(async () => {
-      result.current.handleActionMetamagicConfirm({ options: [], totalCost: 0 });
-    });
-
-    expect(setPopupHtml).toHaveBeenCalledWith(gatePopup.payload);
-    expect(setModalState).not.toHaveBeenCalledWith(expect.objectContaining({ wildMagicSurgeModal: expect.anything() }));
+    expect(props.setModalState).not.toHaveBeenCalled();
+    expect(props.setPopupHtml).not.toHaveBeenCalled();
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
   });
 
-  it('controlledChaos-mode modal payload routes to wildMagicSurgeModal', async () => {
-    const { executeSpellCast } = await import('../../services/rules/spells/spellCastService.js');
-    executeSpellCast.mockResolvedValue({
-      type: 'modal',
-      modalName: 'wildMagicSurge',
-      payload: { ...SURGE_MODAL_PAYLOAD, mode: 'controlledChaos', roll1: 19, roll2: 73 },
-    });
+  it('falls back to setPopupHtml when a modal castResult arrives with no setModalState', async () => {
+    const props = await castWith(
+      { type: 'modal', modalName: 'wildMagicSurge', payload: SURGE_PAYLOAD },
+      { setModalState: undefined },
+    );
 
-    const setModalState = vi.fn();
-    const spell = makeSpell({ level: 1 });
-    const playerStats = makePlayerStats({
-      spellAbilities: { spells: [spell] },
-    });
-    const props = makeHookProps({ playerStats, setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    await act(async () => {
-      await result.current.handleSpellAttackClick({ name: spell.name, spellLevel: 1 });
-    });
-    await act(async () => {
-      result.current.handleActionMetamagicConfirm({ options: [], totalCost: 0 });
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(expect.objectContaining({
-      wildMagicSurgeModal: expect.objectContaining({ mode: 'controlledChaos' }),
-    }));
+    expect(props.setPopupHtml).toHaveBeenCalledWith(SURGE_PAYLOAD);
   });
 });

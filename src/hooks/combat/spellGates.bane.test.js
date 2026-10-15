@@ -1,8 +1,14 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import banesRow from '../../../public/data/2024/spells.json';
+import spells2024 from '../../../public/data/2024/spells.json';
+import spells5e from '../../../public/data/spells.json';
 
 vi.mock('../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(),
+}));
+
+vi.mock('../../services/npcs/monsterUtils.js', () => ({
+  getMonsterData: vi.fn(),
 }));
 
 vi.mock('../runtime/useRuntimeState.js', () => ({
@@ -10,26 +16,24 @@ vi.mock('../runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../services/npcs/monsterUtils.js', () => ({
-  getMonsterData: vi.fn(),
-}));
-
-vi.mock('../../services/combat/conditions/deathSaveRules.js', () => ({
-  isStable: vi.fn(() => false),
-}));
-
 import { tryGateSpell } from './spellGates.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 
-const CAMPAIGN = 'TestCampaign';
+const CAMPAIGN = 'test-campaign';
 
-const BANE = banesRow.find(s => s.name === 'Bane');
+// Data authority: 2024 Essentials row (the only spells.json carrying the
+// upcast_at_slot_level ladder for Bane; the 5e row has none — covered by
+// the missing-data fallback test below).
+const BANE = spells2024.find(s => s.name === 'Bane');
+const BANE_5E = spells5e.find(s => s.name === 'Bane');
 
-function makeCs(count) {
+function makeCs() {
   return {
     creatures: [
       { name: 'Divine_Cleric', type: 'player' },
-      ...Array.from({ length: count }, (_, i) => ({ name: `Bandit ${i + 1}`, type: 'npc' })),
+      { name: 'Bandit 1', type: 'npc' },
+      { name: 'Bandit 2', type: 'npc' },
+      { name: 'Bandit 3', type: 'npc' },
     ],
   };
 }
@@ -44,40 +48,43 @@ function gate(spell) {
     isSorcerer: false,
     setPopupHtml: vi.fn(),
   });
-  return { handled, cfSetPending };
+  return { handled, pending: cfSetPending.mock.calls[0]?.[1] };
 }
 
-describe('SP-011 gateBane — upcast-aware target cap', () => {
+describe('SP-011 gateBane — upcast-aware target cap (concentration debuff gate)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getCombatSummary.mockReturnValue(makeCs(4));
+    getCombatSummary.mockReturnValue(makeCs());
   });
 
-  it('lv1 cap is 3 (RAW "Up to three creatures")', () => {
-    const { handled, cfSetPending } = gate({ ...BANE });
+  it('opens the picker over every combatant at 30 ft, capped at 3 (RAW "Up to three creatures")', () => {
+    const { handled, pending } = gate({ ...BANE });
+
     expect(handled).toBe(true);
-    expect(cfSetPending.mock.calls[0][1].maxTargets).toBe(3);
+    expect(pending.creatureTargets).toEqual(['Divine_Cleric', 'Bandit 1', 'Bandit 2', 'Bandit 3']);
+    expect(pending.maxTargets).toBe(3);
+    expect(pending.range).toBe('30 feet');
   });
 
-  it('lv2 upcast cap is 4 — picker can select a 4th target', () => {
-    const { handled, cfSetPending } = gate({ ...BANE, isUpcast: true, upcastLevel: 2 });
+  it.each([[2, 4], [3, 5], [9, 11]])('lv%d upcast threads the RAW +1/slot ladder (extractMaxTargets)', (lv, cap) => {
+    const { handled, pending } = gate({ ...BANE, isUpcast: true, upcastLevel: lv });
+
     expect(handled).toBe(true);
-    expect(cfSetPending.mock.calls[0][1].maxTargets).toBe(4);
+    expect(pending.maxTargets).toBe(cap);
   });
 
-  it('lv3 upcast cap is 5', () => {
-    const { cfSetPending } = gate({ ...BANE, isUpcast: true, upcastLevel: 3 });
-    expect(cfSetPending.mock.calls[0][1].maxTargets).toBe(5);
+  it('falls back to lv1 cap 3 on the 5e data row (no upcast ladder)', () => {
+    const { pending } = gate({ ...BANE_5E });
+
+    expect(pending.maxTargets).toBe(3);
   });
 
-  it('falls back to lv1 cap 3 when spell carries no upcast data', () => {
-    const { cfSetPending } = gate({ name: 'Bane', level: 1, range: '30 feet' });
-    expect(cfSetPending.mock.calls[0][1].maxTargets).toBe(3);
-  });
+  it('returns false when no creatures are in combat (cast falls through to generic path)', () => {
+    getCombatSummary.mockReturnValue({ creatures: [] });
 
-  it('DATA: bane upcast strings parse RAW "up to N targets" ladder', () => {
-    expect(BANE.upcast_at_slot_level['1']).toBe('up to 3 targets');
-    expect(BANE.upcast_at_slot_level['2']).toBe('up to 4 targets');
-    expect(BANE.upcast_at_slot_level['9']).toBe('up to 11 targets');
+    const { handled, pending } = gate({ ...BANE });
+
+    expect(handled).toBe(false);
+    expect(pending).toBeUndefined();
   });
 });

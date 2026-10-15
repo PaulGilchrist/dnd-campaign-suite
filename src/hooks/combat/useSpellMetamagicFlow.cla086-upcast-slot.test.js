@@ -1,7 +1,11 @@
-// CLA-086: gated confirm lane pays the upcast slot but the heal seams resolved
-// at the base makePending spellLevel. Pins the canonical stampPaidSlotLevel
-// backfill, the upcast-level heal metaCtx for Cure Wounds / Healing Word, the
-// cast-log spellLevel stamp, and the skip rollback refunding the consumed level.
+// @maintained-by-ai: 2026-10-15
+// CLA-086: the gated confirm lane pays the upcast slot but the heal seams (runCureWounds /
+// runHealingWord) historically resolved at the base makePending spellLevel. This file pins
+// ONLY the upcast seam: the canonical stampPaidSlotLevel backfill (and its cantrip / base /
+// pre-set guards), the upcast-level heal metaCtx reaching onExecute / triggerHealingWord,
+// the upcast cast-log spellLevel stamp, and skip refunding the level actually consumed.
+// Base-level (lv1) confirm payloads, pending clears, and gate opens are covered by the
+// sibling lanes (complex-handlers.spells, skip, gate). Spell fixtures mirror spells.json.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
@@ -30,7 +34,7 @@ vi.mock('../../services/npcs/monsterUtils.js', () => ({
 
 vi.mock('../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
-    creatures: [{ name: 'TestCleric', type: 'player' }, { name: 'EvasiveFighter', type: 'player' }],
+    creatures: [{ name: 'TestCleric', type: 'player' }, { name: 'Ally One', type: 'player' }],
   })),
 }));
 
@@ -53,6 +57,7 @@ vi.mock('../../services/rules/spells/spellPreparationService.js', () => ({
   incrementFreeCastResource: vi.fn(),
 }));
 
+// Runtime slot ledger: lv1=4, lv2=3, lv3=2 available — skips read back and refund here.
 const SLOT_DEFAULTS = vi.hoisted(() => ({
   spell_slots_level_1: 4,
   spell_slots_level_2: 3,
@@ -124,6 +129,7 @@ Object.defineProperty(window, 'dispatchEvent', {
   writable: true,
 });
 
+// Fixtures mirror public/data/spells.json (heal_at_slot_level progression, casting times).
 function makePlayerStats(overrides = {}) {
   return {
     name: 'TestCleric',
@@ -133,16 +139,21 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeCureWounds(overrides = {}) {
-  return {
-    name: 'Cure Wounds',
-    level: 1,
-    casting_time: 'Action',
-    range: 'Touch',
-    heal_at_slot_level: { 1: '2d8 + MOD', 2: '4d8 + MOD', 3: '6d8 + MOD' },
-    ...overrides,
-  };
-}
+const CURE_WOUNDS = {
+  name: 'Cure Wounds',
+  level: 1,
+  casting_time: '1 action',
+  range: 'Touch',
+  heal_at_slot_level: { 1: '1d8 + MOD', 2: '2d8 + MOD', 3: '3d8 + MOD' },
+};
+
+const HEALING_WORD = {
+  name: 'Healing Word',
+  level: 1,
+  casting_time: '1 bonus action',
+  range: '60 feet',
+  heal_at_slot_level: { 1: '1d4 + MOD', 2: '2d4 + MOD', 3: '3d4 + MOD' },
+};
 
 function renderFlow(onExecute) {
   return renderHook(() => useSpellMetamagicFlow({
@@ -156,28 +167,20 @@ function renderFlow(onExecute) {
 }
 
 describe('stampPaidSlotLevel (CLA-086 canonical stamp)', () => {
-  it('stamps the upcast level onto the pending metaCtx carrier', () => {
-    const pending = { spell: { level: 1, upcastLevel: 3 }, spellLevel: 1 };
-    stampPaidSlotLevel(pending);
-    expect(pending.metaCtx.slotLevel).toBe(3);
-  });
-
-  it('is a no-op for base-level casts (byte-identical lv1)', () => {
-    const pending = { spell: { level: 1 }, spellLevel: 1 };
-    stampPaidSlotLevel(pending);
-    expect(pending.metaCtx.slotLevel).toBeUndefined();
-  });
-
-  it('is inert for cantrips (level 0 never stamped)', () => {
-    const pending = { spell: { level: 0 }, spellLevel: 0 };
-    stampPaidSlotLevel(pending);
-    expect(pending.metaCtx).toBeUndefined();
-  });
-
-  it('preserves a pre-set metaCtx.slotLevel (byte-twin guard)', () => {
-    const pending = { spell: { level: 1, upcastLevel: 3 }, spellLevel: 1, metaCtx: { slotLevel: 2 } };
-    stampPaidSlotLevel(pending);
-    expect(pending.metaCtx.slotLevel).toBe(2);
+  it('stamps only the paid upcast level onto the pending metaCtx carrier', () => {
+    const cases = [
+      { name: 'upcast lv3', pending: { spell: { level: 1, upcastLevel: 3 }, spellLevel: 1 }, want: 3 },
+      { name: 'base lv1 stays unstamped', pending: { spell: { level: 1 }, spellLevel: 1 }, want: undefined },
+      { name: 'pre-set slotLevel preserved (byte-twin guard)', pending: { spell: { level: 1, upcastLevel: 3 }, spellLevel: 1, metaCtx: { slotLevel: 2 } }, want: 2 },
+    ];
+    for (const tc of cases) {
+      stampPaidSlotLevel(tc.pending);
+      expect(tc.pending.metaCtx?.slotLevel, tc.name).toBe(tc.want);
+    }
+    // The cantrip guard is stronger than "unstamped": the carrier is never created.
+    const cantrip = { spell: { level: 0 }, spellLevel: 0 };
+    stampPaidSlotLevel(cantrip);
+    expect(cantrip.metaCtx).toBeUndefined();
   });
 });
 
@@ -193,12 +196,12 @@ describe('useSpellMetamagicFlow — gated upcast heals resolve at the paid slot 
     const { result } = renderFlow(onExecute);
 
     await act(async () => {
-      await result.current.gateMetamagic(makeCureWounds({ isUpcast: true, upcastLevel: 3 }));
+      await result.current.gateMetamagic({ ...CURE_WOUNDS, isUpcast: true, upcastLevel: 3 });
     });
     expect(result.current.pendingCureWounds).not.toBeNull();
 
     await act(async () => {
-      await result.current.handleCureWoundsConfirm({ targetName: 'EvasiveFighter' });
+      await result.current.handleCureWoundsConfirm({ targetName: 'Ally One' });
     });
 
     // Slot payment stays at the upcast level...
@@ -207,31 +210,11 @@ describe('useSpellMetamagicFlow — gated upcast heals resolve at the paid slot 
     expect(prepOpts.isUpcast).toBe(true);
     // ...and the heal metaCtx now carries it (was lv1 pre-fix).
     expect(onExecute).toHaveBeenCalledTimes(1);
-    expect(onExecute.mock.calls[0][1]).toEqual({ targetName: 'EvasiveFighter', slotLevel: 3 });
+    expect(onExecute.mock.calls[0][1]).toEqual({ targetName: 'Ally One', slotLevel: 3 });
     expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
       type: 'spell',
       spellName: 'Cure Wounds',
       spellLevel: 3,
-    }));
-  });
-
-  it('Cure Wounds lv1 baseline stays byte-identical: heal resolves at 1', async () => {
-    const { addEntry } = await import('../../services/ui/logService.js');
-    const onExecute = vi.fn();
-    const { result } = renderFlow(onExecute);
-
-    await act(async () => {
-      await result.current.gateMetamagic(makeCureWounds());
-    });
-    await act(async () => {
-      await result.current.handleCureWoundsConfirm({ targetName: 'EvasiveFighter' });
-    });
-
-    expect(onExecute.mock.calls[0][1]).toEqual({ targetName: 'EvasiveFighter', slotLevel: 1 });
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-      type: 'spell',
-      spellName: 'Cure Wounds',
-      spellLevel: 1,
     }));
   });
 
@@ -240,26 +223,17 @@ describe('useSpellMetamagicFlow — gated upcast heals resolve at the paid slot 
     const { addEntry } = await import('../../services/ui/logService.js');
     const { result } = renderFlow(vi.fn());
 
-    const spell = {
-      name: 'Healing Word',
-      level: 1,
-      casting_time: 'Bonus Action',
-      range: '60 feet',
-      heal_at_slot_level: { 1: '2d4 + MOD', 2: '4d4 + MOD', 3: '5d4 + MOD' },
-      isUpcast: true,
-      upcastLevel: 3,
-    };
     await act(async () => {
-      await result.current.gateMetamagic(spell);
+      await result.current.gateMetamagic({ ...HEALING_WORD, isUpcast: true, upcastLevel: 3 });
     });
     expect(result.current.pendingHealingWord).not.toBeNull();
 
     await act(async () => {
-      await result.current.handleHealingWordConfirm({ targetName: 'EvasiveFighter' });
+      await result.current.handleHealingWordConfirm({ targetName: 'Ally One' });
     });
 
     expect(triggerHealingWord).toHaveBeenCalledTimes(1);
-    expect(triggerHealingWord.mock.calls[0][1]).toEqual({ targetName: 'EvasiveFighter', slotLevel: 3 });
+    expect(triggerHealingWord.mock.calls[0][1]).toEqual({ targetName: 'Ally One', slotLevel: 3 });
     expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
       type: 'spell',
       spellName: 'Healing Word',
@@ -267,38 +241,29 @@ describe('useSpellMetamagicFlow — gated upcast heals resolve at the paid slot 
     }));
   });
 
-  it('skip after upcast lv3 refunds the lv3 slot, not lv1', async () => {
+  it('skip refunds the slot level actually consumed — lv3 upcast back to lv3, base lv1 back to lv1', async () => {
     const { setRuntimeValue, getRuntimeValue } = await import('../runtime/useRuntimeState.js');
     const { result } = renderFlow(vi.fn());
 
     await act(async () => {
-      await result.current.gateMetamagic(makeCureWounds({ isUpcast: true, upcastLevel: 3 }));
+      await result.current.gateMetamagic({ ...CURE_WOUNDS, isUpcast: true, upcastLevel: 3 });
     });
-    expect(result.current.pendingCureWounds).not.toBeNull();
-
     act(() => {
       result.current.handleCureWoundsSkip();
     });
 
-    // lv3 read back and refunded at lv3 (2 → 3); lv1 key untouched.
+    // lv3 read back and refunded at lv3 (2 → 3); lv1 ledger untouched by the upcast skip.
     expect(getRuntimeValue).toHaveBeenCalledWith('TestCleric', 'spell_slots_level_3');
     expect(setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'spell_slots_level_3', 3, 'TestCampaign');
-    const lv1Writes = setRuntimeValue.mock.calls.filter(c => c[1] === 'spell_slots_level_1');
-    expect(lv1Writes.length).toBe(0);
-  });
+    expect(setRuntimeValue.mock.calls.filter(c => c[1] === 'spell_slots_level_1')).toHaveLength(0);
 
-  it('skip at lv1 (no upcast) still refunds lv1 — byte-identical legacy', async () => {
-    const { setRuntimeValue } = await import('../runtime/useRuntimeState.js');
-    const { result } = renderFlow(vi.fn());
-
+    // Base-level skip keeps the legacy byte-identical lv1 refund (4 → 5).
     await act(async () => {
-      await result.current.gateMetamagic(makeCureWounds());
+      await result.current.gateMetamagic(CURE_WOUNDS);
     });
-
     act(() => {
       result.current.handleCureWoundsSkip();
     });
-
     expect(setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'spell_slots_level_1', 5, 'TestCampaign');
   });
 });

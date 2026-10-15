@@ -1,8 +1,19 @@
-// CLA-283: async aura utils MUST be awaited at gridless sync consumers —
-// non-awaited reads of .advantage/.disadvantage off a Promise were always undefined.
+// @maintained-by-ai
+// CLA-283 lane: async aura utils MUST be awaited at gridless sync consumers —
+// non-awaited reads of .advantage/.disadvantage off a Promise were always
+// undefined, so Wolf/Lion aura mode never reached forcedMode. Canonical home
+// for the resolveWolfAura/resolveLionAura sync lane. forcedMode passthrough/
+// preservation lives in contextBuilder-sync.test.js, the WM-008 roll-only vex
+// consume contract in contextBuilder-sync.wm008-vex-consume.test.js, duplicity
+// in contextBuilder-sync.improved-duplicity.test.js, chain-wide WHO-WINS
+// priority in contextBuilder-sync.advantage-priority.test.js.
+// Resolver order: resolveWolfAura sits above the WM-008 one-shot consume rows in
+// resolveAttackModeResolvers, so a live Wolf aura short-circuits the loop first
+// and must leave the freshly-stamped vex te untouched (roll-only consumption).
+// Deterministic: all externals mocked → stable contract, flag kept.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('./common/damageRoll.js', () => ({ buildBaseAttackContext: vi.fn() }));
 vi.mock('../rules/combat/damageUtils.js', () => ({
@@ -49,6 +60,13 @@ const { getCoronaSaveDisadvantage } = await import('../combat/auras/coronaAuraUt
 const { isActive: isAvengingAngelActive, isAuraTarget } = await import('./handlers/class-cleric-paladin/avengingAngelHandler.js');
 
 const attack = { name: 'Eldritch Blast', damage: '1d10', damageType: 'Force', hitBonus: 8, weaponType: 'ranged' };
+// WM-008 one-shot te that the attack-roll ctx would consume if the resolver
+// loop ever reached the consume rows (they sit below the Wolf/Lion rows).
+const vexTe = { effect: 'next_attack_advantage', target: 'HexWarlock', vexTarget: 'Thug 1', source: 'Vex' };
+
+function teWrite() {
+  return setRuntimeValue.mock.calls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
+}
 
 function makeStats(name) {
   return { name, level: 14, proficiency: 5, class: { class_levels: [] }, abilities: [], automation: { passives: [] } };
@@ -84,13 +102,20 @@ describe('contextBuilder-sync - Wolf/Lion aura consumers awaited (CLA-283)', () 
     expect(result.forcedMode).toBe('advantage');
   });
 
-  it('leaves forcedMode undefined when no Wolf ally is live (control)', async () => {
+  it('leaves one-shot vex te untouched when Wolf aura wins above the WM-008 consume rows', async () => {
     setup();
-    getWolfAdvantageAgainst.mockResolvedValue({ advantage: false });
+    getWolfAdvantageAgainst.mockResolvedValue({ advantage: true, source: 'DraconicDragon' });
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (name === 'campaign' && key === 'targetEffects') return [vexTe];
+      return undefined;
+    });
 
     const result = await buildAttackContextSync(attack, makeStats('HexWarlock'), 'test-campaign', 'normal');
 
-    expect(result.forcedMode).toBeUndefined();
+    expect(result.forcedMode).toBe('advantage');
+    // Short-circuited at resolveWolfAura — consume rows never ran (roll-only semantics).
+    expect(teWrite()).toBeUndefined();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', '_Vex_appliedTarget', null, 'test-campaign');
   });
 
   it('awaits getLionDisadvantageAgainst and sets forcedMode disadvantage when a Lion ally is live', async () => {

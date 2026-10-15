@@ -1,3 +1,26 @@
+// @maintained-by-ai: 2026-10-15
+//
+// CONFIRM-LANE AUTHORITY — the confirm twin of .skip.test.js (skip 19-row table).
+// Owns the gate → pending → CONFIRM contract for the lanes with no chooser spec table:
+//  - metamagic popup lane (useMetamagicHandler): confirm pays SP once at the popup's
+//    totalCost, logs ONE spell entry (metamagic[] + spCost + RAW spellLevel), pays the
+//    slot via prepareSpellCast, executes, clears pending. handleSkip is the mirror:
+//    casts UNMODIFIED (spCost 0, no spend) but still logs — unlike the 'clear' chooser skips.
+//  - multi-target lane (useMultiTargetHandler): confirm/skip both log the full combat
+//    roster at RAW level; only metaCtx.multiTarget differs (confirm {secondTarget} vs {}).
+//  - Magic Missile lv1 baseline (CLA-389 pay-at-confirm): clear + execute threading;
+//    upcast arg matrix → .sp075-magicMissile-upcast; skip row → .skip.test.js.
+// Owned elsewhere — do not duplicate here:
+//  - popup payload shapes:            useSpellMetamagicFlow/confirm-payloads.test.js
+//  - metamagic-handler psionic unit: useSpellMetamagicFlow/metamagic-handler.psionic.test.js
+//  - two-stage chains (Resistance, PfE, Enhance Ability): .gate-two-stage.test.js
+//  - simple-spec confirm dispatch:   .simple-handlers.test.js (Remove Curse rows live HERE —
+//    removeCurse is absent from its SPELL_ROWS)
+//  - chooser skip lanes + refunds:   .skip.test.js; no-pending guards for spec keys:
+//    .handler-guards.test.js (metamagic/multi-target guards below are NOT in its sweep).
+// Levels are RAW, verified against public/data/spells.json + public/data/2024/spells.json
+// (Word of Radiance & psionic picks are 2024 cantrip-era names; lv3/lv1 fixtures were stale).
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
@@ -5,8 +28,8 @@ import { addEntry } from '../../services/ui/logService.js';
 import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js';
 import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/metamagicRules.js';
 import { confirmRemoveCurse } from '../../services/rules/features/removeCurseService.js';
-import { spendSorceryPoints } from './useMetamagic.js';
-import { getCombatSummary } from '../../services/encounters/combatData.js';
+import { spendSorceryPoints, logMetamagicUse } from './useMetamagic.js';
+import { prepareSpellCast } from '../../services/rules/spells/spellPreparationService.js';
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
@@ -21,6 +44,8 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
+  triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
+  triggerBewitchingMagic: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../services/encounters/combatData.js', () => ({
@@ -28,7 +53,6 @@ vi.mock('../../services/encounters/combatData.js', () => ({
     creatures: [
       { name: 'Goblin A' },
       { name: 'Goblin B' },
-      { name: 'Goblin C' },
     ],
   })),
   getCurrentCombatRound: vi.fn(() => 1),
@@ -50,7 +74,8 @@ vi.mock('../../services/rules/spells/materialComponents.js', () => ({
   getMaterialRequirementMessage: vi.fn(() => null),
 }));
 
-// CLA-271: passthrough prepareSpellCast mock so options (usePsionicPayment) are assertable
+// Passthrough prepareSpellCast so the confirm lane's metaCtx (metamagic flags,
+// psionic payment, MM distribution) is assertable on onExecute.
 vi.mock('../../services/rules/spells/spellPreparationService.js', async (importOriginal) => ({
   ...(await importOriginal()),
   prepareSpellCast: vi.fn(async (spell, metaCtx) => ({
@@ -82,325 +107,280 @@ Object.defineProperty(window, 'dispatchEvent', {
   writable: true,
 });
 
-function makePlayerStats(overrides = {}) {
-  return {
-    name: 'TestSorcerer',
-    class: { name: 'Sorcerer' },
-    ...overrides,
-  };
-}
+const CAMPAIGN = 'TestCampaign';
+const CASTER = 'TestSorcerer';
 
 function makeSpell(overrides = {}) {
   return {
     name: 'Fireball',
     level: 3,
-    casting_time: '1 Action',
+    casting_time: '1 action',
     range: '150 ft.',
     ...overrides,
   };
 }
 
-function renderHookWithSpell(hookSetup, spellName, spellOverrides = {}) {
+function renderFlow() {
   const onExecute = vi.fn();
   const { result } = renderHook(() =>
-    hookSetup(onExecute)
+    useSpellMetamagicFlow({
+      playerStats: { name: CASTER, class: { name: 'Sorcerer' }, level: 5 },
+      campaignName: CAMPAIGN,
+      onExecute,
+    })
   );
-  const spell = makeSpell({ name: spellName, ...spellOverrides });
-  act(() => {
-    result.current.gateMetamagic(spell);
-  });
-  return { result, onExecute, spell };
+  return { result, onExecute };
 }
 
-// ── Multi-target flow ────────────────────────────────────────────────────────
-
-describe('useSpellMetamagicFlow — multi-target flow', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getCombatSummary.mockReturnValue({
-      creatures: [{ name: 'Goblin A' }, { name: 'Goblin B' }],
-    });
+async function arm(result, spell) {
+  await act(async () => {
+    await result.current.gateMetamagic(spell);
   });
+}
 
-  it('logs entry, calls onExecute with multiTarget, and clears pending on confirm', () => {
-    getMultiTargetSpreadForSpell.mockReturnValueOnce({ range: '20 ft' });
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-    const spell = makeSpell({ name: 'Word of Radiance' });
-    act(() => {
-      result.current.gateMetamagic(spell);
-    });
-
-    act(() => {
-      result.current.handleMultiTargetConfirm({ secondTarget: 'Goblin B' });
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      targetName: 'Goblin A',
-      targets: ['Goblin A', 'Goblin B'],
-      spellName: 'Word of Radiance',
-      spellLevel: 3,
-      castingTime: '1 Action',
-      timestamp: expect.any(Number),
-    }));
-    expect(onExecute).toHaveBeenCalledWith(spell, { multiTarget: 'Goblin B' });
-    expect(result.current.pendingMultiTarget).toBeNull();
-  });
-
-  it('logs entry, calls onExecute with empty context, and clears pending when secondTarget is omitted', () => {
-    getMultiTargetSpreadForSpell.mockReturnValueOnce({ range: '20 ft' });
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-    const spell = makeSpell({ name: 'Word of Radiance' });
-    act(() => {
-      result.current.gateMetamagic(spell);
-    });
-
-    act(() => {
-      result.current.handleMultiTargetConfirm({});
-    });
-
-    expect(onExecute).toHaveBeenCalledWith(spell, {});
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-      spellName: 'Word of Radiance',
-      targets: ['Goblin A', 'Goblin B'],
-    }));
-    expect(result.current.pendingMultiTarget).toBeNull();
-  });
-
-  it('logs entry, calls onExecute with empty context, and clears pending on skip', () => {
-    getMultiTargetSpreadForSpell.mockReturnValueOnce({ range: '20 ft' });
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-    const spell = makeSpell({ name: 'Word of Radiance' });
-    act(() => {
-      result.current.gateMetamagic(spell);
-    });
-
-    act(() => {
-      result.current.handleMultiTargetSkip();
-    });
-
-    expect(onExecute).toHaveBeenCalledWith(spell, {});
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-      spellName: 'Word of Radiance',
-    }));
-    expect(result.current.pendingMultiTarget).toBeNull();
-  });
-
-  it('does nothing when multi-target handler is called without pending state', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    act(() => {
-      result.current.handleMultiTargetConfirm({ secondTarget: 'Goblin B' });
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(addEntry).not.toHaveBeenCalled();
-  });
-
-  it('does nothing when multi-target skip is called without pending state', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    act(() => {
-      result.current.handleMultiTargetSkip();
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(addEntry).not.toHaveBeenCalled();
-  });
-});
-
-// ── Spell-specific confirm handlers (behavioral) ─────────────────────────────
-
-describe('useSpellMetamagicFlow — spell confirm handlers verify behavior', () => {
+// ── Metamagic popup lane: confirm pays → logs → executes → clears ────────────
+// One row per popup-cast shape. confirmCost = the popup's totalCost (options only;
+// CLA-271: psionic SP is prepareSpellCast's money, folded into the log, not spent).
+describe('useSpellMetamagicFlow — metamagic popup lane confirm authority', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('clears pending state and logs entry for Resistance two-stage confirm flow', async () => {
-    const { result, onExecute } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Resistance',
-      { level: 0 },
-    );
+  const popupCases = [
+    { spell: 'Fireball', level: 3, options: [], cost: 0, flags: {} },
+    { spell: 'Fireball', level: 3, options: ['Empowered Spell'], cost: 1, flags: {} },
+    { spell: 'Shatter', level: 2, options: ['Distant Spell', 'Careful Spell'], cost: 2, flags: { metamagicDistant: true, metamagicCareful: true } },
+    { spell: 'Burning Hands', level: 1, options: ['Heightened Spell'], cost: 3, flags: { metamagicHeighten: true } },
+  ];
 
-    await act(async () => {
-      await result.current.handleResistanceTargetSelect('Goblin A');
-    });
+  for (const tc of popupCases) {
+    it(`${tc.spell} lv${tc.level} + [${tc.options.join(', ') || 'none'}]: pay once, log, execute with flags, clear`, async () => {
+      const { result, onExecute } = renderFlow();
+      const spell = makeSpell({ name: tc.spell, level: tc.level });
 
-    expect(result.current.resistanceStage).toBe('type');
+      await arm(result, spell);
+      expect(result.current.pendingMetamagic).not.toBeNull();
 
-    await act(async () => {
-      await result.current.handleResistanceTypeSelect('Fire');
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(result.current.pendingResistance).toBeNull();
-    expect(result.current.resistanceStage).toBeNull();
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-      spellName: 'Resistance',
-      targetName: 'Goblin A',
-      targets: ['Goblin A'],
-    }));
-  });
-
-  it('clears pending state and logs entry for Remove Curse confirm', async () => {
-    const { result, onExecute } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Remove Curse',
-      { level: 3 },
-    );
-
-    await act(async () => {
-      await result.current.handleRemoveCurseConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(confirmRemoveCurse).toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(result.current.pendingRemoveCurse).toBeNull();
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-      spellName: 'Remove Curse',
-    }));
-  });
-
-  it('clears pending state and logs entry for Magic Missile confirm with distribution', async () => {
-    const { result, onExecute, spell } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Magic Missile',
-      { level: 1 },
-    );
-
-    await act(async () => {
-      await result.current.handleMagicMissileConfirm({
-        distribution: { 'Goblin A': 2, 'Goblin B': 1 },
+      await act(async () => {
+        await result.current.handleConfirm({ totalCost: tc.cost, options: tc.options });
       });
+
+      if (tc.cost > 0) {
+        expect(spendSorceryPoints).toHaveBeenCalledTimes(1);
+        expect(spendSorceryPoints).toHaveBeenCalledWith(CASTER, tc.cost, CAMPAIGN, 10);
+        expect(logMetamagicUse).toHaveBeenCalledWith(CAMPAIGN, CASTER, tc.spell, tc.options, tc.cost);
+      } else {
+        expect(spendSorceryPoints).not.toHaveBeenCalled();
+        expect(logMetamagicUse).not.toHaveBeenCalled();
+      }
+
+      // One RAW-level cast entry carrying the popup's options and spCost.
+      expect(addEntry).toHaveBeenCalledTimes(1);
+      expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+        type: 'spell',
+        characterName: CASTER,
+        spellName: tc.spell,
+        spellLevel: tc.level,
+        metamagic: tc.options,
+        spCost: tc.cost,
+        timestamp: expect.any(Number),
+      }));
+
+      // Slot paid once at the RAW level, then executed with the metamagic flags.
+      // (Base lane: prepareMetamagicCast forwards pending.spell.isUpcast verbatim —
+      // undefined, not false, for a non-upcast spell.)
+      expect(prepareSpellCast).toHaveBeenCalledTimes(1);
+      expect(prepareSpellCast).toHaveBeenCalledWith(
+        expect.objectContaining({ name: tc.spell, level: tc.level }),
+        expect.any(Object),
+        expect.objectContaining({ playerName: CASTER, campaignName: CAMPAIGN, usePsionicPayment: false })
+      );
+      expect(onExecute).toHaveBeenCalledTimes(1);
+      expect(onExecute).toHaveBeenCalledWith(
+        expect.objectContaining({ name: tc.spell }),
+        expect.objectContaining(tc.flags)
+      );
+      expect(result.current.pendingMetamagic).toBeNull();
     });
-
-    expect(onExecute).toHaveBeenCalledWith(spell, expect.objectContaining({
-      magicMissileDistribution: { 'Goblin A': 2, 'Goblin B': 1 },
-      slotLevel: 1,
-    }));
-    expect(result.current.pendingMagicMissile).toBeNull();
-    expect(addEntry).not.toHaveBeenCalled();
-  });
-
-  it('does not execute or log when Magic Missile distribution is all zeros', async () => {
-    const { result, onExecute } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Magic Missile',
-      { level: 1 },
-    );
-
-    await act(async () => {
-      await result.current.handleMagicMissileConfirm({
-        distribution: { 'Goblin A': 0, 'Goblin B': 0 },
-      });
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(result.current.pendingMagicMissile).toBeNull();
-  });
-});
-
-// ── Spell-specific skip handlers (behavioral) ────────────────────────────────
-
-describe('useSpellMetamagicFlow — spell skip handlers verify behavior', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('clears pending state on Magic Missile skip without logging', () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Magic Missile',
-      { level: 1 },
-    );
-
-    act(() => {
-      result.current.handleMagicMissileSkip();
-    });
-
-    expect(result.current.pendingMagicMissile).toBeNull();
-    expect(addEntry).not.toHaveBeenCalled();
-  });
-
-  it('clears pending state and logs entry for Resistance skip', () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Resistance',
-      { level: 0 },
-    );
-
-    act(() => {
-      result.current.handleResistanceSkip();
-    });
-
-    expect(result.current.pendingResistance).toBeNull();
-    expect(result.current.resistanceStage).toBeNull();
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-      spellName: 'Resistance',
-      targetName: null,
-    }));
-  });
-});
-
-// ── Psionic Sorcery confirm flow ─────────────────────────────────────────────
-
-describe('useSpellMetamagicFlow — psionic sorcery confirm flow', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  function setupPsionic() {
-    isPsionicSpell.mockReturnValue(true);
-    hasPsionicSorcery.mockReturnValue(true);
-
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Mind Sliver', level: 1 }));
-    });
-
-    return { result, onExecute };
   }
 
-  it('counts metamagic cost once and forwards psionic payment when Psionic Sorcery selected', async () => {
-    const { result, onExecute } = setupPsionic();
+  it('handleSkip casts unmodified: no SP spend, still pays, logs metamagic:[], clears', async () => {
+    const { result, onExecute } = renderFlow();
+    const spell = makeSpell({ name: 'Fireball', level: 3 });
 
-    // CLA-271: popup confirms metamagic-options cost only; psionic SP payment is
-    // paid by prepareSpellCast (usePsionicPayment forwarded), not re-added here.
-    act(() => {
-      result.current.handleConfirm({ totalCost: 1, options: ['Empowered Spell'], psionicActive: true });
+    await arm(result, spell);
+    expect(result.current.pendingMetamagic).not.toBeNull();
+
+    await act(async () => {
+      await result.current.handleSkip();
     });
 
-    await new Promise(r => setTimeout(r, 0));
-
-    expect(spendSorceryPoints).toHaveBeenCalledWith(
-      'TestSorcerer', 1, 'TestCampaign', expect.any(Number)
+    expect(spendSorceryPoints).not.toHaveBeenCalled();
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+      spellName: 'Fireball',
+      spellLevel: 3,
+      metamagic: [],
+      spCost: 0,
+    }));
+    expect(prepareSpellCast).toHaveBeenCalledTimes(1);
+    expect(prepareSpellCast).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Fireball' }),
+      {},
+      expect.objectContaining({ playerName: CASTER, campaignName: CAMPAIGN, isUpcast: false })
     );
+    expect(onExecute).toHaveBeenCalledTimes(1);
+    expect(result.current.pendingMetamagic).toBeNull();
+  });
+});
 
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-      metamagic: expect.arrayContaining(['Psionic Sorcery', 'Empowered Spell']),
-      spCost: 2,
+// ── Multi-target lane: confirm/skip log the full roster at RAW level ─────────
+
+describe('useSpellMetamagicFlow — multi-target lane confirm/skip authority', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const multiCases = [
+    { label: 'confirm with secondTarget', call: (r) => r.handleMultiTargetConfirm({ secondTarget: 'Goblin B' }), metaCtx: { multiTarget: 'Goblin B' } },
+    { label: 'confirm without secondTarget', call: (r) => r.handleMultiTargetConfirm({}), metaCtx: {} },
+    { label: 'skip', call: (r) => r.handleMultiTargetSkip(), metaCtx: {} },
+  ];
+
+  for (const tc of multiCases) {
+    it(`Word of Radiance cantrip — ${tc.label}: executes, logs roster lv0, clears pending`, async () => {
+      const { result, onExecute } = renderFlow();
+      const spell = makeSpell({ name: 'Word of Radiance', level: 0, range: 'Self' });
+      getMultiTargetSpreadForSpell.mockReturnValueOnce({ range: '20 ft' });
+
+      await arm(result, spell);
+      expect(result.current.pendingMultiTarget).not.toBeNull();
+
+      await act(async () => {
+        await tc.call(result.current);
+      });
+
+      expect(onExecute).toHaveBeenCalledTimes(1);
+      expect(onExecute).toHaveBeenCalledWith(spell, expect.objectContaining(tc.metaCtx));
+      expect(addEntry).toHaveBeenCalledTimes(1);
+      expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+        type: 'spell',
+        characterName: CASTER,
+        targetName: 'Goblin A',
+        targets: ['Goblin A', 'Goblin B'],
+        spellName: 'Word of Radiance',
+        spellLevel: 0,
+        castingTime: '1 action',
+        timestamp: expect.any(Number),
+      }));
+      expect(result.current.pendingMultiTarget).toBeNull();
+    });
+  }
+});
+
+// ── Remove Curse lv3: chooser-confirm lifecycle (absent from simple-handlers) ──
+
+describe('useSpellMetamagicFlow — Remove Curse confirm lifecycle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('lv3 confirm dispatches Remove Curse once, logs one lv3 cast, clears pending', async () => {
+    const { result } = renderFlow();
+
+    await arm(result, makeSpell({ name: 'Remove Curse', level: 3, range: 'Touch' }));
+    expect(result.current.pendingRemoveCurse).not.toBeNull();
+
+    await act(async () => {
+      await result.current.handleRemoveCurseConfirm(['Goblin A']);
+    });
+
+    expect(confirmRemoveCurse).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+      spellName: 'Remove Curse',
+      spellLevel: 3,
+      targetName: 'Goblin A',
+    }));
+    expect(result.current.pendingRemoveCurse).toBeNull();
+  });
+});
+
+// ── Magic Missile lv1 baseline — clear + threading, zero lane-side log ────────
+// Upcast payment matrix → .sp075-magicMissile-upcast; skip row → .skip.test.js.
+
+describe('useSpellMetamagicFlow — Magic Missile lv1 confirm lane', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('lv1 confirm pays the slot once, executes distribution at slotLevel 1, clears, logs nothing', async () => {
+    const { result, onExecute } = renderFlow();
+    const distribution = { 'Goblin A': 2, 'Goblin B': 1 };
+
+    await arm(result, makeSpell({ name: 'Magic Missile', level: 1, range: '120 feet' }));
+    expect(result.current.pendingMagicMissile).not.toBeNull();
+
+    await act(async () => {
+      await result.current.handleMagicMissileConfirm({ distribution });
+    });
+
+    expect(prepareSpellCast).toHaveBeenCalledTimes(1);
+    expect(onExecute).toHaveBeenCalledTimes(1);
+    expect(onExecute).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Magic Missile', level: 1 }),
+      expect.objectContaining({ magicMissileDistribution: distribution, slotLevel: 1 })
+    );
+    // The lane logs NOTHING — executeMagicMissile owns the canonical cast entry.
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(result.current.pendingMagicMissile).toBeNull();
+  });
+
+  it('all-zero distribution is refused: no pay, no execute, no log — pending cleared', async () => {
+    const { result, onExecute } = renderFlow();
+
+    await arm(result, makeSpell({ name: 'Magic Missile', level: 1, range: '120 feet' }));
+    expect(result.current.pendingMagicMissile).not.toBeNull();
+
+    await act(async () => {
+      await result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 0, 'Goblin B': 0 } });
+    });
+
+    expect(prepareSpellCast).not.toHaveBeenCalled();
+    expect(onExecute).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(result.current.pendingMagicMissile).toBeNull();
+  });
+});
+
+// ── Psionic Sorcery gate→confirm integration (CLA-271) ─────────────────────────
+// Handler-unit payment semantics → metamagic-handler.psionic.test.js. These rows own
+// what only the full hook can prove: the gate stamps psionicCost from the RAW spell
+// level (queueSorceryMetamagic) and confirm folds it into the logged spCost.
+
+describe('useSpellMetamagicFlow — psionic sorcery gate→confirm integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isPsionicSpell.mockReturnValue(true);
+    hasPsionicSorcery.mockReturnValue(true);
+  });
+
+  it('popup psionicActive: SP spent once at options cost, log spCost includes gate psionicCost', async () => {
+    const { result, onExecute } = renderFlow();
+
+    await arm(result, makeSpell({ name: 'Suggestion', level: 2, range: '30 feet' }));
+    // Gate stamp: psionicCost = RAW spell level (2), owned nowhere else.
+    expect(result.current.pendingMetamagic.psionicCost).toBe(2);
+
+    await act(async () => {
+      await result.current.handleConfirm({ totalCost: 1, options: ['Empowered Spell'], psionicActive: true });
+    });
+
+    expect(spendSorceryPoints).toHaveBeenCalledTimes(1);
+    expect(spendSorceryPoints).toHaveBeenCalledWith(CASTER, 1, CAMPAIGN, 10);
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+      metamagic: ['Empowered Spell', 'Psionic Sorcery'],
+      spCost: 3,
     }));
     expect(onExecute).toHaveBeenCalledWith(
       expect.any(Object),
@@ -408,19 +388,10 @@ describe('useSpellMetamagicFlow — psionic sorcery confirm flow', () => {
     );
   });
 
-  it('forwards usePsionicPayment from the spell detail opt-in even without popup checkbox', async () => {
-    const onExecute = vi.fn();
-    const { prepareSpellCast } = await import('../../services/rules/spells/spellPreparationService.js');
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
+  it('spell-detail opt-in (usePsionicPayment) forwards through the pending even with checkbox off', async () => {
+    const { result, onExecute } = renderFlow();
 
-    isPsionicSpell.mockReturnValue(true);
-    hasPsionicSorcery.mockReturnValue(true);
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Mind Sliver', level: 1, usePsionicPayment: true }));
-    });
+    await arm(result, makeSpell({ name: 'Suggestion', level: 2, range: '30 feet', usePsionicPayment: true }));
 
     await act(async () => {
       await result.current.handleConfirm({ totalCost: 0, options: [], psionicActive: false });
@@ -432,92 +403,30 @@ describe('useSpellMetamagicFlow — psionic sorcery confirm flow', () => {
       expect.objectContaining({ psionicSpell: true }),
       expect.objectContaining({ usePsionicPayment: true })
     );
-  });
-
-  it('does not add psionic cost or Psionic Sorcery when Subtle Spell is selected', async () => {
-    const { result, onExecute } = setupPsionic();
-
-    act(() => {
-      result.current.handleConfirm({ totalCost: 1, options: ['Subtle Spell'] });
-    });
-
-    await new Promise(r => setTimeout(r, 0));
-
-    expect(spendSorceryPoints).toHaveBeenCalledWith(
-      'TestSorcerer', 1, 'TestCampaign', expect.any(Number)
-    );
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-      metamagic: ['Subtle Spell'],
-      spCost: 1,
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+      metamagic: ['Psionic Sorcery'],
+      spCost: 2,
     }));
-    expect(onExecute).not.toHaveBeenCalledWith(
+    expect(onExecute).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({ psionicSpell: true })
     );
   });
 
-  it('does not add psionic cost when psionic cost is 0', async () => {
-    isPsionicSpell.mockReturnValue(false);
+  it('psionic-capable cast without psionic selection: cost and labels stay non-psionic', async () => {
+    const { result, onExecute } = renderFlow();
 
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
+    await arm(result, makeSpell({ name: 'Suggestion', level: 2, range: '30 feet' }));
 
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Fireball', level: 3 }));
+    await act(async () => {
+      await result.current.handleConfirm({ totalCost: 1, options: ['Subtle Spell'] });
     });
 
-    act(() => {
-      result.current.handleConfirm({ totalCost: 2, options: ['Empowered Spell'] });
-    });
-
-    await new Promise(r => setTimeout(r, 0));
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-      metamagic: ['Empowered Spell'],
-      spCost: 2,
+    expect(spendSorceryPoints).toHaveBeenCalledWith(CASTER, 1, CAMPAIGN, 10);
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+      metamagic: ['Subtle Spell'],
+      spCost: 1,
     }));
-    expect(onExecute).toHaveBeenCalledWith(
-      expect.any(Object),
-      expect.not.objectContaining({ psionicSpell: true })
-    );
-  });
-
-  it('handles confirm with null options gracefully', async () => {
-    const { result } = setupPsionic();
-
-    act(() => {
-      result.current.handleConfirm({ totalCost: 0 });
-    });
-
-    await new Promise(r => setTimeout(r, 0));
-
-    // CLA-271: psionic payment requires an explicit selection — no re-add.
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-      metamagic: [],
-      spCost: 0,
-    }));
-  });
-
-  it('handles confirm with zero total cost and no psionic', async () => {
-    isPsionicSpell.mockReturnValue(false);
-
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Fireball', level: 3 }));
-    });
-
-    act(() => {
-      result.current.handleConfirm({ totalCost: 0, options: [] });
-    });
-
-    await new Promise(r => setTimeout(r, 0));
-
     expect(onExecute).toHaveBeenCalledWith(
       expect.any(Object),
       expect.not.objectContaining({ psionicSpell: true })
@@ -525,40 +434,33 @@ describe('useSpellMetamagicFlow — psionic sorcery confirm flow', () => {
   });
 });
 
-// ── General handleConfirm / handleSkip (metamagic flow) ──────────────────────
+// ── Lane guards: metamagic + multi-target no-pending (not in handler-guards) ──
 
-describe('useSpellMetamagicFlow — general confirm/skip handlers', () => {
+describe('useSpellMetamagicFlow — metamagic/multi-target guards (no pending ⇒ no-op)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('handleConfirm does nothing when no pending metamagic', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
+  const guardRows = [
+    { handler: 'handleConfirm', arg: { totalCost: 1, options: ['Empowered Spell'] }, pending: 'pendingMetamagic' },
+    { handler: 'handleSkip', arg: undefined, pending: 'pendingMetamagic' },
+    { handler: 'handleMultiTargetConfirm', arg: {}, pending: 'pendingMultiTarget' },
+    { handler: 'handleMultiTargetSkip', arg: undefined, pending: 'pendingMultiTarget' },
+  ];
 
-    act(() => {
-      result.current.handleConfirm({ totalCost: 1, options: ['Empowered Spell'] });
+  for (const row of guardRows) {
+    it(`${row.handler} without pending spends nothing, logs nothing, executes nothing`, async () => {
+      const { result, onExecute } = renderFlow();
+
+      await act(async () => {
+        await result.current[row.handler](row.arg);
+      });
+
+      expect(spendSorceryPoints).not.toHaveBeenCalled();
+      expect(prepareSpellCast).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(onExecute).not.toHaveBeenCalled();
+      expect(result.current[row.pending]).toBeNull();
     });
-
-    await new Promise(r => setTimeout(r, 0));
-
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('handleSkip does nothing when no pending metamagic', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    act(() => {
-      result.current.handleSkip();
-    });
-
-    await new Promise(r => setTimeout(r, 0));
-
-    expect(onExecute).not.toHaveBeenCalled();
-  });
+  }
 });

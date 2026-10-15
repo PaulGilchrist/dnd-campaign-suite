@@ -1,6 +1,13 @@
+// Scoped to rollDamageForAction (pure: diceRoller is the only collaborator).
+// buildAttackContextForDamage lanes live in buildAttackContext-map.test.js
+// and buildAttackContext-noMap.test.js — keep new tests out of this file.
+// @maintained-by-ai
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────
+// damageRoll.js imports these service modules at module load; mock the
+// whole import graph so rollDamageForAction tests stay side-effect free.
 
 vi.mock('../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
@@ -44,8 +51,6 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 import { rollDamageForAction } from './damageRoll.js';
 import * as diceRoller from '../../dice/diceRoller.js';
 
-// ── Helpers ────────────────────────────────────────────────────
-
 // ── rollDamageForAction ────────────────────────────────────────
 
 describe('rollDamageForAction', () => {
@@ -56,13 +61,14 @@ describe('rollDamageForAction', () => {
     });
 
     describe('dice rolling', () => {
-        it('rolls normal damage when isCrit is false', () => {
+        it('rolls normal damage when isCrit is false and applies context defaults', () => {
             const auto = { damage: '2d6+3' };
             const mockResult = { total: 8, rolls: [3, 5], modifier: 3 };
             diceRoller.rollExpression.mockReturnValue(mockResult);
 
             const result = rollDamageForAction(auto);
 
+            expect(diceRoller.rollExpressionDoubled).not.toHaveBeenCalled();
             expect(result).toEqual({
                 result: mockResult,
                 attackContext: {
@@ -83,45 +89,41 @@ describe('rollDamageForAction', () => {
 
             const result = rollDamageForAction(auto, { isCrit: true });
 
+            expect(diceRoller.rollExpression).not.toHaveBeenCalled();
             expect(result.result).toBe(mockResult);
-            expect(result.attackContext.damage).toBe('2d6+3');
         });
 
         it('returns null when dice roll fails', () => {
-            const auto = { damage: 'invalid' };
             diceRoller.rollExpression.mockReturnValue(null);
 
-            const result = rollDamageForAction(auto);
-
-            expect(result).toBeNull();
+            expect(rollDamageForAction({ damage: 'invalid' })).toBeNull();
         });
 
-    });
-
-    describe('pre-rolled result', () => {
         it('uses preRolledResult and skips dice rolling', () => {
-            const auto = { damage: '2d6+3' };
             const preRolled = { total: 12, rolls: [6, 6], modifier: 0 };
 
-            const result = rollDamageForAction(auto, { preRolledResult: preRolled });
+            const result = rollDamageForAction({ damage: '2d6+3' }, { preRolledResult: preRolled });
 
             expect(diceRoller.rollExpression).not.toHaveBeenCalled();
             expect(diceRoller.rollExpressionDoubled).not.toHaveBeenCalled();
             expect(result.result).toBe(preRolled);
         });
-
-
     });
 
     describe('attackContext construction', () => {
-        const baseRoll = { total: 5, rolls: [5] };
-
         beforeEach(() => {
-            diceRoller.rollExpression.mockReturnValue(baseRoll);
+            diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
         });
 
-        it('builds full attackContext from auto object fields', () => {
-            const auto = { name: 'Fire Bolt', damage: '1d10', damageType: 'fire', saveDc: 15, saveType: 'DEX' };
+        it('passes auto fields through to attackContext', () => {
+            const auto = {
+                name: 'Fire Bolt',
+                damage: '1d10',
+                damageType: 'fire',
+                saveDc: 15,
+                saveType: 'CON',
+                dcSuccess: 0.75,
+            };
             const result = rollDamageForAction(auto);
 
             expect(result.attackContext).toEqual({
@@ -129,33 +131,20 @@ describe('rollDamageForAction', () => {
                 damage: '1d10',
                 damageType: 'fire',
                 saveDc: 15,
-                saveType: 'DEX',
-                saveSuccess: 0,
+                saveType: 'CON',
+                saveSuccess: 0.75,
             });
         });
 
-        it('defaults saveType to DEX when not provided', () => {
-            const auto = { damage: '1d6' };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.saveType).toBe('DEX');
-        });
-
-        it('uses saveType and dcSuccess from auto when provided', () => {
-            const auto = { damage: '1d6', saveType: 'CON', dcSuccess: 0.75 };
-            const result = rollDamageForAction(auto);
-            expect(result.attackContext.saveType).toBe('CON');
-            expect(result.attackContext.saveSuccess).toBe(0.75);
-        });
-
         it('defaults saveSuccess to 0.5 for cone shapes', () => {
-            const auto = { damage: '1d6', shape: 'cone' };
-            const result = rollDamageForAction(auto);
+            const result = rollDamageForAction({ damage: '1d6', shape: 'cone' });
             expect(result.attackContext.saveSuccess).toBe(0.5);
         });
 
-        it('prefers dcSuccess over shape-derived saveSuccess', () => {
-            const auto = { damage: '1d6', dcSuccess: 0, shape: 'cone' };
-            const result = rollDamageForAction(auto);
+        it('prefers explicit dcSuccess over shape-derived saveSuccess', () => {
+            // Guards the `??` operator: 0 is a meaningful dcSuccess and
+            // must not fall through to the cone default of 0.5.
+            const result = rollDamageForAction({ damage: '1d6', dcSuccess: 0, shape: 'cone' });
             expect(result.attackContext.saveSuccess).toBe(0);
         });
     });

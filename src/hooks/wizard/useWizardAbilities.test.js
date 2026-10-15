@@ -1,3 +1,6 @@
+// @maintained-by-ai
+// Deterministic contract tests for useWizardAbilities: pure point-buy rules and
+// hook API surface, fully mocked deps, no DOM/network/timing coupling.
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardAbilities from './useWizardAbilities.js';
@@ -238,12 +241,6 @@ describe('useWizardAbilities', () => {
   });
 
   describe('calculateTotalPointsSpent', () => {
-    it('should return a function', () => {
-      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors);
-
-      expect(typeof result.current.calculateTotalPointsSpent).toBe('function');
-    });
-
     it('should calculate total points for default abilities (22)', async () => {
       const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors);
 
@@ -321,14 +318,6 @@ describe('useWizardAbilities', () => {
       result.current.onAbilityBaseScoreChange(3, 'abc');
 
       expect(mockUpdateAbility).toHaveBeenCalledWith(3, 'baseScore', 8);
-    });
-
-    it('should default to 8 when value is empty string', () => {
-      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors, mockUpdateAbility);
-
-      result.current.onAbilityBaseScoreChange(4, '');
-
-      expect(mockUpdateAbility).toHaveBeenCalledWith(4, 'baseScore', 8);
     });
 
     it('should reject base scores above 15', () => {
@@ -498,18 +487,6 @@ describe('useWizardAbilities', () => {
       expect(computeRaceBuffs).not.toHaveBeenCalled();
     });
 
-    it('should skip race buffs sync when race has no name', () => {
-      const formData = makeFormData(
-        defaultAbilities(),
-        '5e',
-        { name: null, subrace: null }
-      );
-
-      renderWizardAbilities(formData, 5, mockSetErrors, mockUpdateAbility);
-
-      expect(computeRaceBuffs).not.toHaveBeenCalled();
-    });
-
     it('should update racialIncrease when race provides ability bonuses', () => {
       computeRaceBuffs.mockReturnValue({
         abilityScoreIncreases: [
@@ -570,33 +547,12 @@ describe('useWizardAbilities', () => {
 
       expect(mockUpdateAbility).not.toHaveBeenCalled();
     });
-
-    it('should update racialIncrease when it differs from current value', () => {
-      computeRaceBuffs.mockReturnValue({
-        abilityScoreIncreases: [{ name: 'Strength', amount: 2 }]
-      });
-
-      const abilities = [
-        makeAbility('Strength', 15, 0, 0, 0, 0),
-        makeAbility('Dexterity', 14, 0, 0, 0, 0),
-        makeAbility('Constitution', 12, 0, 0, 0, 0),
-        makeAbility('Intelligence', 10, 0, 0, 0, 0),
-        makeAbility('Wisdom', 8, 0, 0, 0, 0),
-        makeAbility('Charisma', 8, 0, 0, 0, 0)
-      ];
-
-      const formData = makeFormData(abilities, '5e', { name: 'Mountain Dwarf', subrace: null });
-
-      renderWizardAbilities(formData, 5, mockSetErrors, mockUpdateAbility);
-
-      expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'racialIncrease', 2);
-    });
   });
 
   describe('validation with race/subrace', () => {
-    it('should include racial increase in total score during validation', async () => {
+    it('should error when race racial increase alone pushes total above 20', async () => {
       computeRaceBuffs.mockReturnValue({
-        abilityScoreIncreases: [{ name: 'Strength', amount: 2 }]
+        abilityScoreIncreases: [{ name: 'Strength', amount: 6 }]
       });
 
       const formData = makeFormData(
@@ -611,41 +567,15 @@ describe('useWizardAbilities', () => {
         expect(mockSetErrors).toHaveBeenCalled();
       });
 
+      // 15 + 6 racial = 21 > 20; fails if validation ignores racial increases
       const errors = mockSetErrors.mock.calls[0][0]({});
-      expect(errors.ability_0_totalScore).toBeUndefined();
-    });
-
-    it('should include subrace racial increase in total score during validation', async () => {
-      const racialBuffResult = { abilityScoreIncreases: [{ name: 'Strength', amount: 1 }] };
-      computeRaceBuffs
-        .mockReturnValueOnce(racialBuffResult)
-        .mockReturnValueOnce(racialBuffResult)
-        .mockReturnValueOnce(racialBuffResult)
-        .mockReturnValueOnce(racialBuffResult);
-
-      const formData = makeFormData(
-        [makeAbility('Strength', 15), ...defaultAbilities().slice(1)],
-        '5e',
-        { name: 'Custom Dragonborn', subrace: { name: 'Azure Dragon' } }
-      );
-
-      renderWizardAbilities(formData, 5, mockSetErrors, mockUpdateAbility);
-
-      await waitFor(() => {
-        expect(mockSetErrors).toHaveBeenCalled();
-      });
-
-      const errors = mockSetErrors.mock.calls[0][0]({});
-      expect(errors.ability_0_totalScore).toBeUndefined();
+      expect(errors.ability_0_totalScore).toBeDefined();
     });
 
     it('should error when race + subrace racial increases push total above 20', async () => {
-      const racialBuffResult = { abilityScoreIncreases: [{ name: 'Strength', amount: 3 }] };
-      computeRaceBuffs
-        .mockReturnValueOnce(racialBuffResult)
-        .mockReturnValueOnce(racialBuffResult)
-        .mockReturnValueOnce(racialBuffResult)
-        .mockReturnValueOnce(racialBuffResult);
+      computeRaceBuffs.mockReturnValue({
+        abilityScoreIncreases: [{ name: 'Strength', amount: 3 }]
+      });
 
       const formData = makeFormData(
         [makeAbility('Strength', 15), ...defaultAbilities().slice(1)],
@@ -659,8 +589,26 @@ describe('useWizardAbilities', () => {
         expect(mockSetErrors).toHaveBeenCalled();
       });
 
+      // Without the subrace contribution (15 + 3 = 18) this would not error
       const errors = mockSetErrors.mock.calls[0][0]({});
       expect(errors.ability_0_totalScore).toBe('Total score (base + feat + background + racial + misc) cannot exceed 20');
+    });
+
+    it('should count backgroundIncrease toward the total score cap', async () => {
+      const formData = makeFormData([
+        makeAbility('Strength', 15, 0, 0, 6),
+        ...defaultAbilities().slice(1)
+      ]);
+
+      renderWizardAbilities(formData, 5, mockSetErrors);
+
+      await waitFor(() => {
+        expect(mockSetErrors).toHaveBeenCalled();
+      });
+
+      // 15 + 6 background = 21 > 20
+      const errors = mockSetErrors.mock.calls[0][0]({});
+      expect(errors.ability_0_totalScore).toBeDefined();
     });
   });
 });

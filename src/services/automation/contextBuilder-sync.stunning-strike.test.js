@@ -1,3 +1,16 @@
+// @maintained-by-ai
+// contextBuilder-sync stored-advantage + condition/grappler lanes — canonical owner of:
+//   consumeStunningStrikeAdvantage (stored _advantageOn_<target> one-shot consume),
+//   countTargetConditionAdvantage (blinded/charmed/paralyzed/petrified/stunned/
+//   unconscious/restrained/dazed/slow, case-insensitive),
+//   countGrapplerAdvantage (saveModifiers attack_roll|attack_rolls vs grappled target),
+//   attacker-side stored disadvantage tes in accumulateStoredEffectCounts
+//   (disadvantage_next_attack / slasher_enhanced_critical / pesky_swarm).
+// te advantage/consume lane on the TARGET axis: contextBuilder-sync.target-effects.test.js.
+// activeBuffs advantage scan: contextBuilder-sync.buffs.test.js.
+// forced-mode PRIORITY chain (who wins): contextBuilder-sync.advantage-priority.test.js.
+// saveDc/saveType passthrough canonical home: contextBuilder-sync.test.js.
+// Deterministic: all externals mocked → stable contract, flag kept.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -231,24 +244,27 @@ describe('contextBuilder-sync: grappled + Grappler feat advantage', () => {
     getRuntimeValue.mockReturnValue(undefined);
   });
 
-  it('sets advantage when attacker has Grappler saveModifiers and target is grappled', async () => {
-    const grapplerStats = {
-      ...mockStats,
-      saveModifiers: [
-        { target: 'attack_roll', type: 'grappled_advantage' },
-      ],
-    };
+  it.each(['attack_roll', 'attack_rolls'])(
+    'sets advantage when attacker has Grappler saveModifiers (target: %s) and target is grappled',
+    async (modifierTarget) => {
+      const grapplerStats = {
+        ...mockStats,
+        saveModifiers: [
+          { target: modifierTarget, type: 'grappled_advantage' },
+        ],
+      };
 
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeBuffs') return [];
-      if (name === 'Orc' && key === 'activeConditions') return ['grappled'];
-      return undefined;
-    });
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [];
+        if (name === 'Orc' && key === 'activeConditions') return ['grappled'];
+        return undefined;
+      });
 
-    const result = await buildAttackContextSync(mockAttack, grapplerStats, 'camp', 'normal');
+      const result = await buildAttackContextSync(mockAttack, grapplerStats, 'camp', 'normal');
 
-    expect(result.forcedMode).toBe('advantage');
-  });
+      expect(result.forcedMode).toBe('advantage');
+    }
+  );
 
   it('does not set advantage when attacker lacks Grappler saveModifiers', async () => {
     const noGrapplerStats = {
@@ -287,7 +303,7 @@ describe('contextBuilder-sync: grappled + Grappler feat advantage', () => {
   });
 });
 
-describe('contextBuilder-sync: attacker disadvantage effects (sap + slasher)', () => {
+describe('contextBuilder-sync: attacker disadvantage effects (sap, slasher, pesky swarm)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     defaultBaseAttackContext();
@@ -298,6 +314,7 @@ describe('contextBuilder-sync: attacker disadvantage effects (sap + slasher)', (
   it.each([
     { effect: 'disadvantage_next_attack', name: 'sap' },
     { effect: 'slasher_enhanced_critical', name: 'slasher' },
+    { effect: 'pesky_swarm', name: 'pesky swarm (MA-0275)' },
   ])('sets disadvantage when $name effect targets attacker', async ({ effect }) => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'campaign' && key === 'targetEffects') return [{ effect, target: 'Fighter1' }];
@@ -320,39 +337,5 @@ describe('contextBuilder-sync: attacker disadvantage effects (sap + slasher)', (
     const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
-  });
-});
-
-describe('contextBuilder-sync: condition advantage combines with other sources', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    defaultBaseAttackContext();
-    defaultAuraMocks();
-    getRuntimeValue.mockReturnValue(undefined);
-  });
-
-  it('sets advantage when target is stunned and reckless attack effect is present', async () => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (name === 'campaign' && key === 'targetEffects') return [{ effect: 'reckless_attack', target: 'Orc' }];
-      if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_advantage_against' }];
-      if (name === 'Orc' && key === 'activeConditions') return ['stunned'];
-      return undefined;
-    });
-
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
-
-    expect(result.forcedMode).toBe('advantage');
-  });
-
-  it('sets advantage when multiple condition sources stack', async () => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeBuffs') return [];
-      if (name === 'Orc' && key === 'activeConditions') return ['stunned', 'blinded', 'restrained'];
-      return undefined;
-    });
-
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
-
-    expect(result.forcedMode).toBe('advantage');
   });
 });

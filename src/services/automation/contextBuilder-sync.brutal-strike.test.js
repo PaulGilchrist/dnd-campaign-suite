@@ -1,6 +1,8 @@
+// @maintained-by-ai
 // CLA-044 regression: Brutal Strike effect clauses must grant registered
 // targetEffects (speed_reduction / push) on the live sheet-attack lane,
-// replace stale hamstring te, anchor one expiration clock, and log grants.
+// replace stale hamstring te, anchor one expiration clock, log grants,
+// consume the sticky, and no-op when the sticky is absent.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -225,5 +227,16 @@ describe('CLA-044: Brutal Strike effect clause grants (live lane)', () => {
 
     expect(setRuntimeValue).toHaveBeenCalledWith('Korgath', '_brutalStrikeActive', null, 'test-campaign');
     expect(setRuntimeValue).toHaveBeenCalledWith('Korgath', '_brutalStrikeEffects', null, 'test-campaign');
+  });
+
+  it('does nothing when the sticky is not active (no dice, no grants, no consume)', async () => {
+    runtime({ active: false, choices: ['Forceful Blow'] });
+
+    const result = await buildAttackContextSync(attack, stats, 'test-campaign', 'normal');
+
+    expect(result.autoDamageFormula || '').not.toContain('[Brutal Strike]');
+    expect(addExpiration).not.toHaveBeenCalled();
+    expect(storedWrites().some(list => list.some(te => te.option === 'Forceful Blow'))).toBe(false);
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('Korgath', '_brutalStrikeActive', null, 'test-campaign');
   });
 });

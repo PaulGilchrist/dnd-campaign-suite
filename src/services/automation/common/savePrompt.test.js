@@ -1,3 +1,7 @@
+// @maintained-by-ai — deterministic unit tests for savePrompt.js's own contract
+// (buildSaveDc arithmetic, createSaveListener payload shape, promptId matching).
+// Pure behaviour behind mock boundaries; no timers, no network (setup.js fetch is inert).
+// If buildPromptPayload gains a field, extend the exact-payload assertions in one place.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     buildSaveDc,
@@ -46,16 +50,10 @@ function makePlayerStats(overrides = {}) {
     };
 }
 
-// ── Helpers ───────────────────────────────────────────────────────
-
-function resetMocks() {
-    vi.clearAllMocks();
-}
-
 // ── Tests ─────────────────────────────────────────────────────────
 
 beforeEach(() => {
-    resetMocks();
+    vi.clearAllMocks();
 });
 
 // ─── buildSaveDc ─────────────────────────────────────────────────
@@ -70,6 +68,10 @@ describe('buildSaveDc', () => {
             const dc = buildSaveDc({ saveDc: 'ability' }, basePlayerStats);
 
             expect(dc).toBe(13); // 8 + 2 + 3
+            expect(getAbilityModifier).toHaveBeenCalledWith(
+                basePlayerStats.abilities,
+                'CON'
+            );
         });
 
         it('uses explicit saveAbility when provided as string', () => {
@@ -121,6 +123,30 @@ describe('buildSaveDc', () => {
             const dc = buildSaveDc({ saveDc: 'spell_save_dc' }, basePlayerStats);
 
             expect(dc).toBe(15); // 8 + 4 + 3
+            expect(getAbilityModifier).toHaveBeenCalledWith(
+                basePlayerStats.abilities,
+                'CHA'
+            );
+        });
+
+        it('prefers explicit spellAbilities.saveDc over recomputing', () => {
+            const stats = makePlayerStats({
+                spellAbilities: { saveDc: 18 },
+            });
+
+            expect(buildSaveDc({ saveDc: 'spell_save_dc' }, stats)).toBe(18);
+            expect(getAbilityModifier).not.toHaveBeenCalled();
+        });
+
+        it('uses spellAbilities.modifier when present instead of ability lookup', () => {
+            const stats = makePlayerStats({
+                spellAbilities: { modifier: 5 },
+            });
+
+            const dc = buildSaveDc({ saveDc: 'spell_save_dc' }, stats);
+
+            expect(dc).toBe(16); // 8 + 5 + 3
+            expect(getAbilityModifier).not.toHaveBeenCalled();
         });
     });
 
@@ -167,6 +193,9 @@ describe('createSaveListener', () => {
         });
     });
 
+    // CLA-034: saveConditions (e.g. ['frightened'] from a Fear Ray) must be
+    // threaded onto the prompt payload so conditional_advantage passives can
+    // key on the SAVE's own condition.
     it('passes through all config fields when provided', () => {
         utils.guid.mockReturnValue('prompt-full');
 
@@ -177,6 +206,7 @@ describe('createSaveListener', () => {
             dcSuccess: 'The orc falls prone.',
             advantage: true,
             disadvantage: false,
+            saveConditions: ['frightened'],
         });
 
         expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, {
@@ -197,54 +227,11 @@ describe('createSaveListener', () => {
             secondaryDamageType: null,
             secondaryRawDamage: 0,
             isSpellDamage: false,
-            saveConditions: null,
-        });
-    });
-
-    it('CLA-034: threads saveConditions from config onto the prompt payload', () => {
-        utils.guid.mockReturnValue('prompt-cla034');
-
-        createSaveListener(campaignName, {
-            targetName: 'Orc',
-            saveType: 'WIS',
-            saveDc: 17,
             saveConditions: ['frightened'],
         });
-
-        expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-            promptId: 'prompt-cla034',
-            saveConditions: ['frightened'],
-        }));
     });
 
-    it('resolves with event.detail when matching promptId is received', async () => {
-        utils.guid.mockReturnValue('matching-guid');
-
-        const { promise } = createSaveListener(campaignName, {
-            targetName: 'Goblin',
-        });
-
-        window.dispatchEvent(
-            new CustomEvent('save-result', {
-                detail: {
-                    promptId: 'matching-guid',
-                    rolled: 17,
-                    success: true,
-                },
-            })
-        );
-
-        await Promise.resolve();
-        const result = await promise;
-
-        expect(result).toEqual({
-            promptId: 'matching-guid',
-            rolled: 17,
-            success: true,
-        });
-    });
-
-    it('ignores events with non-matching promptId', async () => {
+    it('ignores save-result events with a non-matching promptId and resolves with event.detail on match', async () => {
         utils.guid.mockReturnValue('my-guid');
 
         const { promise } = createSaveListener(campaignName, {
@@ -259,17 +246,24 @@ describe('createSaveListener', () => {
 
         await Promise.resolve();
 
-        // The promise should still be pending — dispatch another event
-        // to actually resolve it
+        // Still pending after the mismatched event — the matching event resolves it
         window.dispatchEvent(
             new CustomEvent('save-result', {
-                detail: { promptId: 'my-guid', rolled: 20 },
+                detail: {
+                    promptId: 'my-guid',
+                    rolled: 17,
+                    success: true,
+                },
             })
         );
 
         await Promise.resolve();
         const result = await promise;
 
-        expect(result).toEqual({ promptId: 'my-guid', rolled: 20 });
+        expect(result).toEqual({
+            promptId: 'my-guid',
+            rolled: 17,
+            success: true,
+        });
     });
 });

@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/rules/features/viciousMockeryService.js', () => ({
@@ -6,25 +7,7 @@ vi.mock('../../services/rules/features/viciousMockeryService.js', () => ({
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
     rollExpressionDoubled: vi.fn(),
-    formatDamageFormula: vi.fn((formula, rolls, isCrit) => {
-        if (!isCrit) return formula;
-        const parsed = formula.match(/^(\d+)?d(\d+)((?:[+-]\d+)+)?$/i);
-        if (!parsed) return formula;
-        const count = parsed[1] || 1;
-        const sides = parsed[2];
-        const modifierStr = parsed[3];
-        let modifier = 0;
-        if (modifierStr) {
-            const segments = modifierStr.match(/([+-]\d+)/g);
-            for (const seg of segments) { modifier += parseInt(seg, 10); }
-        }
-        const dicePart = count === 1 ? `d${sides}` : `${count}d${sides}`;
-        const rollStr = rolls && rolls.length > 0 ? ` (${rolls.join(', ')})` : '';
-        let result = `${dicePart}*2${rollStr}`;
-        if (modifier > 0) result += `+${modifier}`;
-        else if (modifier < 0) result += `${modifier}`;
-        return result;
-    }),
+    formatDamageFormula: vi.fn(),
 }));
 
 vi.mock('../../services/ui/utils.js', () => ({
@@ -49,11 +32,7 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
     playerIsImmuneToCondition: vi.fn(),
     hasGreatWeaponFighting: vi.fn(),
     applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
-    evaluateAutoExpression: vi.fn((expr) => {
-        const match = expr.match(/^(\d+)d(\d+)\+(\d+)/);
-        if (match) return parseInt(match[1]) + parseInt(match[3]);
-        return 0;
-    }),
+    evaluateAutoExpression: vi.fn(),
 }));
 
 vi.mock('../../services/rules/features/invisibilityService.js', () => ({
@@ -85,7 +64,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
-    computeDamageAfterSave: vi.fn((total, success, _dcSuccess) => success ? Math.floor(total / 2) : total),
+    computeDamageAfterSave: vi.fn((total, success) => success ? Math.floor(total / 2) : total),
     computeDamageAfterEvasion: vi.fn((total, success, _dcSuccess, evasion) => (evasion && success ? 0 : (success ? Math.floor(total / 2) : total))),
     rollSaveForCreature: vi.fn(),
     applyDamageToTarget: vi.fn(),
@@ -144,61 +123,28 @@ vi.mock('../../hooks/useAllySelection.js', () => ({
 
 import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
-import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
-import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
-import { hasSoulstitchProtection, applyMinDamageAdjustment } from './loggedDiceRollUtils.js';
 import {
-    computeDamageAfterSave,
+    computeDamageAfterEvasion,
     rollSaveForCreature,
     applyDamageToTarget,
-    computeDamageAfterEvasion,
 } from '../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
 import { getCoronaSaveDisadvantage } from '../../services/combat/auras/coronaAuraUtils.js';
 import { getElderChampionSaveDisadvantage } from '../../services/combat/auras/elderChampionAuraUtils.js';
 import { isCircleOfPowerActive } from '../../services/automation/handlers/buffs/circleOfPowerHandler.js';
-import { rollExpression } from '../../services/dice/diceRoller.js';
 
-describe('Circle of Power advantage on saves', () => {
+// Circle of Power (aura membership owned by circleOfPowerHandler) injects the
+// damage-lane bonuses in handleNpcSaveDamage: save advantage (resolveSaveAdvantage),
+// half-damage-→-none evasion (computeEvasionFlags), and popup forcedMode.
+describe('Circle of Power in the NPC save-damage lane', () => {
     const deps = {
         characterName: 'TestWizard',
         campaignName: 'test-campaign',
-        characters: [
-            { name: 'Goblin', computedStats: { saveBonuses: { DEX: 3 }, armorClass: 12 }, saveModifiers: [] },
-        ],
+        characters: [{ name: 'Goblin', saveModifiers: [] }],
         setPopupHtml: vi.fn(),
         logEntry: vi.fn(),
         pendingSaves: {},
     };
-
-    beforeEach(() => {
-        rollExpression.mockReturnValue({ total: 8, rolls: [5, 3], modifier: 0 });
-        getRuntimeValue.mockReturnValue(null);
-        applyMinDamageAdjustment.mockImplementation((d) => d);
-        hasIgnoreResistance.mockReturnValue(false);
-        hasSoulstitchProtection.mockReturnValue(false);
-        playerIsImmuneToCondition.mockReturnValue(false);
-        endInvisibilityOnHostileAction.mockReturnValue(undefined);
-        computeDamageAfterSave.mockImplementation((total, success, _dcSuccess) => success ? Math.floor(total / 2) : total);
-        computeDamageAfterEvasion.mockImplementation(
-            (total, success, _dcSuccess, evasion) =>
-                evasion && success ? 0 : success ? Math.floor(total / 2) : total,
-        );
-        rollSaveForCreature.mockReturnValue({ success: false, roll: 8, total: 11, bonus: 3, rawRolls: [8] });
-        applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 3, damageReduced: false });
-        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
-        isCircleOfPowerActive.mockReturnValue(false);
-        loadCombatSummary.mockResolvedValue({
-            creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-        });
-        deps.logEntry.mockClear();
-        deps.setPopupHtml.mockClear();
-    });
-
-    function createFn() {
-        return createLogDamageAndShow(deps);
-    }
 
     const fireballContext = {
         targetName: 'Goblin',
@@ -209,91 +155,61 @@ describe('Circle of Power advantage on saves', () => {
         attackerName: 'TestWizard',
     };
 
-    it('passes advantage to NPC save roll when circle of power is active', async () => {
-        isCircleOfPowerActive.mockReturnValue(true);
-
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: fireballContext });
-
-        expect(rollSaveForCreature).toHaveBeenCalledWith(
-            expect.any(Object),
-            'DEX',
-            15,
-            false,
-            true,
+    beforeEach(() => {
+        getRuntimeValue.mockReturnValue(null);
+        rollSaveForCreature.mockReturnValue({ success: false, roll: 8, total: 11, bonus: 3, rawRolls: [8] });
+        applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 3, damageReduced: false });
+        computeDamageAfterEvasion.mockImplementation(
+            (total, success, _dcSuccess, evasion) =>
+                evasion && success ? 0 : success ? Math.floor(total / 2) : total,
         );
-    });
-
-    it('passes no advantage to NPC save roll when circle of power is inactive', async () => {
+        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
+        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
         isCircleOfPowerActive.mockReturnValue(false);
-
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: fireballContext });
-
-        expect(rollSaveForCreature).toHaveBeenCalledWith(
-            expect.any(Object),
-            'DEX',
-            15,
-            false,
-            false,
-        );
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
+        });
+        deps.logEntry.mockClear();
+        deps.setPopupHtml.mockClear();
     });
 
-    it('passes evasion flag to damage computation when circle of power is active', async () => {
-        isCircleOfPowerActive.mockReturnValue(true);
-        computeDamageAfterEvasion.mockReturnValue(10);
+    function castFireball() {
+        return createLogDamageAndShow(deps)({
+            name: 'Fireball',
+            formula: '8d6',
+            total: 20,
+            rolls: [3, 4, 5, 2, 3, 3],
+            modifier: 0,
+            context: fireballContext,
+        });
+    }
 
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: fireballContext });
-
-        expect(computeDamageAfterEvasion).toHaveBeenCalledWith(
-            20,
-            false,
-            'half',
-            true,
-        );
-    });
-
-    it('does not pass evasion flag when circle of power is inactive', async () => {
-        isCircleOfPowerActive.mockReturnValue(false);
-        computeDamageAfterEvasion.mockReturnValue(10);
-
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: fireballContext });
-
-        expect(computeDamageAfterEvasion).toHaveBeenCalledWith(
-            20,
-            false,
-            'half',
-            false,
-        );
-    });
-
-    it('sets popup forcedMode to advantage when circle of power is active', async () => {
+    it('active: grants save advantage, evasion damage treatment, evasion log, and advantage popup', async () => {
         isCircleOfPowerActive.mockReturnValue(true);
 
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: fireballContext });
+        await castFireball();
 
+        expect(isCircleOfPowerActive).toHaveBeenCalledWith('Goblin', 'test-campaign');
+        // Save rolled with advantage (5th arg) ...
+        expect(rollSaveForCreature).toHaveBeenCalledWith(expect.any(Object), 'DEX', 15, false, true);
+        // ... failed save still takes full damage, but the evasion seam is armed ...
+        expect(computeDamageAfterEvasion).toHaveBeenCalledWith(20, false, 'half', true);
+        // ... the shared-evasion roll is logged ...
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ rollType: 'evasion', targetName: 'Goblin' }));
+        // ... and the popup reports forced advantage.
         expect(deps.setPopupHtml).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'save-damage',
-                forcedMode: 'advantage',
-            }),
+            expect.objectContaining({ type: 'save-damage', forcedMode: 'advantage' }),
         );
     });
 
-    it('sets popup forcedMode to normal when circle of power is inactive', async () => {
-        isCircleOfPowerActive.mockReturnValue(false);
+    it('inactive: no advantage, no evasion flag, no evasion log, normal popup', async () => {
+        await castFireball();
 
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: fireballContext });
-
+        expect(rollSaveForCreature).toHaveBeenCalledWith(expect.any(Object), 'DEX', 15, false, false);
+        expect(computeDamageAfterEvasion).toHaveBeenCalledWith(20, false, 'half', false);
+        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ rollType: 'evasion' }));
         expect(deps.setPopupHtml).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'save-damage',
-                forcedMode: 'normal',
-            }),
+            expect.objectContaining({ type: 'save-damage', forcedMode: 'normal' }),
         );
     });
 });

@@ -1,20 +1,20 @@
+// @maintained-by-ai: 2026-10-14
 // MA-2022: Thunderbird legendary_actions[3] "Storm Call (Costs 2 Actions)" shipped
-// `delegates_to:"Thunderstrike (Recharge 5-6)"` with NO own save/damage fields —
-// the gated press spent 2 legendary uses honestly (MA-1883 name-parse) then routed
-// through the MASTER's payload: popup/ledger name "(Thunderstrike (Recharge 5-6)
-// save)", formula 12d10 (live pre-fix: 64 raw, hpΔ −64), AND consumed Thunderstrike's
-// recharge key (`monsterRecharge {Thunderstrike:{recharged:false}}` + thunderstrike
-// spend log stamped by the Storm Call press) — MA-1847/MA-1928 delegate-hijack family.
-// Fix is DATA-only (MA-1928 Cthulhu Madness Whisper byte-shape, MA-1872 twin): drop
-// delegates_to, author OWN fields save_dc 24 / save_type Dexterity /
-// damage_dice_primary "6d8" / damage_type_primary "Lightning" / dc_success "none"
-// (prose "or take" = fail-only, half-default would leak §63/MV-20). Numeric save child
-// self-suppresses its Expend chip (§204/§507) and rides the section-wrapped costs-2
-// gate via the NAME parse. Recharge decoupling: rechargeUsageOf reads ONLY the pressed
-// row's flat recharge (monsterRecharge.js:35) — Storm Call authors none → gate null →
-// the press NEVER spends/refuses on Thunderstrike's key; master keeps its MA-2017
-// recharge:"5-6" byte-unchanged. save_effect stays ABSENT (no condition rider —
-// "or omit" per ticket); range stays ABSENT (shapeless-inline lane preserved, §211).
+// `delegates_to:"Thunderstrike (Recharge 5-6)"` with NO own save/damage fields — the
+// gated press spent 2 legendary uses honestly (MA-1883 name-parse) then routed through
+// the MASTER's payload: 12d10 pool, Thunderstrike ledger name, and consumed the master's
+// recharge key (MA-1847/MA-1928 delegate-hijack family). Fix is DATA-only (MA-1928
+// byte-shape, MA-1872 twin): drop delegates_to, author OWN fields DC 24 / Dexterity /
+// 6d8 Lightning / dc_success "none" (RAW "or take" = fail-only; half-default would leak
+// §63). Costs-2 rides the NAME parse (MA-1883, monsterLegendaryUses.js:179).
+// Recharge decoupling: rechargeUsageOf reads ONLY the pressed row's flat recharge
+// (monsterRecharge.js:35) — Storm Call authors none → gate null → the press never
+// spends/refuses on Thunderstrike's key; master keeps MA-2017 recharge:"5-6" intact.
+// save_effect stays ABSENT (no condition rider — "or omit" per ticket); range stays
+// ABSENT (shapeless-inline lane preserved, §211).
+// Wing Clap twin (legendary_actions[2]) pinned in
+// saveProcessing.ma2021-thunderbird-wing-clap.test.js — Storm Call is deduped THERE;
+// this file is the Storm Call authority.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 
@@ -28,36 +28,23 @@ const STORM_CALL = THUNDERBIRD.legendary_actions[3];
 const STRIKE = THUNDERBIRD.actions.find((a) => a.name === 'Thunderstrike (Recharge 5-6)');
 
 describe('MA-2022 disk fingerprint: Thunderbird Storm Call self-resolving save row', () => {
-  it('row identity + description stay RAW byte-identical (§383 anchor innocence)', () => {
+  it('RAW identity + own save fields authored + costs-2 name parse — delegates_to GONE (§204/§225 hijack dead)', () => {
     expect(THUNDERBIRD.name).toBe('Thunderbird');
     expect(STORM_CALL.name).toBe('Storm Call (Costs 2 Actions)');
     expect(STORM_CALL.description).toBe('The Thunderbird calls down a single bolt of lightning on one creature within 120 ft. The target must succeed on a DC 24 Dexterity saving throw or take 27 (6d8) Lightning damage.');
-  });
-
-  it('own save fields authored: DC 24 Dexterity, 6d8 Lightning, fail-only dc_success none', () => {
+    // Own mechanical fields (MA-1928 byte-shape):
     expect(STORM_CALL.save_dc).toBe(24);
     expect(STORM_CALL.save_type).toBe('Dexterity');
     expect(STORM_CALL.damage_dice_primary).toBe('6d8');
     expect(STORM_CALL.damage_type_primary).toBe('Lightning');
     expect(STORM_CALL.dc_success).toBe('none'); // RAW "or take" — no Success:Half (§63 half-leak guard)
-  });
-
-  it('delegates_to is GONE — the master Thunderstrike 12d10/ledger/AoE hijack is dead (§204/§225)', () => {
-    expect(STORM_CALL.delegates_to).toBeUndefined();
-    expect(legendaryDelegateAction(THUNDERBIRD, STORM_CALL)).toBeNull(); // no delegate leg reachable
-    // Byte-duplicate of legendaryRowHasNumericMechanic (MonsterCardModal.jsx:744,
-    // ma1952 pattern): own save_dc > 0 self-resolves — :895 delegate lane never runs.
-    const numericSelfResolve = (action) => {
-      if (action.attack_bonus != null || Number(action.save_dc) > 0) return true;
-      return false; // description has no "Hit|Failure|Success:" dice paren (MA-2045 zero-own-fields fingerprint pre-fix)
-    };
-    expect(numericSelfResolve(STORM_CALL)).toBe(true);
-    const entersDelegateLeg = !numericSelfResolve(STORM_CALL) && Boolean(STORM_CALL.delegates_to);
-    expect(entersDelegateLeg).toBe(false);
-  });
-
-  it('costs-2 rides the NAME parse (MA-1883 live): press spends exactly 2', () => {
+    // Costs-2 via the MA-1883 NAME parse (no structured cost field exists on disk):
     expect(legendaryActionCost(STORM_CALL)).toBe(2);
+    // No delegate leg reachable: own save_dc > 0 self-resolves, and with delegates_to
+    // absent legendaryDelegateAction returns null — the master's 12d10/ledger/AoE lane
+    // can never run (MonsterCardModal numeric-self-resolve seam, ma1952 pattern).
+    expect(STORM_CALL.delegates_to).toBeUndefined();
+    expect(legendaryDelegateAction(THUNDERBIRD, STORM_CALL)).toBeNull();
   });
 
   it('no save_effect/range/uses/advisory/recharge — no condition rider, shapeless-inline lane, header owns economy, recharge decoupled (§165/§211)', () => {
@@ -87,12 +74,10 @@ describe('MA-2022 disk fingerprint: Thunderbird Storm Call self-resolving save r
 });
 
 // ── Live-lane unit: saveProcessing NPC-inline branch driven from the disk row's OWN
-// bytes (MA-2021 harness mirror, MA-1997 lineage): formula transports as damage_dice_primary
-// "6d8" (rollExpression input pinned — never the master's 12d10), fail pays FULL Σ6d8,
-// dc_success:"none" success pays ZERO (finalDamage 0; live §335 twin: save-damage entry
-// finalDamage:0 + ABSENT hp_change — proven live at re-verify).
+// bytes (MA-2021 harness mirror, MA-1997 lineage): formula transports as
+// autoDamageFormula "6d8" (rollExpression input pinned — never the master's 12d10),
+// fail pays FULL Σ6d8, dc_success:"none" success pays ZERO (finalDamage 0).
 const runtimeStore = {};
-const addEntryLogs = [];
 
 vi.mock('../runtime/useRuntimeState.js', () => ({
   getRuntimeValue: (name, key) => runtimeStore[`${name}.${key}`],
@@ -112,7 +97,7 @@ vi.mock('../../services/automation/common/savePrompt.js', () => ({
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({
-  addEntry: (campaignName, entry) => { addEntryLogs.push(entry); return Promise.resolve(); },
+  addEntry: () => Promise.resolve(),
 }));
 
 vi.mock('../../services/encounters/combatData.js', () => ({
@@ -150,24 +135,8 @@ import { rollExpression } from '../../services/dice/diceRoller.js';
 const campaignName = 'test-campaign';
 const TB_NAME = 'Thunderbird 1';
 
-// Deterministic 6d8 pool (avg 27 target: rolled 30).
-const MOCK_DAMAGE = { total: 30, rolls: [4, 5, 6, 3, 7, 2, 1, 2], modifier: 0 };
-
-function saveContextFromRow({ targetName, effectiveD20 }) {
-  return {
-    attackerName: TB_NAME,
-    targetName,
-    actionName: STORM_CALL.name,
-    saveDc: STORM_CALL.save_dc,
-    saveType: STORM_CALL.save_type,
-    dcSuccess: STORM_CALL.dc_success, // 'none' straight from disk
-    autoDamageFormula: STORM_CALL.damage_dice_primary,
-    autoDamageDamageType: STORM_CALL.damage_type_primary,
-    saveConditions: extractConditionsFromSaveEffect(STORM_CALL.save_effect),
-    effectiveD20,
-    effectiveBonus: 0,
-  };
-}
+// Deterministic 6d8 pool summing 30 (RAW avg 27).
+const MOCK_DAMAGE = { total: 30, rolls: [6, 6, 6, 5, 4, 3], modifier: 0 };
 
 async function rollNpcInline({ targetName, effectiveD20, bonus }) {
   return processSaveRoll({
@@ -175,7 +144,19 @@ async function rollNpcInline({ targetName, effectiveD20, bonus }) {
     target: { name: targetName, type: 'npc' }, // EB-joined NPC → processNpcSave inline lane
     characterName: targetName,
     campaignName,
-    context: saveContextFromRow({ targetName, effectiveD20 }),
+    context: {
+      attackerName: TB_NAME,
+      targetName,
+      actionName: STORM_CALL.name,
+      saveDc: STORM_CALL.save_dc,
+      saveType: STORM_CALL.save_type,
+      dcSuccess: STORM_CALL.dc_success, // 'none' straight from disk
+      autoDamageFormula: STORM_CALL.damage_dice_primary,
+      autoDamageDamageType: STORM_CALL.damage_type_primary,
+      saveConditions: extractConditionsFromSaveEffect(STORM_CALL.save_effect),
+      effectiveD20,
+      effectiveBonus: 0,
+    },
     bonus,
     r1: effectiveD20,
     r2: effectiveD20,
@@ -187,7 +168,6 @@ async function rollNpcInline({ targetName, effectiveD20, bonus }) {
 beforeEach(() => {
   vi.clearAllMocks();
   for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
-  addEntryLogs.length = 0;
   rollExpression.mockReturnValue(MOCK_DAMAGE);
 });
 

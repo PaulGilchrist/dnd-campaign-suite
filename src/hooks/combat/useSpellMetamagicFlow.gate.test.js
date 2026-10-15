@@ -1,8 +1,15 @@
+// @maintained-by-ai: 2026-10-15
+// gateMetamagic registry BREADTH seam: every spell in spellGateMap must flip its
+// pending<Key> with the right shape/targets when routed through the hook.
+// Deep per-gate behavior lives in the spellGates.* lanes (hex, bane, magicMissile,
+// revivify, animalFriendship, spareTheDying, wardingBond, mageArmor); two-stage UI
+// in gate-two-stage; Sorcerer payment/auto-level in gate-sorcerer; material gate in
+// gate-material; confirm/skip execution in spellConfirm and complex-handlers lanes.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
-import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js';
 import { getMonsterData } from '../../services/npcs/monsterUtils.js';
 import { getAllyList } from '../useAllySelection.js';
 import { getRuntimeValue } from '../runtime/useRuntimeState.js';
@@ -29,7 +36,8 @@ vi.mock('../../services/npcs/monsterUtils.js', () => ({
 vi.mock('../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
     creatures: [
-      // Goblin A dead (0 HP) so the SP-100 dead-target gate has a valid target.
+      // Goblin A at 0 HP is DEAD (canonical monster 0-HP model) — the only
+      // Revivify-valid target in this fixture.
       { name: 'Goblin A', type: 'monster', currentHp: 0 },
       { name: 'Goblin B' },
       { name: 'Goblin C' },
@@ -65,6 +73,10 @@ vi.mock('../useAllySelection.js', () => ({
   getAllyList: vi.fn(() => []),
 }));
 
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
 function makePlayerStats(overrides = {}) {
   return {
     name: 'TestSorcerer',
@@ -84,52 +96,49 @@ function makeSpell(overrides = {}) {
   };
 }
 
-function renderHookWithSpell(hookSetup, spellName, spellOverrides = {}) {
-  const onExecute = vi.fn();
+// Render the hook, run gateMetamagic on one spell synchronously, and return
+// the pendingKey entry it opened (or the whole hook API when key is omitted).
+function gate(spellOverrides, pendingKey) {
   const { result } = renderHook(() =>
-    hookSetup(onExecute)
+    useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
   );
-  const spell = makeSpell({ name: spellName, ...spellOverrides });
   act(() => {
-    result.current.gateMetamagic(spell);
+    result.current.gateMetamagic(makeSpell(spellOverrides));
   });
-  return { result, onExecute, spell };
+  return pendingKey ? result.current[pendingKey] : result.current;
 }
 
-// ── Data-driven spell gate tests ─────────────────────────────────────────────
+// ── Registry breadth: name → pending<Key> conversion ─────────────────────────
+// Levels mirror public/data/spells.json (5e) and public/data/2024/spells.json.
+// casterIncluded / casterExcluded pin the gate's getCsAndTargets mode.
 
-// Each entry tests that gateMetamagic sets the expected pending state for a spell.
-// Additional behavior (confirm/skip handlers, two-stage flows, Sorcerer-specific
-// logic) is covered by dedicated test files.
-
-const gatedSpellsWithCreatureChecks = [
+const gateRegistry = [
+  // includeCaster gates — RAW touch spells that may target the caster
   { name: 'Foresight', level: 9, pendingKey: 'pendingForesight', casterIncluded: true },
   { name: 'Sanctuary', level: 1, pendingKey: 'pendingSanctuary', casterIncluded: true },
   { name: 'Protection from Evil and Good', level: 1, pendingKey: 'pendingProtectionFromEvilAndGood', casterIncluded: true },
+  { name: 'Enhance Ability', level: 2, pendingKey: 'pendingEnhanceAbility', casterIncluded: true },
+  // excludeCaster gates — RAW target-another-creature spells
   { name: 'Charm Monster', level: 4, pendingKey: 'pendingCharmMonster', casterExcluded: true },
   { name: 'Banishment', level: 4, pendingKey: 'pendingBanishment', casterExcluded: true },
-  { name: 'Hex', level: 1, pendingKey: 'pendingHex', casterExcluded: true },
+  { name: 'Hex', level: 1, pendingKey: 'pendingHex', casterExcluded: true, maxTargets: 1 },
   { name: 'Prismatic Spray', level: 7, pendingKey: 'pendingPrismaticSpray', casterExcluded: true },
   { name: 'Faerie Fire', level: 1, pendingKey: 'pendingFaerieFire', casterExcluded: true },
-  { name: 'Enhance Ability', level: 2, pendingKey: 'pendingEnhanceAbility', casterIncluded: true },
-  // SP-110: 'Spare The Dying' gate now filters to 0-HP-not-dead creatures —
-  // covered by spellGates.spareTheDying.test.js (this suite's runtime mocks
-  // have no dying creature).
-  { name: 'Revivify', level: 5, pendingKey: 'pendingRevivify', casterExcluded: true },
-];
-
-const simpleGates = [
+  // Revivify filters to DEAD targets — Goblin A (0 HP) qualifies (SP-100
+  // picker depth in spellGates.revivify.test.js).
+  { name: 'Revivify', level: 3, pendingKey: 'pendingRevivify', casterExcluded: true },
+  // Generic gates — picker opens over every combatant
   { name: 'Protection from Poison', level: 2, pendingKey: 'pendingProtectionFromPoison' },
-  { name: 'Stone Skin', level: 3, pendingKey: 'pendingStoneSkin' },
+  { name: 'Stone Skin', level: 4, pendingKey: 'pendingStoneSkin' },
   { name: 'Polymorph', level: 4, pendingKey: 'pendingPolymorph', maxTargets: 1 },
   { name: 'True Polymorph', level: 9, pendingKey: 'pendingTruePolymorph' },
   { name: 'Lesser Restoration', level: 2, pendingKey: 'pendingLesserRestoration' },
   { name: 'Greater Restoration', level: 5, pendingKey: 'pendingGreaterRestoration' },
   { name: 'Remove Curse', level: 3, pendingKey: 'pendingRemoveCurse' },
-  { name: 'Aid', level: 1, pendingKey: 'pendingAid', maxTargets: 3 },
-  { name: 'Bane', level: 0, pendingKey: 'pendingBane', maxTargets: 3 },
+  { name: 'Aid', level: 2, pendingKey: 'pendingAid', maxTargets: 3 },
+  { name: 'Bane', level: 1, pendingKey: 'pendingBane', maxTargets: 3 },
   { name: 'Bless', level: 1, pendingKey: 'pendingBless', maxTargets: 3 },
-  { name: 'Holy Aura', level: 8, pendingKey: 'pendingHolyAura', spellLevel: 8 },
+  { name: 'Holy Aura', level: 8, pendingKey: 'pendingHolyAura' },
   { name: 'Slow', level: 3, pendingKey: 'pendingSlow' },
   { name: 'Haste', level: 3, pendingKey: 'pendingHaste' },
   { name: 'Barkskin', level: 2, pendingKey: 'pendingBarkskin' },
@@ -137,215 +146,119 @@ const simpleGates = [
   { name: 'Greater Invisibility', level: 4, pendingKey: 'pendingGreaterInvisibility' },
   { name: 'Feign Death', level: 3, pendingKey: 'pendingFeignDeath' },
   { name: 'Heal', level: 6, pendingKey: 'pendingHeal' },
-  { name: 'Longstrider', level: 0, pendingKey: 'pendingLongstrider' },
+  { name: 'Longstrider', level: 1, pendingKey: 'pendingLongstrider' },
   { name: 'Pass Without Trace', level: 2, pendingKey: 'pendingPassWithoutTrace' },
   { name: 'Beacon of Hope', level: 3, pendingKey: 'pendingBeaconOfHope' },
-  { name: 'Globe of Invulnerability', level: 4, pendingKey: 'pendingGlobe' },
-  { name: 'Antimagic Field', level: 4, pendingKey: 'pendingAntimagicField' },
+  { name: 'Globe of Invulnerability', level: 6, pendingKey: 'pendingGlobe' },
+  { name: 'Antimagic Field', level: 8, pendingKey: 'pendingAntimagicField' },
   { name: 'Forcecage', level: 7, pendingKey: 'pendingForcecage' },
-  { name: 'Stinking Cloud', level: 1, pendingKey: 'pendingStinkingCloud' },
+  { name: 'Stinking Cloud', level: 3, pendingKey: 'pendingStinkingCloud' },
   { name: 'Confusion', level: 4, pendingKey: 'pendingConfusion' },
-  { name: 'Web', level: 1, pendingKey: 'pendingWeb' },
+  { name: 'Web', level: 2, pendingKey: 'pendingWeb' },
   { name: 'Regenerate', level: 7, pendingKey: 'pendingRegenerate' },
   { name: 'Healing Word', level: 1, pendingKey: 'pendingHealingWord' },
   { name: 'Cure Wounds', level: 1, pendingKey: 'pendingCureWounds' },
-  // SP-008: Aura of Life gate is now party-membership based (selected
-  // allies ∪ party) — goblin-only fixture no longer opens it; pinned in its
-  // own block below.
   { name: 'Aura of Purity', level: 4, pendingKey: 'pendingAuraOfPurity' },
-  { name: 'Circle of Power', level: 9, pendingKey: 'pendingCircleOfPower' },
+  { name: 'Circle of Power', level: 5, pendingKey: 'pendingCircleOfPower' },
   { name: 'Compulsion', level: 4, pendingKey: 'pendingCompulsion' },
   { name: 'Aura of Vitality', level: 3, pendingKey: 'pendingAuraOfVitality' },
   { name: 'Death Ward', level: 4, pendingKey: 'pendingDeathWard' },
   { name: 'Heroism', level: 1, pendingKey: 'pendingHeroism' },
-  { name: 'Hex', level: 1, pendingKey: 'pendingHex', maxTargets: 1 },
-  { name: 'Sleet Storm', level: 3, pendingKey: 'pendingSleetStorm' },
-  { name: 'Magic Missile', level: 3, pendingKey: 'pendingMagicMissile', totalMissiles: 5 },
-  { name: 'Resistance', level: 0, pendingKey: 'pendingResistance', damageTypesLength: 11 },
 ];
 
-describe('useSpellMetamagicFlow — simple spell gates', () => {
-  for (const spell of simpleGates) {
-    describe(spell.name, () => {
-      beforeEach(() => {
-        vi.clearAllMocks();
-        getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-      });
+describe('useSpellMetamagicFlow — gateMetamagic registry breadth', () => {
+  for (const { name, level, pendingKey, maxTargets, casterIncluded, casterExcluded } of gateRegistry) {
+    it(`opens ${pendingKey} for ${name} lv${level}`, () => {
+      const pending = gate({ name, level }, pendingKey);
 
-      it(`sets ${spell.pendingKey} with expected structure`, () => {
-        const { result } = renderHookWithSpell(
-          (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-          spell.name,
-          { level: spell.level },
-        );
-
-        const pending = result.current[spell.pendingKey];
-        expect(pending).not.toBeNull();
-
-        if (spell.name !== 'Magic Missile') {
-          expect(pending.spellName).toBe(spell.name);
-          expect(pending.spellLevel).toBe(spell.level);
-        }
-
-        if (spell.maxTargets !== undefined) {
-          expect(pending.maxTargets).toBe(spell.maxTargets);
-        }
-
-        if (spell.spellLevel !== undefined) {
-          expect(pending.spellLevel).toBe(spell.spellLevel);
-        }
-
-        if (spell.totalMissiles !== undefined) {
-          expect(pending.totalMissiles).toBe(spell.totalMissiles);
-        }
-
-        if (spell.damageTypesLength !== undefined) {
-          expect(pending.damageTypes.length).toBe(spell.damageTypesLength);
-        }
-      });
+      expect(pending).not.toBeNull();
+      expect(pending.spellName).toBe(name);
+      expect(pending.spellLevel).toBe(level);
+      if (maxTargets !== undefined) {
+        expect(pending.maxTargets).toBe(maxTargets);
+      }
+      if (casterIncluded) {
+        expect(pending.creatureTargets).toContain('TestSorcerer');
+      }
+      if (casterExcluded) {
+        expect(pending.creatureTargets).not.toContain('TestSorcerer');
+        expect(pending.creatureTargets).toContain('Goblin A');
+      }
     });
   }
 });
 
-describe('useSpellMetamagicFlow — gated spells with creatureTargets checks', () => {
-  for (const spell of gatedSpellsWithCreatureChecks) {
-    describe(spell.name, () => {
-      beforeEach(() => {
-        vi.clearAllMocks();
-        getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-      });
+describe('useSpellMetamagicFlow — includeCaster gates open on an empty board', () => {
+  for (const { name, level, pendingKey } of gateRegistry.filter(s => s.casterIncluded)) {
+    it(`${name} still includes the caster with no creatures in combat`, () => {
+      getCombatSummary.mockReturnValueOnce({ creatures: [] });
+      const pending = gate({ name, level }, pendingKey);
 
-      it(`sets ${spell.pendingKey} with correct creatureTargets`, () => {
-        const { result } = renderHookWithSpell(
-          (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-          spell.name,
-          { level: spell.level },
-        );
-
-        const pending = result.current[spell.pendingKey];
-        expect(pending).not.toBeNull();
-        expect(Array.isArray(pending.creatureTargets)).toBe(true);
-        expect(pending.creatureTargets.length).toBeGreaterThan(0);
-
-        if (spell.casterIncluded) {
-          expect(pending.creatureTargets).toContain('TestSorcerer');
-        }
-
-        if (spell.casterExcluded) {
-          expect(pending.creatureTargets).not.toContain('TestSorcerer');
-          expect(pending.creatureTargets).toContain('Goblin A');
-        }
-      });
+      expect(pending).not.toBeNull();
+      expect(pending.creatureTargets).toEqual(['TestSorcerer']);
     });
   }
 });
 
-// ── Spells requiring monster data resolution ──────────────────────────────────
+// ── Monster-type-resolution gates (no spellGates.* lane for these) ──────────
 
 describe('useSpellMetamagicFlow — monster-data-gated spells', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-  });
+  it('sets pendingHoldMonster with maxTargets from upcast_at_slot_level', () => {
+    const pending = gate({
+      name: 'Hold Monster',
+      level: 5,
+      upcastLevel: 6,
+      upcast_at_slot_level: { '6': '2 targets' },
+    }, 'pendingHoldMonster');
 
-  it('sets pending holdMonster with maxTargets from upcast_at_slot_level', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Hold Monster',
-        level: 5,
-        upcastLevel: 6,
-        upcast_at_slot_level: { '6': '2 targets' },
-      }));
-    });
-
-    const pending = result.current.pendingHoldMonster;
     expect(pending).not.toBeNull();
     expect(pending.creatureTargets).not.toContain('TestSorcerer');
     expect(pending.creatureTargets).toContain('Goblin A');
     expect(pending.maxTargets).toBe(2);
   });
 
-  it('sets pending holdPerson for humanoid monsters', async () => {
+  it('opens pendingHoldPerson for humanoid monsters only', async () => {
     getMonsterData.mockResolvedValue({ type: 'humanoid' });
     const { result } = renderHook(() =>
       useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
-
     await act(async () => {
       result.current.gateMetamagic(makeSpell({ name: 'Hold Person', level: 2 }));
     });
-
     expect(result.current.pendingHoldPerson).not.toBeNull();
-  });
 
-  it('excludes non-humanoid monsters from holdPerson', async () => {
     getMonsterData.mockResolvedValue({ type: 'Ooze' });
-    const { result } = renderHook(() =>
+    const refused = renderHook(() =>
       useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
-
     await act(async () => {
-      result.current.gateMetamagic(makeSpell({ name: 'Hold Person', level: 2 }));
+      refused.result.current.gateMetamagic(makeSpell({ name: 'Hold Person', level: 2 }));
     });
-
-    expect(result.current.pendingHoldPerson).toBeNull();
+    expect(refused.result.current.pendingHoldPerson).toBeNull();
   });
 
-  it('sets pending charmPerson for humanoids', async () => {
+  it('sets pendingCharmPerson for humanoids', async () => {
     getMonsterData.mockResolvedValue({ type: 'humanoid' });
     const { result } = renderHook(() =>
       useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
-
     await act(async () => {
       result.current.gateMetamagic(makeSpell({ name: 'Charm Person', level: 1 }));
     });
 
     expect(result.current.pendingCharmPerson).not.toBeNull();
   });
-
-  it('sets pending animalFriendship for beasts', async () => {
-    getMonsterData.mockResolvedValue({ type: 'beast' });
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    await act(async () => {
-      result.current.gateMetamagic(makeSpell({ name: 'Animal Friendship', level: 1 }));
-    });
-
-    expect(result.current.pendingAnimalFriendship).not.toBeNull();
-  });
 });
 
-// ── Sorcerer-only gates ───────────────────────────────────────────────────────
+// ── Class-restricted and party-scoped gates ───────────────────────────────────
 
-describe('useSpellMetamagicFlow — Sorcerer-only gates', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-  });
+describe('useSpellMetamagicFlow — Sorcerer-only shapechange gate', () => {
+  it('opens pendingShapechange for a Sorcerer, not for a Wizard', () => {
+    expect(gate({ name: 'Shapechange', level: 9 }).pendingShapechange).not.toBeNull();
 
-  it('sets pending shapechange for Sorcerer', () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Shapechange',
-      { level: 9 },
-    );
-
-    expect(result.current.pendingShapechange).not.toBeNull();
-  });
-
-  it('does not set pending shapechange for non-Sorcerer', () => {
-    const onExecute = vi.fn();
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: { name: 'TestWizard', class: { name: 'Wizard' }, level: 5 }, campaignName: 'TestCampaign', onExecute: onExecute })
+      useSpellMetamagicFlow({ playerStats: { name: 'TestWizard', class: { name: 'Wizard' }, level: 5 }, campaignName: 'TestCampaign', onExecute: vi.fn() })
     );
-
     act(() => {
       result.current.gateMetamagic(makeSpell({ name: 'Shapechange', level: 9 }));
     });
@@ -354,196 +267,38 @@ describe('useSpellMetamagicFlow — Sorcerer-only gates', () => {
   });
 });
 
-// ── Animal Shapes gate ────────────────────────────────────────────────────────
-
 describe('useSpellMetamagicFlow — Animal Shapes gate', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-  });
+  it('filters targets to selected allies with a CR 4 cap', () => {
+    getAllyList.mockReturnValueOnce(['Goblin B']);
+    const pending = gate({ name: 'Animal Shapes', level: 8 }, 'pendingAnimalShapes');
 
-  it('sets pending animalShapes filtering by allies', () => {
-    getAllyList.mockReturnValueOnce(['goblin a']);
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Animal Shapes',
-      { level: 8 },
-    );
-
-    const pending = result.current.pendingAnimalShapes;
     expect(pending).not.toBeNull();
     expect(pending.maxCR).toBe(4);
-    expect(pending.creatureTargets).toContain('Goblin A');
+    expect(pending.creatureTargets).toEqual(['Goblin B']);
   });
 });
 
-// ── Protection from Energy gate ───────────────────────────────────────────────
+// ── Damage-type payloads ───────────────────────────────────────────────────────
 
 describe('useSpellMetamagicFlow — Protection from Energy gate', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
+  it('prefers damageTypes from the spell automation', () => {
+    const pending = gate({ name: 'Protection from Energy', level: 3, automation: { damageTypes: ['Psychic'] } }, 'pendingProtectionFromEnergy');
+
+    expect(pending).not.toBeNull();
+    expect(pending.damageTypes).toEqual(['Psychic']);
   });
 
-  it('sets pending protectionFromEnergy with damageTypes from spell automation', () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Protection from Energy',
-      { level: 3 },
-    );
+  it('uses the default 5-type list when spell has no automation', () => {
+    const pending = gate({ name: 'Protection from Energy', level: 3, automation: null }, 'pendingProtectionFromEnergy');
 
-    const pending = result.current.pendingProtectionFromEnergy;
-    expect(pending).not.toBeNull();
-    expect(Array.isArray(pending.damageTypes)).toBe(true);
-    expect(pending.damageTypes.length).toBeGreaterThan(0);
-  });
-
-  it('uses default damageTypes when spell has no automation', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Protection from Energy', level: 3, automation: null }));
-    });
-
-    const pending = result.current.pendingProtectionFromEnergy;
-    expect(pending).not.toBeNull();
     expect(pending.damageTypes).toEqual(['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder']);
   });
 });
 
-// ── Revivify gate (no creatures) ─────────────────────────────────────────────
-
-describe('useSpellMetamagicFlow — Revivify gate with no creatures', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-  });
-
-  it('returns early without setting pending if no creatures', () => {
-    getCombatSummary.mockReturnValueOnce({ creatures: [] });
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Revivify', level: 5 }));
-    });
-
-    expect(result.current.pendingRevivify).toBeNull();
-  });
-});
-
-// ── Shield of Faith gate (not gated) ──────────────────────────────────────────
-
-describe('useSpellMetamagicFlow — Shield of Faith gate', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-  });
-
-  it('does not gate Shield of Faith (falls through to Sorcerer flow)', () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Shield of Faith',
-      { level: 1 },
-    );
-
-    expect(result.current.pendingShieldOfFaith).toBeNull();
-    const metamagic = result.current.pendingMetamagic;
-    expect(metamagic).not.toBeNull();
-    expect(metamagic.spellName).toBe('Shield of Faith');
-  });
-});
-
-// ── Caster-included spells always include the caster ──────────────────────────
-
-describe('useSpellMetamagicFlow — caster-included spells always include the caster', () => {
-  const casterIncludedSpells = [
-    { name: 'Foresight', level: 9, pendingKey: 'pendingForesight' },
-    { name: 'Sanctuary', level: 1, pendingKey: 'pendingSanctuary' },
-    { name: 'Protection from Evil and Good', level: 1, pendingKey: 'pendingProtectionFromEvilAndGood' },
-    { name: 'Enhance Ability', level: 2, pendingKey: 'pendingEnhanceAbility' },
-  ];
-
-  for (const spell of casterIncludedSpells) {
-    describe(spell.name, () => {
-      beforeEach(() => {
-        vi.clearAllMocks();
-        getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-      });
-
-      it('includes the caster even when combat has no creatures', () => {
-        getCombatSummary.mockReturnValueOnce({ creatures: [] });
-        const { result } = renderHook(() =>
-          useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-        );
-
-        act(() => {
-          result.current.gateMetamagic(makeSpell({ name: spell.name, level: spell.level }));
-        });
-
-        const pending = result.current[spell.pendingKey];
-        expect(pending).not.toBeNull();
-        expect(pending.creatureTargets).toContain('TestSorcerer');
-      });
-    });
-  }
-});
-
-// ── Magic Missile missile count ───────────────────────────────────────────────
-
-describe('useSpellMetamagicFlow — Magic Missile missile count', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-  });
-
-  it('calculates totalMissiles based on spell level (3 + level - 1)', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Magic Missile', level: 1 }));
-    });
-
-    expect(result.current.pendingMagicMissile.totalMissiles).toBe(3);
-  });
-
-  it('calculates totalMissiles for upcast (level 3 = 5 missiles)', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Magic Missile', level: 3 }));
-    });
-
-    expect(result.current.pendingMagicMissile.totalMissiles).toBe(5);
-  });
-});
-
-// ── Resistance damage types ──────────────────────────────────────────────────
-
 describe('useSpellMetamagicFlow — Resistance damage types', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-  });
+  it('carries all 11 standard damage types', () => {
+    const pending = gate({ name: 'Resistance', level: 0 }, 'pendingResistance');
 
-  it('includes all 11 standard damage types', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Resistance', level: 0 }));
-    });
-
-    const pending = result.current.pendingResistance;
     expect(pending.damageTypes).toEqual([
       'Acid', 'Bludgeoning', 'Cold', 'Fire', 'Lightning',
       'Necrotic', 'Piercing', 'Poison', 'Radiant', 'Slashing', 'Thunder',
@@ -551,25 +306,32 @@ describe('useSpellMetamagicFlow — Resistance damage types', () => {
   });
 });
 
-// ── SP-008: Aura of Life party-membership gate ─────────────────────────────
+describe('useSpellMetamagicFlow — Magic Missile dart count', () => {
+  it('scales with effective slot level: 3 + (level - 1)', () => {
+    expect(gate({ name: 'Magic Missile', level: 1 }).pendingMagicMissile.totalMissiles).toBe(3);
+    expect(gate({ name: 'Magic Missile', level: 3 }).pendingMagicMissile.totalMissiles).toBe(5);
+  });
+});
+
+// ── Ungated fallthrough ────────────────────────────────────────────────────────
+
+describe('useSpellMetamagicFlow — ungated spells fall through to metamagic', () => {
+  it('Shield of Faith skips the gate map and opens pendingMetamagic', () => {
+    const { pendingShieldOfFaith, pendingMetamagic } = gate({ name: 'Shield of Faith', level: 1 });
+
+    expect(pendingShieldOfFaith).toBeNull();
+    expect(pendingMetamagic).not.toBeNull();
+    expect(pendingMetamagic.spellName).toBe('Shield of Faith');
+  });
+});
+
+// ── Aura of Life party gate (SP-008) — last block: pins persistent mocks ─────
 
 describe('useSpellMetamagicFlow — Aura of Life party gate (SP-008)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-  });
-
   it('opens the picker with selected allies and no target cap', () => {
     getRuntimeValue.mockImplementation((name, key) => (key === 'selectedAllies' ? ['Goblin B', 'Goblin C'] : 3));
+    const pending = gate({ name: 'Aura of Life', level: 4 }, 'pendingAuraOfLife');
 
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Aura of Life', level: 4 }));
-    });
-
-    const pending = result.current.pendingAuraOfLife;
     expect(pending).not.toBeNull();
     expect(pending.creatureTargets).toEqual(['Goblin B', 'Goblin C']);
     expect(pending).not.toHaveProperty('maxTargets');
@@ -584,15 +346,9 @@ describe('useSpellMetamagicFlow — Aura of Life party gate (SP-008)', () => {
       ],
     }));
     getRuntimeValue.mockReturnValue(null);
+    const pending = gate({ name: 'Aura of Life', level: 4 }, 'pendingAuraOfLife');
 
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Aura of Life', level: 4 }));
-    });
-
-    expect(result.current.pendingAuraOfLife.creatureTargets).toEqual(['TestSorcerer', 'AasimarTest']);
+    expect(pending.creatureTargets).toEqual(['TestSorcerer', 'AasimarTest']);
   });
 
   it('stays closed when no party membership exists on the board', () => {
@@ -604,14 +360,6 @@ describe('useSpellMetamagicFlow — Aura of Life party gate (SP-008)', () => {
       ],
     }));
     getRuntimeValue.mockImplementation((name, key) => (key === 'selectedAllies' ? null : 3));
-
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Aura of Life', level: 4 }));
-    });
-
-    expect(result.current.pendingAuraOfLife).toBeFalsy();
+    expect(gate({ name: 'Aura of Life', level: 4 }).pendingAuraOfLife).toBeFalsy();
   });
 });

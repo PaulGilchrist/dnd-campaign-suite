@@ -1,3 +1,14 @@
+// @maintained-by-ai
+// Generic temp_buff tracked-uses lane of buffHandler.handle: the
+// gateTrackedBuffUses / gateBuffUses / consumeBuffUse / resolveBuffUsesMax
+// contract (Psychic Veil once-per-long-rest gate, psionic-energy-die escape
+// hatch, OFF-leg no-refund, no-uses negative case, multi-use resolution).
+// Fully mocked and deterministic. Adrenaline Rush's parallel uses lane
+// (resolveAdrenalineUsesMax via the bonus_action_dash delegate) and the
+// no-uses long_rest popup are pinned in buffHandler.basic-effects.test.js;
+// invisible / see_invisibility / haste side-effect copy lives in
+// buffHandler.advanced-effects.test.js; the flight-lane refusal copy lives
+// in buffHandler.draconic-flight.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/buffToggle.js', () => ({
@@ -94,7 +105,7 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
     });
   });
 
-  it('consumes the tracked use on activation and stores psychicveilUses 0', async () => {
+  it('consumes the tracked use on activation, stores psychicveilUses 0, and logs the activation', async () => {
     const ps = makeSoulknife();
     const action = makePsychicVeil();
 
@@ -109,6 +120,15 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
     expect(buffToggle.toggleBuff).toHaveBeenCalled();
     expect(result.payload.description).toContain('activated on yourself (1_hour)');
     expect(result.payload.description).toContain('0 uses remaining');
+    expect(logService.addEntry).toHaveBeenCalledWith(
+      campaignName,
+      expect.objectContaining({
+        type: 'ability_use',
+        characterName: ps.name,
+        abilityName: 'Psychic Veil',
+        description: expect.stringContaining('activated Psychic Veil (0 uses remaining)'),
+      }),
+    );
   });
 
   it('refuses re-activation at 0 uses with gate popup and no buff write', async () => {
@@ -181,23 +201,6 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
     );
   });
 
-  it('logs ability_use on activation', async () => {
-    const ps = makeSoulknife();
-    const action = makePsychicVeil();
-
-    await handle(action, ps, campaignName, null);
-
-    expect(logService.addEntry).toHaveBeenCalledWith(
-      campaignName,
-      expect.objectContaining({
-        type: 'ability_use',
-        characterName: ps.name,
-        abilityName: 'Psychic Veil',
-        description: expect.stringContaining('activated Psychic Veil'),
-      }),
-    );
-  });
-
   it('leaves temp_buff features WITHOUT uses untouched (Invisibility regression guard)', async () => {
     const ps = makeSoulknife();
     const action = {
@@ -217,11 +220,19 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
     );
   });
 
-  it('supports multi-use numeric and proficiency_bonus uses declarations', async () => {
+  // resolveBuffUsesMax branches in the generic tracked-uses lane. The
+  // Adrenaline Rush parallel (resolveAdrenalineUsesMax via the
+  // bonus_action_dash delegate) is pinned in buffHandler.basic-effects.test.js —
+  // this lane is generic temp_buff and stays distinct from those pins.
+  it.each([
+    ['numeric string uses', { uses: '2' }, 1],
+    ['numeric uses', { uses: 3 }, 2],
+    ['proficiency_bonus uses', { uses: 'proficiency_bonus' }, 1],
+  ])('resolves max uses from %s and consumes one', async (_label, automation, expectedWritten) => {
     const ps = makeSoulknife({ proficiency: 2 });
     const action = {
       name: 'Multi Buff',
-      automation: { type: 'temp_buff', effect: 'some_effect', duration: '1_minute', uses: 'proficiency_bonus' },
+      automation: { type: 'temp_buff', effect: 'some_effect', duration: '1_minute', ...automation },
     };
 
     const result = await handle(action, ps, campaignName, null);
@@ -229,9 +240,9 @@ describe('buffHandler.handle - Psychic Veil once-per-long-rest gate', () => {
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
       ps.name,
       'multibuffUses',
-      1,
+      expectedWritten,
       campaignName,
     );
-    expect(result.payload.description).toContain('1 use remaining');
+    expect(result.payload.description).toContain(`${expectedWritten} use${expectedWritten !== 1 ? 's' : ''} remaining`);
   });
 });

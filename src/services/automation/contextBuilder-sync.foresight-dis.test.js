@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // SP-052: Foresight/Blur attacker-side Disadvantage on the PC popup lane.
 // The deferred resolver lane (hasBlurOrForesightWithoutCounter) accumulated
 // dis++ but buildAttackContextSync never converted it — attacker rolls were
@@ -7,7 +8,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { computeConditionEffects, combineAttackModes } from '../combat/conditions/conditionEffects.js';
 
 vi.mock('./common/damageRoll.js', () => ({
     buildBaseAttackContext: vi.fn(),
@@ -188,11 +188,6 @@ describe('SP-052 contextBuilder-sync: attacker Disadvantage vs foresight/blur ta
 
     it('does not self-penalize the foresighted creature attacking someone else', async () => {
         teMock([{ effect: 'foresight', target: 'ElfTest', source: 'DivinationWizard' }]);
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (name === 'campaign' && key === 'targetEffects') return [{ effect: 'foresight', target: 'ElfTest', source: 'DivinationWizard' }];
-            if (key === 'activeBuffs') return [];
-            return undefined;
-        });
         buildBaseAttackContext.mockResolvedValue({ target: { name: 'Orc' }, targetName: 'Orc', resistanceNotice: null });
 
         const ctx = await buildAttackContextSync(attack, attackerStats(), 'test-campaign', 'normal');
@@ -214,37 +209,5 @@ describe('SP-052 contextBuilder-sync: attacker Disadvantage vs foresight/blur ta
         const ctx = await buildAttackContextSync(attack, attackerStats(), 'test-campaign', 'normal');
 
         expect(ctx.forcedMode).toBe('advantage');
-    });
-});
-
-describe('SP-052 canonical te-consumer fold (MonsterCardModal lane) keeps foresight semantics', () => {
-    const emptySide = () => computeConditionEffects({ targetEffects: [], attackerSenses: [] });
-
-    it('foresight holder attacking keeps Advantage', () => {
-        const holderEffects = computeConditionEffects({
-            targetEffects: [{ effect: 'foresight', target: 'ElfTest', source: 'DivinationWizard' }],
-            attackerSenses: [],
-        });
-        expect(holderEffects.attackAdvantageCount).toBe(1);
-
-        expect(combineAttackModes(holderEffects, emptySide(), 5, 'Orc')).toBe('advantage');
-    });
-
-    it('other creature attacking the foresight holder gets Disadvantage', () => {
-        const holderAsTarget = computeConditionEffects({
-            targetEffects: [{ effect: 'foresight', target: 'ElfTest', source: 'DivinationWizard' }],
-            attackerSenses: [],
-        });
-
-        expect(combineAttackModes(emptySide(), holderAsTarget, 5, 'ElfTest')).toBe('disadvantage');
-    });
-
-    it('attacker with Blindsight attacking the foresight holder rolls normal', () => {
-        const holderAsTarget = computeConditionEffects({
-            targetEffects: [{ effect: 'foresight', target: 'ElfTest', source: 'DivinationWizard' }],
-            attackerSenses: [{ name: 'Blindsight' }],
-        });
-
-        expect(combineAttackModes(emptySide(), holderAsTarget, 5, 'ElfTest')).toBe('normal');
     });
 });

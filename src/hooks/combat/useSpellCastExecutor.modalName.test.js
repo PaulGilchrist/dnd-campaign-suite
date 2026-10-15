@@ -1,3 +1,8 @@
+// @maintained-by-ai: 2026-10-14
+// Owns modalName field-derivation semantics only: how a bare (non-automationPopup)
+// modalName result is dispatched, including the unknown-name guard. The full
+// modalName→modal-state key map lives in useSpellCastExecutor.modalRouting.test.js;
+// automationPopup precedence lives in useSpellCastExecutor.automationPopup.test.js.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 vi.mock('../../services/rules/spells/spellCastService.js', () => ({
@@ -8,19 +13,11 @@ import { executeSpellCast } from '../../services/rules/spells/spellCastService.j
 import { renderHook, act } from '@testing-library/react';
 import { useSpellCastExecutor } from './useSpellCastExecutor.js';
 
-function makePlayerStats(overrides = {}) {
-  return { name: 'TestCaster', ...overrides };
-}
-
-function makeSpell(overrides = {}) {
-  return { name: 'Fireball', ...overrides };
-}
-
 function makeProps(overrides = {}) {
   return {
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
-    playerStats: makePlayerStats(),
+    playerStats: { name: 'TestCaster' },
     getTargetInfo: vi.fn(),
     campaignName: 'TestCampaign',
     mapName: 'TestMap',
@@ -31,69 +28,30 @@ function makeProps(overrides = {}) {
   };
 }
 
-describe('useSpellCastExecutor', () => {
+// Cast Fireball with a stubbed bare-modalName result; returns the props plus
+// setModalState so tests can assert dispatch without repeating the seam setup.
+async function castWithModalNameResult(result, propOverrides = {}) {
+  executeSpellCast.mockResolvedValue(result);
+  const setModalState = propOverrides.setModalState ?? vi.fn();
+  const props = makeProps({ ...propOverrides, setModalState });
+  const { result: hook } = renderHook(() => useSpellCastExecutor(props));
+  await act(async () => {
+    await hook.current.castAction({ name: 'Fireball' }, {});
+  });
+  return { props, setModalState };
+}
+
+describe('useSpellCastExecutor — bare modalName derivation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('castAction — bare modalName (non-automationPopup) handling', () => {
-    it('calls setModalState with correct mapping when result has modalName and setModalState is provided', async () => {
-      const props = makeProps();
-      const setModalState = vi.fn();
-
-      executeSpellCast.mockResolvedValue({
-        modalName: 'massHealTarget',
-        payload: { action: { name: 'Mass Heal' } },
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor({ ...props, setModalState })
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(setModalState).toHaveBeenCalledWith({ massHealModal: { action: { name: 'Mass Heal' } } });
-      expect(props.setPopupHtml).not.toHaveBeenCalled();
-    });
-
-    it('falls back to setPopupHtml when result has modalName but setModalState is not provided', async () => {
-      const props = makeProps();
-
-      executeSpellCast.mockResolvedValue({
-        modalName: 'fear',
-        payload: { action: { name: 'Fear' } },
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(props)
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(props.setPopupHtml).toHaveBeenCalledWith({ action: { name: 'Fear' } });
-      expect(props.setPopupHtml).toHaveBeenCalledTimes(1);
-    });
-
-    it('logs console.error for unknown modalName when setModalState is provided', async () => {
-      const props = makeProps();
-      const setModalState = vi.fn();
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
-
-      executeSpellCast.mockResolvedValue({
+  it('logs console.error and routes nowhere when modalName is missing from the key map', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
+    try {
+      const { props, setModalState } = await castWithModalNameResult({
         modalName: 'unknownModalType',
         payload: { action: { name: 'Unknown' } },
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor({ ...props, setModalState })
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
       });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -101,112 +59,23 @@ describe('useSpellCastExecutor', () => {
       );
       expect(setModalState).not.toHaveBeenCalled();
       expect(props.setPopupHtml).not.toHaveBeenCalled();
-
+    } finally {
       consoleErrorSpy.mockRestore();
-    });
+    }
+  });
 
-    it('unknown modalName without setModalState falls back to setPopupHtml (no error logged)', async () => {
-      const props = makeProps();
-
-      executeSpellCast.mockResolvedValue({
-        modalName: 'totallyUnknown',
-        payload: { data: 'unknown payload' },
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(props)
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      // Without setModalState, the code path goes directly to setPopupHtml(result.payload)
-      // without calling handleModalResult, so unknown modalNames are silently passed through
-      expect(props.setPopupHtml).toHaveBeenCalledWith({ data: 'unknown payload' });
-    });
-
-    it('automationPopup takes priority over bare modalName in result', async () => {
-      const props = makeProps();
-      const setModalState = vi.fn();
-
-      executeSpellCast.mockResolvedValue({
-        automationPopup: { type: 'popup', payload: '<div>Automation popup</div>' },
+  it('stays silent on the known-name side of the guard — known modalName never logs the unknown-name error', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
+    try {
+      const { setModalState } = await castWithModalNameResult({
         modalName: 'massHealTarget',
         payload: { action: { name: 'Mass Heal' } },
       });
 
-      const { result } = renderHook(() =>
-        useSpellCastExecutor({ ...props, setModalState })
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      // automationPopup path fires first, so setPopupHtml is called with the automation payload
-      expect(props.setPopupHtml).toHaveBeenCalledWith('<div>Automation popup</div>');
-      expect(setModalState).not.toHaveBeenCalled();
-    });
-
-    it('bare modalName payload is preserved through to setModalState without transformation', async () => {
-      const props = makeProps();
-      const setModalState = vi.fn();
-      const complexPayload = { targets: ['A', 'B', 'C'], spellLevel: 3, customFlag: true };
-
-      executeSpellCast.mockResolvedValue({
-        modalName: 'massCureWoundsTarget',
-        payload: complexPayload,
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor({ ...props, setModalState })
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(setModalState).toHaveBeenCalledWith({ massCureWoundsModal: complexPayload });
-    });
-
-    it('bare modalName with empty payload object routes correctly', async () => {
-      const props = makeProps();
-      const setModalState = vi.fn();
-
-      executeSpellCast.mockResolvedValue({
-        modalName: 'calmEmotions',
-        payload: {},
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor({ ...props, setModalState })
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(setModalState).toHaveBeenCalledWith({ calmEmotionsModal: {} });
-    });
-
-    it('bare modalName without payload field routes correctly with undefined', async () => {
-      const props = makeProps();
-      const setModalState = vi.fn();
-
-      executeSpellCast.mockResolvedValue({
-        modalName: 'hypnoticPattern',
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor({ ...props, setModalState })
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(setModalState).toHaveBeenCalledWith({ hypnoticPatternModal: undefined });
-    });
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(setModalState).toHaveBeenCalledWith({ massHealModal: { action: { name: 'Mass Heal' } } });
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });

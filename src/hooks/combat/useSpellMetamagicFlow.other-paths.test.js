@@ -1,12 +1,21 @@
+// @maintained-by-ai: 2026-10-15
+// useSpellMetamagicFlow lane — ONLY the ownerless gateMetamagic branches.
+// Ownership map of gateMetamagic (useSpellMetamagicGates.js / spellGates.js):
+//   - Sorcerer queue + resolveCantripAutoLevel tables/threshold → .gate-sorcerer
+//   - registry breadth incl. Beacon of Hope & Aura of Vitality open → .gate
+//   - non-Sorcerer cantrip material-consume + no-damage fallthrough → .special-paths
+//   - Maze / Warding Bond refusals, Power Word modals → dedicated gates lanes
+// This file keeps what none of them pin:
+//   1. gateBeaconOfHope characters-list fallback when combat summary is empty
+//   2. gateAuraOfVitality metaCtx.freeCastUsed → isFreeCast stamp
+//   3. handleNonSorcererCast auto-level lane (highest-applicable pick + baseLevel
+//      stamp reaching onExecute — sorcerer lane never executes directly)
+//   4. handleNonSorcererCast oldConcentrationSpell branch (cast the ORIGINAL spell
+//      without a prepareSpellCast slot payment)
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
-import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js';
-
-// ── Minimal mocks ──────────────────────────────────────────────────────────────
-// This test file exercises the gateMetamagic branching logic (non-Sorcerer
-// cantrip auto-leveling, Beacon of Hope fallback, Aura of Vitality freeCast).
-// We only mock the modules those specific code paths read from.
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
@@ -36,8 +45,9 @@ vi.mock('../../services/rules/spells/spellPreparationService.js', () => ({
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
-  // CLA-033: fired by the gated confirm lane's rider seam in useConfirmableFlow.
+  // Fired by the gated confirm lane's rider seam in useConfirmableFlow — inert here.
   triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
+  triggerBewitchingMagic: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({
@@ -51,15 +61,12 @@ vi.mock('../../services/encounters/combatData.js', () => ({
       { name: 'Goblin B' },
     ],
   })),
+  loadCombatSummary: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => 3),
   setRuntimeValue: vi.fn(),
-}));
-
-vi.mock('../useAllySelection.js', () => ({
-  getAllyList: vi.fn((casterName) => [casterName.toLowerCase()]),
 }));
 
 global.fetch = vi.fn(() =>
@@ -71,30 +78,11 @@ global.fetch = vi.fn(() =>
   })
 );
 
-Object.defineProperty(window, 'dispatchEvent', {
-  value: vi.fn(),
-  writable: true,
+// ── Helpers ──────────────────────────────────────────────────────────────────────
+
+beforeEach(() => {
+  vi.clearAllMocks(); // factory implementations survive clear — defaults hold
 });
-
-// ── Factories ──────────────────────────────────────────────────────────────────
-
-function makeSorcererStats(overrides = {}) {
-  return {
-    name: 'TestSorcerer',
-    class: { name: 'Sorcerer' },
-    level: 5,
-    ...overrides,
-  };
-}
-
-function makeNonSorcererStats(overrides = {}) {
-  return {
-    name: 'TestWizard',
-    class: { name: 'Wizard' },
-    level: 5,
-    ...overrides,
-  };
-}
 
 function makeSpell(overrides = {}) {
   return {
@@ -106,218 +94,99 @@ function makeSpell(overrides = {}) {
   };
 }
 
-// ── Beacon of Hope: creatureTargets fallback to characters list ────────────────
+// Render the flow for a class and run one gateMetamagic, returning the hook
+// result plus the onExecute spy.
+function gateAs(class_, statsOverrides = {}, spell, metaCtx = {}, hookOverrides = {}) {
+  const onExecute = vi.fn();
+  const { result } = renderHook(() =>
+    useSpellMetamagicFlow({
+      playerStats: { name: class_ === 'Sorcerer' ? 'TestSorcerer' : 'TestWizard', class: { name: class_ }, level: 5, ...statsOverrides },
+      campaignName: 'TestCampaign',
+      onExecute,
+      ...hookOverrides,
+    })
+  );
+  act(() => {
+    result.current.gateMetamagic(spell, metaCtx);
+  });
+  return { result, onExecute };
+}
+
+// ── 1. Beacon of Hope: creatureTargets fallback to characters list ─────────────
 
 describe('useSpellMetamagicFlow — Beacon of Hope creatureTargets fallback', () => {
-  let combatDataModule;
+  it('falls back to the characters roster when combat summary has no creatures', async () => {
+    const { getCombatSummary } = await import('../../services/encounters/combatData.js');
+    getCombatSummary.mockReturnValueOnce({ creatures: [] });
 
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-    combatDataModule = await import('../../services/encounters/combatData.js');
-    combatDataModule.getCombatSummary.mockReturnValue({
-      creatures: [
-        { name: 'Goblin A' },
-        { name: 'Goblin B' },
-      ],
-    });
-  });
-
-  it('uses characters list as creatureTargets when combat summary has no creatures', async () => {
-    combatDataModule.getCombatSummary.mockReturnValue({ creatures: [] });
-
-    const characters = [
-      { name: 'Character A' },
-      { name: 'Character B' },
-    ];
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: characters })
+    const { result } = gateAs(
+      'Sorcerer',
+      {},
+      makeSpell({ name: 'Beacon of Hope', level: 3 }),
+      {},
+      { setSecondaryTargetModal: null, characters: [{ name: 'Character A' }, { name: 'Character B' }] }
     );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Beacon of Hope', level: 3 }));
-    });
 
     expect(result.current.pendingBeaconOfHope).not.toBeNull();
     expect(result.current.pendingBeaconOfHope.creatureTargets).toEqual(['Character A', 'Character B']);
   });
-
-  it('uses combat summary creatures as creatureTargets when available', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Beacon of Hope', level: 3 }));
-    });
-
-    expect(result.current.pendingBeaconOfHope).not.toBeNull();
-    expect(result.current.pendingBeaconOfHope.creatureTargets).toEqual(['Goblin A', 'Goblin B']);
-  });
 });
 
-// ── Aura of Vitality: freeCastUsed metadata ────────────────────────────────────
+// ── 2. Aura of Vitality: freeCastUsed stamp ─────────────────────────────────────
 
-describe('useSpellMetamagicFlow — Aura of Vitality freeCastUsed metadata', () => {
-  let combatDataModule;
-
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-    combatDataModule = await import('../../services/encounters/combatData.js');
-    combatDataModule.getCombatSummary.mockReturnValue({
-      creatures: [
-        { name: 'Goblin A' },
-        { name: 'Goblin B' },
-      ],
-    });
-  });
-
-  it('passes freeCastUsed from metaCtx into pendingAuraOfVitality', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
+describe('useSpellMetamagicFlow — Aura of Vitality freeCastUsed stamp', () => {
+  it('stamps isFreeCast from metaCtx.freeCastUsed onto pendingAuraOfVitality', () => {
+    const { result } = gateAs(
+      'Sorcerer',
+      {},
+      makeSpell({ name: 'Aura of Vitality', level: 3 }),
+      { freeCastUsed: true }
     );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Aura of Vitality', level: 3 }), { freeCastUsed: true });
-    });
 
     expect(result.current.pendingAuraOfVitality).not.toBeNull();
     expect(result.current.pendingAuraOfVitality.isFreeCast).toBe(true);
   });
 
   it('omits isFreeCast when metaCtx.freeCastUsed is falsy', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Aura of Vitality', level: 3 }));
-    });
+    const { result } = gateAs('Sorcerer', {}, makeSpell({ name: 'Aura of Vitality', level: 3 }));
 
     expect(result.current.pendingAuraOfVitality).not.toBeNull();
-    expect(result.current.pendingAuraOfVitality.isFreeCast).toBeUndefined();
+    expect(result.current.pendingAuraOfVitality).not.toHaveProperty('isFreeCast');
   });
 });
 
-// ── Non-Sorcerer cantrip auto-leveling ──────────────────────────────────────────
+// ── 3+4. Non-Sorcerer auto-level lane + concentration-preserving cast ───────────
 
-describe('useSpellMetamagicFlow — non-Sorcerer cantrip auto-leveling', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('auto-levels cantrip with damage_at_character_level and calls onExecute', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeNonSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
+describe('useSpellMetamagicFlow — non-Sorcerer cast lane', () => {
+  it('auto-levels a damage cantrip to the highest applicable level and executes directly', () => {
+    const { result, onExecute } = gateAs(
+      'Wizard',
+      { level: 17 },
+      makeSpell({ name: 'Firebolt', level: 0, damage: { damage_at_character_level: { 5: '1d10', 11: '2d10', 17: '3d10' } } })
     );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Firebolt',
-        level: 0,
-        damage: { damage_at_character_level: { 5: '1d10', 11: '2d10' } },
-      }));
-    });
 
     expect(onExecute).toHaveBeenCalledTimes(1);
     const [preparedSpell] = onExecute.mock.calls[0];
-    expect(preparedSpell.level).toBe(5);
-    expect(preparedSpell.baseLevel).toBe(0);
     expect(preparedSpell.name).toBe('Firebolt');
-    // No pendingMetamagic — non-Sorcerer bypasses metamagic UI for auto-leveled cantrips
-    expect(result.current.pendingMetamagic).toBeNull();
-  });
-
-  it('auto-levels cantrip with damage_at_slot_level and calls onExecute', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeNonSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Firebolt',
-        level: 0,
-        damage: { damage_at_slot_level: { 1: '1d10', 5: '2d10' } },
-      }));
-    });
-
-    expect(onExecute).toHaveBeenCalledTimes(1);
-    const [preparedSpell] = onExecute.mock.calls[0];
-    // Level 5 character: both slot levels 1 and 5 are applicable, picks max
-    expect(preparedSpell.level).toBe(5);
-    expect(preparedSpell.baseLevel).toBe(0);
-  });
-
-  it('auto-levels to the highest applicable character level', () => {
-    const highLevelStats = makeNonSorcererStats({ level: 17 });
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: highLevelStats, campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Firebolt',
-        level: 0,
-        damage: { damage_at_character_level: { 5: '1d10', 11: '2d10', 17: '3d10' } },
-      }));
-    });
-
-    expect(onExecute).toHaveBeenCalledTimes(1);
-    const [preparedSpell] = onExecute.mock.calls[0];
     expect(preparedSpell.level).toBe(17);
-  });
-
-  it('falls through to prepareSpellCast for cantrip without any damage property', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeNonSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    await act(async () => {
-      result.current.gateMetamagic(makeSpell({ name: 'Friends', level: 0 }));
-    });
-
-    // No damage → falls through to prepareSpellCast → onExecute is called
-    expect(onExecute).toHaveBeenCalledTimes(1);
+    expect(preparedSpell.baseLevel).toBe(0);
+    // Non-Sorcerer bypasses the metamagic UI for auto-leveled cantrips
     expect(result.current.pendingMetamagic).toBeNull();
   });
 
-  it('uses oldConcentrationSpell path for non-cantrip with oldConcentrationSpell', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeNonSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
+  it('executes the ORIGINAL spell unpaid via the oldConcentrationSpell branch', () => {
+    const { result, onExecute } = gateAs(
+      'Wizard',
+      {},
+      makeSpell({ name: 'Fireball', level: 3 }),
+      { oldConcentrationSpell: 'OldSpell' }
     );
 
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Fireball', level: 3 }), { oldConcentrationSpell: 'OldSpell' });
-    });
-
     expect(onExecute).toHaveBeenCalledTimes(1);
-    expect(result.current.pendingMetamagic).toBeNull();
-  });
-
-  it('falls through to prepareSpellCast when character level is below all damage levels', async () => {
-    const lowLevelStats = makeNonSorcererStats({ level: 4 });
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: lowLevelStats, campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    await act(async () => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Firebolt',
-        level: 0,
-        damage: { damage_at_character_level: { 5: '1d10', 11: '2d10' } },
-      }));
-    });
-
-    // No applicable damage levels → falls through to prepareSpellCast
-    expect(onExecute).toHaveBeenCalledTimes(1);
+    // Raw spell passes through — the prepareSpellCast mock yields modifiedSpell {},
+    // so a name here proves the concentration-preserving branch skipped the re-prepare.
+    const [executedSpell] = onExecute.mock.calls[0];
+    expect(executedSpell.name).toBe('Fireball');
     expect(result.current.pendingMetamagic).toBeNull();
   });
 });

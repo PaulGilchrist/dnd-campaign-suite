@@ -1,5 +1,8 @@
+// @maintained-by-ai
 // §9.4 — confirmed world proposals: narrative → log, quest_draft → CRUD lane.
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// Pure dispatcher over a stable KIND_APPLY table with service boundaries mocked;
+// deterministic contract, no churn expected when the app changes.
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../ui/logService.js', () => ({ addEntry: vi.fn(async () => ({})) }));
 vi.mock('../campaign/questsService.js', () => ({
@@ -14,19 +17,21 @@ import { applyWorldProposal } from './applyWorldProposal.js';
 const CN = 'test-campaign';
 
 beforeEach(() => { vi.clearAllMocks(); loadQuests.mockResolvedValue([]); });
-afterEach(() => vi.unstubAllGlobals());
 
 describe('applyWorldProposal', () => {
     it('recap confirms as a narrative log entry + audit', async () => {
         const r = await applyWorldProposal({ campaignName: CN, proposal: { kind: 'recap', text: 'Ash and ember…' } });
         expect(r.applied).toBe(true);
-        expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'narrative' }));
+        expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'narrative', name: 'World keeper', description: expect.stringContaining('Ash and ember…') }));
         expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'ai_world_applied', description: expect.stringContaining('applied: recap') }));
     });
 
     it('npc_dialogue logs with the speaker; rumors too', async () => {
         await applyWorldProposal({ campaignName: CN, proposal: { kind: 'npc_dialogue', npcName: 'Mira', text: 'Trouble follows you.' } });
         expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'narrative', name: 'Mira', description: expect.stringContaining('Trouble follows you.') }));
+
+        await applyWorldProposal({ campaignName: CN, proposal: { kind: 'rumor', text: 'The vault is guarded.' } });
+        expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'narrative', name: 'World keeper', description: expect.stringContaining('The vault is guarded.') }));
     });
 
     it('quest_draft rides the normal quests CRUD lane, provenance stamped', async () => {
@@ -51,8 +56,19 @@ describe('applyWorldProposal', () => {
 
     it('needs_human / garbage never write', async () => {
         expect((await applyWorldProposal({ campaignName: CN, proposal: { kind: 'needs_human', text: 'GM decides' } })).applied).toBe(false);
-        expect((await applyWorldProposal({ campaignName: CN, proposal: { kind: 'rewrite_history' } })).applied).toBe(false);
         expect((await applyWorldProposal({ campaignName: CN, proposal: null })).applied).toBe(false);
+        // Silent short-circuit: nothing written to any lane, not even the audit row.
+        expect(addEntry).not.toHaveBeenCalled();
+
+        // Unknown kinds are refused AND leave a refused audit trail.
+        const r = await applyWorldProposal({ campaignName: CN, proposal: { kind: 'rewrite_history' } });
+        expect(r.applied).toBe(false);
+        expect(r.detail).toMatch(/unknown kind .* refused/);
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({
+            type: 'ai_world_applied',
+            description: expect.stringContaining('refused: rewrite_history'),
+        }));
         expect(saveQuests).not.toHaveBeenCalled();
     });
 });

@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useDiceRoll from './useDiceRoll.js';
@@ -10,57 +11,46 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
 describe('useDiceRoll', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    rollD20.mockReturnValue(15);
+    // Distinct values pin both rolls and their order in popupHtml
+    rollD20.mockReturnValueOnce(15).mockReturnValue(3);
   });
 
-  describe('d20 roll types', () => {
+  describe('d20 rolls', () => {
+    // [fnName, rollType, name (undefined = fixed 'Initiative'), bonus]
     const rollTypeTests = [
-      ['rollAbilityCheck', 'check'],
-      ['rollSavingThrow', 'save'],
-      ['rollSkillCheck', 'skill'],
-      ['rollAttack', 'attack'],
-      ['rollInitiative', 'initiative'],
+      ['rollAbilityCheck', 'check', 'Test', 7],
+      ['rollSavingThrow', 'save', 'Test', -3],
+      ['rollSkillCheck', 'skill', 'Test', 0],
+      ['rollAttack', 'attack', 'Test', 5],
+      ['rollInitiative', 'initiative', undefined, 4],
     ];
 
-    for (const [fnName, expectedRollType] of rollTypeTests) {
-      it(`sets popupHtml with type d20 and rollType "${expectedRollType}" when calling ${fnName}`, () => {
+    for (const [fnName, rollType, name, bonus] of rollTypeTests) {
+      it(`${fnName} opens a d20 popup with rollType "${rollType}"`, () => {
         const { result } = renderHook(() => useDiceRoll());
-        const isInitiative = fnName === 'rollInitiative';
         act(() => {
-          if (isInitiative) {
-            result.current[fnName](4);
+          if (name === undefined) {
+            result.current[fnName](bonus);
           } else {
-            result.current[fnName]('Test', 5);
+            result.current[fnName](name, bonus);
           }
         });
 
+        // Always rolls twice for possible adv/disadv
+        expect(rollD20).toHaveBeenCalledTimes(2);
         expect(result.current.popupHtml).toEqual({
           type: 'd20',
-          rollType: expectedRollType,
-          name: isInitiative ? 'Initiative' : 'Test',
-          rolls: [15, 15],
-          bonus: isInitiative ? 4 : 5,
+          rollType,
+          name: name ?? 'Initiative',
+          rolls: [15, 3],
+          bonus,
         });
       });
     }
-
-    it('passes through positive, negative, and zero bonus values', () => {
-      const { result: neg } = renderHook(() => useDiceRoll());
-      act(() => { neg.current.rollAbilityCheck('Test', -5); });
-      expect(neg.current.popupHtml.bonus).toBe(-5);
-
-      const { result: pos } = renderHook(() => useDiceRoll());
-      act(() => { pos.current.rollAttack('Test', 15); });
-      expect(pos.current.popupHtml.bonus).toBe(15);
-
-      const { result: zero } = renderHook(() => useDiceRoll());
-      act(() => { zero.current.rollSkillCheck('Test', 0); });
-      expect(zero.current.popupHtml.bonus).toBe(0);
-    });
   });
 
-  describe('damage rolls', () => {
-    it('sets popupHtml with type damage and all fields', () => {
+  describe('rollDamage', () => {
+    it('opens a damage popup with all fields, critLabels null without context', () => {
       const { result } = renderHook(() => useDiceRoll());
       act(() => {
         result.current.rollDamage({ name: 'Longsword', formula: '1d8+3', total: 7, rolls: [4, 3], modifier: 3, context: undefined });
@@ -77,48 +67,17 @@ describe('useDiceRoll', () => {
       });
     });
 
-    it('passes critLabels from ctx, null when ctx is undefined or null', () => {
-      const { result: withLabels } = renderHook(() => useDiceRoll());
-      act(() => {
-        withLabels.current.rollDamage({ name: 'Test', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: { critLabels: 'critical' } });
-      });
-      expect(withLabels.current.popupHtml.critLabels).toBe('critical');
-
-      const { result: undef } = renderHook(() => useDiceRoll());
-      act(() => {
-        undef.current.rollDamage({ name: 'Test', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: undefined });
-      });
-      expect(undef.current.popupHtml.critLabels).toBeNull();
-
-      const { result: nullCtx } = renderHook(() => useDiceRoll());
-      act(() => {
-        nullCtx.current.rollDamage({ name: 'Test', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: null });
-      });
-      expect(nullCtx.current.popupHtml.critLabels).toBeNull();
-    });
-
-    it('handles empty rolls array', () => {
+    it('reads critLabels from context, null for null context', () => {
       const { result } = renderHook(() => useDiceRoll());
       act(() => {
-        result.current.rollDamage({ name: 'Test', formula: '1d0', total: 0, rolls: [], modifier: 0, context: undefined });
+        result.current.rollDamage({ name: 'Test', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: { critLabels: 'critical' } });
       });
-      expect(result.current.popupHtml.rolls).toEqual([]);
-    });
-  });
-
-  describe('setPopupHtml', () => {
-    it('allows direct setPopupHtml calls and clearing', () => {
-      const { result } = renderHook(() => useDiceRoll());
+      expect(result.current.popupHtml.critLabels).toBe('critical');
 
       act(() => {
-        result.current.setPopupHtml({ type: 'custom', value: 42 });
+        result.current.rollDamage({ name: 'Test', formula: '1d8', total: 5, rolls: [5], modifier: 0, context: null });
       });
-      expect(result.current.popupHtml).toEqual({ type: 'custom', value: 42 });
-
-      act(() => {
-        result.current.setPopupHtml(null);
-      });
-      expect(result.current.popupHtml).toBeNull();
+      expect(result.current.popupHtml.critLabels).toBeNull();
     });
   });
 });

@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// Shield of Faith handler contract: target-selection popup shape, +2 AC buff
+// registration into activeBuffs, per-target expiration + log, and the pure
+// activeBuffs predicates (isShieldOfFaithActive / getShieldOfFaithBonus,
+// including the acBonus||2 falsy fallback). Fully mocked and deterministic.
+// AC application on the attack lane lives in loggedDiceRollUtils
+// (getShieldOfFaithAcBonus); the selection popup is consumed by the spell
+// overlay / CharSheet, which mock this module rather than re-testing it.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, applyShieldOfFaith, isShieldOfFaithActive, getShieldOfFaithBonus } from '../shieldOfFaithHandler.js';
@@ -54,123 +62,76 @@ describe('shieldOfFaithHandler.handle', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         rangeValidation.rangeToFeet.mockReturnValue(60);
-    });
-
-    it('returns target selection popup with creature list from combat summary', async () => {
+        combatData.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Enemy1' }] });
         targetResolver.resolveMapPositions.mockResolvedValue(null);
+    });
+
+    it('returns the full shield_of_faith_target_selection popup', async () => {
         combatData.getCombatSummary.mockReturnValue({
-            creatures: [
-                { name: 'Ally1' },
-                { name: PLAYER_NAME },
-                { name: 'Enemy1' },
-            ],
+            creatures: [{ name: 'Ally1' }, { name: PLAYER_NAME }, { name: 'Enemy1' }],
         });
 
         const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, []);
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('shield_of_faith_target_selection');
-        expect(result.payload.name).toBe('Shield of Faith');
-        expect(result.payload.creatureTargets).toEqual(['Ally1', PLAYER_NAME, 'Enemy1']);
-        expect(result.payload.range).toBe('60 feet');
-        expect(result.payload.rangeFt).toBe(60);
-        expect(result.payload.duration).toBe('Concentration, up to 10 minutes');
-        expect(result.payload.attackerPos).toBeNull();
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'shield_of_faith_target_selection',
+                name: 'Shield of Faith',
+                creatureTargets: ['Ally1', PLAYER_NAME, 'Enemy1'],
+                range: '60 feet',
+                rangeFt: 60,
+                duration: 'Concentration, up to 10 minutes',
+                attackerPos: null,
+            },
+        });
     });
 
-    it('returns empty creature list when no combat summary', async () => {
-        combatData.getCombatSummary.mockReturnValue(null);
+    it('passes spell.range to rangeToFeet and surfaces whatever rangeToFeet produces', async () => {
+        rangeValidation.rangeToFeet.mockReturnValue(45);
 
-        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, []);
+        const result = await handle(makeAction({ spell: { range: 'Touched-by-a-glove', duration: '1 minute' } }), makePlayerStats(), CAMPAIGN_NAME, null, []);
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('shield_of_faith_target_selection');
-        expect(result.payload.creatureTargets).toEqual([]);
+        expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('Touched-by-a-glove');
+        expect(result.payload.range).toBe('Touched-by-a-glove');
+        expect(result.payload.duration).toBe('1 minute');
+        expect(result.payload.rangeFt).toBe(45);
     });
 
-    it('returns empty creature list when combat summary has no creatures', async () => {
-        combatData.getCombatSummary.mockReturnValue({});
-
-        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, []);
-
-        expect(result.payload.creatureTargets).toEqual([]);
+    it('defaults range to 60 feet and duration to Concentration when spell is missing or null', async () => {
+        for (const action of [{ name: 'Shield of Faith' }, { name: 'Shield of Faith', spell: null }]) {
+            const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null, []);
+            expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('60 feet');
+            expect(result.payload.range).toBe('60 feet');
+            expect(result.payload.duration).toBe('Concentration, up to 10 minutes');
+        }
     });
 
-    it('resolves map positions when mapName is provided', async () => {
+    it('resolves attackerPos when mapName is provided, null when unresolved', async () => {
         targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 1, gridY: 2 } });
-
-        combatData.getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'Enemy1' }],
-        });
-
         const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, 'test-map', []);
-
         expect(targetResolver.resolveMapPositions).toHaveBeenCalledWith(CAMPAIGN_NAME, 'test-map', PLAYER_NAME);
         expect(result.payload.attackerPos).toEqual({ gridX: 1, gridY: 2 });
+
+        targetResolver.resolveMapPositions.mockResolvedValue(null);
+        const unresolved = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, 'test-map', []);
+        expect(unresolved.payload.attackerPos).toBeNull();
     });
 
-    it('sets attackerPos to null when resolveMapPositions resolves to null', async () => {
-        targetResolver.resolveMapPositions.mockResolvedValue(null);
-
-        combatData.getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'Enemy1' }],
-        });
-
-        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, 'test-map', []);
-
+    it('does not resolve map positions when mapName is absent', async () => {
+        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, []);
+        expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
         expect(result.payload.attackerPos).toBeNull();
     });
 
-    it('uses spell range/duration when present, falls back to defaults when absent', async () => {
-        targetResolver.resolveMapPositions.mockResolvedValue(null);
-
-        combatData.getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'Enemy1' }],
-        });
-
-        const result = await handle(makeAction({ spell: { range: '30 feet', duration: '1 minute' } }), makePlayerStats(), CAMPAIGN_NAME, null, []);
-
-        expect(result.payload.range).toBe('30 feet');
-        expect(result.payload.duration).toBe('1 minute');
-    });
-
-    it('uses defaults when action has no spell property', async () => {
-        targetResolver.resolveMapPositions.mockResolvedValue(null);
-
-        combatData.getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'Enemy1' }],
-        });
-
-        const result = await handle({ name: 'Shield of Faith' }, makePlayerStats(), CAMPAIGN_NAME, null, []);
-
-        expect(result.payload.range).toBe('60 feet');
-        expect(result.payload.duration).toBe('Concentration, up to 10 minutes');
-    });
-
-    it('uses defaults when action.spell is null', async () => {
-        targetResolver.resolveMapPositions.mockResolvedValue(null);
-
-        combatData.getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'Enemy1' }],
-        });
-
-        const result = await handle({ name: 'Shield of Faith', spell: null }, makePlayerStats(), CAMPAIGN_NAME, null, []);
-
-        expect(result.payload.range).toBe('60 feet');
-        expect(result.payload.duration).toBe('Concentration, up to 10 minutes');
-    });
-
-    it('defaults rangeFt to 0 when range string is unparseable', async () => {
-        targetResolver.resolveMapPositions.mockResolvedValue(null);
-        rangeValidation.rangeToFeet.mockReturnValue(0);
-
-        combatData.getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'Enemy1' }],
-        });
-
-        const result = await handle(makeAction({ spell: { range: 'invalid' } }), makePlayerStats(), CAMPAIGN_NAME, null, []);
-
-        expect(result.payload.rangeFt).toBe(0);
+    it('returns empty creatureTargets when combat summary is missing or has no creatures', async () => {
+        for (const summary of [null, {}]) {
+            combatData.getCombatSummary.mockReturnValue(summary);
+            const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, []);
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('shield_of_faith_target_selection');
+            expect(result.payload.creatureTargets).toEqual([]);
+        }
     });
 });
 
@@ -182,153 +143,98 @@ describe('shieldOfFaithHandler.applyShieldOfFaith', () => {
         logService.addEntry.mockResolvedValue(undefined);
     });
 
-    it('returns null when targetNames is null', async () => {
-        const result = await applyShieldOfFaith(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, null);
-        expect(result).toBeNull();
-    });
-
-    it('returns null when targetNames is an empty array', async () => {
-        const result = await applyShieldOfFaith(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, []);
-        expect(result).toBeNull();
-    });
-
-    it('returns null when targetNames is not an array', async () => {
-        const result = await applyShieldOfFaith(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, 'Ally1');
-        expect(result).toBeNull();
-    });
-
-    it('applies shield of faith buff and sets expiration for each target', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-            if (key === 'activeBuffs') return [];
-            return null;
-        });
-
-        const result = await applyShieldOfFaith(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Ally1']);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Ally1 gained +2 AC from Shield of Faith.');
-
-        expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Ally1', 'activeBuffs', CAMPAIGN_NAME);
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Ally1',
-            'activeBuffs',
-            expect.arrayContaining([
-                expect.objectContaining({
-                    name: 'Shield of Faith',
-                    effect: 'shield_of_faith',
-                    acBonus: 2,
-                    duration: 'Concentration, up to 10 minutes',
-                    sourceCharacter: PLAYER_NAME,
-                }),
-            ]),
-            CAMPAIGN_NAME
-        );
-
-        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: 'Ally1', effects: expect.arrayContaining([
-                expect.objectContaining({
-                    type: 'remove_active_buff',
-                    buffName: 'Shield of Faith',
-                }),
-            ]), campaignName: CAMPAIGN_NAME });
-
-        expect(logService.addEntry).toHaveBeenCalledWith(
-            CAMPAIGN_NAME,
-            expect.objectContaining({
-                type: 'ability_use',
-                characterName: PLAYER_NAME,
-                abilityName: 'Shield of Faith',
-                description: `${PLAYER_NAME} cast Shield of Faith on Ally1. Target's AC increases by 2.`,
-            })
-        );
-    });
-
-    it('skips adding buff when it already exists on target but still adds expiration and log', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name) => {
-            if (name === 'Ally1') return [{ name: 'Shield of Faith', effect: 'shield_of_faith' }];
-            return [];
-        });
-
-        const result = await applyShieldOfFaith(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Ally1']);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Ally1 gained +2 AC from Shield of Faith.');
-
+    it('returns null for null, empty, or non-array targetNames with no side effects', async () => {
+        for (const targetNames of [null, [], 'Ally1']) {
+            expect(await applyShieldOfFaith(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, targetNames)).toBeNull();
+        }
+        expect(runtimeState.getRuntimeValue).not.toHaveBeenCalled();
         expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-        expect(expirations.addExpiration).toHaveBeenCalledTimes(1);
-        expect(logService.addEntry).toHaveBeenCalledTimes(1);
+        expect(expirations.addExpiration).not.toHaveBeenCalled();
+        expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
-    it('applies to new targets and skips duplicates in multi-target call', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name) => {
-            if (name === 'Ally1') return [{ name: 'Shield of Faith', effect: 'shield_of_faith' }];
-            return [];
-        });
-
-        await applyShieldOfFaith(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Ally1', 'Ally2']);
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Ally2', 'activeBuffs', expect.any(Array), CAMPAIGN_NAME);
-        expect(expirations.addExpiration).toHaveBeenCalledTimes(2);
-        expect(logService.addEntry).toHaveBeenCalledTimes(2);
-    });
-
-    it('reports correct target count in description for multiple targets', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-            if (key === 'activeBuffs') return [];
-            return null;
-        });
-
-        const result = await applyShieldOfFaith(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['A', 'B', 'C']);
-
-        expect(result.payload.description).toContain('3 targets gained +2 AC from Shield of Faith: A, B, C.');
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(3);
-    });
-
-    it('handles target with null activeBuffs value', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-            if (key === 'activeBuffs') return null;
-            return null;
-        });
+    it('registers buff, expiration, and log for a fresh single target', async () => {
+        runtimeState.getRuntimeValue.mockReturnValue([]);
 
         const result = await applyShieldOfFaith(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Ally1']);
 
-        expect(result).not.toBeNull();
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Shield of Faith',
+                description: 'Ally1 gained +2 AC from Shield of Faith.',
+            },
+        });
+        expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Ally1', 'activeBuffs', CAMPAIGN_NAME);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Ally1', 'activeBuffs', [
+            { name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 2, duration: 'Concentration, up to 10 minutes', sourceCharacter: PLAYER_NAME },
+        ], CAMPAIGN_NAME);
+        expect(expirations.addExpiration).toHaveBeenCalledWith({
+            attackerName: PLAYER_NAME,
+            targetName: 'Ally1',
+            effects: [{ type: 'remove_active_buff', buffName: 'Shield of Faith' }],
+            campaignName: CAMPAIGN_NAME,
+        });
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, {
+            type: 'ability_use',
+            characterName: PLAYER_NAME,
+            abilityName: 'Shield of Faith',
+            description: `${PLAYER_NAME} cast Shield of Faith on Ally1. Target's AC increases by 2.`,
+        });
+    });
+
+    it('applies to each fresh target, skips those already shielded, expires and logs every target', async () => {
+        runtimeState.getRuntimeValue.mockImplementation((name) =>
+            name === 'Ally1' ? [{ name: 'Shield of Faith', effect: 'shield_of_faith' }] : []);
+
+        const result = await applyShieldOfFaith(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Ally1', 'Ally2', 'Ally3']);
+
+        expect(result.payload.description).toBe('3 targets gained +2 AC from Shield of Faith: Ally1, Ally2, Ally3.');
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(2);
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith('Ally1', 'activeBuffs', expect.any(Array), CAMPAIGN_NAME);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Ally2', 'activeBuffs', expect.any(Array), CAMPAIGN_NAME);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Ally3', 'activeBuffs', expect.any(Array), CAMPAIGN_NAME);
+        expect(expirations.addExpiration).toHaveBeenCalledTimes(3);
+        expect(logService.addEntry).toHaveBeenCalledTimes(3);
+        expect(logService.addEntry.mock.calls.map(([, e]) => e.description)).toEqual([
+            `${PLAYER_NAME} cast Shield of Faith on Ally1. Target's AC increases by 2.`,
+            `${PLAYER_NAME} cast Shield of Faith on Ally2. Target's AC increases by 2.`,
+            `${PLAYER_NAME} cast Shield of Faith on Ally3. Target's AC increases by 2.`,
+        ]);
+    });
+
+    it('treats null activeBuffs as empty and still registers the buff', async () => {
+        runtimeState.getRuntimeValue.mockReturnValue(null);
+
+        const result = await applyShieldOfFaith(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Ally1']);
+
         expect(result.type).toBe('popup');
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Ally1',
-            'activeBuffs',
-            expect.arrayContaining([
-                expect.objectContaining({ name: 'Shield of Faith' }),
-            ]),
-            CAMPAIGN_NAME
-        );
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Ally1', 'activeBuffs', [
+            expect.objectContaining({ name: 'Shield of Faith', effect: 'shield_of_faith' }),
+        ], CAMPAIGN_NAME);
     });
 
-    it('uses action name in description when spell property is absent', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-            if (key === 'activeBuffs') return [];
-            return null;
-        });
+    it('preserves pre-existing buffs when appending Shield of Faith', async () => {
+        runtimeState.getRuntimeValue.mockReturnValue([{ name: 'Bless', effect: 'bless' }]);
 
-        const action = { name: 'Shield of Faith' };
+        await applyShieldOfFaith(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Ally1']);
 
-        const result = await applyShieldOfFaith(action, makePlayerStats(), CAMPAIGN_NAME, null, ['Ally1']);
-
-        expect(result.payload.description).toContain('Shield of Faith');
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Ally1', 'activeBuffs', [
+            { name: 'Bless', effect: 'bless' },
+            { name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 2, duration: 'Concentration, up to 10 minutes', sourceCharacter: PLAYER_NAME },
+        ], CAMPAIGN_NAME);
     });
 
-    it('logs with correct description for single target vs multiple', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-            if (key === 'activeBuffs') return [];
-            return null;
-        });
+    it('defaults the buff duration to Concentration and names the popup from action.name when spell is absent', async () => {
+        runtimeState.getRuntimeValue.mockReturnValue([]);
 
-        await applyShieldOfFaith(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Ally1', 'Ally2']);
+        const result = await applyShieldOfFaith({ name: 'Shield of Faith' }, makePlayerStats(), CAMPAIGN_NAME, null, ['Ally1']);
 
-        const logCalls = logService.addEntry.mock.calls;
-        expect(logCalls[0][1].description).toBe(`${PLAYER_NAME} cast Shield of Faith on Ally1. Target's AC increases by 2.`);
-        expect(logCalls[1][1].description).toBe(`${PLAYER_NAME} cast Shield of Faith on Ally2. Target's AC increases by 2.`);
+        expect(result.payload.description).toBe('Ally1 gained +2 AC from Shield of Faith.');
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Ally1', 'activeBuffs', [
+            expect.objectContaining({ duration: 'Concentration, up to 10 minutes' }),
+        ], CAMPAIGN_NAME);
     });
 });
 
@@ -339,62 +245,27 @@ describe('shieldOfFaithHandler.isShieldOfFaithActive', () => {
         vi.clearAllMocks();
     });
 
-    it('returns true when shield of faith buff is active', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 2 },
-        ]);
-
-        const result = isShieldOfFaithActive('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(true);
+    it('returns true when a Shield of Faith buff is present, alone or among others', () => {
+        for (const buffs of [
+            [{ name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 2 }],
+            [{ name: 'Mage Armor', effect: 'mage_armor' }, { name: 'Shield of Faith', effect: 'shield_of_faith' }, { name: 'Bless', effect: 'bless' }],
+        ]) {
+            runtimeState.getRuntimeValue.mockReturnValue(buffs);
+            expect(isShieldOfFaithActive('Ally1', CAMPAIGN_NAME)).toBe(true);
+        }
     });
 
-    it('returns false when no buffs stored', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(null);
-
-        const result = isShieldOfFaithActive('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns false when activeBuffs is an empty array', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([]);
-
-        const result = isShieldOfFaithActive('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns true when shield of faith is among multiple buffs', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Mage Armor', effect: 'mage_armor' },
-            { name: 'Shield of Faith', effect: 'shield_of_faith' },
-            { name: 'Bless', effect: 'bless' },
-        ]);
-
-        const result = isShieldOfFaithActive('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(true);
-    });
-
-    it('returns false when buff has same name but different effect', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Shield of Faith', effect: 'something_else' },
-        ]);
-
-        const result = isShieldOfFaithActive('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns false when buff has same effect but different name', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Some Other Buff', effect: 'shield_of_faith' },
-        ]);
-
-        const result = isShieldOfFaithActive('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(false);
+    it('returns false when name and effect do not both match, or the store is empty, null, or not an array', () => {
+        for (const stored of [
+            null,
+            [],
+            'not-an-array',
+            [{ name: 'Shield of Faith', effect: 'something_else' }],
+            [{ name: 'Some Other Buff', effect: 'shield_of_faith' }],
+        ]) {
+            runtimeState.getRuntimeValue.mockReturnValue(stored);
+            expect(isShieldOfFaithActive('Ally1', CAMPAIGN_NAME)).toBe(false);
+        }
     });
 });
 
@@ -405,81 +276,29 @@ describe('shieldOfFaithHandler.getShieldOfFaithBonus', () => {
         vi.clearAllMocks();
     });
 
-    it('returns the acBonus value when shield of faith buff is active', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 2 },
-        ]);
-
-        const result = getShieldOfFaithBonus('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(2);
+    it('returns the buff acBonus, falling back to 2 when the buff matches but acBonus is absent or zero', () => {
+        for (const [buffs, expected] of [
+            [[{ name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 2 }], 2],
+            [[{ name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 5 }], 5],
+            [[{ name: 'Mage Armor', effect: 'mage_armor' }, { name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 3 }, { name: 'Bless', effect: 'bless' }], 3],
+            [[{ name: 'Shield of Faith', effect: 'shield_of_faith' }], 2],
+            [[{ name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 0 }], 2],
+        ]) {
+            runtimeState.getRuntimeValue.mockReturnValue(buffs);
+            expect(getShieldOfFaithBonus('Ally1', CAMPAIGN_NAME)).toBe(expected);
+        }
     });
 
-    it('returns default 2 when acBonus is missing from buff', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Shield of Faith', effect: 'shield_of_faith' },
-        ]);
-
-        const result = getShieldOfFaithBonus('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(2);
-    });
-
-    it('returns 0 when no buffs stored', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(null);
-
-        const result = getShieldOfFaithBonus('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(0);
-    });
-
-    it('returns 0 when activeBuffs is an empty array', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([]);
-
-        const result = getShieldOfFaithBonus('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(0);
-    });
-
-    it('returns custom acBonus when present on the buff', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 5 },
-        ]);
-
-        const result = getShieldOfFaithBonus('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(5);
-    });
-
-    it('returns default 2 when acBonus is explicitly zero (falsy fallback)', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 0 },
-        ]);
-
-        const result = getShieldOfFaithBonus('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(2);
-    });
-
-    it('returns 0 when buff has same effect but different name', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Some Other Buff', effect: 'shield_of_faith' },
-        ]);
-
-        const result = getShieldOfFaithBonus('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(0);
-    });
-
-    it('finds shield of faith among multiple buffs and returns its bonus', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Mage Armor', effect: 'mage_armor' },
-            { name: 'Shield of Faith', effect: 'shield_of_faith', acBonus: 3 },
-            { name: 'Bless', effect: 'bless' },
-        ]);
-
-        const result = getShieldOfFaithBonus('Ally1', CAMPAIGN_NAME);
-
-        expect(result).toBe(3);
+    it('returns 0 when no Shield of Faith buff matches (empty, null, non-array, or name/effect mismatch)', () => {
+        for (const stored of [
+            null,
+            [],
+            'not-an-array',
+            [{ name: 'Shield of Faith', effect: 'something_else' }],
+            [{ name: 'Some Other Buff', effect: 'shield_of_faith' }],
+        ]) {
+            runtimeState.getRuntimeValue.mockReturnValue(stored);
+            expect(getShieldOfFaithBonus('Ally1', CAMPAIGN_NAME)).toBe(0);
+        }
     });
 });

@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 // MA-1863: Behemoth Trumpet — the granted half of the fix. The row (now
 // authored save_dc 23 + save_type Wisdom + dc_success none + save_effect
 // "can't take Reactions until the end of its next turn") rides the INLINE
@@ -77,10 +78,11 @@ const campaignName = 'test-campaign';
 const BEHEMOTH = 'Behemoth 1';
 const TARGET = 'Bandit 1';
 
-// Behemoth Trumpet (monsters.json behemoth legendary_actions[3], MA-1863 fix)
+// Behemoth Trumpet (monsters.json behemoth legendary_actions, MA-1863 fix)
 // — DC 23 Wisdom, condition-only fail face ("Costs 2 Actions" spend stays
 // advisory engine-side MA-1847 floor; this file locks the SAVE adjudication).
-const TRUMPET = monstersData.find(m => m.name === 'Behemoth').legendary_actions[3];
+const BEHEMOTH_ROW = monstersData.find(m => m.name === 'Behemoth');
+const TRUMPET = BEHEMOTH_ROW.legendary_actions.find(a => a.name.startsWith('Trumpet'));
 
 const trumpetContext = {
     saveDc: TRUMPET.save_dc,
@@ -111,6 +113,13 @@ async function resolveSave(context, success, roll) {
         logEntry: vi.fn(),
         setPopupHtml: vi.fn(),
     });
+}
+
+function expectNothingGranted() {
+    expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
+    expect(addExpiration).not.toHaveBeenCalled();
+    expect(addEntryLogs.some(e => e.type === 'condition' && e.action === 'applied')).toBe(false);
+    expect(addEntryLogs.some(e => e.automationType === 'condition_clauses_advisory')).toBe(false);
 }
 
 beforeEach(() => {
@@ -161,19 +170,23 @@ describe('MA-1863 Behemoth Trumpet inline failed-save no_reactions te', () => {
 
     it('successful save: no te, no expiry, no grant/advisory logs (clause is Failure-only)', async () => {
         await resolveSave({ ...trumpetContext }, true, 20);
-
-        expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
-        expect(addExpiration).not.toHaveBeenCalled();
-        expect(addEntryLogs.some(e => e.type === 'condition' && e.action === 'applied')).toBe(false);
-        expect(addEntryLogs.some(e => e.automationType === 'condition_clauses_advisory')).toBe(false);
+        expectNothingGranted();
     });
 
     it('byte-inert: clauseless legendary sibling (Behemoth Gore) arms nothing even on a failed save', async () => {
-        const gore = { ...trumpetContext, actionName: 'Gore', slowedClauses: null };
-        await resolveSave(gore, false, 2);
+        // Real row through the same parse seam: no save_effect → both clause
+        // parses null → grant legs never arm (byte-inert, not hand-nulled).
+        const gore = BEHEMOTH_ROW.legendary_actions.find(a => a.name === 'Gore');
+        const goreContext = {
+            ...trumpetContext,
+            actionName: gore.name,
+            slowedClauses: parseSlowedClauses(gore.save_effect),
+            conditionDurationNote: extractConditionDurationNote(gore.save_effect),
+        };
+        expect(goreContext.slowedClauses).toBeNull();
+        expect(goreContext.conditionDurationNote).toBeNull();
 
-        expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
-        expect(addExpiration).not.toHaveBeenCalled();
-        expect(addEntryLogs.some(e => e.automationType === 'condition_clauses_advisory')).toBe(false);
+        await resolveSave(goreContext, false, 2);
+        expectNothingGranted();
     });
 });

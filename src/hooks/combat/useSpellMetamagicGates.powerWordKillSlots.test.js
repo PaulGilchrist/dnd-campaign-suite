@@ -1,3 +1,14 @@
+// @maintained-by-ai: 2026-10-15
+// SP-089 Power Word Kill slot handling on the Words-of-Creation second-target gate
+// (useSpellMetamagicGates.js spendPowerWordSlot / openPowerWordTargetModal).
+// Data authority — public/data/2024/spells.json: Power Word Kill is level 9 Enchantment,
+// casting_time "Action", range "60 feet", non-concentration; the fixture below mirrors it.
+// Slot mechanics shared with Power Word Heal live in the twin
+// useSpellMetamagicGates.powerWordSlots.test.js; CLA-392 first+second-target effect
+// spread is covered where it lives, in modalSpells.powerWordSpread.test.js (including
+// the multiTarget===first-target dedupe). This file stays PWK-specific: both cast paths
+// pay the lv9 slot exactly once BEFORE onExecute, free casts pay nothing, and the
+// modal-spell handler refuses to claim non-PWK spells.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { gateMetamagic } from './useSpellMetamagicGates.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -45,7 +56,7 @@ vi.mock('./useSpellMetamagicHelpers.js', () => ({
   getCreatureTargets: vi.fn(() => ['Archmage 1', 'Wight 1']),
 }));
 
-vi.mock('../../services/rules/spells/spellCastService/execution/../../../../automation/handlers/spells/shapechangeHandler.js', () => ({
+vi.mock('../../services/automation/handlers/spells/shapechangeHandler.js', () => ({
   handle: vi.fn(),
 }));
 
@@ -64,6 +75,7 @@ function makeWizard() {
   };
 }
 
+// Fixture mirrors 2024 spells.json: Power Word Kill, lv9, Action, 60 feet.
 function makePowerWordKill(overrides = {}) {
   return {
     name: 'Power Word Kill',
@@ -97,19 +109,25 @@ function slotLogs() {
   return addEntry.mock.calls.filter(c => c[1].type === 'ability_use');
 }
 
-describe('SP-089 Power Word Kill lv9 slot consumption + effect routing', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    prepareSpellCast.mockResolvedValue({ modifiedSpell: {}, metaCtx: {}, slotConsumed: true });
-    isFreeCastAuthorized.mockReturnValue(false);
-    getCreatureTargets.mockReturnValue(['Archmage 1', 'Wight 1']);
-  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  prepareSpellCast.mockResolvedValue({ modifiedSpell: {}, metaCtx: {}, slotConsumed: true });
+  isFreeCastAuthorized.mockReturnValue(false);
+  getCreatureTargets.mockReturnValue(['Archmage 1', 'Wight 1']);
+});
 
-  it('skip path (primary PWK repro) spends the lv9 slot exactly once BEFORE onExecute', async () => {
+// Both chooser outcomes cast the spell, so both must pay the lv9 slot first.
+const CAST_PATHS = [
+  { path: 'skip', choose: modal => modal.onSkip(), expectedMetaCtx: {} },
+  { path: 'target-selected', choose: modal => modal.onTargetSelected('Wight 1'), expectedMetaCtx: { multiTarget: 'Wight 1' } },
+];
+
+describe.each(CAST_PATHS)('SP-089 Power Word Kill $path path', ({ choose, expectedMetaCtx }) => {
+  it('spends the lv9 slot exactly once BEFORE onExecute and emits one ability_use log', async () => {
     const spell = makePowerWordKill();
     const { onExecute, modal } = await gate(spell);
 
-    await modal.onSkip();
+    await choose(modal);
 
     expect(prepareSpellCast).toHaveBeenCalledTimes(1);
     expect(prepareSpellCast).toHaveBeenCalledWith(spell, {}, expect.objectContaining({
@@ -119,13 +137,7 @@ describe('SP-089 Power Word Kill lv9 slot consumption + effect routing', () => {
     }));
     expect(prepareSpellCast.mock.invocationCallOrder[0]).toBeLessThan(onExecute.mock.invocationCallOrder[0]);
     expect(onExecute).toHaveBeenCalledTimes(1);
-    expect(onExecute).toHaveBeenCalledWith(expect.objectContaining({ name: 'Power Word Kill' }), {});
-  });
-
-  it('skip path emits exactly one ability_use lv9 slot-spend log for Power Word Kill', async () => {
-    const { modal } = await gate(makePowerWordKill());
-
-    await modal.onSkip();
+    expect(onExecute).toHaveBeenCalledWith(expect.objectContaining({ name: 'Power Word Kill' }), expectedMetaCtx);
 
     const logs = slotLogs();
     expect(logs).toHaveLength(1);
@@ -138,23 +150,9 @@ describe('SP-089 Power Word Kill lv9 slot consumption + effect routing', () => {
     }));
     expect(logs[0][1].description).toContain('Expended a level 9 spell slot');
   });
+});
 
-  it('target-selected path spends the lv9 slot exactly once BEFORE onExecute with multiTarget payload', async () => {
-    const spell = makePowerWordKill();
-    const { onExecute, modal } = await gate(spell);
-
-    await modal.onTargetSelected('Wight 1');
-
-    expect(prepareSpellCast).toHaveBeenCalledTimes(1);
-    expect(prepareSpellCast).toHaveBeenCalledWith(spell, {}, expect.objectContaining({
-      playerName: 'DivinationWizard',
-      campaignName: CAMPAIGN,
-    }));
-    expect(prepareSpellCast.mock.invocationCallOrder[0]).toBeLessThan(onExecute.mock.invocationCallOrder[0]);
-    expect(onExecute).toHaveBeenCalledWith(expect.objectContaining({ name: 'Power Word Kill' }), { multiTarget: 'Wight 1' });
-    expect(slotLogs()).toHaveLength(1);
-  });
-
+describe('SP-089 Power Word Kill payment guards', () => {
   it('free cast does not emit a slot-spend log', async () => {
     prepareSpellCast.mockResolvedValue({ modifiedSpell: {}, metaCtx: {}, slotConsumed: false });
     const { onExecute, modal } = await gate(makePowerWordKill());
@@ -166,30 +164,6 @@ describe('SP-089 Power Word Kill lv9 slot consumption + effect routing', () => {
     expect(slotLogs()).toHaveLength(0);
   });
 
-  it('CLA-392: handlePowerWordKill applies to the FIRST resolved target AND the multiTarget second target', async () => {
-    const apply = vi.fn(() => Promise.resolve());
-    const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Archmage 1' }));
-
-    const result = await handlePowerWordKill({ spell: makePowerWordKill(), metaCtx: { multiTarget: 'Wight 1' }, getTargetInfo, playerStats: makeWizard(), campaignName: CAMPAIGN, applyPowerWordKillToTarget: apply });
-
-    expect(result).toEqual({ handled: true });
-    expect(getTargetInfo).toHaveBeenCalledTimes(1);
-    expect(apply).toHaveBeenCalledTimes(2);
-    expect(apply).toHaveBeenNthCalledWith(1, 'Archmage 1', expect.objectContaining({ name: 'DivinationWizard' }), CAMPAIGN, expect.anything());
-    expect(apply).toHaveBeenNthCalledWith(2, 'Wight 1', expect.objectContaining({ name: 'DivinationWizard' }), CAMPAIGN, expect.anything());
-  });
-
-  it('handlePowerWordKill routes single resolved target to applyPowerWordKillToTarget', async () => {
-    const apply = vi.fn(() => Promise.resolve());
-    const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Wight 1' }));
-
-    const result = await handlePowerWordKill({ spell: makePowerWordKill(), metaCtx: {}, getTargetInfo, playerStats: makeWizard(), campaignName: CAMPAIGN, applyPowerWordKillToTarget: apply });
-
-    expect(result).toEqual({ handled: true });
-    expect(getTargetInfo).toHaveBeenCalledTimes(1);
-    expect(apply).toHaveBeenCalledWith('Wight 1', expect.objectContaining({ name: 'DivinationWizard' }), CAMPAIGN, expect.anything());
-  });
-
   it('handlePowerWordKill ignores non-PWK spells', async () => {
     const apply = vi.fn(() => Promise.resolve());
     const getTargetInfo = vi.fn(() => Promise.resolve({ name: 'Wight 1' }));
@@ -197,6 +171,7 @@ describe('SP-089 Power Word Kill lv9 slot consumption + effect routing', () => {
     const result = await handlePowerWordKill({ spell: { name: 'Fire Bolt' }, metaCtx: {}, getTargetInfo, playerStats: makeWizard(), campaignName: CAMPAIGN, applyPowerWordKillToTarget: apply });
 
     expect(result).toEqual({ handled: false });
+    expect(getTargetInfo).not.toHaveBeenCalled();
     expect(apply).not.toHaveBeenCalled();
   });
 });

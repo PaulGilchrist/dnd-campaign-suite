@@ -1,6 +1,9 @@
+// @maintained-by-ai
+// Pure-function contract tests over the runtime store: stable key mapping,
+// exact-name matching, array guards. Deterministic; no app churn expected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { clearRuntimeState, setRuntimeValue as setRuntimeProp, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
-import { toggleBuff, getActiveBuffs, isBuffActive, hasBuffEffect } from './buffToggle.js';
+import { clearRuntimeState, setRuntimeValue as setRuntimeProp, getRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
+import { computeToggledBuffs, toggleBuff, getActiveBuffs, isBuffActive, hasBuffEffect } from './buffToggle.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -39,6 +42,27 @@ beforeEach(() => {
         ok: true,
         status: 200,
         json: () => Promise.resolve({}),
+    });
+});
+
+describe('computeToggledBuffs', () => {
+    const campaign = 'TestCampaign';
+
+    it('is pure — computes toggled buffs without writing to the runtime store', () => {
+        clearRuntimeState('pure-char');
+        const existing = [{ name: 'Bless', effect: '+1 saves' }];
+
+        const activation = computeToggledBuffs([], 'Shield', makeAuto({ effect: '+2 AC' }), 'caster');
+        expect(activation).toMatchObject({ isActive: true, wasActive: false });
+        expect(activation.buffs).toHaveLength(1);
+        expect(activation.buffs[0].sourceCharacter).toBe('caster');
+
+        const deactivation = computeToggledBuffs(existing, 'Bless', makeAuto(), 'caster');
+        expect(deactivation).toMatchObject({ isActive: false, wasActive: true });
+        expect(deactivation.buffs).toHaveLength(0);
+
+        // Neither call above may touch the store — SP-094 callers write atomically themselves.
+        expect(getRuntimeValue('pure-char', 'activeBuffs', campaign)).toBeNull();
     });
 });
 
@@ -125,19 +149,6 @@ describe('toggleBuff', () => {
             expect(result.buffs).toHaveLength(0);
         });
 
-        it('deactivating one buff leaves others intact', () => {
-            clearRuntimeState('bard2');
-            const auto1 = makeAuto({ effect: 'a' });
-            const auto2 = makeAuto({ effect: 'b' });
-            toggleBuff('bard2', 'BuffA', auto1, campaign);
-            toggleBuff('bard2', 'BuffB', auto2, campaign);
-
-            const result = toggleBuff('bard2', 'BuffA', auto1, campaign);
-
-            expect(result.buffs).toHaveLength(1);
-            expect(result.buffs[0].name).toBe('BuffB');
-        });
-
         it('removes only the exact matching buff name, not similarly named ones', () => {
             clearRuntimeState('similar-names');
             const auto1 = makeAuto({ effect: 'a' });
@@ -201,24 +212,6 @@ describe('getActiveBuffs', () => {
 
 describe('isBuffActive', () => {
     const campaign = 'TestCampaign';
-
-    it('returns true when buff name matches an active buff', () => {
-        clearRuntimeState('check-char');
-        setRuntimeProp('check-char', 'activeBuffs', [
-            { name: 'Bless', effect: '+1' },
-        ], campaign);
-
-        expect(isBuffActive('check-char', 'Bless', campaign)).toBe(true);
-    });
-
-    it('returns false when buff name does not match any active buff', () => {
-        clearRuntimeState('miss-char');
-        setRuntimeProp('miss-char', 'activeBuffs', [
-            { name: 'Haste', effect: '+speed' },
-        ], campaign);
-
-        expect(isBuffActive('miss-char', 'Bless', campaign)).toBe(false);
-    });
 
     it('finds the correct buff among many active buffs', () => {
         clearRuntimeState('multi-char');

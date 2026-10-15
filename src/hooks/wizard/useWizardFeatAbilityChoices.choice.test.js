@@ -1,3 +1,8 @@
+// @maintained-by-ai
+// Sole owner of handleFeatAbilityChoice coverage for useWizardFeatAbilityChoices.js:
+// fixed assignment, single/dual choice assignment, ability-increase recompute via
+// the choice handler, and unknown-group-id guard. All deterministic (buffs fully
+// mocked); no sibling covers these branches.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useWizardFeatAbilityChoices from './useWizardFeatAbilityChoices.js';

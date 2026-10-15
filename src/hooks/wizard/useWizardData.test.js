@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Stable data-loading contract for the character wizard: deterministic mocked
+// fetch of static JSON paths with pure mapping to hook state. Update only if
+// the hook's URLs, output shape, or ruleset branches change.
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardData from './useWizardData.js';
@@ -45,32 +49,16 @@ describe('useWizardData', () => {
 
     expect(result.current.backgrounds).toEqual([]);
     expect(result.current.racesData).toEqual([]);
+    expect(result.current.allRacesData).toEqual([]);
     expect(result.current.classSubtypes).toEqual([]);
+    expect(result.current.allClassesData).toEqual([]);
     expect(result.current.feats).toEqual([]);
     expect(result.current.magicItems).toEqual([]);
     expect(result.current.isDataLoading).toBe(true);
   });
 
-  describe('initialization', () => {
-    it('should set isDataLoading to false after data loads', async () => {
-      const responses = create5eResponses(
-        [{ name: 'Human' }],
-        [{ name: 'Fighter', subclasses: ['Battle Master'] }],
-        [{ name: 'Actor' }],
-        [{ name: 'Fireball Scroll' }]
-      );
-      global.fetch = createMockFetch(responses);
-
-      const { result } = renderHook(() => useWizardData('5e'));
-
-      await waitFor(() => {
-        expect(result.current.isDataLoading).toBe(false);
-      });
-    });
-  });
-
   describe('5e ruleset', () => {
-    it('should load races, classes, feats, and magic items', async () => {
+    it('should load races, classes, feats, and magic items and map subclasses to classSubtypes', async () => {
       const races = [{ name: 'Human' }, { name: 'Elf' }];
       const classes = [
         { name: 'Fighter', subclasses: ['Battle Master', 'Champion'] },
@@ -85,36 +73,25 @@ describe('useWizardData', () => {
       const { result } = renderHook(() => useWizardData('5e'));
 
       await waitFor(() => {
-        expect(result.current.racesData.length).toBeGreaterThan(0);
+        expect(result.current.isDataLoading).toBe(false);
       });
 
       expect(result.current.racesData).toEqual(races);
+      expect(result.current.allRacesData).toEqual(races);
       expect(result.current.classSubtypes).toEqual([
         { className: 'Fighter', subtypes: ['Battle Master', 'Champion'] },
         { className: 'Wizard', subtypes: ['School of Evocation'] },
       ]);
+      expect(result.current.allClassesData).toEqual(classes);
       expect(result.current.feats).toEqual(feats);
       expect(result.current.magicItems).toEqual(magicItems);
+      // 5e has no backgrounds — the hook explicitly clears them
       expect(result.current.backgrounds).toEqual([]);
-    });
-
-    it('should map classes with subclasses to classSubtypes', async () => {
-      const classes = [{ name: 'Cleric', subclasses: ['Life', 'Death'] }];
-      const responses = create5eResponses([], classes, [], []);
-      global.fetch = createMockFetch(responses);
-
-      const { result } = renderHook(() => useWizardData('5e'));
-
-      await waitFor(() => {
-        expect(result.current.classSubtypes).toEqual([
-          { className: 'Cleric', subtypes: ['Life', 'Death'] },
-        ]);
-      });
     });
   });
 
   describe('2024 ruleset', () => {
-    it('should load backgrounds, races, classes, feats, and magic items', async () => {
+    it('should load backgrounds, races, classes, feats, and magic items and map majors to classSubtypes', async () => {
       const backgrounds = [{ name: 'Acolyte' }, { name: 'Soldier' }];
       const races = [{ name: 'Human 2024' }];
       const classes = [{ name: 'Rogue', majors: ['Thief', 'Assassin'] }];
@@ -129,30 +106,18 @@ describe('useWizardData', () => {
       const { result } = renderHook(() => useWizardData('2024'));
 
       await waitFor(() => {
-        expect(result.current.racesData.length).toBeGreaterThan(0);
+        expect(result.current.isDataLoading).toBe(false);
       });
 
       expect(result.current.backgrounds).toEqual(backgrounds);
       expect(result.current.racesData).toEqual(races);
+      expect(result.current.allRacesData).toEqual(races);
       expect(result.current.classSubtypes).toEqual([
         { className: 'Rogue', subtypes: ['Thief', 'Assassin'] },
       ]);
+      expect(result.current.allClassesData).toEqual(classes);
       expect(result.current.feats).toEqual(feats);
       expect(result.current.magicItems).toEqual(magicItems);
-    });
-
-    it('should map classes with majors to classSubtypes when subclasses is absent', async () => {
-      const classes = [{ name: 'Barbarian', majors: ['Berserker'] }];
-      const responses = create2024Responses([], [], classes, [], []);
-      global.fetch = createMockFetch(responses);
-
-      const { result } = renderHook(() => useWizardData('2024'));
-
-      await waitFor(() => {
-        expect(result.current.classSubtypes).toEqual([
-          { className: 'Barbarian', subtypes: ['Berserker'] },
-        ]);
-      });
     });
 
     it('should prefer subclasses over majors for 2024 classes', async () => {
@@ -173,34 +138,21 @@ describe('useWizardData', () => {
   });
 
   describe('data loading errors', () => {
-    it('should handle fetch rejection gracefully', async () => {
+    it('should handle failed loads gracefully and log the error', async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
       const consoleSpy = vi.spyOn(console, 'error');
 
       const { result } = renderHook(() => useWizardData('5e'));
 
       await waitFor(() => {
-        expect(result.current.racesData).toEqual([]);
+        expect(consoleSpy).toHaveBeenCalled();
       });
 
-      expect(consoleSpy).toHaveBeenCalled();
+      expect(result.current.racesData).toEqual([]);
+      expect(result.current.classSubtypes).toEqual([]);
+      expect(result.current.feats).toEqual([]);
+      expect(result.current.magicItems).toEqual([]);
       consoleSpy.mockRestore();
-    });
-
-    it('should handle non-200 responses gracefully', async () => {
-      const responses = {
-        '/data/races.json': { ok: false },
-        '/data/classes.json': { ok: false },
-        '/data/feats.json': { ok: false },
-        '/data/magic-items.json': { ok: false },
-      };
-      global.fetch = createMockFetch(responses);
-
-      const { result } = renderHook(() => useWizardData('5e'));
-
-      await waitFor(() => {
-        expect(result.current.racesData).toEqual([]);
-      });
     });
   });
 

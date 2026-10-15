@@ -1,7 +1,13 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useActionSpellMetamagic } from './useActionSpellMetamagic.js';
-import { makeHookProps, makePlayerStats, setupBeforeEach } from './useActionSpellMetamagic.test-utils.js';
+import {
+  makeHookProps,
+  makeAttack,
+  makePlayerStats,
+  setupBeforeEach,
+} from './useActionSpellMetamagic.test-utils.js';
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
@@ -29,20 +35,40 @@ vi.mock('../../services/rules/spells/spellCastService.js', () => ({
   executeSpellCast: vi.fn(() => Promise.resolve(null)),
 }));
 
+// ── Click harness ────────────────────────────────────────────────────────────
+// Renders the hook and clicks handleActionSpellDamageClick with an AoE
+// attack; returns the captured saveAttackAoeModal (or null when no modal
+// opened) plus the props for downstream assertions.
+
+async function clickAoE(attackOverrides = {}, propsOverrides = {}) {
+  const setModalState = vi.fn();
+  const props = makeHookProps({ setModalState, ...propsOverrides });
+  const { result } = renderHook(() => useActionSpellMetamagic(props));
+  const attack = makeAttack(attackOverrides);
+
+  await act(async () => {
+    result.current.handleActionSpellDamageClick(attack);
+  });
+
+  const call = setModalState.mock.calls[0];
+  return {
+    modal: call ? call[0].saveAttackAoeModal : null,
+    opened: setModalState.mock.calls.length > 0,
+    attack,
+    props,
+    result,
+  };
+}
+
 describe('useActionSpellMetamagic - handleActionSpellDamageClick - area of effect', () => {
   setupBeforeEach();
 
-  // ── Modal structure ──────────────────────────────────────────────────────
+  // ── Modal population ─────────────────────────────────────────────────────
 
-  it('sets modalState for area of effect attacks with shape', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      spellLevel: 3,
-      castingTime: '1 Action',
+  it('opens saveAttackAoeModal fully populated from a 2024 Fireball attack', async () => {
+    // Mirrors the 2024 data shape in public/data/2024/spells.json
+    // (area_of_effect.shape) and the 5e fallback range default of 15 feet.
+    const { modal, result } = await clickAoE({
       area_of_effect: { shape: 'sphere', size: '20-foot-radius' },
       saveDc: 15,
       saveSuccess: 0.5,
@@ -50,13 +76,8 @@ describe('useActionSpellMetamagic - handleActionSpellDamageClick - area of effec
       damageType: 'fire',
       saveType: 'DEX',
       range: '150 feet',
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
     });
 
-    const modal = setModalState.mock.calls[0][0].saveAttackAoeModal;
     expect(modal.shape).toBe('sphere');
     expect(modal.range).toBe(150);
     expect(modal.damage).toBe('8d6');
@@ -66,472 +87,117 @@ describe('useActionSpellMetamagic - handleActionSpellDamageClick - area of effec
     expect(modal.dcSuccess).toBe('half');
     expect(modal.action.name).toBe('Fireball');
     expect(modal.action.automation).toEqual({});
-  });
-
-  it('includes playerStats and campaignName in the modal object', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere', size: '20-foot-radius' },
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
+    expect(modal.action.spell.name).toBe('Fireball');
+    expect(modal.playerStats).toEqual({
+      name: 'TestSorcerer',
+      class: { name: 'Sorcerer' },
+      level: 5,
     });
-
-    const modalArg = setModalState.mock.calls[0][0].saveAttackAoeModal;
-    expect(modalArg.playerStats).toEqual(props.playerStats);
-    expect(modalArg.campaignName).toBe('test-campaign');
+    expect(modal.campaignName).toBe('test-campaign');
+    // The AoE modal owns metamagic selection downstream — this lane must
+    // not queue pendingActionMetamagic (see sibling confirm/skip lanes).
+    expect(result.current.pendingActionMetamagic).toBeNull();
   });
 
-  // ── Range extraction ─────────────────────────────────────────────────────
+  // ── Range parsing ────────────────────────────────────────────────────────
 
-  it('extracts range number from range string with unit suffix', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
+  it('parses range into feet for every range form', async () => {
+    const cases = [
+      ['30 feet', 30],       // unit suffix with space
+      ['60ft', 60],          // unit suffix without space
+      ['Self', 0],           // Self is range 0
+      ['Self (10-foot radius)', 10], // number embedded in Self text
+      [60, 60],             // numeric range passes through
+      [undefined, 15],      // missing range falls back to 15 feet
+    ];
 
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'cone', size: '30-foot' },
-      range: '30 feet',
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ range: 30 }),
-      }),
-    );
+    for (const [range, expected] of cases) {
+      const { modal, opened } = await clickAoE({
+        area_of_effect: { shape: 'sphere' },
+        range,
+      });
+      expect(opened, `range ${JSON.stringify(range)}`).toBe(true);
+      expect(modal.range, `range ${JSON.stringify(range)}`).toBe(expected);
+    }
   });
 
-  it('extracts range from string without space between number and unit', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
+  // ── Save DC and DC success ───────────────────────────────────────────────
 
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere' },
-      range: '60ft',
-    };
+  it('maps saveSuccess values to dcSuccess', async () => {
+    const cases = [
+      [0, 'none'],
+      [0.5, 'half'],
+      [1, 1],               // non-half/non-none values pass through
+      [undefined, undefined],
+    ];
 
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ range: 60 }),
-      }),
-    );
+    for (const [saveSuccess, expected] of cases) {
+      const { modal } = await clickAoE({
+        area_of_effect: { shape: 'sphere' },
+        saveSuccess,
+      });
+      expect(modal.dcSuccess, `saveSuccess ${saveSuccess}`).toBe(expected);
+    }
   });
-
-  it('handles Self range as 0', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere', size: '20-foot-radius' },
-      range: 'Self',
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ range: 0 }),
-      }),
-    );
-  });
-
-  it('extracts number from Self with extra text', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere' },
-      range: 'Self (10-foot radius)',
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ range: 10 }),
-      }),
-    );
-  });
-
-  it('handles numeric range directly', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere', size: '20-foot-radius' },
-      range: 60,
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ range: 60 }),
-      }),
-    );
-  });
-
-  it('falls back to 15 when range is missing', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere' },
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ range: 15 }),
-      }),
-    );
-  });
-
-  // ── Save DC and success ──────────────────────────────────────────────────
 
   it('falls back to playerStats.spellAbilities.saveDc when attack.saveDc is missing', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({
-      setModalState,
-      playerStats: makePlayerStats({ spellAbilities: { saveDc: 17 } }),
-    });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere' },
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ saveDc: 17 }),
-      }),
+    const { modal } = await clickAoE(
+      { area_of_effect: { shape: 'sphere' } },
+      { playerStats: makePlayerStats({ spellAbilities: { saveDc: 17 } }) },
     );
+    expect(modal.saveDc).toBe(17);
   });
 
-  it('handles saveSuccess 0 as none', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
+  // ── Defaults for missing damage fields ───────────────────────────────────
 
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere' },
-      saveSuccess: 0,
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ dcSuccess: 'none' }),
-      }),
-    );
-  });
-
-  it('handles saveSuccess 0.5 as half (default)', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere' },
-      saveSuccess: 0.5,
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ dcSuccess: 'half' }),
-      }),
-    );
-  });
-
-  it('handles saveSuccess 1 as full', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere' },
-      saveSuccess: 1,
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ dcSuccess: 1 }),
-      }),
-    );
-  });
-
-  it('passes through undefined saveSuccess as undefined', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere' },
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ dcSuccess: undefined }),
-      }),
-    );
-  });
-
-  // ── Damage and save type defaults ────────────────────────────────────────
-
-  it('defaults damage to "0" when missing', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere' },
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ damage: '0' }),
-      }),
-    );
-  });
-
-  it('defaults damageType to empty string when missing', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere' },
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ damageType: '' }),
-      }),
-    );
-  });
-
-  it('defaults saveType to DEX when missing', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { shape: 'sphere' },
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ saveType: 'DEX' }),
-      }),
-    );
+  it('defaults damage, damageType, and saveType when missing', async () => {
+    const { modal } = await clickAoE({ area_of_effect: { shape: 'sphere' } });
+    expect(modal.damage).toBe('0');
+    expect(modal.damageType).toBe('');
+    expect(modal.saveType).toBe('DEX');
   });
 
   // ── Shape detection ──────────────────────────────────────────────────────
 
-  it('handles all recognized area shapes', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const shapes = ['emanation','cone','line','sphere','cube','cylinder','square','circle','wall','cage','floor','area'];
-
+  it('accepts every recognized area shape, including aoe.type fallback', async () => {
+    const shapes = ['emanation', 'cone', 'line', 'sphere', 'cube', 'cylinder', 'square', 'circle', 'wall', 'cage', 'floor', 'area'];
     for (const shape of shapes) {
-      setModalState.mockClear();
-      const attack = {
-        name: 'Fireball',
-        area_of_effect: { shape },
-      };
+      const { modal, opened } = await clickAoE({ area_of_effect: { shape } });
+      expect(opened, `shape ${shape}`).toBe(true);
+      expect(modal.shape, `shape ${shape}`).toBe(shape);
+    }
 
-      await act(async () => {
-        result.current.handleActionSpellDamageClick(attack);
-      });
+    // 5e spells.json stores the shape under area_of_effect.type
+    const viaType = await clickAoE({ area_of_effect: { type: 'cone', size: '30-foot' } });
+    expect(viaType.modal.shape).toBe('cone');
+  });
 
-      expect(setModalState).toHaveBeenCalledWith(
-        expect.objectContaining({
-          saveAttackAoeModal: expect.objectContaining({ shape }),
-        }),
-      );
+  // ── Guards: no modal, fall through to handleAttackClick ──────────────────
+
+  it('does not open a modal for unrecognized or missing area_of_effect and falls through to handleAttackClick', async () => {
+    const guards = [
+      { shape: 'unknown_shape' }, // unrecognized string
+      { shape: 1 },                // numeric shape rejected after String()
+      { type: 'pyramid' },       // unrecognized type
+      null,                        // explicit null AoE
+      undefined,                   // missing AoE
+    ];
+
+    for (const aoe of guards) {
+      const { opened, props, attack } = await clickAoE({ area_of_effect: aoe });
+      expect(opened, `aoe ${JSON.stringify(aoe)}`).toBe(false);
+      // Default sorcerer stats have no matching prepared spell, so the
+      // non-AoE attack falls back to the plain attack-click lane.
+      expect(props.handleAttackClick, `aoe ${JSON.stringify(aoe)}`).toHaveBeenCalledWith(attack);
     }
   });
 
-  it('detects shape via aoe.type when aoe.shape is missing', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      area_of_effect: { type: 'cone', size: '30-foot' },
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).toHaveBeenCalledWith(
-      expect.objectContaining({
-        saveAttackAoeModal: expect.objectContaining({ shape: 'cone' }),
-      }),
+  it('skips the modal and queues nothing when setModalState prop is null', async () => {
+    const { opened, result } = await clickAoE(
+      { area_of_effect: { shape: 'sphere', size: '20-foot-radius' } },
+      { setModalState: null },
     );
-  });
-
-  it('treats non-area shapes as area attacks when shape is unrecognized', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'TestSpell',
-      area_of_effect: { shape: 'unknown_shape' },
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).not.toHaveBeenCalled();
-  });
-
-  it('handles aoe.shape as a number by converting to string', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'TestSpell',
-      area_of_effect: { shape: 1 },
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).not.toHaveBeenCalled();
-  });
-
-  // ── Non-area and null guards ─────────────────────────────────────────────
-
-  it('does not set modalState for null area_of_effect', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Magic Missile',
-      spellLevel: 1,
-      area_of_effect: null,
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).not.toHaveBeenCalled();
-  });
-
-  it('does not set modalState for undefined area_of_effect', async () => {
-    const setModalState = vi.fn();
-    const props = makeHookProps({ setModalState });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Magic Missile',
-      spellLevel: 1,
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    expect(setModalState).not.toHaveBeenCalled();
-  });
-
-  it('does not set modalState when setModalState prop is null', async () => {
-    const props = makeHookProps({ setModalState: null });
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    const attack = {
-      name: 'Fireball',
-      spellLevel: 3,
-      area_of_effect: { shape: 'sphere', size: '20-foot-radius' },
-    };
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
+    expect(opened).toBe(false);
     expect(result.current.pendingActionMetamagic).toBeNull();
   });
 });

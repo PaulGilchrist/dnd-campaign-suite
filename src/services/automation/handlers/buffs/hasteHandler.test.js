@@ -1,3 +1,14 @@
+// @maintained-by-ai
+//
+// Unit tests for the Haste automation handler (./hasteHandler.js).
+// Fully deterministic: every external dependency (runtime store, combat
+// summary, log service, map-position resolver, range validation, expirations)
+// is mocked, so this suite pins only the handler's own stable contract:
+//   - handle()        → haste_target_selection popup payload
+//   - applyHaste()   → buff write, DEX save advantage, expiration, logging
+//   - isHasteActive()→ stored-buff lookup (name AND effect must match)
+// If the handler's output contract changes, update this file alongside it.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, applyHaste, isHasteActive } from './hasteHandler.js';
@@ -36,6 +47,14 @@ vi.mock('../../../encounters/combatData.js', () => ({
 const CAMPAIGN = 'test-campaign';
 const MAP = 'test-map';
 
+beforeEach(() => {
+    // resetAllMocks (not clearAllMocks) so mockImplementation never leaks
+    // between tests; re-stub the values the handler depends on by default.
+    vi.resetAllMocks();
+    addEntry.mockResolvedValue(undefined); // handler calls .catch() on this
+    rangeToFeet.mockReturnValue(30);
+});
+
 function makePlayerStats(overrides = {}) {
     return {
         name: 'Wizard1',
@@ -52,161 +71,127 @@ function makeAction(overrides = {}) {
     };
 }
 
+/** Fresh target: no buffs, empty conditionEffects. */
+function mockFreshTarget() {
+    getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [];
+        if (key === 'conditionEffects') return {};
+        return null;
+    });
+}
+
+function buffsWritesFor(targetName) {
+    return setRuntimeValue.mock.calls.filter(
+        (c) => c[0] === targetName && c[1] === 'activeBuffs',
+    );
+}
+
 // ─── handle ───
 
 describe('hasteHandler.handle', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        rangeToFeet.mockReturnValue(30);
-    });
-
-    it('returns target selection popup with creature list from combat summary', async () => {
+    it('returns the haste_target_selection popup payload', async () => {
         getCombatSummary.mockReturnValue({
-            creatures: [
-                { name: 'Ally1' },
-                { name: 'Wizard1' },
-                { name: 'Enemy1' },
-            ],
+            creatures: [{ name: 'Ally1' }, { name: 'Wizard1' }, { name: 'Enemy1' }],
         });
-        resolveMapPositions.mockResolvedValue(null);
 
-        const action = makeAction();
-        const result = await handle(action, makePlayerStats(), CAMPAIGN, null, []);
+        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN, null, []);
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('haste_target_selection');
-        expect(result.payload.name).toBe('Haste');
-        expect(result.payload.creatureTargets).toEqual(['Ally1', 'Wizard1', 'Enemy1']);
-        expect(result.payload.range).toBe('30 feet');
-        expect(result.payload.rangeFt).toBe(30);
-        expect(result.payload.duration).toBe('Concentration, up to 1 minute');
-        expect(result.payload.attackerPos).toBeNull();
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'haste_target_selection',
+                name: 'Haste',
+                creatureTargets: ['Ally1', 'Wizard1', 'Enemy1'],
+                range: '30 feet',
+                rangeFt: 30,
+                duration: 'Concentration, up to 1 minute',
+                attackerPos: null,
+            },
+        });
+        expect(getCombatSummary).toHaveBeenCalledWith(CAMPAIGN);
+        expect(rangeToFeet).toHaveBeenCalledWith('30 feet');
+        expect(resolveMapPositions).not.toHaveBeenCalled();
     });
 
-    it('returns empty creature list when no combat summary', async () => {
+    it('returns an empty creature list when no creatures are available', async () => {
         getCombatSummary.mockReturnValue(null);
-
-        const action = makeAction();
-        const result = await handle(action, makePlayerStats(), CAMPAIGN, null, []);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('haste_target_selection');
+        let result = await handle(makeAction(), makePlayerStats(), CAMPAIGN, null, []);
         expect(result.payload.creatureTargets).toEqual([]);
-    });
 
-    it('returns empty creature list when combat summary has no creatures', async () => {
         getCombatSummary.mockReturnValue({ creatures: [] });
-
-        const action = makeAction();
-        const result = await handle(action, makePlayerStats(), CAMPAIGN, null, []);
-
+        result = await handle(makeAction(), makePlayerStats(), CAMPAIGN, null, []);
         expect(result.payload.creatureTargets).toEqual([]);
     });
 
-    it('resolves map positions when mapName is provided', async () => {
+    it('resolves attacker position only when a map name is provided', async () => {
+        getCombatSummary.mockReturnValue({ creatures: [{ name: 'Enemy1' }] });
         resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 1, gridY: 2 } });
-        getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'Enemy1' }],
-        });
 
-        const action = makeAction();
-        const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP, []);
+        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN, MAP, []);
 
         expect(resolveMapPositions).toHaveBeenCalledWith(CAMPAIGN, MAP, 'Wizard1');
         expect(result.payload.attackerPos).toEqual({ gridX: 1, gridY: 2 });
+
+        resolveMapPositions.mockResolvedValue({});
+        const noPos = await handle(makeAction(), makePlayerStats(), CAMPAIGN, MAP, []);
+        expect(noPos.payload.attackerPos).toBeNull();
     });
 
-    it('uses spell range and duration from action when present', async () => {
-        resolveMapPositions.mockResolvedValue(null);
-        getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'Enemy1' }],
-        });
+    it('passes spell range to rangeToFeet and surfaces name/range/duration in the payload', async () => {
+        getCombatSummary.mockReturnValue({ creatures: [] });
+        rangeToFeet.mockReturnValue(60);
 
-        const action = makeAction({ spell: { range: '60 feet', duration: '10 minutes' } });
+        const action = { name: 'Custom Haste', spell: { range: '60 feet', duration: '10 minutes' } };
         const result = await handle(action, makePlayerStats(), CAMPAIGN, null, []);
 
+        expect(rangeToFeet).toHaveBeenCalledWith('60 feet');
+        expect(result.payload.name).toBe('Custom Haste');
         expect(result.payload.range).toBe('60 feet');
+        expect(result.payload.rangeFt).toBe(60);
         expect(result.payload.duration).toBe('10 minutes');
     });
 
-    it('uses defaults when action has no spell property', async () => {
-        resolveMapPositions.mockResolvedValue(null);
-        getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'Enemy1' }],
-        });
+    it('falls back to default range and duration when spell data is absent', async () => {
+        getCombatSummary.mockReturnValue({ creatures: [] });
 
-        const action = { name: 'Haste' };
-        const result = await handle(action, makePlayerStats(), CAMPAIGN, null, []);
+        const noSpell = await handle({ name: 'Haste' }, makePlayerStats(), CAMPAIGN, null, []);
+        expect(noSpell.payload.range).toBe('30 feet');
+        expect(noSpell.payload.duration).toBe('Concentration, up to 1 minute');
 
-        expect(result.payload.range).toBe('30 feet');
-        expect(result.payload.duration).toBe('Concentration, up to 1 minute');
-    });
-
-    it('uses action name in popup payload when provided', async () => {
-        resolveMapPositions.mockResolvedValue(null);
-        getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'Ally1' }],
-        });
-
-        const action = { name: 'Custom Haste', spell: { range: '30 feet' } };
-        const result = await handle(action, makePlayerStats(), CAMPAIGN, null, []);
-
-        expect(result.payload.name).toBe('Custom Haste');
-    });
-
-    it('defaults range to 30 feet when spell.range is missing', async () => {
-        resolveMapPositions.mockResolvedValue(null);
-        getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'Ally1' }],
-        });
-
-        const action = makeAction({ spell: { duration: '1 minute' } });
-        const result = await handle(action, makePlayerStats(), CAMPAIGN, null, []);
-
-        expect(result.payload.range).toBe('30 feet');
+        const partialSpell = await handle(
+            { name: 'Haste', spell: { duration: '1 minute' } },
+            makePlayerStats(), CAMPAIGN, null, [],
+        );
+        expect(partialSpell.payload.range).toBe('30 feet');
+        expect(partialSpell.payload.duration).toBe('1 minute');
     });
 });
 
 // ─── applyHaste ───
 
 describe('hasteHandler.applyHaste', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+    it('returns null without side effects for missing, empty, or non-array targetNames', async () => {
+        const action = makeAction();
+
+        expect(await applyHaste(action, makePlayerStats(), CAMPAIGN, null, null)).toBeNull();
+        expect(await applyHaste(action, makePlayerStats(), CAMPAIGN, null, [])).toBeNull();
+        expect(await applyHaste(action, makePlayerStats(), CAMPAIGN, null, 'Ally1')).toBeNull();
+
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('returns null when targetNames is null', async () => {
-        const action = makeAction();
-        const result = await applyHaste(action, makePlayerStats(), CAMPAIGN, null, null);
-        expect(result).toBeNull();
-    });
+    it('writes the Haste buff to activeBuffs and returns an info popup', async () => {
+        mockFreshTarget();
 
-    it('returns null when targetNames is an empty array', async () => {
-        const action = makeAction();
-        const result = await applyHaste(action, makePlayerStats(), CAMPAIGN, null, []);
-        expect(result).toBeNull();
-    });
+        const result = await applyHaste(
+            makeAction(), makePlayerStats({ name: 'CasterOne' }), CAMPAIGN, null, ['Ally1'],
+        );
 
-    it('returns null when targetNames is not an array', async () => {
-        const action = makeAction();
-        const result = await applyHaste(action, makePlayerStats(), CAMPAIGN, null, 'Ally1');
-        expect(result).toBeNull();
-    });
-
-    it('applies haste buff to a single target and returns info popup', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
-
-        const action = makeAction();
-        const result = await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1']);
-
-        expect(result).not.toBeNull();
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('Ally1 gained Haste');
-
+        expect(result.payload.name).toBe('Haste');
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'Ally1',
             'activeBuffs',
@@ -215,340 +200,171 @@ describe('hasteHandler.applyHaste', () => {
                     name: 'Haste',
                     effect: 'haste',
                     duration: 'Concentration, up to 1 minute',
-                    sourceCharacter: 'Wizard1',
+                    sourceCharacter: 'CasterOne',
                 }),
             ]),
             CAMPAIGN,
         );
     });
 
-    it('returns info popup with description when target already has Haste', async () => {
+    it('does not write activeBuffs when the target already has Haste', async () => {
         getRuntimeValue.mockImplementation((name, key) => {
             if (key === 'activeBuffs') return [{ name: 'Haste', effect: 'haste' }];
-            return {};
+            if (key === 'conditionEffects') return {};
+            return null;
         });
 
-        const action = makeAction();
-        const result = await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1']);
+        const result = await applyHaste(makeAction(), makePlayerStats(), CAMPAIGN, null, ['Ally1']);
 
         expect(result).not.toBeNull();
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('Ally1 gained Haste');
-
-        const buffsCalls = setRuntimeValue.mock.calls.filter(
-            (c) => c[0] === 'Ally1' && c[1] === 'activeBuffs',
-        );
-        expect(buffsCalls).toHaveLength(0);
+        expect(buffsWritesFor('Ally1')).toHaveLength(0);
     });
 
-    it('applies buff to multiple targets', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
+    it('applies the buff to every target in a multi-target cast', async () => {
+        mockFreshTarget();
 
-        const action = makeAction();
-        const result = await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1', 'Ally2', 'Ally3']);
+        const result = await applyHaste(
+            makeAction(), makePlayerStats(), CAMPAIGN, null, ['Ally1', 'Ally2', 'Ally3'],
+        );
 
-        expect(result.payload.description).toContain('3 targets gained Haste');
-        expect(setRuntimeValue).toHaveBeenCalledWith('Ally1', 'activeBuffs', expect.any(Array), CAMPAIGN);
-        expect(setRuntimeValue).toHaveBeenCalledWith('Ally2', 'activeBuffs', expect.any(Array), CAMPAIGN);
-        expect(setRuntimeValue).toHaveBeenCalledWith('Ally3', 'activeBuffs', expect.any(Array), CAMPAIGN);
+        expect(result.payload.description).toBe('3 targets gained Haste from Haste: Ally1, Ally2, Ally3.');
+        expect(buffsWritesFor('Ally1')).toHaveLength(1);
+        expect(buffsWritesFor('Ally2')).toHaveLength(1);
+        expect(buffsWritesFor('Ally3')).toHaveLength(1);
     });
 
-    it('skips targets that already have Haste in multi-target call', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') {
-                if (name === 'Ally1') return [{ name: 'Haste', effect: 'haste' }];
-                return [];
-            }
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
-
+    it('coerces missing or malformed stored activeBuffs to an empty array', async () => {
         const action = makeAction();
-        await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1', 'Ally2']);
 
-        const buffsCalls = setRuntimeValue.mock.calls.filter(
-            (c) => c[1] === 'activeBuffs',
-        );
-        expect(buffsCalls).toHaveLength(1);
-        expect(buffsCalls[0][0]).toBe('Ally2');
+        for (const stored of [null, 'not-an-array']) {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'activeBuffs') return stored;
+                if (key === 'conditionEffects') return {};
+                return null;
+            });
+            const target = stored === null ? 'Ally1' : 'Ally2';
+            const result = await applyHaste(action, makePlayerStats(), CAMPAIGN, null, [target]);
+
+            expect(result).not.toBeNull();
+            expect(buffsWritesFor(target)[0][2]).toContainEqual(
+                expect.objectContaining({ name: 'Haste', effect: 'haste' }),
+            );
+        }
     });
 
-    it('handles activeBuffs not set (null stored value)', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return null;
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
+    it('grants DEX save advantage, tolerating missing conditionEffects data', async () => {
+        const variants = [null, {}, { saveAdvantageCount: 0 }];
+        const targets = ['Ally1', 'Ally2', 'Ally3'];
 
-        const action = makeAction();
-        const result = await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1']);
+        for (let i = 0; i < variants.length; i++) {
+            const conditionEffects = variants[i];
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'activeBuffs') return [];
+                if (key === 'conditionEffects') return conditionEffects;
+                return null;
+            });
+            await applyHaste(makeAction(), makePlayerStats(), CAMPAIGN, null, [targets[i]]);
 
-        expect(result).not.toBeNull();
-        const buffsCalls = setRuntimeValue.mock.calls.filter(
-            (c) => c[0] === 'Ally1' && c[1] === 'activeBuffs',
-        );
-        expect(buffsCalls).toHaveLength(1);
-        expect(buffsCalls[0][2]).toContainEqual(
-            expect.objectContaining({ name: 'Haste', effect: 'haste' }),
-        );
-    });
-
-    it('handles activeBuffs set to non-array value (coerces to empty array)', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return 'not-an-array';
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
-
-        const action = makeAction();
-        const result = await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1']);
-
-        expect(result).not.toBeNull();
-        const buffsCalls = setRuntimeValue.mock.calls.filter(
-            (c) => c[0] === 'Ally1' && c[1] === 'activeBuffs',
-        );
-        expect(buffsCalls).toHaveLength(1);
-    });
-
-    it('adds DEX save advantage to conditionEffects for each target', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
-
-        const action = makeAction();
-        await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1']);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'Ally1',
-            'conditionEffects',
-            expect.objectContaining({
-                saveAdvantageCount: 1,
-                saveAdvantageAbilities: expect.arrayContaining(['DEX']),
-            }),
-            CAMPAIGN,
-        );
-    });
-
-    it('does not duplicate DEX in saveAdvantageAbilities if already present', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return {
-                saveAdvantageCount: 1,
-                saveAdvantageAbilities: ['DEX'],
-            };
-            return null;
-        });
-
-        const action = makeAction();
-        await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1']);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'Ally1',
-            'conditionEffects',
-            expect.objectContaining({
-                saveAdvantageCount: 2,
-                saveAdvantageAbilities: ['DEX'],
-            }),
-            CAMPAIGN,
-        );
-    });
-
-    it('adds new ability to saveAdvantageAbilities if not already present', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return {
-                saveAdvantageCount: 1,
-                saveAdvantageAbilities: ['STR'],
-            };
-            return null;
-        });
-
-        const action = makeAction();
-        await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1']);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'Ally1',
-            'conditionEffects',
-            expect.objectContaining({
-                saveAdvantageCount: 2,
-                saveAdvantageAbilities: ['STR', 'DEX'],
-            }),
-            CAMPAIGN,
-        );
-    });
-
-    it('handles missing conditionEffects (null stored value)', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return null;
-            return null;
-        });
-
-        const action = makeAction();
-        await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1']);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'Ally1',
-            'conditionEffects',
-            expect.objectContaining({
-                saveAdvantageCount: 1,
-                saveAdvantageAbilities: expect.arrayContaining(['DEX']),
-            }),
-            CAMPAIGN,
-        );
-    });
-
-    it('handles missing conditionEffects.saveAdvantageAbilities (undefined)', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return { saveAdvantageCount: 0 };
-            return null;
-        });
-
-        const action = makeAction();
-        await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1']);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'Ally1',
-            'conditionEffects',
-            expect.objectContaining({
-                saveAdvantageAbilities: ['DEX'],
-            }),
-            CAMPAIGN,
-        );
-    });
-
-    it('adds expiration for each target', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
-
-        const action = makeAction();
-        await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1', 'Ally2']);
-
-        expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'Ally1', effects: expect.arrayContaining([
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                targets[i],
+                'conditionEffects',
                 expect.objectContaining({
-                    type: 'remove_active_buff',
-                    buffName: 'Haste',
+                    saveAdvantageCount: 1,
+                    saveAdvantageAbilities: ['DEX'],
                 }),
-            ]), campaignName: CAMPAIGN });
-        expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'Ally2', effects: expect.arrayContaining([
+                CAMPAIGN,
+            );
+        }
+    });
+
+    it('preserves existing save advantage abilities and never duplicates DEX', async () => {
+        const cases = [
+            { target: 'Ally1', existing: ['DEX'], expected: ['DEX'] },
+            { target: 'Ally2', existing: ['STR'], expected: ['STR', 'DEX'] },
+        ];
+
+        for (const { target, existing, expected } of cases) {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'activeBuffs') return [];
+                if (key === 'conditionEffects') return { saveAdvantageCount: 1, saveAdvantageAbilities: existing };
+                return null;
+            });
+            await applyHaste(makeAction(), makePlayerStats(), CAMPAIGN, null, [target]);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                target,
+                'conditionEffects',
                 expect.objectContaining({
-                    type: 'remove_active_buff',
-                    buffName: 'Haste',
+                    saveAdvantageCount: 2,
+                    saveAdvantageAbilities: expected,
                 }),
-            ]), campaignName: CAMPAIGN });
+                CAMPAIGN,
+            );
+        }
     });
 
-    it('posts a log entry for each target', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
+    it('uses spell duration for the buff and falls back to the default', async () => {
+        mockFreshTarget();
 
-        const action = makeAction();
-        await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1', 'Ally2']);
-
-        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-            type: 'ability_use',
-            characterName: 'Wizard1',
-            abilityName: 'Haste',
-            description: expect.stringContaining('Wizard1 cast Haste on Ally1'),
-        }));
-        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-            type: 'ability_use',
-            characterName: 'Wizard1',
-            abilityName: 'Haste',
-            description: expect.stringContaining('Wizard1 cast Haste on Ally2'),
-        }));
-    });
-
-    it('uses custom duration from spell when provided', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
-
-        const action = makeAction({ spell: { duration: '2 minutes' } });
-        await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1']);
-
-        const buffsCalls = setRuntimeValue.mock.calls.filter(
-            (c) => c[0] === 'Ally1' && c[1] === 'activeBuffs',
+        await applyHaste(
+            makeAction({ spell: { duration: '2 minutes' } }),
+            makePlayerStats(), CAMPAIGN, null, ['Ally1'],
         );
-        expect(buffsCalls[0][2]).toContainEqual(
+        expect(buffsWritesFor('Ally1')[0][2]).toContainEqual(
             expect.objectContaining({ duration: '2 minutes' }),
         );
-    });
 
-    it('uses default duration when action.spell is missing duration', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
-
-        const action = makeAction({ spell: {} });
-        await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1']);
-
-        const buffsCalls = setRuntimeValue.mock.calls.filter(
-            (c) => c[0] === 'Ally1' && c[1] === 'activeBuffs',
+        await applyHaste(
+            makeAction({ spell: {} }),
+            makePlayerStats(), CAMPAIGN, null, ['Ally2'],
         );
-        expect(buffsCalls[0][2]).toContainEqual(
+        expect(buffsWritesFor('Ally2')[0][2]).toContainEqual(
             expect.objectContaining({ duration: 'Concentration, up to 1 minute' }),
         );
     });
 
-    it('reports single target in description correctly', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
+    it('adds a remove_active_buff expiration for each target', async () => {
+        mockFreshTarget();
 
-        const action = makeAction();
-        const result = await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1']);
+        await applyHaste(makeAction(), makePlayerStats(), CAMPAIGN, null, ['Ally1', 'Ally2']);
 
-        expect(result.payload.description).toBe('Ally1 gained Haste from Haste.');
+        for (const target of ['Ally1', 'Ally2']) {
+            expect(addExpiration).toHaveBeenCalledWith({
+                attackerName: 'Wizard1',
+                targetName: target,
+                effects: [expect.objectContaining({ type: 'remove_active_buff', buffName: 'Haste' })],
+                campaignName: CAMPAIGN,
+            });
+        }
     });
 
-    it('reports multiple targets in description correctly', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
+    it('logs an ability_use entry for each target (required for all automation)', async () => {
+        mockFreshTarget();
 
-        const action = makeAction();
-        const result = await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1', 'Ally2']);
+        await applyHaste(makeAction(), makePlayerStats(), CAMPAIGN, null, ['Ally1', 'Ally2']);
 
-        expect(result.payload.description).toBe('2 targets gained Haste from Haste: Ally1, Ally2.');
+        for (const target of ['Ally1', 'Ally2']) {
+            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'Wizard1',
+                abilityName: 'Haste',
+                description: expect.stringContaining(`Wizard1 cast Haste on ${target}`),
+            }));
+        }
     });
 
-    it('uses action name in description when different from default', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
+    it('names the caster and action in the single-target description', async () => {
+        mockFreshTarget();
 
-        const action = { name: 'Enhanced Haste', spell: { range: '30 feet' } };
-        const result = await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1']);
+        const result = await applyHaste(
+            { name: 'Enhanced Haste', spell: { range: '30 feet' } },
+            makePlayerStats({ name: 'CasterOne' }), CAMPAIGN, null, ['Ally1'],
+        );
 
         expect(result.payload.description).toBe('Ally1 gained Haste from Enhanced Haste.');
     });
 
-    it('skips adding buff but still adds expiration and log for already-hasted target in multi-target', async () => {
+    it('skips the buff write for an already-hasted target but still expires and logs it', async () => {
         getRuntimeValue.mockImplementation((name, key) => {
             if (key === 'activeBuffs') {
                 if (name === 'Ally1') return [{ name: 'Haste', effect: 'haste' }];
@@ -558,119 +374,45 @@ describe('hasteHandler.applyHaste', () => {
             return null;
         });
 
-        const action = makeAction();
-        const result = await applyHaste(action, makePlayerStats(), CAMPAIGN, null, ['Ally1', 'Ally2']);
+        const result = await applyHaste(makeAction(), makePlayerStats(), CAMPAIGN, null, ['Ally1', 'Ally2']);
 
         expect(result).not.toBeNull();
-
-        const buffsCalls = setRuntimeValue.mock.calls.filter(
-            (c) => c[1] === 'activeBuffs',
-        );
-        expect(buffsCalls).toHaveLength(1);
-        expect(buffsCalls[0][0]).toBe('Ally2');
-
+        const buffsWrites = setRuntimeValue.mock.calls.filter((c) => c[1] === 'activeBuffs');
+        expect(buffsWrites).toHaveLength(1);
+        expect(buffsWrites[0][0]).toBe('Ally2');
         expect(addExpiration).toHaveBeenCalledTimes(2);
         expect(addEntry).toHaveBeenCalledTimes(2);
-    });
-
-    it('uses playerStats.name as sourceCharacter in buff', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeBuffs') return [];
-            if (key === 'conditionEffects') return {};
-            return null;
-        });
-
-        const action = makeAction();
-        await applyHaste(action, makePlayerStats({ name: 'ClericOfLathander' }), CAMPAIGN, null, ['Ally1']);
-
-        const buffsCalls = setRuntimeValue.mock.calls.filter(
-            (c) => c[0] === 'Ally1' && c[1] === 'activeBuffs',
-        );
-        expect(buffsCalls[0][2]).toContainEqual(
-            expect.objectContaining({ sourceCharacter: 'ClericOfLathander' }),
-        );
     });
 });
 
 // ─── isHasteActive ───
 
 describe('hasteHandler.isHasteActive', () => {
-    it('returns true when haste buff is active', () => {
-        getRuntimeValue.mockReturnValue([
-            { name: 'Haste', effect: 'haste', duration: 'Concentration, up to 1 minute' },
-        ]);
-
-        const result = isHasteActive('Ally1', CAMPAIGN);
-        expect(result).toBe(true);
-    });
-
-    it('returns false when no buffs stored', () => {
-        getRuntimeValue.mockReturnValue(null);
-
-        const result = isHasteActive('Ally1', CAMPAIGN);
-        expect(result).toBe(false);
-    });
-
-    it('returns false when activeBuffs is an empty array', () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        const result = isHasteActive('Ally1', CAMPAIGN);
-        expect(result).toBe(false);
-    });
-
-    it('returns false when haste has wrong effect value', () => {
-        getRuntimeValue.mockReturnValue([
-            { name: 'Haste', effect: 'slow' },
-        ]);
-
-        const result = isHasteActive('Ally1', CAMPAIGN);
-        expect(result).toBe(false);
-    });
-
-    it('returns false when haste has wrong name', () => {
-        getRuntimeValue.mockReturnValue([
-            { name: 'Slow', effect: 'haste' },
-        ]);
-
-        const result = isHasteActive('Ally1', CAMPAIGN);
-        expect(result).toBe(false);
-    });
-
-    it('returns true when haste is among multiple buffs', () => {
+    it('returns true when a Haste buff (name and effect) is stored, even among other buffs', () => {
         getRuntimeValue.mockReturnValue([
             { name: 'Bless', effect: 'bless' },
             { name: 'Haste', effect: 'haste' },
-            { name: 'Shield of Faith', effect: 'shield_of_faith' },
         ]);
 
-        const result = isHasteActive('Ally1', CAMPAIGN);
-        expect(result).toBe(true);
+        expect(isHasteActive('Ally1', CAMPAIGN)).toBe(true);
+        expect(getRuntimeValue).toHaveBeenCalledWith('Ally1', 'activeBuffs', CAMPAIGN);
     });
 
-    it('returns false when activeBuffs is not an array', () => {
-        getRuntimeValue.mockReturnValue('not-an-array');
-
-        const result = isHasteActive('Ally1', CAMPAIGN);
-        expect(result).toBe(false);
+    it('returns false when nothing usable is stored', () => {
+        for (const stored of [null, undefined, [], 'not-an-array']) {
+            getRuntimeValue.mockReturnValue(stored);
+            expect(isHasteActive('Ally1', CAMPAIGN)).toBe(false);
+        }
     });
 
     it('requires both name and effect to match', () => {
-        // name matches but effect doesn't
-        getRuntimeValue.mockReturnValue([
-            { name: 'Haste', effect: 'something_else' },
-        ]);
+        getRuntimeValue.mockReturnValue([{ name: 'Haste', effect: 'slow' }]);
         expect(isHasteActive('Ally1', CAMPAIGN)).toBe(false);
 
-        // effect matches but name doesn't
-        getRuntimeValue.mockReturnValue([
-            { name: 'Something', effect: 'haste' },
-        ]);
+        getRuntimeValue.mockReturnValue([{ name: 'Slow', effect: 'haste' }]);
         expect(isHasteActive('Ally1', CAMPAIGN)).toBe(false);
 
-        // both match
-        getRuntimeValue.mockReturnValue([
-            { name: 'Haste', effect: 'haste' },
-        ]);
+        getRuntimeValue.mockReturnValue([{ name: 'Haste', effect: 'haste' }]);
         expect(isHasteActive('Ally1', CAMPAIGN)).toBe(true);
     });
 });

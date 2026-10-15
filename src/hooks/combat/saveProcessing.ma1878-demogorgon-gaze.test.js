@@ -1,24 +1,23 @@
-// MA-1878: Demogorgon Gaze choose-or-roll-d6 branch row — the adjudicated
-// fix. The row (DC 23 Wisdom, range:"120 feet", variants[] trio
+// @maintained-by-ai: 2026-10-14
+// MA-1878: Demogorgon Gaze choose-or-roll-d6 variant row — the unique
+// contract locked HERE (gaze generics live in the other gaze lanes:
+// frightening-gaze, chilling-gaze-immunity, ma1877-tentacle).
+// The row (DC 23 Wisdom, range:"120 feet", variants[] trio
 // beguiling→stunned / confusing→confusion te / hypnotic→charmed, rounds:2,
-// dc_success:"none") rides the INLINE block-save seam: the MA-1878 LOS
-// guard in breathAoeShape kills the MA-1436/§412 fake "60-ft Line" picker
-// fabricated from "no longer within line of sight" prose (numeric range
-// authored + feet tokens prose-less ⇒ Line default 60 was the fingerprint),
-// so single-target inline is the route (Bone Naga Serpentine Gaze canonical
-// twin, §211). Pre-fix the chooser was inert (no variants[]) and the
-// stranded save-shell granted ZERO condition / ZERO te / ZERO save_result
-// grants on every fail (MA-1855 twin, MA-0575 random-branch zero transport).
-// Post-fix the GM variant chooser's picked variant threads via
+// dc_success:"none") rides the INLINE block-save seam: shapeless single-
+// target sighted save (Bone Naga Serpentine Gaze canonical twin, §211) —
+// the fake-60-ft-Line picker is killed by the MA-1878 LOS guard in
+// breathAoeShape. Post-fix the GM chooser's picked variant threads via
 // buildAbilitySaveRollContext.saveVariant (pruned stamp) and the fail-face
 // consumer grantSaveVariantClause registers the declared te (MA-1847/MA-0595
 // byte-shape) + arms ONE merged §80 clock (rounds:2 "until start of the
 // demogorgon's next turn") covering the declared conditions AND the te
-// removal; canonical conditions ride the proven saveConditions lane (§159).
-// Success face (§511 fail-only): zero grants, zero clock, zero damage (row
-// authors no damage_dice — applySaveDamage never runs). Rows without the
-// chooser stamp stay byte-inert (§384 pin). The Confusion 1d10 behavior roll
-// stays §410 GM-enforced for EB-NPC victims (TURN_START_HANDLERS guard).
+// removal. Canonical conditions ride the proven saveConditions lane (§159).
+// Success face is fail-only (§511): zero grants, zero clock, zero damage
+// (row authors no damage_dice — applySaveDamage never runs). Rows without
+// the chooser stamp stay byte-inert (§384 pin). The Confusion 1d10 behavior
+// roll stays §410 GM-enforced for EB-NPC victims (TURN_START_HANDLERS
+// guard).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -83,7 +82,6 @@ import monstersData from '../../../public/data/monsters.json';
 
 const campaignName = 'test-campaign';
 const DEMO = 'Demogorgon 1';
-const TARGET = 'Bandit 1';
 
 // Demogorgon Gaze (monsters.json demogorgon.actions[2], MA-1878 fix) —
 // DC 23 Wisdom, single-target sighted save at 120 feet, choose-one variants.
@@ -108,15 +106,15 @@ function gazeContext(variant) {
     };
 }
 
-async function resolveSave(context, success, roll) {
-    // EB-NPC inline lane (§211/§336): dice rolled upstream, pre-stamped on
-    // context.effectiveD20; DC 23 faces: nat 10 + bonus 0 = 10 ✗ (Bandit
-    // WIS+0 structurally fails); nat 20 + bonus 4 = 24 ≥ 23 ✓ (§511 rig).
+// EB-NPC inline lane (§211/§336): dice rolled upstream, pre-stamped on
+// context.effectiveD20. DC 23 faces (§511 rig): fail = low roll + 0 bonus;
+// success = nat 20 + 4 bonus ≥ 23.
+async function resolveSave(target, context, success, roll) {
     const bonus = success ? 4 : 0;
     await processSaveRoll({
         rollType: 'save',
-        target: { name: TARGET, type: 'npc' },
-        characterName: TARGET,
+        target: { name: target, type: 'npc' },
+        characterName: target,
         campaignName,
         context: { ...context, effectiveD20: success ? 20 : roll, effectiveBonus: bonus },
         bonus,
@@ -135,7 +133,7 @@ beforeEach(() => {
 });
 
 describe('MA-1878 Demogorgon Gaze DATA lock', () => {
-    it('row keeps DC 23 WIS + description byte-intact, gains range "120 feet" + 3 variants', () => {
+    it('row: DC 23 WIS, range "120 feet", no attack/damage, 3 chooser variants (beguiling=stunned, confusing=te confusion, hypnotic=charmed) — all rounds:2, dc_success none, no damage', () => {
         expect(GAZE.name).toBe('Gaze');
         expect(GAZE.save_dc).toBe(23);
         expect(GAZE.save_type).toBe('Wisdom');
@@ -145,9 +143,7 @@ describe('MA-1878 Demogorgon Gaze DATA lock', () => {
         expect(GAZE.description.startsWith('Wisdom Saving Throw: DC 23, one creature it can see within 120 ft.')).toBe(true);
         expect(GAZE.description.endsWith('No damage.')).toBe(true);
         expect(GAZE.variants).toHaveLength(3);
-    });
 
-    it('variants payload: beguiling=stunned, confusing=te confusion (no canonical condition), hypnotic=charmed — all rounds:2, dc_success none, no damage', () => {
         expect(byKey.beguiling.conditions).toEqual(['stunned']);
         expect(byKey.beguiling.te ?? null).toBeNull();
         expect(byKey.confusing.te).toBe('confusion');
@@ -165,36 +161,40 @@ describe('MA-1878 Demogorgon Gaze DATA lock', () => {
 });
 
 describe('MA-1878 Demogorgon Gaze failed-save adjudication (GM chooser faces)', () => {
-    it('beguiling: Stunned granted + ONE rounds:2 condition clock + grant log, zero te, zero damage', async () => {
-        await resolveSave(gazeContext(byKey.beguiling), false, 10);
+    // Canonical-condition legs share one lane (saveConditions §159) — one
+    // test loops both d6 condition ranges; the te leg is its own contract.
+    it.each([
+        ['beguiling', 'Bandit 1', 'stunned', 'Stunned', 10],
+        ['hypnotic', 'Bandit 2', 'charmed', 'Charmed', 5],
+    ])('%s: %s granted + ONE rounds:2 condition clock + grant log, zero te, zero damage', async (_key, target, condition, label, roll) => {
+        await resolveSave(target, gazeContext(byKey[_key]), false, roll);
 
-        expect(runtimeStore[`${TARGET}.activeConditions`]).toContain('stunned');
+        expect(runtimeStore[`${target}.activeConditions`]).toContain(condition);
         expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration.mock.calls[0][0]).toMatchObject({
             attackerName: DEMO,
-            targetName: TARGET,
+            targetName: target,
             campaignName,
             rounds: 2,
-            effects: [{ type: 'condition', condition: 'stunned' }],
+            effects: [{ type: 'condition', condition }],
         });
         const grant = addEntryLogs.find(e => e.type === 'condition' && e.action === 'applied');
         expect(grant).toBeTruthy();
-        expect(grant.characterName).toBe(TARGET);
+        expect(grant.characterName).toBe(target);
         expect(grant.sourceName).toBe(DEMO);
-        expect(grant.condition).toBe('Stunned');
-        // zero te, zero damage on the condition leg
+        expect(grant.condition).toBe(label);
         expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
         expect(applyDamageToTarget).not.toHaveBeenCalled();
         expect(logEntryLogs.some(e => e.rollType === 'save-damage')).toBe(false);
     });
 
     it('confusing: confusion te registered on targetEffects fail-only + ONE rounds:2 merged te-removal clock + "Confused" grant log, zero canonical conditions', async () => {
-        await resolveSave(gazeContext(byKey.confusing), false, 7);
+        await resolveSave('Bandit 3', gazeContext(byKey.confusing), false, 7);
 
         const tes = runtimeStore['campaign.targetEffects'] || [];
         expect(tes).toHaveLength(1);
         expect(tes[0]).toMatchObject({
-            target: TARGET,
+            target: 'Bandit 3',
             effect: 'confusion',
             source: DEMO,
             duration: 'until_start_of_next_turn',
@@ -202,55 +202,39 @@ describe('MA-1878 Demogorgon Gaze failed-save adjudication (GM chooser faces)', 
         expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration.mock.calls[0][0]).toMatchObject({
             attackerName: DEMO,
-            targetName: TARGET,
+            targetName: 'Bandit 3',
             campaignName,
             rounds: 2,
-            effects: [{ type: 'remove_target_effect', effectKey: 'confusion', source: DEMO, target: TARGET }],
+            effects: [{ type: 'remove_target_effect', effectKey: 'confusion', source: DEMO, target: 'Bandit 3' }],
         });
         const grant = addEntryLogs.find(e => e.type === 'condition' && e.action === 'applied');
         expect(grant).toBeTruthy();
         expect(grant.condition).toBe('Confused');
-        expect(grant.characterName).toBe(TARGET);
+        expect(grant.characterName).toBe('Bandit 3');
         // zero canonical-condition spray (stunned/charmed stay ungranted)
-        expect(runtimeStore[`${TARGET}.activeConditions`] || []).toEqual([]);
-        expect(applyDamageToTarget).not.toHaveBeenCalled();
-    });
-
-    it('hypnotic: Charmed granted + ONE rounds:2 condition clock, zero te, zero confusion log', async () => {
-        await resolveSave(gazeContext(byKey.hypnotic), false, 5);
-
-        expect(runtimeStore[`${TARGET}.activeConditions`]).toContain('charmed');
-        expect(addExpiration).toHaveBeenCalledTimes(1);
-        expect(addExpiration.mock.calls[0][0]).toMatchObject({
-            rounds: 2,
-            effects: [{ type: 'condition', condition: 'charmed' }],
-        });
-        expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
-        expect(addEntryLogs.some(e => e.condition === 'Confused')).toBe(false);
+        expect(runtimeStore['Bandit 3.activeConditions'] || []).toEqual([]);
         expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
 });
 
 describe('MA-1878 success face + byte-inertia (§511 fail-only, §384 pin)', () => {
-    it('successful save (nat 20 + 4 ≥ 23): zero condition, zero te, zero clock, zero grant log, zero damage', async () => {
-        await resolveSave(gazeContext(byKey.confusing), true, 20);
+    it.each([
+        ['confusing', 'Bandit 1'],
+        ['beguiling', 'Bandit 2'],
+    ])('%s success face (nat 20 + 4 ≥ 23): zero condition, zero te, zero clock, zero grant log, zero damage', async (key, target) => {
+        await resolveSave(target, gazeContext(byKey[key]), true, 20);
 
-        expect(runtimeStore[`${TARGET}.activeConditions`] || []).toEqual([]);
+        expect(runtimeStore[`${target}.activeConditions`] || []).toEqual([]);
         expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
         expect(addExpiration).not.toHaveBeenCalled();
         expect(addEntryLogs.some(e => e.type === 'condition' && e.action === 'applied')).toBe(false);
         expect(applyDamageToTarget).not.toHaveBeenCalled();
-        // beguiling success twin — same zero-grant law covers condition legs
-        await resolveSave(gazeContext(byKey.beguiling), true, 20);
-        expect(runtimeStore[`${TARGET}.activeConditions`] || []).toEqual([]);
-        expect(addExpiration).not.toHaveBeenCalled();
     });
 
     it('byte-inert control: chooserless row (no context.saveVariant) arms NO te, NO clock from this seam', async () => {
-        const ctx = gazeContext(byKey.beguiling);
+        const ctx = gazeContext(byKey.confusing);
         delete ctx.saveVariant;
-        ctx.saveConditions = [];
-        await resolveSave(ctx, false, 10);
+        await resolveSave('Bandit 1', ctx, false, 10);
 
         expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
         expect(addExpiration).not.toHaveBeenCalled();

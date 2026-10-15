@@ -1,3 +1,12 @@
+// @maintained-by-ai: 2026-10-14
+// Base lane for useLoggedDiceRollSaves.createSaves: the quick-roll save seam
+// (pending guards → roll → damage threading → sendSaveResult → pending removal →
+// popup) and the Glorious Defense counterattack outcome routing.
+// Evasion / shield / target-effect riders: useLoggedDiceRollSaves.evasion.test.js.
+// Event-handler seam: useLoggedDiceRollEventHandlers.test.js.
+// Pure damage math (computeDamageAfterEvasion) and bane/bless roll internals:
+// applyDamage + bane/bless service lanes.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/encounters/combatData.js', () => ({
@@ -6,18 +15,9 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 }));
 
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
-    computeDamageAfterEvasion: vi.fn((raw, success, dcSuccess, evasion) => {
-        if (evasion && dcSuccess === 'half') {
-            if (success) return 0;
-            return Math.floor(raw / 2);
-        }
-        if (!success) return raw;
-        if (dcSuccess === 'half') return Math.floor(raw / 2);
-        return 0;
-    }),
+    computeDamageAfterEvasion: vi.fn(() => 10),
     rollSaveForCreature: vi.fn(),
     applyDamageToTarget: vi.fn(),
-    clearReTriggeredSequence: vi.fn(),
     normalizeSaveType: (saveType) => {
         if (!saveType) return '';
         const map = { 'STRENGTH': 'STR', 'DEXTERITY': 'DEX', 'CONSTITUTION': 'CON', 'INTELLIGENCE': 'INT', 'WISDOM': 'WIS', 'CHARISMA': 'CHA' };
@@ -29,6 +29,7 @@ vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
     sendSaveResult: vi.fn(),
 }));
 
+// Guard the heavy transitive damage graph — this lane never reaches it.
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getTargetFromAttacker: vi.fn(),
     getCombatContext: vi.fn(),
@@ -48,19 +49,11 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
     evaluateAutoExpression: vi.fn(),
 }));
 
-vi.mock('./loggedDiceRollUtils.js', () => ({
-    getGuardianProtectionAcBonus: vi.fn(() => 0),
-    getParryAcBonus: vi.fn(() => 0),
-    hasPotentCantrip: vi.fn(),
-}));
-
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { computeDamageAfterEvasion, rollSaveForCreature, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { sendSaveResult } from '../../services/combat/conditions/savePromptService.js';
-import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
-import { hasPotentCantrip } from './loggedDiceRollUtils.js';
 import { createSaves } from './useLoggedDiceRollSaves.js';
 
 describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
@@ -79,336 +72,248 @@ describe('createSaves (useLoggedDiceRollSaves) - Core', () => {
         deps.charactersRef.current = [];
         deps.pendingSaves = {};
         deps.logEntry.mockResolvedValue({ id: 'log-1' });
-        getCombatContext.mockResolvedValue(null);
         loadCombatSummary.mockResolvedValue(null);
-        getRuntimeValue.mockReturnValue(null);
+        getRuntimeValue.mockImplementation(() => null);
         setRuntimeValue.mockReturnValue(undefined);
         rollSaveForCreature.mockReturnValue({ success: true, roll: 15, total: 18, bonus: 3 });
         computeDamageAfterEvasion.mockReturnValue(10);
         applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 5, damageReduced: false });
         hasIgnoreResistance.mockReturnValue(false);
-        hasPotentCantrip.mockReturnValue(false);
     });
 
-    function createFn() {
-        return createSaves(deps);
+    // Key-based runtime mock — immune to the order/count of getRuntimeValue calls
+    // (targetEffects, activeBuffs, activeConditions, lastAttack, hitPoints, ...).
+    function mockRuntime(overrides = {}) {
+        getRuntimeValue.mockImplementation((name, key) => overrides[`${name}|${key}`] ?? null);
     }
 
+    function mockCreatures(...creatures) {
+        loadCombatSummary.mockResolvedValue({ creatures });
+    }
+
+    function queueSave({ success = true, roll = 18, total = 21, bonus = 3 } = {}) {
+        rollSaveForCreature.mockReturnValue({ success, roll, total, bonus });
+    }
+
+    const makePending = (overrides = {}) => ({
+        targetName: 'Goblin',
+        rawDamage: 15,
+        saveDc: 15,
+        saveType: 'DEX',
+        dcSuccess: 'half',
+        damageType: 'fire',
+        attackerName: 'TestWizard',
+        name: 'Fireball',
+        formula: '8d6',
+        rolls: [3, 4, 5, 2, 3, 3],
+        modifier: 0,
+        ...overrides,
+    });
+
     describe('quickRollPlayerSave', () => {
-        const basePending = {
-            targetName: 'Goblin',
-            rawDamage: 15,
-            saveDc: 15,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-            damageType: 'fire',
-            attackerName: 'TestWizard',
-            name: 'Fireball',
-            formula: '8d6',
-            rolls: [3, 4, 5, 2, 3, 3],
-            modifier: 0,
-            campaignName: 'test-campaign',
-            setPopupHtml: vi.fn(),
-        };
-
-        function setupCreature(type, hp) {
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type, ac: 12, currentHp: hp, maxHp: hp }],
-            });
-        }
-
         it('returns early when pending does not exist or target not found', async () => {
-            const { quickRollPlayerSave } = createFn();
+            const { quickRollPlayerSave } = createSaves(deps);
             await quickRollPlayerSave('nonexistent', 'Goblin', 'DEX', 15);
             expect(loadCombatSummary).not.toHaveBeenCalled();
 
-            deps.pendingSaves['prompt-1'] = { ...basePending };
-            loadCombatSummary.mockResolvedValue({ creatures: [] });
+            deps.pendingSaves['prompt-1'] = makePending();
+            mockCreatures();
             await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
             expect(rollSaveForCreature).not.toHaveBeenCalled();
+            expect(sendSaveResult).not.toHaveBeenCalled();
         });
 
-        it('rolls save, applies damage, sends result, and removes pending', async () => {
-            deps.pendingSaves['prompt-1'] = { ...basePending };
-            setupCreature('npc', 13);
-            rollSaveForCreature.mockReturnValue({ success: false, roll: 8, total: 11, bonus: 3 });
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
-            expect(rollSaveForCreature).toHaveBeenCalled();
-            expect(applyDamageToTarget).toHaveBeenCalled();
-            expect(sendSaveResult).toHaveBeenCalled();
-            expect(deps.pendingSaves['prompt-1']).toBeUndefined();
-        });
+        it('rolls the save, threads damage, sends the result, and removes pending', async () => {
+            deps.pendingSaves['prompt-1'] = makePending();
+            mockCreatures({ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 });
+            const { quickRollPlayerSave } = createSaves(deps);
 
-        it('sends save result with correct data and sets popupHtml with save-damage type', async () => {
-            deps.pendingSaves['prompt-1'] = { ...basePending };
-            setupCreature('npc', 13);
-            const { quickRollPlayerSave } = createFn();
             await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
-            expect(sendSaveResult).toHaveBeenCalledWith('test-campaign', 'Goblin', expect.objectContaining({
+            // Clean NPC target: no advantage, no disadvantage, no evasion.
+            expect(rollSaveForCreature).toHaveBeenCalledWith(expect.any(Object), 'DEX', 15, false, false);
+            expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, true, 'half', false);
+            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 10, ['fire'], {
+                campaignName: 'test-campaign',
+                characters: expect.any(Array),
+                ignoreResistance: false,
+                attackerName: 'TestWizard',
+            });
+            expect(sendSaveResult).toHaveBeenCalledWith('test-campaign', 'Goblin', {
                 promptId: 'prompt-1',
                 success: true,
                 roll: 15,
-            }));
+                total: 18,
+                saveBonus: 3,
+            });
+            expect(deps.pendingSaves['prompt-1']).toBeUndefined();
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 type: 'save-damage',
                 name: 'Fireball',
                 saveDc: 15,
                 saveType: 'DEX',
+                finalDamage: 10,
+                damageApplied: true,
+                damageReduced: false,
             }));
-        });
 
-        it('handles save failure with full damage, success with dcSuccess none reduces to 0', async () => {
-            deps.pendingSaves['prompt-1'] = { ...basePending, rawDamage: 20 };
-            setupCreature('npc', 13);
-            rollSaveForCreature.mockReturnValue({ success: false, roll: 5, total: 8, bonus: 3 });
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
-            expect(computeDamageAfterEvasion).toHaveBeenCalledWith(20, false, 'half', false);
-
-            deps.pendingSaves['prompt-2'] = { ...basePending, rawDamage: 20, dcSuccess: 'none' };
-            rollSaveForCreature.mockReturnValue({ success: true, roll: 18, total: 21, bonus: 3 });
+            // Failed save threads through as full halve-eligible damage (dcSuccess 'half').
+            deps.pendingSaves['prompt-2'] = makePending({ rawDamage: 20 });
+            queueSave({ success: false, roll: 8, total: 11 });
+            computeDamageAfterEvasion.mockReturnValue(20);
             await quickRollPlayerSave('prompt-2', 'Goblin', 'DEX', 15);
-            expect(computeDamageAfterEvasion).toHaveBeenCalledWith(20, true, 'none', false);
+            expect(computeDamageAfterEvasion).toHaveBeenLastCalledWith(20, false, 'half', false);
         });
 
-        it('passes ignoreResistance flag to applyDamageToTarget', async () => {
-            deps.pendingSaves['prompt-1'] = { ...basePending, playerStats: {} };
-            setupCreature('npc', 13);
+        it('threads ignoreResistance from pending.playerStats into applyDamageToTarget', async () => {
+            deps.pendingSaves['prompt-1'] = makePending({ playerStats: {} });
+            mockCreatures({ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 });
             hasIgnoreResistance.mockReturnValue(true);
-            const { quickRollPlayerSave } = createFn();
+            const { quickRollPlayerSave } = createSaves(deps);
+
             await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
             expect(hasIgnoreResistance).toHaveBeenCalledWith({}, 'fire');
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', expect.any(Number), ['fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: true, attackerName: 'TestWizard' });
+            expect(applyDamageToTarget).toHaveBeenCalledWith(
+                expect.any(Object), 'Goblin', expect.any(Number), ['fire'],
+                expect.objectContaining({ ignoreResistance: true })
+            );
         });
 
-        it('uses target saveModifiers from charactersRef when available', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                ...basePending,
+        it('CLA-324: grants against_spell save advantage only for spell-origin saves', async () => {
+            deps.pendingSaves['prompt-1'] = makePending({
                 targetName: 'Wiz',
-                rawDamage: 10,
-                saveDc: 13,
                 saveType: 'INT',
+                saveDc: 13,
                 damageType: 'psychic',
-                attackerName: 'TestWizard',
                 name: 'Mind Sliver',
                 formula: '1d6',
                 rolls: [4],
                 isSpellDamage: true,
-            };
+            });
             deps.charactersRef.current = [{
                 name: 'Wiz',
                 saveModifiers: [
                     { target: 'saving_throw', effect: 'advantage', condition: 'against_spell' },
                 ],
-                computedStats: { saveModifiers: [] },
             }];
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Wiz', type: 'player', ac: 13, currentHp: 15, maxHp: 15 }],
-            });
-            const { quickRollPlayerSave } = createFn();
+            mockCreatures({ name: 'Wiz', type: 'player', ac: 13, currentHp: 15, maxHp: 15 });
+            const { quickRollPlayerSave } = createSaves(deps);
+
             await quickRollPlayerSave('prompt-1', 'Wiz', 'INT', 13);
-            expect(rollSaveForCreature).toHaveBeenCalledWith(
-                expect.any(Object),
-                'INT',
-                13,
-                false,
-                true
-            );
+            expect(rollSaveForCreature).toHaveBeenCalledWith(expect.any(Object), 'INT', 13, false, true);
         });
 
-        it('sets popupHtml with correct HP values for player vs npc targets', async () => {
-            deps.pendingSaves['prompt-1'] = {
-                ...basePending,
-                targetName: 'Ally',
-                rawDamage: 10,
-            };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Ally', type: 'player', ac: 16, currentHp: 20, maxHp: 20 }],
-            });
+        it('popup reports HP from runtime hitPoints for players and from the summary for npcs', async () => {
+            const { quickRollPlayerSave } = createSaves(deps);
+
+            deps.pendingSaves['prompt-1'] = makePending({ targetName: 'Ally', rawDamage: 10 });
+            mockCreatures({ name: 'Ally', type: 'player', ac: 16, currentHp: 20, maxHp: 20 });
             applyDamageToTarget.mockReturnValue({ finalDamage: 5, newHp: 15, damageReduced: true });
-            getRuntimeValue.mockReturnValueOnce([])
-                .mockReturnValueOnce(null)
-                .mockReturnValueOnce([])
-                .mockReturnValueOnce([])
-                .mockReturnValueOnce([])
-                .mockReturnValueOnce(20);
-            const { quickRollPlayerSave } = createFn();
+            mockRuntime({ 'Ally|hitPoints': 20 });
             await quickRollPlayerSave('prompt-1', 'Ally', 'DEX', 15);
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 targetCurrentHp: 15,
                 targetMaxHp: 20,
             }));
 
-            deps.pendingSaves['prompt-2'] = { ...basePending, targetName: 'Goblin', rawDamage: 10 };
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
+            deps.pendingSaves['prompt-2'] = makePending({ rawDamage: 10 });
+            mockCreatures({ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 });
+            applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 5, damageReduced: false });
             await quickRollPlayerSave('prompt-2', 'Goblin', 'DEX', 15);
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+            expect(deps.setPopupHtml).toHaveBeenLastCalledWith(expect.objectContaining({
+                targetCurrentHp: 5,
                 targetMaxHp: 13,
             }));
-        });
-
-        it('handles popupHtml with finalDamage and damageApplied fields', async () => {
-            deps.pendingSaves['prompt-1'] = { ...basePending };
-            setupCreature('npc', 13);
-            applyDamageToTarget.mockReturnValue({ finalDamage: 7, newHp: 6, damageReduced: true });
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                finalDamage: 7,
-                damageApplied: true,
-                damageReduced: true,
-            }));
-        });
-
-        it('handles save with no advantage or disadvantage by default', async () => {
-            deps.pendingSaves['prompt-1'] = { ...basePending };
-            deps.charactersRef.current = [{
-                name: 'Goblin',
-                computedStats: { saveModifiers: [] },
-            }];
-            setupCreature('npc', 13);
-            const { quickRollPlayerSave } = createFn();
-            await quickRollPlayerSave('prompt-1', 'Goblin', 'DEX', 15);
-            expect(rollSaveForCreature).toHaveBeenCalledWith(
-                expect.any(Object),
-                'DEX',
-                15,
-                false,
-                false
-            );
         });
     });
 
     describe('triggerGloriousDefenseCounterAttack', () => {
-        it('returns early when no uses remaining', async () => {
-            getRuntimeValue.mockReturnValue(0);
-            const { triggerGloriousDefenseCounterAttack } = createFn();
+        // d20 9 + bonus 7 = 16 vs AC 16 + CHA 1 = 17 → miss (counterattack allowed);
+        // d20 15 + bonus 7 = 22 ≥ 17 → still hits (blocked).
+        const lastAttack = (d20, attackerName = 'Goblin') => ({
+            targetName: 'TestFighter',
+            d20,
+            bonus: 7,
+            targetAc: 16,
+            hit: true,
+            attackerName,
+        });
+
+        function mockCounterAttackSetup(d20, uses = 2) {
+            mockRuntime({
+                'TestFighter|gloriousDefenseUses': uses,
+                'campaign|lastAttack': lastAttack(d20),
+            });
+            mockCreatures({
+                type: 'player',
+                name: 'TestFighter',
+                attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }],
+            });
+        }
+
+        it('blocks when no uses remain', async () => {
+            mockRuntime({ 'TestFighter|gloriousDefenseUses': 0 });
+            const { triggerGloriousDefenseCounterAttack } = createSaves(deps);
             await triggerGloriousDefenseCounterAttack();
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 popupMessage: expect.stringContaining('no uses remaining'),
             }));
         });
 
-        it('returns popup when no attack event exists', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            getCombatContext.mockResolvedValue({
-                lastAttack: null,
-            });
-            const { triggerGloriousDefenseCounterAttack } = createFn();
-            await triggerGloriousDefenseCounterAttack();
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                popupMessage: expect.stringContaining('The last attack did not target you'),
-            }));
-        });
+        it('blocks when there is no last attack or it targeted someone else', async () => {
+            const { triggerGloriousDefenseCounterAttack } = createSaves(deps);
 
-        it('returns popup when attack did not target this player', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            getCombatContext.mockResolvedValue({
-                lastAttack: {
-                    targetName: 'SomeOtherCharacter',
-                    d20: 12,
-                    bonus: 7,
-                    targetAc: 16,
-                    hit: true,
-                },
-            });
-            const { triggerGloriousDefenseCounterAttack } = createFn();
+            mockRuntime({ 'TestFighter|gloriousDefenseUses': 2 });
             await triggerGloriousDefenseCounterAttack();
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 popupMessage: expect.stringContaining('did not target you'),
             }));
+
+            mockRuntime({
+                'TestFighter|gloriousDefenseUses': 2,
+                'campaign|lastAttack': { ...lastAttack(9), targetName: 'SomeOtherCharacter' },
+            });
+            await triggerGloriousDefenseCounterAttack();
+            expect(deps.setPopupHtml).toHaveBeenLastCalledWith(expect.objectContaining({
+                popupMessage: expect.stringContaining('did not target you'),
+            }));
         });
 
-        it('returns popup when attack still hits with CHA bonus', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') return {
-                    targetName: 'TestFighter',
-                    d20: 15,
-                    bonus: 7,
-                    targetAc: 16,
-                    hit: true,
-                    attackerName: 'Goblin',
-                };
-                if (key === 'gloriousDefenseUses') return 2;
-                return null;
-            });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }] },
-                ],
-            });
-            const { triggerGloriousDefenseCounterAttack } = createFn();
+        it('blocks when the CHA bonus is not enough to change the outcome', async () => {
+            mockCounterAttackSetup(15);
+            const { triggerGloriousDefenseCounterAttack } = createSaves(deps);
             await triggerGloriousDefenseCounterAttack();
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 popupMessage: expect.stringContaining('not enough to change the outcome'),
             }));
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('calls logAndShow when attack becomes miss', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') return {
-                    targetName: 'TestFighter',
-                    d20: 9,
-                    bonus: 7,
-                    targetAc: 16,
-                    hit: true,
-                    attackerName: 'Goblin',
-                };
-                if (key === 'gloriousDefenseUses') return 2;
-                return null;
-            });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }] },
-                ],
-            });
-            const { triggerGloriousDefenseCounterAttack } = createFn();
+        it('counters the last attacker, spends a use, and logs the ability use', async () => {
+            mockCounterAttackSetup(9, 2);
+            const { triggerGloriousDefenseCounterAttack } = createSaves(deps);
             await triggerGloriousDefenseCounterAttack();
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'gloriousDefenseUses', 1, 'test-campaign');
-            expect(deps.logAndShow).toHaveBeenCalledWith('Longsword', 5, 'attack', expect.objectContaining({
-                targetName: 'Goblin',
-            }));
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
                 type: 'ability_use',
                 abilityName: 'Glorious Defense',
                 targetName: 'Goblin',
             }));
-        });
-
-        it('handles no combat context gracefully', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            getCombatContext.mockResolvedValue({
-                lastAttack: null,
-            });
-            const { triggerGloriousDefenseCounterAttack } = createFn();
-            await triggerGloriousDefenseCounterAttack();
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                popupMessage: expect.stringContaining('did not target you'),
+            expect(deps.logAndShow).toHaveBeenCalledWith('Longsword', 5, 'attack', expect.objectContaining({
+                targetName: 'Goblin',
             }));
         });
 
-        it('targets attacker from lastAttack instead of current target', async () => {
-            getRuntimeValue.mockImplementation((name, key, _campaign) => {
-                if (name === 'campaign' && key === 'lastAttack') return {
-                    targetName: 'TestFighter',
-                    d20: 9,
-                    bonus: 7,
-                    targetAc: 16,
-                    hit: true,
-                    attackerName: 'Red Dragon',
-                };
-                if (key === 'gloriousDefenseUses') return 2;
-                return null;
+        it('counters the lastAttack attacker (not any current target)', async () => {
+            mockRuntime({
+                'TestFighter|gloriousDefenseUses': 2,
+                'campaign|lastAttack': lastAttack(9, 'Red Dragon'),
             });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { type: 'player', name: 'TestFighter', attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }] },
-                ],
+            mockCreatures({
+                type: 'player',
+                name: 'TestFighter',
+                attacks: [{ name: 'Longsword', hitBonus: 5, range: 5 }],
             });
-            const { triggerGloriousDefenseCounterAttack } = createFn();
+            const { triggerGloriousDefenseCounterAttack } = createSaves(deps);
             await triggerGloriousDefenseCounterAttack();
             expect(deps.logAndShow).toHaveBeenCalledWith('Longsword', 5, 'attack', expect.objectContaining({
                 targetName: 'Red Dragon',

@@ -1,3 +1,17 @@
+// @maintained-by-ai
+// Invisibility handler: thin adapter over invisibilityShared.js.
+// This suite pins the regular-Invisibility contract (popup type, buff name
+// 'Invisibility', 'Concentration, up to 1 hour' default, the
+// '_activeInvisibility_' tracking key consumed by concentration/rest/
+// initiative code) and is the CANONICAL home for the shared apply mechanics
+// in invisibilityShared.js (dedupe branches, nullish-store guards, self
+// pronoun, multi-target formatting) — the greater lane delegates them here
+// via its own header. The greater lane pins only greater-specific constants
+// plus the shared targetNames null-guard, so that guard is not repeated here.
+// NOTE: the shared log text ("Spell ends if target attacks...") is correct
+// ONLY for regular Invisibility — Greater Invisibility does not end on
+// attack; that phrasing lives in invisibilityShared.js and must stay
+// parameterised before the greater lane reuses it.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ─────────────────────────────────────────
@@ -58,6 +72,11 @@ function makeAction(overrides = {}) {
     };
 }
 
+/** Fresh empty-list answers for every runtime read (buffs/conditions/targetEffects). */
+function emptyStores() {
+    useRuntimeState.getRuntimeValue.mockReturnValue([]);
+}
+
 // ── handle ───────────────────────────────────────────────────────
 
 describe('invisibilityHandler.handle', () => {
@@ -65,7 +84,7 @@ describe('invisibilityHandler.handle', () => {
         vi.clearAllMocks();
     });
 
-    it('returns target selection popup with creature list when combat context exists', async () => {
+    it('returns invisibility target selection popup with creature list', async () => {
         combatData.getCombatSummary.mockReturnValue({
             creatures: [
                 { name: 'Ally1', type: 'player' },
@@ -83,52 +102,32 @@ describe('invisibilityHandler.handle', () => {
         expect(result.payload.duration).toBe('Up to 1 hour');
         expect(result.payload.range).toBe('Touch');
         expect(result.payload.rangeFt).toBe(5);
-        expect(result.payload).toHaveProperty('attackerPos');
+        expect(result.payload.attackerPos).toBeNull();
     });
 
-    it('uses default range and duration when spell object is empty', async () => {
+    it.each([
+        { label: 'spell object is empty', spell: {} },
+        { label: 'spell object is absent', spell: undefined },
+    ])('defaults to Touch range and 1-hour concentration duration when $label', async ({ spell }) => {
         combatData.getCombatSummary.mockReturnValue({
             creatures: [{ name: 'Ally1' }],
         });
 
-        const result = await handle(
-            { name: 'Invisibility', spell: {}, automation: {} },
-            makePlayerStats(),
-            campaignName,
-            null,
-        );
+        const action = { name: 'Invisibility', automation: {} };
+        if (spell !== undefined) action.spell = spell;
 
-        expect(result.payload.range).toBe('Touch');
-        expect(result.payload.duration).toBe('Concentration, up to 1 hour');
-    });
-
-    it('uses default range and duration when spell object is absent', async () => {
-        combatData.getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'Ally1' }],
-        });
-
-        const result = await handle(
-            { name: 'Invisibility', automation: {} },
-            makePlayerStats(),
-            campaignName,
-            null,
-        );
+        const result = await handle(action, makePlayerStats(), campaignName, null);
 
         expect(result.payload.range).toBe('Touch');
         expect(result.payload.rangeFt).toBe(5);
         expect(result.payload.duration).toBe('Concentration, up to 1 hour');
     });
 
-    it('returns empty creature list when no combat summary', async () => {
-        combatData.getCombatSummary.mockReturnValue(null);
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result.payload.creatureTargets).toEqual([]);
-    });
-
-    it('returns empty creature list when combat summary has no creatures', async () => {
-        combatData.getCombatSummary.mockReturnValue({ creatures: [] });
+    it.each([
+        { label: 'no combat summary', summary: null },
+        { label: 'summary has no creatures', summary: { creatures: [] } },
+    ])('returns empty creature list when $label', async ({ summary }) => {
+        combatData.getCombatSummary.mockReturnValue(summary);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -139,12 +138,7 @@ describe('invisibilityHandler.handle', () => {
         combatData.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Ally1' }] });
         targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: { x: 1, y: 2 } });
 
-        const result = await handle(
-            makeAction(),
-            makePlayerStats(),
-            campaignName,
-            mapName,
-        );
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
         expect(result.payload.attackerPos).toEqual({ x: 1, y: 2 });
     });
@@ -152,45 +146,23 @@ describe('invisibilityHandler.handle', () => {
     it('does not call resolveMapPositions when mapName is absent', async () => {
         combatData.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Ally1' }] });
 
-        await handle(
-            makeAction(),
-            makePlayerStats(),
-            campaignName,
-            null,
-        );
+        await handle(makeAction(), makePlayerStats(), campaignName, null);
 
         expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
     });
 });
 
 // ── applyInvisibility ────────────────────────────────────────────
+// targetNames null/empty guard is asserted in the greater lane
+// (same applyInvisibilityToTargets branch); not repeated here.
 
 describe('invisibilityHandler.applyInvisibility', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    it.each([
-        { label: 'empty array', targets: [] },
-        { label: 'null', targets: null },
-        { label: 'undefined', targets: undefined },
-        { label: 'non-array string', targets: 'not-an-array' },
-        { label: 'non-array number', targets: 42 },
-    ])('returns null when targetNames is $label', async ({ targets }) => {
-        const result = await applyInvisibility(
-            makeAction(),
-            makePlayerStats(),
-            campaignName,
-            null,
-            targets,
-        );
-        expect(result).toBeNull();
-    });
-
-    it('applies invisibility to a single target', async () => {
-        useRuntimeState.getRuntimeValue
-            .mockReturnValueOnce([]) // activeBuffs for target
-            .mockReturnValueOnce([]); // activeConditions for target
+    it('stamps Invisibility buff, condition, tracking key, targetEffect, expiration and log', async () => {
+        emptyStores();
 
         const result = await applyInvisibility(
             makeAction(),
@@ -204,7 +176,7 @@ describe('invisibilityHandler.applyInvisibility', () => {
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
 
-        // Check buff was added
+        // Buff carries the regular-Invisibility identity and duration
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             'Ally1',
             'activeBuffs',
@@ -212,13 +184,14 @@ describe('invisibilityHandler.applyInvisibility', () => {
                 expect.objectContaining({
                     name: 'Invisibility',
                     effect: 'invisible',
+                    duration: 'Up to 1 hour',
                     sourceCharacter: 'TestWizard',
                 }),
             ]),
             campaignName,
         );
 
-        // Check condition was added
+        // Condition was added
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             'Ally1',
             'activeConditions',
@@ -226,7 +199,7 @@ describe('invisibilityHandler.applyInvisibility', () => {
             campaignName,
         );
 
-        // Check tracking key was set
+        // Tracking key (consumed by concentration/rest/initiative code)
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
             '_activeInvisibility_Ally1',
@@ -234,7 +207,7 @@ describe('invisibilityHandler.applyInvisibility', () => {
             campaignName,
         );
 
-        // Check campaign-level targetEffects was set
+        // Campaign-level targetEffects was set
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
             'targetEffects',
@@ -248,27 +221,30 @@ describe('invisibilityHandler.applyInvisibility', () => {
             campaignName,
         );
 
-        // Check expiration was added
-        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestWizard', targetName: 'Ally1', effects: expect.arrayContaining([
+        // Expiration removes the regular buff by name
+        expect(expirations.addExpiration).toHaveBeenCalledWith({
+            attackerName: 'TestWizard',
+            targetName: 'Ally1',
+            effects: expect.arrayContaining([
                 expect.objectContaining({
                     type: 'remove_active_buff',
                     buffName: 'Invisibility',
                 }),
-            ]), campaignName });
+            ]),
+            campaignName,
+        });
 
-        // Check log entry
+        // Log entry — regular Invisibility DOES end on attack
         expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
             type: 'ability_use',
             characterName: 'TestWizard',
             abilityName: 'Invisibility',
-            description: expect.stringContaining('Ally1'),
+            description: expect.stringContaining('ends if target makes an attack roll'),
         }));
     });
 
-    it('applies invisibility to self', async () => {
-        useRuntimeState.getRuntimeValue
-            .mockReturnValueOnce([]) // buffs
-            .mockReturnValueOnce([]); // conditions
+    it('applies invisibility to self with themself pronoun', async () => {
+        emptyStores();
 
         const result = await applyInvisibility(
             makeAction(),
@@ -285,10 +261,10 @@ describe('invisibilityHandler.applyInvisibility', () => {
         }));
     });
 
-    it('does not add duplicate buff if already active', async () => {
+    it('skips duplicate buff/condition writes but still stamps tracking key, targetEffect, expiration and log', async () => {
         useRuntimeState.getRuntimeValue
-            .mockReturnValueOnce([{ name: 'Invisibility', effect: 'invisible' }]) // already has buff
-            .mockReturnValueOnce([]); // conditions
+            .mockReturnValueOnce([{ name: 'Invisibility', effect: 'invisible' }]) // buff already present
+            .mockReturnValueOnce(['Invisible']); // condition present, different case
 
         await applyInvisibility(
             makeAction(),
@@ -298,38 +274,36 @@ describe('invisibilityHandler.applyInvisibility', () => {
             ['Ally1'],
         );
 
-        // Should not add a second buff
         const buffCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
             call => call[1] === 'activeBuffs' && call[0] === 'Ally1',
         );
-        expect(buffCalls).toHaveLength(0);
-    });
-
-    it('does not add duplicate condition if already present (case-insensitive)', async () => {
-        useRuntimeState.getRuntimeValue
-            .mockReturnValueOnce([]) // buffs
-            .mockReturnValueOnce(['Invisible']); // already has condition (capitalized)
-
-        await applyInvisibility(
-            makeAction(),
-            makePlayerStats(),
-            campaignName,
-            null,
-            ['Ally1'],
-        );
-
         const condCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
             call => call[1] === 'activeConditions' && call[0] === 'Ally1',
         );
+        expect(buffCalls).toHaveLength(0);
         expect(condCalls).toHaveLength(0);
+
+        // Campaign-level stamps happen regardless of dedupe
+        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'campaign',
+            '_activeInvisibility_Ally1',
+            'TestWizard',
+            campaignName,
+        );
+        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'campaign',
+            'targetEffects',
+            expect.arrayContaining([
+                expect.objectContaining({ target: 'Ally1', effect: 'invisible' }),
+            ]),
+            campaignName,
+        );
+        expect(expirations.addExpiration).toHaveBeenCalledTimes(1);
+        expect(logService.addEntry).toHaveBeenCalledTimes(1);
     });
 
-    it('applies invisibility to multiple targets', async () => {
-        useRuntimeState.getRuntimeValue
-            .mockReturnValueOnce([]) // Ally1 buffs
-            .mockReturnValueOnce([]) // Ally1 conditions
-            .mockReturnValueOnce([]) // Enemy1 buffs
-            .mockReturnValueOnce([]); // Enemy1 conditions
+    it('applies invisibility to multiple targets with plural description', async () => {
+        emptyStores();
 
         const result = await applyInvisibility(
             makeAction(),
@@ -343,12 +317,11 @@ describe('invisibilityHandler.applyInvisibility', () => {
         expect(result.payload.description).toContain('2 targets');
         expect(result.payload.description).toContain('Ally1');
         expect(result.payload.description).toContain('Enemy1');
+        expect(logService.addEntry).toHaveBeenCalledTimes(2);
     });
 
     it('respects custom duration from spell object', async () => {
-        useRuntimeState.getRuntimeValue
-            .mockReturnValueOnce([])
-            .mockReturnValueOnce([]);
+        emptyStores();
 
         await applyInvisibility(
             {
@@ -372,10 +345,8 @@ describe('invisibilityHandler.applyInvisibility', () => {
         );
     });
 
-    it('uses default duration when spell object is absent', async () => {
-        useRuntimeState.getRuntimeValue
-            .mockReturnValueOnce([])
-            .mockReturnValueOnce([]);
+    it('uses default 1-hour concentration duration when spell object is absent', async () => {
+        emptyStores();
 
         await applyInvisibility(
             { name: 'Invisibility', automation: { type: 'invisibility' } },
@@ -395,10 +366,9 @@ describe('invisibilityHandler.applyInvisibility', () => {
         );
     });
 
-    it('handles null activeBuffs gracefully', async () => {
-        useRuntimeState.getRuntimeValue
-            .mockReturnValueOnce(null) // activeBuffs is null
-            .mockReturnValueOnce([]); // conditions
+    it('survives null runtime stores and still stamps buff, condition and targetEffects', async () => {
+        // Every read (buffs, conditions, campaign targetEffects) returns null
+        useRuntimeState.getRuntimeValue.mockReturnValue(null);
 
         await applyInvisibility(
             makeAction(),
@@ -411,105 +381,19 @@ describe('invisibilityHandler.applyInvisibility', () => {
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             'Ally1',
             'activeBuffs',
-            expect.arrayContaining([
-                expect.objectContaining({ name: 'Invisibility' }),
-            ]),
+            expect.arrayContaining([expect.objectContaining({ name: 'Invisibility' })]),
             campaignName,
         );
-    });
-
-    it('handles null activeConditions gracefully', async () => {
-        useRuntimeState.getRuntimeValue
-            .mockReturnValueOnce([]) // buffs
-            .mockReturnValueOnce(null); // conditions is null
-
-        await applyInvisibility(
-            makeAction(),
-            makePlayerStats(),
-            campaignName,
-            null,
-            ['Ally1'],
-        );
-
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             'Ally1',
             'activeConditions',
             expect.arrayContaining(['invisible']),
             campaignName,
         );
-    });
-
-    it('skips buff and condition for target that already has both', async () => {
-        useRuntimeState.getRuntimeValue
-            .mockReturnValueOnce([{ name: 'Invisibility', effect: 'invisible' }]) // has buff
-            .mockReturnValueOnce(['invisible']); // has condition
-
-        await applyInvisibility(
-            makeAction(),
-            makePlayerStats(),
-            campaignName,
-            null,
-            ['Ally1'],
-        );
-
-        const buffCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
-            call => call[1] === 'activeBuffs' && call[0] === 'Ally1',
-        );
-        const condCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
-            call => call[1] === 'activeConditions' && call[0] === 'Ally1',
-        );
-        expect(buffCalls).toHaveLength(0);
-        expect(condCalls).toHaveLength(0);
-    });
-
-    it('sets tracking key and targetEffects even when buff/condition already present', async () => {
-        useRuntimeState.getRuntimeValue
-            .mockReturnValueOnce([{ name: 'Invisibility', effect: 'invisible' }])
-            .mockReturnValueOnce(['invisible']);
-
-        await applyInvisibility(
-            makeAction(),
-            makePlayerStats(),
-            campaignName,
-            null,
-            ['Ally1'],
-        );
-
-        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            '_activeInvisibility_Ally1',
-            'TestWizard',
-            campaignName,
-        );
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
             'targetEffects',
-            expect.arrayContaining([
-                expect.objectContaining({ target: 'Ally1', effect: 'invisible' }),
-            ]),
-            campaignName,
-        );
-    });
-
-    it('uses playerStats.name for source in targetEffects', async () => {
-        useRuntimeState.getRuntimeValue
-            .mockReturnValueOnce([])
-            .mockReturnValueOnce([]);
-
-        await applyInvisibility(
-            makeAction(),
-            makePlayerStats({ name: 'ArchmageElara' }),
-            campaignName,
-            null,
-            ['Ally1'],
-        );
-
-        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'targetEffects',
-            expect.arrayContaining([
-                expect.objectContaining({ source: 'ArchmageElara' }),
-            ]),
+            expect.arrayContaining([expect.objectContaining({ target: 'Ally1' })]),
             campaignName,
         );
     });
@@ -530,36 +414,15 @@ describe('invisibilityHandler.isInvisibilityActive', () => {
         expect(isInvisibilityActive('Ally1', campaignName)).toBe(true);
     });
 
-    it('returns false when buff has Invisibility name but wrong effect', () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Invisibility', effect: 'some_other_effect' },
-        ]);
-
-        expect(isInvisibilityActive('Ally1', campaignName)).toBe(false);
-    });
-
-    it('returns false when no Invisibility buff', () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Shield', effect: 'shield' },
-        ]);
-
-        expect(isInvisibilityActive('Ally1', campaignName)).toBe(false);
-    });
-
-    it('returns false when activeBuffs is empty', () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-        expect(isInvisibilityActive('Ally1', campaignName)).toBe(false);
-    });
-
-    it('returns false when activeBuffs is null', () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-        expect(isInvisibilityActive('Ally1', campaignName)).toBe(false);
-    });
-
-    it('returns false when activeBuffs is undefined', () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
+    it.each([
+        { label: 'wrong effect', buffs: [{ name: 'Invisibility', effect: 'some_other_effect' }] },
+        { label: 'only GreaterInvisibility buff', buffs: [{ name: 'GreaterInvisibility', effect: 'invisible' }] },
+        { label: 'unrelated buff', buffs: [{ name: 'Shield', effect: 'shield' }] },
+        { label: 'empty buffs', buffs: [] },
+        { label: 'null buffs', buffs: null },
+        { label: 'undefined buffs', buffs: undefined },
+    ])('returns false when activeBuffs is $label', ({ buffs }) => {
+        useRuntimeState.getRuntimeValue.mockReturnValue(buffs);
 
         expect(isInvisibilityActive('Ally1', campaignName)).toBe(false);
     });

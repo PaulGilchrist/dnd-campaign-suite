@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { setRuntimeValue, getRuntimeValue } from '../runtime/useRuntimeState.js';
@@ -160,6 +161,15 @@ describe('createLogAndShow - auto_effect miss trigger (Studied Attacks)', () => 
         autoDamageSourceRef: { current: null },
     };
 
+    // Mirrors the 2024 Psi Warrior Studied Attacks declaration in
+    // public/data/2024/classes.json: auto_effect/miss/next_attack_advantage.
+    const MISS_PASSIVE = {
+        type: 'auto_effect',
+        name: 'Studied Attacks',
+        trigger: 'miss',
+        effect: 'next_attack_advantage',
+    };
+
     function makePassives(passiveList) {
         return {
             targetName: 'Goblin',
@@ -182,142 +192,69 @@ describe('createLogAndShow - auto_effect miss trigger (Studied Attacks)', () => 
         getRuntimeValue.mockReturnValue(null);
     });
 
-    function createFn() {
-        return createLogAndShow(deps);
-    }
-
     describe('next_attack_advantage on miss', () => {
-        it('adds a targetEffect when the attack misses and a matching passive exists', async () => {
-            const missPassive = {
-                type: 'auto_effect',
-                name: 'Studied Attacks',
-                trigger: 'miss',
+        it('grants a vex-channel targetEffect on miss, defaulting duration to until_start_of_next_turn', async () => {
+            await createLogAndShow(deps)('Longsword', 0, 'attack', makePassives([MISS_PASSIVE]));
+
+            const calls = targetEffectsCalls();
+            expect(calls.length).toBe(1);
+            expect(calls[0][1]).toBe('targetEffects');
+            expect(calls[0][2]).toContainEqual({
+                target: 'TestFighter',
+                source: 'Studied Attacks',
                 effect: 'next_attack_advantage',
+                vexTarget: 'Goblin',
                 duration: 'until_start_of_next_turn',
-            };
-
-            const fn = createFn();
-            await fn('Longsword', 0, 'attack', makePassives([missPassive]));
-
-            const calls = targetEffectsCalls();
-            expect(calls.length).toBeGreaterThan(0);
-            const effect = calls[0][2];
-            expect(effect).toContainEqual(
-                expect.objectContaining({
-                    target: 'TestFighter',
-                    source: 'Studied Attacks',
-                    effect: 'next_attack_advantage',
-                    vexTarget: 'Goblin',
-                    duration: 'until_start_of_next_turn',
-                })
-            );
-        });
-
-        it('defaults duration to until_start_of_next_turn when not specified', async () => {
-            const missPassive = {
-                type: 'auto_effect',
-                name: 'Studied Attacks',
-                trigger: 'miss',
-                effect: 'next_attack_advantage',
-            };
-
-            const fn = createFn();
-            await fn('Longsword', 0, 'attack', makePassives([missPassive]));
-
-            const calls = targetEffectsCalls();
-            expect(calls.length).toBeGreaterThan(0);
-            expect(calls[0][2]).toContainEqual(
-                expect.objectContaining({
-                    duration: 'until_start_of_next_turn',
-                })
-            );
+            });
         });
 
         it('does not add an effect when isAutoMiss is true', async () => {
-            const missPassive = {
-                type: 'auto_effect',
-                name: 'Studied Attacks',
-                trigger: 'miss',
-                effect: 'next_attack_advantage',
-            };
-
-            const fn = createFn();
-            await fn('Longsword', 0, 'attack', {
-                ...makePassives([missPassive]),
+            await createLogAndShow(deps)('Longsword', 0, 'attack', {
+                ...makePassives([MISS_PASSIVE]),
                 isAutoMiss: true,
             });
 
             expect(targetEffectsCalls().length).toBe(0);
         });
 
-        it('does not add an effect when no passives exist', async () => {
-            const fn = createFn();
-            await fn('Longsword', 0, 'attack', {
-                playerStats: { name: 'TestFighter' },
-            });
+        it('does not add an effect for non-matching passive trigger or effect', async () => {
+            const passives = [
+                { type: 'auto_effect', name: 'Hit Effect', trigger: 'hit', effect: 'knock_prone' },
+                { type: 'auto_effect', name: 'Wrong Effect', trigger: 'miss', effect: 'knock_prone' },
+            ];
+
+            await createLogAndShow(deps)('Longsword', 0, 'attack', makePassives(passives));
 
             expect(targetEffectsCalls().length).toBe(0);
+            expect(addEntryMock).not.toHaveBeenCalled();
         });
 
-        it('does not add an effect when passives array is empty', async () => {
-            const fn = createFn();
+        it('does not add an effect or log when there are no passives (missing automation or empty)', async () => {
+            const fn = createLogAndShow(deps);
+
+            await fn('Longsword', 0, 'attack', { playerStats: { name: 'TestFighter' } });
             await fn('Longsword', 0, 'attack', makePassives([]));
 
             expect(targetEffectsCalls().length).toBe(0);
+            expect(addEntryMock).not.toHaveBeenCalled();
         });
 
-        it('does not add an effect when passive trigger is "hit" instead of "miss"', async () => {
-            const hitPassive = {
-                type: 'auto_effect',
-                name: 'Hit Effect',
-                trigger: 'hit',
-                effect: 'knock_prone',
-            };
-
-            const fn = createFn();
-            await fn('Longsword', 0, 'attack', makePassives([hitPassive]));
-
-            expect(targetEffectsCalls().length).toBe(0);
-        });
-
-        it('does not add an effect when passive effect is different from next_attack_advantage', async () => {
-            const missPassive = {
-                type: 'auto_effect',
-                name: 'Wrong Effect',
-                trigger: 'miss',
-                effect: 'knock_prone',
-            };
-
-            const fn = createFn();
-            await fn('Longsword', 0, 'attack', makePassives([missPassive]));
-
-            expect(targetEffectsCalls().length).toBe(0);
-        });
-
-        it('adds effects for all matching passives when multiple match', async () => {
+        it('grants one effect per matching passive, preserving explicit durations', async () => {
             const passives = [
-                {
-                    type: 'auto_effect',
-                    name: 'Studied Attacks',
-                    trigger: 'miss',
-                    effect: 'next_attack_advantage',
-                    duration: 'until_start_of_next_turn',
-                },
-                {
-                    type: 'auto_effect',
-                    name: 'Another Miss Effect',
-                    trigger: 'miss',
-                    effect: 'next_attack_advantage',
-                    duration: '1_round',
-                },
+                MISS_PASSIVE,
+                { ...MISS_PASSIVE, name: 'Another Miss Effect', duration: '1_round' },
             ];
 
-            const fn = createFn();
-            await fn('Longsword', 0, 'attack', makePassives(passives));
+            await createLogAndShow(deps)('Longsword', 0, 'attack', makePassives(passives));
 
             const calls = targetEffectsCalls();
-            expect(calls.length).toBeGreaterThan(0);
-            expect(calls[0][2].length).toBe(2);
+            expect(calls.length).toBe(1);
+            expect(calls[0][2]).toContainEqual(
+                expect.objectContaining({ source: 'Studied Attacks', duration: 'until_start_of_next_turn' })
+            );
+            expect(calls[0][2]).toContainEqual(
+                expect.objectContaining({ source: 'Another Miss Effect', duration: '1_round' })
+            );
         });
 
         it('preserves existing targetEffects when merging new ones', async () => {
@@ -328,38 +265,16 @@ describe('createLogAndShow - auto_effect miss trigger (Studied Attacks)', () => 
                 return null;
             });
 
-            const missPassive = {
-                type: 'auto_effect',
-                name: 'Studied Attacks',
-                trigger: 'miss',
-                effect: 'next_attack_advantage',
-            };
-
-            const fn = createFn();
-            await fn('Longsword', 0, 'attack', makePassives([missPassive]));
+            await createLogAndShow(deps)('Longsword', 0, 'attack', makePassives([MISS_PASSIVE]));
 
             const calls = targetEffectsCalls();
-            expect(calls.length).toBeGreaterThan(0);
-            const effects = calls[0][2];
-            expect(effects.length).toBe(2);
-            expect(effects).toContainEqual(
-                expect.objectContaining({ effect: 'old_effect' })
-            );
-            expect(effects).toContainEqual(
-                expect.objectContaining({ effect: 'next_attack_advantage' })
-            );
+            expect(calls.length).toBe(1);
+            expect(calls[0][2]).toContainEqual(expect.objectContaining({ effect: 'old_effect' }));
+            expect(calls[0][2]).toContainEqual(expect.objectContaining({ effect: 'next_attack_advantage' }));
         });
 
-        it('calls addEntry to record the ability use on miss', async () => {
-            const missPassive = {
-                type: 'auto_effect',
-                name: 'Studied Attacks',
-                trigger: 'miss',
-                effect: 'next_attack_advantage',
-            };
-
-            const fn = createFn();
-            await fn('Longsword', 0, 'attack', makePassives([missPassive]));
+        it('logs an ability_use entry per granted effect on miss', async () => {
+            await createLogAndShow(deps)('Longsword', 0, 'attack', makePassives([MISS_PASSIVE]));
 
             expect(addEntryMock).toHaveBeenCalledWith(
                 'test-campaign',
@@ -371,13 +286,6 @@ describe('createLogAndShow - auto_effect miss trigger (Studied Attacks)', () => 
                     targetName: 'Goblin',
                 })
             );
-        });
-
-        it('does not call addEntry when no matching passives exist', async () => {
-            const fn = createFn();
-            await fn('Longsword', 0, 'attack', makePassives([]));
-
-            expect(addEntryMock).not.toHaveBeenCalled();
         });
     });
 });

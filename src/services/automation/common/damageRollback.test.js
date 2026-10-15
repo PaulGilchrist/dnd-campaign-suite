@@ -1,3 +1,6 @@
+// @maintained-by-ai — deterministic unit tests for the damageRollback.js public contract.
+// All I/O (runtime store, combat context, healing, log, conditions) is mocked, so these
+// tests exercise stable pure selection/arithmetic behaviour that does not churn with app changes.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
     findLastAttack,
@@ -5,6 +8,9 @@ import {
     rollbackDamage,
     findRollsByCreature,
     findMostRecentRollAcrossCreatures,
+    normalizeSchool,
+    storeSpellLastAttack,
+    addTargetResult,
     rollbackSpellEffects,
 } from './damageRollback.js';
 
@@ -68,6 +74,20 @@ function makeLastAttack(overrides = {}) {
     };
 }
 
+function makeSpellLastAttack(overrides = {}) {
+    return {
+        attackerName: 'Goblin',
+        targetName: 'Hero',
+        attackName: 'Fire Bolt',
+        damageName: 'Fire Bolt',
+        primaryDamage: 8,
+        secondaryDamage: 0,
+        actualDamage: 8,
+        affectedTargets: ['Hero'],
+        statusEffects: null,
+        ...overrides,
+    };
+}
 
 // ── Tests ────────────────────────────────────────────────────────
 
@@ -78,9 +98,9 @@ describe('damageRollback', () => {
     // ─── findLastAttack ────────────────────────────────────────
 
     describe('findLastAttack', () => {
-        it('returns default values when combat context or lastAttack is absent', async () => {
+        it('returns default values when lastAttack is absent', async () => {
             getRuntimeValue.mockReturnValue(null);
-            let result = await findLastAttack(campaignName);
+            const result = await findLastAttack(campaignName);
             expect(result).toEqual({
                 attackEvent: null, attackerName: null, targetName: null,
                 primaryDamage: 0, secondaryDamage: 0, totalDamage: 0, damageTypes: [],
@@ -217,6 +237,15 @@ describe('damageRollback', () => {
             expect(result).toBe(0);
         });
 
+        it('returns 0 when combat context is unavailable', async () => {
+            getRuntimeValue.mockReturnValue(makeLastAttack());
+            getCombatContext.mockResolvedValue(null);
+
+            const result = await rollbackDamage('Goblin', 'Hero', campaignName, 'Mirror Image');
+            expect(result).toBe(0);
+            expect(applyHealingToTarget).not.toHaveBeenCalled();
+        });
+
         it('heals target and returns totalDamage when all conditions match', async () => {
             const attack = makeLastAttack({ primaryDamage: 10, secondaryDamage: 2, attackerName: 'Goblin', targetName: 'Hero' });
             getRuntimeValue.mockReturnValue(attack);
@@ -290,14 +319,10 @@ describe('damageRollback', () => {
     describe('findRollsByCreature', () => {
         it('returns null when combat context is null or creatures array is absent', async () => {
             getCombatContext.mockResolvedValue(null);
-            getRuntimeValue.mockReturnValue(null);
-            let result = await findRollsByCreature(campaignName);
-            expect(result).toBeNull();
+            expect(await findRollsByCreature(campaignName)).toBeNull();
 
-            getRuntimeValue.mockReturnValue(makeLastAttack());
-            getCombatContext.mockResolvedValue({ creatures: [{ name: 'Hero' }] });
-            result = await findRollsByCreature(campaignName);
-            expect(result.Hero.attackEvent).toEqual(makeLastAttack());
+            getCombatContext.mockResolvedValue({});
+            expect(await findRollsByCreature(campaignName)).toBeNull();
         });
 
         it('returns empty map when creatures array is empty', async () => {
@@ -351,9 +376,9 @@ describe('damageRollback', () => {
     // ─── findMostRecentRollAcrossCreatures ─────────────────────
 
     describe('findMostRecentRollAcrossCreatures', () => {
-        it('returns null when combat context is null or no lastAttack exists', async () => {
+        it('returns null when no lastAttack exists', async () => {
             getRuntimeValue.mockReturnValue(null);
-            let result = await findMostRecentRollAcrossCreatures(campaignName);
+            const result = await findMostRecentRollAcrossCreatures(campaignName);
             expect(result).toBeNull();
         });
 
@@ -376,26 +401,169 @@ describe('damageRollback', () => {
                 expect(result.eventData).toBe(attack);
                 expect(result.isStale).toBe(false);
             }
+        });
+    });
+
+    // ─── normalizeSchool ───────────────────────────────────────
+
+    describe('normalizeSchool', () => {
+        it('lowercases school names', () => {
+            expect(normalizeSchool('Evocation')).toBe('evocation');
+            expect(normalizeSchool('NECROMANCY')).toBe('necromancy');
+        });
+
+        it('normalizes empty or missing values to null', () => {
+            expect(normalizeSchool('')).toBeNull();
+            expect(normalizeSchool(undefined)).toBeNull();
+            expect(normalizeSchool(null)).toBeNull();
+        });
+    });
+
+    // ─── storeSpellLastAttack ──────────────────────────────────
+
+    describe('storeSpellLastAttack', () => {
+        it('stores a spell-save lastAttack entry with defaults and stores it under campaign/lastAttack', () => {
+            storeSpellLastAttack(campaignName, {
+                casterName: 'Goblin Shaman',
+                spellName: 'Fireball',
+                saveType: 'DEX',
+                saveDc: 13,
+                attackScope: 'aoe',
+                damageFormula: '8d6',
+                damageType: 'Fire',
+                damageOnSuccess: 4,
+                damageOnFailure: 8,
+                spellSchool: 'Evocation',
+            });
+
+            expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+            const [scope, key, entry, campaign] = setRuntimeValue.mock.calls[0];
+            expect(scope).toBe('campaign');
+            expect(key).toBe('lastAttack');
+            expect(campaign).toBe(campaignName);
+            expect(entry).toMatchObject({
+                attackerName: 'Goblin Shaman',
+                attackName: 'Fireball',
+                rollType: 'spell-save',
+                spellSchool: 'evocation',
+                saveType: 'DEX',
+                saveDc: 13,
+                attackScope: 'aoe',
+                damageFormula: '8d6',
+                damageType: 'Fire',
+                damageOnSuccess: 4,
+                damageOnFailure: 8,
+                targetResults: [],
+                affectedTargets: [],
+                statusEffects: [],
+                rawDamage: 0,
+                primaryDamage: 0,
+                actualDamage: 0,
+                damageApplied: false,
+            });
+            expect(typeof entry.timestamp).toBe('number');
+        });
+
+        it('defaults optional config fields without throwing', () => {
+            storeSpellLastAttack(campaignName, {
+                casterName: 'Wizard',
+                spellName: 'Command',
+                saveType: 'WIS',
+                saveDc: 15,
+                attackScope: 'single',
+            });
+
+            const entry = setRuntimeValue.mock.calls[0][2];
+            expect(entry.spellSchool).toBeNull();
+            expect(entry.damageFormula).toBeNull();
+            expect(entry.damageType).toBeNull();
+            expect(entry.damageOnSuccess).toBe(0);
+            expect(entry.damageOnFailure).toBe(0);
+        });
+    });
+
+    // ─── addTargetResult ───────────────────────────────────────
+
+    describe('addTargetResult', () => {
+        it('returns without storing when no lastAttack exists or it is not a spell-save entry', async () => {
+            getRuntimeValue.mockReturnValue(null);
+            await addTargetResult(campaignName, { targetName: 'Hero', saveResult: 'failure' });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+
+            getRuntimeValue.mockReturnValue(makeLastAttack()); // rollType: 'attack'
+            await addTargetResult(campaignName, { targetName: 'Hero', saveResult: 'failure' });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
+
+        it('appends the target result and recomputes aggregate fields', async () => {
+            const existing = {
+                rollType: 'spell-save',
+                targetResults: [{
+                    targetName: 'Hero',
+                    saveResult: 'failure',
+                    roll: 5,
+                    total: 7,
+                    conditions: ['paralyzed'],
+                    appliedDamage: 9,
+                }],
+                affectedTargets: ['Hero'],
+                statusEffects: ['paralyzed'],
+                rawDamage: 9,
+                primaryDamage: 9,
+                actualDamage: 9,
+                damageApplied: true,
+            };
+            getRuntimeValue.mockReturnValue(existing);
+
+            await addTargetResult(campaignName, {
+                targetName: 'Wizard',
+                saveResult: 'success',
+                roll: 14,
+                total: 16,
+                conditions: [],
+                appliedDamage: 4,
+            });
+
+            expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+            const [scope, key, updated, campaign] = setRuntimeValue.mock.calls[0];
+            expect(scope).toBe('campaign');
+            expect(key).toBe('lastAttack');
+            expect(campaign).toBe(campaignName);
+
+            expect(updated.targetResults).toHaveLength(2);
+            expect(updated.targetResults[1]).toEqual({
+                targetName: 'Wizard',
+                saveResult: 'success',
+                roll: 14,
+                total: 16,
+                conditions: [],
+                appliedDamage: 4,
+            });
+            expect(updated.affectedTargets).toEqual(['Hero', 'Wizard']);
+            expect(updated.statusEffects).toEqual(['paralyzed']);
+            expect(updated.rawDamage).toBe(13);
+            expect(updated.primaryDamage).toBe(13);
+            expect(updated.actualDamage).toBe(13);
+            expect(updated.damageApplied).toBe(true);
+            // existing entry is not mutated
+            expect(existing.actualDamage).toBe(9);
+        });
+
+        it('clears damageApplied when aggregated damage is zero', async () => {
+            getRuntimeValue.mockReturnValue({ rollType: 'spell-save', targetResults: [] });
+
+            await addTargetResult(campaignName, { targetName: 'Hero', saveResult: 'success' });
+
+            const updated = setRuntimeValue.mock.calls[0][2];
+            expect(updated.actualDamage).toBe(0);
+            expect(updated.damageApplied).toBe(false);
+            expect(updated.statusEffects).toEqual([]);
+        });
     });
 
     // ─── rollbackSpellEffects ─────────────────────────────────
 
     describe('rollbackSpellEffects', () => {
-        function makeSpellLastAttack(overrides = {}) {
-            return {
-                attackerName: 'Goblin',
-                targetName: 'Hero',
-                attackName: 'Fire Bolt',
-                damageName: 'Fire Bolt',
-                primaryDamage: 8,
-                secondaryDamage: 0,
-                actualDamage: 8,
-                affectedTargets: ['Hero'],
-                statusEffects: null,
-                ...overrides,
-            };
-        }
-
         const cs = { creatures: [{ name: 'Hero', currentHp: 10, maxHp: 20 }] };
 
         it('returns early when no combat context is provided and fetch returns null', async () => {
@@ -445,6 +613,24 @@ describe('damageRollback', () => {
 
             expect(applyHealingToTarget).toHaveBeenCalledWith(cs, 'Hero', 13, campaignName);
             expect(result.damageHealed).toBe(13);
+        });
+
+        it('heals per-target damage from targetResults when present', async () => {
+            const attack = makeSpellLastAttack({
+                targetResults: [
+                    { targetName: 'Hero', appliedDamage: 7, conditions: ['burning'] },
+                    { targetName: 'Wizard', appliedDamage: 3, conditions: [] },
+                ],
+            });
+            applyHealingToTarget.mockReturnValue({ newHp: 20, actualHeal: 7, oldHp: 13 });
+
+            const result = await rollbackSpellEffects(attack, campaignName, 'Counterspell', cs);
+
+            expect(applyHealingToTarget).toHaveBeenCalledWith(cs, 'Hero', 7, campaignName);
+            expect(applyHealingToTarget).toHaveBeenCalledWith(cs, 'Wizard', 3, campaignName);
+            expect(result.targetsHealed).toBe(2);
+            expect(result.damageHealed).toBe(10);
+            expect(result.conditionsRemoved).toEqual([{ targetName: 'Hero', condition: 'burning' }]);
         });
 
         it('removes conditions from lastAttack.statusEffects', async () => {
@@ -499,26 +685,11 @@ describe('damageRollback', () => {
 
         it('falls back to damageName when attackName is absent', async () => {
             const attack = makeSpellLastAttack({ attackName: undefined, damageName: 'Lightning Bolt' });
-
-            await rollbackSpellEffects(attack, campaignName, 'Counterspell', cs);
-
-            // Should not throw — spellName resolves to 'Lightning Bolt'
-        });
-
-        it('uses affectedTargets from lastAttack instead of targetName', async () => {
-            const attack = makeSpellLastAttack({
-                targetName: 'Hero',
-                affectedTargets: ['Hero', 'Wizard'],
-                primaryDamage: 6,
-                actualDamage: 6,
-            });
-            applyHealingToTarget.mockReturnValue({ newHp: 16, actualHeal: 6, oldHp: 10 });
+            applyHealingToTarget.mockReturnValue({ newHp: 20, actualHeal: 8, oldHp: 10 });
 
             const result = await rollbackSpellEffects(attack, campaignName, 'Counterspell', cs);
 
-            expect(applyHealingToTarget).toHaveBeenCalledTimes(2);
-            expect(result.targetsHealed).toBe(2);
+            expect(result.logDescription).toContain("'Lightning Bolt'");
         });
     });
-});
 });

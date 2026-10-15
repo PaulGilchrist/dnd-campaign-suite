@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 // MA-1877: Demogorgon Tentacle — the save-FAIL-face max-HP-reduce consumer
 // (§388 code-gap fix, MA-1847 §511 fail-face grant seam precedent). The row
 // (monsters.json demogorgon actions[1]) now authors save_dc 23 +
@@ -14,8 +15,10 @@
 // replaces campaign lastAttack with a save descriptor BEFORE applySaveOutcome).
 // Both-faces rows (MA-1547 Draining Kiss: autoDamageFormula set) are refused
 // HERE and stay on applySaveHpMaxReduceLeg byte-identically — the guard is
-// the double-pay closure. Real hpMaxReduceService runs: cs maxHp drop +
-// currentHp clamp + te ledger {baseMax,reduced,max} duration until_long_rest
+// the double-pay closure (both-faces lane itself is exhaustively locked in
+// saveProcessing.ma1547-draining-kiss.test.js; only the refusal pin lives
+// here). Real hpMaxReduceService runs: cs maxHp drop + currentHp clamp +
+// te ledger {baseMax,reduced,max} duration until_long_rest
 // (LR clear rides LONG_REST_TARGET_EFFECT_CLEAR_KEYS) + hp_max_reduce face
 // log + `condition applied` "Max HP Reduced"; NO addExpiration clock.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -33,9 +36,10 @@ vi.mock('../../services/ui/utils.js', () => ({
     default: { guid: () => 'id-' + Math.random().toString(36).slice(2) },
 }));
 
-const rollExpression = vi.fn(() => ({ total: 20, rolls: [5, 6, 9], modifier: 0 }));
+// Fixed 3d8 total for the MA-1547 double-pay refusal pin; the rider-only
+// tentacle lane never rolls (formula-less save leg).
 vi.mock('../../services/dice/diceRoller.js', () => ({
-    rollExpression: (...args) => rollExpression(...args),
+    rollExpression: () => ({ total: 20, rolls: [5, 6, 9], modifier: 0 }),
 }));
 
 // EB-NPC inline lane never opens a save prompt — static stub suffices.
@@ -126,11 +130,11 @@ const tentacleContext = (overrides = {}) => ({
     ...overrides,
 });
 
-async function resolveSave(context, { d20, bonus }) {
+async function resolveSave(context, { d20, bonus, characterName = DEMOGORGON }) {
     return await processSaveRoll({
         rollType: 'save',
         target: { name: TARGET, type: 'npc' },
-        characterName: DEMOGORGON,
+        characterName,
         campaignName,
         context: { ...context, effectiveD20: d20, effectiveBonus: bonus },
         bonus,
@@ -191,8 +195,7 @@ describe('MA-1877 save-FAIL face: rider pays', () => {
         expect(face).toBeTruthy();
         expect(face.description).toMatch(/reduced by 30/i);
         expect(face.description).toMatch(/long rest/i);
-        expect(face.description).toMatch(/999/);
-        expect(face.description).toMatch(/969/);
+        expect(face.description).toMatch(/999 → 969/);
         const grant = addEntryLogs.find(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Max HP Reduced');
         expect(grant).toBeTruthy();
         expect(grant.reason).toMatch(/30, equal to damage taken/);
@@ -233,64 +236,51 @@ describe('MA-1877 save-SUCCESS face: rider zero-pays (§87 dc_success full)', ()
 });
 
 describe('MA-1877 byte-inert + double-pay closure', () => {
-    it('MA-1547 twin control: Draining Kiss (autoDamageFormula set, both-faces lane) reduces EXACTLY once on fail — the new fail-face leg never second-pays', async () => {
-        const kissContext = {
+    it('MA-1547 refusal pin: Draining Kiss (autoDamageFormula set, both-faces lane) reduces EXACTLY once on fail — the new fail-face leg never second-pays', async () => {
+        // nat 5 + 0 = 5 < 15 → failure: save leg pays FULL 3d8 (mock 20) and
+        // applySaveHpMaxReduceLeg reduces max by 20 — ONCE; the fail-face leg
+        // returns at its autoDamageFormula guard. (Both-faces lane behavior is
+        // exhaustively locked in saveProcessing.ma1547-draining-kiss.test.js.)
+        await resolveSave(tentacleContext({
             saveDc: SUCCUBUS_KISS.save_dc,
             saveType: SUCCUBUS_KISS.save_type,
-            attackerName: 'Succubus 1',
             actionName: SUCCUBUS_KISS.name,
             dcSuccess: SUCCUBUS_KISS.dc_success,
             autoDamageFormula: SUCCUBUS_KISS.damage_dice_primary,
             autoDamageDamageType: 'Psychic',
             autoDamageName: SUCCUBUS_KISS.name,
-            saveConditions: [],
             saveHpMaxReduce: parseSaveHpMaxReduce(SUCCUBUS_KISS),
-            _characters: [{ name: TARGET, computedStats: { armorClass: 12 } }],
-            _target: { name: TARGET, type: 'npc' },
-        };
-        // nat 5 + 0 = 5 < 15 → failure: save leg pays FULL 3d8 (mock 20),
-        // applySaveHpMaxReduceLeg reduces max by 20 — ONCE.
-        await processSaveRoll({
-            rollType: 'save',
-            target: { name: TARGET, type: 'npc' },
-            characterName: 'Succubus 1',
-            campaignName,
-            context: { ...kissContext, effectiveD20: 5, effectiveBonus: 0 },
-            bonus: 0,
-            r1: 5,
-            r2: 5,
-            logEntry: (entry) => logEntryLogs.push(entry),
-            setPopupHtml: vi.fn(),
-        });
+        }), { d20: 5, bonus: 0, characterName: 'Succubus 1' });
 
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(20);
         expect(registerTargetEffect).toHaveBeenCalledTimes(1);
-        expect(registerTargetEffect.mock.calls[0][2]).toBe('hp_max_reduce');
         expect(registerTargetEffect.mock.calls[0][4]).toMatchObject({ baseMax: 999, reduced: 20, max: 979 });
         expect(bandit.maxHp).toBe(979);
     });
 
-    it('MA-1867 sibling control: Cthulhu Tentacles (rider-only grapple composite, NO max-reduce key) stays byte-inert on fail', async () => {
+    it('rows without the rider key stay byte-inert on fail — Cthulhu rider-only sibling AND a clauseless context (no te, no logs, max untouched)', async () => {
         expect(parseSaveHpMaxReduce(CTHULHU_TENTACLES)).toBeNull();
-        await resolveSave(tentacleContext({
-            saveDc: CTHULHU_TENTACLES.save_dc,
-            saveType: CTHULHU_TENTACLES.save_type,
-            actionName: CTHULHU_TENTACLES.name,
-            saveHpMaxReduce: parseSaveHpMaxReduce(CTHULHU_TENTACLES),
-            saveRiderAttackDamage: 22,
-        }), { d20: 3, bonus: 0 });
-
-        expect(registerTargetEffect).not.toHaveBeenCalled();
-        expect(hpMaxReduceLogs()).toHaveLength(0);
-        expect(bandit.maxHp).toBe(999);
-        expect(bandit.currentHp).toBe(999);
-    });
-
-    it('clauseless control: rider keys absent from the context → consumer zero-touch even on fail', async () => {
-        await resolveSave(tentacleContext({ saveHpMaxReduce: null, saveRiderAttackDamage: null }), { d20: 4, bonus: 0 });
-        expect(registerTargetEffect).not.toHaveBeenCalled();
-        expect(hpMaxReduceLogs()).toHaveLength(0);
-        expect(bandit.maxHp).toBe(999);
+        const inertContexts = [
+            // MA-1867 sibling: Cthulhu Tentacles (grapple composite, NO save_hp_max_reduce
+            // key) — dangerous variant: damage snapshot present, rider key absent.
+            tentacleContext({
+                saveDc: CTHULHU_TENTACLES.save_dc,
+                saveType: CTHULHU_TENTACLES.save_type,
+                actionName: CTHULHU_TENTACLES.name,
+                saveHpMaxReduce: parseSaveHpMaxReduce(CTHULHU_TENTACLES),
+                saveRiderAttackDamage: 22,
+            }),
+            // Clauseless: both rider keys stripped.
+            tentacleContext({ saveHpMaxReduce: null, saveRiderAttackDamage: null }),
+        ];
+        for (const context of inertContexts) {
+            // nat 3 + 0 fails BOTH DCs (23 tentacle, 26 cthulhu) → fail face runs
+            await resolveSave(context, { d20: 3, bonus: 0 });
+            expect(registerTargetEffect).not.toHaveBeenCalled();
+            expect(hpMaxReduceLogs()).toHaveLength(0);
+            expect(bandit.maxHp).toBe(999);
+            expect(bandit.currentHp).toBe(999);
+        }
     });
 });

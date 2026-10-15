@@ -1,3 +1,13 @@
+// @maintained-by-ai: 2026-10-14
+// createLogAndShow — Unbreakable Majesty ATTACK-SIDE trigger lane (hitResolution.
+// runUnbreakableMajesty): guard checks, one-shot attacker mark, save-DC and
+// prompt dispatch, activation/revocation logs, and the indefinite no-timers wait
+// for the player's save (2024 Oath of the Crown, public/data/2024/classes.json:
+// "whenever any creature hits you with an attack roll ... the attacker must
+// succeed on a Charisma saving throw ... or the attack misses instead" — the
+// rule is attack-type agnostic, so no per-weapon DC branches exist here).
+// Twin seam (useLoggedDiceRollAttack.target-effects-majesty-save.test.js): how
+// the save OUTCOME drives targetEffects revoke/consume via a stateful fake store.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -76,11 +86,11 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
     getBaitAndSwitchAcBonus: vi.fn(() => 0),
     getGuardianProtectionAcBonus: vi.fn(() => 0),
     getParryAcBonus: vi.fn(() => 0),
-  getSlowAcPenalty: () => 0,
+    getSlowAcPenalty: vi.fn(() => 0),
     dispatchUnbreakableMajestySave: vi.fn(),
     hasPotentCantrip: vi.fn(),
-    getShieldAcBonus: vi.fn(),
-    getShieldOfFaithAcBonus: vi.fn(),
+    getShieldAcBonus: vi.fn(() => 0),
+    getShieldOfFaithAcBonus: vi.fn(() => 0),
     getWardingBondAcBonus: vi.fn(() => 0),
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
@@ -112,7 +122,9 @@ import {
 } from './loggedDiceRollUtils.js';
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
 
-describe('createLogAndShow - Unbreakable Majesty Save Flow', () => {
+const MAJESTY_PROMPT_ID = 'majesty-majesty-guid-001'; // `majesty-${utils.guid()}`
+
+describe('createLogAndShow - Unbreakable Majesty attack-side trigger', () => {
     const deps = {
         characterName: 'TestFighter',
         campaignName: 'test-campaign',
@@ -122,219 +134,125 @@ describe('createLogAndShow - Unbreakable Majesty Save Flow', () => {
         autoDamageSourceRef: { current: null },
     };
 
-    const origSetTimeout = globalThis.setTimeout;
-    const origAddEventListener = window.addEventListener.bind(window);
-    const origRemoveEventListener = window.removeEventListener.bind(window);
-
     beforeEach(() => {
         vi.clearAllMocks();
-        window.addEventListener = origAddEventListener;
-        window.removeEventListener = origRemoveEventListener;
-        globalThis.setTimeout = origSetTimeout;
-        rollD20.mockReturnValue(20);
-        getTargetFromAttacker.mockReturnValue({ name: 'Mage', ac: 10 });
-        getShieldAcBonus.mockReturnValue(0);
-        getShieldOfFaithAcBonus.mockReturnValue(0);
-        getRuntimeValue.mockReturnValue(null);
-        loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Mage', type: 'npc', ac: 10 }] });
+        // clearAllMocks keeps implementations — re-pin so no stateful return
+        // value leaks from a previous test (twin-file pattern).
+        rollD20.mockReset().mockReturnValue(12); // 12 + 5 = 17 vs ac 10 → hit, non-crit
+        getTargetFromAttacker.mockReset().mockReturnValue({ name: 'Mage', ac: 10 });
+        getRuntimeValue.mockReset().mockReturnValue(null);
+        loadCombatSummary.mockReset().mockResolvedValue({ creatures: [{ name: 'Mage', type: 'npc', ac: 10 }] });
+        getShieldAcBonus.mockReset().mockReturnValue(0);
+        getShieldOfFaithAcBonus.mockReset().mockReturnValue(0);
+        isUnbreakableMajestyActive.mockReset().mockReturnValue(false);
+        hasAttackerTriggeredMajesty.mockReset().mockReturnValue(false);
+        getUnbreakableMajestySaveDc.mockReset().mockReturnValue(15);
+        markAttackerTriggeredMajesty.mockReset();
+        dispatchUnbreakableMajestySave.mockReset();
     });
 
-    function createFn() {
-        return createLogAndShow(deps);
+    function armMajesty(saveDc = 15) {
+        isUnbreakableMajestyActive.mockReturnValue(true);
+        getUnbreakableMajestySaveDc.mockReturnValue(saveDc);
     }
 
-    // no-timers T2: the majesty save prompt now waits INDEFINITELY (no 30s
-    // fail-open). Tests answer the prompt exactly as the player would —
-    // dispatching save-result for the majesty promptId until the flow settles.
-    async function runAnsweringMajestySave(weapon, bonus, ctx, success = true) {
-        globalThis.setTimeout = (cb) => { cb(); return 0; }; // benign deferrals only
-        try {
-            const fn = createFn();
-            let settled = false;
-            const run = fn(weapon, bonus, 'attack', ctx).then((r) => { settled = true; return r; });
-            for (let i = 0; i < 40 && !settled; i++) {
-                await new Promise((r) => origSetTimeout(r, 5));
-                window.dispatchEvent(new CustomEvent('save-result', {
-                    detail: { promptId: 'majesty-majesty-guid-001', success },
-                }));
-            }
-            return await run;
-        } finally {
-            globalThis.setTimeout = origSetTimeout;
-        }
+    function majestyLogCalls() {
+        return deps.logEntry.mock.calls.filter(
+            (call) => call[0]?.type === 'ability_use' && call[0]?.abilityName === 'Unbreakable Majesty',
+        );
     }
 
-    describe('majesty triggers when attack hits defender with active majesty', () => {
-        it('checks majesty state, marks attacker, and dispatches save when hit and target has majesty active', async () => {
-            isUnbreakableMajestyActive.mockReturnValue(true);
-            hasAttackerTriggeredMajesty.mockReturnValue(false);
-            getUnbreakableMajestySaveDc.mockReturnValue(15);
-
-            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
-
-            expect(isUnbreakableMajestyActive).toHaveBeenCalledWith('Mage', 'test-campaign');
-            expect(hasAttackerTriggeredMajesty).toHaveBeenCalledWith('Mage', 'TestFighter', 'test-campaign');
-            expect(markAttackerTriggeredMajesty).toHaveBeenCalledWith('Mage', 'TestFighter', 'test-campaign');
-            expect(dispatchUnbreakableMajestySave).toHaveBeenCalledWith(
-                'test-campaign',
-                'Mage',
-                'TestFighter',
-                15,
-                'majesty-majesty-guid-001',
-            );
-        });
-
-        it('logs majesty activation description when the save prompt is dispatched', async () => {
-            isUnbreakableMajestyActive.mockReturnValue(true);
-            hasAttackerTriggeredMajesty.mockReturnValue(false);
-            getUnbreakableMajestySaveDc.mockReturnValue(15);
-
-            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
-
-            const majestyLogEntries = deps.logEntry.mock.calls.filter(
-                (call) => call[0]?.type === 'ability_use' && call[0]?.abilityName === 'Unbreakable Majesty',
-            );
-            expect(majestyLogEntries.length).toBeGreaterThanOrEqual(1);
-            expect(majestyLogEntries[0][0].description).toContain('Unbreakable Majesty');
-            expect(majestyLogEntries[0][0].description).toContain('CHA save');
-            expect(majestyLogEntries[0][0].description).toContain('DC 15');
-        });
-
-        it('marks attacker as triggered to prevent re-triggering in the same round', async () => {
-            isUnbreakableMajestyActive.mockReturnValue(true);
-            hasAttackerTriggeredMajesty.mockReturnValue(false);
-            getUnbreakableMajestySaveDc.mockReturnValue(15);
-            const markSpy = vi.fn();
-            vi.mocked(markAttackerTriggeredMajesty).mockImplementation(markSpy);
-
-            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
-
-            expect(markSpy).toHaveBeenCalledWith('Mage', 'TestFighter', 'test-campaign');
-        });
-    });
-
-        it('never auto-resolves by the clock — waits for the player, then honors their failed save', async () => {
-            isUnbreakableMajestyActive.mockReturnValue(true);
-            hasAttackerTriggeredMajesty.mockReturnValue(false);
-            getUnbreakableMajestySaveDc.mockReturnValue(19);
-
-            // no-timers T2: the old 30s fail-open window is gone. The flow
-            // must still be PENDING after real time has passed (no timeout log,
-            // no silent resolution) and complete only when the player saves.
-            globalThis.setTimeout = (cb) => { cb(); return 0; };
-            const fn = createFn();
-            globalThis.setTimeout = origSetTimeout;
-            let settled = false;
-            const run = fn('Mace', 5, 'attack', { targetName: 'Mage' }).then((r) => { settled = true; return r; });
-            await new Promise((r) => origSetTimeout(r, 80));
-            expect(settled).toBe(false);
-
+    // no-timers T2: the majesty save prompt waits INDEFINITELY (no 30s
+    // fail-open). Answer it exactly as the player would — dispatch save-result
+    // for the majesty promptId until the roll settles (bounded poll; never a
+    // game clock).
+    async function rollAnsweringMajestySave(name = 'Longsword', bonus = 5, success = true) {
+        const run = createLogAndShow(deps)(name, bonus, 'attack', { targetName: 'Mage' });
+        let settled = false;
+        run.then(() => { settled = true; });
+        for (let i = 0; i < 40 && !settled; i++) {
+            await new Promise((r) => setTimeout(r, 5));
             window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'majesty-majesty-guid-001', success: false },
+                detail: { promptId: MAJESTY_PROMPT_ID, success },
             }));
-            await run;
+        }
+        await run;
+    }
 
-            const timeoutLogs = deps.logEntry.mock.calls.filter(
-                (call) => /timeout/i.test(call[0]?.description || ''),
-            );
-            expect(timeoutLogs.length).toBe(0);
-            const missLogs = deps.logEntry.mock.calls.filter(
-                (call) => call[0]?.abilityName === 'Unbreakable Majesty' && /attack misses due to Unbreakable Majesty/i.test(call[0]?.description || ''),
-            );
-            expect(missLogs.length).toBe(1);
-        });
+    it('marks the attacker once and dispatches the CHA save prompt when a hit lands on a majesty defender', async () => {
+        armMajesty();
 
-    describe('majesty does not trigger', () => {
-        it('does not trigger majesty when majesty is not active on the target', async () => {
-            isUnbreakableMajestyActive.mockReturnValue(false);
+        await rollAnsweringMajestySave();
 
-            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
-
-            expect(isUnbreakableMajestyActive).toHaveBeenCalledWith('Mage', 'test-campaign');
-            expect(hasAttackerTriggeredMajesty).not.toHaveBeenCalled();
-            expect(markAttackerTriggeredMajesty).not.toHaveBeenCalled();
-            expect(dispatchUnbreakableMajestySave).not.toHaveBeenCalled();
-        });
-
-        it('does not trigger majesty when attacker already triggered this round', async () => {
-            isUnbreakableMajestyActive.mockReturnValue(true);
-            hasAttackerTriggeredMajesty.mockReturnValue(true);
-
-            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
-
-            expect(hasAttackerTriggeredMajesty).toHaveBeenCalledWith('Mage', 'TestFighter', 'test-campaign');
-            expect(markAttackerTriggeredMajesty).not.toHaveBeenCalled();
-            expect(dispatchUnbreakableMajestySave).not.toHaveBeenCalled();
-        });
-
-        it('does not trigger majesty when attack misses before majesty check', async () => {
-            isUnbreakableMajestyActive.mockReturnValue(true);
-            hasAttackerTriggeredMajesty.mockReturnValue(false);
-            getUnbreakableMajestySaveDc.mockReturnValue(15);
-            rollD20.mockReturnValue(3);
-
-            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
-
-            expect(dispatchUnbreakableMajestySave).not.toHaveBeenCalled();
-            expect(markAttackerTriggeredMajesty).not.toHaveBeenCalled();
-        });
+        expect(isUnbreakableMajestyActive).toHaveBeenCalledWith('Mage', 'test-campaign');
+        expect(hasAttackerTriggeredMajesty).toHaveBeenCalledWith('Mage', 'TestFighter', 'test-campaign');
+        // ONE-SHOT mark: recorded once per hit so the same attacker cannot
+        // re-trigger majesty again this round.
+        expect(markAttackerTriggeredMajesty).toHaveBeenCalledTimes(1);
+        expect(markAttackerTriggeredMajesty).toHaveBeenCalledWith('Mage', 'TestFighter', 'test-campaign');
+        expect(dispatchUnbreakableMajestySave).toHaveBeenCalledWith(
+            'test-campaign', 'Mage', 'TestFighter', 15, MAJESTY_PROMPT_ID,
+        );
     });
 
-    describe('majesty with different save DC values', () => {
-        it('dispatches the correct DC from majesty configuration', async () => {
-            isUnbreakableMajestyActive.mockReturnValue(true);
-            hasAttackerTriggeredMajesty.mockReturnValue(false);
-            getUnbreakableMajestySaveDc.mockReturnValue(20);
+    it('logs the majesty activation with the CHA save type and DC when the prompt is dispatched', async () => {
+        armMajesty();
 
-            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
+        await rollAnsweringMajestySave();
 
-            expect(dispatchUnbreakableMajestySave).toHaveBeenCalledWith(
-                'test-campaign',
-                'Mage',
-                'TestFighter',
-                20,
-                'majesty-majesty-guid-001',
-            );
-        });
-
-        it('uses DC 0 when majesty save DC is not set', async () => {
-            isUnbreakableMajestyActive.mockReturnValue(true);
-            hasAttackerTriggeredMajesty.mockReturnValue(false);
-            getUnbreakableMajestySaveDc.mockReturnValue(0);
-
-            await runAnsweringMajestySave('Longsword', 5, { targetName: 'Mage' });
-
-            expect(dispatchUnbreakableMajestySave).toHaveBeenCalledWith(
-                'test-campaign',
-                'Mage',
-                'TestFighter',
-                0,
-                'majesty-majesty-guid-001',
-            );
-        });
+        const activation = majestyLogCalls();
+        expect(activation.length).toBeGreaterThanOrEqual(1);
+        expect(activation[0][0].description).toContain('Unbreakable Majesty');
+        expect(activation[0][0].description).toContain('CHA save');
+        expect(activation[0][0].description).toContain('DC 15');
     });
 
-    describe('majesty with different attack types', () => {
-        it('triggers majesty on spell attacks', async () => {
-            isUnbreakableMajestyActive.mockReturnValue(true);
-            hasAttackerTriggeredMajesty.mockReturnValue(false);
-            getUnbreakableMajestySaveDc.mockReturnValue(15);
+    it('never auto-resolves by the clock — waits for the player, then honors their failed save', async () => {
+        armMajesty(19);
 
-            await runAnsweringMajestySave('Eldritch Blast', 5, { targetName: 'Mage' });
+        const run = createLogAndShow(deps)('Mace', 5, 'attack', { targetName: 'Mage' });
+        let settled = false;
+        run.then(() => { settled = true; });
+        await new Promise((r) => setTimeout(r, 80));
+        // Still PENDING after real time has passed — no timeout log, no silent
+        // resolution (the old 30s fail-open window is retired).
+        expect(settled).toBe(false);
 
-            expect(dispatchUnbreakableMajestySave).toHaveBeenCalled();
-            expect(markAttackerTriggeredMajesty).toHaveBeenCalled();
-        });
+        window.dispatchEvent(new CustomEvent('save-result', {
+            detail: { promptId: MAJESTY_PROMPT_ID, success: false },
+        }));
+        await run;
 
-        it('triggers majesty on melee weapon attacks', async () => {
-            isUnbreakableMajestyActive.mockReturnValue(true);
-            hasAttackerTriggeredMajesty.mockReturnValue(false);
-            getUnbreakableMajestySaveDc.mockReturnValue(15);
+        expect(deps.logEntry.mock.calls.filter(
+            (call) => /timeout/i.test(call[0]?.description || ''),
+        )).toHaveLength(0);
+        const missLogs = majestyLogCalls().filter(
+            (call) => /attack misses due to Unbreakable Majesty/i.test(call[0]?.description || ''),
+        );
+        expect(missLogs).toHaveLength(1);
+    });
 
-            await runAnsweringMajestySave('Greatsword', 8, { targetName: 'Mage' });
+    it.each`
+        scenario                              | majestyActive | alreadyTriggered
+        ${'majesty is not active on the defender'} | ${false}      | ${false}
+        ${'the attacker already triggered majesty this round'} | ${true}       | ${true}
+    `('does not trigger when $scenario', async ({ majestyActive, alreadyTriggered }) => {
+        isUnbreakableMajestyActive.mockReturnValue(majestyActive);
+        hasAttackerTriggeredMajesty.mockReturnValue(alreadyTriggered);
 
-            expect(dispatchUnbreakableMajestySave).toHaveBeenCalled();
-            expect(markAttackerTriggeredMajesty).toHaveBeenCalled();
-        });
+        await rollAnsweringMajestySave();
+
+        expect(markAttackerTriggeredMajesty).not.toHaveBeenCalled();
+        expect(dispatchUnbreakableMajestySave).not.toHaveBeenCalled();
+    });
+
+    it('does not trigger majesty when the attack misses before the check', async () => {
+        armMajesty();
+        rollD20.mockReturnValue(3); // 3 + 5 = 8 vs ac 10 → miss; majesty never arms
+
+        await rollAnsweringMajestySave();
+
+        expect(markAttackerTriggeredMajesty).not.toHaveBeenCalled();
+        expect(dispatchUnbreakableMajestySave).not.toHaveBeenCalled();
     });
 });

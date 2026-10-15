@@ -1,8 +1,22 @@
+// @maintained-by-ai: 2026-10-15
+// Special-path skip lanes for useSpellMetamagicFlow — branches no sibling suite pins:
+// - Foresight skip: default allTargets lane stamps EVERY combatant (exact payload).
+// - Protection from Evil and Good skip: the SIMPLE_SPELL_SPECS skipTargets override
+//   (useSimpleSpellHandlers.js) must log ONLY the caster — unique in the registry.
+// - True Polymorph skip AFTER path-select: the multi-stage machine clears unpaid.
+// Owned elsewhere and removed as duplicates: Animal Shapes target-confirm popup +
+// lv8 CR gate (complex-handlers.spells.test.js), beast-picker stage-2→3 handoff
+// and concentration stamps (multi-stage.test.js), skip-before-select for all 18
+// table spells incl. True Polymorph and the never-arm no-op (skip.test.js),
+// Shield of Faith no-gate routing (gate.test.js) and its un-armed handler guards
+// (generic useConfirmableFlow pending guard, exercised in skip/rollback lanes).
+// Spell levels/casting times verified against public/data/spells.json 2026-10-15.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
 import { addEntry } from '../../services/ui/logService.js';
-import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js';
+import { applyTruePolymorph } from '../../services/automation/handlers/spells/truePolymorphService.js';
 
 
 vi.mock('./useMetamagic.js', () => ({
@@ -62,7 +76,6 @@ vi.mock('../../services/automation/index.js', () => ({
   applyFeignDeath: vi.fn(() => Promise.resolve(null)),
   applyLongstriderEffect: vi.fn(() => Promise.resolve(null)),
   applySpareTheDyingEffect: vi.fn(() => Promise.resolve(null)),
-  applyPassWithoutTraceEffect: vi.fn(() => Promise.resolve(null)),
   applyBeaconOfHopeEffect: vi.fn(() => Promise.resolve(null)),
   applyAuraOfLifeEffect: vi.fn(),
   applyAuraOfPurityEffect: vi.fn(),
@@ -179,198 +192,107 @@ Object.defineProperty(window, 'dispatchEvent', {
   writable: true,
 });
 
-function makePlayerStats(overrides = {}) {
-  return {
-    name: 'TestSorcerer',
-    class: { name: 'Sorcerer' },
-    level: 5,
-    ...overrides,
-  };
-}
+const CAMPAIGN = 'TestCampaign';
+const CASTER = 'TestSorcerer';
 
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Fireball',
-    level: 3,
-    casting_time: '1 Action',
-    range: '150 ft.',
-    ...overrides,
-  };
-}
-
-function renderHookWithSpell(hookSetup, spellName, spellOverrides = {}) {
+function renderFlow() {
   const onExecute = vi.fn();
   const { result } = renderHook(() =>
-    hookSetup(onExecute)
+    useSpellMetamagicFlow({
+      playerStats: { name: CASTER, class: { name: 'Sorcerer' }, level: 5 },
+      campaignName: CAMPAIGN,
+      onExecute,
+      setSecondaryTargetModal: null,
+      characters: [],
+      setPopupHtml: vi.fn(),
+    })
   );
-  const spell = makeSpell({ name: spellName, ...spellOverrides });
-  act(() => {
-    result.current.gateMetamagic(spell);
-  });
-  return { result, onExecute, spell };
+  return { result, onExecute };
 }
 
-describe('useSpellMetamagicFlow — handleAnimalShapesBeastConfirm success', () => {
+async function gateSpell(result, spell) {
+  await act(async () => {
+    await result.current.gateMetamagic(spell);
+  });
+}
+
+describe('useSpellMetamagicFlow — skip lanes with spell-specific target lists', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
   });
 
-  it('sets animalShapes concentration state when result.ok is true', async () => {
-    const animalShapesModule = await import('../../services/automation/handlers/spells/animalShapesService.js');
-    animalShapesModule.applyAnimalShapes.mockResolvedValue({ ok: true });
-
-    const setPopupHtml = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-    );
-
-    const allySel = await import('../../hooks/useAllySelection.js');
-    allySel.getAllyList.mockReturnValueOnce(['goblin a']);
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Animal Shapes', level: 8 }));
-    });
-
-    expect(result.current.pendingAnimalShapes).not.toBeNull();
-
-    await act(async () => {
-      await result.current.handleAnimalShapesTargetConfirm(['Goblin A']);
-    });
-
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'animal_shapes_target_selection',
-    }));
-  });
-});
-
-describe('useSpellMetamagicFlow — handleTruePolymorphSkip', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-  });
-
-  it('clears pending truePolymorph without calling onExecute', () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'True Polymorph',
-      { level: 9 },
-    );
-
-    act(() => {
-      result.current.handleTruePolymorphPathSelect('creature_to_creature');
-    });
-
-    act(() => {
-      result.current.handleTruePolymorphSkip();
-    });
-
-    expect(result.current.pendingTruePolymorph).toBeNull();
-  });
-});
-
-describe('useSpellMetamagicFlow — handleForesightSkip', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-  });
-
-  it('clears pending foresight and logs entry on skip', () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Foresight',
-      { level: 9 },
-    );
+  it('Foresight skip: default allTargets lane logs EVERY combatant, then clears pending', async () => {
+    const { result } = renderFlow();
+    // spells.json: lv9, 1 minute, Touch (no casting-time branch in the lane — pure echo).
+    await gateSpell(result, { name: 'Foresight', level: 9, casting_time: '1 minute', range: 'Touch' });
+    expect(result.current.pendingForesight).not.toBeNull();
 
     act(() => {
       result.current.handleForesightSkip();
     });
 
     expect(result.current.pendingForesight).toBeNull();
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
       type: 'spell',
-      characterName: 'TestSorcerer',
-      targetName: 'TestSorcerer',
-      targets: ['TestSorcerer', 'Goblin A', 'Goblin B', 'Goblin C'],
+      characterName: CASTER,
+      targetName: CASTER,
+      targets: [CASTER, 'Goblin A', 'Goblin B', 'Goblin C'],
       spellName: 'Foresight',
       spellLevel: 9,
-      castingTime: '1 Action',
+      castingTime: '1 minute',
       timestamp: expect.any(Number),
     });
   });
-});
 
-describe('useSpellMetamagicFlow — handleProtectionFromEvilAndGoodSkip', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-  });
-
-  it('clears pending and logs entry on skip', () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Protection from Evil and Good',
-      { level: 1 },
-    );
+  it('Protection from Evil and Good skip: skipTargets override logs ONLY the caster', async () => {
+    const { result } = renderFlow();
+    // spells.json: lv1, 1 action, Touch. The gate includes the caster in creatureTargets,
+    // and the spec's skipTargets override picks it out — goblins must NOT be stamped.
+    await gateSpell(result, { name: 'Protection from Evil and Good', level: 1, casting_time: '1 action', range: 'Touch' });
+    expect(result.current.pendingProtectionFromEvilAndGood).not.toBeNull();
 
     act(() => {
       result.current.handleProtectionFromEvilAndGoodSkip();
     });
 
     expect(result.current.pendingProtectionFromEvilAndGood).toBeNull();
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
       type: 'spell',
-      characterName: 'TestSorcerer',
-      targetName: 'TestSorcerer',
-      targets: ['TestSorcerer'],
+      characterName: CASTER,
+      targetName: CASTER,
+      targets: [CASTER],
       spellName: 'Protection from Evil and Good',
       spellLevel: 1,
-      castingTime: '1 Action',
+      castingTime: '1 action',
       timestamp: expect.any(Number),
     });
   });
 });
 
-describe('useSpellMetamagicFlow — Shield of Faith Sorcerer flow', () => {
+describe('useSpellMetamagicFlow — True Polymorph skip after path-select', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
   });
 
-  it('sets pendingMetamagic for Shield of Faith (no gate)', () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Shield of Faith',
-      { level: 1 },
-    );
-
-    expect(result.current.pendingMetamagic).not.toBeNull();
-    expect(result.current.pendingShieldOfFaith).toBeNull();
-  });
-
-  it('handleShieldOfFaithConfirm does nothing without pendingShieldOfFaith', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
+  it('skip mid-machine (path persisted, nothing paid) clears without log, refund, or apply', async () => {
+    const { result, onExecute } = renderFlow();
+    // spells.json: lv9, 1 action, 30 feet. creature_to_creature pays at target-confirm,
+    // so skipping after path-select must leave no money movement (clear lane).
+    await gateSpell(result, { name: 'True Polymorph', level: 9, casting_time: '1 action', range: '30 feet' });
 
     act(() => {
-      result.current.handleShieldOfFaithConfirm(['Goblin A']);
+      result.current.handleTruePolymorphPathSelect('creature_to_creature');
     });
-
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('handleShieldOfFaithSkip does nothing without pendingShieldOfFaith', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
+    // Path-select keeps the machine open (multi-stage seam) — skip must still reach it.
+    expect(result.current.pendingTruePolymorph).not.toBeNull();
 
     act(() => {
-      result.current.handleShieldOfFaithSkip();
+      result.current.handleTruePolymorphSkip();
     });
 
+    expect(result.current.pendingTruePolymorph).toBeNull();
+    expect(addEntry).not.toHaveBeenCalled();
     expect(onExecute).not.toHaveBeenCalled();
+    expect(applyTruePolymorph).not.toHaveBeenCalled();
   });
 });

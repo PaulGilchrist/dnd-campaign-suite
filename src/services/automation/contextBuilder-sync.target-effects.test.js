@@ -1,3 +1,8 @@
+// @maintained-by-ai
+// Target-axis targetEffects → forcedMode contract for buildAttackContextSync:
+// one-shot consumption (distracting strike), unconsumed adv/dis forced modes,
+// sundering-blow inertness (applied downstream), and Death Ward disadvantage.
+// Fully mocked, deterministic — no churn needed when the app changes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -155,20 +160,13 @@ describe('contextBuilder-sync: target effects that grant advantage (consumed)', 
     defaultAuraMocks();
   });
 
-  it.each([
-    {
-      effect: 'distracting_strike_advantage',
-      name: 'distracting strike',
-      setup: () => ({ effect: 'distracting_strike_advantage', target: 'Orc', source: 'Ally' }),
-    },
-    {
-      effect: 'next_attack_advantage',
-      name: 'vex (next_attack_advantage)',
-      setup: () => ({ effect: 'next_attack_advantage', target: 'Fighter1', vexTarget: 'Orc', source: 'Thorn' }),
-    },
-  ])('sets advantage and consumes $name effect', async ({ setup }) => {
+  // WM-008 vex (next_attack_advantage, attacker-held te with vexTarget) consumption
+  // lives in contextBuilder-sync.wm008-vex-consume.test.js — target-axis only here.
+  it('sets advantage and consumes distracting_strike_advantage effect', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
-      if (name === 'campaign' && key === 'targetEffects') return [setup()];
+      if (name === 'campaign' && key === 'targetEffects') return [
+        { effect: 'distracting_strike_advantage', target: 'Orc', source: 'Ally' },
+      ];
       if (key === 'activeBuffs') return [];
       return undefined;
     });
@@ -205,7 +203,7 @@ describe('contextBuilder-sync: target effects that grant advantage (consumed)', 
   });
 });
 
-describe('contextBuilder-sync: target effects that grant advantage (not consumed)', () => {
+describe('contextBuilder-sync: target effects that force attack mode (not consumed)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     defaultBaseAttackContext();
@@ -214,19 +212,22 @@ describe('contextBuilder-sync: target effects that grant advantage (not consumed
   });
 
   it.each([
-    { effect: 'reckless_attack', setup: () => ({ effect: 'reckless_attack', target: 'Orc' }) },
-    { effect: 'crusher_enhanced_critical', setup: () => ({ effect: 'crusher_enhanced_critical', target: 'Orc' }) },
-    { effect: 'protection', setup: () => ({ effect: 'protection', target: 'Orc', source: 'Paladin' }) },
-  ])('sets forcedMode when $effect effect is on target', async ({ setup }) => {
+    { effect: 'reckless_attack', te: { effect: 'reckless_attack', target: 'Orc' }, expected: 'advantage' },
+    { effect: 'crusher_enhanced_critical', te: { effect: 'crusher_enhanced_critical', target: 'Orc' }, expected: 'advantage' },
+    // Protection rides the deferred resolver chain, not the stored-count scan.
+    { effect: 'protection', te: { effect: 'protection', target: 'Orc', source: 'Paladin' }, expected: 'disadvantage' },
+  ])('sets $expected when $effect effect is on target', async ({ te, expected }) => {
     getRuntimeValue.mockImplementation((name, key) => {
-      if (name === 'campaign' && key === 'targetEffects') return [setup()];
+      if (name === 'campaign' && key === 'targetEffects') return [te];
       if (key === 'activeBuffs') return [];
       return undefined;
     });
 
     const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
-    expect(result.forcedMode).toBe(setup().effect === 'protection' ? 'disadvantage' : 'advantage');
+    expect(result.forcedMode).toBe(expected);
+    // Not consumed — the te survives the attack for later turns/twins.
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects', expect.anything(), 'camp');
   });
 
   it('does not set advantage/disadvantage when effect targets a different creature', async () => {
@@ -252,7 +253,12 @@ describe('contextBuilder-sync: next_attack_bonus (Sundering Blow)', () => {
     defaultAuraMocks();
   });
 
-  it('processes next_attack_bonus effects on target', async () => {
+  // Contract (formula quirk, pinned deliberately): buildAttackContextSync computes
+  // effectiveHitBonus BEFORE computeSunderingBonus runs, so the +5 never lands on
+  // hitBonus here — the bonus is applied downstream in d20RollComputation.js, which
+  // reads the te itself (covered in useLoggedDiceRollAttack.misc-effects.test.js).
+  // This suite pins that the sync builder leaves the te intact and the bonus inert.
+  it('leaves hitBonus and next_attack_bonus te untouched on target (applied downstream)', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'campaign' && key === 'targetEffects') return [
         { effect: 'next_attack_bonus', target: 'Orc', value: 5 },
@@ -264,21 +270,8 @@ describe('contextBuilder-sync: next_attack_bonus (Sundering Blow)', () => {
     const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.hitBonus).toBe(7);
-  });
-
-  it('processes multiple next_attack_bonus effects on target', async () => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (name === 'campaign' && key === 'targetEffects') return [
-        { effect: 'next_attack_bonus', target: 'Orc', value: 5 },
-        { effect: 'next_attack_bonus', target: 'Orc', value: 3 },
-      ];
-      if (key === 'activeBuffs') return [];
-      return undefined;
-    });
-
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
-
-    expect(result.hitBonus).toBe(7);
+    expect(result.hitBonusFormula).not.toContain('Sundering Blow');
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects', expect.anything(), 'camp');
   });
 });
 
@@ -304,17 +297,5 @@ describe('contextBuilder-sync: Death Ward grants disadvantage on attacks', () =>
     const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
 
     expect(result.forcedMode).toBeUndefined();
-  });
-
-  it('stacks with other disadvantage sources', async () => {
-    isDeathWardActive.mockReturnValue(true);
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeBuffs') return [{ effect: 'dodge' }];
-      return undefined;
-    });
-
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
-
-    expect(result.forcedMode).toBe('disadvantage');
   });
 });

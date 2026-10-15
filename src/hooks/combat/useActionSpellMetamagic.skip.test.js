@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useActionSpellMetamagic } from './useActionSpellMetamagic.js';
@@ -34,41 +35,34 @@ vi.mock('../../services/rules/spells/spellCastService.js', () => ({
   executeSpellCast: vi.fn(() => Promise.resolve(null)),
 }));
 
+// Skip lane: handleActionMetamagicSkip must clear pending, log a free-cast
+// spell entry (metamagic: [], spCost: 0), and fire the pending action with
+// an empty metaCtx. Queuing, confirm payment, AoE guards, and modal routing
+// are owned by the sibling lanes (castClick / confirm / aoeClick /
+// modalRouting / attackClick).
 describe('useActionSpellMetamagic - handleActionMetamagicSkip', () => {
   setupBeforeEach();
 
-  // ── Skip with pending action ─────────────────────────────────────────────
-
-  it('clears pending and logs spell entry when skipping with a pending action', async () => {
-    const spell = makeSpell();
-    const props = makeHookProps({
+  const sorcererWith = (...spells) =>
+    makeHookProps({
       playerStats: {
         name: 'TestSorcerer',
         class: { name: 'Sorcerer' },
         level: 5,
-        spellAbilities: { spells: [spell] },
+        spellAbilities: { spells },
       },
     });
+
+  it('clears pending, logs a free-cast spell entry, and casts with empty metaCtx', async () => {
     const { addEntry } = await import('../../services/ui/logService.js');
-    const { isPsionicSpell, hasPsionicSorcery } = await import(
-      '../../services/rules/spells/metamagicRules.js'
-    );
-    const { executeSpellCast } = await import(
-      '../../services/rules/spells/spellCastService.js'
-    );
+    const { executeSpellCast } = await import('../../services/rules/spells/spellCastService.js');
 
-    isPsionicSpell.mockReturnValue(false);
-    hasPsionicSorcery.mockReturnValue(false);
-    executeSpellCast.mockResolvedValue(null);
-
-    const attack = makeAttack({ name: 'Fireball', spellLevel: 3, castingTime: '1 Action' });
-
+    const props = sorcererWith(makeSpell());
     const { result } = renderHook(() => useActionSpellMetamagic(props));
 
     await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
+      result.current.handleActionSpellDamageClick(makeAttack());
     });
-
     expect(result.current.pendingActionMetamagic).not.toBeNull();
 
     await act(async () => {
@@ -89,17 +83,15 @@ describe('useActionSpellMetamagic - handleActionMetamagicSkip', () => {
         timestamp: expect.any(Number),
       }),
     );
-    expect(executeSpellCast).toHaveBeenCalled();
+    expect(executeSpellCast).toHaveBeenCalledTimes(1);
+    expect(executeSpellCast.mock.calls[0][1]).toEqual({});
   });
 
   it('does not log or call spell services when skipping with no pending action', async () => {
     const { addEntry } = await import('../../services/ui/logService.js');
-    const { executeSpellCast } = await import(
-      '../../services/rules/spells/spellCastService.js'
-    );
+    const { executeSpellCast } = await import('../../services/rules/spells/spellCastService.js');
 
-    const props = makeHookProps();
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
+    const { result } = renderHook(() => useActionSpellMetamagic(makeHookProps()));
 
     await act(async () => {
       result.current.handleActionMetamagicSkip();
@@ -110,81 +102,13 @@ describe('useActionSpellMetamagic - handleActionMetamagicSkip', () => {
     expect(executeSpellCast).not.toHaveBeenCalled();
   });
 
-  it('calls the pending action with empty metaCtx on skip', async () => {
-    const spell = makeSpell();
-    const props = makeHookProps({
-      playerStats: {
-        name: 'TestSorcerer',
-        class: { name: 'Sorcerer' },
-        level: 5,
-        spellAbilities: { spells: [spell] },
-      },
-    });
-    const { executeSpellCast } = await import(
-      '../../services/rules/spells/spellCastService.js'
-    );
-    const { isPsionicSpell, hasPsionicSorcery } = await import(
-      '../../services/rules/spells/metamagicRules.js'
-    );
-
-    isPsionicSpell.mockReturnValue(false);
-    hasPsionicSorcery.mockReturnValue(false);
-    executeSpellCast.mockResolvedValue(null);
-
-    const attack = makeAttack({ name: 'Fireball', spellLevel: 3, castingTime: '1 Action' });
-
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    const pendingBefore = result.current.pendingActionMetamagic;
-
-    await act(async () => {
-      result.current.handleActionMetamagicSkip();
-    });
-
-    expect(executeSpellCast).toHaveBeenCalled();
-    const metaCtx = executeSpellCast.mock.calls[0][1];
-    expect(metaCtx).toEqual({});
-    expect(result.current.pendingActionMetamagic).toBeNull();
-    expect(result.current.pendingActionMetamagic).not.toBe(pendingBefore);
-  });
-
-  it('logs correct castingTime from pending action on skip', async () => {
-    const spell = makeSpell({
-      name: 'Hypnotic Pattern',
-      level: 3,
-      casting_time: '1 Action',
-    });
-    const props = makeHookProps({
-      playerStats: {
-        name: 'TestSorcerer',
-        class: { name: 'Sorcerer' },
-        level: 5,
-        spellAbilities: { spells: [spell] },
-      },
-    });
+  it('logs fallback spellLevel 0 and castingTime "Action" when pending lacks them', async () => {
     const { addEntry } = await import('../../services/ui/logService.js');
-    const { executeSpellCast } = await import(
-      '../../services/rules/spells/spellCastService.js'
-    );
-    const { isPsionicSpell, hasPsionicSorcery } = await import(
-      '../../services/rules/spells/metamagicRules.js'
-    );
 
-    isPsionicSpell.mockReturnValue(false);
-    hasPsionicSorcery.mockReturnValue(false);
-    executeSpellCast.mockResolvedValue(null);
+    const spell = makeSpell({ name: 'Silent Image', level: undefined, casting_time: undefined });
+    const attack = { name: 'Silent Image', spellLevel: undefined, castingTime: undefined };
 
-    const attack = makeAttack({
-      name: 'Hypnotic Pattern',
-      spellLevel: 3,
-      castingTime: '1 Action',
-    });
-
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
+    const { result } = renderHook(() => useActionSpellMetamagic(sorcererWith(spell)));
 
     await act(async () => {
       result.current.handleActionSpellDamageClick(attack);
@@ -197,93 +121,9 @@ describe('useActionSpellMetamagic - handleActionMetamagicSkip', () => {
     expect(addEntry).toHaveBeenCalledWith(
       'test-campaign',
       expect.objectContaining({
-        spellName: 'Hypnotic Pattern',
-        castingTime: '1 Action',
-      }),
-    );
-  });
-
-  it('logs default castingTime "Action" when pending lacks castingTime', async () => {
-    const spell = makeSpell({ name: 'Silent Image', level: 1, casting_time: undefined });
-    const props = makeHookProps({
-      playerStats: {
-        name: 'TestSorcerer',
-        class: { name: 'Sorcerer' },
-        level: 5,
-        spellAbilities: { spells: [spell] },
-      },
-    });
-    const { addEntry } = await import('../../services/ui/logService.js');
-    const { executeSpellCast } = await import(
-      '../../services/rules/spells/spellCastService.js'
-    );
-    const { isPsionicSpell, hasPsionicSorcery } = await import(
-      '../../services/rules/spells/metamagicRules.js'
-    );
-
-    isPsionicSpell.mockReturnValue(false);
-    hasPsionicSorcery.mockReturnValue(false);
-    executeSpellCast.mockResolvedValue(null);
-
-    const attack = { name: 'Silent Image', spellLevel: 1, castingTime: undefined };
-
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    await act(async () => {
-      result.current.handleActionMetamagicSkip();
-    });
-
-    expect(addEntry).toHaveBeenCalledWith(
-      'test-campaign',
-      expect.objectContaining({
+        spellName: 'Silent Image',
+        spellLevel: 0,
         castingTime: 'Action',
-      }),
-    );
-  });
-
-  it('logs correct spellLevel from pending action on skip', async () => {
-    const spell = makeSpell({ name: 'Major Image', level: 2, casting_time: '1 Action' });
-    const props = makeHookProps({
-      playerStats: {
-        name: 'TestSorcerer',
-        class: { name: 'Sorcerer' },
-        level: 5,
-        spellAbilities: { spells: [spell] },
-      },
-    });
-    const { addEntry } = await import('../../services/ui/logService.js');
-    const { executeSpellCast } = await import(
-      '../../services/rules/spells/spellCastService.js'
-    );
-    const { isPsionicSpell, hasPsionicSorcery } = await import(
-      '../../services/rules/spells/metamagicRules.js'
-    );
-
-    isPsionicSpell.mockReturnValue(false);
-    hasPsionicSorcery.mockReturnValue(false);
-    executeSpellCast.mockResolvedValue(null);
-
-    const attack = makeAttack({ name: 'Major Image', spellLevel: 2 });
-
-    const { result } = renderHook(() => useActionSpellMetamagic(props));
-
-    await act(async () => {
-      result.current.handleActionSpellDamageClick(attack);
-    });
-
-    await act(async () => {
-      result.current.handleActionMetamagicSkip();
-    });
-
-    expect(addEntry).toHaveBeenCalledWith(
-      'test-campaign',
-      expect.objectContaining({
-        spellName: 'Major Image',
-        spellLevel: 2,
       }),
     );
   });

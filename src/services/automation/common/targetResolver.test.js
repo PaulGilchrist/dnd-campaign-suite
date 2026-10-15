@@ -1,3 +1,5 @@
+// @maintained-by-ai
+// Small pure wiring module over mocked deps — deterministic branch contract.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -130,6 +132,7 @@ describe('targetResolver', () => {
       const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
 
       expect(result).toBeNull();
+      expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
     });
 
     it('returns positions when targetPlayer is found on the map', async () => {
@@ -190,6 +193,17 @@ describe('targetResolver', () => {
         attackerPos: { gridX: 5, gridY: 10 },
         targetPos: null,
       });
+    });
+
+    it('returns null when resolveTarget resolves to null', async () => {
+      // resolveTarget returns null (not an object), so the destructuring of
+      // { target } rejects and the module-level catch swallows it to null.
+      mapsService.loadMapData.mockResolvedValue(makeMapData());
+      damageUtils.getCombatContext.mockResolvedValue(null);
+
+      const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
+
+      expect(result).toBeNull();
     });
   });
 });

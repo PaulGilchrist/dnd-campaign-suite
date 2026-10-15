@@ -1,4 +1,10 @@
-// CLA-239: Necrotic Shroud regression — CHA DC ability + non-CD features skip Channel Divinity gate
+// @maintained-by-ai
+// CLA-239: Necrotic Shroud regression — CHA DC ability + non-CD features skip Channel Divinity gate.
+// Unit-side contract of conditionHandler.handle for the automation shape dispatched by
+// celestialRevelationHandler (its dispatcher-side half lives in celestialRevelationHandler.test.js,
+// which mocks this handler). Fully mocked and deterministic: stable behaviour, no app churn expected.
+// Generic channelHandler coverage (defaults, ranges, map/pos, popup formats, CLA-303 gates) lives in
+// conditionHandler.test.js and is intentionally not repeated here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -97,25 +103,18 @@ describe('conditionHandler CLA-239 Necrotic Shroud', () => {
   });
 
   describe('save DC ability', () => {
-    it('builds DC from CHA when explicit saveAbility CHA is passed (DC 16 = 8 + 3 + 5)', async () => {
+    it('builds DC from explicit saveAbility CHA and logs it (DC 16 = 8 + 3 + 5, never WIS)', async () => {
       const result = await handle(makeNecroticShroudAction(), makePlayerStats(), CAMPAIGN_NAME, null);
 
       expect(result.type).toBe('modal');
       expect(result.payload.saveDc).toBe(16);
       expect(getAbilityModifier).toHaveBeenCalledWith(expect.anything(), 'CHA');
       expect(getAbilityModifier).not.toHaveBeenCalledWith(expect.anything(), 'WIS');
-    });
-
-    it('log line reports CHA save with the CHA-based DC', async () => {
-      await handle(makeNecroticShroudAction(), makePlayerStats(), CAMPAIGN_NAME, null);
-
       expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
         type: 'ability_use',
-        characterName: 'AasimarTest',
         abilityName: 'Necrotic Shroud',
       }));
-      const description = addEntry.mock.calls.at(-1)[1].description;
-      expect(description).toContain('CHA save DC 16');
+      expect(addEntry.mock.calls.at(-1)[1].description).toContain('CHA save DC 16');
     });
 
     it('parses until_end_of_next_turn duration to durationRounds 2', async () => {
@@ -145,45 +144,21 @@ describe('conditionHandler CLA-239 Necrotic Shroud', () => {
       expect(result.payload.channelDivinityCharges).toBeNull();
     });
 
-    it('channel_divinity typed feature is still gated when charges are 0', async () => {
-      getRuntimeValue.mockImplementation((_name, key) => (key === 'channelDivinityCharges' ? 0 : null));
-
+    it('channel_divinity typed feature remains gated at 0 charges and carries live charges otherwise', async () => {
       const action = {
         name: 'Abjure Foes',
         automation: { type: 'channel_divinity', saveDc: 'ability', saveType: 'WIS' },
       };
 
-      const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null);
+      getRuntimeValue.mockImplementation((_name, key) => (key === 'channelDivinityCharges' ? 0 : null));
+      const blocked = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null);
+      expect(blocked.type).toBe('popup');
+      expect(blocked.payload.description).toBe('No Channel Divinity charges remaining.');
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
-    });
-
-    it('channel_divinity feature payload still carries channelDivinityCharges', async () => {
       getRuntimeValue.mockImplementation((_name, key) => (key === 'channelDivinityCharges' ? 3 : null));
-
-      const action = {
-        name: 'Abjure Foes',
-        automation: { type: 'channel_divinity', saveDc: 'ability', saveType: 'WIS' },
-      };
-
-      const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null);
-
-      expect(result.type).toBe('modal');
-      expect(result.payload.channelDivinityCharges).toBe(3);
-    });
-
-    it('resourceCost channel_divinity feature is gated even with set_condition type', async () => {
-      getRuntimeValue.mockImplementation((_name, key) => (key === 'channelDivinityCharges' ? 0 : null));
-
-      const action = {
-        name: 'Turn the Undead',
-        automation: { type: 'set_condition', resourceCost: 'channel_divinity', saveDc: 'ability' },
-      };
-
-      const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null);
-
-      expect(result.type).toBe('popup');
+      const allowed = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null);
+      expect(allowed.type).toBe('modal');
+      expect(allowed.payload.channelDivinityCharges).toBe(3);
     });
   });
 });

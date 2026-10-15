@@ -1,3 +1,13 @@
+// @maintained-by-ai: 2026-10-15
+// Generic upcast maxTargets threading through the gate lane: extractMaxTargets
+// (spellGateHelpers.js) parsing the "N targets" string from upcast_at_slot_level
+// into pending.maxTargets for Charm Monster and Banishment — the two gates no
+// sibling lane pins (cla086 owns the heal-slot seam, sp075 the Magic Missile
+// darts, sp127 the Aid ladder, gate.test.js the Hold Monster lv6 parse and the
+// gate-open breadth). Fixtures mirror public/data/2024/spells.json ladders (the
+// 5e rows for these spells carry no upcast_at_slot_level). Defensive-branch
+// coverage (missing ladder / non-string value / no matching key / regex variants)
+// is unique to this lane and kept as folded tables.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
@@ -177,217 +187,95 @@ Object.defineProperty(window, 'dispatchEvent', {
   writable: true,
 });
 
-function makePlayerStats(overrides = {}) {
-  return {
-    name: 'TestSorcerer',
-    class: { name: 'Sorcerer' },
-    level: 5,
-    ...overrides,
-  };
+const UPCAST_LADDER_4TO9 = { 4: '1 target', 5: '2 targets', 6: '3 targets', 7: '4 targets', 8: '5 targets', 9: '6 targets' };
+
+function gate(spellOverrides, pendingKey) {
+  const { result } = renderHook(() =>
+    useSpellMetamagicFlow({
+      playerStats: { name: 'TestSorcerer', class: { name: 'Sorcerer' }, level: 9 },
+      campaignName: 'TestCampaign',
+      onExecute: vi.fn(),
+    })
+  );
+  act(() => {
+    result.current.gateMetamagic({
+      casting_time: '1 action',
+      ...spellOverrides,
+    });
+  });
+  return result.current[pendingKey];
 }
 
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Fireball',
-    level: 3,
-    casting_time: '1 Action',
-    range: '150 ft.',
-    ...overrides,
-  };
-}
-
-// ── Upcast maxTargets parsing ─────────────────────────────────────────────────
-// Tests verify that spell gates which use extractMaxTargets correctly parse the
-// "N targets" string from upcast_at_slot_level and set pending.maxTargets.
-
-describe('useSpellMetamagicFlow — upcast maxTargets parsing', () => {
+describe('useSpellMetamagicFlow — extractMaxTargets threading (Charm Monster / Banishment)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getMultiTargetSpreadForSpell.mockReturnValue(null);
   });
 
-  const spellCases = [
-    { name: 'Hold Monster', level: 5, upcastLevel: 7, upcastSlotKey: '7', expectedMaxTargets: 4 },
-    { name: 'Charm Monster', level: 4, upcastLevel: 6, upcastSlotKey: '6', expectedMaxTargets: 5 },
-    { name: 'Banishment', level: 4, upcastLevel: 5, upcastSlotKey: '5', expectedMaxTargets: 2 },
-  ];
+  // 2024 spells.json ladders: both spells scale +1 target per slot above 4th.
+  it.each([
+    { name: 'Charm Monster', pendingKey: 'pendingCharmMonster', upcastLevel: 4, expectedMaxTargets: 1 },
+    { name: 'Charm Monster', pendingKey: 'pendingCharmMonster', upcastLevel: 6, expectedMaxTargets: 3 },
+    { name: 'Banishment', pendingKey: 'pendingBanishment', upcastLevel: 5, expectedMaxTargets: 2 },
+    { name: 'Banishment', pendingKey: 'pendingBanishment', upcastLevel: 7, expectedMaxTargets: 4 },
+  ])('$name at slot $upcastLevel threads maxTargets $expectedMaxTargets onto the pending', ({ name, pendingKey, upcastLevel, expectedMaxTargets }) => {
+    const pending = gate({
+      name,
+      level: 4,
+      range: '30 feet',
+      upcastLevel,
+      upcast_at_slot_level: UPCAST_LADDER_4TO9,
+    }, pendingKey);
 
-  for (const { name, level, upcastLevel, upcastSlotKey, expectedMaxTargets } of spellCases) {
-    it(`parses maxTargets from ${name} upcast_at_slot_level["${upcastSlotKey}"]`, () => {
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-      );
-
-      const pendingKey = name === 'Hold Monster' ? 'pendingHoldMonster'
-        : name === 'Charm Monster' ? 'pendingCharmMonster'
-        : 'pendingBanishment';
-
-      act(() => {
-        result.current.gateMetamagic(makeSpell({
-          name,
-          level,
-          upcastLevel,
-          upcast_at_slot_level: { [upcastSlotKey]: `${expectedMaxTargets} targets` },
-        }));
-      });
-
-      const pending = result.current[pendingKey];
-      expect(pending).not.toBeNull();
-      expect(pending.maxTargets).toBe(expectedMaxTargets);
-      expect(pending.spellName).toBe(name);
-      expect(pending.creatureTargets).toContain('Goblin A');
-    });
-  }
-
-  it('returns null maxTargets when upcast_at_slot_level has no matching slot key', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Hold Monster',
-        level: 5,
-        upcastLevel: 8,
-        upcast_at_slot_level: { '7': '4 targets' },
-      }));
-    });
-
-    expect(result.current.pendingHoldMonster.maxTargets).toBeNull();
+    expect(pending).not.toBeNull();
+    expect(pending.spellName).toBe(name);
+    expect(pending.maxTargets).toBe(expectedMaxTargets);
+    expect(pending.creatureTargets).toContain('Goblin A');
   });
 
-  it('returns null maxTargets when upcast_at_slot_level is missing', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
+  // /(\d+)\s+targets?/i grammar variants, folded across one spell.
+  it.each([
+    ['1 target', 1],
+    ['up to 4 targets or more', 4],
+    ['10 TARGETS', 10],
+  ])('regex variant %o parses to %i', (raw, expectedMaxTargets) => {
+    const pending = gate({
+      name: 'Charm Monster',
+      level: 4,
+      upcastLevel: 6,
+      upcast_at_slot_level: { '6': raw },
+    }, 'pendingCharmMonster');
 
-    act(() => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Hold Monster',
-        level: 5,
-        upcastLevel: 7,
-      }));
-    });
-
-    expect(result.current.pendingHoldMonster.maxTargets).toBeNull();
-  });
-
-  it('returns null maxTargets when upcast_at_slot_value is not a string', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Hold Monster',
-        level: 5,
-        upcastLevel: 7,
-        upcast_at_slot_level: { '7': 42 },
-      }));
-    });
-
-    expect(result.current.pendingHoldMonster.maxTargets).toBeNull();
-  });
-
-  it('parses maxTargets from value with surrounding text (regex finds embedded number)', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Hold Monster',
-        level: 5,
-        upcastLevel: 7,
-        upcast_at_slot_level: { '7': 'up to 4 targets or more' },
-      }));
-    });
-
-    // The regex /(\d+)\s+targets?/i finds the first number before "targets"
-    expect(result.current.pendingHoldMonster.maxTargets).toBe(4);
+    expect(pending.maxTargets).toBe(expectedMaxTargets);
   });
 
   it('falls back to spell.level when upcastLevel is not provided', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
+    const pending = gate({
+      name: 'Charm Monster',
+      level: 6,
+      upcast_at_slot_level: UPCAST_LADDER_4TO9,
+    }, 'pendingCharmMonster');
 
-    act(() => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Hold Monster',
-        level: 7,
-        upcast_at_slot_level: { '7': '4 targets' },
-      }));
-    });
-
-    expect(result.current.pendingHoldMonster.maxTargets).toBe(4);
+    expect(pending.maxTargets).toBe(3);
   });
 
-  it('returns null maxTargets when upcast_at_slot_level is not an object', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
+  // Defensive branches: every malformed ladder shape must yield null maxTargets
+  // (the gate stays open; the picker then runs uncapped).
+  it.each([
+    ['missing ladder', undefined],
+    ['null ladder', null],
+    ['string ladder', '4 targets'],
+    ['no matching slot key', { 7: '4 targets' }],
+    ['non-string rung', { 6: 42 }],
+  ])('returns null maxTargets when the ladder is %s', (_label, ladder) => {
+    const pending = gate({
+      name: 'Charm Monster',
+      level: 4,
+      upcastLevel: 6,
+      ...(ladder === undefined ? {} : { upcast_at_slot_level: ladder }),
+    }, 'pendingCharmMonster');
 
-    act(() => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Hold Monster',
-        level: 5,
-        upcastLevel: 7,
-        upcast_at_slot_level: '4 targets',
-      }));
-    });
-
-    expect(result.current.pendingHoldMonster.maxTargets).toBeNull();
-  });
-
-  it('returns null maxTargets when upcast_at_slot_level is null', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Hold Monster',
-        level: 5,
-        upcastLevel: 7,
-        upcast_at_slot_level: null,
-      }));
-    });
-
-    expect(result.current.pendingHoldMonster.maxTargets).toBeNull();
-  });
-
-  it('parses singular "target" variant', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Hold Monster',
-        level: 5,
-        upcastLevel: 7,
-        upcast_at_slot_level: { '7': '1 target' },
-      }));
-    });
-
-    expect(result.current.pendingHoldMonster.maxTargets).toBe(1);
-  });
-
-  it('parses uppercase "TARGETS" variant', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({
-        name: 'Hold Monster',
-        level: 5,
-        upcastLevel: 7,
-        upcast_at_slot_level: { '7': '10 TARGETS' },
-      }));
-    });
-
-    expect(result.current.pendingHoldMonster.maxTargets).toBe(10);
+    expect(pending).not.toBeNull();
+    expect(pending.maxTargets).toBeNull();
   });
 });

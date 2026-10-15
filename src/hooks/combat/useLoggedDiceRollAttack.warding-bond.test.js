@@ -1,9 +1,14 @@
-// SP-125: the AC resolver must fold the warded target's warding_bond acBonus
-// (+1 AC) into effectiveAc and forward it to the log/popup payloads — mirrors the
-// verified SP-105 Shield of Faith forwarding pattern.
-// SP-105: the popup/log payload must forward the resolver's authoritative
-// effectiveAc (+2 Shield of Faith, +5 Shield) so computedHit can never flip
-// a resolved MISS into a damage-applying HIT.
+// @maintained-by-ai: 2026-10-14
+// SP-125 attack-lane AC-fold authority: createLogAndShow reads the wardee's
+// warding_bond acBonus (+1 AC per public/data/spells.json) via the mocked
+// getWardingBondAcBonus getter, stamps ctx._wardingBondAcBonus, and
+// hitResolution folds it into effectiveAc (useLoggedDiceRollAttack.js:512 →
+// hitResolution.js computeEffectiveAc). The folded AC + wardingBondAcBonus
+// must reach BOTH the popup and log payloads so computedHit can never flip a
+// resolved MISS into a damage-applying HIT (mirrors the SP-105 Shield of
+// Faith forwarding pattern). Getter internals: loggedDiceRollUtils.warding-
+// bond.test.js. Casting/slot gates: spellGates.wardingBond.test.js — do not
+// re-test either here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -173,17 +178,11 @@ vi.mock('../../services/rules/spells/metamagicRules.js', () => ({
 }));
 
 import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
-import utils from '../../services/ui/utils.js';
-import { getTargetFromAttacker, findCreatureByName } from '../../services/rules/combat/damageUtils.js';
+import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { isUnbreakableMajestyActive, hasAttackerTriggeredMajesty } from '../../services/combat/auras/unbreakableMajesty.js';
-import {
-    getShieldAcBonus,
-    getShieldOfFaithAcBonus,
-    getWardingBondAcBonus,
-    applyMinDamageAdjustment,
-} from './loggedDiceRollUtils.js';
+import { getWardingBondAcBonus } from './loggedDiceRollUtils.js';
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
 
 describe('useLoggedDiceRollAttack — SP-125 Warding Bond AC fold', () => {
@@ -191,7 +190,7 @@ describe('useLoggedDiceRollAttack — SP-125 Warding Bond AC fold', () => {
     let fn;
 
     beforeEach(() => {
-        vi.clearAllMocks();
+        vi.clearAllMocks(); // clears calls only — factory defaults persist
         deps = {
             characterName: 'Thug 1',
             campaignName: 'test-campaign',
@@ -204,16 +203,11 @@ describe('useLoggedDiceRollAttack — SP-125 Warding Bond AC fold', () => {
         rollD20.mockReturnValue(9);
         rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
         getTargetFromAttacker.mockReturnValue({ name: 'EvasiveFighter', type: 'player', ac: 10 });
-        findCreatureByName.mockReturnValue(null);
         loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'EvasiveFighter', type: 'player', ac: 10 }] });
         isUnbreakableMajestyActive.mockReturnValue(false);
         hasAttackerTriggeredMajesty.mockReturnValue(false);
         getRuntimeValue.mockReturnValue(null);
-        getShieldAcBonus.mockReturnValue(0);
-        getShieldOfFaithAcBonus.mockReturnValue(0);
-        getWardingBondAcBonus.mockReturnValue(0);
-        applyMinDamageAdjustment.mockImplementation((d) => d);
-        utils.getName.mockImplementation((n) => n);
+        getWardingBondAcBonus.mockReturnValue(0); // reset boundary-stamp leakage between tests
     });
 
     it('control: no ward → effectiveAc is base AC 10 and total 12 hits', async () => {

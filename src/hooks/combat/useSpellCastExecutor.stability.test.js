@@ -1,3 +1,11 @@
+// @maintained-by-ai: 2026-10-14
+// useCallback stability seam for useSpellCastExecutor: castAction must keep a stable
+// reference while props are unchanged (consumers re-render-loop guard) and must be
+// recreated whenever any runCast/castAction dependency changes.
+// Dep array verified against useSpellCastExecutor.js (castAction: playerStats,
+// campaignName, setPopupHtml, ref, runCast; runCast: everything else).
+// Result routing lives in automationPopup/healResult/modalName/modalRouting siblings;
+// the clear matrix in castAction.test.js; return-value contract in returnValue.test.js.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 vi.mock('../../services/rules/spells/spellCastService.js', () => ({
@@ -22,191 +30,60 @@ function makeProps(overrides = {}) {
     characters: [],
     setPopupHtml: vi.fn(),
     extraMeta: {},
+    cachedPosRef: { current: null },
+    setModalState: vi.fn(),
     ...overrides,
   };
 }
 
-describe('useSpellCastExecutor', () => {
+// Fresh value per dependency so each rerender changes exactly one dep.
+const DEP_CHANGES = [
+  ['rollAttack', () => vi.fn()],
+  ['rollDamage', () => vi.fn()],
+  ['playerStats', () => makePlayerStats({ name: 'NewCaster' })],
+  ['getTargetInfo', () => vi.fn()],
+  ['campaignName', () => 'NewCampaign'],
+  ['mapName', () => 'NewMap'],
+  ['characters', () => [{ name: 'NewChar' }]],
+  ['setPopupHtml', () => vi.fn()],
+  ['extraMeta', () => ({ newFlag: true })],
+  ['cachedPosRef', () => ({ current: null })],
+  ['setModalState', () => vi.fn()],
+];
+
+describe('useSpellCastExecutor — useCallback stability', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('useCallback stability — castAction reference equality', () => {
-    it('returns the same castAction reference when props do not change', () => {
+  it('returns the same castAction reference when props do not change', () => {
+    const props = makeProps();
+    const { result, rerender } = renderHook(({ p }) => useSpellCastExecutor(p), {
+      initialProps: { p: props },
+    });
+
+    const firstAction = result.current.castAction;
+    rerender({ p: props });
+    expect(result.current.castAction).toBe(firstAction);
+  });
+
+  it.each(DEP_CHANGES)(
+    'returns a new castAction when %s changes',
+    (key, makeValue) => {
       const props = makeProps();
-      const extraMeta = {};
-      const ref = { current: null };
-
-      const { result, rerender } = renderHook(
-        ({ p, em, r }) =>
-          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
-        { initialProps: { p: props, em: extraMeta, r: ref } },
-      );
-
-      const firstAction = result.current.castAction;
-      rerender({ p: props, em: extraMeta, r: ref });
-      expect(result.current.castAction).toBe(firstAction);
-    });
-
-    it('returns a new castAction when rollAttack changes', () => {
-      const { result, rerender } = renderHook(
-        ({ p, em, r }) =>
-          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
-        { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
-      );
-
-      const firstAction = result.current.castAction;
-      rerender({
-        p: { ...makeProps(), rollAttack: vi.fn() },
-        em: {},
-        r: { current: null },
+      const { result, rerender } = renderHook(({ p }) => useSpellCastExecutor(p), {
+        initialProps: { p: props },
       });
-      expect(result.current.castAction).not.toBe(firstAction);
-    });
-
-    it('returns a new castAction when rollDamage changes', () => {
-      const { result, rerender } = renderHook(
-        ({ p, em, r }) =>
-          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
-        { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
-      );
 
       const firstAction = result.current.castAction;
-      rerender({
-        p: { ...makeProps(), rollDamage: vi.fn() },
-        em: {},
-        r: { current: null },
-      });
+      rerender({ p: makeProps({ ...props, [key]: makeValue() }) });
       expect(result.current.castAction).not.toBe(firstAction);
-    });
+    },
+  );
 
-    it('returns a new castAction when playerStats changes', () => {
-      const { result, rerender } = renderHook(
-        ({ p, em, r }) =>
-          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
-        { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
-      );
-
-      const firstAction = result.current.castAction;
-      rerender({
-        p: { ...makeProps(), playerStats: makePlayerStats({ name: 'NewCaster' }) },
-        em: {},
-        r: { current: null },
-      });
-      expect(result.current.castAction).not.toBe(firstAction);
-    });
-
-    it('returns a new castAction when campaignName changes', () => {
-      const { result, rerender } = renderHook(
-        ({ p, em, r }) =>
-          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
-        { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
-      );
-
-      const firstAction = result.current.castAction;
-      rerender({
-        p: { ...makeProps(), campaignName: 'NewCampaign' },
-        em: {},
-        r: { current: null },
-      });
-      expect(result.current.castAction).not.toBe(firstAction);
-    });
-
-    it('returns a new castAction when mapName changes', () => {
-      const { result, rerender } = renderHook(
-        ({ p, em, r }) =>
-          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
-        { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
-      );
-
-      const firstAction = result.current.castAction;
-      rerender({
-        p: { ...makeProps(), mapName: 'NewMap' },
-        em: {},
-        r: { current: null },
-      });
-      expect(result.current.castAction).not.toBe(firstAction);
-    });
-
-    it('returns a new castAction when characters array changes', () => {
-      const { result, rerender } = renderHook(
-        ({ p, em, r }) =>
-          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
-        { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
-      );
-
-      const firstAction = result.current.castAction;
-      rerender({
-        p: { ...makeProps(), characters: [{ name: 'NewChar' }] },
-        em: {},
-        r: { current: null },
-      });
-      expect(result.current.castAction).not.toBe(firstAction);
-    });
-
-    it('returns a new castAction when setPopupHtml changes', () => {
-      const { result, rerender } = renderHook(
-        ({ p, em, r }) =>
-          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
-        { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
-      );
-
-      const firstAction = result.current.castAction;
-      rerender({
-        p: { ...makeProps(), setPopupHtml: vi.fn() },
-        em: {},
-        r: { current: null },
-      });
-      expect(result.current.castAction).not.toBe(firstAction);
-    });
-
-    it('returns a new castAction when extraMeta object changes', () => {
-      const { result, rerender } = renderHook(
-        ({ p, em, r }) =>
-          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
-        { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
-      );
-
-      const firstAction = result.current.castAction;
-      rerender({
-        p: makeProps(),
-        em: { newFlag: true },
-        r: { current: null },
-      });
-      expect(result.current.castAction).not.toBe(firstAction);
-    });
-
-    it('returns a new castAction when cachedPosRef changes', () => {
-      const { result, rerender } = renderHook(
-        ({ p, em, r }) =>
-          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r }),
-        { initialProps: { p: makeProps(), em: {}, r: { current: null } } },
-      );
-
-      const firstAction = result.current.castAction;
-      rerender({
-        p: makeProps(),
-        em: {},
-        r: { current: null },
-      });
-      expect(result.current.castAction).not.toBe(firstAction);
-    });
-
-    it('returns a new castAction when setModalState changes', () => {
-      const { result, rerender } = renderHook(
-        ({ p, em, r, ms }) =>
-          useSpellCastExecutor({ ...p, extraMeta: em, cachedPosRef: r, setModalState: ms }),
-        { initialProps: { p: makeProps(), em: {}, r: { current: null }, ms: vi.fn() } },
-      );
-
-      const firstAction = result.current.castAction;
-      rerender({
-        p: makeProps(),
-        em: {},
-        r: { current: null },
-        ms: vi.fn(),
-      });
-      expect(result.current.castAction).not.toBe(firstAction);
-    });
+  it('mounts and unmounts cleanly', () => {
+    const { result, unmount } = renderHook(() => useSpellCastExecutor(makeProps()));
+    expect(typeof result.current.castAction).toBe('function');
+    expect(() => unmount()).not.toThrow();
   });
 });

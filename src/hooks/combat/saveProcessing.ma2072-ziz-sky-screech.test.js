@@ -1,19 +1,22 @@
+// @maintained-by-ai: 2026-10-14
 // MA-2072: Ziz "Sky Screech (Costs 2 Actions)" legendary save child — formerly
 // a prose-only row (name + delegates_to:null + description only) that spent 2
 // legendary uses via the MA-1883 costs-2 NAME-parse and dead-ended at the
-// console.error in MonsterCardModal.resolveLegendaryRowMechanic (:776) with
-// ZERO save/damage/Prone (exact MA-2063 Ymir Frost Geyser / MA-1990 Simurgh
+// console.error in MonsterCardModal.resolveLegendaryRowMechanic with ZERO
+// save/damage/Prone (exact MA-2063 Ymir Frost Geyser / MA-1990 Simurgh
 // silent-burn twins; MA-1974 active-trap fingerprint).
 // DATA fix (MA-2063 byte-shape): author save_dc:23 / save_type:"Wisdom" /
 // damage_dice_primary:"2d6" / damage_type_primary:"Thunder" /
 // save_effect:"The target has the Prone condition." with delegates_to:null
-// KEPT (numeric child self-resolves at :895/:754 — the save_dc>0 leg routes
-// before the delegate leg) and dc_success UNSET (RAW states no Success face
-// explicitly: engine half-damage default applies to damage; Prone stays
-// fail-only via the save_effect word lane). NO range field — "Enemies within
-// 60 ft." carries no Cone/Line/Sphere/Radius shape noun, so the prose picker
-// stays inert (MA-2041 pin) and the row rides the inline save lane (MA-2041/
-// MA-2021). Costs-2 enforcement rides the name-parse (legendaryActionCost).
+// KEPT (numeric child self-resolves — the save_dc>0 leg routes before the
+// delegate leg) and dc_success UNSET (RAW states no Success face explicitly:
+// engine half-damage default applies to damage; Prone stays fail-only via the
+// save_effect word lane). NO range field — "Enemies within 60 ft." carries no
+// Cone/Line/Sphere/Radius shape noun, so the prose picker stays inert
+// (MA-2041 pin) and the row rides the inline save lane (MA-2041/MA-2021).
+// Costs-2 enforcement rides the name-parse (legendaryActionCost — generic
+// parse pinned in monsterLegendaryUses.ma1883; the Blinding Ascent self-buff
+// sibling is pinned in monsterSelfBuff.ma2071 — deduped here).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 
@@ -22,55 +25,37 @@ import { legendaryActionCost } from '../../services/encounters/monsterLegendaryU
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const ZIZ = monsters.find((m) => m.index === 'ziz');
-const HEADER = ZIZ.legendary_actions[0];
-const ASCENT = ZIZ.legendary_actions[2];
 const SCREECH = ZIZ.legendary_actions[3];
 const SCREECH_DESC = 'Enemies within 60 ft. must succeed on a DC 23 Wisdom saving throw or take 7 (2d6) Thunder damage and be knocked Prone.';
 
 describe('MA-2072 disk fingerprint: Ziz Sky Screech structured save fields authored, MA-2063 byte-shape', () => {
-  it('row identity + save core: DC 23 Wisdom, 2d6 Thunder (live-verified RAW)', () => {
+  it('live-verified exact: DC 23 Wisdom 2d6 Thunder + canonical Prone word; half-default honest; key order mirrors Ymir twin (range slot skipped — no shape noun)', () => {
     expect(ZIZ.name).toBe('Ziz');
     expect(SCREECH.name).toBe('Sky Screech (Costs 2 Actions)');
     expect(SCREECH.save_dc).toBe(23);
     expect(SCREECH.save_type).toBe('Wisdom');
     expect(SCREECH.damage_dice_primary).toBe('2d6');
     expect(SCREECH.damage_type_primary).toBe('Thunder');
-  });
-
-  it('save_effect authored with the canonical Prone word; dc_success UNSET (half-damage default honest; Prone fail-only word lane)', () => {
     expect(SCREECH.save_effect).toBe('The target has the Prone condition.');
-    expect(SCREECH.dc_success).toBeUndefined();
-  });
-
-  it('delegates_to:null KEPT (numeric save child self-resolves at :754/:895 — the pre-fix burn marker, pinned) + description byte-exact + NO range field (shapeless inline lane, MA-2041 pin)', () => {
-    expect(SCREECH.delegates_to).toBeNull();
+    expect(SCREECH.dc_success).toBeUndefined(); // half-damage default honest; Prone fail-only word lane
     expect(SCREECH.description).toBe(SCREECH_DESC);
-    expect(SCREECH.range).toBeUndefined(); // "within 60 ft." carries no shape noun — picker-inert
-    expect(SCREECH.attack_bonus).toBeUndefined();
-    expect(SCREECH.automation).toBeUndefined();
-    expect(SCREECH.advisory).toBeUndefined();
-  });
-
-  it('key order mirrors the MA-2063 Ymir Frost Geyser twin (range slot skipped — no shape noun)', () => {
     expect(Object.keys(SCREECH)).toEqual([
       'name', 'delegates_to', 'save_dc', 'save_type', 'damage_dice_primary', 'damage_type_primary', 'save_effect', 'description',
     ]);
-  });
-
-  it('extractor grants prone (was save_effect-less inert → [] → zero grant)', () => {
+    // delegates_to:null KEPT — the pre-fix burn marker, pinned; numeric child self-resolves.
+    expect(SCREECH.delegates_to).toBeNull();
+    // Shapeless inline lane pins (MA-2041): "within 60 ft." carries no shape noun.
+    expect(SCREECH.range).toBeUndefined();
+    expect(SCREECH.attack_bonus).toBeUndefined();
+    expect(SCREECH.automation).toBeUndefined();
+    expect(SCREECH.advisory).toBeUndefined();
+    // Unique save-lane contract: the extractor grants prone (was save_effect-less inert → [] → zero grant).
     expect(extractConditionsFromSaveEffect(SCREECH.save_effect)).toEqual(['prone']);
     expect(extractConditionsFromSaveEffect(undefined)).toEqual([]); // pre-fix input: zero save-lane producers
   });
 
   it('costs-2 NAME-parse honest: legendaryActionCost === 2 (spends exactly 2, never 1)', () => {
     expect(legendaryActionCost(SCREECH)).toBe(2);
-    expect(legendaryActionCost(HEADER)).toBe(1); // header/no-name-cost rows default 1
-  });
-
-  it('Blinding Ascent sibling stays the MA-2071 self-buff shape byte-inert', () => {
-    expect(ASCENT.name).toBe('Blinding Ascent');
-    expect(ASCENT.automation).toEqual({ type: 'monster_self_buff', effect: 'invisible', rounds: 2 });
-    expect(ASCENT.save_dc).toBeUndefined();
   });
 });
 
@@ -136,7 +121,6 @@ import { rollExpression } from '../../services/dice/diceRoller.js';
 
 const campaignName = 'test-campaign';
 const ZIZ_NAME = 'Ziz 1';
-const TARGET = 'Bandit 1';
 
 // Deterministic 2d6 pool (fail-face live repro will record exact rolls).
 const MOCK_DAMAGE = { total: 9, rolls: [4, 5], modifier: 0 };
@@ -181,7 +165,7 @@ beforeEach(() => {
 
 describe('MA-2072 live-lane: DC 23 Wisdom save now resolves inline — fail grants 2d6 Thunder + Prone (was console.error dead-end)', () => {
   it('failed save (Bandit raw WIS +0, nat cap 20 < DC 23 structural fail): full 2d6 Thunder AND prone applied + grant log + meta stamp', async () => {
-    const { saveSuccess } = await rollNpcInline({ targetName: TARGET, effectiveD20: 20, bonus: 0 });
+    const { saveSuccess } = await rollNpcInline({ targetName: 'Bandit 1', effectiveD20: 20, bonus: 0 });
     expect(saveSuccess).toBe(false); // raw +0: even nat 20 cannot beat DC 23 — structural fail
 
     // Full damage face (computeDamageAfterEvasion: fail → total, no halve)
@@ -189,8 +173,8 @@ describe('MA-2072 live-lane: DC 23 Wisdom save now resolves inline — fail gran
     expect(applyDamageToTarget.mock.calls[0][2]).toBe(9);
 
     // Prone grant (was zero pre-fix — prose never reached the word lane)
-    expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['prone']);
-    expect(runtimeStore[`${TARGET}.activeConditionMeta`].prone).toEqual(
+    expect(runtimeStore['Bandit 1.activeConditions']).toEqual(['prone']);
+    expect(runtimeStore['Bandit 1.activeConditionMeta'].prone).toEqual(
       expect.objectContaining({ source: ZIZ_NAME }));
     expect(addEntryLogs.some(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Prone' && e.sourceName === ZIZ_NAME)).toBe(true);
   });
@@ -198,7 +182,6 @@ describe('MA-2072 live-lane: DC 23 Wisdom save now resolves inline — fail gran
   it('successful save (+8 rig, deterministic face): half damage floor(9/2)=4 AND zero prone grant (fail-only word lane, dc_success UNSET half-default)', async () => {
     const { saveSuccess } = await rollNpcInline({ targetName: 'Bandit 2', effectiveD20: 20, bonus: 8 });
     expect(saveSuccess).toBe(true); // 28 ≥ DC 23
-
 
     // Half-on-success default transport (dc_success absent on disk)
     expect(applyDamageToTarget).toHaveBeenCalledTimes(1);

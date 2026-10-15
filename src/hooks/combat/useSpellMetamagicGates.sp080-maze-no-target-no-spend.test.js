@@ -1,6 +1,19 @@
+// @maintained-by-ai: 2026-10-15
+// SP-080 no-spend family (§CLA-208 pay-no-effect) gate lane: Maze has no chooser
+// modal, so gateMetamagic resolves the exact same armed initiative target mazeHandler
+// will use (getCombatContext + targetResolver.resolveTarget) and refuses UNPAID in
+// all three unresolvable branches — no creatures in combat, no armed target, armed
+// target no longer in combat — before prepareSpellCast/consumeMaterial/addEntry
+// (no slot, no caster concentration, no phantom cast). Refusal face: automation_info
+// popup plus one `maze_refused` automation log ending "Nothing spent." An armed
+// valid target keeps the paid lane verbatim; unlike sp079's deferred chooser, the
+// gate fires before the sorcerer metamagic queue too.
+// Shared no-spend family pattern (twin: sp079-mass-suggestion): fixtures mirror
+// public/data/2024/spells.json, table-drive cases, one gate() helper, paid-lane
+// control (the ordinary-spell control lives in sp079 — not repeated here).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { gateMetamagic } from './useSpellMetamagicGates.js';
-import { prepareSpellCast, isFreeCastAuthorized } from '../../services/rules/spells/spellPreparationService.js';
+import { prepareSpellCast } from '../../services/rules/spells/spellPreparationService.js';
 import { consumeMaterial } from '../../services/rules/spells/materialComponents.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { resolveTarget } from '../../services/automation/common/targetResolver.js';
@@ -22,7 +35,7 @@ vi.mock('../../services/rules/spells/materialComponents.js', () => ({
 }));
 
 vi.mock('../../services/rules/spells/spellPreparationService.js', () => ({
-  prepareSpellCast: vi.fn(() => Promise.resolve({ modifiedSpell: {}, metaCtx: {}, slotConsumed: true })),
+  prepareSpellCast: vi.fn(),
   isFreeCastAuthorized: vi.fn(() => false),
   isWizardRitualAdeptSpell: vi.fn(() => false),
   incrementFreeCastResource: vi.fn(),
@@ -47,11 +60,11 @@ vi.mock('./useSpellMetamagicHelpers.js', () => ({
 }));
 
 vi.mock('../../services/automation/common/targetResolver.js', () => ({
-  resolveTarget: vi.fn(() => Promise.resolve(null)),
+  resolveTarget: vi.fn(),
 }));
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => Promise.resolve({ creatures: [{ name: 'DivinationWizard' }, { name: 'Androsphinx 1' }] })),
+  getCombatContext: vi.fn(),
 }));
 
 const CAMPAIGN = 'test-campaign';
@@ -65,6 +78,10 @@ function makeWizard() {
   };
 }
 
+// Fixture mirrors public/data/2024/spells.json Maze (lv8, Action, 60 feet,
+// concentration, automation { type: 'maze', saveType: 'WIS', range: '60 feet' } —
+// no saveDc key in the data). The 5e row carries no automation block; the
+// name-side branch of isMazeSpell gates it identically.
 function makeMaze(overrides = {}) {
   return {
     name: 'Maze',
@@ -72,105 +89,114 @@ function makeMaze(overrides = {}) {
     casting_time: 'Action',
     range: '60 feet',
     concentration: true,
-    automation: { type: 'maze', saveType: 'WIS', saveDc: 'spell_save_dc' },
+    automation: { type: 'maze', saveType: 'WIS', range: '60 feet' },
     ...overrides,
   };
 }
 
-async function gate(spell, setPopupHtml = vi.fn()) {
+async function gate(spell, { isSorcerer = false } = {}) {
   const playerStats = makeWizard();
   const onExecute = vi.fn();
+  const setPopupHtml = vi.fn();
+  const cfSetPending = vi.fn();
   await gateMetamagic(spell, {}, {
     hasMaterial: () => true,
     setPopupHtml,
-    isSorcerer: false,
+    isSorcerer,
     playerStats,
     campaignName: CAMPAIGN,
-    cfSetPending: vi.fn(),
+    cfSetPending,
     setSecondaryTargetModal: vi.fn(),
     characters: [],
     onExecute,
   });
-  return { playerStats, onExecute, setPopupHtml };
+  return { onExecute, setPopupHtml, cfSetPending };
 }
 
-function refusalLogs() {
-  return addEntry.mock.calls
-    .map(c => c[1])
-    .filter(e => e?.automationType === 'maze_refused');
-}
-
-describe('SP-080 Maze unarmed cast — refuse unpaid before prepareSpellCast', () => {
+describe('SP-080 unarmed Maze cast — refused unpaid before any payment lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    prepareSpellCast.mockResolvedValue({ modifiedSpell: {}, metaCtx: {}, slotConsumed: true });
-    isFreeCastAuthorized.mockReturnValue(false);
+    // Snapshot semantics of the real prepareSpellCast (used by the paid-lane control).
+    prepareSpellCast.mockImplementation(async (spell, passedCtx) => ({
+      modifiedSpell: { ...spell },
+      metaCtx: { ...passedCtx, slotConsumed: true },
+      slotConsumed: true,
+    }));
     consumeMaterial.mockResolvedValue(true);
     getCombatContext.mockResolvedValue({ creatures: [{ name: 'DivinationWizard' }, { name: 'Androsphinx 1' }] });
     resolveTarget.mockResolvedValue(null);
   });
 
-  it('no armed target: prepareSpellCast never called, onExecute never called, nothing spent', async () => {
-    const { onExecute } = await gate(makeMaze());
-
-    expect(prepareSpellCast).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('no armed target: refusal popup mirrors the handler face verbatim', async () => {
-    const { setPopupHtml } = await gate(makeMaze());
-
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'automation_info',
-      name: 'Maze',
-      description: 'No target selected. Maze has no effect.',
-    }));
-  });
-
-  it('no armed target: maze_refused automation log with reason no_target and "Nothing spent."', async () => {
-    await gate(makeMaze());
-
-    const logs = refusalLogs();
-    expect(logs).toHaveLength(1);
-    expect(logs[0]).toMatchObject({
-      type: 'automation',
-      automationType: 'maze_refused',
+  const REFUSAL_CASES = [
+    {
+      name: 'no armed initiative target',
+      resolved: null,
+      head: 'No target selected.',
       reason: 'no_target',
-      characterName: 'DivinationWizard',
-      abilityName: 'Maze',
+    },
+    {
+      name: 'no creatures in combat',
+      combat: { creatures: [] },
+      resolved: null,
+      head: 'No creatures in combat.',
+      reason: 'no_creatures',
+    },
+    {
+      name: 'armed target no longer in combat',
+      resolved: { target: { name: 'Androsphinx 2' } },
+      head: 'Target "Androsphinx 2" not found in combat.',
+      reason: 'no_target',
+    },
+  ];
+
+  describe.each(REFUSAL_CASES)('$name — refuse face verbatim, nothing spent', ({ combat, resolved, head, reason }) => {
+    it('spends nothing (no slot, no material, no cast log) and emits the handler refusal face', async () => {
+      if (combat) getCombatContext.mockResolvedValue(combat);
+      resolveTarget.mockResolvedValue(resolved);
+
+      const { onExecute, setPopupHtml } = await gate(makeMaze());
+
+      expect(prepareSpellCast).not.toHaveBeenCalled();
+      expect(consumeMaterial).not.toHaveBeenCalled();
+      expect(onExecute).not.toHaveBeenCalled();
+
+      expect(setPopupHtml).toHaveBeenCalledWith({
+        type: 'automation_info',
+        name: 'Maze',
+        automationType: 'maze_refused',
+        description: `${head} Maze has no effect.`,
+      });
+      expect(addEntry).toHaveBeenCalledTimes(1);
+      const refused = addEntry.mock.calls[0][1];
+      expect(refused).toMatchObject({
+        type: 'automation',
+        automationType: 'maze_refused',
+        reason,
+        characterName: 'DivinationWizard',
+        abilityName: 'Maze',
+      });
+      expect(refused.description).toBe(`Maze refused: ${head.charAt(0).toLowerCase()}${head.slice(1)} Nothing spent.`);
     });
-    expect(logs[0].description).toContain('Nothing spent.');
   });
 
-  it('no creatures in combat: refusal face + no spend, reason no_creatures', async () => {
-    getCombatContext.mockResolvedValue({ creatures: [] });
+  it('control: armed valid target keeps the paid lane verbatim — prepareSpellCast pays once, onExecute runs, zero refusals', async () => {
+    resolveTarget.mockResolvedValue({ target: { name: 'Androsphinx 1' } });
 
     const { onExecute, setPopupHtml } = await gate(makeMaze());
 
-    expect(prepareSpellCast).not.toHaveBeenCalled();
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-      description: 'No creatures in combat. Maze has no effect.',
-    }));
-    expect(refusalLogs()[0].reason).toBe('no_creatures');
-  });
-
-  it('armed valid target: paid lane unchanged — prepareSpellCast pays once, onExecute runs', async () => {
-    resolveTarget.mockResolvedValue({ target: { name: 'Androsphinx 1' } });
-
-    const { onExecute } = await gate(makeMaze());
-
     expect(prepareSpellCast).toHaveBeenCalledTimes(1);
     expect(onExecute).toHaveBeenCalledTimes(1);
-    expect(refusalLogs()).toHaveLength(0);
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(setPopupHtml).not.toHaveBeenCalled();
   });
 
-  it('control: an ordinary non-sorcerer spell is unaffected by the maze gate', async () => {
-    resolveTarget.mockResolvedValue(null);
+  it('control: sorcerer unarmed Maze is refused before the metamagic queue (unlike sp079 deferred chooser)', async () => {
+    const { onExecute, cfSetPending, setPopupHtml } = await gate(makeMaze(), { isSorcerer: true });
 
-    await gate({ name: 'Fireball', level: 3, casting_time: 'Action', range: '150 feet', damage: { damage_dice: '8d6' } });
-
-    expect(prepareSpellCast).toHaveBeenCalledTimes(1);
-    expect(refusalLogs()).toHaveLength(0);
+    expect(cfSetPending).not.toHaveBeenCalled();
+    expect(onExecute).not.toHaveBeenCalled();
+    expect(prepareSpellCast).not.toHaveBeenCalled();
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ automationType: 'maze_refused' }));
+    expect(addEntry.mock.calls[0][1]).toMatchObject({ automationType: 'maze_refused', reason: 'no_target' });
   });
 });

@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-15
 // SP-126: the live Web confirmer must stamp the REACHABLE automation type
 // 'web_area_save' (the pre-fix 'web' stamp fell through executeHandler to
 // null — slot + concentration paid, no saves, no Restrained, no logs).
@@ -87,12 +88,14 @@ const playerStats = {
 };
 
 function makeSpell(overrides = {}) {
+  // Field values mirror the current Web entry in public/data/spells.json.
   return {
     name: 'Web',
     level: 2,
     range: '60 feet',
-    casting_time: 'Action',
-    duration: 'Concentration, up to 1 hour',
+    casting_time: '1 action',
+    duration: 'Up to 1 hour',
+    concentration: true,
     school: 'Conjuration',
     ...overrides,
   };
@@ -118,11 +121,16 @@ describe('useSpellMetamagicFlow — Web confirm stamp (SP-126)', () => {
       await result.current.handleWebConfirm(['Zombie 1', 'Thug 1']);
     });
 
+    // useConfirmableFlow deletes the pending op before applying — the modal closes.
+    expect(result.current.pendingWeb).toBeFalsy();
+
     expect(executeHandler).toHaveBeenCalledTimes(1);
-    const action = executeHandler.mock.calls[0][0];
+    const [action, , campaignName] = executeHandler.mock.calls[0];
     expect(action.automation.type).toBe('web_area_save');
-    expect(action.automation.saveDc).toBe(19);
+    // DC derived via computeSaveDc's spellAbilities.saveDc fallback, not hardcoded.
+    expect(action.automation.saveDc).toBe(playerStats.spellAbilities.saveDc);
     expect(action.automation.saveType).toBe('DEX');
     expect(action.metaCtx.targets).toEqual(['Zombie 1', 'Thug 1']);
+    expect(campaignName).toBe('test-campaign');
   });
 });

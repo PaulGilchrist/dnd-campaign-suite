@@ -1,9 +1,13 @@
-// SP-125: Warding Bond previously had no gate — casts fell through to the
-// generic paid lane, burning the lv2 slot on the handler's no-target refusal
-// and never setting metaCtx.wardingBondTargetName outside combat. gateWardingBond
-// opens the chooser UNPAID (pay-at-confirm) whenever a picker candidate exists,
-// and defers to the paid lane byte-identically when an initiative target is armed.
+// @maintained-by-ai: 2026-10-14
+// SP-125: Warding Bond (2024) targets ANOTHER willing creature at touch range.
+// Previously casts fell through to the generic paid lane, burning the lv2 slot
+// on the handler's no-target refusal and never setting metaCtx.wardingBondTargetName
+// outside combat. gateWardingBond opens the SecondaryTarget chooser UNPAID
+// (pay-at-confirm) whenever a picker candidate exists, and defers to the verified
+// paid lane when an initiative target is armed. Gate lane only — handler/AC-bonus
+// seams live in wardingBondHandler + loggedDiceRollUtils.warding-bond tests.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import spells2024 from '../../../public/data/2024/spells.json';
 
 vi.mock('../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(),
@@ -22,35 +26,21 @@ vi.mock('../../services/combat/conditions/deathSaveRules.js', () => ({
   isStable: vi.fn(() => false),
 }));
 
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  getTargetFromAttacker: vi.fn((cs, attackerName) => {
-    const attacker = cs?.creatures?.find(c => c.name === attackerName);
-    if (!attacker?.targetName) return null;
-    return cs.creatures.find(c => c.name === attacker.targetName) || null;
-  }),
-}));
-
 import { tryGateSpell } from './spellGates.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 
 const CAMPAIGN = 'test-campaign';
 const CASTER = 'War_Cleric';
 
-const WARDING_BOND = {
-  name: 'Warding Bond',
-  level: 2,
-  casting_time: 'Action',
-  range: 'Touch',
-  concentration: false,
-  duration: '1 hour',
-  automation: { type: 'warding_bond', duration: '1 hour', target: 'willing_creature', casting_time: '1 action' },
-};
+// Data authority: 2024 Essentials row (SP-125 gate was built for the 2024 text;
+// the 5e row shares the same automation and the gate keys off lowercase name).
+const WARDING_BOND = spells2024.find(s => s.name === 'Warding Bond');
 
 function gate({ cs, characters = [] } = {}) {
   getCombatSummary.mockReturnValue(cs);
   const cfSetPending = vi.fn();
   const handled = tryGateSpell('warding bond', CAMPAIGN, cfSetPending, {
-    spell: WARDING_BOND,
+    spell: { ...WARDING_BOND },
     metaCtx: {},
     playerStats: { name: CASTER },
     characters,
@@ -76,7 +66,7 @@ describe('SP-125 gateWardingBond — unpaid chooser + paid-lane preservation', (
     expect(handled).toBe(false);
   });
 
-  it('combat without armed target: opens chooser unpaid with candidates excluding the caster', () => {
+  it('combat without armed target: opens chooser unpaid over every non-caster in initiative', () => {
     const cs = {
       creatures: [
         { name: CASTER, type: 'player' },
@@ -88,8 +78,8 @@ describe('SP-125 gateWardingBond — unpaid chooser + paid-lane preservation', (
     expect(handled).toBe(true);
     expect(pending.spellName).toBe('Warding Bond');
     expect(pending.spellLevel).toBe(2);
+    expect(pending.range).toBe('Touch');
     expect(pending.creatureTargets).toEqual(['AasimarTest', 'Bandit 1']);
-    expect(pending.creatureTargets).not.toContain(CASTER);
   });
 
   it('outside combat: campaign roster fallback feeds the chooser (the previously dead lane)', () => {
@@ -101,13 +91,8 @@ describe('SP-125 gateWardingBond — unpaid chooser + paid-lane preservation', (
     expect(pending.creatureTargets).toEqual(['AasimarTest', 'ElderPaladin']);
   });
 
-  it('zero candidates (no combat, empty roster): returns false so the unpaid refusal gate catches it', () => {
-    const { handled } = gate({ cs: null, characters: [] });
-    expect(handled).toBe(false);
-  });
-
-  it('solo roster (only the caster): RAW "another creature" — no chooser', () => {
-    const { handled } = gate({ cs: null, characters: [{ name: CASTER }] });
-    expect(handled).toBe(false);
+  it('no valid candidate (empty roster, or RAW "another creature" solo caster): returns false for the unpaid refusal gate', () => {
+    expect(gate({ cs: null, characters: [] }).handled).toBe(false);
+    expect(gate({ cs: null, characters: [{ name: CASTER }] }).handled).toBe(false);
   });
 });

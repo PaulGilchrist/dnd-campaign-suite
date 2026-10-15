@@ -1,3 +1,14 @@
+// @maintained-by-ai
+// Canonical base suite of the contextBuilder-sync cluster. Owns the core output
+// contract of buildAttackContextSync: basic field shapes (target/attacker names,
+// damageType fallback, isMelee, isWeaponAttack, isPsychicBlade, hitBonus ?? 0),
+// resistanceNotice passthrough, saveDc/saveType/dcSuccess passthrough (canonical
+// home per sibling headers), forcedMode passthrough/preservation through the
+// adv/dis chain (conditionAttackMode wins), and the antimagic-field /
+// resilient-sphere blocked-attack early returns. Lane-specific adv/dis sources
+// live in the sibling suites (buffs, advantage-priority, target-effects,
+// wolf-aura, wm008-vex-consume, ...) — do not re-add single-source lane tests here.
+// Deterministic: all externals mocked → stable contract, flag kept.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -332,8 +343,13 @@ describe('contextBuilder-sync: basic context fields', () => {
       let result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
       expect(result.isAutoMiss).toBeUndefined();
 
-      // No one affected
-      result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+      // No one affected — empty targetEffects, spell attack does not block
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (name === 'campaign' && key === 'targetEffects') return [];
+        return undefined;
+      });
+
+      result = await buildAttackContextSync({ ...mockAttack, isWeaponAttack: false, weaponType: undefined }, mockStats, 'camp', 'normal', {});
       expect(result.isAutoMiss).toBeUndefined();
 
       // Null targetName does not trigger block
@@ -374,7 +390,7 @@ describe('contextBuilder-sync: basic context fields', () => {
       expect(result.rangeReason).toBe('Resilient Sphere blocks attacks — nothing passes through the barrier');
     });
 
-    it('does not trigger when no one is in a sphere or both are in spheres', async () => {
+    it('does not trigger when no one is in a sphere; blocks when both attacker and target are enclosed', async () => {
       isResilientSphereActive.mockReturnValue(false);
 
       const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
@@ -382,6 +398,7 @@ describe('contextBuilder-sync: basic context fields', () => {
       expect(result.isAutoMiss).toBeUndefined();
       expect(result.forcedMode).toBeUndefined();
 
+      // Both enclosed — the attacker-side check fires first and blocks
       isResilientSphereActive.mockReturnValue(true);
 
       const result2 = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
@@ -391,34 +408,21 @@ describe('contextBuilder-sync: basic context fields', () => {
   });
 
   describe('hitBonus undefined on attack object', () => {
-    it('defaults to 0 instead of producing NaN when attack.hitBonus is undefined', async () => {
-      const attackWithoutHitBonus = {
-        name: 'Greataxe',
-        damage: '1d12',
-        damageType: 'Slashing',
-        weaponType: 'melee',
-        hitBonus: undefined,
-      };
+    it('defaults to 0 instead of producing NaN when attack.hitBonus is undefined or null', async () => {
+      for (const hitBonus of [undefined, null]) {
+        const attack = {
+          name: 'Greataxe',
+          damage: '1d12',
+          damageType: 'Slashing',
+          weaponType: 'melee',
+          hitBonus,
+        };
 
-      const result = await buildAttackContextSync(attackWithoutHitBonus, mockStats, 'camp', 'normal', {});
+        const result = await buildAttackContextSync(attack, mockStats, 'camp', 'normal', {});
 
-      expect(result.hitBonus).toBe(0);
-      expect(Number.isNaN(result.hitBonus)).toBe(false);
-    });
-
-    it('defaults to 0 when attack.hitBonus is null', async () => {
-      const attackWithNullHitBonus = {
-        name: 'Greataxe',
-        damage: '1d12',
-        damageType: 'Slashing',
-        weaponType: 'melee',
-        hitBonus: null,
-      };
-
-      const result = await buildAttackContextSync(attackWithNullHitBonus, mockStats, 'camp', 'normal', {});
-
-      expect(result.hitBonus).toBe(0);
-      expect(Number.isNaN(result.hitBonus)).toBe(false);
+        expect(result.hitBonus).toBe(0);
+        expect(Number.isNaN(result.hitBonus)).toBe(false);
+      }
     });
   });
 });

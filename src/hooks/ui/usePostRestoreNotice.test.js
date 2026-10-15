@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Unit-level owner of the usePostRestoreNotice contract (per the coverage split
+// declared in App.post-restore.test.jsx): notice parsing/consumption from
+// sessionStorage, consumeRestore gating, and one-shot banner drop.
+// App-level wiring lives in App.post-restore.test.jsx; the write side lives in
+// components/campaign-admin/CampaignAdmin.rollback-upload.test.jsx.
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { usePostRestoreNotice } from './usePostRestoreNotice.js';
@@ -26,6 +32,7 @@ describe('usePostRestoreNotice', () => {
 
     expect(result.current.autoSelectCampaign).toBeNull();
     expect(result.current.restoredSnapshot).toBeNull();
+    expect(sessionStorage.getItem('postRestoreNotice')).toBeNull();
   });
 
   it('consumeRestore claims the restored campaign once and ignores other campaigns', async () => {
@@ -44,6 +51,11 @@ describe('usePostRestoreNotice', () => {
 
     const { result, rerender } = renderHook(({ view }) => usePostRestoreNotice(view), { initialProps: { view: null } });
     await waitFor(() => expect(result.current.restoredSnapshot).toBe(RESTORED_FILE));
+
+    // While the restore is still pending (not yet consumed), navigating to a
+    // non-Admin view must NOT drop the banner.
+    rerender({ view: 'notes' });
+    expect(result.current.restoredSnapshot).toBe(RESTORED_FILE);
 
     rerender({ view: 'campaignRepair' });
     act(() => { result.current.consumeRestore('test-campaign'); });

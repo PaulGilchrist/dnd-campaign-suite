@@ -1,4 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+// @maintained-by-ai
+// choiceStorage.js is a thin, stable wrapper: key mangling plus delegation to the
+// in-memory runtime store (fetch is inert in tests via src/test/setup.js).
+// This suite pins that public contract and should need no churn as the app changes.
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { clearRuntimeState } from '../../../hooks/runtime/useRuntimeState.js';
 import { getChosenRuntimeValue, setChosenRuntimeValue } from './choiceStorage.js';
 
@@ -17,6 +21,10 @@ function makePlayerStats(overrides = {}) {
 
 beforeEach(() => {
     resetRuntime();
+});
+
+afterEach(() => {
+    vi.restoreAllMocks();
 });
 
 describe('getChosenRuntimeValue / setChosenRuntimeValue', () => {
@@ -57,10 +65,47 @@ describe('getChosenRuntimeValue / setChosenRuntimeValue', () => {
         expect(getChosenRuntimeValue(otherPlayer, 'Fire Shield', 'chosenType')).toBe('Cold');
     });
 
-    it('supports campaignName override for both write and read', () => {
+    it('treats a missing suffix as part of the key contract (unsuffixed key is distinct)', () => {
         const stats = makePlayerStats();
+
+        setChosenRuntimeValue(stats, 'Fire Shield', 'Base');
+        setChosenRuntimeValue(stats, 'Fire Shield', 'Typed', 'chosenType');
+
+        expect(getChosenRuntimeValue(stats, 'Fire Shield')).toBe('Base');
+        expect(getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType')).toBe('Typed');
+    });
+
+    it('reads back null for keys that were never written', () => {
+        const stats = makePlayerStats();
+
+        // The runtime store returns null (not undefined) for missing keys;
+        // pin this so consumers relying on falsy checks keep working.
+        expect(getChosenRuntimeValue(stats, 'Never Set', 'chosenType')).toBeNull();
+    });
+
+    it('posts writes to playerStats.campaignName by default', () => {
+        const stats = makePlayerStats();
+        const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
+
+        setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType');
+
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        const [url, options] = fetchSpy.mock.calls[0];
+        expect(url).toContain('/api/campaigns/TestCampaign/alice');
+        expect(options.method).toBe('POST');
+        expect(getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType')).toBe('Fire');
+    });
+
+    it('routes writes to a campaignName override instead of playerStats.campaignName', () => {
+        const stats = makePlayerStats();
+        const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
+
         setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType', 'OverrideCampaign');
-        const result = getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType', 'OverrideCampaign');
-        expect(result).toBe('Fire');
+
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        const [url] = fetchSpy.mock.calls[0];
+        expect(url).toContain('/api/campaigns/OverrideCampaign/alice');
+        expect(url).not.toContain('TestCampaign');
+        expect(getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType', 'OverrideCampaign')).toBe('Fire');
     });
 });

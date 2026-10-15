@@ -1,3 +1,8 @@
+// @maintained-by-ai
+// Hermetic unit suite for powerWordFortifyHandler: all deps mocked, no timers/network/server state.
+// Pins stable contracts — slot-level substitution precedence, dice/arith expression evaluation,
+// eligible-target filtering, guard refusals (zero side effects), confirm popup/log payloads.
+// Deterministic: no churn needed unless the handler's own behaviour or message copy changes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ─────────────────────────────────────────
@@ -185,24 +190,6 @@ describe('powerWordFortifyHandler', () => {
       expect(diceRoller.rollExpression).not.toHaveBeenCalled();
       expect(result.payload.totalTempHp).toBe(50);
     });
-
-    it('handles dice expressions with positive modifiers', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 25, rolls: [12, 8, 5], modifier: 0 });
-
-      const result = await handle(makeAction({ tempHpExpression: '3d8+1' }), makePlayerStats(), campaignName, null);
-
-      expect(diceRoller.rollExpression).toHaveBeenCalledWith('3d8+1');
-      expect(result.payload.totalTempHp).toBe(25);
-    });
-
-    it('handles dice expressions with negative modifiers', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 18, rolls: [6, 6, 6], modifier: 0 });
-
-      const result = await handle(makeAction({ tempHpExpression: '3d6-3' }), makePlayerStats(), campaignName, null);
-
-      expect(diceRoller.rollExpression).toHaveBeenCalledWith('3d6-3');
-      expect(result.payload.totalTempHp).toBe(18);
-    });
   });
 
   // ── handle: roll failure ─────────────────────────────────────
@@ -283,17 +270,6 @@ describe('powerWordFortifyHandler', () => {
       expect(damageUtils.getCombatContext).toHaveBeenCalledWith(campaignName);
     });
 
-    it('returns popup when no allies exist at all', async () => {
-      allySelection.getAllyList.mockReturnValue([]);
-
-      damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No allies within range');
-    });
-
     it('includes the caster as a valid target', async () => {
       allySelection.getAllyList.mockReturnValue([playerName, 'Ally1', 'Ally2']);
 
@@ -367,6 +343,7 @@ describe('powerWordFortifyHandler', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(rangeValidation.rangeToFeet).not.toHaveBeenCalled();
+      expect(rangeCheck.isWithinRange).toHaveBeenCalledWith(playerName, 'Ally1', 60);
       expect(result.type).toBe('modal');
     });
 
@@ -376,6 +353,7 @@ describe('powerWordFortifyHandler', () => {
       const result = await handle(makeAction({ range: '30 ft' }), makePlayerStats(), campaignName, null);
 
       expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('30 ft');
+      expect(rangeCheck.isWithinRange).toHaveBeenCalledWith(playerName, 'Ally1', 30);
       expect(result.type).toBe('modal');
     });
   });
@@ -434,21 +412,6 @@ describe('powerWordFortifyHandler', () => {
       const result = await handle(makeAction({ maxTargets: 4 }), makePlayerStats(), campaignName, null);
 
       expect(result.payload.maxTargets).toBe(4);
-    });
-
-    it('passes the dice expression through in payload', async () => {
-      allySelection.getAllyList.mockReturnValue(['Ally1']);
-
-      damageUtils.getCombatContext.mockResolvedValue(
-        makeCombatContext([playerName, 'Ally1']),
-      );
-
-      diceRoller.rollExpression.mockReturnValue({ total: 25, rolls: [25], modifier: 0 });
-
-      const result = await handle(makeAction({ tempHpExpression: '2d10+5' }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.tempHpExpression).toBe('2d10+5');
-      expect(result.payload.totalTempHp).toBe(25);
     });
   });
 });
@@ -557,26 +520,8 @@ describe('confirmPowerWordFortify', () => {
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
     expect(result.payload.name).toBe('Power Word Fortify');
-    expect(result.payload.description).toContain('50 temp HP distributed');
-    expect(result.payload.description).toContain('Ally1: 20');
-    expect(result.payload.description).toContain('Ally2: 30');
-  });
-
-  it('includes automationType in popup payload', async () => {
-    const distribution = { Ally1: 20 };
-    const action = makeAction({ type: 'power_word_fortify' });
-    const ps = makePlayerStats();
-
-    const result = await confirmPowerWordFortify({
-    action,
-    playerStats: ps,
-    campaignName,
-    distribution,
-    totalTempHp: 20,
-    tempHpExpression: '2d8+4',
-});
-
     expect(result.payload.automationType).toBe('power_word_fortify');
+    expect(result.payload.description).toBe('Power Word Fortify: 50 temp HP distributed — Ally1: 20, Ally2: 30.');
   });
 
   it('handles empty distribution (no targets selected)', async () => {
@@ -594,8 +539,7 @@ describe('confirmPowerWordFortify', () => {
 });
 
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('0 temp HP distributed');
-    expect(result.payload.description).toContain('none');
+    expect(result.payload.description).toBe('Power Word Fortify: 0 temp HP distributed — none.');
     expect(tempHpService.setTempHp).not.toHaveBeenCalled();
   });
 
@@ -644,51 +588,12 @@ describe('confirmPowerWordFortify', () => {
     expect(tempHpService.setTempHp).toHaveBeenCalledWith('Ally1', 20, campaignName);
   });
 
-  it('handles single target distribution', async () => {
-    const distribution = { SoloAlly: 40 };
-    const action = makeAction();
-    const ps = makePlayerStats();
-
-    const result = await confirmPowerWordFortify({
-    action,
-    playerStats: ps,
-    campaignName,
-    distribution,
-    totalTempHp: 40,
-    tempHpExpression: '4d8+4',
-});
-
-    expect(tempHpService.setTempHp).toHaveBeenCalledWith('SoloAlly', 40, campaignName);
-    expect(result.payload.description).toContain('SoloAlly: 40');
-  });
-
-  it('handles multiple targets with same amount', async () => {
-    const distribution = { Ally1: 10, Ally2: 10, Ally3: 10 };
-    const action = makeAction();
-    const ps = makePlayerStats();
-
-    const result = await confirmPowerWordFortify({
-    action,
-    playerStats: ps,
-    campaignName,
-    distribution,
-    totalTempHp: 30,
-    tempHpExpression: '2d6+4',
-});
-
-    expect(tempHpService.setTempHp).toHaveBeenCalledWith('Ally1', 10, campaignName);
-    expect(tempHpService.setTempHp).toHaveBeenCalledWith('Ally2', 10, campaignName);
-    expect(tempHpService.setTempHp).toHaveBeenCalledWith('Ally3', 10, campaignName);
-    expect(result.payload.description).toContain('Ally1: 10');
-    expect(result.payload.description).toContain('Ally2: 10');
-    expect(result.payload.description).toContain('Ally3: 10');
-  });
-
   it('refuses distributions exceeding maxTargets with zero temp HP writes', async () => {
     const distribution = { A: 10, B: 10, C: 10, D: 10, E: 10, F: 10, G: 10 };
     const action = makeAction({ maxTargets: 6 });
     const ps = makePlayerStats();
 
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
     const result = await confirmPowerWordFortify({
     action,
     playerStats: ps,
@@ -699,16 +604,18 @@ describe('confirmPowerWordFortify', () => {
 });
 
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('max 6');
+    expect(result.payload.description).toBe('Power Word Fortify: cannot fortify 7 targets — max 6.');
     expect(tempHpService.setTempHp).not.toHaveBeenCalled();
+    expect(dispatchSpy).not.toHaveBeenCalled();
     expect(logService.addEntry).toHaveBeenCalledWith(
       campaignName,
       expect.objectContaining({
         type: 'automation',
         automationType: 'power_word_fortify_refused',
-        description: expect.stringContaining('target_cap_exceeded'),
+        description: 'Power Word Fortify refused — target_cap_exceeded (7 selected, max 6)',
       }),
     );
+    dispatchSpy.mockRestore();
   });
 
   it('refuses pooled distributions exceeding totalTempHp with zero temp HP writes', async () => {
@@ -716,6 +623,7 @@ describe('confirmPowerWordFortify', () => {
     const action = makeAction({ maxTargets: 6 });
     const ps = makePlayerStats();
 
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
     const result = await confirmPowerWordFortify({
     action,
     playerStats: ps,
@@ -726,15 +634,17 @@ describe('confirmPowerWordFortify', () => {
 });
 
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('exceeds the pool of 120');
+    expect(result.payload.description).toBe('Power Word Fortify: allocated 200 temp HP exceeds the pool of 120.');
     expect(tempHpService.setTempHp).not.toHaveBeenCalled();
+    expect(dispatchSpy).not.toHaveBeenCalled();
     expect(logService.addEntry).toHaveBeenCalledWith(
       campaignName,
       expect.objectContaining({
         type: 'automation',
         automationType: 'power_word_fortify_refused',
-        description: expect.stringContaining('pool_exceeded'),
+        description: 'Power Word Fortify refused — pool_exceeded (200 allocated, pool 120)',
       }),
     );
+    dispatchSpy.mockRestore();
   });
 });

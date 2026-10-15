@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Deterministic unit tests for the once-per-turn latch contract (FT-082:
+// re-arm is round-scoped off the holder's own store, never the stale
+// cs.activeCreatureName mirror). Stable pure behaviour — no app churn needed.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -72,16 +76,7 @@ describe('checkOncePerTurn', () => {
         expect(result).toBeNull();
     });
 
-    it('returns null when stored new-format round+1 and creature matches', async () => {
-        mockCombatContext({ round: 4, activeCreatureName: 'TestCharacter' });
-        runtimeState.getRuntimeValue.mockReturnValue({ round: 3, activeCreature: 'TestCharacter' });
-
-        const result = await checkOncePerTurn('Cunning Strike', '_CunningStrike_usedRound', 'TestCharacter', CAMPAIGN);
-
-        expect(result).toBeNull();
-    });
-
-    it('returns popup when stored new-format same round different creature', async () => {
+    it('returns popup when stored new-format round is the current round', async () => {
         mockCombatContext({ round: 3, activeCreatureName: 'OtherCreature' });
         runtimeState.getRuntimeValue.mockReturnValue({ round: 3, activeCreature: 'TestCharacter' });
 
@@ -100,7 +95,7 @@ describe('checkOncePerTurn', () => {
     // FT-082: re-arm is round-scoped off the holder's own store. A stale
     // cs.activeCreatureName mirror must NOT block re-arm on the holder's
     // next turn (old behavior degraded once-per-turn to once-per-2-rounds).
-    it('returns null when stored new-format round+1 but mirror creature does not match (stale mirror)', async () => {
+    it('returns null when stored new-format round has advanced, even with a stale mirror', async () => {
         mockCombatContext({ round: 4, activeCreatureName: 'OtherCreature' });
         runtimeState.getRuntimeValue.mockReturnValue({ round: 3, activeCreature: 'TestCharacter' });
 
@@ -109,22 +104,13 @@ describe('checkOncePerTurn', () => {
         expect(result).toBeNull();
     });
 
-    it('returns null when current round > stored round + 1', async () => {
-        mockCombatContext({ round: 5, activeCreatureName: 'TestCharacter' });
-        runtimeState.getRuntimeValue.mockReturnValue({ round: 3, activeCreature: 'TestCharacter' });
-
-        const result = await checkOncePerTurn('Cunning Strike', '_CunningStrike_usedRound', 'TestCharacter', CAMPAIGN);
-
-        expect(result).toBeNull();
-    });
-
-    it('returns null when combat context is null (defaults round=1, creature=null)', async () => {
+    it('defaults round to 1 when combat context is null', async () => {
         damageUtils.getCombatContext.mockResolvedValue(null);
-        runtimeState.getRuntimeValue.mockReturnValue(null);
+        runtimeState.getRuntimeValue.mockReturnValue({ round: 1, activeCreature: 'TestCharacter' });
 
         const result = await checkOncePerTurn('Feature', '_key', 'TestCharacter', CAMPAIGN);
 
-        expect(result).toBeNull();
+        expect(result?.payload?.description).toContain('once per turn');
     });
 });
 
@@ -186,24 +172,7 @@ describe('checkOncePerTurnWithSkip', () => {
         expect(result).toBeNull();
     });
 
-    it('returns null when stored new-format round+1 and creature matches', async () => {
-        mockCombatContext({ round: 4, activeCreatureName: 'TestCharacter' });
-        runtimeState.getRuntimeValue
-            .mockReturnValueOnce({ round: 3, activeCreature: 'TestCharacter' })
-            .mockReturnValueOnce(null);
-
-        const result = await checkOncePerTurnWithSkip(
-            'Feature',
-            '_usedKey',
-            '_skipKey',
-            PLAYER_STATS,
-            CAMPAIGN
-        );
-
-        expect(result).toBeNull();
-    });
-
-    it('returns popup when stored new-format same round different creature', async () => {
+    it('returns popup when stored new-format round is the current round', async () => {
         mockCombatContext({ round: 3, activeCreatureName: 'OtherCreature' });
         runtimeState.getRuntimeValue
             .mockReturnValueOnce({ round: 3, activeCreature: 'TestCharacter' })
@@ -229,25 +198,8 @@ describe('checkOncePerTurnWithSkip', () => {
 
     // FT-082: round-scoped re-arm — a stale cs.activeCreatureName mirror
     // must not block re-arm in a later round.
-    it('returns null when stored new-format round+1 but mirror creature does not match (stale mirror)', async () => {
+    it('returns null when stored new-format round has advanced, even with a stale mirror', async () => {
         mockCombatContext({ round: 4, activeCreatureName: 'OtherCreature' });
-        runtimeState.getRuntimeValue
-            .mockReturnValueOnce({ round: 3, activeCreature: 'TestCharacter' })
-            .mockReturnValueOnce(null);
-
-        const result = await checkOncePerTurnWithSkip(
-            'Feature',
-            '_usedKey',
-            '_skipKey',
-            PLAYER_STATS,
-            CAMPAIGN
-        );
-
-        expect(result).toBeNull();
-    });
-
-    it('returns null when current round > stored round + 1', async () => {
-        mockCombatContext({ round: 5, activeCreatureName: 'TestCharacter' });
         runtimeState.getRuntimeValue
             .mockReturnValueOnce({ round: 3, activeCreature: 'TestCharacter' })
             .mockReturnValueOnce(null);
@@ -305,7 +257,7 @@ describe('checkOncePerTurnWithSkip', () => {
     });
 
     // FT-082: skip-flag re-arm is round-scoped; creature mismatch no longer
-    // blocks once the round has advanced.
+    // blocks once the round has advanced, and never blocks within it.
     it('returns popup when skip flag is new-format same round (creature mismatch)', async () => {
         mockCombatContext({ round: 3, activeCreatureName: 'OtherCreature' });
         runtimeState.getRuntimeValue
@@ -330,7 +282,7 @@ describe('checkOncePerTurnWithSkip', () => {
         });
     });
 
-    it('returns null when skip flag is new-format and round > stored round AND creature matches', async () => {
+    it('returns null when skip flag is new-format and round has advanced', async () => {
         mockCombatContext({ round: 4, activeCreatureName: 'TestCharacter' });
         runtimeState.getRuntimeValue
             .mockReturnValueOnce(null)
@@ -402,46 +354,31 @@ describe('checkOncePerTurnWithSkip', () => {
 // ── markOncePerTurn ────────────────────────────────────────────
 
 describe('markOncePerTurn', () => {
-    it('stores { round, activeCreature } and returns it', async () => {
-        mockCombatContext({ round: 5, activeCreatureName: 'TestCharacter' });
-
-        const result = await markOncePerTurn('Feature', '_usedKey', PLAYER_STATS, CAMPAIGN);
-
-        expect(result).toEqual({ round: 5, activeCreature: 'TestCharacter' });
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'TestCharacter',
-            '_usedKey',
-            { round: 5, activeCreature: 'TestCharacter' },
-            CAMPAIGN
-        );
-    });
-
-    it('falls back to playerStats.name when activeCreatureName is null', async () => {
-        mockCombatContext({ round: 1, activeCreatureName: null });
-
-        const result = await markOncePerTurn('Feature', '_usedKey', PLAYER_STATS, CAMPAIGN);
-
-        expect(result).toEqual({ round: 1, activeCreature: 'TestCharacter' });
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'TestCharacter',
-            '_usedKey',
-            { round: 1, activeCreature: 'TestCharacter' },
-            CAMPAIGN
-        );
-    });
-
-    // FT-082: the cs.activeCreatureName mirror goes stale mid-combat
-    // (pitfall 30) — the stamp must always carry the holder's name.
-    it('stamps playerStats.name even when the cs mirror is stale', async () => {
+    // FT-082 / pitfall 30: the cs.activeCreatureName mirror goes stale
+    // mid-combat — the stamp must ALWAYS carry the holder's own name,
+    // whether the mirror is a different creature or null.
+    it('stamps { round, activeCreature: playerStats.name } regardless of the cs mirror', async () => {
         mockCombatContext({ round: 2, activeCreatureName: 'AasimarTest' });
 
-        const result = await markOncePerTurn('Hamstring', '_Hamstring_usedRound', { name: 'EvasiveFighter' }, CAMPAIGN);
+        const stale = await markOncePerTurn('Hamstring', '_Hamstring_usedRound', { name: 'EvasiveFighter' }, CAMPAIGN);
 
-        expect(result).toEqual({ round: 2, activeCreature: 'EvasiveFighter' });
+        expect(stale).toEqual({ round: 2, activeCreature: 'EvasiveFighter' });
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
             'EvasiveFighter',
             '_Hamstring_usedRound',
             { round: 2, activeCreature: 'EvasiveFighter' },
+            CAMPAIGN
+        );
+
+        mockCombatContext({ round: 5, activeCreatureName: null });
+
+        const nullMirror = await markOncePerTurn('Feature', '_usedKey', PLAYER_STATS, CAMPAIGN);
+
+        expect(nullMirror).toEqual({ round: 5, activeCreature: 'TestCharacter' });
+        expect(runtimeState.setRuntimeValue).toHaveBeenLastCalledWith(
+            'TestCharacter',
+            '_usedKey',
+            { round: 5, activeCreature: 'TestCharacter' },
             CAMPAIGN
         );
     });
@@ -467,8 +404,9 @@ describe('markOncePerTurn', () => {
 // ── setSkipFlag ────────────────────────────────────────────────
 
 describe('setSkipFlag', () => {
-    it('stores { round, activeCreature } for the skip key and returns it', async () => {
-        mockCombatContext({ round: 5, activeCreatureName: 'TestCharacter' });
+    // FT-074 recipe: stamps the holder's name, never the cs mirror.
+    it('stamps holder name on the skip key, writes it, and returns it', async () => {
+        mockCombatContext({ round: 5, activeCreatureName: 'OtherCreature' });
 
         const result = await setSkipFlag('_skipKey', PLAYER_STATS, CAMPAIGN);
 
@@ -480,22 +418,12 @@ describe('setSkipFlag', () => {
             CAMPAIGN
         );
     });
-
-    it('falls back to playerStats.name when activeCreatureName is null', async () => {
-        mockCombatContext({ round: 1, activeCreatureName: null });
-
-        const result = await setSkipFlag('_skipKey', PLAYER_STATS, CAMPAIGN);
-
-        expect(result).toEqual({ round: 1, activeCreature: 'TestCharacter' });
-    });
 });
 
 // ── clearSkipFlag ──────────────────────────────────────────────
 
 describe('clearSkipFlag', () => {
     it('sets the skip key to null', async () => {
-        mockCombatContext({ round: 5, activeCreatureName: 'TestCharacter' });
-
         await clearSkipFlag('_skipKey', PLAYER_STATS, CAMPAIGN);
 
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(

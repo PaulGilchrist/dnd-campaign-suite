@@ -1,7 +1,17 @@
+// @maintained-by-ai: 2026-10-15
+// SP-079 pay-at-confirm family (§CLA-208) gate lane: for Mass Suggestion the gate
+// OPENS THE CHOOSER UNPAID — handleNonSorcererCast short-circuits before
+// prepareSpellCast/consumeMaterial/addEntry and stamps _deferChooserSlotPayment +
+// slotLevel (upcastLevel || level) so executeSpellCast skips the cast log and
+// MassSuggestionModal's confirm consumes the slot once. Skip/cancel spends nothing.
+// Shared no-spend family pattern (twins: sp080-maze, sp125-warding-bond): fixtures
+// mirror public/data/2024/spells.json, table-drive cases, one gate() helper, and a
+// control pinning that ordinary casts keep the paid lane verbatim.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { gateMetamagic } from './useSpellMetamagicGates.js';
-import { prepareSpellCast, isFreeCastAuthorized } from '../../services/rules/spells/spellPreparationService.js';
+import { prepareSpellCast } from '../../services/rules/spells/spellPreparationService.js';
 import { consumeMaterial } from '../../services/rules/spells/materialComponents.js';
+import { addEntry } from '../../services/ui/logService.js';
 
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
@@ -19,7 +29,7 @@ vi.mock('../../services/rules/spells/materialComponents.js', () => ({
 }));
 
 vi.mock('../../services/rules/spells/spellPreparationService.js', () => ({
-  prepareSpellCast: vi.fn(() => Promise.resolve({ modifiedSpell: {}, metaCtx: {}, slotConsumed: true })),
+  prepareSpellCast: vi.fn(),
   isFreeCastAuthorized: vi.fn(() => false),
   isWizardRitualAdeptSpell: vi.fn(() => false),
   incrementFreeCastResource: vi.fn(),
@@ -54,6 +64,8 @@ function makeWizard() {
   };
 }
 
+// Fixture mirrors public/data/2024/spells.json mass-suggestion (lv6, Action,
+// 60 feet, no concentration, WIS save vs spell_save_dc, maxTargets 12).
 function makeMassSuggestion(overrides = {}) {
   return {
     name: 'Mass Suggestion',
@@ -61,16 +73,16 @@ function makeMassSuggestion(overrides = {}) {
     casting_time: 'Action',
     range: '60 feet',
     concentration: false,
-    automation: { type: 'mass_suggestion', saveType: 'WIS', saveDc: 'spell_save_dc', maxTargets: 12 },
+    automation: { type: 'mass_suggestion', saveType: 'WIS', saveDc: 'spell_save_dc', range: '60 feet', duration: '24 hours', maxTargets: 12 },
     ...overrides,
   };
 }
 
-async function gate(spell, isSorcerer = false) {
+async function gate(spell, { isSorcerer = false, metaCtx = {} } = {}) {
   const playerStats = makeWizard();
   const onExecute = vi.fn();
   const cfSetPending = vi.fn();
-  await gateMetamagic(spell, {}, {
+  await gateMetamagic(spell, metaCtx, {
     hasMaterial: () => true,
     setPopupHtml: vi.fn(),
     isSorcerer,
@@ -81,43 +93,65 @@ async function gate(spell, isSorcerer = false) {
     characters: [],
     onExecute,
   });
-  return { playerStats, onExecute, cfSetPending };
+  return { metaCtx, onExecute, cfSetPending };
 }
 
-describe('SP-079 Mass Suggestion pay-at-open fix — open lane spends nothing', () => {
+describe('SP-079 Mass Suggestion pay-at-confirm — gate opens the chooser unpaid', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    prepareSpellCast.mockResolvedValue({ modifiedSpell: {}, metaCtx: {}, slotConsumed: true });
-    isFreeCastAuthorized.mockReturnValue(false);
-    consumeMaterial.mockResolvedValue(true);
+    // Snapshot semantics of the real prepareSpellCast (used by the paid-lane control).
+    prepareSpellCast.mockImplementation(async (spell, passedCtx) => ({
+      modifiedSpell: { ...spell },
+      metaCtx: { ...passedCtx, slotConsumed: true },
+      slotConsumed: true,
+    }));
   });
 
-  it('non-sorcerer Mass Suggestion does NOT call prepareSpellCast at open (no spend at row-click/open)', async () => {
-    const { onExecute } = await gate(makeMassSuggestion());
+  const DEFERRED_CASES = [
+    {
+      name: 'base lv6 cast',
+      spellOverrides: {},
+      expectedSlotLevel: 6,
+    },
+    {
+      name: 'lv7 upcast',
+      spellOverrides: { isUpcast: true, upcastLevel: 7 },
+      expectedSlotLevel: 7,
+    },
+  ];
 
-    expect(prepareSpellCast).not.toHaveBeenCalled();
+  describe.each(DEFERRED_CASES)('$name — non-sorcerer opens unpaid, chooser confirm pays', ({ spellOverrides, expectedSlotLevel }) => {
+    it('spends nothing (no slot, no material, no cast log) and stamps the deferred-payment forward', async () => {
+      const spell = makeMassSuggestion(spellOverrides);
+      const { metaCtx, onExecute } = await gate(spell);
+
+      expect(prepareSpellCast).not.toHaveBeenCalled();
+      expect(consumeMaterial).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+
+      expect(onExecute).toHaveBeenCalledTimes(1);
+      const [forwarded, forwardedCtx] = onExecute.mock.calls[0];
+      expect(forwarded._deferChooserSlotPayment).toBe(true);
+      expect(forwarded.slotLevel).toBe(expectedSlotLevel);
+      // metaCtx rides through untouched — the confirm lane pays and logs once.
+      expect(forwardedCtx).toBe(metaCtx);
+      // The original spell row is not mutated by the stamp.
+      expect(spell._deferChooserSlotPayment).toBeUndefined();
+    });
+  });
+
+  it('control: an ordinary non-sorcerer spell still pays its slot at open (paid lane unchanged)', async () => {
+    const { onExecute } = await gate({ name: 'Fireball', level: 3, casting_time: 'Action', range: '150 feet', damage: { damage_dice: '8d6' } });
+
+    expect(prepareSpellCast).toHaveBeenCalledTimes(1);
     expect(onExecute).toHaveBeenCalledTimes(1);
   });
 
-  it('stamps _deferChooserSlotPayment + slotLevel so the chooser confirm pays', async () => {
-    const { onExecute } = await gate(makeMassSuggestion());
-
-    const forwarded = onExecute.mock.calls[0][0];
-    expect(forwarded._deferChooserSlotPayment).toBe(true);
-    expect(forwarded.slotLevel).toBe(6);
-  });
-
-  it('control: an ordinary non-sorcerer spell still pays its slot at open (unchanged lane)', async () => {
-    await gate({ name: 'Fireball', level: 3, casting_time: 'Action', range: '150 feet', damage: { damage_dice: '8d6' } });
-
-    expect(prepareSpellCast).toHaveBeenCalledTimes(1);
-  });
-
-  it('control: a non-sorcerer Mass Suggestion open never spends even after many opens', async () => {
-    for (let i = 0; i < 3; i++) {
-      await gate(makeMassSuggestion());
-    }
+  it('control: a sorcerer Mass Suggestion queues the metamagic modal instead (unpaid, no defer stamp)', async () => {
+    const { onExecute, cfSetPending } = await gate(makeMassSuggestion(), { isSorcerer: true });
 
     expect(prepareSpellCast).not.toHaveBeenCalled();
+    expect(onExecute).not.toHaveBeenCalled();
+    expect(cfSetPending).toHaveBeenCalledWith('metamagic', expect.objectContaining({ spellName: 'Mass Suggestion', spellLevel: 6 }));
   });
 });

@@ -1,8 +1,14 @@
-// SP-127: Aid upcast burned the lv3 slot but applyAid resolved hpMaxIncreaseExpression
-// at the base spell.level (+5). Pins the paid-slot threading on the aid spec bodyOf
-// (stampPaidSlotLevel / CLA-086 seam), the exact chooser-selection cast log
-// (targets list was allTargets + stray targetName), the lv2 baseline byte-shape,
-// and the deathWard/auraOfVitality twin fold.
+// @maintained-by-ai: 2026-10-15
+// SP-127 Aid upcast-slot specifics — the Aid-specific half of the paid-slot contract.
+// The generic CLA-086 stamp / heal-metaCtx / raw-slot skip refund lanes live in
+// cla086-upcast-slot.test.js; Magic Missile in sp075. This file pins ONLY what is
+// Aid-family: the spellSlotLevel threading on the aid spec bodyOf (useSimpleSpellHandlers
+// 'aid' line — applyAidEffect must see the paid slot, not the base spell.level), the
+// exact chooser-selection cast log (confirmTargets toArray(sel) — previously allTargets
+// stamped every combatant), the free-cast refund lane ('aid' ∈ FREE_CAST_SPELLS, so skip
+// routes through incrementFreeCastResource at the paid level, never raw slot keys), the
+// lv2 baseline byte-shape, and the SP-127 twins (auraOfVitality consumes spellSlotLevel;
+// deathWard never reads it — byte-harmless twin). Fixtures mirror spells.json (5e + 2024).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
@@ -124,15 +130,20 @@ Object.defineProperty(window, 'dispatchEvent', {
   writable: true,
 });
 
-function makePlayerStats(overrides = {}) {
-  return {
-    name: 'TestCleric',
-    class: { name: 'Cleric' },
-    level: 17,
-    ...overrides,
-  };
+function renderFlow() {
+  return renderHook(() => useSpellMetamagicFlow({
+    playerStats: { name: 'TestCleric', class: { name: 'Cleric' }, level: 17 },
+    campaignName: 'TestCampaign',
+    onExecute: vi.fn(),
+    setSecondaryTargetModal: null,
+    characters: [],
+    setPopupHtml: vi.fn(),
+  }));
 }
 
+// Mirrors spells.json Aid (both rulesets): lv2, automation.type 'aid',
+// hpMaxIncreaseExpression keyed on spellSlotLevel; 'Bonus Action' is the 2024
+// casting_time carried on the popup fixture.
 function makeAid(overrides = {}) {
   return {
     name: 'Aid',
@@ -145,24 +156,14 @@ function makeAid(overrides = {}) {
   };
 }
 
-function renderFlow() {
-  return renderHook(() => useSpellMetamagicFlow({
-    playerStats: makePlayerStats(),
-    campaignName: 'TestCampaign',
-    onExecute: vi.fn(),
-    setSecondaryTargetModal: null,
-    characters: [],
-    setPopupHtml: vi.fn(),
-  }));
-}
-
 describe('SP-127 Aid — confirm lane threads the paid slot + exact target log', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('lv3 upcast: applyAid receives spellSlotLevel 3 (was base 2)', async () => {
+  it('lv3 upcast: applyAid receives spellSlotLevel 3 (was base 2) and the log lists ONLY the chosen targets', async () => {
     const { applyAidEffect } = await import('../../services/automation/index.js');
+    const { addEntry } = await import('../../services/ui/logService.js');
     const { result } = renderFlow();
 
     await act(async () => {
@@ -178,19 +179,8 @@ describe('SP-127 Aid — confirm lane threads the paid slot + exact target log',
     const [action] = applyAidEffect.mock.calls[0];
     expect(action.spellSlotLevel).toBe(3);
     expect(action.automation.type).toBe('aid');
-  });
 
-  it('lv3 upcast: cast log lists ONLY the chosen targets, no stray targetName', async () => {
-    const { addEntry } = await import('../../services/ui/logService.js');
-    const { result } = renderFlow();
-
-    await act(async () => {
-      await result.current.gateMetamagic(makeAid({ isUpcast: true, upcastLevel: 3 }));
-    });
-    await act(async () => {
-      await result.current.handleAidConfirm(['War_Cleric']);
-    });
-
+    // Exact chooser selection — no allTargets stamping of every combatant.
     expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
       type: 'spell',
       spellName: 'Aid',
@@ -246,33 +236,25 @@ describe('SP-127 Aid — confirm lane threads the paid slot + exact target log',
     expect(lv2Writes.length).toBe(0);
   });
 
-  it('SP-127 twins: Aura of Vitality upcast lv4 forwards spellSlotLevel 4', async () => {
-    const { applyAuraOfVitalityEffect } = await import('../../services/automation/index.js');
+  const TWINS = [
+    // auraOfVitalityHandler.js consumes spellSlotLevel — the fold is live.
+    { label: 'Aura of Vitality upcast lv4 forwards spellSlotLevel 4', apply: 'applyAuraOfVitalityEffect', handler: 'handleAuraOfVitalityConfirm', spell: { name: 'Aura of Vitality', level: 3, casting_time: 'Action', range: '30 feet', isUpcast: true, upcastLevel: 4 }, want: 4 },
+    // deathWardHandler never reads spellSlotLevel (RAW static) — byte-harmless twin.
+    { label: 'Death Ward upcast lv5 forwards spellSlotLevel 5', apply: 'applyDeathWardEffect', handler: 'handleDeathWardConfirm', spell: { name: 'Death Ward', level: 4, casting_time: 'Action', range: 'Touch', isUpcast: true, upcastLevel: 5 }, want: 5 },
+  ];
+
+  it.each(TWINS)('SP-127 twins: $label', async ({ apply, handler, spell, want }) => {
+    const automation = await import('../../services/automation/index.js');
     const { result } = renderFlow();
 
     await act(async () => {
-      await result.current.gateMetamagic({ name: 'Aura of Vitality', level: 3, casting_time: 'Action', range: '30 feet', isUpcast: true, upcastLevel: 4 });
+      await result.current.gateMetamagic(spell);
     });
     await act(async () => {
-      await result.current.handleAuraOfVitalityConfirm(['War_Cleric']);
+      await result.current[handler](['War_Cleric']);
     });
 
-    expect(applyAuraOfVitalityEffect).toHaveBeenCalledTimes(1);
-    expect(applyAuraOfVitalityEffect.mock.calls[0][0].spellSlotLevel).toBe(4);
-  });
-
-  it('SP-127 twins: Death Ward upcast lv5 forwards spellSlotLevel 5 (byte-harmless consumer)', async () => {
-    const { applyDeathWardEffect } = await import('../../services/automation/index.js');
-    const { result } = renderFlow();
-
-    await act(async () => {
-      await result.current.gateMetamagic({ name: 'Death Ward', level: 4, casting_time: 'Action', range: 'Touch', isUpcast: true, upcastLevel: 5 });
-    });
-    await act(async () => {
-      await result.current.handleDeathWardConfirm(['War_Cleric']);
-    });
-
-    expect(applyDeathWardEffect).toHaveBeenCalledTimes(1);
-    expect(applyDeathWardEffect.mock.calls[0][0].spellSlotLevel).toBe(5);
+    expect(automation[apply]).toHaveBeenCalledTimes(1);
+    expect(automation[apply].mock.calls[0][0].spellSlotLevel).toBe(want);
   });
 });

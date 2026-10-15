@@ -1,11 +1,12 @@
+// @maintained-by-ai: 2026-10-14
 // MA-2026: Tiamat "Frightful Presence" — exact MA-1997 (Smaug) twin. FP save
 // row (actions index 3) authored ONLY conditions:["frightened"] + save_dc/
 // save_type: the DC 26 Wisdom save adjudicated honestly on the live EB-NPC
 // inline lane (chip armed, Bandit 1 raw WIS +0 rolled, failure stamped on the
-// log) but extractConditionsFromSaveEffect (Helpers:383) is save_effect-scoped
+// log) but extractConditionsFromSaveEffect (Helpers) is save_effect-scoped
 // with ZERO description fallback and plain action.conditions is NOT a save-lane
-// producer (MA-1927/§346) → applyDamagelessSaveConditions (saveProcessing.js:1232)
-// early-returned and Frightened NEVER landed = FAIL(a).
+// producer (MA-1927/§346) → applyDamagelessSaveConditions early-returned and
+// Frightened NEVER landed = FAIL(a).
 // DATA fix: save_effect:"…Frightened…" (canonical word §346/§52) + the MA-1577
 // adult-blue-dracolich FP service shape (OBJECT success_immunity + repeat_save
 // between save_type and save_effect — booleans kill it, MA-0147), byte-mirroring
@@ -13,6 +14,11 @@
 // of each turn + 24h immunity stated; 1-minute duration = frightful_presence
 // engine default rounds:10 (same as Smaug). dc_success stays ABSENT — damageless
 // row, half-default never computes damage (§63 moot, zero hp_change live-verified).
+// Ownership (per saveProcessing.frightful-presence.test.js map): generic FP
+// machinery — extractor, Smaug row bytes, dracolich merged-clock legs — lives in
+// the twins (ma1997-smaug) and the MA-0048 file. This file pins ONLY the
+// Tiamat-specific row: DC 26 wording, the higher-DC success/fail faces on the
+// live NPC inline lane, and the refusal gate against the Tiamat-named te.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 
@@ -43,26 +49,6 @@ describe('MA-2026 disk fingerprint: Tiamat Frightful Presence save_effect + FP s
     expect(keys.indexOf('success_immunity')).toBeGreaterThan(keys.indexOf('save_type'));
     expect(keys.indexOf('repeat_save')).toBeLessThan(keys.indexOf('save_effect'));
     expect(FP.dc_success).toBeUndefined(); // damageless row — half-default never pays damage (§63 moot)
-  });
-
-  it('extractor grants frightened (was save_effect-less inert → [] → applyDamagelessSaveConditions early-return)', () => {
-    expect(extractConditionsFromSaveEffect(FP.save_effect)).toEqual(['frightened']);
-    expect(extractConditionsFromSaveEffect(undefined)).toEqual([]); // pre-fix input: zero save-lane producers
-  });
-
-  it('gazeImmunityActive refuses FP re-fires once the success-immunity te stands (live refused press)', () => {
-    const immunityTe = { target: 'Bandit 1', effect: 'frightful_presence_immunity', source: 'Tiamat 1' };
-    expect(gazeImmunityActive({ action: FP, target: { name: 'Bandit 1' }, monsterName: 'Tiamat 1', targetEffects: [immunityTe] })).toEqual(
-      expect.objectContaining({ effect: 'frightful_presence_immunity', durationMinutes: 1440 }));
-    expect(gazeImmunityActive({ action: FP, target: { name: 'Bandit 1' }, monsterName: 'Tiamat 1', targetEffects: [] })).toBeNull();
-  });
-
-  it('Smaug MA-1997 twin row byte-guarded (same file, untouched by this fix)', () => {
-    const SMAUG = monsters.find((m) => m.index === 'smaug-the-golden');
-    const SMAUG_FP = SMAUG.actions.find((a) => a.name === 'Frightful Presence');
-    expect(SMAUG_FP.save_dc).toBe(22);
-    expect(SMAUG_FP.save_effect).toContain('Frightened');
-    expect(SMAUG_FP.success_immunity).toEqual({ effect: 'frightful_presence_immunity', duration: '24_hours', duration_minutes: 1440 });
   });
 });
 
@@ -204,12 +190,11 @@ describe('MA-2026 live-lane: Frightened now lands on the failed save (was FAIL(a
     expect(addEntryLogs.some(e => e.automationType === 'frightful_presence_tracked')).toBe(false);
   });
 
-  it('refused-on-immune unit: re-fire against a victim already holding the immunity te refuses via gazeImmunityActive gate (MA-0030 lane)', async () => {
+  it('refused-on-immune gate (MA-0030 lane): re-fire vs Tiamat-named immunity te refuses, absent te fires', () => {
     const immunityTe = { target: TARGET, effect: 'frightful_presence_immunity', source: TIAMAT_NAME };
-    const gate = gazeImmunityActive({ action: FP, target: { name: TARGET }, monsterName: TIAMAT_NAME, targetEffects: [immunityTe] });
-    expect(gate).toEqual(expect.objectContaining({ effect: 'frightful_presence_immunity', durationMinutes: 1440 }));
-    // zero-roll refusal: the chip press short-circuits before processSaveRoll on the live lane
-    expect(runtimeStore[`${TARGET}.activeConditions`]).toBeUndefined();
-    expect(addEntryLogs.length).toBe(0);
+    // chip press short-circuits via this gate before processSaveRoll on the live lane
+    expect(gazeImmunityActive({ action: FP, target: { name: TARGET }, monsterName: TIAMAT_NAME, targetEffects: [immunityTe] })).toEqual(
+      expect.objectContaining({ effect: 'frightful_presence_immunity', durationMinutes: 1440 }));
+    expect(gazeImmunityActive({ action: FP, target: { name: TARGET }, monsterName: TIAMAT_NAME, targetEffects: [] })).toBeNull();
   });
 });

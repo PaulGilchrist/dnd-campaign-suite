@@ -1,8 +1,13 @@
+// @maintained-by-ai
 // WM-008: the Vex next_attack_advantage te (with vexTarget) is consumed by the NEXT
 // attack ROLL only. Damage-phase ctx rebuilds (proceedWithDamage / buildContext /
 // cunningStrike) pass { consumeAttackTe:false } so they never erase the te that the
 // same attack's tacticalMaster step has just stamped — that self-erase was why
 // advantage was never produced.
+//
+// CANONICAL OWNER of the sync-lane vex consume contract (target-effects.test.js
+// defers the vex row here). Deterministic: pure buildAttackContextSync over a fully
+// mocked runtime store — mark stable against app churn.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -91,26 +96,26 @@ describe('WM-008 contextBuilder-sync: vex te consumption', () => {
     });
   });
 
-  it('attack-roll ctx consumes the vex te and grants advantage', async () => {
+  it('attack-roll ctx consumes the vex te: advantage, te cleared, latch released', async () => {
     const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
     expect(result.forcedMode).toBe('advantage');
     expect(teWrite()).toBeDefined();
     expect(teWrite()[2]).toEqual([]);
-  });
-
-  it('damage-phase ctx rebuild (consumeAttackTe:false) does NOT consume the freshly-stamped te', async () => {
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', { consumeAttackTe: false });
-    expect(result.forcedMode).toBeUndefined();
-    expect(teWrite()).toBeUndefined();
-  });
-
-  it('attack-roll consumption releases the campaign _Vex_appliedTarget latch', async () => {
-    await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
     expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_Vex_appliedTarget', null, 'camp');
   });
 
-  it('damage-phase rebuild does NOT release the latch', async () => {
-    await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', { consumeAttackTe: false });
+  it('damage-phase ctx rebuild (consumeAttackTe:false) does NOT consume the freshly-stamped te or release the latch', async () => {
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', { consumeAttackTe: false });
+    expect(result.forcedMode).toBeUndefined();
+    expect(teWrite()).toBeUndefined();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', '_Vex_appliedTarget', null, 'camp');
+  });
+
+  it('attack-roll against a creature other than vexTarget does not consume the te', async () => {
+    buildBaseAttackContext.mockResolvedValue({ target: { name: 'Thug 2' }, targetName: 'Thug 2', resistanceNotice: null });
+    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
+    expect(result.forcedMode).toBeUndefined();
+    expect(teWrite()).toBeUndefined();
     expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', '_Vex_appliedTarget', null, 'camp');
   });
 });

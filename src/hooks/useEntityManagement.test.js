@@ -1,4 +1,9 @@
-// @improved-by-ai
+// @maintained-by-ai
+// Deterministic hook-contract suite for the generic useEntityManagement hook:
+// all load/save/delete dependencies are plain vi.fn() mocks, so there is no
+// network, timer, or randomness here. This is the ONLY coverage of the hook
+// implementation itself (consumers like Quests/NPCs/Settlements mock it).
+// Update only if the hook's public contract changes.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useEntityManagement } from './useEntityManagement.js';
@@ -65,14 +70,6 @@ describe('useEntityManagement', () => {
       const hooks = createHooks();
 
       render(hooks, { loadOnMount: false });
-
-      expect(hooks.load).not.toHaveBeenCalled();
-    });
-
-    it('does not attempt to load on mount without a campaign', () => {
-      const hooks = createHooks();
-
-      render(hooks, {}, null);
 
       expect(hooks.load).not.toHaveBeenCalled();
     });
@@ -145,18 +142,6 @@ describe('useEntityManagement', () => {
       expect(result.current.items).toEqual([]);
     });
 
-    it('clears items without calling the backend when there is no campaign', async () => {
-      const hooks = createHooks();
-
-      const { result } = render(hooks, { loadOnMount: false }, null);
-      await act(async () => {
-        await result.current.loadItems();
-      });
-
-      expect(result.current.items).toEqual([]);
-      expect(hooks.load).not.toHaveBeenCalled();
-    });
-
     it('reports loading while a fetch is in flight and clears it afterwards', async () => {
       const hooks = createHooks();
       let resolveLoad;
@@ -208,19 +193,6 @@ describe('useEntityManagement', () => {
         expect.any(Error)
       );
     });
-
-    it('silences load failures when logError is false', async () => {
-      const hooks = createHooks();
-      hooks.load.mockRejectedValue(new Error('Network error'));
-
-      const { result } = render(hooks, { logError: false });
-      await act(async () => {
-        await result.current.loadItems();
-      });
-
-      expect(result.current.loading).toBe(false);
-      expect(consoleError).not.toHaveBeenCalled();
-    });
   });
 
   describe('saveItems', () => {
@@ -242,19 +214,7 @@ describe('useEntityManagement', () => {
       expect(result.current.items).toEqual(serverState);
     });
 
-    it('does not call the backend when there is no campaign', async () => {
-      const hooks = createHooks();
-
-      const { result } = render(hooks, { loadOnMount: false }, null);
-      await act(async () => {
-        await result.current.saveItems([{ id: 1 }]);
-      });
-
-      expect(hooks.save).not.toHaveBeenCalled();
-      expect(hooks.load).not.toHaveBeenCalled();
-    });
-
-    it('rethrows, logs, and skips the reload when the save fails', async () => {
+    it('rethrows and logs the failure without reloading when the save fails', async () => {
       const hooks = createHooks();
       hooks.save.mockRejectedValue(new Error('Save failed'));
 
@@ -271,42 +231,10 @@ describe('useEntityManagement', () => {
         expect.any(Error)
       );
     });
-
-    it('rethrows without logging when logError is false', async () => {
-      const hooks = createHooks();
-      hooks.save.mockRejectedValue(new Error('Save failed'));
-
-      const { result } = render(hooks, { logError: false });
-      await expect(
-        act(async () => {
-          await result.current.saveItems([{ id: 1 }]);
-        })
-      ).rejects.toThrow('Save failed');
-
-      expect(consoleError).not.toHaveBeenCalled();
-    });
   });
 
   describe('deleteItem', () => {
-    it('deletes by id then repopulates items from the server state', async () => {
-      const hooks = createHooks();
-      hooks.delete.mockResolvedValue(undefined);
-      hooks.load.mockResolvedValue([]);
-
-      const { result } = render(hooks);
-      await act(async () => {
-        await result.current.deleteItem('entity-id-123');
-      });
-
-      expect(hooks.delete).toHaveBeenCalledWith(
-        campaignName,
-        'entity-id-123'
-      );
-      expect(hooks.load).toHaveBeenCalledTimes(1);
-      expect(result.current.items).toEqual([]);
-    });
-
-    it('shows the remaining entities after a successful delete', async () => {
+    it('deletes by id then repopulates the remaining items from the server state', async () => {
       const hooks = createHooks();
       hooks.delete.mockResolvedValue(undefined);
       hooks.load
@@ -323,22 +251,12 @@ describe('useEntityManagement', () => {
         await result.current.deleteItem('a');
       });
 
+      expect(hooks.delete).toHaveBeenCalledWith(campaignName, 'a');
+      expect(hooks.load).toHaveBeenCalledTimes(2);
       expect(result.current.items).toEqual([{ id: 'b' }]);
     });
 
-    it('does not call the backend when there is no campaign', async () => {
-      const hooks = createHooks();
-
-      const { result } = render(hooks, { loadOnMount: false }, null);
-      await act(async () => {
-        await result.current.deleteItem('entity-id-123');
-      });
-
-      expect(hooks.delete).not.toHaveBeenCalled();
-      expect(hooks.load).not.toHaveBeenCalled();
-    });
-
-    it('rethrows, logs, and skips the reload when the delete fails', async () => {
+    it('rethrows and logs the failure without reloading when the delete fails', async () => {
       const hooks = createHooks();
       hooks.delete.mockRejectedValue(new Error('Delete failed'));
       hooks.load.mockResolvedValue([{ id: 'a' }]);
@@ -356,26 +274,69 @@ describe('useEntityManagement', () => {
         expect.any(Error)
       );
     });
+  });
 
-    it('rethrows without logging when logError is false', async () => {
-      const hooks = createHooks();
-      hooks.delete.mockRejectedValue(new Error('Delete failed'));
+  describe('without a campaign', () => {
+    it.each([
+      ['loadItems', (result) => result.loadItems()],
+      ['saveItems', (result) => result.saveItems([{ id: 1 }])],
+      ['deleteItem', (result) => result.deleteItem('entity-id-123')],
+    ])(
+      '%s touches no backend endpoint and leaves items empty',
+      async (_label, run) => {
+        const hooks = createHooks();
 
-      const { result } = render(hooks, { logError: false });
-      await expect(
-        act(async () => {
-          await result.current.deleteItem('entity-id-123');
-        })
-      ).rejects.toThrow('Delete failed');
+        const { result } = render(hooks, { loadOnMount: false }, null);
+        await act(async () => {
+          await run(result.current);
+        });
 
-      expect(consoleError).not.toHaveBeenCalled();
-    });
+        expect(hooks.load).not.toHaveBeenCalled();
+        expect(hooks.save).not.toHaveBeenCalled();
+        expect(hooks.delete).not.toHaveBeenCalled();
+        expect(result.current.items).toEqual([]);
+      }
+    );
+  });
+
+  describe('logError: false', () => {
+    // The hook's campaign guard is covered above; here every op is wired to
+    // reject so each exercises its own silent-failure branch (load swallows,
+    // save/delete rethrow without logging).
+    it.each([
+      ['loadItems', (result) => result.loadItems(), false, undefined],
+      ['saveItems', (result) => result.saveItems([{ id: 1 }]), true, 'Save failed'],
+      ['deleteItem', (result) => result.deleteItem('entity-id-123'), true, 'Delete failed'],
+    ])(
+      '%s fails without logging (rethrows: %s)',
+      async (_label, run, shouldThrow, message) => {
+        const hooks = createHooks();
+        hooks.load.mockRejectedValue(new Error('Network error'));
+        hooks.save.mockRejectedValue(new Error('Save failed'));
+        hooks.delete.mockRejectedValue(new Error('Delete failed'));
+
+        const { result } = render(hooks, { logError: false });
+        const attempt = act(async () => {
+          await run(result.current);
+        });
+
+        if (shouldThrow) {
+          // save/delete rethrow the original error to the caller.
+          await expect(attempt).rejects.toThrow(message);
+        } else {
+          // load swallows the rejection.
+          await attempt;
+        }
+        expect(consoleError).not.toHaveBeenCalled();
+      }
+    );
   });
 
   describe('error log messages', () => {
     // Each operation names failures differently; responseKey should appear
-    // in all of them. Rejection of save/delete is asserted per-operation
-    // above — here we only check what got logged.
+    // in all of them. Default (responseKey-less) messages and rejection
+    // behaviour are asserted per-operation above — here we only check the
+    // responseKey naming got logged.
     const messageCases = [
       {
         label: 'loadItems',

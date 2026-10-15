@@ -1,10 +1,25 @@
+// @maintained-by-ai: 2026-10-15
+// Complex-spell routing table for the sheet-confirm metamagic flow.
+// Owns: per-spell execute payloads for the area lane (Globe / Antimagic Field),
+// the save-DC lane (Stinking Cloud / Confusion), the single-target heal transport
+// (Cure Wounds lv1 payload pin — cited by complex-handlers.charm-heal), the
+// trigger/apply payload shape for Hold Monster / Polymorph / True Polymorph
+// (SP-124) and the Animal Shapes target-selection popup routing.
+// Not owned here (covered by siblings): skip clearing (skip.test.js), popup-html
+// payloads (confirm-payloads.test.js), simple-lane no-pending guards
+// (handler-guards.test.js), upcast slot stamps (cla086-upcast-slot.test.js),
+// two-stage path storage (multi-stage.test.js), animal-shapes beast stage
+// (special-paths.animal-polymorph.test.js).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { executeHandler } from '../../services/automation/index.js';
+import { prepareSpellCast } from '../../services/rules/spells/spellPreparationService.js';
+import { getAllyList } from '../useAllySelection.js';
 
-// ─── Mocks (only what the tested handlers actually use) ─────────────────────
+// ─── Mocks (only what the tested lanes actually touch) ────────────────────────
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
@@ -19,6 +34,8 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
+  triggerPostCastRiderSaves: vi.fn(() => Promise.resolve()),
+  triggerBewitchingMagic: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../services/npcs/monsterUtils.js', () => ({
@@ -147,7 +164,13 @@ Object.defineProperty(window, 'dispatchEvent', {
   writable: true,
 });
 
-// ─── Factories ────────────────────────────────────────────────────────────────
+// ─── Fixtures (spell rows read straight from public/data/spells.json) ─────────
+
+const CAMPAIGN = 'TestCampaign';
+
+const SPELL_ROWS = Object.fromEntries(
+  JSON.parse(readFileSync('public/data/spells.json', 'utf8')).map((s) => [s.name, s])
+);
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -159,285 +182,146 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Fireball',
-    level: 3,
-    casting_time: '1 Action',
-    range: '150 ft.',
-    ...overrides,
-  };
-}
-
-function setupHook(onExecute, spellOverrides = {}) {
-  const stats = makePlayerStats();
-  const spell = makeSpell(spellOverrides);
+// Render the flow and gate the disk spell row so its sheet-confirm pending arms.
+async function renderGated(spell, { onExecute = vi.fn(), setPopupHtml = vi.fn(), playerStats = makePlayerStats() } = {}) {
   const { result } = renderHook(() =>
-    useSpellMetamagicFlow({ playerStats: stats, campaignName: 'TestCampaign', onExecute: onExecute })
+    useSpellMetamagicFlow({ playerStats, campaignName: CAMPAIGN, onExecute, setSecondaryTargetModal: null, characters: [], setPopupHtml })
   );
-  act(() => {
-    result.current.gateMetamagic(spell);
+  await act(async () => {
+    await result.current.gateMetamagic(spell);
   });
-  return { result, onExecute, stats, spell };
+  return { result, onExecute, setPopupHtml, playerStats, spell };
 }
 
-// ─── Globe of Invulnerability ────────────────────────────────────────────────
+// ─── Area lane: manual cast log + executeHandler payload ──────────────────────
+// Globe / Antimagic Field confirm (useAreaEffectHandlers): the handler logs the
+// cast itself (no createConfirmHandler wrapper) and stamps automation.range from
+// the gated spell row.
 
-describe('useSpellMetamagicFlow — Globe of Invulnerability', () => {
+const AREA_LOGGED_ROWS = [
+  { spell: 'Globe of Invulnerability', pending: 'pendingGlobe', handler: 'handleGlobeConfirm', automationType: 'globe_of_invulnerability' },
+  { spell: 'Antimagic Field', pending: 'pendingAntimagicField', handler: 'handleAntimagicFieldConfirm', automationType: 'antimagic_field' },
+];
+
+describe('useSpellMetamagicFlow — area confirm lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('logs entry with correct payload and calls executeHandler on confirm', async () => {
-    const { result } = setupHook(vi.fn(), { name: 'Globe of Invulnerability', level: 4 });
+  for (const row of AREA_LOGGED_ROWS) {
+    it(`${row.spell}: logs the cast and executes the automation payload`, async () => {
+      const spell = SPELL_ROWS[row.spell];
+      const { result } = await renderGated(spell);
+      expect(result.current[row.pending]).not.toBeNull();
 
-    await act(async () => {
-      await result.current.handleGlobeConfirm(['Goblin A', 'Goblin B']);
+      await act(async () => {
+        await result.current[row.handler](['Goblin A', 'Goblin B']);
+      });
+
+      expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
+        type: 'spell',
+        characterName: 'TestSorcerer',
+        targetName: 'Goblin A',
+        targets: ['Goblin A', 'Goblin B'],
+        spellName: row.spell,
+        spellLevel: spell.level,
+        castingTime: spell.casting_time,
+        timestamp: expect.any(Number),
+      });
+
+      expect(executeHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          automation: { type: row.automationType, range: spell.range },
+          metaCtx: { creatures: ['Goblin A', 'Goblin B'] },
+        }),
+        expect.any(Object),
+        CAMPAIGN,
+        null,
+      );
+
+      expect(result.current[row.pending]).toBeNull();
     });
 
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      targetName: 'Goblin A',
-      targets: ['Goblin A', 'Goblin B'],
-      spellName: 'Globe of Invulnerability',
-      spellLevel: 4,
-      castingTime: '1 Action',
-      timestamp: expect.any(Number),
+    it(`${row.spell}: confirm without pending is a no-op`, async () => {
+      const { result } = await renderGated(SPELL_ROWS['Fireball']);
+
+      await act(async () => {
+        await result.current[row.handler](['Goblin A']);
+      });
+
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(executeHandler).not.toHaveBeenCalled();
     });
+  }
 
-    expect(executeHandler).toHaveBeenCalledWith(
-      expect.objectContaining({
-        automation: { type: 'globe_of_invulnerability', range: '150 ft.' },
-        metaCtx: { creatures: ['Goblin A', 'Goblin B'] },
-      }),
-      expect.any(Object),
-      'TestCampaign',
-      null,
-    );
-
-    expect(result.current.pendingGlobe).toBeNull();
-  });
-
-  it('logs entry with null targetName and empty targets when no targets given', async () => {
-    const { result } = setupHook(vi.fn(), { name: 'Globe of Invulnerability', level: 4 });
+  it('area confirm with zero targets logs a null-target entry', async () => {
+    const { result } = await renderGated(SPELL_ROWS['Globe of Invulnerability']);
 
     await act(async () => {
       await result.current.handleGlobeConfirm([]);
     });
 
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
       targetName: null,
       targets: [],
     }));
   });
-
-  it('clears pending on skip', () => {
-    const { result } = setupHook(vi.fn(), { name: 'Globe of Invulnerability', level: 4 });
-
-    act(() => {
-      result.current.handleGlobeSkip();
-    });
-
-    expect(result.current.pendingGlobe).toBeNull();
-  });
-
-  it('does nothing when confirming without pending state', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    await act(async () => {
-      await result.current.handleGlobeConfirm(['Goblin A']);
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(executeHandler).not.toHaveBeenCalled();
-  });
 });
 
-// ─── Antimagic Field ─────────────────────────────────────────────────────────
+// ─── Save-DC lane: createConfirmHandler pays the slot, runner builds the
+// area action at the caster's save DC (useSimpleSpellHandlers.areaExecute).
 
-describe('useSpellMetamagicFlow — Antimagic Field', () => {
+const SAVE_DC_ROWS = [
+  { spell: 'Stinking Cloud', pending: 'pendingStinkingCloud', handler: 'handleStinkingCloudConfirm', automationType: 'stinking_cloud', saveType: 'CON' },
+  { spell: 'Confusion', pending: 'pendingConfusion', handler: 'handleConfusionConfirm', automationType: 'confusion', saveType: 'WIS' },
+];
+
+describe('useSpellMetamagicFlow — save-DC confirm lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('logs entry with correct payload and calls executeHandler on confirm', async () => {
-    const { result } = setupHook(vi.fn(), { name: 'Antimagic Field', level: 4 });
+  for (const row of SAVE_DC_ROWS) {
+    it(`${row.spell}: pays the slot and executes with saveDc 8+prof / ${row.saveType}`, async () => {
+      const spell = SPELL_ROWS[row.spell];
+      const stats = makePlayerStats();
+      const { result } = await renderGated(spell, { playerStats: stats });
+      expect(result.current[row.pending]).not.toBeNull();
 
-    await act(async () => {
-      await result.current.handleAntimagicFieldConfirm(['Goblin A']);
+      await act(async () => {
+        await result.current[row.handler](['Goblin A', 'Goblin B']);
+      });
+
+      expect(executeHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          automation: {
+            type: row.automationType,
+            saveDc: 8 + stats.proficiency,
+            saveType: row.saveType,
+          },
+          metaCtx: expect.objectContaining({ targets: ['Goblin A', 'Goblin B'] }),
+        }),
+        expect.any(Object),
+        CAMPAIGN,
+        null,
+      );
+      expect(prepareSpellCast).toHaveBeenCalled();
+      expect(result.current[row.pending]).toBeNull();
     });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      targetName: 'Goblin A',
-      targets: ['Goblin A'],
-      spellName: 'Antimagic Field',
-      spellLevel: 4,
-      castingTime: '1 Action',
-      timestamp: expect.any(Number),
-    });
-
-    expect(executeHandler).toHaveBeenCalledWith(
-      expect.objectContaining({
-        automation: { type: 'antimagic_field', range: '150 ft.' },
-        metaCtx: { creatures: ['Goblin A'] },
-      }),
-      expect.any(Object),
-      'TestCampaign',
-      null,
-    );
-
-    expect(result.current.pendingAntimagicField).toBeNull();
-  });
-
-  it('clears pending on skip', () => {
-    const { result } = setupHook(vi.fn(), { name: 'Antimagic Field', level: 4 });
-
-    act(() => {
-      result.current.handleAntimagicFieldSkip();
-    });
-
-    expect(result.current.pendingAntimagicField).toBeNull();
-  });
-
-  it('does nothing when confirming without pending state', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    await act(async () => {
-      await result.current.handleAntimagicFieldConfirm(['Goblin A']);
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-    expect(executeHandler).not.toHaveBeenCalled();
-  });
+  }
 });
 
-// ─── Stinking Cloud ──────────────────────────────────────────────────────────
+// ─── Cure Wounds: single-target heal transport to onExecute.
+// Pins the lv1 slotLevel payload (cited by complex-handlers.charm-heal);
+// the lv3 upcast stamp is owned by cla086-upcast-slot.test.js.
 
-describe('useSpellMetamagicFlow — Stinking Cloud', () => {
+describe('useSpellMetamagicFlow — Cure Wounds confirm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('calls executeHandler with correct action shape on confirm', async () => {
-    const stats = makePlayerStats();
-    const spell = makeSpell({ name: 'Stinking Cloud', level: 1 });
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: stats, campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-    act(() => {
-      result.current.gateMetamagic(spell);
-    });
-
-    await act(async () => {
-      await result.current.handleStinkingCloudConfirm(['Goblin A', 'Goblin B']);
-    });
-
-    const expectedSaveDc = 8 + stats.proficiency;
-
-    expect(executeHandler).toHaveBeenCalledWith(
-      expect.objectContaining({
-        automation: {
-          type: 'stinking_cloud',
-          saveDc: expectedSaveDc,
-          saveType: 'CON',
-        },
-        metaCtx: { targets: ['Goblin A', 'Goblin B'] },
-      }),
-      expect.any(Object),
-      'TestCampaign',
-      null,
-    );
-
-    expect(result.current.pendingStinkingCloud).toBeNull();
-  });
-
-  it('clears pending on skip', () => {
-    const { result } = setupHook(vi.fn(), { name: 'Stinking Cloud', level: 1 });
-
-    act(() => {
-      result.current.handleStinkingCloudSkip();
-    });
-
-    expect(result.current.pendingStinkingCloud).toBeNull();
-  });
-});
-
-// ─── Confusion ───────────────────────────────────────────────────────────────
-
-describe('useSpellMetamagicFlow — Confusion', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('calls executeHandler with correct action shape on confirm', async () => {
-    const stats = makePlayerStats();
-    const spell = makeSpell({ name: 'Confusion', level: 4 });
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: stats, campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-    act(() => {
-      result.current.gateMetamagic(spell);
-    });
-
-    await act(async () => {
-      await result.current.handleConfusionConfirm(['Goblin A']);
-    });
-
-    const expectedSaveDc = 8 + stats.proficiency;
-
-    expect(executeHandler).toHaveBeenCalledWith(
-      expect.objectContaining({
-        automation: {
-          type: 'confusion',
-          saveDc: expectedSaveDc,
-          saveType: 'WIS',
-        },
-        metaCtx: { targets: ['Goblin A'] },
-      }),
-      expect.any(Object),
-      'TestCampaign',
-      null,
-    );
-
-    expect(result.current.pendingConfusion).toBeNull();
-  });
-
-  it('clears pending on skip', () => {
-    const { result } = setupHook(vi.fn(), { name: 'Confusion', level: 4 });
-
-    act(() => {
-      result.current.handleConfusionSkip();
-    });
-
-    expect(result.current.pendingConfusion).toBeNull();
-  });
-});
-
-// ─── Cure Wounds ─────────────────────────────────────────────────────────────
-
-describe('useSpellMetamagicFlow — Cure Wounds', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('calls onExecute with spell and target context on confirm', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-    const spell = makeSpell({ name: 'Cure Wounds', level: 1 });
-    act(() => {
-      result.current.gateMetamagic(spell);
-    });
+  it('calls onExecute with the pending spell and the paid lv1 slot', async () => {
+    const { result, onExecute, spell } = await renderGated(SPELL_ROWS['Cure Wounds']);
 
     await act(async () => {
       await result.current.handleCureWoundsConfirm({ targetName: 'Ally One' });
@@ -448,14 +332,7 @@ describe('useSpellMetamagicFlow — Cure Wounds', () => {
   });
 
   it('does not call onExecute when targetName is missing', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-    const spell = makeSpell({ name: 'Cure Wounds', level: 1 });
-    act(() => {
-      result.current.gateMetamagic(spell);
-    });
+    const { result, onExecute } = await renderGated(SPELL_ROWS['Cure Wounds']);
 
     await act(async () => {
       await result.current.handleCureWoundsConfirm({});
@@ -463,41 +340,18 @@ describe('useSpellMetamagicFlow — Cure Wounds', () => {
 
     expect(onExecute).not.toHaveBeenCalled();
   });
-
-  it('does nothing when confirming without pending state', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    await act(async () => {
-      await result.current.handleCureWoundsConfirm({ targetName: 'Ally One' });
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-
-  it('clears pending on skip', () => {
-    const { result } = setupHook(vi.fn(), { name: 'Cure Wounds', level: 1 });
-
-    act(() => {
-      result.current.handleCureWoundsSkip();
-    });
-
-    expect(result.current.pendingCureWounds).toBeNull();
-  });
 });
 
-// ─── Hold Monster ────────────────────────────────────────────────────────────
+// ─── Hold Monster: trigger payload + single-target normalization ──────────────
 
-describe('useSpellMetamagicFlow — Hold Monster', () => {
+describe('useSpellMetamagicFlow — Hold Monster confirm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('calls triggerHoldMonster with holdMonsterTargets on confirm', async () => {
+  it('threads array targets to triggerHoldMonster and clears pending', async () => {
     const { triggerHoldMonster } = await import('../../services/rules/features/holdMonsterService.js');
-    const { result } = setupHook(vi.fn(), { name: 'Hold Monster', level: 5 });
+    const { result } = await renderGated(SPELL_ROWS['Hold Monster']);
 
     await act(async () => {
       await result.current.handleHoldMonsterConfirm(['Goblin A', 'Goblin B']);
@@ -507,53 +361,40 @@ describe('useSpellMetamagicFlow — Hold Monster', () => {
       expect.objectContaining({ name: 'Hold Monster' }),
       { holdMonsterTargets: ['Goblin A', 'Goblin B'] },
       expect.any(Object),
-      'TestCampaign',
+      CAMPAIGN,
       null,
     );
-
     expect(result.current.pendingHoldMonster).toBeNull();
   });
 
-  it('normalizes single target to array', async () => {
+  it('normalizes a single string target to an array', async () => {
     const { triggerHoldMonster } = await import('../../services/rules/features/holdMonsterService.js');
-    const { result } = setupHook(vi.fn(), { name: 'Hold Monster', level: 5 });
+    const { result } = await renderGated(SPELL_ROWS['Hold Monster']);
 
     await act(async () => {
-      await result.current.handleHoldMonsterConfirm('SingleTarget');
+      await result.current.handleHoldMonsterConfirm('Goblin A');
     });
 
     expect(triggerHoldMonster).toHaveBeenCalledWith(
       expect.any(Object),
-      { holdMonsterTargets: ['SingleTarget'] },
+      { holdMonsterTargets: ['Goblin A'] },
       expect.any(Object),
-      expect.any(String),
+      CAMPAIGN,
       null,
     );
   });
-
-  it('clears pending on skip', () => {
-    const { result } = setupHook(vi.fn(), { name: 'Hold Monster', level: 5 });
-
-    act(() => {
-      result.current.handleHoldMonsterSkip();
-    });
-
-    expect(result.current.pendingHoldMonster).toBeNull();
-  });
 });
 
+// ─── Polymorph: apply payload + empty-target guard ────────────────────────────
 
-
-// ─── Polymorph ───────────────────────────────────────────────────────────────
-
-describe('useSpellMetamagicFlow — Polymorph', () => {
+describe('useSpellMetamagicFlow — Polymorph confirm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('calls applyPolymorph with target and characters on confirm', async () => {
+  it('applies polymorph with the first target and clears pending', async () => {
     const { applyPolymorph } = await import('../../services/automation/handlers/spells/polymorphService.js');
-    const { result } = setupHook(vi.fn(), { name: 'Polymorph', level: 4 });
+    const { result } = await renderGated(SPELL_ROWS['Polymorph']);
 
     await act(async () => {
       await result.current.handlePolymorphConfirm(['Goblin A']);
@@ -563,16 +404,15 @@ describe('useSpellMetamagicFlow — Polymorph', () => {
       expect.objectContaining({ name: 'Polymorph' }),
       { polymorphTarget: 'Goblin A', characters: [] },
       expect.any(Object),
-      'TestCampaign',
+      CAMPAIGN,
       null,
     );
-
     expect(result.current.pendingPolymorph).toBeNull();
   });
 
-  it('does nothing when target is empty', async () => {
+  it('does nothing when the target list is empty', async () => {
     const { applyPolymorph } = await import('../../services/automation/handlers/spells/polymorphService.js');
-    const { result } = setupHook(vi.fn(), { name: 'Polymorph', level: 4 });
+    const { result } = await renderGated(SPELL_ROWS['Polymorph']);
 
     await act(async () => {
       await result.current.handlePolymorphConfirm([]);
@@ -580,45 +420,41 @@ describe('useSpellMetamagicFlow — Polymorph', () => {
 
     expect(applyPolymorph).not.toHaveBeenCalled();
   });
-
-  it('clears pending on skip', () => {
-    const { result } = setupHook(vi.fn(), { name: 'Polymorph', level: 4 });
-
-    act(() => {
-      result.current.handlePolymorphSkip();
-    });
-
-    expect(result.current.pendingPolymorph).toBeNull();
-  });
 });
 
-// ─── True Polymorph ──────────────────────────────────────────────────────────
+// ─── True Polymorph: two-stage chooser lanes (SP-124) ─────────────────────────
+// Path storage and skip are owned by multi-stage.test.js; popup payloads by
+// confirm-payloads.test.js. This lane pins transport + slot payment timing.
 
 describe('useSpellMetamagicFlow — True Polymorph', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('SP-124: injects pending spell (not the names array) at target confirm and pays the slot', async () => {
+  it('SP-124: target confirm injects the pending spell (not the names array) and pays the lv9 slot', async () => {
     const { applyTruePolymorph } = await import('../../services/automation/handlers/spells/truePolymorphService.js');
-    const { prepareSpellCast } = await import('../../services/rules/spells/spellPreparationService.js');
-    const { result } = setupHook(vi.fn(), { name: 'True Polymorph', level: 9 });
+    const spell = SPELL_ROWS['True Polymorph'];
+    const { result } = await renderGated(spell);
 
     act(() => {
       result.current.handleTruePolymorphPathSelect('creature_to_creature');
     });
-
     await act(async () => {
       await result.current.handleTruePolymorphTargetConfirm(['Goblin A']);
     });
 
-    // Regression: the modal emits onConfirm(names) — the wrapper must inject pending so
-    // applyTruePolymorph gets the real spell object, not undefined (the old crash).
+    // Regression: the modal emits onConfirm(names) — the wrapper must inject pending
+    // so applyTruePolymorph gets the real spell object, not undefined (the old crash).
+    expect(applyTruePolymorph.mock.calls[0][0]).toBe(spell);
     expect(applyTruePolymorph).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'True Polymorph' }),
-      expect.objectContaining({ truePolymorphTarget: 'Goblin A' }),
       expect.any(Object),
-      'TestCampaign',
+      expect.objectContaining({
+        truePolymorphTarget: 'Goblin A',
+        truePolymorphPath: 'creature_to_creature',
+        slotLevel: 9,
+      }),
+      expect.any(Object),
+      CAMPAIGN,
       null,
     );
     // DEFECT D: slot pays at confirm on this modal chain.
@@ -626,40 +462,38 @@ describe('useSpellMetamagicFlow — True Polymorph', () => {
     expect(result.current.pendingTruePolymorph).toBeNull();
   });
 
-  it('SP-124: object_into_creature pays the slot at path-select', async () => {
-    const { prepareSpellCast } = await import('../../services/rules/spells/spellPreparationService.js');
-    const { result } = setupHook(vi.fn(), { name: 'True Polymorph', level: 9 });
+  it('SP-124: object_into_creature pays the slot at path-select and applies with a null target', async () => {
+    const { applyTruePolymorph } = await import('../../services/automation/handlers/spells/truePolymorphService.js');
+    const { result } = await renderGated(SPELL_ROWS['True Polymorph']);
 
     await act(async () => {
       await result.current.handleTruePolymorphPathSelect('object_into_creature');
     });
 
     expect(prepareSpellCast).toHaveBeenCalled();
+    expect(applyTruePolymorph).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'True Polymorph' }),
+      { truePolymorphTarget: null, truePolymorphPath: 'object_into_creature', characters: [] },
+      expect.any(Object),
+      CAMPAIGN,
+      null,
+    );
     expect(result.current.pendingTruePolymorph).toBeNull();
   });
 });
 
-// ─── Animal Shapes ───────────────────────────────────────────────────────────
+// ─── Animal Shapes: target stage hands the chooser popup, then clears pending ──
 
-describe('useSpellMetamagicFlow — Animal Shapes', () => {
+describe('useSpellMetamagicFlow — Animal Shapes target confirm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('opens beast selection popup on target confirm', async () => {
+  it('opens the beast-selection popup for the selected allies with the lv8 gate CR', async () => {
+    // Gate filters combatants by ally list — arm the picker with the goblins.
+    getAllyList.mockReturnValueOnce(['Goblin A', 'Goblin B']);
     const setPopupHtml = vi.fn();
-    // Override getAllyList to return a matching ally name so gate sets pending
-    const allySel = await import('../useAllySelection.js');
-    allySel.getAllyList.mockReturnValueOnce(['Goblin A', 'Goblin B']);
-
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Animal Shapes', level: 8 }));
-    });
-
+    const { result } = await renderGated(SPELL_ROWS['Animal Shapes'], { setPopupHtml });
     expect(result.current.pendingAnimalShapes).not.toBeNull();
 
     await act(async () => {
@@ -670,76 +504,11 @@ describe('useSpellMetamagicFlow — Animal Shapes', () => {
       type: 'animal_shapes_target_selection',
       targets: ['Goblin A'],
       casterName: 'TestSorcerer',
-      campaignName: 'TestCampaign',
+      campaignName: CAMPAIGN,
       spell: expect.any(Object),
-      spellLevel: 8,
+      spellLevel: SPELL_ROWS['Animal Shapes'].level,
       maxCR: 4,
     });
-
     expect(result.current.pendingAnimalShapes).toBeNull();
-  });
-
-  it('clears pending on skip', () => {
-    const { result } = setupHook(vi.fn(), { name: 'Animal Shapes', level: 8 });
-
-    act(() => {
-      result.current.handleAnimalShapesSkip();
-    });
-
-    expect(result.current.pendingAnimalShapes).toBeNull();
-  });
-});
-
-// ─── True Polymorph ──────────────────────────────────────────────────────────
-
-describe('useSpellMetamagicFlow — True Polymorph', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('stores path on pending when selecting non-object path', () => {
-    const { result } = setupHook(vi.fn(), { name: 'True Polymorph', level: 9 });
-
-    act(() => {
-      result.current.handleTruePolymorphPathSelect('creature_to_creature');
-    });
-
-    expect(result.current.pendingTruePolymorph.path).toBe('creature_to_creature');
-  });
-
-  it('applies true polymorph and clears pending for object_into_creature', async () => {
-    const { applyTruePolymorph } = await import('../../services/automation/handlers/spells/truePolymorphService.js');
-    const setPopupHtml = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'True Polymorph', level: 9 }));
-    });
-
-    await act(async () => {
-      await result.current.handleTruePolymorphPathSelect('object_into_creature');
-    });
-
-    expect(applyTruePolymorph).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'True Polymorph' }),
-      { truePolymorphTarget: null, truePolymorphPath: 'object_into_creature', characters: [] },
-      expect.any(Object),
-      'TestCampaign',
-      null,
-    );
-
-    expect(result.current.pendingTruePolymorph).toBeNull();
-  });
-
-  it('clears pending on skip', () => {
-    const { result } = setupHook(vi.fn(), { name: 'True Polymorph', level: 9 });
-
-    act(() => {
-      result.current.handleTruePolymorphSkip();
-    });
-
-    expect(result.current.pendingTruePolymorph).toBeNull();
   });
 });

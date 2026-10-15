@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 // MA-2078: Zmey Gorynych "Dust Storm" legendary save — DC 23 Strength, 2d6
 // Bludgeoning, "Failure: Blinded until the end of its next turn". The row
 // authored conditions:["blinded"] BAIT (buildHitConditionClause is attack-lane
@@ -15,72 +16,43 @@
 // damage-bearing save row. conditions:["blinded"] bait KEPT per ticket
 // (MA-2021 precedent kept hit_conditions). Shapeless "within 40 ft." carries
 // no Cone/Line/Sphere noun → picker-inert inline lane (§211/MA-2041 pin).
+// Wing Buffet sibling pins live in the MA-2079 twin (that file owns the row);
+// costs-1 name-parse and clauseless-note defaults covered in
+// monsterLegendaryUses / monsterAbilityUses unit suites — deduped out here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 import { extractConditionsFromSaveEffect } from '../../components/encounter/MonsterCardHelpers.js';
 import { extractConditionDurationNote } from '../../services/encounters/monsterAbilityUses.js';
-import { legendaryActionCost } from '../../services/encounters/monsterLegendaryUses.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const ZMEY = monsters.find((m) => m.index === 'zmey-gorynych');
-const HEADER = ZMEY.legendary_actions[0];
 const DUST = ZMEY.legendary_actions.find((a) => a.name === 'Dust Storm');
-const WING = ZMEY.legendary_actions.find((a) => a.name === 'Wing Buffet (Costs 2 Actions)');
-const DUST_DESC = 'Strength Saving Throw: DC 23, each creature within 40 ft. Failure: Blinded until the end of its next turn; takes 7 (2d6) Bludgeoning damage.';
 
 describe('MA-2078 disk fingerprint: Zmey Dust Storm save_effect authored, MA-2059 byte-shape', () => {
-  it('row identity + save core byte-unchanged (live-verified RAW): DC 23 STR, 2d6 Bludgeoning', () => {
+  it('row fingerprint: DC 23 STR / 2d6 Bludgeoning core byte-unchanged; save_effect authored with canonical Blinded word + honest RAW until-clause; half-default, bait kept, picker-inert (live-verified RAW)', () => {
     expect(ZMEY.name).toBe('Zmey Gorynych');
     expect(DUST.name).toBe('Dust Storm');
     expect(DUST.save_dc).toBe(23);
     expect(DUST.save_type).toBe('Strength');
     expect(DUST.damage_dice_primary).toBe('2d6');
     expect(DUST.damage_type_primary).toBe('Bludgeoning');
-    expect(DUST.description).toBe(DUST_DESC);
-  });
-
-  it('save_effect authored: canonical Blinded word + honest RAW until-clause (MA-2059 Glacier Wave phrasing twin)', () => {
+    expect(DUST.description).toBe('Strength Saving Throw: DC 23, each creature within 40 ft. Failure: Blinded until the end of its next turn; takes 7 (2d6) Bludgeoning damage.');
+    // The single DATA-fix field (MA-2059 Glacier Wave phrasing twin).
     expect(DUST.save_effect).toBe('The target has the Blinded condition until the end of its next turn.');
     expect(DUST.dc_success).toBeUndefined(); // half-default = RAW half on success
-  });
-
-  it('conditions:["blinded"] bait left UNTOUCHED per ticket (attack-lane-only, §153/§567 pin — MA-2021 kept hit_conditions)', () => {
-    expect(DUST.conditions).toEqual(['blinded']); // never read on the save lane — harmless bait
-  });
-
-  it('NO range field — shapeless "within 40 ft." carries no Cone/Line/Sphere noun (picker-inert inline lane, §211/MA-2041 pin)', () => {
+    expect(DUST.conditions).toEqual(['blinded']); // attack-lane-only bait UNTOUCHED per ticket — never read on the save lane
+    // No range/attack/automation/delegate fields — shapeless "within 40 ft."
+    // carries no Cone/Line/Sphere noun → picker-inert inline lane (§211/MA-2041).
     expect(DUST.range).toBeUndefined();
     expect(DUST.attack_bonus).toBeUndefined();
     expect(DUST.automation).toBeUndefined();
     expect(DUST.delegates_to).toBeUndefined();
   });
 
-  it('extractor grants blinded (was save_effect-less inert → [] → zero grant)', () => {
+  it('save lane word-scans the fixed save_effect: Blinded granted + until-clause durationNote lands (was save_effect-less inert → [] → zero grant)', () => {
     expect(extractConditionsFromSaveEffect(DUST.save_effect)).toEqual(['blinded']);
-    expect(extractConditionsFromSaveEffect(undefined)).toEqual([]); // pre-fix input: zero save-lane producers
-  });
-
-  it('until-clause durationNote lands (MA-2059 phrasing chose over MA-2021 clause-less shape)', () => {
     expect(extractConditionDurationNote(DUST.save_effect)).toBe('until the end of its next turn (GM-enforced)');
-    expect(extractConditionDurationNote('The target has the Prone condition.')).toBeNull(); // MA-2021 shape: no until-note
-  });
-
-  it('legendary cost honest: name carries no "Costs N" → cost 1 (LA spends exactly 1, live-proven "2 of 3 left")', () => {
-    expect(legendaryActionCost(DUST)).toBe(1);
-    expect(legendaryActionCost(HEADER)).toBe(1);
-  });
-
-  it('MA-2079 sibling Wing Buffet self-resolving save row (§384 inversion of stale delegate pin)', () => {
-    expect(WING.name).toBe('Wing Buffet (Costs 2 Actions)');
-    expect(WING.delegates_to).toBeUndefined(); // delegate-hijack dropped (MA-2022 pattern)
-    expect(WING.save_dc).toBe(23);
-    expect(WING.save_type).toBe('Dexterity');
-    expect(WING.damage_dice_primary).toBe('2d8');
-    expect(WING.damage_type_primary).toBe('Fire');
-    expect(WING.dc_success).toBeUndefined(); // half-default — RAW "Success: Half"
-    expect(WING.save_effect).toBeUndefined();
-    expect(legendaryActionCost(WING)).toBe(2);
   });
 });
 
@@ -203,8 +175,10 @@ describe('MA-2078 live-lane: Blinded now lands on the failed save alongside full
     // Blinded grant (was zero pre-fix — prose never reached the word lane)
     expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['blinded']);
     expect(runtimeStore[`${TARGET}.activeConditionMeta`].blinded).toEqual(
-      expect.objectContaining({ source: ZMEY_NAME }));
-    expect(runtimeStore[`${TARGET}.activeConditionMeta`].blinded.durationNote).toBe('until the end of its next turn (GM-enforced)');
+      expect.objectContaining({
+        source: ZMEY_NAME,
+        durationNote: 'until the end of its next turn (GM-enforced)',
+      }));
     expect(addEntryLogs.some(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Blinded' && e.sourceName === ZMEY_NAME)).toBe(true);
     // until-clause advisory log carries the honest duration (§346 durationNote family)
     expect(addEntryLogs.some(e => e.automationType === 'condition_clauses_advisory' && e.characterName === TARGET && e.description.includes('until the end of its next turn (GM-enforced)'))).toBe(true);

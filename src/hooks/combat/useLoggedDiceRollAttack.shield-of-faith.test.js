@@ -1,6 +1,10 @@
+// @maintained-by-ai: 2026-10-14
 // SP-105: the popup/log payload must forward the resolver's authoritative
-// effectiveAc (+2 Shield of Faith, +5 Shield) so computedHit can never flip
-// a resolved MISS into a damage-applying HIT.
+// effectiveAc (+2 Shield of Faith, +5 Shield — public/data/spells.json) so
+// computedHit can never flip a resolved MISS into a damage-applying HIT.
+// Fold arithmetic itself lives in hitResolution.js computeEffectiveAc
+// (producer seams: loggedDiceRollUtils / utils.core tests); this file pins
+// the transport through createLogAndShow's popup + log payloads.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -54,9 +58,9 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 }));
 
 vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({
-    isUnbreakableMajestyActive: vi.fn(),
+    isUnbreakableMajestyActive: vi.fn(() => false),
     getUnbreakableMajestySaveDc: vi.fn(),
-    hasAttackerTriggeredMajesty: vi.fn(),
+    hasAttackerTriggeredMajesty: vi.fn(() => false),
     markAttackerTriggeredMajesty: vi.fn(),
 }));
 
@@ -79,11 +83,11 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
     getBaitAndSwitchAcBonus: vi.fn(() => 0),
     getGuardianProtectionAcBonus: vi.fn(() => 0),
     getParryAcBonus: vi.fn(() => 0),
-  getSlowAcPenalty: () => 0,
+    getSlowAcPenalty: vi.fn(() => 0),
     dispatchUnbreakableMajestySave: vi.fn(),
     hasPotentCantrip: vi.fn(),
-    getShieldAcBonus: vi.fn(),
-    getShieldOfFaithAcBonus: vi.fn(),
+    getShieldAcBonus: vi.fn(() => 0),
+    getShieldOfFaithAcBonus: vi.fn(() => 0),
     getWardingBondAcBonus: vi.fn(() => 0),
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
@@ -170,16 +174,10 @@ vi.mock('../../services/rules/spells/metamagicRules.js', () => ({
 }));
 
 import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
-import utils from '../../services/ui/utils.js';
-import { getTargetFromAttacker, findCreatureByName } from '../../services/rules/combat/damageUtils.js';
+import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
-import { isUnbreakableMajestyActive, hasAttackerTriggeredMajesty } from '../../services/combat/auras/unbreakableMajesty.js';
-import {
-    getShieldAcBonus,
-    getShieldOfFaithAcBonus,
-    applyMinDamageAdjustment,
-} from './loggedDiceRollUtils.js';
+import { getShieldAcBonus, getShieldOfFaithAcBonus } from './loggedDiceRollUtils.js';
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
 
 describe('useLoggedDiceRollAttack — SP-105 effective AC forwarding', () => {
@@ -200,27 +198,25 @@ describe('useLoggedDiceRollAttack — SP-105 effective AC forwarding', () => {
         rollD20.mockReturnValue(9);
         rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
         getTargetFromAttacker.mockReturnValue({ name: 'Divine_Cleric', type: 'player', ac: 12 });
-        findCreatureByName.mockReturnValue(null);
         loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Divine_Cleric', type: 'player', ac: 12 }] });
-        isUnbreakableMajestyActive.mockReturnValue(false);
-        hasAttackerTriggeredMajesty.mockReturnValue(false);
         getRuntimeValue.mockReturnValue(null);
+        // mockClear does not restore factory impls after a test's mockReturnValue —
+        // re-arm the no-buff baseline every time.
         getShieldAcBonus.mockReturnValue(0);
         getShieldOfFaithAcBonus.mockReturnValue(0);
-        applyMinDamageAdjustment.mockImplementation((d) => d);
-        utils.getName.mockImplementation((n) => n);
     });
 
-    it('forwards shieldOfFaithAcBonus and effectiveAc (AC 14) to popup and log on a boundary miss', async () => {
+    it('pins the hit boundary at the folded effective AC and forwards buffs to popup and log', async () => {
         getShieldOfFaithAcBonus.mockReturnValue(2);
+
+        // d20 9 + 3 = 12 would hit base AC 12, but misses folded AC 14 —
+        // the miss must be reported with effectiveAc so no HIT can be derived.
         await fn('Slam', 3, 'attack', { targetName: 'Divine_Cleric' });
-
-        const popup = deps.setPopupHtml.mock.calls[0][0];
-        expect(popup.targetAc).toBe(12);
-        expect(popup.effectiveAc).toBe(14);
-        expect(popup.shieldOfFaithAcBonus).toBe(2);
-        expect(popup.hit).toBe(false);
-
+        const miss = deps.setPopupHtml.mock.calls[0][0];
+        expect(miss.targetAc).toBe(12);
+        expect(miss.effectiveAc).toBe(14);
+        expect(miss.shieldOfFaithAcBonus).toBe(2);
+        expect(miss.hit).toBe(false);
         expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             type: 'roll',
             rollType: 'attack',
@@ -229,16 +225,21 @@ describe('useLoggedDiceRollAttack — SP-105 effective AC forwarding', () => {
             shieldOfFaithAcBonus: 2,
             hit: false,
         }));
-    });
 
-    it('flips to HIT at exactly AC 14 with Shield of Faith still forwarded', async () => {
-        getShieldOfFaithAcBonus.mockReturnValue(2);
+        // Total 14 meets folded AC 14 — flips to HIT, bonus still forwarded.
         rollD20.mockReturnValue(11);
         await fn('Slam', 3, 'attack', { targetName: 'Divine_Cleric' });
+        const hit = deps.setPopupHtml.mock.calls[1][0];
+        expect(hit.effectiveAc).toBe(14);
+        expect(hit.hit).toBe(true);
 
-        const popup = deps.setPopupHtml.mock.calls[0][0];
-        expect(popup.effectiveAc).toBe(14);
-        expect(popup.hit).toBe(true);
+        // Control: buff off → same total 12 hits base AC 12, effectiveAc = base.
+        getShieldOfFaithAcBonus.mockReturnValue(0);
+        await fn('Slam', 3, 'attack', { targetName: 'Divine_Cleric' });
+        const control = deps.setPopupHtml.mock.calls[2][0];
+        expect(control.effectiveAc).toBe(12);
+        expect(control.shieldOfFaithAcBonus).toBe(0);
+        expect(control.hit).toBe(true);
     });
 
     it('forwards shield spell +5 into effectiveAc and payload', async () => {
@@ -249,15 +250,6 @@ describe('useLoggedDiceRollAttack — SP-105 effective AC forwarding', () => {
         expect(popup.effectiveAc).toBe(17);
         expect(popup.shieldAcBonus).toBe(5);
         expect(popup.hit).toBe(false);
-    });
-
-    it('control: no AC buffs → effectiveAc equals base AC and boundary total 12 hits', async () => {
-        await fn('Slam', 3, 'attack', { targetName: 'Divine_Cleric' });
-
-        const popup = deps.setPopupHtml.mock.calls[0][0];
-        expect(popup.effectiveAc).toBe(12);
-        expect(popup.shieldOfFaithAcBonus).toBe(0);
-        expect(popup.hit).toBe(true);
     });
 
     it('folds cover bonus into the forwarded effectiveAc', async () => {

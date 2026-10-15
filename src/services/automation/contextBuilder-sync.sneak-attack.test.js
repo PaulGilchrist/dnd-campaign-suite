@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Deterministic contract suite for the CLA-317 sneak-attack gate in contextBuilder-sync.js
+// (computeSneakAttackDice / hasFlankingAlly). Fully mocked, no timers, stable 2024 rules —
+// no churn expected when the app changes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder-sync.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -183,6 +187,36 @@ describe('CLA-317: sneak attack ally-5ft gate', () => {
     getCombatContext.mockResolvedValue(combatSummary([{ key: 'Incapacitated' }]));
     const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
     expect(result.sneakAttackDice).toBe(0);
+  });
+
+  it('refuses sneak when the only creature within range is a hostile NPC', async () => {
+    isWithinRange.mockResolvedValue(true);
+    getCombatContext.mockResolvedValue({
+      round: 1,
+      creatures: [
+        { name: 'AasimarTest', type: 'player' },
+        { name: 'Thug 1', type: 'npc', attitude: 'hostile' },
+        { name: 'Goblin Pet', type: 'npc', attitude: 'hostile' },
+      ],
+    });
+    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
+    expect(result.sneakAttackDice).toBe(0);
+    expect(isWithinRange).not.toHaveBeenCalled();
+  });
+
+  it('grants sneak when a friendly NPC (non-player) ally is within 5 ft', async () => {
+    isWithinRange.mockResolvedValue(true);
+    getCombatContext.mockResolvedValue({
+      round: 1,
+      creatures: [
+        { name: 'AasimarTest', type: 'player' },
+        { name: 'Thug 1', type: 'npc', attitude: 'hostile' },
+        { name: 'Wolf Companion', type: 'npc', attitude: 'friendly' },
+      ],
+    });
+    const result = await buildAttackContextSync(finesseAttack, rogueStats, 'camp', 'normal');
+    expect(result.sneakAttackDice).toBe(9);
+    expect(isWithinRange).toHaveBeenCalledWith('Thug 1', 'Wolf Companion', 5);
   });
 
   it('grants sneak via advantage without consulting the ally range loop', async () => {

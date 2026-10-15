@@ -1,10 +1,11 @@
+// @maintained-by-ai: 2026-10-14
 // MA-1997: Smaug the Golden "Frightful Presence" — FP save row authored ONLY
 // conditions:["frightened"] + save_dc/save_type: the DC 22 Wisdom save adjudicated
 // honestly on the live EB-NPC inline lane (chip armed, victim rolled, failure
 // stamped on log/lastAttack) but extractConditionsFromSaveEffect (Helpers:383) is
 // save_effect-scoped with ZERO description fallback and plain action.conditions is
 // NOT a save-lane producer (MA-1927/§346) → applyDamagelessSaveConditions
-// (saveProcessing.js:1232) early-returned and Frightened NEVER landed = FAIL(a).
+// (saveProcessing.js) early-returned and Frightened NEVER landed = FAIL(a).
 // DATA fix: save_effect:"…Frightened…" (canonical word §346) + the MA-1577
 // adult-blue-dracolich FP service shape (OBJECT success_immunity + repeat_save
 // between save_type and save_effect — booleans kill it, MA-0147). dc_success
@@ -13,6 +14,10 @@
 // grant log + frightful_presence tracked te with merged 10-round clock; success
 // face grants frightful_presence_immunity te (24h = 14400 rounds) and the
 // MA-0030 refusal gate refuses re-fires (`frightful_presence_refused (immunity)`).
+// Authority per saveProcessing.frightful-presence.test.js ownership map: this
+// file + the MA-2026 Tiamat twin own the FP success face + refusal gate on
+// disk rows. (MA-1996 Fire Breath sibling guard lives in its dedicated
+// services/encounters/monsterRecharge.ma1996-smaug-fire-breath-recharge.test.js.)
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 
@@ -21,22 +26,17 @@ import { extractConditionsFromSaveEffect, gazeImmunityActive } from '../../compo
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const SMAUG = monsters.find((m) => m.index === 'smaug-the-golden');
 const FP = SMAUG.actions.find((a) => a.name === 'Frightful Presence');
-const FIRE_BREATH = SMAUG.actions[4];
 
 describe('MA-1997 disk fingerprint: Smaug Frightful Presence save_effect + FP service shape authored', () => {
-  it('row identity + save core byte-unchanged (live-verified exact): DC 22 WIS, control-only', () => {
+  it('row bytes: DC 22 WIS control-only core + MA-1577 canonical FP clause + service shape (objects, not booleans, MA-0147)', () => {
     expect(SMAUG.name).toBe('Smaug the Golden');
     expect(FP.save_dc).toBe(22);
     expect(FP.save_type).toBe('Wisdom');
     expect(FP.conditions).toEqual(['frightened']); // pre-existing byte kept (inert on the save lane, MA-1927)
     expect(FP.description).toContain('or have the Frightened condition for 1 minute');
-  });
 
-  it('save_effect byte-mirrors the adult-blue-dracolich MA-1577 canonical FP clause', () => {
     expect(FP.save_effect).toBe('The target becomes Frightened. The effect lasts for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success. Successful creatures are immune to this effect for the next 24 hours. This effect deals no damage.');
-  });
 
-  it('success_immunity + repeat_save ride the MA-1577 byte-slice between save_type and save_effect (objects, not booleans, MA-0147)', () => {
     expect(FP.success_immunity).toEqual({ effect: 'frightful_presence_immunity', duration: '24_hours', duration_minutes: 1440 });
     expect(FP.repeat_save).toEqual({ condition: 'frightened', save_type: 'Wisdom', duration_minutes: 1 });
     const keys = Object.keys(FP);
@@ -55,12 +55,6 @@ describe('MA-1997 disk fingerprint: Smaug Frightful Presence save_effect + FP se
     expect(gazeImmunityActive({ action: FP, target: { name: 'Bandit 2' }, monsterName: 'Smaug the Golden 1', targetEffects: [immunityTe] })).toEqual(
       expect.objectContaining({ effect: 'frightful_presence_immunity', durationMinutes: 1440 }));
     expect(gazeImmunityActive({ action: FP, target: { name: 'Bandit 2' }, monsterName: 'Smaug the Golden 1', targetEffects: [] })).toBeNull();
-  });
-
-  it('MA-1996 sibling byte-guarded (edited same board, untouched by this fix)', () => {
-    expect(FIRE_BREATH.name).toBe('Fire Breath (Recharge 5-6)');
-    expect(FIRE_BREATH.recharge).toBe('5-6'); // MA-1996 fix intact
-    expect(FIRE_BREATH.save_effect).toBeUndefined();
   });
 });
 
@@ -126,7 +120,6 @@ import { processSaveRoll } from './saveProcessing.js';
 
 const campaignName = 'test-campaign';
 const SMAUG_NAME = 'Smaug the Golden 1';
-const TARGET = 'Bandit 1';
 
 function saveContextFromRow({ targetName, effectiveD20 }) {
   return {
@@ -165,6 +158,7 @@ beforeEach(() => {
 
 describe('MA-1997 live-lane: Frightened now lands on the failed save (was FAIL(a) zero-grant)', () => {
   it('failed save (raw +0, nat 6 < DC 22): frightened applied + grant log + FP tracked te + merged clock, zero damage', async () => {
+    const TARGET = 'Bandit 1';
     const { saveSuccess } = await rollNpcInline({ targetName: TARGET, effectiveD20: 6, bonus: 0 });
     expect(saveSuccess).toBe(false);
 

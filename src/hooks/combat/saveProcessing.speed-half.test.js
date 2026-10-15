@@ -1,4 +1,21 @@
+// @maintained-by-ai: 2026-10-14
+// MA-0073: Adult Brass Dragon Scorching Sands — the failed-save speed_half te
+// PRODUCER seam in saveProcessing (grantSpeedHalf): registry te on the target
+// sourced from the attacker, duration until_end_of_next_turn with the rounds:2
+// pendingExpirations clock (MA-0038 shape), plus the named grant log.
+// Context is built EXACTLY as production MonsterCardModal wires it:
+// speedHalf: parseSpeedHalfClause(save_effect) off the adult-brass-dragon
+// disk row (DC 16 DEX, 6d8 Fire, dc_success:"none" — the ancient row's DC 20
+// 8d8 twin is byte-distinct; this file pins the adult row).
+// Cross-refs (do not duplicate here): parser contract →
+// MonsterCardHelpers.speed-half.test.js; speed_zero twin (MA-0146/MA-2013) →
+// saveProcessing.ma2013-sun-wukong-locking-word.test.js; multi-clause slowed
+// modal consumer → SaveAttackAoeModal.slowed-breath.test.jsx; te consumers →
+// ConditionEffectBadges + conditionEffects speed_half.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+
+import { parseSpeedHalfClause, extractConditionsFromSaveEffect } from '../../components/encounter/MonsterCardHelpers.js';
 
 const runtimeStore = {};
 const addEntryLogs = [];
@@ -65,17 +82,24 @@ const campaignName = 'test-campaign';
 const DRAGON = 'Adult Brass Dragon 1';
 const TARGET = 'AberrantSorcerer';
 
-// MA-0073 Adult Brass Dragon Scorching Sands (monsters.json row shape).
+// Live disk row — adult-brass-dragon Scorching Sands (legendary).
+const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+const SANDS = monsters
+    .find((m) => m.index === 'adult-brass-dragon')
+    .legendary_actions.find(a => a.name === 'Scorching Sands');
+
+// Modal-shaped save context (MonsterCardModal inline-save builder): every
+// scalar derived from the row's bytes so data drift breaks this lane loudly.
 const sandsContext = {
-    saveDc: 16,
-    saveType: 'Dexterity',
+    saveDc: SANDS.save_dc,
+    saveType: SANDS.save_type,
     attackerName: DRAGON,
-    actionName: 'Scorching Sands',
-    dcSuccess: 'none',
-    autoDamageFormula: '6d8',
-    autoDamageDamageType: 'Fire',
-    saveConditions: [],
-    speedHalf: { effect: 'speed_half' },
+    actionName: SANDS.name,
+    dcSuccess: SANDS.dc_success,
+    autoDamageFormula: SANDS.damage_dice_primary,
+    autoDamageDamageType: SANDS.damage_type_primary,
+    saveConditions: extractConditionsFromSaveEffect(SANDS.save_effect),
+    speedHalf: parseSpeedHalfClause(SANDS.save_effect),
 };
 
 async function resolveSave(context, success, roll) {
@@ -100,8 +124,20 @@ beforeEach(() => {
 
 describe('MA-0073 Scorching Sands failed-save speed_half te', () => {
     it('failed save: speed_half te on target sourced from dragon, until_end_of_next_turn, rounds:2 clock + granted log', async () => {
+        // Row-contract pin: adult row untouched, clause parses to the seam's key.
+        expect(SANDS).toMatchObject({
+            name: 'Scorching Sands',
+            save_dc: 16,
+            save_type: 'Dexterity',
+            dc_success: 'none',
+            damage_dice_primary: '6d8',
+            damage_type_primary: 'Fire',
+        });
+        expect(sandsContext.speedHalf).toEqual({ effect: 'speed_half' });
+
         await resolveSave({ ...sandsContext }, false, 8);
 
+        // dc_success:"none" → fail takes full auto-roll damage (30 from mock).
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(30);
 
         const tes = runtimeStore['campaign.targetEffects'] || [];
@@ -139,7 +175,7 @@ describe('MA-0073 Scorching Sands failed-save speed_half te', () => {
     });
 
     it('rows without the clause are byte-inert: no te even on a failed save', async () => {
-        const claw = { ...sandsContext, actionName: 'Claw', speedHalf: null };
+        const claw = { ...sandsContext, actionName: 'Claw', speedHalf: parseSpeedHalfClause(undefined) };
         await resolveSave(claw, false, 3);
 
         expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);

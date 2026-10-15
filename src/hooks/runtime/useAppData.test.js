@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Deterministic contract test for useAppData: mocks the dataLoader boundary and
+// asserts the hook's output shape (initial values, happy path, showButton guard,
+// error path). Stable unless the hook's returned field list changes.
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -7,7 +11,6 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
   loadEquipment: vi.fn(),
   loadMagicItems: vi.fn(),
   loadMonsters: vi.fn(),
-  loadWildMagicSurgeTable: vi.fn(async () => []),
   loadRaceData: vi.fn(),
   loadSpells: vi.fn(),
 }));
@@ -95,8 +98,6 @@ describe('useAppData', () => {
     it('populates all data arrays after successful fetch and sets isLoading to false', async () => {
       const { result } = renderHook(() => useAppData());
 
-      expect(result.current.isLoading).toBe(true);
-
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
       });
@@ -119,34 +120,18 @@ describe('useAppData', () => {
   });
 
   describe('showButton logic', () => {
-    it('is true when classes, equipment, and both spell sets are non-empty', async () => {
-      const { result } = renderHook(() => useAppData());
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      expect(result.current.showButton).toBe(true);
-    });
-
-    it('is false when any required data source is empty', async () => {
-      loadClassData.mockImplementation((version) =>
-        version === '2024'
-          ? Promise.resolve(mockClasses2024)
-          : Promise.resolve([])
-      );
-
-      const { result } = renderHook(() => useAppData());
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false);
-      });
-
-      expect(result.current.showButton).toBe(false);
-    });
-
-    it('is false when equipment is empty', async () => {
-      loadEquipment.mockResolvedValue([]);
+    // showButton = classes && equipment && spells && spells2024 (all non-empty)
+    it.each([
+      ['classes', () => loadClassData.mockResolvedValue([])],
+      ['equipment', () => loadEquipment.mockResolvedValue([])],
+      ['5e spells', () => loadSpells.mockImplementation((version) =>
+        version === '2024' ? Promise.resolve(mockSpells2024) : Promise.resolve([])
+      )],
+      ['2024 spells', () => loadSpells.mockImplementation((version) =>
+        version === '2024' ? Promise.resolve([]) : Promise.resolve(mockSpells)
+      )],
+    ])('is false when %s is empty', async (_name, emptySource) => {
+      emptySource();
 
       const { result } = renderHook(() => useAppData());
 

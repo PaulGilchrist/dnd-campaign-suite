@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Owner of the Stone Skin automation handler contract: target-selection popup shape,
+// activeBuffs/stoneSkinDamageTypes runtime writes, buff replace/append semantics,
+// expiry registration, concentration save-DC sourcing, and logging. Fully mocked and
+// deterministic. Two-stage flow wiring lives in useSpellMetamagicFlow suites (which
+// mock this handler); concentration clearing lives in cleanupConcentrationEffects;
+// CharSummary resistance merging reads the real getter but owns display-side dedup.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ─────────────────────
@@ -44,6 +51,8 @@ const CAMPAIGN_NAME = 'TestCampaign';
 const PLAYER_NAME = 'TestWizard';
 const TARGET_NAME = 'Ally1';
 
+const DEFAULT_DAMAGE_TYPES = ['Bludgeoning', 'Piercing', 'Slashing'];
+
 function makePlayerStats(overrides = {}) {
   return {
     name: PLAYER_NAME,
@@ -57,7 +66,7 @@ function makeAction(automation = {}) {
     name: 'Stone Skin',
     automation: {
       type: 'protection_from_energy',
-      damageTypes: ['Bludgeoning', 'Piercing', 'Slashing'],
+      damageTypes: DEFAULT_DAMAGE_TYPES,
       duration: 'Concentration, up to 1 hour',
       ...automation,
     },
@@ -70,6 +79,18 @@ function makeCombatContext(creatureNames = []) {
   };
 }
 
+function activeBuffsWritten() {
+  const callArgs = useRuntimeState.setRuntimeValue.mock.calls.find(
+    (c) => c[1] === 'activeBuffs'
+  );
+  return callArgs[2];
+}
+
+function stubApplyReads(storedBuffs = []) {
+  useRuntimeState.getRuntimeValue.mockReturnValue(storedBuffs);
+  combatData.getCombatSummary.mockReturnValue(makeCombatContext([PLAYER_NAME, TARGET_NAME]));
+}
+
 // ── Tests ─────────────────────────────────────────────────────────
 
 describe('stoneSkinHandler', () => {
@@ -78,41 +99,26 @@ describe('stoneSkinHandler', () => {
   });
 
   describe('handle', () => {
-    it('returns info popup when no combat context', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, 'TestMap');
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Stone Skin');
-      expect(result.payload.description).toContain('No combat context found');
-      expect(result.payload.description).toContain('Stone Skin');
-    });
-
-    it('returns target selection popup with all creatures including caster when combat context exists', async () => {
+    it('returns target selection popup listing every creature (caster included) with automation passthrough', async () => {
+      const action = makeAction();
       damageUtils.getCombatContext.mockResolvedValue(
         makeCombatContext([TARGET_NAME, PLAYER_NAME])
       );
 
-      const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, 'TestMap');
+      const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'TestMap');
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('stoneSkin_target_selection');
-      expect(result.payload.name).toBe('Stone Skin');
-      expect(result.payload.creatureTargets).toEqual([TARGET_NAME, PLAYER_NAME]);
-      expect(result.payload.automation).toEqual(makeAction().automation);
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'stoneSkin_target_selection',
+          name: 'Stone Skin',
+          creatureTargets: [TARGET_NAME, PLAYER_NAME],
+          automation: action.automation,
+        },
+      });
     });
 
-    it('returns all creatures when only the caster is present', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatContext([PLAYER_NAME]));
-
-      const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, 'TestMap');
-
-      expect(result.payload.creatureTargets).toEqual([PLAYER_NAME]);
-    });
-
-    it('returns empty creatureTargets list when combat context has no creatures', async () => {
+    it('returns empty creatureTargets when combat context has no creatures', async () => {
       damageUtils.getCombatContext.mockResolvedValue(makeCombatContext([]));
 
       const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, 'TestMap');
@@ -120,7 +126,7 @@ describe('stoneSkinHandler', () => {
       expect(result.payload.creatureTargets).toEqual([]);
     });
 
-    it('handles action with no automation property', async () => {
+    it('defaults automation to empty object when missing from action', async () => {
       damageUtils.getCombatContext.mockResolvedValue(makeCombatContext([TARGET_NAME]));
 
       const result = await handle({ name: 'Stone Skin' }, makePlayerStats(), CAMPAIGN_NAME, 'TestMap');
@@ -129,176 +135,180 @@ describe('stoneSkinHandler', () => {
       expect(result.payload.automation).toEqual({});
     });
 
-    it('passes automation object through to payload', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatContext([TARGET_NAME]));
-      const customAutomation = { type: 'protection_from_energy', damageTypes: ['Fire'] };
+    it('returns info popup when no combat context', async () => {
+      damageUtils.getCombatContext.mockResolvedValue(null);
 
-      const result = await handle(
-        { name: 'Stone Skin', automation: customAutomation },
-        makePlayerStats(),
-        CAMPAIGN_NAME,
-        'TestMap'
-      );
+      const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, 'TestMap');
 
-      expect(result.payload.automation).toBe(customAutomation);
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Stone Skin',
+          description: 'No combat context found. Cannot apply Stone Skin.',
+          automation: makeAction().automation,
+        },
+      });
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
   });
 
   describe('applyStoneSkin', () => {
-    it('returns null when target is falsy', async () => {
-      const result = await applyStoneSkin(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
-      expect(result).toBeNull();
+    it('returns null with no side effects when targetName is missing', async () => {
+      for (const target of [null, '']) {
+        expect(await applyStoneSkin(makeAction(), makePlayerStats(), CAMPAIGN_NAME, target)).toBeNull();
+      }
+
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(expirations.addExpiration).not.toHaveBeenCalled();
+      expect(concentrationService.addConcentration).not.toHaveBeenCalled();
+      expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
-    it('returns null when target is an empty string', async () => {
-      const result = await applyStoneSkin(makeAction(), makePlayerStats(), CAMPAIGN_NAME, '');
-      expect(result).toBeNull();
-    });
+    it('writes resistance buff, damage-type key, expiry, and confirmation popup for a fresh target', async () => {
+      const action = makeAction();
+      stubApplyReads([]);
 
-    it('applies resistance buff to target and stores damage types', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-      combatData.getCombatSummary.mockReturnValue(makeCombatContext([PLAYER_NAME]));
+      const result = await applyStoneSkin(action, makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
 
-      const result = await applyStoneSkin(makeAction(), makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('Stone Skin');
-      expect(result.payload.description).toContain(TARGET_NAME);
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Stone Skin',
+          automationType: 'protection_from_energy',
+          description: 'Stone Skin applied to Ally1. They now have Resistance to Bludgeoning, Piercing, and Slashing damage.',
+          automation: action.automation,
+        },
+      });
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         TARGET_NAME,
         'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: 'Stone Skin',
-            effect: 'damage_resistance',
-            resistanceTypes: ['Bludgeoning', 'Piercing', 'Slashing'],
-            sourceCharacter: PLAYER_NAME,
-          }),
-        ]),
+        [{
+          name: 'Stone Skin',
+          effect: 'damage_resistance',
+          duration: 'Concentration, up to 1 hour',
+          resistanceTypes: DEFAULT_DAMAGE_TYPES,
+          sourceCharacter: PLAYER_NAME,
+        }],
         CAMPAIGN_NAME,
       );
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         TARGET_NAME,
         'stoneSkinDamageTypes',
-        ['Bludgeoning', 'Piercing', 'Slashing'],
+        DEFAULT_DAMAGE_TYPES,
         CAMPAIGN_NAME,
       );
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: TARGET_NAME, effects: expect.any(Array), campaignName: CAMPAIGN_NAME });
-
-      expect(concentrationService.addConcentration).toHaveBeenCalled();
-      expect(logService.addEntry).toHaveBeenCalled();
+      expect(expirations.addExpiration).toHaveBeenCalledWith({
+        attackerName: PLAYER_NAME,
+        targetName: TARGET_NAME,
+        effects: [{ type: 'remove_active_buff', buffName: 'Stone Skin' }],
+        campaignName: CAMPAIGN_NAME,
+      });
     });
 
-    it('replaces existing Stone Skin buff with updated damage types', async () => {
-      const existingBuff = {
-        name: 'Stone Skin',
-        effect: 'damage_resistance',
-        resistanceTypes: ['Bludgeoning'],
-      };
-      useRuntimeState.getRuntimeValue.mockReturnValue([existingBuff]);
-      combatData.getCombatSummary.mockReturnValue(makeCombatContext([PLAYER_NAME]));
+    it('defaults damage types and duration to Bludgeoning/Piercing/Slashing, Concentration up to 1 hour, when automation omits them', async () => {
+      const actions = [
+        makeAction({ damageTypes: undefined, duration: undefined }),
+        makeAction({}), // automation present but empty after stripping
+        { name: 'Stone Skin' },
+      ];
+      for (const action of actions) {
+        useRuntimeState.setRuntimeValue.mockClear();
+        stubApplyReads([]);
+        await applyStoneSkin(action, makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
 
-      await applyStoneSkin(makeAction(), makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
-
-      const buffsArg = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'activeBuffs'
-      )[2];
-      const stoneSkinBuffs = buffsArg.filter((b) => b.name === 'Stone Skin');
-      expect(stoneSkinBuffs).toHaveLength(1);
-      expect(stoneSkinBuffs[0].resistanceTypes).toEqual(['Bludgeoning', 'Piercing', 'Slashing']);
-    });
-
-    it('replaces existing Stone Skin while preserving other buffs', async () => {
-      const existingStoneSkin = {
-        name: 'Stone Skin',
-        effect: 'damage_resistance',
-        resistanceTypes: ['Bludgeoning'],
-      };
-      const otherBuff = {
-        name: 'Mage Armor',
-        effect: 'ac_bonus',
-        acValue: 12,
-      };
-      useRuntimeState.getRuntimeValue.mockReturnValue([existingStoneSkin, otherBuff]);
-      combatData.getCombatSummary.mockReturnValue(makeCombatContext([PLAYER_NAME]));
-
-      await applyStoneSkin(makeAction(), makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
-
-      const buffsArg = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'activeBuffs'
-      )[2];
-      expect(buffsArg).toHaveLength(2);
-      expect(buffsArg).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ name: 'Mage Armor' }),
-          expect.objectContaining({ name: 'Stone Skin', resistanceTypes: ['Bludgeoning', 'Piercing', 'Slashing'] }),
-        ]),
-      );
-    });
-
-    it('uses default damage types when automation does not specify them', async () => {
-      const action = makeAction({ damageTypes: undefined });
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-      combatData.getCombatSummary.mockReturnValue(makeCombatContext([PLAYER_NAME]));
-
-      await applyStoneSkin(action, makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
-
-      const buffsArg = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'activeBuffs'
-      )[2];
-      const stoneSkinBuff = buffsArg.find((b) => b.name === 'Stone Skin');
-      expect(stoneSkinBuff.resistanceTypes).toEqual(['Bludgeoning', 'Piercing', 'Slashing']);
-    });
-
-    it('uses default damage types when automation is missing entirely', async () => {
-      const action = { name: 'Stone Skin' };
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-      combatData.getCombatSummary.mockReturnValue(makeCombatContext([PLAYER_NAME]));
-
-      await applyStoneSkin(action, makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
-
-      const buffsArg = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'activeBuffs'
-      )[2];
-      const stoneSkinBuff = buffsArg.find((b) => b.name === 'Stone Skin');
-      expect(stoneSkinBuff.resistanceTypes).toEqual(['Bludgeoning', 'Piercing', 'Slashing']);
-    });
-
-    it('uses default duration when automation has no duration', async () => {
-      const action = makeAction({ duration: undefined });
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-      combatData.getCombatSummary.mockReturnValue(makeCombatContext([PLAYER_NAME]));
-
-      await applyStoneSkin(action, makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
-
-      const buffsArg = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'activeBuffs'
-      )[2];
-      const buff = buffsArg.find((b) => b.name === 'Stone Skin');
-      expect(buff.duration).toBe('Concentration, up to 1 hour');
+        const buff = activeBuffsWritten().find((b) => b.name === 'Stone Skin');
+        expect(buff).toEqual({
+          name: 'Stone Skin',
+          effect: 'damage_resistance',
+          duration: 'Concentration, up to 1 hour',
+          resistanceTypes: DEFAULT_DAMAGE_TYPES,
+          sourceCharacter: PLAYER_NAME,
+        });
+      }
     });
 
     it('uses custom duration from automation when provided', async () => {
-      const action = makeAction({ duration: 'Concentration, up to 10 minutes' });
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-      combatData.getCombatSummary.mockReturnValue(makeCombatContext([PLAYER_NAME]));
+      stubApplyReads([]);
 
-      await applyStoneSkin(action, makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
+      await applyStoneSkin(
+        makeAction({ duration: 'Concentration, up to 10 minutes' }),
+        makePlayerStats(),
+        CAMPAIGN_NAME,
+        TARGET_NAME
+      );
 
-      const buffsArg = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'activeBuffs'
-      )[2];
-      const buff = buffsArg.find((b) => b.name === 'Stone Skin');
+      const buff = activeBuffsWritten().find((b) => b.name === 'Stone Skin');
       expect(buff.duration).toBe('Concentration, up to 10 minutes');
     });
 
-    it('adds concentration with save DC from playerStats.spellAbilities.saveDc', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-      combatData.getCombatSummary.mockReturnValue(makeCombatContext([PLAYER_NAME]));
+    it('replaces an existing Stone Skin buff at the tail, preserving unrelated buffs', async () => {
+      stubApplyReads([
+        { name: 'Mage Armor', effect: 'ac_bonus', acValue: 12 },
+        { name: 'Stone Skin', effect: 'damage_resistance', resistanceTypes: ['Bludgeoning'] },
+      ]);
+
+      await applyStoneSkin(makeAction(), makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
+
+      expect(activeBuffsWritten()).toEqual([
+        { name: 'Mage Armor', effect: 'ac_bonus', acValue: 12 },
+        {
+          name: 'Stone Skin',
+          effect: 'damage_resistance',
+          duration: 'Concentration, up to 1 hour',
+          resistanceTypes: DEFAULT_DAMAGE_TYPES,
+          sourceCharacter: PLAYER_NAME,
+        },
+      ]);
+    });
+
+    it('appends the buff to existing unrelated buffs when no Stone Skin is present', async () => {
+      stubApplyReads([
+        { name: 'Shield of Faith', effect: 'ac_bonus', acBonus: 2 },
+        { name: 'Bless', effect: 'ability_check_bless' },
+      ]);
+
+      await applyStoneSkin(makeAction(), makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
+
+      const buffs = activeBuffsWritten();
+      expect(buffs).toHaveLength(3);
+      expect(buffs[0]).toEqual({ name: 'Shield of Faith', effect: 'ac_bonus', acBonus: 2 });
+      expect(buffs[1]).toEqual({ name: 'Bless', effect: 'ability_check_bless' });
+      expect(buffs[2]).toEqual({
+        name: 'Stone Skin',
+        effect: 'damage_resistance',
+        duration: 'Concentration, up to 1 hour',
+        resistanceTypes: DEFAULT_DAMAGE_TYPES,
+        sourceCharacter: PLAYER_NAME,
+      });
+    });
+
+    it('treats missing or non-array activeBuffs store as empty', async () => {
+      for (const stored of [null, undefined, 'not-an-array']) {
+        useRuntimeState.setRuntimeValue.mockClear();
+        stubApplyReads(stored);
+
+        await applyStoneSkin(makeAction(), makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
+
+        expect(activeBuffsWritten()).toEqual([
+          {
+            name: 'Stone Skin',
+            effect: 'damage_resistance',
+            duration: 'Concentration, up to 1 hour',
+            resistanceTypes: DEFAULT_DAMAGE_TYPES,
+            sourceCharacter: PLAYER_NAME,
+          },
+        ]);
+      }
+    });
+
+    it('registers concentration with save DC from spellAbilities.saveDc', async () => {
+      const summary = makeCombatContext([PLAYER_NAME, TARGET_NAME]);
+      stubApplyReads([]);
 
       await applyStoneSkin(
         makeAction(),
@@ -308,7 +318,7 @@ describe('stoneSkinHandler', () => {
       );
 
       expect(concentrationService.addConcentration).toHaveBeenCalledWith(
-        expect.objectContaining({ creatures: expect.any(Array) }),
+        summary,
         PLAYER_NAME,
         'Stone Skin',
         15,
@@ -316,20 +326,15 @@ describe('stoneSkinHandler', () => {
       );
     });
 
-    it('adds concentration with save DC computed as 8 + proficiency when spellAbilities is missing', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-      combatData.getCombatSummary.mockReturnValue(makeCombatContext([PLAYER_NAME]));
+    it('computes save DC as 8 + proficiency when spellAbilities is missing', async () => {
+      const summary = makeCombatContext([PLAYER_NAME, TARGET_NAME]);
+      stubApplyReads([]);
 
-      await applyStoneSkin(
-        makeAction(),
-        makePlayerStats({ proficiency: 4 }),
-        CAMPAIGN_NAME,
-        TARGET_NAME
-      );
+      await applyStoneSkin(makeAction(), makePlayerStats({ proficiency: 4 }), CAMPAIGN_NAME, TARGET_NAME);
 
       // 8 + 4 = 12
       expect(concentrationService.addConcentration).toHaveBeenCalledWith(
-        expect.any(Object),
+        summary,
         PLAYER_NAME,
         'Stone Skin',
         12,
@@ -337,9 +342,8 @@ describe('stoneSkinHandler', () => {
       );
     });
 
-    it('logs the ability use with correct payload', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-      combatData.getCombatSummary.mockReturnValue(makeCombatContext([PLAYER_NAME]));
+    it('logs the cast to the campaign log', async () => {
+      stubApplyReads([]);
 
       await applyStoneSkin(makeAction(), makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
 
@@ -347,108 +351,65 @@ describe('stoneSkinHandler', () => {
         type: 'ability_use',
         characterName: PLAYER_NAME,
         abilityName: 'Stone Skin',
-        description: expect.stringContaining(TARGET_NAME),
+        description: 'TestWizard cast Stone Skin on Ally1. Target has Resistance to Bludgeoning, Piercing, and Slashing damage.',
         targetName: TARGET_NAME,
         timestamp: expect.any(Number),
       });
     });
-
-    it('appends buff when no existing buffs array', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-      combatData.getCombatSummary.mockReturnValue(makeCombatContext([PLAYER_NAME]));
-
-      await applyStoneSkin(makeAction(), makePlayerStats(), CAMPAIGN_NAME, TARGET_NAME);
-
-      const buffsArg = useRuntimeState.setRuntimeValue.mock.calls.find(
-        (c) => c[1] === 'activeBuffs'
-      )[2];
-
-      expect(buffsArg).toHaveLength(1);
-      expect(buffsArg[0].name).toBe('Stone Skin');
-      expect(buffsArg[0].resistanceTypes).toEqual(['Bludgeoning', 'Piercing', 'Slashing']);
-    });
   });
 
   describe('isStoneSkinActive', () => {
-    it('returns true when Stone Skin buff with damage_resistance exists', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Stone Skin', effect: 'damage_resistance' },
-      ]);
+    it('reads activeBuffs and returns true when Stone Skin damage_resistance buff is present, alone or among others', () => {
+      for (const buffs of [
+        [{ name: 'Stone Skin', effect: 'damage_resistance' }],
+        [
+          { name: 'Mage Armor', effect: 'ac_bonus' },
+          { name: 'Stone Skin', effect: 'damage_resistance' },
+          { name: 'Shield', effect: 'ac_bonus' },
+        ],
+      ]) {
+        useRuntimeState.getRuntimeValue.mockReturnValue(buffs);
+        expect(isStoneSkinActive(TARGET_NAME, CAMPAIGN_NAME)).toBe(true);
+      }
 
-      expect(isStoneSkinActive(TARGET_NAME, CAMPAIGN_NAME)).toBe(true);
+      expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith(TARGET_NAME, 'activeBuffs', CAMPAIGN_NAME);
     });
 
-    it('returns false when buff has wrong name', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Protection from Energy', effect: 'damage_resistance' },
-      ]);
-
-      expect(isStoneSkinActive(TARGET_NAME, CAMPAIGN_NAME)).toBe(false);
+    it('returns false when name or effect does not match', () => {
+      for (const buffs of [
+        [{ name: 'Protection from Energy', effect: 'damage_resistance' }],
+        [{ name: 'Stone Skin', effect: 'ac_bonus' }],
+        [
+          { name: 'Mage Armor', effect: 'ac_bonus' },
+          { name: 'Shield', effect: 'ac_bonus' },
+        ],
+      ]) {
+        useRuntimeState.getRuntimeValue.mockReturnValue(buffs);
+        expect(isStoneSkinActive(TARGET_NAME, CAMPAIGN_NAME)).toBe(false);
+      }
     });
 
-    it('returns false when buff has wrong effect', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Stone Skin', effect: 'ac_bonus' },
-      ]);
-
-      expect(isStoneSkinActive(TARGET_NAME, CAMPAIGN_NAME)).toBe(false);
-    });
-
-    it('returns false when activeBuffs is empty', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      expect(isStoneSkinActive(TARGET_NAME, CAMPAIGN_NAME)).toBe(false);
-    });
-
-    it('returns false when activeBuffs is null', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      expect(isStoneSkinActive(TARGET_NAME, CAMPAIGN_NAME)).toBe(false);
-    });
-
-    it('returns false when activeBuffs is undefined', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-
-      expect(isStoneSkinActive(TARGET_NAME, CAMPAIGN_NAME)).toBe(false);
-    });
-
-    it('returns true when multiple buffs include Stone Skin', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Mage Armor', effect: 'ac_bonus' },
-        { name: 'Stone Skin', effect: 'damage_resistance' },
-        { name: 'Shield', effect: 'ac_bonus' },
-      ]);
-
-      expect(isStoneSkinActive(TARGET_NAME, CAMPAIGN_NAME)).toBe(true);
-    });
-
-    it('returns false when multiple buffs exist but none match Stone Skin', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Mage Armor', effect: 'ac_bonus' },
-        { name: 'Shield', effect: 'ac_bonus' },
-      ]);
-
-      expect(isStoneSkinActive(TARGET_NAME, CAMPAIGN_NAME)).toBe(false);
+    it('returns false when activeBuffs is empty, null, or undefined', () => {
+      for (const stored of [[], null, undefined]) {
+        useRuntimeState.getRuntimeValue.mockReturnValue(stored);
+        expect(isStoneSkinActive(TARGET_NAME, CAMPAIGN_NAME)).toBe(false);
+      }
     });
   });
 
   describe('getStoneSkinDamageTypes', () => {
-    it('returns the stored damage types', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(['Bludgeoning', 'Piercing', 'Slashing']);
+    it('reads the stoneSkinDamageTypes key and passes the stored value through', () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(DEFAULT_DAMAGE_TYPES);
 
-      expect(getStoneSkinDamageTypes(TARGET_NAME, CAMPAIGN_NAME)).toEqual(['Bludgeoning', 'Piercing', 'Slashing']);
+      expect(getStoneSkinDamageTypes(TARGET_NAME, CAMPAIGN_NAME)).toEqual(DEFAULT_DAMAGE_TYPES);
+      expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith(TARGET_NAME, 'stoneSkinDamageTypes', CAMPAIGN_NAME);
     });
 
-    it('returns null when nothing is stored', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      expect(getStoneSkinDamageTypes(TARGET_NAME, CAMPAIGN_NAME)).toBeNull();
-    });
-
-    it('returns undefined when nothing is stored', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-
-      expect(getStoneSkinDamageTypes(TARGET_NAME, CAMPAIGN_NAME)).toBeUndefined();
+    it('passes through null or undefined when nothing is stored', () => {
+      for (const stored of [null, undefined]) {
+        useRuntimeState.getRuntimeValue.mockReturnValue(stored);
+        expect(getStoneSkinDamageTypes(TARGET_NAME, CAMPAIGN_NAME)).toBe(stored);
+      }
     });
   });
 });

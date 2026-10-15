@@ -1,3 +1,8 @@
+// @maintained-by-ai
+// Deterministic contract tests for the pure isPolearmWeapon utility:
+// hardcoded weapon names, Heavy+Reach property detection, fetch caching,
+// and error handling. Only touch these if the polearm detection contract
+// in ./polearmUtils.js changes.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 function createMockResponse(json) {
@@ -20,178 +25,103 @@ const mixedWeaponsData = [
   { name: 'Mace', properties: [] },
 ];
 
-// Hardcoded weapon tests don't need fetch — no resetModules needed
-describe('isPolearmWeapon (hardcoded weapons)', () => {
-  beforeEach(() => {
-    global.fetch = vi.fn();
-  });
+describe('isPolearmWeapon', () => {
+  let isPolearmWeapon;
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('returns true for Quarterstaff', async () => {
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-    const result = await isPolearmWeapon('Quarterstaff');
-    expect(result).toBe(true);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('returns true for Spear', async () => {
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-    const result = await isPolearmWeapon('Spear');
-    expect(result).toBe(true);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('does not call fetch for hardcoded weapons', async () => {
-    global.fetch.mockResolvedValue(createMockResponse(glaiveData));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-
-    await isPolearmWeapon('Quarterstaff');
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('returns false for null weapon name', async () => {
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-    const result = await isPolearmWeapon(null);
-    expect(result).toBe(false);
-  });
-
-  it('returns false for undefined weapon name', async () => {
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-    const result = await isPolearmWeapon(undefined);
-    expect(result).toBe(false);
-  });
-
-  it('returns false for empty string weapon name', async () => {
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-    const result = await isPolearmWeapon('');
-    expect(result).toBe(false);
-  });
-});
-
-// Equipment-data-based tests need fetch mocking + module reset
-describe('isPolearmWeapon (equipment data)', () => {
-  beforeEach(() => {
+  // Fresh module per test so the module-level equipment cache never leaks
+  // between tests that mock fetch with different payloads.
+  beforeEach(async () => {
     global.fetch = vi.fn();
     vi.resetModules();
+    ({ isPolearmWeapon } = await import('./polearmUtils.js'));
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('returns true for weapons with Heavy and Reach properties (Glaive)', async () => {
-    global.fetch.mockResolvedValue(createMockResponse(glaiveData));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
+  describe('hardcoded weapons', () => {
+    it.each(['Quarterstaff', 'Spear'])(
+      'returns true for %s without fetching',
+      async (name) => {
+        expect(await isPolearmWeapon(name)).toBe(true);
+        expect(global.fetch).not.toHaveBeenCalled();
+      }
+    );
 
-    const result = await isPolearmWeapon('Glaive');
-    expect(result).toBe(true);
+    it.each([null, undefined, ''])(
+      'returns false for falsy weapon name %p without fetching',
+      async (name) => {
+        expect(await isPolearmWeapon(name)).toBe(false);
+        expect(global.fetch).not.toHaveBeenCalled();
+      }
+    );
   });
 
-  it('returns true for weapons with Heavy and Reach properties (Halberd)', async () => {
-    global.fetch.mockResolvedValue(createMockResponse(glaiveData));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
+  describe('equipment data lookup', () => {
+    it.each(['Glaive', 'Halberd', 'Pike'])(
+      'returns true for Heavy + Reach weapon %s',
+      async (name) => {
+        global.fetch.mockResolvedValue(createMockResponse(glaiveData));
+        expect(await isPolearmWeapon(name)).toBe(true);
+      }
+    );
 
-    const result = await isPolearmWeapon('Halberd');
-    expect(result).toBe(true);
+    it('returns false for weapon with only Heavy property', async () => {
+      global.fetch.mockResolvedValue(createMockResponse(mixedWeaponsData));
+      expect(await isPolearmWeapon('Greatsword')).toBe(false);
+    });
+
+    it('returns false for weapon with only Reach property', async () => {
+      global.fetch.mockResolvedValue(createMockResponse(mixedWeaponsData));
+      expect(await isPolearmWeapon('Whip')).toBe(false);
+    });
+
+    it.each(['Longsword', 'Mace'])(
+      'returns false for weapon with neither Heavy nor Reach (%s)',
+      async (name) => {
+        global.fetch.mockResolvedValue(createMockResponse(mixedWeaponsData));
+        expect(await isPolearmWeapon(name)).toBe(false);
+      }
+    );
+
+    it('treats weapons without a properties array as not polearms', async () => {
+      global.fetch.mockResolvedValue(createMockResponse([{ name: 'Strange Weapon' }]));
+      expect(await isPolearmWeapon('Strange Weapon')).toBe(false);
+    });
+
+    it('returns false for weapons not found in equipment data', async () => {
+      global.fetch.mockResolvedValue(createMockResponse(mixedWeaponsData));
+      expect(await isPolearmWeapon('FantasySword')).toBe(false);
+    });
   });
 
-  it('returns true for weapons with Heavy and Reach properties (Pike)', async () => {
-    global.fetch.mockResolvedValue(createMockResponse(glaiveData));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
+  describe('equipment data fetching', () => {
+    it('fetches /data/equipment.json for unknown weapons', async () => {
+      global.fetch.mockResolvedValue(createMockResponse([]));
+      await isPolearmWeapon('UnknownWeapon');
+      expect(global.fetch).toHaveBeenCalledWith('/data/equipment.json');
+    });
 
-    const result = await isPolearmWeapon('Pike');
-    expect(result).toBe(true);
-  });
+    it('caches equipment data — one fetch across multiple lookups', async () => {
+      global.fetch.mockResolvedValue(createMockResponse(glaiveData));
+      expect(await isPolearmWeapon('Glaive')).toBe(true);
+      expect(await isPolearmWeapon('Halberd')).toBe(true);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
 
-  it('returns false for weapons with only Heavy property', async () => {
-    global.fetch.mockResolvedValue(createMockResponse(mixedWeaponsData));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
+    it('caches an empty fetch result instead of refetching', async () => {
+      global.fetch.mockResolvedValue(createMockResponse([]));
+      expect(await isPolearmWeapon('Glaive')).toBe(false);
+      expect(await isPolearmWeapon('Halberd')).toBe(false);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
 
-    const result = await isPolearmWeapon('Greatsword');
-    expect(result).toBe(false);
-  });
-
-  it('returns false for weapons with only Reach property', async () => {
-    global.fetch.mockResolvedValue(createMockResponse(mixedWeaponsData));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-
-    const result = await isPolearmWeapon('Whip');
-    expect(result).toBe(false);
-  });
-
-  it('returns false for weapons with neither Heavy nor Reach', async () => {
-    global.fetch.mockResolvedValue(createMockResponse(mixedWeaponsData));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-
-    const result = await isPolearmWeapon('Longsword');
-    expect(result).toBe(false);
-  });
-
-  it('returns false for weapons with empty properties', async () => {
-    global.fetch.mockResolvedValue(createMockResponse(mixedWeaponsData));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-
-    const result = await isPolearmWeapon('Mace');
-    expect(result).toBe(false);
-  });
-
-  it('returns false for weapons not found in equipment data', async () => {
-    global.fetch.mockResolvedValue(createMockResponse(mixedWeaponsData));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-
-    const result = await isPolearmWeapon('FantasySword');
-    expect(result).toBe(false);
-  });
-
-  it('fetches equipment data for unknown weapons', async () => {
-    global.fetch.mockResolvedValue(createMockResponse([]));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-
-    await isPolearmWeapon('UnknownWeapon');
-    expect(global.fetch).toHaveBeenCalledWith('/data/equipment.json');
-  });
-
-  it('caches equipment data on first fetch', async () => {
-    global.fetch.mockResolvedValue(createMockResponse(glaiveData));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-
-    await isPolearmWeapon('Glaive');
-    await isPolearmWeapon('Halberd');
-
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('handles fetch failure by returning false for non-hardcoded weapons', async () => {
-    global.fetch.mockRejectedValue(new Error('Network error'));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-
-    const result = await isPolearmWeapon('Glaive');
-    expect(result).toBe(false);
-  });
-
-  it('treats weapons without properties array as not polearm weapons', async () => {
-    const noPropsData = [
-      { name: 'Strange Weapon' },
-    ];
-    global.fetch.mockResolvedValue(createMockResponse(noPropsData));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-
-    const result = await isPolearmWeapon('Strange Weapon');
-    expect(result).toBe(false);
-  });
-
-  it('caches empty array when fetch returns empty', async () => {
-    global.fetch.mockResolvedValue(createMockResponse([]));
-    const { isPolearmWeapon } = await import('./polearmUtils.js');
-
-    const result1 = await isPolearmWeapon('Glaive');
-    const result2 = await isPolearmWeapon('Halberd');
-
-    expect(result1).toBe(false);
-    expect(result2).toBe(false);
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    it('returns false and caches when fetch fails', async () => {
+      global.fetch.mockRejectedValue(new Error('Network error'));
+      expect(await isPolearmWeapon('Glaive')).toBe(false);
+      expect(await isPolearmWeapon('Glaive')).toBe(false);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
   });
 });

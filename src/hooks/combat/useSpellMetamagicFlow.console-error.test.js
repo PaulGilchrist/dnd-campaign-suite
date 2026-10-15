@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-15
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
@@ -193,6 +194,19 @@ function makeSpell(overrides = {}) {
   };
 }
 
+// Render the flow as a Sorcerer (unless overridden) with the given spell's
+// gate triggered, after getCombatSummary has been primed (e.g. creatures:null).
+function renderGate(spellName, spellOverrides = {}, hookProps = {}) {
+  const { playerStats = makePlayerStats(), ...rest } = hookProps;
+  const { result } = renderHook(() =>
+    useSpellMetamagicFlow({ playerStats, campaignName: 'TestCampaign', onExecute: vi.fn(), ...rest })
+  );
+  act(() => {
+    result.current.gateMetamagic(makeSpell({ name: spellName, ...spellOverrides }));
+  });
+  return result;
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
 describe('useSpellMetamagicFlow — null creatures behavior', () => {
@@ -206,6 +220,8 @@ describe('useSpellMetamagicFlow — null creatures behavior', () => {
   // pending state. This is the same behavior verified for individual spells in
   // useSpellMetamagicFlow.gate.test.js; this file tests the behavior with a
   // representative subset of gate handler categories.
+
+  const expectedError = 'Creature targets empty for unknown: cs=exists, characters.length=undefined';
 
   const gateSpellNames = [
     'Foresight',
@@ -229,17 +245,9 @@ describe('useSpellMetamagicFlow — null creatures behavior', () => {
       const spy = vi.spyOn(console, 'error');
       getCombatSummary.mockReturnValueOnce({ creatures: null });
 
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-      );
+      const result = renderGate(spellName);
 
-      act(() => {
-        result.current.gateMetamagic(makeSpell({ name: spellName }));
-      });
-
-      expect(spy).toHaveBeenCalledWith(
-        'Creature targets empty for unknown: cs=exists, characters.length=undefined'
-      );
+      expect(spy).toHaveBeenCalledWith(expectedError);
       // Gate handler returns false (no creatureTargets), so flow falls through
       // to Sorcerer metamagic path which sets pendingMetamagic
       expect(result.current.pendingMetamagic).not.toBeNull();
@@ -255,17 +263,9 @@ describe('useSpellMetamagicFlow — null creatures behavior', () => {
     const spy = vi.spyOn(console, 'error');
     getCombatSummary.mockReturnValueOnce({ creatures: null });
 
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
+    const result = renderGate('Revivify');
 
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Revivify' }));
-    });
-
-    expect(spy).toHaveBeenCalledWith(
-      'Creature targets empty for unknown: cs=exists, characters.length=undefined'
-    );
+    expect(spy).toHaveBeenCalledWith(expectedError);
     expect(result.current.pendingMetamagic).toBeNull();
     expect(result.current.pendingRevivify).toBeNull();
 
@@ -277,13 +277,7 @@ describe('useSpellMetamagicFlow — null creatures behavior', () => {
   it('falls through to metamagic pending when a non-gated spell is used with null creatures', () => {
     getCombatSummary.mockReturnValueOnce({ creatures: null });
 
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn() })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Shield of Faith', level: 1 }));
-    });
+    const result = renderGate('Shield of Faith', { level: 1 });
 
     expect(result.current.pendingMetamagic).not.toBeNull();
     expect(result.current.pendingMetamagic.spellName).toBe('Shield of Faith');
@@ -296,9 +290,11 @@ describe('useSpellMetamagicFlow — null creatures behavior', () => {
     const onExecute = vi.fn();
 
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow(
-        { playerStats: { name: 'TestWizard', class: { name: 'Wizard' }, level: 5 }, campaignName: 'TestCampaign', onExecute: onExecute }
-      )
+      useSpellMetamagicFlow({
+        playerStats: { name: 'TestWizard', class: { name: 'Wizard' }, level: 5 },
+        campaignName: 'TestCampaign',
+        onExecute,
+      })
     );
 
     await act(async () => {
@@ -314,13 +310,9 @@ describe('useSpellMetamagicFlow — null creatures behavior', () => {
     getMultiTargetSpreadForSpell.mockReturnValue({ range: '30 feet' });
     getCombatSummary.mockReturnValueOnce({ creatures: null });
 
-    const characters = [{ name: 'Ally One' }];
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: characters })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Fireball', level: 3 }));
+    const result = renderGate('Fireball', { level: 3 }, {
+      characters: [{ name: 'Ally One' }],
+      setSecondaryTargetModal: null,
     });
 
     expect(result.current.pendingMultiTarget).not.toBeNull();

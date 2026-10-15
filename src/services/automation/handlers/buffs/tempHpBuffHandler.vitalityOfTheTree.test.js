@@ -1,3 +1,8 @@
+// @maintained-by-ai — deterministic contract tests for the Vitality of the Tree lane of tempHpBuffHandler:
+// dispatch into handleVitalityOfTheTree, CLA-378 offer/round gates, modal payload, confirmVitalityOfTheTree.
+// Generic-lane message copy ("No temp HP expression defined" / "Could not calculate temp HP") is owned SOLELY
+// by tempHpBuffHandler.handle.test.js — falls-through cases here pin shape only (type==='popup', no modalName).
+// replace-if-larger tempHp semantics are owned by tempHpBuffHandler.bolsteringTreats.test.js (REAL setTempHp).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -86,37 +91,27 @@ describe('route detection', () => {
     expect(result.modalName).toBe('vitalityOfTheTreeTarget');
   });
 
-  it('does NOT delegate when only ongoingHealingExpression is set without healingStartOfTurn', async () => {
+  // AND-condition: each flag alone must NOT enter the vitality lane. Shape-only pins —
+  // the fall-through popup copy is owned by the generic handle lane (handle.test.js).
+  it.each([
+    ['ongoingHealingExpression without healingStartOfTurn', { ongoingHealingExpression: 'rage_damage_d6', healingStartOfTurn: false }],
+    ['healingStartOfTurn without ongoingHealingExpression', { ongoingHealingExpression: '', healingStartOfTurn: true }],
+  ])('does NOT delegate when only %s is set', async (_label, automation) => {
     resetMocks();
-    const action = makeAction({
-      ongoingHealingExpression: 'rage_damage_d6',
-      healingStartOfTurn: false,
-    });
-    const ps = makePlayerStats();
+    const action = makeAction(automation);
 
-    const result = await handle(action, ps, campaignName);
+    const result = await handle(action, makePlayerStats(), campaignName);
 
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('No temp HP expression defined');
-  });
-
-  it('does NOT delegate when only healingStartOfTurn is set without ongoingHealingExpression', async () => {
-    resetMocks();
-    const action = makeAction({
-      ongoingHealingExpression: '',
-      healingStartOfTurn: true,
-    });
-    const ps = makePlayerStats();
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('No temp HP expression defined');
+    expect(result.modalName).toBeUndefined();
+    // vitality lane never entered → no vitality refusal log either
+    expect(logService.addEntry).not.toHaveBeenCalled();
   });
 });
 
 // ────────────────────────────────────────────────────────────────
 // CLA-378 offer gates — live Rage + vitalityOfTheTreeAvailable
+// (positive "both gates pass → modal" case is pinned in route detection)
 // ────────────────────────────────────────────────────────────────
 
 describe('offer gates', () => {
@@ -154,19 +149,10 @@ describe('offer gates', () => {
       automationType: 'vitality_of_the_tree_refused',
     }));
   });
-
-  it('opens the modal when Rage is live and the offer flag is set', async () => {
-    gateMocks({ rage: true, available: true, rageRound: 1 });
-
-    const result = await handle(vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName);
-
-    expect(result.type).toBe('modal');
-    expect(result.modalName).toBe('vitalityOfTheTreeTarget');
-  });
 });
 
 // ────────────────────────────────────────────────────────────────
-// handleVitalityOfTheTree — same round as rage (no creatures)
+// handleVitalityOfTheTree — roundsElapsed <= 0 refusal guard
 // ────────────────────────────────────────────────────────────────
 
 describe('same round as rage', () => {
@@ -175,30 +161,23 @@ describe('same round as rage', () => {
     automationService.evaluateAutoExpression.mockReturnValue(3);
   });
 
-  it('returns popup and logs refusal when current round equals rage activation round', async () => {
-    gateMocks({ rageRound: 3 });
+  it.each([
+    ['rage activated this round', 3],
+    ['rage round in the future', 5],
+  ])('refuses and logs when current round is 3 and %s', async (_label, rageRound) => {
+    gateMocks({ rageRound });
     combatData.getCurrentCombatRound.mockReturnValue(3);
     damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
 
     const result = await handle(vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName);
 
     expect(result.type).toBe('popup');
+    expect(result.modalName).toBeUndefined();
     expect(result.payload.description).toContain('same round');
     expect(result.payload.description).toContain('Rage activated');
     expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
       automationType: 'vitality_of_the_tree_refused',
     }));
-  });
-
-  it('returns popup when rage round is in the future relative to current round', async () => {
-    gateMocks({ rageRound: 5 });
-    combatData.getCurrentCombatRound.mockReturnValue(3);
-    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-
-    const result = await handle(vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('same round');
   });
 });
 
@@ -209,7 +188,7 @@ describe('same round as rage', () => {
 describe('modal payload', () => {
   beforeEach(() => resetMocks());
 
-  it('returns modal with creature targets from combat context', async () => {
+  it('returns modal with creature targets, caller refs, and temp HP from the expression', async () => {
     gateMocks({ rageRound: 1 });
     combatData.getCurrentCombatRound.mockReturnValue(3);
     automationService.evaluateAutoExpression.mockReturnValue(3);
@@ -238,23 +217,14 @@ describe('modal payload', () => {
     expect(result.payload.tempHp).toBe(3);
   });
 
-  it('returns empty creatureTargets when combat context has no creatures key', async () => {
+  it.each([
+    ['no creatures key', {}],
+    ['null combat context', null],
+  ])('returns empty creatureTargets when combat context has %s', async (_label, combatContext) => {
     gateMocks({ rageRound: 1 });
     combatData.getCurrentCombatRound.mockReturnValue(3);
     automationService.evaluateAutoExpression.mockReturnValue(3);
-    damageUtils.getCombatContext.mockResolvedValue({});
-
-    const result = await handle(vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName);
-
-    expect(result.type).toBe('modal');
-    expect(result.payload.creatureTargets).toEqual([]);
-  });
-
-  it('returns empty creatureTargets when combat context is null', async () => {
-    gateMocks({ rageRound: 1 });
-    combatData.getCurrentCombatRound.mockReturnValue(3);
-    automationService.evaluateAutoExpression.mockReturnValue(3);
-    damageUtils.getCombatContext.mockResolvedValue(null);
+    damageUtils.getCombatContext.mockResolvedValue(combatContext);
 
     const result = await handle(vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName);
 
@@ -274,62 +244,7 @@ describe('modal payload', () => {
     expect(result.payload.maxTargets).toBe(1);
   });
 
-  it('calculates temp HP from ongoingHealingExpression', async () => {
-    gateMocks({ rageRound: 1 });
-    combatData.getCurrentCombatRound.mockReturnValue(2);
-    automationService.evaluateAutoExpression.mockReturnValue(7);
-    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-
-    const result = await handle(vitalityAction(), makePlayerStats({ name: 'Barbarian1' }), campaignName);
-
-    expect(result.payload.tempHp).toBe(7);
-  });
-
-  it('returns popup when temp HP calculation yields a non-positive value', async () => {
-    gateMocks({ rageRound: 1 });
-    combatData.getCurrentCombatRound.mockReturnValue(2);
-    automationService.evaluateAutoExpression.mockReturnValue(-1);
-    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-
-    const result = await handle(makeAction({
-      ongoingHealingExpression: 'invalid_expr',
-      healingStartOfTurn: true,
-    }), makePlayerStats({ name: 'Barbarian1' }), campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Could not calculate temp HP');
-  });
-
-  it('returns popup when temp HP calculation yields zero', async () => {
-    gateMocks({ rageRound: 1 });
-    combatData.getCurrentCombatRound.mockReturnValue(2);
-    automationService.evaluateAutoExpression.mockReturnValue(0);
-    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-
-    const result = await handle(makeAction({
-      ongoingHealingExpression: '0',
-      healingStartOfTurn: true,
-    }), makePlayerStats({ name: 'Barbarian1' }), campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Could not calculate temp HP');
-  });
-
-  it('includes the expression in the error message when calculation fails', async () => {
-    gateMocks({ rageRound: 1 });
-    combatData.getCurrentCombatRound.mockReturnValue(2);
-    automationService.evaluateAutoExpression.mockReturnValue(null);
-    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-
-    const result = await handle(makeAction({
-      ongoingHealingExpression: 'bad_expression',
-      healingStartOfTurn: true,
-    }), makePlayerStats({ name: 'Barbarian1' }), campaignName);
-
-    expect(result.payload.description).toContain('bad_expression');
-  });
-
-  it('returns modal when evaluation yields a parseable dice string like 1d6', async () => {
+  it('rolls the temp HP amount when evaluation yields a parseable dice string', async () => {
     gateMocks({ rageRound: 1 });
     combatData.getCurrentCombatRound.mockReturnValue(2);
     automationService.evaluateAutoExpression.mockReturnValue('1d6');
@@ -346,34 +261,30 @@ describe('modal payload', () => {
     expect(result.payload.tempHp).toBeLessThanOrEqual(6);
   });
 
-  it('returns popup when evaluation yields an unparseable string', async () => {
+  // Every failure arm of rollDiceExpression's guard (≤0 number, non-string,
+  // unparseable string): shape-only pins per lane ownership — the error popup
+  // copy lives with the generic handle lane. Ordering pin: the guard fires
+  // before any combat-context read or store write.
+  it.each([
+    ['zero', 0],
+    ['negative', -1],
+    ['null', null],
+    ['unparseable string', 'not_a_dice'],
+  ])('returns popup with zero side effects when evaluation yields %p', async (_label, evalResult) => {
     gateMocks({ rageRound: 1 });
     combatData.getCurrentCombatRound.mockReturnValue(2);
-    automationService.evaluateAutoExpression.mockReturnValue('not_a_dice');
-    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
+    automationService.evaluateAutoExpression.mockReturnValue(evalResult);
 
     const result = await handle(makeAction({
-      ongoingHealingExpression: 'not_a_dice',
+      ongoingHealingExpression: 'bad_expression',
       healingStartOfTurn: true,
     }), makePlayerStats({ name: 'Barbarian1' }), campaignName);
 
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Could not calculate temp HP');
-  });
-
-  it('includes action name and automationType in error popup', async () => {
-    gateMocks({ rageRound: 1 });
-    combatData.getCurrentCombatRound.mockReturnValue(2);
-    automationService.evaluateAutoExpression.mockReturnValue(-1);
-    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-
-    const result = await handle(makeAction({
-      ongoingHealingExpression: 'bad',
-      healingStartOfTurn: true,
-    }), makePlayerStats({ name: 'Barbarian1' }), campaignName);
-
-    expect(result.payload.name).toBe('Second Wind');
-    expect(result.payload.automationType).toBe('temp_hp_buff');
+    expect(result.modalName).toBeUndefined();
+    expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(useRuntimeState.setRuntimeObject).not.toHaveBeenCalled();
   });
 });
 
@@ -387,7 +298,7 @@ describe('confirmVitalityOfTheTree', () => {
     gateMocks({ rageRound: 1 });
   });
 
-  it('applies temp HP to a single selected target', async () => {
+  it('applies temp HP to a single selected target and returns the info popup', async () => {
     const result = await confirmVitalityOfTheTree({
           action: vitalityAction(),
           playerStats: makePlayerStats({ name: 'Barbarian1' }),
@@ -397,6 +308,9 @@ describe('confirmVitalityOfTheTree', () => {
       });
 
     expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.name).toBe('Second Wind');
+    expect(result.payload.automationType).toBe('temp_hp_buff');
     expect(result.payload.description).toContain('Ally1');
     expect(result.payload.description).toContain('8 temporary hit points');
 
@@ -442,116 +356,22 @@ describe('confirmVitalityOfTheTree', () => {
     expect(tempCalls[0][0]).toBe('Ally1');
   });
 
-  it('CLA-378 clamps to 1 creature even when maxTargets is falsy', async () => {
-    await confirmVitalityOfTheTree({
-          action: vitalityAction(),
-          playerStats: makePlayerStats({ name: 'Barbarian1' }),
-          campaignName,
-          selectedTargets: ['A', 'B', 'C', 'D', 'E'],
-          tempHp: 8,
-      });
-
-    const tempCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
-      (c) => c[1] === 'tempHp',
-    );
-    expect(tempCalls.length).toBe(1);
-    expect(tempCalls[0][0]).toBe('A');
-  });
-
-  it('handles empty selected targets array', async () => {
+  it.each([
+    ['empty array', []],
+    ['null', null],
+    ['undefined', undefined],
+  ])('grants nothing and returns the no-targets popup when selectedTargets is %s', async (_label, selectedTargets) => {
     const result = await confirmVitalityOfTheTree({
           action: vitalityAction(),
           playerStats: makePlayerStats({ name: 'Barbarian1' }),
           campaignName,
-          selectedTargets: [],
+          selectedTargets,
           tempHp: 8,
       });
 
+    expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('No targets granted');
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('handles null selected targets', async () => {
-    const result = await confirmVitalityOfTheTree({
-          action: vitalityAction(),
-          playerStats: makePlayerStats({ name: 'Barbarian1' }),
-          campaignName,
-          selectedTargets: null,
-          tempHp: 8,
-      });
-
-    expect(result.payload.description).toContain('No targets granted');
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('handles undefined selected targets', async () => {
-    const result = await confirmVitalityOfTheTree({
-          action: vitalityAction(),
-          playerStats: makePlayerStats({ name: 'Barbarian1' }),
-          campaignName,
-          selectedTargets: undefined,
-          tempHp: 8,
-      });
-
-    expect(result.payload.description).toContain('No targets granted');
-  });
-
-  it('returns popup with automation_info type and correct metadata', async () => {
-    const result = await confirmVitalityOfTheTree({
-          action: vitalityAction(),
-          playerStats: makePlayerStats({ name: 'Barbarian1' }),
-          campaignName,
-          selectedTargets: ['Ally1'],
-          tempHp: 8,
-      });
-
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.name).toBe('Second Wind');
-    expect(result.payload.automationType).toBe('temp_hp_buff');
-  });
-
-  it('uses max of existing temp HP when existing is higher than granted amount', async () => {
-    useRuntimeState.getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'activeBuffs') return RAGE_BUFF;
-      if (prop === 'tempHp') return 15;
-      if (prop === 'vitalityOfTheTreeGrantedTargets') return [];
-      return 0;
-    });
-
-    await confirmVitalityOfTheTree({
-          action: vitalityAction(),
-          playerStats: makePlayerStats({ name: 'Barbarian1' }),
-          campaignName,
-          selectedTargets: ['Ally1'],
-          tempHp: 8,
-      });
-
-    const tempCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
-      (c) => c[1] === 'tempHp',
-    );
-    expect(tempCalls[0][2]).toBe(15);
-  });
-
-  it('uses the new amount when it exceeds existing temp HP', async () => {
-    useRuntimeState.getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'activeBuffs') return RAGE_BUFF;
-      if (prop === 'tempHp') return 3;
-      if (prop === 'vitalityOfTheTreeGrantedTargets') return [];
-      return 0;
-    });
-
-    await confirmVitalityOfTheTree({
-          action: vitalityAction(),
-          playerStats: makePlayerStats({ name: 'Barbarian1' }),
-          campaignName,
-          selectedTargets: ['Ally1'],
-          tempHp: 10,
-      });
-
-    const tempCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
-      (c) => c[1] === 'tempHp',
-    );
-    expect(tempCalls[0][2]).toBe(10);
   });
 
   it('CLA-378 refuses the grant without a live Rage buff, logging refusal and granting nothing', async () => {

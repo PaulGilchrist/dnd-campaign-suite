@@ -1,15 +1,18 @@
+// @maintained-by-ai: 2026-10-14
 // MA-2021: Thunderbird "Wing Clap" legendary save — DC 23 Strength, 2d6 Thunder,
-// "Failure: pushed 20 ft. and knocked Prone". The row authored save_dc/save_type/
+// "Failure: pushed 20 ft. and knocked Prone". The row shipped save_dc/save_type/
 // damage_dice_primary + hit_conditions:["prone"] BAIT (buildHitConditionClause is
 // attack-lane only, §153/§567) but NO save_effect: the save lane word-scans
 // save_effect ONLY (extractConditionsFromSaveEffect, Helpers:383) → [] → zero
 // prone grant on a failed save = FAIL(a). Push 20 ft / multi-target shapeless
 // clause stay §398/§211 advisory-by-design.
 // DATA fix: one field save_effect:"The target has the Prone condition." (canonical
-// word §346, byte-mirror of the centaur Trampling Charge / damage+condition save
+// word §346, byte-mirror of the centaur Trampling Charge damage+condition save
 // siblings). dc_success stays ABSENT — half-default pays half on success, matching
 // RAW "Success: Half damage". Prone has no duration clause in RAW (ends by moving
 // an action), so no durationNote wording is authored.
+// Storm Call sibling (legendary_actions[3], MA-2022 delegates_to hijack) is pinned
+// exhaustively in saveProcessing.ma2022-thunderbird-storm-call.test.js — deduped here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 
@@ -18,40 +21,22 @@ import { extractConditionsFromSaveEffect } from '../../components/encounter/Mons
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const THUNDERBIRD = monsters.find((m) => m.index === 'thunderbird');
 const WING_CLAP = THUNDERBIRD.legendary_actions.find((a) => a.name === 'Wing Clap');
-const STORM_CALL = THUNDERBIRD.legendary_actions[3];
 
-describe('MA-2021 disk fingerprint: Thunderbird Wing Clap save_effect authored, core bytes intact', () => {
-  it('row identity + save core byte-unchanged (live-verified exact): DC 23 STR, 2d6 Thunder', () => {
+describe('MA-2021 disk fingerprint: Wing Clap save_effect authored, core bytes intact', () => {
+  it('live-verified exact: DC 23 STR 2d6 Thunder + canonical Prone word; bait and half-default untouched', () => {
     expect(THUNDERBIRD.name).toBe('Thunderbird');
     expect(WING_CLAP.save_dc).toBe(23);
     expect(WING_CLAP.save_type).toBe('Strength');
     expect(WING_CLAP.damage_dice_primary).toBe('2d6');
     expect(WING_CLAP.damage_type_primary).toBe('Thunder');
     expect(WING_CLAP.description).toContain('Failure: pushed 20 ft. and knocked Prone; takes 7 (2d6) Thunder damage.');
-  });
-
-  it('save_effect authored with the canonical Prone word (byte-minimal, sibling shape)', () => {
+    // The one-field DATA fix (byte-minimal, sibling shape):
     expect(WING_CLAP.save_effect).toBe('The target has the Prone condition.');
     expect(WING_CLAP.dc_success).toBeUndefined(); // half-default = RAW "Success: Half damage"
-  });
-
-  it('hit_conditions bait left UNTOUCHED per ticket (attack-lane-only, §153/§567 pin)', () => {
-    expect(WING_CLAP.hit_conditions).toEqual(['prone']); // never read on the save lane — honest RAW mirror of "knocked Prone"
-  });
-
-  it('extractor grants prone (was save_effect-less inert → [] → zero grant)', () => {
+    // hit_conditions bait left UNTOUCHED per ticket — never read on the save lane:
+    expect(WING_CLAP.hit_conditions).toEqual(['prone']); // honest RAW mirror of "knocked Prone"
+    // Unique save-lane contract: the extractor grants prone (was save_effect-less inert → []):
     expect(extractConditionsFromSaveEffect(WING_CLAP.save_effect)).toEqual(['prone']);
-    expect(extractConditionsFromSaveEffect(undefined)).toEqual([]); // pre-fix input: zero save-lane producers
-  });
-
-  it('Storm Call sibling fixed MA-2022 same-pass — delegates_to GONE, own save fields authored (stale pre-fix pin inverted §384)', () => {
-    expect(STORM_CALL.name).toBe('Storm Call (Costs 2 Actions)');
-    expect(STORM_CALL.delegates_to).toBeUndefined(); // MA-2022: master 12d10 hijack dead, self-resolves DC24 Dex 6d8
-    expect(STORM_CALL.save_dc).toBe(24);
-    expect(STORM_CALL.save_type).toBe('Dexterity');
-    expect(STORM_CALL.damage_dice_primary).toBe('6d8');
-    expect(STORM_CALL.dc_success).toBe('none');
-    expect(STORM_CALL.save_effect).toBeUndefined();
   });
 });
 
@@ -118,7 +103,6 @@ import { rollExpression } from '../../services/dice/diceRoller.js';
 
 const campaignName = 'test-campaign';
 const TB_NAME = 'Thunderbird 1';
-const TARGET = 'Bandit 1';
 
 // Deterministic 2d6 pool (live repro rolled 2,1 = 3; fail face proven exact there).
 const MOCK_DAMAGE = { total: 9, rolls: [4, 5], modifier: 0 };
@@ -161,9 +145,9 @@ beforeEach(() => {
   rollExpression.mockReturnValue(MOCK_DAMAGE);
 });
 
-describe('MA-2021 live-lane: Prone now lands on the failed save alongside full damage (was FAIL(a) zero-grant)', () => {
-  it('failed save (raw +0, nat 3 < DC 23, structural fail): full 2d6 Thunder AND prone applied + grant log + meta stamp', async () => {
-    const { saveSuccess } = await rollNpcInline({ targetName: TARGET, effectiveD20: 3, bonus: 0 });
+describe('MA-2021 live-lane: Prone lands on the failed save alongside damage (was FAIL(a) zero-grant)', () => {
+  it('failed save (raw +0, nat 3 < DC 23): full 2d6 Thunder AND prone applied + grant log + meta stamp', async () => {
+    const { saveSuccess } = await rollNpcInline({ targetName: 'Bandit 1', effectiveD20: 3, bonus: 0 });
     expect(saveSuccess).toBe(false);
 
     // Full damage face (computeDamageAfterEvasion: fail → total, no halve)
@@ -171,13 +155,13 @@ describe('MA-2021 live-lane: Prone now lands on the failed save alongside full d
     expect(applyDamageToTarget.mock.calls[0][2]).toBe(9);
 
     // Prone grant (was zero pre-fix)
-    expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['prone']);
-    expect(runtimeStore[`${TARGET}.activeConditionMeta`].prone).toEqual(
+    expect(runtimeStore['Bandit 1.activeConditions']).toEqual(['prone']);
+    expect(runtimeStore['Bandit 1.activeConditionMeta'].prone).toEqual(
       expect.objectContaining({ source: TB_NAME }));
     expect(addEntryLogs.some(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Prone' && e.sourceName === TB_NAME)).toBe(true);
   });
 
-  it('successful save (+21 rig, deterministic face): half damage floor(9/2)=4 AND zero prone grant', async () => {
+  it('successful save (+21 rig, nat 19 ≥ DC 23): half damage floor(9/2)=4 AND zero prone grant', async () => {
     const { saveSuccess } = await rollNpcInline({ targetName: 'Bandit 2', effectiveD20: 19, bonus: 21 });
     expect(saveSuccess).toBe(true);
 

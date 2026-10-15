@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -80,7 +81,7 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
     getBaitAndSwitchAcBonus: vi.fn(() => 0),
     getGuardianProtectionAcBonus: vi.fn(() => 0),
     getParryAcBonus: vi.fn(() => 0),
-  getSlowAcPenalty: () => 0,
+    getSlowAcPenalty: () => 0,
     dispatchUnbreakableMajestySave: vi.fn(),
     hasPotentCantrip: vi.fn(),
     getShieldAcBonus: vi.fn(),
@@ -159,6 +160,10 @@ import {
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
 import { addEntry } from '../../services/ui/logService.js';
 
+// Attack-lane seam: the REAL hitResolution.js runs through createLogAndShow
+// (the veer-homing-graze sibling mocks resolveHit — this file owns the live
+// Unerring Strike / Veer behaviour inside resolveHit).
+
 describe('createLogAndShow - Living Legend & Veer', () => {
     const deps = {
         characterName: 'TestFighter',
@@ -184,12 +189,9 @@ describe('createLogAndShow - Living Legend & Veer', () => {
         utils.getName.mockImplementation((n) => n);
     });
 
-    function createFn() {
-        return createLogAndShow(deps);
-    }
-
     // ---------------------------------------------------------------------------
-    // Living Legend / Unerring Strike
+    // Living Legend / Unerring Strike (2024: once per turn, missed weapon
+    // attack hits; nat 1 is not an auto-miss in 2024, so it converts too)
     // ---------------------------------------------------------------------------
 
     describe('living legend / unerring strike', () => {
@@ -201,29 +203,29 @@ describe('createLogAndShow - Living Legend & Veer', () => {
             });
         }
 
-        it('converts miss to hit when livingLegendActive and unerringStrikeUsed is false', async () => {
-            rollD20.mockReturnValueOnce(5);
+        async function runWeaponAttack(context = {}) {
+            await createLogAndShow(deps)('Longsword', 5, 'attack', {
+                targetName: 'Goblin',
+                isWeaponAttack: true,
+                ...context,
+            });
+        }
+
+        it.each([
+            ['a regular miss', 5],
+            ['a natural 1 (2024: nat 1 is not an auto-miss)', 1],
+        ])('converts %s to a hit, consumes the use, and logs Living Legend', async (_label, d20) => {
+            rollD20.mockReturnValueOnce(d20);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
             mockLivingLegend(true, false);
 
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: true });
+            await runWeaponAttack();
 
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'unerringStrikeUsed', true, 'test-campaign');
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 hit: true,
                 unerringStrikeApplied: true,
             }));
-        });
-
-        it('logs Unerring Strike ability use to campaign log when converting miss to hit', async () => {
-            rollD20.mockReturnValueOnce(5);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-            mockLivingLegend(true, false);
-
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: true });
-
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 type: 'ability_use',
                 characterName: 'TestFighter',
@@ -233,91 +235,65 @@ describe('createLogAndShow - Living Legend & Veer', () => {
             }));
         });
 
-        it('does not convert when livingLegendActive is false', async () => {
-            rollD20.mockReturnValueOnce(5);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-            getRuntimeValue.mockReturnValue(null);
-
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: true });
-
+        function expectNotConverted() {
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 hit: false,
                 unerringStrikeApplied: false,
             }));
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', 'unerringStrikeUsed', true, 'test-campaign');
+        }
+
+        async function runExpectedMiss() {
+            rollD20.mockReturnValueOnce(5);
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
+            await runWeaponAttack();
+        }
+
+        it('does not convert when livingLegendActive is false', async () => {
+            mockLivingLegend(false, false);
+            await runExpectedMiss();
+            expectNotConverted();
         });
 
         it('does not convert when unerringStrikeUsed was already consumed', async () => {
-            rollD20.mockReturnValueOnce(5);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
             mockLivingLegend(true, true);
-
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: true });
-
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                hit: false,
-                unerringStrikeApplied: false,
-            }));
+            await runExpectedMiss();
+            expectNotConverted();
         });
 
         it('does not convert when isWeaponAttack is false', async () => {
+            mockLivingLegend(true, false);
             rollD20.mockReturnValueOnce(5);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-            mockLivingLegend(true, false);
-
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: false });
-
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                hit: false,
-                unerringStrikeApplied: false,
-            }));
+            await runWeaponAttack({ isWeaponAttack: false });
+            expectNotConverted();
         });
 
         it('does not convert when the roll already hits', async () => {
-            rollD20.mockReturnValueOnce(20);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 15 });
             mockLivingLegend(true, false);
-
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: true });
+            rollD20.mockReturnValueOnce(20);
+            await runWeaponAttack();
 
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 hit: true,
                 unerringStrikeApplied: false,
             }));
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', 'unerringStrikeUsed', true, 'test-campaign');
-        });
-
-        it('does convert on an auto miss since natural 1 is not isAutoMiss', async () => {
-            rollD20.mockReturnValueOnce(1);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-            mockLivingLegend(true, false);
-
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', isWeaponAttack: true });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'unerringStrikeUsed', true, 'test-campaign');
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                hit: true,
-                unerringStrikeApplied: true,
-            }));
         });
     });
 
     // ---------------------------------------------------------------------------
-    // Veer (mounted creature redirect)
+    // Veer (2024 Mount feat): rider forces an attack that hit their mount to
+    // hit them instead. 2024 feats.json "Veer" + incapacitated guards.
     // ---------------------------------------------------------------------------
 
     describe('veer (mounted creature redirect)', () => {
-        function mockVeerSetup(mountName, riderName, mountConditions = []) {
+        function mockVeerSetup(mountName, riderName, mountConditions = [], riderConditions = []) {
             getTargetFromAttacker.mockReturnValue({ name: mountName, ac: 12 });
             getRuntimeValue.mockImplementation((name, prop) => {
                 if (name === mountName && prop === 'mountedBy') return riderName;
                 if (name === riderName && prop === 'veerActive') return true;
-                if (name === riderName && prop === 'activeConditions') return [];
+                if (name === riderName && prop === 'activeConditions') return riderConditions;
                 return null;
             });
             loadCombatSummary.mockResolvedValue({
@@ -325,67 +301,47 @@ describe('createLogAndShow - Living Legend & Veer', () => {
             });
         }
 
-        // no-timers T2: fakeTimersSync helper removed — prompts no longer have
-        // timeout branches to fire; tests answer them with real events instead.
-
-        it('redirects attack to rider when veer is active and rider confirms', async () => {
-            mockVeerSetup('Mount', 'Rider');
-
-            // no-timers T2: the confirm waits forever — dispatch the rider's
-            // answer as the player would (the old 15s auto-confirm is gone).
-            const fn = createFn();
+        // no-timers T2: the veer-confirm prompt waits indefinitely — answer it
+        // as the rider would (dispatch until the roll resolves).
+        async function runAnsweringVeerPrompt(confirm) {
+            const fn = createLogAndShow(deps);
             let settled = false;
             const run = fn('Longsword', 5, 'attack', { targetName: 'Mount' }).then((r) => { settled = true; return r; });
             for (let i = 0; i < 40 && !settled; i++) {
                 await new Promise((r) => setTimeout(r, 5));
                 window.dispatchEvent(new CustomEvent('veer-confirm', {
-                    detail: { promptId: 'veer-Mount', confirm: true },
+                    detail: { promptId: 'veer-Mount', confirm },
                 }));
             }
             await run;
+        }
+
+        function expectVeerNotTriggered() {
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('Rider', 'veerActive', null, 'test-campaign');
+            expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({
+                abilityName: 'Veer',
+            }));
+        }
+
+        it('redirects attack to rider when veer is active and rider confirms', async () => {
+            mockVeerSetup('Mount', 'Rider');
+            await runAnsweringVeerPrompt(true);
 
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
                 abilityName: 'Veer',
                 characterName: 'Rider',
+            }));
+            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+                abilityName: 'Veer',
+                description: expect.stringContaining('redirects the attack'),
             }));
             expect(setRuntimeValue).toHaveBeenCalledWith('Rider', 'veerActive', null, 'test-campaign');
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ hit: true }));
         });
 
         it('keeps attack on original target when rider declines veer', async () => {
-            vi.useFakeTimers();
-            const origAddEventListener = window.addEventListener.bind(window);
-            let veerHandler = null;
-            window.addEventListener = (event, cb) => {
-                if (event === 'veer-confirm') {
-                    veerHandler = cb;
-                } else {
-                    origAddEventListener(event, cb);
-                }
-            };
-
             mockVeerSetup('Mount', 'Rider');
-
-            const fn = createFn();
-            const promise = fn('Longsword', 5, 'attack', { targetName: 'Mount' });
-
-            // Advance microtasks so the async code sets up the event listener
-            await vi.advanceTimersByTimeAsync(0);
-
-            // Dispatch the decline event before the 15s timeout fires
-            if (veerHandler) {
-                veerHandler(new CustomEvent('veer-confirm', {
-                    detail: { promptId: 'veer-Mount', confirm: false },
-                }));
-            }
-
-            // Resolve via the captured handler (no timer involved anymore —
-            // the prompt would otherwise wait forever, AGENTS.md "No Game Timers").
-            await vi.advanceTimersByTimeAsync(1);
-
-            await promise;
-            vi.useRealTimers();
-            window.addEventListener = origAddEventListener;
+            await runAnsweringVeerPrompt(false);
 
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
                 abilityName: 'Veer',
@@ -397,63 +353,26 @@ describe('createLogAndShow - Living Legend & Veer', () => {
         it('does not trigger veer when mount is incapacitated', async () => {
             mockVeerSetup('Mount', 'Rider', [{ key: 'incapacitated' }]);
 
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mount' });
+            await createLogAndShow(deps)('Longsword', 5, 'attack', { targetName: 'Mount' });
 
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('Rider', 'veerActive', null, 'test-campaign');
-            expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({
-                abilityName: 'Veer',
-            }));
+            expectVeerNotTriggered();
         });
 
         it('does not trigger veer when rider is incapacitated', async () => {
-            getRuntimeValue.mockImplementation((name, prop) => {
-                if (name === 'Mount' && prop === 'mountedBy') return 'Rider';
-                if (name === 'Rider' && prop === 'veerActive') return true;
-                if (name === 'Rider' && prop === 'activeConditions') return [{ key: 'incapacitated' }];
-                return null;
-            });
+            mockVeerSetup('Mount', 'Rider', [], [{ key: 'incapacitated' }]);
 
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mount' });
+            await createLogAndShow(deps)('Longsword', 5, 'attack', { targetName: 'Mount' });
 
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('Rider', 'veerActive', null, 'test-campaign');
-            expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({
-                abilityName: 'Veer',
-            }));
+            expectVeerNotTriggered();
         });
 
         it('does not trigger veer when there is no rider on the mount', async () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Mount', ac: 12 });
             getRuntimeValue.mockReturnValue(null);
 
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Mount' });
+            await createLogAndShow(deps)('Longsword', 5, 'attack', { targetName: 'Mount' });
 
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('Rider', 'veerActive', null, 'test-campaign');
-        });
-
-        it('logs veer ability use when redirecting attack to rider', async () => {
-            mockVeerSetup('Mount', 'Rider');
-
-            // no-timers T2: answer the confirm prompt as the rider would.
-            const fn = createFn();
-            let settled = false;
-            const run = fn('Longsword', 5, 'attack', { targetName: 'Mount' }).then((r) => { settled = true; return r; });
-            for (let i = 0; i < 40 && !settled; i++) {
-                await new Promise((r) => setTimeout(r, 5));
-                window.dispatchEvent(new CustomEvent('veer-confirm', {
-                    detail: { promptId: 'veer-Mount', confirm: true },
-                }));
-            }
-            await run;
-
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'ability_use',
-                characterName: 'Rider',
-                abilityName: 'Veer',
-                description: expect.stringContaining('redirects the attack'),
-            }));
+            expectVeerNotTriggered();
         });
     });
 });

@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// Basic-effect lanes of buffHandler.handle: the bonus_action_dash delegate
+// (Adrenaline Rush uses resolution + temp-HP bonus), effect delegation
+// (teleport / vow_of_enmity), the FT-105 dash_action speed_boost grant,
+// and the generic requiredLevel / long_rest gates. Fully mocked and
+// deterministic. Generic toggle popup copy is pinned in
+// buffHandler.advanced-effects.test.js; level-gate refusal copy for the
+// flight lane is pinned in buffHandler.draconic-flight.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/buffToggle.js', () => ({
@@ -111,6 +119,8 @@ describe('buffHandler.handle - basic effects', () => {
         3,
         campaignName,
       );
+      // No bonusEffect declared — dash alone, no temp HP.
+      expect(tempHpService.setTempHp).not.toHaveBeenCalled();
       expect(logService.addEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({
@@ -121,7 +131,7 @@ describe('buffHandler.handle - basic effects', () => {
       );
     });
 
-    it('blocks when uses are exhausted', async () => {
+    it('blocks when stored uses are exhausted', async () => {
       const ps = makePlayerStats({ proficiency: 3 });
       const action = makeAction({ effect: 'bonus_action_dash', uses: 'proficiency_bonus' });
       runtimeState.getRuntimeValue.mockReturnValue(0);
@@ -135,7 +145,39 @@ describe('buffHandler.handle - basic effects', () => {
       expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
-    it('grants temp HP when bonusEffect is temp_hp and expression exists', async () => {
+    it('blocks when proficiency_bonus resolves to 0 uses', async () => {
+      const ps = makePlayerStats({ proficiency: 0 });
+      const action = makeAction({ effect: 'bonus_action_dash', uses: 'proficiency_bonus' });
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.description).toContain('no uses remaining');
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    // resolveAdrenalineUsesMax branches, all with no stored value.
+    it.each([
+      ['explicit number', { uses: 2 }, 1],
+      ['usesMax override for unrecognizable uses', { uses: 'half', usesMax: 3 }, 2],
+      ['default 1 when uses unrecognizable and usesMax absent', { uses: 'half' }, 0],
+      ['proficiency_bonus', { uses: 'proficiency_bonus' }, 2],
+    ])('resolves max uses from %s', async (_label, automation, expectedWritten) => {
+      const ps = makePlayerStats({ proficiency: 3 });
+      const action = makeAction({ effect: 'bonus_action_dash', ...automation });
+      runtimeState.getRuntimeValue.mockReturnValue(null);
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+        ps.name,
+        'adrenalineRushUses',
+        expectedWritten,
+        campaignName,
+      );
+      expect(result.payload.description).toContain(`${expectedWritten} use${expectedWritten !== 1 ? 's' : ''} remaining`);
+    });
+
+    it('grants temp HP when bonusEffect is temp_hp and expression is positive', async () => {
       const ps = makePlayerStats({ proficiency: 3 });
       const action = makeAction({ effect: 'bonus_action_dash', uses: 1, bonusEffect: 'temp_hp', bonusExpression: '2d6+2' });
       runtimeState.getRuntimeValue.mockReturnValue(1);
@@ -150,101 +192,26 @@ describe('buffHandler.handle - basic effects', () => {
       expect(logService.addEntry).toHaveBeenCalled();
     });
 
-    it('skips temp HP when expression evaluates to zero', async () => {
+    it.each([
+      ['zero', 0],
+      ['a negative number', -3],
+    ])('skips temp HP when expression evaluates to %s', async (_label, value) => {
       const ps = makePlayerStats({ proficiency: 3 });
       const action = makeAction({ effect: 'bonus_action_dash', uses: 1, bonusEffect: 'temp_hp', bonusExpression: '1d1' });
       runtimeState.getRuntimeValue.mockReturnValue(1);
-      automationService.evaluateAutoExpression.mockReturnValue(0);
+      automationService.evaluateAutoExpression.mockReturnValue(value);
 
       const result = await handle(action, ps, campaignName, null);
 
       expect(tempHpService.setTempHp).not.toHaveBeenCalled();
       expect(result.payload.description).not.toContain('temporary hit points');
-      expect(result.payload.description).toContain('0 uses remaining');
+      // The dash use is still consumed even when the bonus grants nothing.
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         ps.name,
         'adrenalineRushUses',
         0,
         campaignName,
       );
-    });
-
-    it('skips temp HP when expression evaluates to a negative number', async () => {
-      const ps = makePlayerStats({ proficiency: 3 });
-      const action = makeAction({ effect: 'bonus_action_dash', uses: 1, bonusEffect: 'temp_hp', bonusExpression: '-5' });
-      runtimeState.getRuntimeValue.mockReturnValue(1);
-      automationService.evaluateAutoExpression.mockReturnValue(-3);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(tempHpService.setTempHp).not.toHaveBeenCalled();
-      expect(result.payload.description).not.toContain('temporary hit points');
-    });
-
-    it('uses explicit uses number', async () => {
-      const ps = makePlayerStats({ proficiency: 5 });
-      const action = makeAction({ effect: 'bonus_action_dash', uses: 2 });
-      runtimeState.getRuntimeValue.mockReturnValue(2);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(ps.name, 'adrenalineRushUses', 1, campaignName);
-      expect(result.payload.description).toContain('1 use remaining');
-    });
-
-    it('uses usesMax override when uses is unrecognizable', async () => {
-      const ps = makePlayerStats({ proficiency: 5 });
-      const action = makeAction({ effect: 'bonus_action_dash', uses: 'half', usesMax: 3 });
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(ps.name, 'adrenalineRushUses', 2, campaignName);
-      expect(result.payload.description).toContain('2 uses remaining');
-    });
-
-    it('defaults to 1 use when uses field is unrecognizable and usesMax is absent', async () => {
-      const ps = makePlayerStats({ proficiency: 5 });
-      const action = makeAction({ effect: 'bonus_action_dash', uses: 'half' });
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(ps.name, 'adrenalineRushUses', 0, campaignName);
-      expect(result.payload.description).toContain('0 uses remaining');
-    });
-
-    it('uses stored uses value when available instead of computed max', async () => {
-      const ps = makePlayerStats({ proficiency: 3 });
-      const action = makeAction({ effect: 'bonus_action_dash', uses: 'proficiency_bonus' });
-      runtimeState.getRuntimeValue.mockReturnValue(10);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(ps.name, 'adrenalineRushUses', 9, campaignName);
-      expect(result.payload.description).toContain('9 uses remaining');
-    });
-
-    it('grants dash without temp HP when bonusEffect is absent', async () => {
-      const ps = makePlayerStats({ proficiency: 3 });
-      const action = makeAction({ effect: 'bonus_action_dash', uses: 1 });
-      runtimeState.getRuntimeValue.mockReturnValue(1);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(tempHpService.setTempHp).not.toHaveBeenCalled();
-      expect(result.payload.description).not.toContain('temporary hit points');
-      expect(result.payload.description).toContain('0 uses remaining');
-    });
-
-    it('blocks when proficiency_bonus is 0 resulting in 0 uses', async () => {
-      const ps = makePlayerStats({ proficiency: 0 });
-      const action = makeAction({ effect: 'bonus_action_dash', uses: 'proficiency_bonus' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('no uses remaining');
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
   });
 
@@ -325,26 +292,27 @@ describe('buffHandler.handle - basic effects', () => {
       );
     });
 
-    it('falls through to normal buff flow when bonusAmount is 0', async () => {
+    // Generic-lane fall-through: the exact 'activated on yourself (10 min)'
+    // copy is pinned in buffHandler.advanced-effects.test.js — these only
+    // prove the dash shortcut does NOT capture these shapes.
+    it.each([
+      ['zero bonus', { effect: 'speed_bonus', bonus: '0 ft' }],
+      ['non-speed effect', { effect: 'some_other_effect', bonus: '20 ft' }],
+    ])('falls through to the normal buff flow with %s', async (_label, automation) => {
       const ps = makePlayerStats();
       const action = {
-        name: 'Empty Buff',
-        automation: {
-          type: 'buff',
-          trigger: 'dash_action',
-          effect: 'speed_bonus',
-          bonus: '0 ft',
-        },
+        name: 'Dash Fallthrough',
+        automation: { type: 'buff', trigger: 'dash_action', ...automation },
       };
       buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
       const result = await handle(action, ps, campaignName, null);
 
       expect(buffToggle.toggleBuff).toHaveBeenCalled();
-      expect(result.payload.description).toBe('Empty Buff activated on yourself (10 min)');
+      expect(result.payload.description).toContain('activated on yourself');
     });
 
-    it('does not add duplicate temp buff if one already exists', async () => {
+    it('replaces any existing stamp with ONE upgraded speed_boost entry', async () => {
       const ps = makePlayerStats();
       const action = {
         name: 'Swift Step',
@@ -373,46 +341,21 @@ describe('buffHandler.handle - basic effects', () => {
       expect(written.some(b => b.tempBuff)).toBe(false);
       expect(result.payload.description).toBe('Swift Step: +10 ft Speed for this Dash action.');
     });
+  });
 
-    it('falls through when trigger is dash_action but effect is not speed_bonus', async () => {
-      const ps = makePlayerStats();
-      const action = {
-        name: 'Dash Buff',
-        automation: {
-          type: 'buff',
-          trigger: 'dash_action',
-          effect: 'some_other_effect',
-          bonus: '20 ft',
-        },
-      };
+  describe('Required level guard', () => {
+    // The level < requiredLevel refusal branch (same checkBuffGates lines)
+    // is pinned by buffHandler.draconic-flight.test.js — this pins the
+    // inclusive boundary: level === requiredLevel activates.
+    it('allows activation at exactly requiredLevel', async () => {
+      const ps = makePlayerStats({ level: 5 });
+      const action = makeAction({ requiredLevel: 5 });
       buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
       const result = await handle(action, ps, campaignName, null);
 
       expect(buffToggle.toggleBuff).toHaveBeenCalled();
-      expect(result.payload.description).toBe('Dash Buff activated on yourself (10 min)');
-    });
-  });
-
-  describe('Required level guard', () => {
-    it.each([
-      [3, 5, true],
-      [5, 5, false],
-      [7, 5, false],
-    ])('blocks when level %s < requiredLevel %s, allows otherwise', async (level, requiredLevel, shouldBlock) => {
-      const ps = makePlayerStats({ level });
-      const action = makeAction({ requiredLevel });
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      if (shouldBlock) {
-        expect(result.payload.description).toContain(`requires character level ${requiredLevel}`);
-        expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
-      } else {
-        expect(buffToggle.toggleBuff).toHaveBeenCalled();
-        expect(result.payload.description).toContain('activated on yourself');
-      }
+      expect(result.payload.description).toContain('activated on yourself');
     });
   });
 
@@ -426,18 +369,6 @@ describe('buffHandler.handle - basic effects', () => {
 
       expect(result.payload.description).toContain('cannot be used again until a Long Rest');
       expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
-    });
-
-    it('allows activation when buff is not active or recharge is not long_rest', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ recharge: 'long_rest' });
-      runtimeState.getRuntimeValue.mockReturnValue([]);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(buffToggle.toggleBuff).toHaveBeenCalled();
-      expect(result.payload.description).toContain('activated on yourself');
     });
 
     it('does not apply long_rest guard when uses field is present', async () => {

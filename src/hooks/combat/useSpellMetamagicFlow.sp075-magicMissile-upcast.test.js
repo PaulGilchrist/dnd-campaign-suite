@@ -1,9 +1,13 @@
+// @maintained-by-ai: 2026-10-15
 // SP-075: handleMagicMissileConfirm hardcoded isUpcast:false and slotLevel from
 // spell.level, so prepareSpellCast paid the lv1 slot even when the popup carried a
 // Level 2/4 selection on spell.upcastLevel — the lv-N slot was never paid and
 // executeMagicMissile logged 3 darts. Pins the CLA-312 effective-level threading
-// through the confirm lane and the byte-identical lv1 baseline.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// through the confirm lane (isFreeCastAuthorized + prepareSpellCast + onExecute
+// args) and the byte-identical lv1 baseline. Gate-side dart totals are pinned
+// upstream in spellGates.magicMissile.test.js; execution-side dart rolls in
+// spellCastService execution helpers — this file owns only the confirm lane.
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
 
@@ -72,29 +76,22 @@ Object.defineProperty(window, 'dispatchEvent', {
   writable: true,
 });
 
-function makePlayerStats(overrides = {}) {
-  return {
-    name: 'DivinationWizard',
-    class: { name: 'Wizard' },
-    level: 20,
-    ...overrides,
-  };
-}
+const CAMPAIGN = 'test-campaign';
+const CASTER = 'DivinationWizard';
 
-function makeMagicMissile(overrides = {}) {
-  return {
-    name: 'Magic Missile',
-    level: 1,
-    casting_time: 'Action',
-    range: '120 feet',
-    ...overrides,
-  };
-}
+let prepareSpellCast;
+let isFreeCastAuthorized;
+
+beforeAll(async () => {
+  const prep = await import('../../services/rules/spells/spellPreparationService.js');
+  prepareSpellCast = prep.prepareSpellCast;
+  isFreeCastAuthorized = prep.isFreeCastAuthorized;
+});
 
 function renderFlow(onExecute) {
   return renderHook(() => useSpellMetamagicFlow({
-    playerStats: makePlayerStats(),
-    campaignName: 'test-campaign',
+    playerStats: { name: CASTER, class: { name: 'Wizard' }, level: 20 },
+    campaignName: CAMPAIGN,
     onExecute,
     setSecondaryTargetModal: null,
     characters: [],
@@ -102,61 +99,59 @@ function renderFlow(onExecute) {
   }));
 }
 
+// Popup shape (SpellDetailPopup onCast): upcasts arrive as isUpcast + upcastLevel
+// while spell.level stays 1. Darts = 3 + (slotLevel - 1) per spells.json
+// higher_level text, distributed across two goblins (2 to B, rest to A).
+const CONFIRM_CASES = [
+  { label: 'lv1 baseline: isUpcast false, slotLevel 1 — byte-compatible legacy', spell: {}, slotLevel: 1, isUpcast: false },
+  { label: 'lv2 upcast: isUpcast true + upcastLevel 2 threaded, slotLevel 2', spell: { isUpcast: true, upcastLevel: 2 }, slotLevel: 2, isUpcast: true },
+  { label: 'lv4 upcast: isUpcast true + upcastLevel 4 threaded, slotLevel 4', spell: { isUpcast: true, upcastLevel: 4 }, slotLevel: 4, isUpcast: true },
+];
+
 describe('SP-075 Magic Missile — confirm lane pays the upcast slot', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('lv2 upcast: prepareSpellCast receives isUpcast true + upcastLevel 2, metaCtx.slotLevel 2', async () => {
-    const { prepareSpellCast, isFreeCastAuthorized } = await import('../../services/rules/spells/spellPreparationService.js');
+  it.each(CONFIRM_CASES)('$label', async ({ spell, slotLevel, isUpcast }) => {
+    const darts = 3 + (slotLevel - 1);
+    const distribution = { 'Goblin A': darts - 2, 'Goblin B': 2 };
     const onExecute = vi.fn();
     const { result } = renderFlow(onExecute);
 
     await act(async () => {
-      await result.current.gateMetamagic(makeMagicMissile({ isUpcast: true, upcastLevel: 2 }));
+      await result.current.gateMetamagic({
+        name: 'Magic Missile',
+        level: 1,
+        casting_time: 'Action',
+        range: '120 feet',
+        ...spell,
+      });
     });
-    expect(result.current.pendingMagicMissile.totalMissiles).toBe(4);
+    // Gate armed with the effective-level dart total (full totals matrix lives
+    // in spellGates.magicMissile.test.js — this only proves confirm had pending
+    // state to consume before cfClearPending).
+    expect(result.current.pendingMagicMissile.totalMissiles).toBe(darts);
 
     await act(async () => {
-      await result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 4 } });
+      await result.current.handleMagicMissileConfirm({ distribution });
     });
 
-    expect(isFreeCastAuthorized).toHaveBeenCalledWith('DivinationWizard', 'Magic Missile', 2, expect.any(Object), 'test-campaign');
-    expect(prepareSpellCast).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Magic Missile', level: 1 }),
-      expect.objectContaining({ magicMissileDistribution: { 'Goblin A': 4 }, slotLevel: 2 }),
-      expect.objectContaining({ playerName: 'DivinationWizard', campaignName: 'test-campaign', isUpcast: true, upcastLevel: 2 })
-    );
+    expect(isFreeCastAuthorized).toHaveBeenCalledWith(CASTER, 'Magic Missile', slotLevel, expect.any(Object), CAMPAIGN);
+    const prepareArgs = prepareSpellCast.mock.calls.find(c => c[0]?.name === 'Magic Missile');
+    expect(prepareArgs).toBeDefined();
+    expect(prepareArgs[0]).toEqual(expect.objectContaining({ name: 'Magic Missile', level: 1 }));
+    expect(prepareArgs[1]).toEqual(expect.objectContaining({ magicMissileDistribution: distribution, slotLevel }));
+    expect(prepareArgs[2]).toEqual(expect.objectContaining({
+      playerName: CASTER,
+      campaignName: CAMPAIGN,
+      isUpcast,
+      ...(isUpcast ? { upcastLevel: slotLevel } : {}),
+    }));
     expect(onExecute).toHaveBeenCalledWith(
       expect.any(Object),
-      expect.objectContaining({ magicMissileDistribution: { 'Goblin A': 4 }, slotLevel: 2 })
+      expect.objectContaining({ magicMissileDistribution: distribution, slotLevel })
     );
     expect(result.current.pendingMagicMissile).toBeNull();
-  });
-
-  it('lv1 baseline: isUpcast false, slotLevel 1 — byte-compatible legacy', async () => {
-    const { prepareSpellCast, isFreeCastAuthorized } = await import('../../services/rules/spells/spellPreparationService.js');
-    const onExecute = vi.fn();
-    const { result } = renderFlow(onExecute);
-
-    await act(async () => {
-      await result.current.gateMetamagic(makeMagicMissile());
-    });
-    expect(result.current.pendingMagicMissile.totalMissiles).toBe(3);
-
-    await act(async () => {
-      await result.current.handleMagicMissileConfirm({ distribution: { 'Goblin A': 3 } });
-    });
-
-    expect(isFreeCastAuthorized).toHaveBeenCalledWith('DivinationWizard', 'Magic Missile', 1, expect.any(Object), 'test-campaign');
-    expect(prepareSpellCast).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Magic Missile', level: 1 }),
-      expect.objectContaining({ magicMissileDistribution: { 'Goblin A': 3 }, slotLevel: 1 }),
-      expect.objectContaining({ playerName: 'DivinationWizard', campaignName: 'test-campaign', isUpcast: false })
-    );
-    expect(onExecute).toHaveBeenCalledWith(
-      expect.any(Object),
-      expect.objectContaining({ magicMissileDistribution: { 'Goblin A': 3 }, slotLevel: 1 })
-    );
   });
 });

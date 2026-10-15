@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Generic buff lane contract for buffHandler.handle: willing-target resolution,
+// toggle popup copy, temp-HP side effects, invisible/see_invisibility/haste
+// branches, and adrenaline restore. Fully mocked and deterministic.
+// Wild Shape lives in buffHandler.wild-shape.test.js; long-rest flight in
+// buffHandler.draconic-flight.test.js; use-gating in buffHandler.psychic-veil.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/buffToggle.js', () => ({
@@ -47,10 +53,6 @@ vi.mock('../../../../services/shared/abilityLookup.js', () => ({
   getAbilityModifier: vi.fn(),
 }));
 
-vi.mock('../class-druid/wildShapeCreatureBuilder.js', () => ({
-  cleanupWildShape: vi.fn(),
-}));
-
 vi.mock('./tempHpService.js', () => ({
   setTempHp: vi.fn(),
 }));
@@ -63,7 +65,6 @@ import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 import * as logService from '../../../ui/logService.js';
 import * as expirations from '../../../rules/effects/expirations.js';
-import * as wildShapeCreatureBuilder from '../class-druid/wildShapeCreatureBuilder.js';
 import * as tempHpService from './tempHpService.js';
 
 const campaignName = 'test-campaign';
@@ -94,21 +95,6 @@ describe('buffHandler.handle - advanced effects', () => {
   });
 
   describe('Target resolution', () => {
-    it('uses playerStats.name as targetName when target is not willing_creature', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ target: 'self' });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-        ps.name,
-        action.name,
-        action.automation,
-        campaignName,
-        ps.name
-      );
-    });
-
     it('uses target name from getTargetFromAttacker when target is willing_creature and combatSummary exists', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ target: 'willing_creature' });
@@ -229,30 +215,14 @@ describe('buffHandler.handle - advanced effects', () => {
       expect(tempHpService.setTempHp).not.toHaveBeenCalled();
     });
 
-    it('does not call setTempHp when expression evaluates to zero', async () => {
+    it.each([
+      ['zero', 0],
+      ['a negative number', -3],
+      ['a non-number', null],
+    ])('does not call setTempHp when expression evaluates to %s', async (_label, value) => {
       const ps = makePlayerStats();
       const action = makeAction({ tempHpExpression: '1d2' });
-      automationService.evaluateAutoExpression.mockReturnValue(0);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(tempHpService.setTempHp).not.toHaveBeenCalled();
-    });
-
-    it('does not call setTempHp when expression evaluates to a negative number', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ tempHpExpression: '-5' });
-      automationService.evaluateAutoExpression.mockReturnValue(-3);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(tempHpService.setTempHp).not.toHaveBeenCalled();
-    });
-
-    it('does not call setTempHp when expression evaluates to a non-number', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ tempHpExpression: '2d4' });
-      automationService.evaluateAutoExpression.mockReturnValue(null);
+      automationService.evaluateAutoExpression.mockReturnValue(value);
 
       await handle(action, ps, campaignName, null);
 
@@ -261,12 +231,16 @@ describe('buffHandler.handle - advanced effects', () => {
   });
 
   describe('Wild Shape (shape_shift)', () => {
-    it('returns wild_shape_select popup when activating with uses available', async () => {
+    // OFF-leg cleanup and the 0-uses refusal gate are locked in
+    // buffHandler.wild-shape.test.js (CLA-391 + Archdruid lane) — this only
+    // pins the ON-leg payload echo: the chooser popup must hand the modal the
+    // same action/playerStats/campaign references.
+    it('returns wild_shape_select popup echoing action, playerStats and campaign when activating with uses available', async () => {
       const ps = makePlayerStats({
         level: 7,
         class: { major: { name: 'Druid' }, subclass: { name: 'Circle of the Moon' }, class_levels: [{ level: 7, wild_shape: 2 }] },
       });
-      const action = makeAction({ tempHpExpression: '2d6+2', effect: 'shape_shift' });
+      const action = makeAction({ effect: 'shape_shift' });
       runtimeState.getRuntimeValue.mockReturnValue(2);
 
       const result = await handle(action, ps, campaignName, null);
@@ -277,47 +251,6 @@ describe('buffHandler.handle - advanced effects', () => {
       expect(result.payload.playerStats).toBe(ps);
       expect(result.payload.campaignName).toBe(campaignName);
     });
-
-    it('returns automation_info with deactivation message when shape_shift is already active', async () => {
-      const ps = makePlayerStats({
-        level: 7,
-        class: { major: { name: 'Druid' }, subclass: { name: 'Circle of the Moon' }, class_levels: [{ level: 7, wild_shape: 2 }] },
-      });
-      const action = makeAction({ effect: 'shape_shift' });
-      runtimeState.getRuntimeValue.mockReturnValue(2);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('Test Buff toggled OFF');
-      expect(wildShapeCreatureBuilder.cleanupWildShape).toHaveBeenCalledWith(ps.name, campaignName);
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'ability_use',
-          characterName: ps.name,
-          abilityName: 'Test Buff',
-          description: expect.stringContaining('deactivated Wild Shape'),
-        })
-      );
-    });
-
-    it('blocks shape_shift when no uses remaining', async () => {
-      const ps = makePlayerStats({
-        level: 7,
-        class: { major: { name: 'Druid' }, subclass: { name: 'Circle of the Moon' }, class_levels: [{ level: 7, wild_shape: 0 }] },
-      });
-      const action = makeAction({ effect: 'shape_shift' });
-      runtimeState.getRuntimeValue.mockReturnValue(0);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No Wild Shape uses remaining');
-      expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
-    });
-
   });
 
   describe('Invisible effect', () => {
@@ -342,7 +275,7 @@ describe('buffHandler.handle - advanced effects', () => {
       );
     });
 
-    it('removes invisible from activeConditions when deactivating', async () => {
+    it('removes invisible from activeConditions and clears the tracking key when deactivating', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ effect: 'invisible' });
       buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
@@ -356,16 +289,6 @@ describe('buffHandler.handle - advanced effects', () => {
         ['bleeding', 'poisoned'],
         campaignName
       );
-    });
-
-    it('clears invisibility tracking key when deactivating', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ effect: 'invisible' });
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-      runtimeState.getRuntimeValue.mockReturnValue(['invisible']);
-
-      await handle(action, ps, campaignName, null);
-
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'campaign',
         `_activeInvisibility_${ps.name}`,
@@ -468,27 +391,6 @@ describe('buffHandler.handle - advanced effects', () => {
         expect.anything(),
         campaignName
       );
-    });
-  });
-
-  describe('Fly speed equals walk speed effect', () => {
-    it('is a no-op when toggling off', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ effect: 'fly_speed_equals_walk_speed' });
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      const result = await handle(action, ps, campaignName, null);
-      expect(result.payload.description).toBe('Test Buff toggled OFF');
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('passes through to normal buff flow when toggling on', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ effect: 'fly_speed_equals_walk_speed' });
-
-      const result = await handle(action, ps, campaignName, null);
-      expect(result.payload.description).toContain('activated on yourself');
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
   });
 

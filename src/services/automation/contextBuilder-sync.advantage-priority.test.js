@@ -1,3 +1,12 @@
+// @maintained-by-ai
+// contextBuilder-sync advantage/disadvantage PRIORITY lane — the only suite
+// asserting the ordering contract of buildAttackContextSync's forced-mode chain:
+//   conditionAttackMode > stored/buff-scan accumulation > deferred resolvers > dis fold.
+// Individual lane behaviours live in their own sibling suites (buffs, wolf-aura,
+// improved-duplicity, target-effects, foresight-dis, wm008-vex-consume, buffs
+// vow-of-enmity, and the core shapes in contextBuilder-sync.test.js) — do not
+// re-add single-source pass/fail tests here; this file is about WHO WINS.
+// Deterministic: all externals mocked → stable contract, flag kept.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -71,6 +80,7 @@ vi.mock('./handlers/class-cleric-paladin/avengingAngelHandler.js', () => ({
 }));
 
 const { buildBaseAttackContext } = await import('./common/damageRoll.js');
+const { getCombatContext } = await import('../rules/combat/damageUtils.js');
 const { getInnateSorceryBonus } = await import('../combat/buffs/buffService.js');
 const { getWolfAdvantageAgainst } = await import('../combat/auras/wolfAuraUtils.js');
 const { getDuplicityAdvantageAgainst } = await import('../combat/auras/duplicityAuraUtils.js');
@@ -103,6 +113,17 @@ const mockAttack = {
   weaponType: 'melee',
 };
 
+// 2024 Ranger level 17 with the precise_hunter passive (mockStats otherwise has none).
+const rangerStats = {
+  ...mockStats,
+  name: 'TestRanger',
+  automation: {
+    passives: [
+      { type: 'passive_rule', effect: 'precise_hunter', name: 'Precise Hunter' },
+    ],
+  },
+};
+
 function defaultBaseAttackContext(targetName = 'Orc', target = null) {
   buildBaseAttackContext.mockResolvedValue({
     target: target ?? { name: targetName },
@@ -111,60 +132,30 @@ function defaultBaseAttackContext(targetName = 'Orc', target = null) {
   });
 }
 
-describe('contextBuilder-sync: saveDc and saveType', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    defaultBaseAttackContext();
-    getRuntimeValue.mockReturnValue(undefined);
-    getInnateSorceryBonus.mockReturnValue({ spellAdvantage: false, saveDcBonus: 0 });
-    getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
-    getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
-    getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
-    getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-  });
-
-  it('includes saveType and dcSuccess from attack when present', async () => {
-    const attack = { ...mockAttack, saveDc: 13, saveType: 'DEX', saveSuccess: 0.5 };
-    const result = await buildAttackContextSync(attack, mockStats, 'camp', 'normal');
-
-    expect(result.saveType).toBe('DEX');
-    expect(result.dcSuccess).toBe(0.5);
-  });
-
-  it('includes saveType and dcSuccess as undefined when not on attack', async () => {
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal');
-
-    expect(result.saveType).toBeUndefined();
-    expect(result.dcSuccess).toBeUndefined();
-  });
-});
+// Every adv/dis source OFF — each test switches on exactly the sources it needs.
+// (Shared re-stub boilerplate across the sync cluster could later move to a
+// contextBuilder-sync.test-utils.js — deliberately not created mid-queue.)
+function neutralSources() {
+  getRuntimeValue.mockReturnValue(undefined);
+  getCombatContext.mockResolvedValue({ creatures: [] });
+  getInnateSorceryBonus.mockReturnValue({ spellAdvantage: false, saveDcBonus: 0 });
+  getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
+  getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
+  getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
+  getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
+}
 
 describe('contextBuilder-sync: forcedMode priority chain', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     defaultBaseAttackContext();
-    getRuntimeValue.mockReturnValue(undefined);
-    getInnateSorceryBonus.mockReturnValue({ spellAdvantage: false, saveDcBonus: 0 });
-    getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
-    getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
-    getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
-    getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-  });
-
-  it('conditionAttackMode takes highest priority over all advantage sources', async () => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_advantage_against' }];
-      return undefined;
-    });
-    getInnateSorceryBonus.mockReturnValue({ spellAdvantage: true, saveDcBonus: 0 });
-    getWolfAdvantageAgainst.mockReturnValue({ advantage: true });
-
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'disadvantage');
-
-    expect(result.forcedMode).toBe('disadvantage');
+    neutralSources();
   });
 
   it('all advantage sources are checked before any disadvantage sources', async () => {
+    // Buff-scan advantage (Reckless-style buff) must resolve forcedMode='advantage'
+    // before the deferred chain ever reaches the protection-te, Lion aura, or
+    // Corona disadvantage resolvers.
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_advantage_against' }];
       if (name === 'campaign' && key === 'targetEffects') return [{ effect: 'protection', target: 'Orc', source: 'Paladin' }];
@@ -177,38 +168,37 @@ describe('contextBuilder-sync: forcedMode priority chain', () => {
 
     expect(result.forcedMode).toBe('advantage');
   });
+
+  it('precise_hunter defers to the higher-priority vow of enmity resolver', async () => {
+    // Vow of enmity is deferred resolver #1, precise_hunter #5. Hunter's Mark
+    // concentration is live (precise_hunter WOULD fire), so if the resolver
+    // order flipped, advantageReason would carry the precise-hunter stamp.
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'activeBuffs') return [{ effect: 'vow_of_enmity' }];
+      return undefined;
+    });
+    getCombatContext.mockResolvedValue({
+      creatures: [
+        { name: 'TestRanger', concentration: { spell: "Hunter's Mark", target: 'Orc' } },
+        { name: 'Orc' },
+      ],
+    });
+
+    const result = await buildAttackContextSync(mockAttack, rangerStats, 'camp', 'normal');
+
+    expect(result.forcedMode).toBe('advantage');
+    expect(result.advantageReason).toBeUndefined();
+  });
 });
 
 describe('contextBuilder-sync: precise hunter (2024 Ranger level 17)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     defaultBaseAttackContext();
-    getRuntimeValue.mockReturnValue(undefined);
-    getInnateSorceryBonus.mockReturnValue({ spellAdvantage: false, saveDcBonus: 0 });
-    getWolfAdvantageAgainst.mockReturnValue({ advantage: false });
-    getDuplicityAdvantageAgainst.mockReturnValue({ advantage: false });
-    getLionDisadvantageAgainst.mockReturnValue({ disadvantage: false });
-    getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
+    neutralSources();
   });
 
   it('sets advantage when attacker has precise_hunter passive and target has Hunter\'s Mark concentration', async () => {
-    const { getCombatContext } = await import('../rules/combat/damageUtils.js');
-
-    const rangerStats = {
-      ...mockStats,
-      name: 'TestRanger',
-      automation: {
-        passives: [
-          { type: 'passive_rule', effect: 'precise_hunter', name: 'Precise Hunter' },
-        ],
-      },
-    };
-
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeBuffs') return [];
-      return undefined;
-    });
-
     getCombatContext.mockResolvedValue({
       creatures: [
         { name: 'TestRanger', concentration: { spell: "Hunter's Mark", target: 'Orc' } },
@@ -222,24 +212,7 @@ describe('contextBuilder-sync: precise hunter (2024 Ranger level 17)', () => {
     expect(result.advantageReason).toBe('Precise Hunter (Hunter\'s Mark)');
   });
 
-  it('does not set advantage when attacker has precise_hunter but target lacks Hunter\'s Mark', async () => {
-    const { getCombatContext } = await import('../rules/combat/damageUtils.js');
-
-    const rangerStats = {
-      ...mockStats,
-      name: 'TestRanger',
-      automation: {
-        passives: [
-          { type: 'passive_rule', effect: 'precise_hunter', name: 'Precise Hunter' },
-        ],
-      },
-    };
-
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeBuffs') return [];
-      return undefined;
-    });
-
+  it('does not set advantage when attacker has precise_hunter but lacks Hunter\'s Mark concentration', async () => {
     getCombatContext.mockResolvedValue({
       creatures: [
         { name: 'TestRanger' },
@@ -254,13 +227,6 @@ describe('contextBuilder-sync: precise hunter (2024 Ranger level 17)', () => {
   });
 
   it('does not set advantage when target has Hunter\'s Mark but attacker lacks precise_hunter', async () => {
-    const { getCombatContext } = await import('../rules/combat/damageUtils.js');
-
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeBuffs') return [];
-      return undefined;
-    });
-
     getCombatContext.mockResolvedValue({
       creatures: [
         { name: 'TestCharacter' },
@@ -272,27 +238,5 @@ describe('contextBuilder-sync: precise hunter (2024 Ranger level 17)', () => {
 
     expect(result.forcedMode).toBeUndefined();
     expect(result.advantageReason).toBeUndefined();
-  });
-
-  it('precise_hunter does not override higher-priority advantage sources', async () => {
-    const rangerStats = {
-      ...mockStats,
-      name: 'TestRanger',
-      automation: {
-        passives: [
-          { type: 'passive_rule', effect: 'precise_hunter', name: 'Precise Hunter' },
-        ],
-      },
-    };
-
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeBuffs') return [{ effect: 'vow_of_enmity' }];
-      if (key === 'vowOfEnmityTarget') return 'Orc';
-      return undefined;
-    });
-
-    const result = await buildAttackContextSync(mockAttack, rangerStats, 'camp', 'normal');
-
-    expect(result.forcedMode).toBe('advantage');
   });
 });

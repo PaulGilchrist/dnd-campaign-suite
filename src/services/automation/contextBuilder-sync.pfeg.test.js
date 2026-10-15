@@ -1,4 +1,9 @@
+// @maintained-by-ai
 // SP-094: attacker-type gate must resolve combatSummary monsterType (not 'npc').
+// Deterministic contract lane: fully mocked buildAttackContextSync, asserts the
+// attacker-type arg to isCreatureWarded (Undead monsterType / Giant / pc fall-through)
+// and forcedMode. Uniquely exercises the PFE-active path — all sibling
+// contextBuilder-sync suites mock isProtectionFromEvilAndGoodActive=false.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';

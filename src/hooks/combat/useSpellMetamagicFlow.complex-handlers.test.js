@@ -1,10 +1,23 @@
+// @maintained-by-ai: 2026-10-15
+// Complex-handler dispatch/gate seam for useSpellMetamagicFlow.
+// Owns: the dispatch registry that routes gated spells into their dedicated lanes
+// (two-stage Enhance Ability, custom Protection from Poison / Stone Skin) and the
+// unarmed-lane no-op guard those confirms share. Spell routing tables live in the
+// twins: per-spell execute payloads → complex-handlers.spells, charm/heal routing →
+// complex-handlers.charm-heal. Skip lanes → skip.test.js / special-paths.rollback,
+// stage machines → gate-two-stage.test.js / useTwoStageHandlers.enhanceAbility,
+// poison slot semantics → useCustomHandlers.protectionFromPoison, popup payloads →
+// confirm-payloads.test.js. Stone Skin fields are disk-derived from
+// public/data/2024/spells.json (lv4, Action, Touch — the old lv3 fixture was stale).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { applyStoneSkinHandler } from '../../services/automation/index.js';
 import { consumeMaterial } from '../../services/rules/spells/materialComponents.js';
 
-// ─── Minimal mocks (only what the tested handlers need) ────────────────────────
+// ─── Mocks (only what the dispatch/gate lanes actually touch) ─────────────────
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
@@ -17,10 +30,12 @@ vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
+// useConfirmableFlow.fireConfirmLaneRider imports both riders on every confirm —
+// stub them so the riders seam stays out of this dispatch lane's assertions.
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
-  // CLA-033: fired by the gated confirm lane's rider seam in useConfirmableFlow.
   triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
+  triggerBewitchingMagic: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../services/npcs/monsterUtils.js', () => ({
@@ -71,27 +86,25 @@ vi.mock('../../services/rules/spells/spellPreparationService.js', () => ({
   incrementFreeCastResource: vi.fn(),
 }));
 
-global.fetch = vi.fn((url) => {
-  if (url && url.includes('combat-summary')) {
-    return Promise.resolve({
-      ok: true,
-      json: () => Promise.resolve({ creatures: [] }),
-    });
-  }
-  return Promise.resolve({
-    ok: true,
-    status: 200,
-    json: () => Promise.resolve({}),
-    text: () => Promise.resolve(''),
-  });
-});
+global.fetch = vi.fn(() => Promise.resolve({
+  ok: true,
+  status: 200,
+  json: () => Promise.resolve({ creatures: [] }),
+  text: () => Promise.resolve(''),
+}));
 
 Object.defineProperty(window, 'dispatchEvent', {
   value: vi.fn(),
   writable: true,
 });
 
-// ─── Factories ────────────────────────────────────────────────────────────────
+// ─── Fixtures ───────────────────────────────────────────────────────────────────
+
+const CAMPAIGN = 'TestCampaign';
+
+const SPELL_ROWS = Object.fromEntries(
+  JSON.parse(readFileSync('public/data/2024/spells.json', 'utf8')).map((s) => [s.name, s])
+);
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -102,235 +115,106 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Fireball',
-    level: 3,
-    casting_time: '1 Action',
-    range: '150 ft.',
-    ...overrides,
-  };
-}
-
-function renderHookWithSpell(hookSetup, spellName, spellOverrides = {}) {
-  const onExecute = vi.fn();
+// Render the flow and gate the spell so its lane pending arms.
+async function renderGated(spell, { onExecute = vi.fn(), playerStats = makePlayerStats() } = {}) {
   const { result } = renderHook(() =>
-    hookSetup(onExecute)
+    useSpellMetamagicFlow({ playerStats, campaignName: CAMPAIGN, onExecute, setSecondaryTargetModal: null, characters: [], setPopupHtml: vi.fn() })
   );
-  const spell = makeSpell({ name: spellName, ...spellOverrides });
-  act(() => {
-    result.current.gateMetamagic(spell);
+  await act(async () => {
+    await result.current.gateMetamagic(spell);
   });
   return { result, onExecute, spell };
 }
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
+// ─── Dispatch registry: each complex spell arms its own lane ──────────────────
 
-describe('useSpellMetamagicFlow — Enhance Ability confirm/skip', () => {
+const DISPATCH_ROWS = [
+  // two-stage lane (useTwoStageHandlers): stage machine opens at 'ability';
+  // gate includes the caster among target candidates
+  { spell: 'Enhance Ability', pending: 'pendingEnhanceAbility', handler: 'handleEnhanceAbilityConfirm', stage: 'enhanceAbilityStage', stageValue: 'ability', arg: { targetName: 'Goblin A' }, targets: ['TestSorcerer', 'Goblin A', 'Goblin B', 'Goblin C'] },
+  // custom lane (useCustomHandlers): confirm takes the target array directly;
+  // gate includes the caster among target candidates
+  { spell: 'Protection from Poison', pending: 'pendingProtectionFromPoison', handler: 'handleProtectionFromPoisonConfirm', arg: ['Goblin A'], targets: ['TestSorcerer', 'Goblin A', 'Goblin B', 'Goblin C'] },
+  // custom consume lane (useCustomHandlers): confirm takes a string target;
+  // gate arms willing creatures only (no caster)
+  { spell: 'Stone Skin', pending: 'pendingStoneSkin', handler: 'handleStoneSkinConfirm', arg: 'Goblin A', targets: ['Goblin A', 'Goblin B', 'Goblin C'] },
+];
+
+describe('useSpellMetamagicFlow — complex lane dispatch registry', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('applies enhance ability effect, logs entry, and clears state on confirm', async () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Enhance Ability',
-      { level: 2 },
-    );
+  for (const row of DISPATCH_ROWS) {
+    const spell = SPELL_ROWS[row.spell];
 
-    act(() => {
-      result.current.handleEnhanceAbilityAbilitySelect('Bull\'s Strength');
+    it(`${row.spell}: gateMetamagic routes to ${row.pending} armed with combat targets`, async () => {
+      const { result } = await renderGated(spell);
+
+      expect(result.current[row.pending]).not.toBeNull();
+      if (row.stage) {
+        expect(result.current[row.stage]).toBe(row.stageValue);
+      }
+      expect(result.current[row.pending].creatureTargets).toEqual(row.targets);
     });
 
-    expect(result.current.enhanceAbilityStage).toBe('target');
+    it(`${row.spell}: confirm on an unarmed lane is a silent no-op`, async () => {
+      const { result, onExecute } = await renderGated(SPELL_ROWS['Fireball']);
 
-    await act(async () => {
-      await result.current.handleEnhanceAbilityConfirm({ targetName: 'Goblin A' });
+      await act(async () => {
+        await result.current[row.handler](row.arg);
+      });
+
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(onExecute).not.toHaveBeenCalled();
     });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      targetName: 'Goblin A',
-      targets: ['Goblin A'],
-      spellName: 'Enhance Ability',
-      spellLevel: 2,
-      castingTime: '1 Action',
-      timestamp: expect.any(Number),
-    });
-
-    expect(result.current.enhanceAbilityStage).toBeNull();
-    expect(result.current.pendingEnhanceAbility).toBeNull();
-  });
-
-  it('clears two-stage state and pending on skip', () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Enhance Ability',
-      { level: 2 },
-    );
-
-    act(() => {
-      result.current.handleEnhanceAbilityAbilitySelect('Bull\'s Strength');
-    });
-
-    expect(result.current.enhanceAbilityStage).toBe('target');
-
-    act(() => {
-      result.current.handleEnhanceAbilitySkip();
-    });
-
-    expect(result.current.enhanceAbilityStage).toBeNull();
-    expect(result.current.pendingEnhanceAbility).toBeNull();
-  });
-
-  it('does nothing when confirming without selecting an ability first', async () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Enhance Ability',
-      { level: 2 },
-    );
-
-    // No ability select — stage stays null, no pending data
-    await act(async () => {
-      await result.current.handleEnhanceAbilityConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(addEntry).not.toHaveBeenCalled();
-  });
-
-  it('does nothing when confirming with no pending state', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    await act(async () => {
-      await result.current.handleEnhanceAbilityConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
-  });
+  }
 });
 
-describe('useSpellMetamagicFlow — Protection from Poison confirm/skip', () => {
+// ─── Stone Skin confirm: the consume → apply → log → clear lifecycle seam ─────
+// Unique to this file — no sibling pins the diamond-dust consumption or the
+// protection_from_energy automation payload (skip rollback lives in
+// special-paths.rollback, popup payload in confirm-payloads).
+
+describe('useSpellMetamagicFlow — Stone Skin consume lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('applies protection from poison handler, logs entry, and clears pending on confirm', async () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Protection from Poison',
-      { level: 2 },
-    );
-
-    await act(async () => {
-      await result.current.handleProtectionFromPoisonConfirm(['Goblin A']);
-    });
-
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      targetName: 'Goblin A',
-      targets: ['Goblin A'],
-      spellName: 'Protection from Poison',
-      spellLevel: 2,
-      castingTime: '1 Action',
-      timestamp: expect.any(Number),
-    });
-
-    expect(result.current.pendingProtectionFromPoison).toBeNull();
-  });
-
-  it('clears pending on skip', () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Protection from Poison',
-      { level: 2 },
-    );
-
-    act(() => {
-      result.current.handleProtectionFromPoisonSkip();
-    });
-
-    expect(result.current.pendingProtectionFromPoison).toBeNull();
-  });
-
-  it('does nothing when confirming with no pending state', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    await act(async () => {
-      await result.current.handleProtectionFromPoisonConfirm(['Goblin A']);
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-});
-
-describe('useSpellMetamagicFlow — Stone Skin confirm/skip', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('consumes material, applies handler, logs entry, and clears pending on confirm', async () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Stone Skin',
-      { level: 3 },
-    );
+  it('consumes the diamond dust, applies the protection automation, logs the cast, clears pending', async () => {
+    const spell = SPELL_ROWS['Stone Skin'];
+    const { result } = await renderGated(spell);
 
     await act(async () => {
       await result.current.handleStoneSkinConfirm('Goblin A');
     });
 
-    expect(consumeMaterial).toHaveBeenCalledWith(
+    expect(consumeMaterial).toHaveBeenCalledWith(expect.any(Object), 'Diamond Dust (100 gp)', CAMPAIGN);
+
+    expect(applyStoneSkinHandler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Stone Skin',
+        automation: expect.objectContaining({
+          type: 'protection_from_energy',
+          damageTypes: ['Bludgeoning', 'Piercing', 'Slashing'],
+        }),
+      }),
       expect.any(Object),
-      'Diamond Dust (100 gp)',
-      'TestCampaign'
+      CAMPAIGN,
+      'Goblin A',
     );
 
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
       type: 'spell',
       characterName: 'TestSorcerer',
       targetName: 'Goblin A',
       targets: ['Goblin A'],
       spellName: 'Stone Skin',
-      spellLevel: 3,
-      castingTime: '1 Action',
+      spellLevel: spell.level,
+      castingTime: spell.casting_time,
       timestamp: expect.any(Number),
     });
 
     expect(result.current.pendingStoneSkin).toBeNull();
-  });
-
-  it('clears pending on skip', () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Stone Skin',
-      { level: 3 },
-    );
-
-    act(() => {
-      result.current.handleStoneSkinSkip();
-    });
-
-    expect(result.current.pendingStoneSkin).toBeNull();
-  });
-
-  it('does nothing when confirming with no pending state', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    await act(async () => {
-      await result.current.handleStoneSkinConfirm('Goblin A');
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
   });
 });

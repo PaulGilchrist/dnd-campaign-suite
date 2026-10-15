@@ -1,107 +1,69 @@
-import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai: 2026-10-14
 import React from 'react';
-import { DiceRollContext } from './DiceRollContext.js';
+import { render, renderHook, act } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import useSharedPopup from './useSharedPopup.js';
+import { DiceRollContext, useDiceRollPopup } from './DiceRollContext.js';
 
-// Mock usePopup with a real React hook implementation
-vi.mock('./usePopup.js', () => {
-  return {
-    default: function usePopupMock(buildHtml) {
-      const [popupHtml, setPopupHtml] = React.useState(null);
-      const showPopup = React.useCallback(
-        (entity) => {
-          const html = buildHtml(entity);
-          if (html) {
-            setPopupHtml(html);
-          }
-        },
-        [buildHtml]
-      );
-      return { showPopup, popupHtml, setPopupHtml };
-    },
-  };
-});
+// Seam unique to useSharedPopup: it adapts usePopup's state into a memoized
+// DiceRollContext value flagged _isShared (consumers like useLoggedDiceRoll
+// route writes through it). The underlying usePopup contract (showPopup /
+// buildHtml / setPopupHtml) is authoritative in usePopup.test.jsx, so the
+// real hook is used here — no mock to drift.
 
 describe('useSharedPopup', () => {
-  it('returns popupHtml, setPopupHtml, value, and Provider', async () => {
-    const { default: useSharedPopup } = await import('./useSharedPopup.js');
-    const { result } = renderHook(() => useSharedPopup());
-    expect(result.current).toHaveProperty('popupHtml');
-    expect(result.current).toHaveProperty('setPopupHtml');
-    expect(result.current).toHaveProperty('value');
-    expect(result.current).toHaveProperty('Provider');
-  });
-
-  it('initializes popupHtml as null', async () => {
-    const { default: useSharedPopup } = await import('./useSharedPopup.js');
+  it('exposes popupHtml (initially null), setPopupHtml, _isShared value, and DiceRollContext.Provider', () => {
     const { result } = renderHook(() => useSharedPopup());
     expect(result.current.popupHtml).toBeNull();
-  });
-
-  it('sets Provider to DiceRollContext.Provider', async () => {
-    const { default: useSharedPopup } = await import('./useSharedPopup.js');
-    const { result } = renderHook(() => useSharedPopup());
+    expect(typeof result.current.setPopupHtml).toBe('function');
     expect(result.current.Provider).toBe(DiceRollContext.Provider);
-  });
-
-  it('value object has _isShared set to true', async () => {
-    const { default: useSharedPopup } = await import('./useSharedPopup.js');
-    const { result } = renderHook(() => useSharedPopup());
     expect(result.current.value._isShared).toBe(true);
   });
 
-  it('value.popupHtml updates when setPopupHtml is called', async () => {
-    const { default: useSharedPopup } = await import('./useSharedPopup.js');
-    const { result } = renderHook(() => useSharedPopup());
-    act(() => {
-      result.current.setPopupHtml('<p>Updated</p>');
-    });
-    expect(result.current.value.popupHtml).toBe('<p>Updated</p>');
-  });
-
-  it('returns the same value object reference on re-render (memoization)', async () => {
-    const { default: useSharedPopup } = await import('./useSharedPopup.js');
+  it('memoizes value: stable across re-renders, refreshed when popupHtml changes', () => {
     const { result, rerender } = renderHook(() => useSharedPopup());
-    const firstValue = result.current.value;
+    const first = result.current.value;
+
     rerender();
-    expect(result.current.value).toBe(firstValue);
+    expect(result.current.value).toBe(first);
+
+    act(() => result.current.setPopupHtml('<p>Updated</p>'));
+    expect(result.current.value.popupHtml).toBe('<p>Updated</p>');
+    expect(result.current.value).not.toBe(first);
   });
 
-  it('allows wrapping a component with the Provider', async () => {
-    const { default: useSharedPopup } = await import('./useSharedPopup.js');
+  it('delivers the shared value to consumers through the Provider', () => {
     const { result } = renderHook(() => useSharedPopup());
     const Provider = result.current.Provider;
-
-    const TestComponent = () => {
-      const ctx = React.useContext(DiceRollContext);
-      expect(ctx._isShared).toBe(true);
-      return React.createElement('span', null, 'ok');
+    let seen = null;
+    const Consumer = () => {
+      seen = useDiceRollPopup();
+      return null;
     };
 
-    const app = React.createElement(
-      Provider,
-      { value: result.current.value },
-      React.createElement(TestComponent)
+    const { rerender } = render(
+      React.createElement(Provider, { value: result.current.value },
+        React.createElement(Consumer))
     );
-    expect(app.type).toBe(Provider);
-    expect(app.props.value).toBe(result.current.value);
+    expect(seen._isShared).toBe(true);
+    expect(seen.popupHtml).toBeNull();
+
+    act(() => result.current.setPopupHtml('<p>shared</p>'));
+    rerender(
+      React.createElement(Provider, { value: result.current.value },
+        React.createElement(Consumer))
+    );
+    expect(seen.popupHtml).toBe('<p>shared</p>');
   });
 
-  it('has independent value objects per instance', async () => {
-    const { default: useSharedPopup } = await import('./useSharedPopup.js');
-    const { result: result1 } = renderHook(() => useSharedPopup());
-    const { result: result2 } = renderHook(() => useSharedPopup());
-    expect(result1.current.value).not.toBe(result2.current.value);
-  });
+  it('keeps state independent per hook instance', () => {
+    const { result: a } = renderHook(() => useSharedPopup());
+    const { result: b } = renderHook(() => useSharedPopup());
 
-  it('has independent popupHtml per instance', async () => {
-    const { default: useSharedPopup } = await import('./useSharedPopup.js');
-    const { result: result1 } = renderHook(() => useSharedPopup());
-    const { result: result2 } = renderHook(() => useSharedPopup());
-    act(() => {
-      result1.current.setPopupHtml('instance1');
-    });
-    expect(result1.current.popupHtml).toBe('instance1');
-    expect(result2.current.popupHtml).toBeNull();
+    act(() => a.current.setPopupHtml('instance-a'));
+    expect(a.current.popupHtml).toBe('instance-a');
+    expect(a.current.value.popupHtml).toBe('instance-a');
+    expect(b.current.popupHtml).toBeNull();
+    expect(b.current.value.popupHtml).toBeNull();
   });
 });

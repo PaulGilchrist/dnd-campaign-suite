@@ -1,3 +1,11 @@
+// @maintained-by-ai: 2026-10-14
+// Owns the blocked-attack lane of createLogAndShow: the real attackBlockers.js
+// unblockers (popup + log content, roll aborted), attacker-side Sanctuary end,
+// Compelled Duel expiry, Resilient Sphere auto-miss, and the starryDragon.js
+// re-exports. cannotAct / isWithinRange gates do NOT live in this lane —
+// they are owned by canTakeAction.js / rangeCheck.js and their own suites.
+// Sibling lane files neuter ./attackBlockers.js and ./sanctuarySave.js in
+// their mocks, so nothing else exercises these paths for real.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -76,7 +84,7 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
     getBaitAndSwitchAcBonus: vi.fn(() => 0),
     getGuardianProtectionAcBonus: vi.fn(() => 0),
     getParryAcBonus: vi.fn(() => 0),
-  getSlowAcPenalty: () => 0,
+    getSlowAcPenalty: () => 0,
     dispatchUnbreakableMajestySave: vi.fn(),
     hasPotentCantrip: vi.fn(),
     getShieldAcBonus: vi.fn(),
@@ -138,7 +146,7 @@ vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorit
     getManeuversForRules: vi.fn(),
 }));
 
-import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
+import { rollD20 } from '../../services/dice/diceRoller.js';
 import utils from '../../services/ui/utils.js';
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { getRuntimeValue } from '../runtime/useRuntimeState.js';
@@ -153,7 +161,11 @@ import {
     applyMinDamageAdjustment,
 } from './loggedDiceRollUtils.js';
 import { isResilientSphereActive } from '../../services/combat/automation/automationPassives.js';
-import { createLogAndShow, hasStarryDragonActive, starryDragonAppliesToRoll } from './useLoggedDiceRollAttack.js';
+import {
+    createLogAndShow,
+    hasStarryDragonActive,
+    starryDragonAppliesToRoll,
+} from './useLoggedDiceRollAttack.js';
 import { isForcecageBlocked } from '../../services/automation/handlers/spells/forcecageHandler.js';
 import { isMazeBlocked } from '../../services/automation/handlers/spells/mazeHandler.js';
 import { isBanishmentBlocked } from '../../services/automation/handlers/spells/banishmentHandler.js';
@@ -163,276 +175,179 @@ import { endSanctuary } from '../../services/automation/handlers/spells/sanctuar
 import { checkCompelledDuelAttackExpiry } from '../../services/automation/handlers/spells/compelledDuelHandler.js';
 import { addEntry } from '../../services/ui/logService.js';
 
-describe('createLogAndShow - Blocked Attacks & Sanctuary', () => {
-    const deps = {
-        characterName: 'TestFighter',
-        campaignName: 'test-campaign',
-        characters: [{ name: 'Goblin', computedStats: { armorClass: 12 } }],
-        setPopupHtml: vi.fn(),
-        logEntry: vi.fn(),
-        autoDamageSourceRef: { current: null },
-    };
+const deps = {
+    characterName: 'TestFighter',
+    campaignName: 'test-campaign',
+    characters: [{ name: 'Goblin', computedStats: { armorClass: 12 } }],
+    setPopupHtml: vi.fn(),
+    logEntry: vi.fn(),
+    autoDamageSourceRef: { current: null },
+};
 
-    const blockerTests = [
-        { handler: isForcecageBlocked, name: 'Forcecage' },
-        { handler: isMazeBlocked, name: 'Maze' },
-        { handler: isBanishmentBlocked, name: 'Banishment' },
-        { handler: isImprisonmentBlocked, name: 'Imprisonment' },
-        { handler: isPrismaticSprayBlocked, name: 'Prismatic Spray' },
-    ];
+// Every attack blocker: an enclosed creature makes the attack impossible
+// ("No attack, spell, or effect can pass through"), per attackBlockers.js.
+const blockerTests = [
+    { handler: isForcecageBlocked, name: 'Forcecage' },
+    { handler: isMazeBlocked, name: 'Maze' },
+    { handler: isBanishmentBlocked, name: 'Banishment' },
+    { handler: isImprisonmentBlocked, name: 'Imprisonment' },
+    { handler: isPrismaticSprayBlocked, name: 'Prismatic Spray' },
+];
 
-    beforeEach(() => {
-        vi.clearAllMocks();
-        rollD20.mockReturnValue(15);
-        rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
-        loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12 }] });
-        isUnbreakableMajestyActive.mockReturnValue(false);
-        hasAttackerTriggeredMajesty.mockReturnValue(false);
-        getRuntimeValue.mockReturnValue(null);
-        getShieldAcBonus.mockReturnValue(0);
-        getShieldOfFaithAcBonus.mockReturnValue(0);
-        applyMinDamageAdjustment.mockImplementation((d) => d);
-        utils.getName.mockImplementation((n) => n);
-        isForcecageBlocked.mockReturnValue(false);
-        isMazeBlocked.mockReturnValue(false);
-        isBanishmentBlocked.mockReturnValue(false);
-        isImprisonmentBlocked.mockReturnValue(false);
-        isPrismaticSprayBlocked.mockReturnValue(false);
-        isResilientSphereActive.mockReturnValue(false);
-    });
+beforeEach(() => {
+    vi.clearAllMocks();
+    rollD20.mockReturnValue(15);
+    getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
+    loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12 }] });
+    isUnbreakableMajestyActive.mockReturnValue(false);
+    hasAttackerTriggeredMajesty.mockReturnValue(false);
+    getRuntimeValue.mockReturnValue(null);
+    getShieldAcBonus.mockReturnValue(0);
+    getShieldOfFaithAcBonus.mockReturnValue(0);
+    applyMinDamageAdjustment.mockImplementation((d) => d);
+    utils.getName.mockImplementation((n) => n);
+    isForcecageBlocked.mockReturnValue(false);
+    isMazeBlocked.mockReturnValue(false);
+    isBanishmentBlocked.mockReturnValue(false);
+    isImprisonmentBlocked.mockReturnValue(false);
+    isPrismaticSprayBlocked.mockReturnValue(false);
+    isResilientSphereActive.mockReturnValue(false);
+    checkCompelledDuelAttackExpiry.mockReturnValue(null);
+});
 
-    function createFn() {
-        return createLogAndShow(deps);
-    }
-
+describe('createLogAndShow - attack blockers (real attackBlockers.js)', () => {
     describe.each(blockerTests)('$name block', ({ handler, name }) => {
-        it('blocks attack, shows popup, and logs when blocker returns true', async () => {
+        it('shows popup, logs, and aborts the roll when blocked', async () => {
             handler.mockReturnValue(true);
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', attackerName: 'TestFighter' });
+            await createLogAndShow(deps)('Longsword', 5, 'attack', {
+                targetName: 'Goblin',
+                attackerName: 'TestFighter',
+            });
 
             expect(handler).toHaveBeenCalledWith('TestFighter', 'Goblin', 'test-campaign');
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 type: 'automation_info',
                 name,
+                description: expect.stringContaining(`blocked by ${name}`),
             }));
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 type: 'info',
                 text: expect.stringContaining(`blocked by ${name}`),
             }));
-        });
-
-        it('does not block when handler returns false', async () => {
-            handler.mockReturnValue(false);
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
-
-            expect(deps.setPopupHtml).not.toHaveBeenCalledWith(expect.objectContaining({ name }));
+            // Blocked = the roll never happens.
+            expect(rollD20).not.toHaveBeenCalled();
+            expect(deps.logEntry).not.toHaveBeenCalled();
         });
     });
 
-    describe('sanctuary - attacker has sanctuary', () => {
-        it('ends sanctuary on attacker when attacker has sanctuary targetEffect', async () => {
-            getRuntimeValue.mockImplementation((name, prop) => {
-                if (name === 'campaign' && prop === 'targetEffects') {
-                    return [{ effect: 'sanctuary', target: 'TestFighter', source: 'Cleric' }];
-                }
-                return null;
-            });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
-
-            expect(endSanctuary).toHaveBeenCalledWith(
-                'Cleric',
-                'TestFighter',
-                'test-campaign',
-                expect.stringContaining('made an attack'),
-            );
+    it('proceeds with a normal d20 attack when no blocker fires', async () => {
+        await createLogAndShow(deps)('Longsword', 5, 'attack', {
+            targetName: 'Goblin',
+            attackerName: 'TestFighter',
         });
+
+        expect(rollD20).toHaveBeenCalled();
+        expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ type: 'd20' }));
+        expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            text: expect.stringContaining('blocked by'),
+        }));
     });
 });
 
-describe('createLogAndShow - Compelled Duel Attack Expiry', () => {
-    const deps = {
-        characterName: 'TestFighter',
-        campaignName: 'test-campaign',
-        characters: [{ name: 'Goblin', computedStats: { armorClass: 12 } }],
-        setPopupHtml: vi.fn(),
-        logEntry: vi.fn(),
-        autoDamageSourceRef: { current: null },
-    };
+describe('createLogAndShow - sanctuary', () => {
+    it('ends the attacker\'s own Sanctuary when they make an attack', async () => {
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (key === 'campaign' && prop === 'targetEffects') {
+                return [{ effect: 'sanctuary', target: 'TestFighter', source: 'Cleric' }];
+            }
+            return null;
+        });
+        await createLogAndShow(deps)('Longsword', 5, 'attack', { targetName: 'Goblin' });
 
-    beforeEach(() => {
-        vi.clearAllMocks();
-        rollD20.mockReturnValue(15);
-        rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
-        loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12 }] });
-        isUnbreakableMajestyActive.mockReturnValue(false);
-        hasAttackerTriggeredMajesty.mockReturnValue(false);
-        getRuntimeValue.mockReturnValue(null);
-        getShieldAcBonus.mockReturnValue(0);
-        getShieldOfFaithAcBonus.mockReturnValue(0);
-        applyMinDamageAdjustment.mockImplementation((d) => d);
-        utils.getName.mockImplementation((n) => n);
-        checkCompelledDuelAttackExpiry.mockReturnValue(null);
+        expect(endSanctuary).toHaveBeenCalledWith(
+            'Cleric',
+            'TestFighter',
+            'test-campaign',
+            expect.stringContaining('made an attack'),
+        );
+        // Self-targeted Sanctuary does not gate the roll — the attack proceeds.
+        expect(rollD20).toHaveBeenCalled();
     });
+});
 
-    function createFn() {
-        return createLogAndShow(deps);
-    }
-
-    it('calls checkCompelledDuelAttackExpiry on attack with target and shows popup when returned', async () => {
+describe('createLogAndShow - Compelled Duel attack expiry', () => {
+    it('shows the expiry popup when the caster attacks a non-duel target', async () => {
         const popup = { type: 'automation_info', name: 'Compelled Duel', description: 'Effect ended' };
         checkCompelledDuelAttackExpiry.mockReturnValue(popup);
-        const fn = createFn();
-        await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
+        await createLogAndShow(deps)('Longsword', 5, 'attack', { targetName: 'Goblin' });
 
         expect(checkCompelledDuelAttackExpiry).toHaveBeenCalledWith('TestFighter', 'Goblin', 'test-campaign');
         expect(deps.setPopupHtml).toHaveBeenCalledWith(popup);
     });
 
-    it('does not call checkCompelledDuelAttackExpiry for non-attack roll types', async () => {
-        const fn = createFn();
-        await fn('Athletics', 3, 'check', {});
+    it('is never consulted for non-attack roll types', async () => {
+        await createLogAndShow(deps)('Athletics', 3, 'check', {});
         expect(checkCompelledDuelAttackExpiry).not.toHaveBeenCalled();
     });
 });
 
-describe('createLogAndShow - Resilient Sphere', () => {
-    const deps = {
-        characterName: 'TestFighter',
-        campaignName: 'test-campaign',
-        characters: [{ name: 'Goblin', computedStats: { armorClass: 12 } }],
-        setPopupHtml: vi.fn(),
-        logEntry: vi.fn(),
-        autoDamageSourceRef: { current: null },
-    };
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        rollD20.mockReturnValue(15);
-        rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
-        loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12 }] });
-        isUnbreakableMajestyActive.mockReturnValue(false);
-        hasAttackerTriggeredMajesty.mockReturnValue(false);
-        getRuntimeValue.mockReturnValue(null);
-        getShieldAcBonus.mockReturnValue(0);
-        getShieldOfFaithAcBonus.mockReturnValue(0);
-        applyMinDamageAdjustment.mockImplementation((d) => d);
-        utils.getName.mockImplementation((n) => n);
-    });
-
-    function createFn() {
-        return createLogAndShow(deps);
-    }
-
-    it('sets isAutoMiss when attacker is in resilient sphere', async () => {
-        isResilientSphereActive.mockReturnValue(true);
-        const fn = createFn();
-        await fn('Longsword', 5, 'attack', { targetName: 'Goblin', attackerName: 'TestFighter' });
-        expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-            isAutoMiss: true,
-        }));
-    });
-
-    it('sets isAutoMiss when target is in resilient sphere', async () => {
-        isResilientSphereActive.mockImplementation((name) => name === 'Goblin' ? true : false);
-        const fn = createFn();
-        await fn('Longsword', 5, 'attack', { targetName: 'Goblin', attackerName: 'TestFighter' });
-        expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-            isAutoMiss: true,
-        }));
-    });
-
-    it('sets notice on context when blocked by resilient sphere', async () => {
-        isResilientSphereActive.mockReturnValue(true);
+describe('createLogAndShow - Resilient Sphere auto-miss', () => {
+    // resolveResilientSphereAutoMiss: enclosed attacker OR enclosed target ⇒ auto-miss.
+    it.each([
+        ['attacker', () => (name) => name === 'TestFighter'],
+        ['target', () => (name) => name === 'Goblin'],
+    ])('auto-misses when the %s is enclosed, with barrier notice', async (_who, implFactory) => {
+        isResilientSphereActive.mockImplementation(implFactory());
         const context = { targetName: 'Goblin', attackerName: 'TestFighter' };
-        const fn = createFn();
-        await fn('Longsword', 5, 'attack', context);
+        await createLogAndShow(deps)('Longsword', 5, 'attack', context);
+
+        expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ isAutoMiss: true }));
         expect(context.notice).toBe('Attack blocked by Resilient Sphere — nothing can pass through the barrier.');
     });
+
+    it('does not auto-miss when nobody is enclosed', async () => {
+        const context = { targetName: 'Goblin', attackerName: 'TestFighter' };
+        await createLogAndShow(deps)('Longsword', 5, 'attack', context);
+
+        expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.not.objectContaining({ isAutoMiss: true }));
+        expect(context.notice).toBeUndefined();
+    });
 });
 
-describe('hasStarryDragonActive export', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+describe('hasStarryDragonActive', () => {
+    it('returns true only for an active Starry Form: Dragon buff', () => {
+        getRuntimeValue.mockReturnValue([{ name: 'Starry Form', constellation: 'Dragon' }]);
+        expect(hasStarryDragonActive('TestWizard', 'test-campaign')).toBe(true);
+
+        getRuntimeValue.mockReturnValue([{ name: 'Starry Form', constellation: 'Wyrm' }]);
+        expect(hasStarryDragonActive('TestWizard', 'test-campaign')).toBe(false);
+
         getRuntimeValue.mockReturnValue(null);
-    });
-
-    it('returns true when Starry Form Dragon buff is active', async () => {
-        getRuntimeValue.mockImplementation((key, field) => {
-            if (key === 'TestWizard' && field === 'activeBuffs') {
-                return [{ name: 'Starry Form', constellation: 'Dragon' }];
-            }
-            return null;
-        });
-        const result = hasStarryDragonActive('TestWizard', 'test-campaign');
-        expect(result).toBe(true);
-    });
-
-    it('returns false when no buffs', async () => {
-        getRuntimeValue.mockImplementation((key, field) => {
-            if (key === 'TestWizard' && field === 'activeBuffs') return null;
-            return null;
-        });
-        const result = hasStarryDragonActive('TestWizard', 'test-campaign');
-        expect(result).toBe(false);
-    });
-
-    it('returns false when Starry Form is active but not Dragon', async () => {
-        getRuntimeValue.mockImplementation((key, field) => {
-            if (key === 'TestWizard' && field === 'activeBuffs') {
-                return [{ name: 'Starry Form', constellation: 'Wyrm' }];
-            }
-            return null;
-        });
-        const result = hasStarryDragonActive('TestWizard', 'test-campaign');
-        expect(result).toBe(false);
+        expect(hasStarryDragonActive('TestWizard', 'test-campaign')).toBe(false);
     });
 });
 
-describe('starryDragonAppliesToRoll export', () => {
-    it('returns true for Constitution save variants', () => {
+describe('starryDragonAppliesToRoll', () => {
+    it('applies to CON saves and INT/WIS ability checks and skills', () => {
         expect(starryDragonAppliesToRoll('Constitution', 'save')).toBe(true);
         expect(starryDragonAppliesToRoll('CONSTITUTION', 'save')).toBe(true);
         expect(starryDragonAppliesToRoll('CON', 'save')).toBe(true);
-    });
-
-    it('returns false for non-constitution saves', () => {
-        expect(starryDragonAppliesToRoll('Dexterity', 'save')).toBe(false);
-        expect(starryDragonAppliesToRoll('DEX', 'save')).toBe(false);
-    });
-
-    it('returns true for Intelligence skills and ability checks', () => {
-        expect(starryDragonAppliesToRoll('Arcana', 'skill')).toBe(true);
-        expect(starryDragonAppliesToRoll('History', 'skill')).toBe(true);
-        expect(starryDragonAppliesToRoll('Investigation', 'skill')).toBe(true);
-        expect(starryDragonAppliesToRoll('Nature', 'skill')).toBe(true);
-        expect(starryDragonAppliesToRoll('Religion', 'skill')).toBe(true);
         expect(starryDragonAppliesToRoll('Intelligence', 'check')).toBe(true);
         expect(starryDragonAppliesToRoll('Intellect', 'check')).toBe(true);
         expect(starryDragonAppliesToRoll('INT', 'check')).toBe(true);
-    });
-
-    it('returns true for Wisdom skills and ability checks', () => {
-        expect(starryDragonAppliesToRoll('Animal Handling', 'skill')).toBe(true);
-        expect(starryDragonAppliesToRoll('Insight', 'skill')).toBe(true);
-        expect(starryDragonAppliesToRoll('Medicine', 'skill')).toBe(true);
-        expect(starryDragonAppliesToRoll('Perception', 'skill')).toBe(true);
-        expect(starryDragonAppliesToRoll('Survival', 'skill')).toBe(true);
         expect(starryDragonAppliesToRoll('Wisdom', 'check')).toBe(true);
         expect(starryDragonAppliesToRoll('WIS', 'check')).toBe(true);
+        for (const skill of ['Arcana', 'History', 'Investigation', 'Nature', 'Religion',
+            'Animal Handling', 'Insight', 'Medicine', 'Perception', 'Survival']) {
+            expect(starryDragonAppliesToRoll(skill, 'skill')).toBe(true);
+        }
     });
 
-    it('returns false for unrelated skill names', () => {
+    it('does not apply to other saves, checks, skills, or attack rolls', () => {
+        expect(starryDragonAppliesToRoll('Dexterity', 'save')).toBe(false);
+        expect(starryDragonAppliesToRoll('DEX', 'save')).toBe(false);
         expect(starryDragonAppliesToRoll('Stealth', 'skill')).toBe(false);
         expect(starryDragonAppliesToRoll('Acrobatics', 'check')).toBe(false);
-    });
-
-    it('returns false for attack roll type', () => {
         expect(starryDragonAppliesToRoll('Constitution', 'attack')).toBe(false);
     });
 });

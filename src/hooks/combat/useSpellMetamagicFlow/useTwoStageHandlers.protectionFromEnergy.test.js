@@ -1,3 +1,14 @@
+// @maintained-by-ai: 2026-10-15
+// Protection from Energy lane internals for useTwoStageHandlers (per-handler owner —
+// flow orchestration / stage-machine seam lives in ../useSpellMetamagicFlow.gate-two-stage.test.js;
+// the apply-effect body itself lives in services/automation/handlers/buffs/protectionFromEnergyHandler.test.js).
+// Pins the SP-093 contract: the slot is consumed by prepareSpellCast at TYPE-select confirm
+// (exactly once, before applyProtectionFromEnergy) — target-select spends nothing and a skip
+// never rolls back an unspent slot. CLA-312: free-cast authorization is gated on the EFFECTIVE
+// cast level (upcast). Apply call is positional 5-arg: (action, playerStats, campaignName,
+// targetName, chosenDamageType) per applyProtectionFromEnergy's signature.
+// Data authority: public/data/2024/spells.json protection-from-energy — lv3 Abjuration,
+// Action, Touch, concentration, damageTypes Acid/Cold/Fire/Lightning/Thunder.
 import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useTwoStageHandlers } from './useTwoStageHandlers.js'
@@ -28,72 +39,142 @@ vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
 const CAMPAIGN = 'test-campaign'
 const CASTER = 'DivinationWizard'
 const TARGET = 'HexWarlock'
+const DAMAGE_TYPES = ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder']
 
-const pfSpell = {
-  name: 'Protection from Energy',
-  level: 3,
-  concentration: true,
-  casting_time: 'Action',
-  range: 'Touch',
-  automation: { type: 'protection_from_energy', damageTypes: ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'] },
-}
-
-function makePending() {
+function makeSpell(overrides = {}) {
   return {
-    spell: pfSpell,
-    spellName: 'Protection from Energy',
-    spellLevel: 3,
-    castingTime: 'Action',
+    name: 'Protection from Energy',
+    level: 3,
+    concentration: true,
+    casting_time: 'Action',
     range: 'Touch',
-    creatureTargets: [CASTER, TARGET],
-    damageTypes: ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'],
+    automation: { type: 'protection_from_energy', damageTypes: DAMAGE_TYPES },
+    ...overrides,
   }
 }
 
-function renderPfE() {
+function renderPfE(spell = makeSpell()) {
   const playerStats = { name: CASTER, class: { name: 'Wizard' }, level: 20, spellAbilities: { saveDc: 18, spell_slots_level_3: 3 } }
   let cleared = false
   const cfClearPending = vi.fn(() => { cleared = true })
-  const getPending = (type) => (type === 'protectionFromEnergy' && !cleared ? makePending() : null)
+  const getPending = (type) => (type === 'protectionFromEnergy' && !cleared ? {
+    spell,
+    spellName: spell.name,
+    spellLevel: spell.level,
+    castingTime: spell.casting_time,
+    range: spell.range,
+    creatureTargets: [CASTER, TARGET],
+    damageTypes: DAMAGE_TYPES,
+  } : null)
   const { result } = renderHook(() =>
-    useTwoStageHandlers({ playerStats: playerStats, campaignName: CAMPAIGN, cfClearPending: cfClearPending, getPending: getPending, setPopupHtml: vi.fn() })
+    useTwoStageHandlers({ playerStats, campaignName: CAMPAIGN, cfClearPending, getPending, setPopupHtml: vi.fn() })
   )
   return { result, playerStats, cfClearPending }
 }
 
-describe('SP-093 handleProtectionFromEnergyTypeSelect — slot consumption at type-select confirm', () => {
+async function selectTargetThenType(result, damageType) {
+  await act(async () => {
+    result.current.handleProtectionFromEnergyTargetSelect(TARGET)
+  })
+  expect(result.current.protectionFromEnergyStage).toBe('type')
+  await act(async () => {
+    await result.current.handleProtectionFromEnergyTypeSelect(damageType)
+  })
+}
+
+// Type-select confirm table: slot consumption, CLA-312 gate level, upcast normalization,
+// exact positional apply payload, and stage reset — one shared assertion body.
+const castCases = [
+  {
+    name: 'base-level cast consumes a level-3 slot',
+    spell: makeSpell(),
+    damageType: 'Lightning',
+    freeCastAuthorized: false,
+    gateLevel: 3,
+    slotOptions: { isUpcast: false, upcastLevel: undefined, freeCastAuthorized: false },
+  },
+  {
+    name: 'upcast gates free-cast authorization on the upcast level (CLA-312)',
+    spell: makeSpell({ upcastLevel: 5 }),
+    damageType: 'Fire',
+    freeCastAuthorized: false,
+    gateLevel: 5,
+    slotOptions: { isUpcast: true, upcastLevel: 5, freeCastAuthorized: false },
+  },
+  {
+    name: 'an upcastLevel equal to the spell level is not an upcast',
+    spell: makeSpell({ upcastLevel: 3 }),
+    damageType: 'Cold',
+    freeCastAuthorized: false,
+    gateLevel: 3,
+    slotOptions: { isUpcast: false, upcastLevel: 3, freeCastAuthorized: false },
+  },
+  {
+    name: 'an authorized free cast is threaded through prepareSpellCast',
+    spell: makeSpell(),
+    damageType: 'Thunder',
+    freeCastAuthorized: true,
+    gateLevel: 3,
+    slotOptions: { isUpcast: false, upcastLevel: undefined, freeCastAuthorized: true },
+  },
+]
+
+describe('handleProtectionFromEnergyTypeSelect — SP-093 slot consumption at type-select confirm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('calls prepareSpellCast exactly once, before applying the effect', async () => {
-    const { result, playerStats } = renderPfE()
+  for (const testCase of castCases) {
+    it(`${testCase.name} — prepares once before applying, exact 5-positional apply payload`, async () => {
+      const { result, playerStats, cfClearPending } = renderPfE(testCase.spell)
+      if (testCase.freeCastAuthorized) {
+        isFreeCastAuthorized.mockReturnValueOnce(true)
+      }
 
-    await act(async () => {
-      result.current.handleProtectionFromEnergyTargetSelect(TARGET)
-    })
-    await act(async () => {
-      await result.current.handleProtectionFromEnergyTypeSelect('Lightning')
-    })
+      await selectTargetThenType(result, testCase.damageType)
 
-    expect(isFreeCastAuthorized).toHaveBeenCalledWith(CASTER, 'Protection from Energy', 3, playerStats, CAMPAIGN)
-    expect(prepareSpellCast).toHaveBeenCalledTimes(1)
-    expect(prepareSpellCast).toHaveBeenCalledWith(pfSpell, {}, {
-      playerName: CASTER,
-      playerStats,
-      campaignName: CAMPAIGN,
-      isUpcast: false,
-      upcastLevel: undefined,
-      freeCastAuthorized: false,
+      expect(isFreeCastAuthorized).toHaveBeenCalledWith(CASTER, 'Protection from Energy', testCase.gateLevel, playerStats, CAMPAIGN)
+      expect(prepareSpellCast).toHaveBeenCalledTimes(1)
+      expect(prepareSpellCast).toHaveBeenCalledWith(testCase.spell, {}, {
+        playerName: CASTER,
+        playerStats,
+        campaignName: CAMPAIGN,
+        ...testCase.slotOptions,
+      })
+      expect(prepareSpellCast.mock.invocationCallOrder[0]).toBeLessThan(applyProtectionFromEnergyHandler.mock.invocationCallOrder[0])
+
+      expect(applyProtectionFromEnergyHandler).toHaveBeenCalledTimes(1)
+      expect(applyProtectionFromEnergyHandler.mock.calls[0].length).toBe(5)
+      expect(applyProtectionFromEnergyHandler).toHaveBeenCalledWith(
+        { name: 'Protection from Energy', spell: testCase.spell, automation: { type: 'protection_from_energy', damageTypes: DAMAGE_TYPES } },
+        playerStats,
+        CAMPAIGN,
+        TARGET,
+        testCase.damageType,
+      )
+
+      expect(cfClearPending).toHaveBeenCalledWith('protectionFromEnergy')
+      expect(result.current.protectionFromEnergyStage).toBeNull()
+      expect(result.current.protectionFromEnergySelectedTarget).toBeNull()
+      expect(rollbackSpellSlot).not.toHaveBeenCalled()
     })
-    expect(prepareSpellCast.mock.invocationCallOrder[0]).toBeLessThan(applyProtectionFromEnergyHandler.mock.invocationCallOrder[0])
+  }
+
+  it('cantrip-level cast skips slot preparation but still applies the effect', async () => {
+    const cantrip = makeSpell({ level: 0 })
+    const { result } = renderPfE(cantrip)
+
+    await selectTargetThenType(result, 'Acid')
+
+    expect(prepareSpellCast).not.toHaveBeenCalled()
+    expect(isFreeCastAuthorized).not.toHaveBeenCalled()
     expect(applyProtectionFromEnergyHandler).toHaveBeenCalledTimes(1)
-    expect(applyProtectionFromEnergyHandler.mock.calls[0][3]).toBe(TARGET)
-    expect(rollbackSpellSlot).not.toHaveBeenCalled()
+    expect(applyProtectionFromEnergyHandler.mock.calls[0][0].spell).toBe(cantrip)
   })
 
-  it('does not consume a slot when type select runs without a prior target selection', async () => {
-    const { result } = renderPfE()
+  it('type select without a prior target selection spends nothing and stays parked on the target stage', async () => {
+    const { result, cfClearPending } = renderPfE()
+    expect(result.current.protectionFromEnergyStage).toBe('target')
 
     await act(async () => {
       await result.current.handleProtectionFromEnergyTypeSelect('Lightning')
@@ -101,38 +182,40 @@ describe('SP-093 handleProtectionFromEnergyTypeSelect — slot consumption at ty
 
     expect(prepareSpellCast).not.toHaveBeenCalled()
     expect(applyProtectionFromEnergyHandler).not.toHaveBeenCalled()
+    expect(cfClearPending).not.toHaveBeenCalled()
+    expect(result.current.protectionFromEnergyStage).toBe('target')
   })
 })
 
-describe('SP-093 handleProtectionFromEnergySkip — no rollback of an unspent slot', () => {
+describe('handleProtectionFromEnergySkip — SP-093 no rollback of an unspent slot', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('never calls rollbackSpellSlot or prepareSpellCast on skip', () => {
-    const { result, cfClearPending } = renderPfE()
+  const skipCases = [
+    { name: 'without any target selected', preSelect: false },
+    { name: 'after target selection but before type confirm', preSelect: true },
+  ]
 
-    act(() => {
-      result.current.handleProtectionFromEnergySkip()
+  for (const testCase of skipCases) {
+    it(`skipping ${testCase.name} never rolls back, never spends, and clears the lane`, async () => {
+      const { result, cfClearPending } = renderPfE()
+      if (testCase.preSelect) {
+        await act(async () => {
+          result.current.handleProtectionFromEnergyTargetSelect(TARGET)
+        })
+      }
+
+      act(() => {
+        result.current.handleProtectionFromEnergySkip()
+      })
+
+      expect(rollbackSpellSlot).not.toHaveBeenCalled()
+      expect(prepareSpellCast).not.toHaveBeenCalled()
+      expect(applyProtectionFromEnergyHandler).not.toHaveBeenCalled()
+      expect(cfClearPending).toHaveBeenCalledWith('protectionFromEnergy')
+      expect(result.current.protectionFromEnergyStage).toBeNull()
+      expect(result.current.protectionFromEnergySelectedTarget).toBeNull()
     })
-
-    expect(rollbackSpellSlot).not.toHaveBeenCalled()
-    expect(prepareSpellCast).not.toHaveBeenCalled()
-    expect(cfClearPending).toHaveBeenCalledWith('protectionFromEnergy')
-    expect(result.current.protectionFromEnergyStage).toBeNull()
-  })
-
-  it('still does not roll back when skipping after a target was selected but before type confirm', async () => {
-    const { result } = renderPfE()
-
-    await act(async () => {
-      result.current.handleProtectionFromEnergyTargetSelect(TARGET)
-    })
-    act(() => {
-      result.current.handleProtectionFromEnergySkip()
-    })
-
-    expect(rollbackSpellSlot).not.toHaveBeenCalled()
-    expect(prepareSpellCast).not.toHaveBeenCalled()
-  })
+  }
 })

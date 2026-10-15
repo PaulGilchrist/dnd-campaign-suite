@@ -1,6 +1,30 @@
+// @maintained-by-ai: 2026-10-15
+// Flow-wiring lane for SIMPLE_SPELL_SPECS (useSimpleSpellHandlers.js): one shared
+// table drives both sweeps of the createConfirmHandler/createSkipHandler contract:
+//   gate → pending armed → confirm dispatches the spec's apply/trigger fn exactly
+//   once, logs one spell entry, clears pending; skip clears + logs WITHOUT dispatch.
+// Owned elsewhere — do not duplicate here:
+//   - no-pending misfire guards:        useSpellMetamagicFlow.handler-guards.test.js
+//   - complex/area/custom skip clears:  useSpellMetamagicFlow.skip.test.js
+//   - SP-100 Revivify refusal refunds:  useSpellMetamagicFlow.revivifyRefusal.test.js
+//   - exposed return-value surface:     useSpellMetamagicFlow.returnValue.test.js
+//   - per-handler payload internals:    useSpellMetamagicFlow/useSimpleSpellHandlers.*.test.js
+// Adding a spec to SIMPLE_SPELL_SPECS? Add one row to SPELL_ROWS below.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
+import { addEntry } from '../../services/ui/logService.js';
+import {
+  applyBaneEffect, applyBlessEffect, applyHaste, applyInvisibility,
+  applyGreaterInvisibility, applyFeignDeath, applyLongstriderEffect,
+  applySpareTheDyingEffect, applyBeaconOfHopeEffect, applyAuraOfLifeEffect,
+  applyAuraOfPurityEffect, applyCircleOfPowerEffect, applyCompulsionEffect,
+  applyAuraOfVitalityEffect, applyDeathWardEffect, applyHeroism,
+  handleSanctuary, executeHandler,
+} from '../../services/automation/index.js';
+import { triggerFaerieFire } from '../../services/rules/features/faerieFireService.js';
+import { triggerForesight } from '../../services/rules/features/foresightService.js';
+import { triggerRevivify } from '../../services/rules/features/revivifyService.js';
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
@@ -15,6 +39,8 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
+  triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
+  triggerBewitchingMagic: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../services/npcs/monsterUtils.js', () => ({
@@ -63,8 +89,7 @@ vi.mock('../useAllySelection.js', () => ({
   getAllyList: vi.fn((casterName) => [casterName.toLowerCase()]),
 }));
 
-// Automation mocks — only the functions actually used by the simple handlers
-// tested in this file. Each mock tracks call count and arguments.
+// Automation mocks — only the dispatch fns the table below asserts on.
 vi.mock('../../services/automation/index.js', () => ({
   applyBaneEffect: vi.fn(() => Promise.resolve(null)),
   applyBlessEffect: vi.fn(() => Promise.resolve(null)),
@@ -115,6 +140,8 @@ Object.defineProperty(window, 'dispatchEvent', {
   writable: true,
 });
 
+const CAMPAIGN = 'TestCampaign';
+
 function makePlayerStats(overrides = {}) {
   return {
     name: 'TestSorcerer',
@@ -134,341 +161,103 @@ function makeSpell(overrides = {}) {
   };
 }
 
-// ── Tests ──────────────────────────────────────────────────────────────────────
+function renderFlow() {
+  const { result } = renderHook(() =>
+    useSpellMetamagicFlow({
+      playerStats: makePlayerStats(),
+      campaignName: CAMPAIGN,
+      onExecute: vi.fn(),
+      setSecondaryTargetModal: null,
+      characters: [],
+      setPopupHtml: vi.fn(),
+    })
+  );
+  return { result };
+}
+
+// One row per SIMPLE_SPELL_SPECS member owned by this flow lane.
+// fn = the dispatch fn the spec's runner must invoke exactly once on confirm.
+// skipOwnedElsewhere: Web/Revivify skip-clears live in skip.test.js.
+const SPELL_ROWS = [
+  { spell: 'Bane', level: 0, key: 'Bane', fn: applyBaneEffect },
+  { spell: 'Bless', level: 1, key: 'Bless', fn: applyBlessEffect },
+  { spell: 'Faerie Fire', level: 1, key: 'FaerieFire', fn: triggerFaerieFire },
+  { spell: 'Haste', level: 3, key: 'Haste', fn: applyHaste },
+  { spell: 'Invisibility', level: 2, key: 'Invisibility', fn: applyInvisibility },
+  { spell: 'Greater Invisibility', level: 4, key: 'GreaterInvisibility', fn: applyGreaterInvisibility },
+  { spell: 'Feign Death', level: 3, key: 'FeignDeath', fn: applyFeignDeath },
+  { spell: 'Longstrider', level: 0, key: 'Longstrider', fn: applyLongstriderEffect },
+  { spell: 'Spare The Dying', level: 0, key: 'SpareTheDying', fn: applySpareTheDyingEffect },
+  { spell: 'Beacon of Hope', level: 3, key: 'BeaconOfHope', fn: applyBeaconOfHopeEffect },
+  { spell: 'Aura of Life', level: 4, key: 'AuraOfLife', fn: applyAuraOfLifeEffect },
+  { spell: 'Aura of Purity', level: 4, key: 'AuraOfPurity', fn: applyAuraOfPurityEffect },
+  { spell: 'Circle of Power', level: 5, key: 'CircleOfPower', fn: applyCircleOfPowerEffect },
+  { spell: 'Compulsion', level: 4, key: 'Compulsion', fn: applyCompulsionEffect },
+  { spell: 'Aura of Vitality', level: 3, key: 'AuraOfVitality', fn: applyAuraOfVitalityEffect },
+  { spell: 'Death Ward', level: 4, key: 'DeathWard', fn: applyDeathWardEffect },
+  { spell: 'Heroism', level: 1, key: 'Heroism', fn: applyHeroism },
+  { spell: 'Sanctuary', level: 1, key: 'Sanctuary', fn: handleSanctuary, arg: 'Goblin A' },
+  { spell: 'Foresight', level: 9, key: 'Foresight', fn: triggerForesight },
+  { spell: 'Slow', level: 3, key: 'Slow', fn: executeHandler },
+  { spell: 'Web', level: 1, key: 'Web', fn: executeHandler, skipOwnedElsewhere: true },
+  { spell: 'Sleet Storm', level: 3, key: 'SleetStorm', fn: executeHandler },
+  { spell: 'Revivify', level: 5, key: 'Revivify', fn: triggerRevivify, arg: { targetName: 'Goblin A' }, skipOwnedElsewhere: true },
+];
+
+// Default confirm payload for array-target selectors (allTargets/toArray lanes).
+const TARGETS = ['Goblin A'];
+
+async function armPending(result, tc) {
+  await act(async () => {
+    await result.current.gateMetamagic(makeSpell({ name: tc.spell, level: tc.level }));
+  });
+  expect(result.current[`pending${tc.key}`]).not.toBeNull();
+}
 
 describe('useSpellMetamagicFlow — simple handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('pending state clears on confirm', () => {
-    const pendingClearCases = [
-      { spell: 'Bane', level: 0, handler: 'handleBaneConfirm', pending: 'pendingBane', arg: ['Goblin A'] },
-      { spell: 'Bless', level: 1, handler: 'handleBlessConfirm', pending: 'pendingBless', arg: ['Goblin A'] },
-      { spell: 'Faerie Fire', level: 1, handler: 'handleFaerieFireConfirm', pending: 'pendingFaerieFire', arg: ['Goblin A'] },
-      { spell: 'Haste', level: 3, handler: 'handleHasteConfirm', pending: 'pendingHaste', arg: ['Goblin A'] },
-      { spell: 'Invisibility', level: 2, handler: 'handleInvisibilityConfirm', pending: 'pendingInvisibility', arg: ['Goblin A'] },
-      { spell: 'Greater Invisibility', level: 4, handler: 'handleGreaterInvisibilityConfirm', pending: 'pendingGreaterInvisibility', arg: ['Goblin A'] },
-      { spell: 'Feign Death', level: 3, handler: 'handleFeignDeathConfirm', pending: 'pendingFeignDeath', arg: ['Goblin A'] },
-      { spell: 'Longstrider', level: 0, handler: 'handleLongstriderConfirm', pending: 'pendingLongstrider', arg: ['Goblin A'] },
-      { spell: 'Spare The Dying', level: 0, handler: 'handleSpareTheDyingConfirm', pending: 'pendingSpareTheDying', arg: ['Goblin A'] },
-      { spell: 'Beacon of Hope', level: 3, handler: 'handleBeaconOfHopeConfirm', pending: 'pendingBeaconOfHope', arg: ['Goblin A'] },
-      { spell: 'Aura of Life', level: 4, handler: 'handleAuraOfLifeConfirm', pending: 'pendingAuraOfLife', arg: ['Goblin A'] },
-      { spell: 'Aura of Purity', level: 4, handler: 'handleAuraOfPurityConfirm', pending: 'pendingAuraOfPurity', arg: ['Goblin A'] },
-      { spell: 'Circle of Power', level: 9, handler: 'handleCircleOfPowerConfirm', pending: 'pendingCircleOfPower', arg: ['Goblin A'] },
-      { spell: 'Compulsion', level: 4, handler: 'handleCompulsionConfirm', pending: 'pendingCompulsion', arg: ['Goblin A'] },
-      { spell: 'Aura of Vitality', level: 3, handler: 'handleAuraOfVitalityConfirm', pending: 'pendingAuraOfVitality', arg: ['Goblin A'] },
-      { spell: 'Death Ward', level: 4, handler: 'handleDeathWardConfirm', pending: 'pendingDeathWard', arg: ['Goblin A'] },
-      { spell: 'Heroism', level: 1, handler: 'handleHeroismConfirm', pending: 'pendingHeroism', arg: ['Goblin A'] },
-      { spell: 'Sanctuary', level: 1, handler: 'handleSanctuaryConfirm', pending: 'pendingSanctuary', arg: 'Goblin A' },
-      { spell: 'Foresight', level: 9, handler: 'handleForesightConfirm', pending: 'pendingForesight', arg: ['Goblin A'] },
-    ];
-
-    for (const tc of pendingClearCases) {
-      it(`clears ${tc.pending} when ${tc.handler} is called`, async () => {
-        const setPopupHtml = vi.fn();
-        const { result } = renderHook(() =>
-          useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-        );
-
-        act(() => {
-          result.current.gateMetamagic(makeSpell({ name: tc.spell, level: tc.level }));
-        });
-
-        expect(result.current[tc.pending]).not.toBeNull();
+  describe('confirm dispatches, logs, clears pending', () => {
+    for (const tc of SPELL_ROWS) {
+      it(`${tc.spell}: handle${tc.key}Confirm dispatches once, logs the cast, clears pending`, async () => {
+        const { result } = renderFlow();
+        await armPending(result, tc);
 
         await act(async () => {
-          await result.current[tc.handler](tc.arg);
+          await result.current[`handle${tc.key}Confirm`](tc.arg || TARGETS);
         });
 
-        expect(result.current[tc.pending]).toBeNull();
+        expect(tc.fn).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+          type: 'spell',
+          spellName: tc.spell,
+          targets: expect.any(Array),
+        }));
+        expect(result.current[`pending${tc.key}`]).toBeNull();
       });
     }
   });
 
-  describe('pending state clears on skip', () => {
-    const pendingSkipCases = [
-      { spell: 'Bane', level: 0, handler: 'handleBaneSkip', pending: 'pendingBane' },
-      { spell: 'Bless', level: 1, handler: 'handleBlessSkip', pending: 'pendingBless' },
-      { spell: 'Faerie Fire', level: 1, handler: 'handleFaerieFireSkip', pending: 'pendingFaerieFire' },
-      { spell: 'Haste', level: 3, handler: 'handleHasteSkip', pending: 'pendingHaste' },
-      { spell: 'Invisibility', level: 2, handler: 'handleInvisibilitySkip', pending: 'pendingInvisibility' },
-      { spell: 'Greater Invisibility', level: 4, handler: 'handleGreaterInvisibilitySkip', pending: 'pendingGreaterInvisibility' },
-      { spell: 'Feign Death', level: 3, handler: 'handleFeignDeathSkip', pending: 'pendingFeignDeath' },
-      { spell: 'Longstrider', level: 0, handler: 'handleLongstriderSkip', pending: 'pendingLongstrider' },
-      { spell: 'Spare The Dying', level: 0, handler: 'handleSpareTheDyingSkip', pending: 'pendingSpareTheDying' },
-      { spell: 'Beacon of Hope', level: 3, handler: 'handleBeaconOfHopeSkip', pending: 'pendingBeaconOfHope' },
-      { spell: 'Aura of Life', level: 4, handler: 'handleAuraOfLifeSkip', pending: 'pendingAuraOfLife' },
-      { spell: 'Aura of Purity', level: 4, handler: 'handleAuraOfPuritySkip', pending: 'pendingAuraOfPurity' },
-      { spell: 'Circle of Power', level: 9, handler: 'handleCircleOfPowerSkip', pending: 'pendingCircleOfPower' },
-      { spell: 'Compulsion', level: 4, handler: 'handleCompulsionSkip', pending: 'pendingCompulsion' },
-      { spell: 'Aura of Vitality', level: 3, handler: 'handleAuraOfVitalitySkip', pending: 'pendingAuraOfVitality' },
-      { spell: 'Death Ward', level: 4, handler: 'handleDeathWardSkip', pending: 'pendingDeathWard' },
-      { spell: 'Heroism', level: 1, handler: 'handleHeroismSkip', pending: 'pendingHeroism' },
-      { spell: 'Sanctuary', level: 1, handler: 'handleSanctuarySkip', pending: 'pendingSanctuary' },
-      { spell: 'Foresight', level: 9, handler: 'handleForesightSkip', pending: 'pendingForesight' },
-    ];
-
-    for (const tc of pendingSkipCases) {
-      it(`clears ${tc.pending} when ${tc.handler} is called`, async () => {
-        const setPopupHtml = vi.fn();
-        const { result } = renderHook(() =>
-          useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-        );
-
-        act(() => {
-          result.current.gateMetamagic(makeSpell({ name: tc.spell, level: tc.level }));
-        });
-
-        expect(result.current[tc.pending]).not.toBeNull();
+  describe('skip clears pending and logs without dispatching', () => {
+    for (const tc of SPELL_ROWS.filter(r => !r.skipOwnedElsewhere)) {
+      it(`${tc.spell}: handle${tc.key}Skip clears pending, logs, dispatches nothing`, async () => {
+        const { result } = renderFlow();
+        await armPending(result, tc);
 
         await act(async () => {
-          result.current[tc.handler]();
+          result.current[`handle${tc.key}Skip`]();
         });
 
-        expect(result.current[tc.pending]).toBeNull();
+        expect(tc.fn).not.toHaveBeenCalled();
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+          spellName: tc.spell,
+        }));
+        expect(result.current[`pending${tc.key}`]).toBeNull();
       });
     }
-  });
-
-  describe('automation functions are invoked on confirm', () => {
-    const automationCases = [
-      { spell: 'Bane', level: 0, handler: 'handleBaneConfirm', automation: 'applyBaneEffect', arg: ['Goblin A'] },
-      { spell: 'Bless', level: 1, handler: 'handleBlessConfirm', automation: 'applyBlessEffect', arg: ['Goblin A'] },
-      { spell: 'Haste', level: 3, handler: 'handleHasteConfirm', automation: 'applyHaste', arg: ['Goblin A'] },
-      { spell: 'Invisibility', level: 2, handler: 'handleInvisibilityConfirm', automation: 'applyInvisibility', arg: ['Goblin A'] },
-      { spell: 'Greater Invisibility', level: 4, handler: 'handleGreaterInvisibilityConfirm', automation: 'applyGreaterInvisibility', arg: ['Goblin A'] },
-      { spell: 'Feign Death', level: 3, handler: 'handleFeignDeathConfirm', automation: 'applyFeignDeath', arg: ['Goblin A'] },
-      { spell: 'Longstrider', level: 0, handler: 'handleLongstriderConfirm', automation: 'applyLongstriderEffect', arg: ['Goblin A'] },
-      { spell: 'Spare The Dying', level: 0, handler: 'handleSpareTheDyingConfirm', automation: 'applySpareTheDyingEffect', arg: ['Goblin A'] },
-      { spell: 'Beacon of Hope', level: 3, handler: 'handleBeaconOfHopeConfirm', automation: 'applyBeaconOfHopeEffect', arg: ['Goblin A'] },
-      { spell: 'Aura of Life', level: 4, handler: 'handleAuraOfLifeConfirm', automation: 'applyAuraOfLifeEffect', arg: ['Goblin A'] },
-      { spell: 'Aura of Purity', level: 4, handler: 'handleAuraOfPurityConfirm', automation: 'applyAuraOfPurityEffect', arg: ['Goblin A'] },
-      { spell: 'Circle of Power', level: 9, handler: 'handleCircleOfPowerConfirm', automation: 'applyCircleOfPowerEffect', arg: ['Goblin A'] },
-      { spell: 'Compulsion', level: 4, handler: 'handleCompulsionConfirm', automation: 'applyCompulsionEffect', arg: ['Goblin A'] },
-      { spell: 'Aura of Vitality', level: 3, handler: 'handleAuraOfVitalityConfirm', automation: 'applyAuraOfVitalityEffect', arg: ['Goblin A'] },
-      { spell: 'Death Ward', level: 4, handler: 'handleDeathWardConfirm', automation: 'applyDeathWardEffect', arg: ['Goblin A'] },
-      { spell: 'Heroism', level: 1, handler: 'handleHeroismConfirm', automation: 'applyHeroism', arg: ['Goblin A'] },
-      { spell: 'Sanctuary', level: 1, handler: 'handleSanctuaryConfirm', automation: 'handleSanctuary', arg: 'Goblin A' },
-    ];
-
-    for (const tc of automationCases) {
-      it(`calls ${tc.automation} when ${tc.handler} is invoked`, async () => {
-        const setPopupHtml = vi.fn();
-        const { result } = renderHook(() =>
-          useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-        );
-
-        act(() => {
-          result.current.gateMetamagic(makeSpell({ name: tc.spell, level: tc.level }));
-        });
-
-        const automationFn = vi.mocked(await import('../../services/automation/index.js'))[tc.automation];
-
-        await act(async () => {
-          await result.current[tc.handler](tc.arg);
-        });
-
-        expect(automationFn).toHaveBeenCalledTimes(1);
-      });
-    }
-  });
-
-  describe('executeHandler-based spells', () => {
-    it('calls executeHandler for Slow', async () => {
-      const setPopupHtml = vi.fn();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-      );
-
-      act(() => {
-        result.current.gateMetamagic(makeSpell({ name: 'Slow', level: 3 }));
-      });
-
-      const { executeHandler } = await import('../../services/automation/index.js');
-
-      await act(async () => {
-        await result.current.handleSlowConfirm(['Goblin A']);
-      });
-
-      expect(executeHandler).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls executeHandler for Web', async () => {
-      const setPopupHtml = vi.fn();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-      );
-
-      act(() => {
-        result.current.gateMetamagic(makeSpell({ name: 'Web', level: 1 }));
-      });
-
-      const { executeHandler } = await import('../../services/automation/index.js');
-
-      await act(async () => {
-        await result.current.handleWebConfirm(['Goblin A']);
-      });
-
-      expect(executeHandler).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls executeHandler for Sleet Storm', async () => {
-      const setPopupHtml = vi.fn();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-      );
-
-      act(() => {
-        result.current.gateMetamagic(makeSpell({ name: 'Sleet Storm', level: 3 }));
-      });
-
-      const { executeHandler } = await import('../../services/automation/index.js');
-
-      await act(async () => {
-        await result.current.handleSleetStormConfirm(['Goblin A']);
-      });
-
-      expect(executeHandler).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('feature service functions are invoked', () => {
-    it('calls triggerFaerieFire for Faerie Fire', async () => {
-      const setPopupHtml = vi.fn();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-      );
-
-      act(() => {
-        result.current.gateMetamagic(makeSpell({ name: 'Faerie Fire', level: 1 }));
-      });
-
-      const { triggerFaerieFire } = await import('../../services/rules/features/faerieFireService.js');
-
-      await act(async () => {
-        await result.current.handleFaerieFireConfirm(['Goblin A']);
-      });
-
-      expect(triggerFaerieFire).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls triggerForesight for Foresight', async () => {
-      const setPopupHtml = vi.fn();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-      );
-
-      act(() => {
-        result.current.gateMetamagic(makeSpell({ name: 'Foresight', level: 9 }));
-      });
-
-      const { triggerForesight } = await import('../../services/rules/features/foresightService.js');
-
-      await act(async () => {
-        await result.current.handleForesightConfirm(['Goblin A']);
-      });
-
-      expect(triggerForesight).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls triggerRevivify for Revivify', async () => {
-      const setPopupHtml = vi.fn();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-      );
-
-      act(() => {
-        result.current.gateMetamagic(makeSpell({ name: 'Revivify', level: 5 }));
-      });
-
-      const { triggerRevivify } = await import('../../services/rules/features/revivifyService.js');
-
-      await act(async () => {
-        await result.current.handleRevivifyConfirm({ targetName: 'Goblin A' });
-      });
-
-      expect(triggerRevivify).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('log entries are created', () => {
-    it('calls addEntry on confirm', async () => {
-      const setPopupHtml = vi.fn();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-      );
-
-      act(() => {
-        result.current.gateMetamagic(makeSpell({ name: 'Bane', level: 0 }));
-      });
-
-      const { addEntry } = await import('../../services/ui/logService.js');
-
-      await act(async () => {
-        await result.current.handleBaneConfirm(['Goblin A']);
-      });
-
-      expect(addEntry).toHaveBeenCalledTimes(1);
-      expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-        spellName: 'Bane',
-        targetName: 'Goblin A',
-        targets: expect.arrayContaining(['Goblin A']),
-      }));
-    });
-
-    it('calls addEntry on skip', async () => {
-      const setPopupHtml = vi.fn();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-      );
-
-      act(() => {
-        result.current.gateMetamagic(makeSpell({ name: 'Bane', level: 0 }));
-      });
-
-      const { addEntry } = await import('../../services/ui/logService.js');
-
-      await act(async () => {
-        result.current.handleBaneSkip();
-      });
-
-      expect(addEntry).toHaveBeenCalledTimes(1);
-      expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-        spellName: 'Bane',
-      }));
-    });
-  });
-
-  describe('no-op when no pending state', () => {
-    it('handleConfirm does nothing when pending is null', async () => {
-      const setPopupHtml = vi.fn();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-      );
-
-      const { addEntry } = await import('../../services/ui/logService.js');
-
-      await act(async () => {
-        await result.current.handleBaneConfirm(['Goblin A']);
-      });
-
-      expect(addEntry).not.toHaveBeenCalled();
-    });
-
-    it('handleSkip does nothing when pending is null', async () => {
-      const setPopupHtml = vi.fn();
-      const { result } = renderHook(() =>
-        useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-      );
-
-      const { addEntry } = await import('../../services/ui/logService.js');
-
-      await act(async () => {
-        result.current.handleBaneSkip();
-      });
-
-      expect(addEntry).not.toHaveBeenCalled();
-    });
   });
 });

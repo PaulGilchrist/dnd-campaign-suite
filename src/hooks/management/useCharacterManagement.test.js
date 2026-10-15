@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Deterministic unit contract for useCharacterManagement (file upload/download,
+// active-character selection). Stable leaf hook — see note in useCharacterManagement.js:
+// intentionally NOT refactored onto useEntityManagement, so these tests ride along with
+// the hook's own handler signatures. App-level deletion/wizard flows are covered
+// separately in src/App.runtime-events.test.jsx.
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import useCharacterManagement from './useCharacterManagement.js';
@@ -29,8 +35,8 @@ describe('useCharacterManagement', () => {
 
   describe('handleCharacterClick', () => {
     it('sets activeCharacter to a deep clone of the clicked character', () => {
-      const original = { name: 'Gandalf', class: 'Wizard' };
-      const { result } = renderHook(() => useCharacterManagement(undefined));
+      const original = { name: 'Gandalf', class: { name: 'Wizard', level: 5 } };
+      const { result } = renderHook(() => useCharacterManagement());
 
       act(() => {
         result.current.handleCharacterClick(original);
@@ -38,30 +44,21 @@ describe('useCharacterManagement', () => {
 
       expect(result.current.activeCharacter).toEqual(original);
       expect(result.current.activeCharacter).not.toBe(original);
-    });
 
-    it('does not mutate the original character when activeCharacter is modified afterward', () => {
-      const original = { name: 'Aragorn', hp: 10 };
-      const { result } = renderHook(() => useCharacterManagement(undefined));
-
-      act(() => {
-        result.current.handleCharacterClick(original);
-      });
-
-      act(() => {
-        result.current.setActiveCharacter({ ...result.current.activeCharacter, hp: 20 });
-      });
-
-      expect(result.current.activeCharacter).toEqual({ name: 'Aragorn', hp: 20 });
-      expect(original).toEqual({ name: 'Aragorn', hp: 10 });
+      // Mutating the source afterward must not leak into the selection.
+      original.class.level = 99;
+      expect(result.current.activeCharacter.class.level).toBe(5);
     });
   });
 
   describe('handleInitiativeClick', () => {
-    it('sets activeCharacter to null', () => {
-      const { result } = renderHook(() =>
-        useCharacterManagement(undefined, { activeCharacter: { name: 'Gandalf' } })
-      );
+    it('clears the active character', () => {
+      const { result } = renderHook(() => useCharacterManagement());
+
+      act(() => {
+        result.current.handleCharacterClick({ name: 'Gandalf' });
+      });
+      expect(result.current.activeCharacter).toEqual({ name: 'Gandalf' });
 
       act(() => {
         result.current.handleInitiativeClick();
@@ -77,7 +74,7 @@ describe('useCharacterManagement', () => {
       const { default: Utils } = await import('../../services/ui/utils.js');
       const char = { name: 'Dark Lord' };
 
-      const { result } = renderHook(() => useCharacterManagement(undefined));
+      const { result } = renderHook(() => useCharacterManagement());
       act(() => {
         result.current.setActiveCharacter(char);
       });
@@ -96,11 +93,23 @@ describe('useCharacterManagement', () => {
     });
   });
 
+  describe('handleUploadClick', () => {
+    it('triggers the hidden file input via inputRef', () => {
+      const { result } = renderHook(() => useCharacterManagement());
+      const click = vi.fn();
+
+      act(() => {
+        result.current.inputRef.current = { click };
+      });
+      result.current.handleUploadClick();
+
+      expect(click).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('handleUploadChange', () => {
     function createMockFile(name, content) {
-      const file = new File([content], name, { type: 'application/json' });
-      Object.defineProperty(file, 'name', { value: name });
-      return file;
+      return new File([content], name, { type: 'application/json' });
     }
 
     function createMockEvent(files) {
@@ -132,7 +141,7 @@ describe('useCharacterManagement', () => {
       const uploaded = [{ name: 'Pippin', level: 5 }, { name: 'Legolas' }];
       const files = uploaded.map((c) => createMockFile(`${c.name}.json`, JSON.stringify(c)));
 
-      const { result } = renderHook(() => useCharacterManagement(undefined));
+      const { result } = renderHook(() => useCharacterManagement());
       act(() => {
         result.current.setCharacters(existing);
       });
@@ -152,7 +161,7 @@ describe('useCharacterManagement', () => {
       const uploaded = [{ name: 'Eowyn' }];
       const files = uploaded.map((c) => createMockFile(`${c.name}.json`, JSON.stringify(c)));
 
-      const { result } = renderHook(() => useCharacterManagement(undefined));
+      const { result } = renderHook(() => useCharacterManagement());
 
       await act(async () => {
         result.current.handleUploadChange(createMockEvent(files));
@@ -166,7 +175,7 @@ describe('useCharacterManagement', () => {
       const uploaded = [{ name: 'Gandalf', level: 10 }];
       const files = uploaded.map((c) => createMockFile(`${c.name}.json`, JSON.stringify(c)));
 
-      const { result } = renderHook(() => useCharacterManagement(undefined));
+      const { result } = renderHook(() => useCharacterManagement());
       act(() => {
         result.current.setCharacters(existing);
         result.current.setActiveCharacter({ name: 'Gandalf', level: 1 });
@@ -180,12 +189,13 @@ describe('useCharacterManagement', () => {
       expect(result.current.characters).toEqual([{ name: 'Gandalf', level: 10 }]);
     });
 
-    it('does nothing when no files are provided', async () => {
+    it('leaves characters and active selection untouched when no files are provided', async () => {
       const existing = [{ name: 'Merry' }];
 
-      const { result } = renderHook(() => useCharacterManagement(undefined));
+      const { result } = renderHook(() => useCharacterManagement());
       act(() => {
         result.current.setCharacters(existing);
+        result.current.setActiveCharacter({ name: 'Merry' });
       });
 
       await act(async () => {
@@ -193,6 +203,7 @@ describe('useCharacterManagement', () => {
       });
 
       expect(result.current.characters).toEqual([{ name: 'Merry' }]);
+      expect(result.current.activeCharacter).toEqual({ name: 'Merry' });
     });
   });
 
@@ -206,7 +217,7 @@ describe('useCharacterManagement', () => {
       delete window.confirm;
     });
 
-    it('deletes character and removes from state when confirmed', async () => {
+    it('confirms, deletes via campaignService, and removes the character from state', async () => {
       const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
       const chars = [{ name: 'Frodo' }, { name: 'Sam' }];
 
@@ -258,9 +269,9 @@ describe('useCharacterManagement', () => {
         result.current.handleDeleteCharacter('Frodo');
       });
 
-      const { default: cloneDeep } = await import('lodash/cloneDeep');
-      expect(cloneDeep).toHaveBeenCalledWith({ name: 'Sam' });
       expect(result.current.activeCharacter).toEqual({ name: 'Sam' });
+      // The reassigned selection must be an independent clone, not the roster entry.
+      expect(result.current.activeCharacter).not.toBe(chars[1]);
       expect(result.current.characters).toEqual([{ name: 'Sam' }]);
     });
 

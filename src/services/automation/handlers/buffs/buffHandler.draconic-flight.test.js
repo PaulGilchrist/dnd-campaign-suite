@@ -1,7 +1,11 @@
+// @maintained-by-ai
 // BUG CLA-096 locks: activation registers the 10-minute rounds clock + LR use
 // flag + logs; re-click while used-and-active RETRACTS (no refusal); used-and-
 // inactive refuses (with log); the verified no-flag buff-active refusal stays
 // byte-identical (Celestial Revelation lane).
+// Canonical owner (basic-effects lane defers): the requiredLevel BLOCK branch
+// refusal copy + side-effect-free gate, and the long-rest-recharge popup copy
+// (basic-effects pins only the inclusive level===requiredLevel allow leg).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/buffToggle.js', () => ({
@@ -118,7 +122,7 @@ describe('CLA-096 buffHandler — Draconic Flight (fly_speed_equals_walk_speed +
 
     const result = await handle(makeDraconicFlightAction(), makePlayerStats(), campaignName, null);
 
-    expect(result.payload.description).toContain('activated on yourself (10_minutes)');
+    expect(result.payload.description).toBe('Draconic Flight activated on yourself (10_minutes)');
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('DragonbornTest', 'draconicFlightUsed', true, campaignName);
     expect(expirations.addExpiration).toHaveBeenCalledTimes(1);
     expect(expirations.addExpiration).toHaveBeenCalledWith({
@@ -192,7 +196,7 @@ describe('CLA-096 buffHandler — Draconic Flight (fly_speed_equals_walk_speed +
 
     const result = await handle(makeDraconicFlightAction(), makePlayerStats({ level: 1 }), campaignName, null);
 
-    expect(result.payload.description).toContain('requires character level 5');
+    expect(result.payload.description).toBe('Draconic Flight requires character level 5. You are level 1.');
     expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     expect(expirations.addExpiration).not.toHaveBeenCalled();
     expect(logService.addEntry).not.toHaveBeenCalled();

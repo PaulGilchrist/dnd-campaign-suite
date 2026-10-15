@@ -1,3 +1,15 @@
+// @maintained-by-ai
+// Owns: rollbackFeatIncreases semantics of useWizardFeatAbilityChoices.js — both
+// paths that roll back feat-derived ability increases (feats emptied, and feats
+// non-empty but no choice-type increases left), the residue guard (rollback writes
+// ONLY when stale featAbilityChoices and/or orphan featIncreases exist — one test
+// per guard clause), preservation of non-choice feat increases during rollback, and
+// rollback of a previously-initialised choice group across renders.
+// Adjacency adjudication: dedup.test.js "does not reprocess when the rules|feats
+// key is unchanged" pins the lastProcessedKey call-count guard on RE-render; this
+// suite's "does not write when there is no residue" pins rollbackFeatIncreases's
+// own residue guard — different guards, both kept.
+// Fully deterministic (computeAllFeatBuffs fully mocked); stable contract.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useWizardFeatAbilityChoices from './useWizardFeatAbilityChoices.js';
@@ -15,6 +27,8 @@ const ASI_CHOICE = {
   description: 'Increase one ability score of your choice by 2, or increase two ability scores of your choice by 1.',
   featName: 'Ability Score Improvement',
 };
+
+const ALERT_INCREASE = { name: 'Constitution', amount: 1, featName: 'Alert' };
 
 const createBaseFormData = (overrides = {}) => ({
   rules: '2024',
@@ -35,19 +49,27 @@ const allFeats = [
   { name: 'Alert', benefits: [] },
 ];
 
-describe('useWizardFeatAbilityChoices - FT-001 rollback of feat increases', () => {
+describe('useWizardFeatAbilityChoices - rollback of feat increases', () => {
   let formData;
   let setFormData;
 
   beforeEach(() => {
     vi.clearAllMocks();
     formData = createBaseFormData();
+    // Stateful stand-in for the wizard's setFormData so functional updates
+    // compose against the evolving form state.
     setFormData = vi.fn((fn) => {
       if (typeof fn === 'function') {
         formData = fn(formData);
       }
     });
   });
+
+  // Apply the latest setFormData update to inspect the written payload.
+  const lastWrite = () => {
+    const args = setFormData.mock.calls[setFormData.mock.calls.length - 1];
+    return typeof args[0] === 'function' ? args[0](formData) : args[0];
+  };
 
   it('zeros orphan featIncreases and clears stale choices when all feats removed', () => {
     formData = createBaseFormData({
@@ -62,11 +84,10 @@ describe('useWizardFeatAbilityChoices - FT-001 rollback of feat increases', () =
     renderHook(() => useWizardFeatAbilityChoices(formData, allFeats, setFormData));
 
     expect(setFormData).toHaveBeenCalled();
-    const written = setFormData.mock.calls.map(c => (typeof c[0] === 'function' ? c[0](formData) : c[0])).pop();
+    const written = lastWrite();
     expect(written.featAbilityChoices).toEqual({});
-    written.abilities.forEach(a => expect(a.featIncrease || 0).toBe(0));
     expect(written.abilities[4].featIncrease).toBe(0);
-    expect(written.abilities[1].featIncrease).toBe(0);
+    written.abilities.forEach(a => expect(a.featIncrease || 0).toBe(0));
   });
 
   it('zeros ASI increases while preserving non-choice feat increases when ASI unticked', () => {
@@ -78,20 +99,22 @@ describe('useWizardFeatAbilityChoices - FT-001 rollback of feat increases', () =
     });
     formData.abilities[1].featIncrease = 1;
     formData.abilities[4].featIncrease = 2;
-    computeAllFeatBuffs.mockReturnValue({
-      abilityScoreIncreases: [{ name: 'Constitution', amount: 1, featName: 'Alert' }],
-    });
+    computeAllFeatBuffs.mockReturnValue({ abilityScoreIncreases: [ALERT_INCREASE] });
 
     renderHook(() => useWizardFeatAbilityChoices(formData, allFeats, setFormData));
 
-    const written = setFormData.mock.calls.map(c => (typeof c[0] === 'function' ? c[0](formData) : c[0])).pop();
+    expect(setFormData).toHaveBeenCalled();
+    const written = lastWrite();
     expect(written.featAbilityChoices).toEqual({});
+    // Rollback is not blanket-zeroing: the Alert non-choice increase survives.
     expect(written.abilities[1].featIncrease).toBe(0);
     expect(written.abilities[4].featIncrease).toBe(0);
     expect(written.abilities[2].featIncrease).toBe(1);
   });
 
-  it('writes back recomputed increases when a choice feat is replaced by another choice feat', () => {
+  it('rolls back a previously-initialised choice group when ASI is unticked for a non-choice feat', () => {
+    // Mount with ASI ticked: the saved single-mode choice initialises cleanly
+    // and no rollback write occurs yet.
     formData = createBaseFormData({
       feats: ['Ability Score Improvement'],
       featAbilityChoices: {
@@ -105,8 +128,9 @@ describe('useWizardFeatAbilityChoices - FT-001 rollback of feat increases', () =
       ({ fd }) => useWizardFeatAbilityChoices(fd, allFeats, setFormData),
       { initialProps: { fd: formData } }
     );
+    expect(setFormData).not.toHaveBeenCalled();
 
-    // Un-tick ASI, tick Alert (non-choice): ASI increases must roll back
+    // Un-tick ASI, tick Alert (non-choice): the ASI residue must roll back.
     formData = createBaseFormData({
       feats: ['Alert'],
       featAbilityChoices: {
@@ -114,19 +138,32 @@ describe('useWizardFeatAbilityChoices - FT-001 rollback of feat increases', () =
       },
     });
     formData.abilities[4].featIncrease = 2;
-    computeAllFeatBuffs.mockReturnValue({
-      abilityScoreIncreases: [{ name: 'Constitution', amount: 1, featName: 'Alert' }],
-    });
+    computeAllFeatBuffs.mockReturnValue({ abilityScoreIncreases: [ALERT_INCREASE] });
     rerender({ fd: formData });
 
-    const writes = setFormData.mock.calls.map(c => (typeof c[0] === 'function' ? c[0](formData) : c[0]));
-    const rolledBack = writes.find(w => w.featAbilityChoices && Object.keys(w.featAbilityChoices).length === 0 && w.abilities);
-    expect(rolledBack).toBeDefined();
-    expect(rolledBack.abilities[4].featIncrease).toBe(0);
-    expect(rolledBack.abilities[2].featIncrease).toBe(1);
+    const written = lastWrite();
+    expect(written.featAbilityChoices).toEqual({});
+    expect(written.abilities[4].featIncrease).toBe(0);
+    expect(written.abilities[2].featIncrease).toBe(1);
+  });
+
+  it('rolls back orphan featIncreases even when featAbilityChoices is already empty', () => {
+    // Second clause of the residue guard: hasOrphanIncreases alone triggers it.
+    formData = createBaseFormData({ feats: [] });
+    formData.abilities[0].featIncrease = 1;
+    computeAllFeatBuffs.mockReturnValue({ abilityScoreIncreases: [] });
+
+    renderHook(() => useWizardFeatAbilityChoices(formData, allFeats, setFormData));
+
+    expect(setFormData).toHaveBeenCalled();
+    const written = lastWrite();
+    expect(written.featAbilityChoices).toEqual({});
+    expect(written.abilities[0].featIncrease).toBe(0);
   });
 
   it('does not write when there is no residue to roll back', () => {
+    // Pins rollbackFeatIncreases's residue guard (both clauses false) on the
+    // feats-empty mount path — NOT the dedup suite's lastProcessedKey guard.
     computeAllFeatBuffs.mockReturnValue({ abilityScoreIncreases: [] });
 
     renderHook(() => useWizardFeatAbilityChoices(formData, allFeats, setFormData));

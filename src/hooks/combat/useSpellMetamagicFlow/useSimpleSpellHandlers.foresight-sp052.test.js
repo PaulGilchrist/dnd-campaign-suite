@@ -1,8 +1,13 @@
-// SP-052: Foresight confirm lane — the runner must resolve the RADIO
-// SELECTION (result), and the cast log's confirmTargets must report only the
-// selection. The allTargets default stamped every combatant with
-// creatureTargets[0] ("Bandit 1") as targetName regardless of who was picked.
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai: 2026-10-15
+// SP-052: Foresight confirm lane — the runner must resolve the RADIO SELECTION
+// (result), and the cast log's confirmTargets must report ONLY the selection.
+// The allTargets default stamped every combatant with creatureTargets[0]
+// ("Bandit 1") as targetName regardless of who was picked. Sibling suites
+// (simple-handlers, confirm-payloads) cover Foresight breadth but pass arg[0]
+// of the combatant list and assert targets loosely, so they cannot catch a
+// mis-stamp — the disjoint selections below pin both seams of
+// useSimpleSpellHandlers.js runForesight + the confirmTargets spec.
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/automation/index.js');
 vi.mock('../../../services/rules/features/faerieFireService.js');
@@ -30,12 +35,14 @@ vi.mock('../../runtime/useRuntimeState.js', () => ({
 vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
     prepareSpellCast: vi.fn(() => Promise.resolve({ modifiedSpell: {}, metaCtx: {} })),
     isFreeCastAuthorized: vi.fn(() => false),
-  isWizardRitualAdeptSpell: vi.fn(() => false),
+    isWizardRitualAdeptSpell: vi.fn(() => false),
 }));
 
 import { useSimpleSpellHandlers } from './useSimpleSpellHandlers.js';
 import { triggerForesight } from '../../../services/rules/features/foresightService.js';
 
+// Factory seam: capture the applyFn/getTargets each spec registers with
+// createConfirmHandler (useSimpleSpellHandlers.js SIMPLE_SPELL_SPECS).
 function setup() {
     const applies = {};
     const confirmTargets = {};
@@ -57,14 +64,15 @@ function setup() {
     return { run: applies.foresight, getTargets: confirmTargets.foresight };
 }
 
+// Fixture mirrors spells.json Foresight (lv9, Touch, 1 minute).
+// First combatant is Bandit 1 — the SP-052 bug stamped it as the target.
 function makePending(overrides = {}) {
     return {
         spellName: 'Foresight',
-        spell: { name: 'Foresight', level: 9, casting_time: 'Action' },
+        spell: { name: 'Foresight', level: 9, casting_time: '1 minute' },
         spellLevel: 9,
-        castingTime: 'Action',
+        castingTime: '1 minute',
         range: 'Touch',
-        // First combatant is Bandit 1 — the bug stamped it as the target.
         creatureTargets: ['Bandit 1', 'DivinationWizard', 'ElfTest'],
         metaCtx: {},
         ...overrides,
@@ -72,27 +80,34 @@ function makePending(overrides = {}) {
 }
 
 describe('SP-052 Foresight confirm lane — radio selection is the target', () => {
-    it('run forwards the selected ElfTest (not creatureTargets[0] Bandit 1)', async () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    // Disjoint selections: neither is creatureTargets[0], so a mis-stamp fails.
+    for (const selection of [['ElfTest'], ['DivinationWizard']]) {
+        it(`run forwards ${selection[0]} and the log reports only the selection`, async () => {
+            const { run, getTargets } = setup();
+            const pending = makePending();
+
+            await run(pending, selection);
+
+            expect(triggerForesight).toHaveBeenCalledTimes(1);
+            const [spellData, metaCtx, stats, campaignName] = triggerForesight.mock.calls[0];
+            expect(spellData).toEqual({ name: 'Foresight', spell: pending.spell });
+            expect(metaCtx.targetName).toBe(selection[0]);
+            expect(stats.name).toBe('DivinationWizard');
+            expect(campaignName).toBe('test-campaign');
+
+            // createConfirmHandler seam calls getTargets(pending, selection)
+            expect(getTargets(pending, selection)).toEqual(selection);
+        });
+    }
+
+    it('empty selection falls back to creatureTargets[0] (spec: result?.[0] || creatureTargets?.[0])', async () => {
         const { run } = setup();
 
-        await run(makePending(), ['ElfTest']);
+        await run(makePending(), []);
 
         expect(triggerForesight).toHaveBeenCalledTimes(1);
-        const [spellData, metaCtx, stats, campaignName] = triggerForesight.mock.calls[0];
-        expect(spellData.name).toBe('Foresight');
-        expect(metaCtx.targetName).toBe('ElfTest');
-        expect(stats.name).toBe('DivinationWizard');
-        expect(campaignName).toBe('test-campaign');
-    });
-
-    it('confirmTargets logs ONLY the selection — never all combatants', () => {
-        const { getTargets } = setup();
-        const pending = makePending();
-
-        // createConfirmHandler seam calls getTargets(pending, selection)
-        const logged = getTargets(pending, ['ElfTest']);
-
-        expect(logged).toEqual(['ElfTest']);
-        expect(logged).not.toContain('Bandit 1');
+        expect(triggerForesight.mock.calls[0][1].targetName).toBe('Bandit 1');
     });
 });

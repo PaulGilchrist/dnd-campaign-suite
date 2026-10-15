@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Deterministic state-machine contract tests for useTravelManagement. All services
+// and the runtime store are fully mocked, so this suite stays green across app churn
+// unless the hook's own observable contract changes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useTravelManagement from './useTravelManagement.js';
@@ -117,6 +121,16 @@ describe('useTravelManagement', () => {
     setRuntimeValue.mockReturnValue(undefined);
     hasSelfRestoration.mockReturnValue(false);
   });
+
+  // Shared setup for event tests: plan a route, arm the event trigger, advance once.
+  // Returns the advanceOneHex result so callers can assert the return contract too.
+  function advanceIntoEvent(result) {
+    act(() => { result.current.setDestinationAndPath({ q: 2, r: 0 }); });
+    shouldTriggerEvent.mockReturnValue(true);
+    let res;
+    act(() => { res = result.current.advanceOneHex(); });
+    return res;
+  }
 
   describe('initial state', () => {
     it('returns default values when no initialTravelState is provided', () => {
@@ -249,7 +263,10 @@ describe('useTravelManagement', () => {
 
   describe('changePace', () => {
     it('updates travelPace, resets exhaustion, and recalculates dailyBudget', () => {
-      const { result } = renderHook(() => useTravelManagement(baseArgs));
+      const { result } = renderHook(() => useTravelManagement({
+        ...baseArgs,
+        initialTravelState: { dayExhausted: true, forcedMarchHours: 2 },
+      }));
       act(() => {
         result.current.changePace('fast');
       });
@@ -344,18 +361,11 @@ describe('useTravelManagement', () => {
     });
 
     it('triggers a random event and pauses travel when shouldTriggerEvent returns true', () => {
-      shouldTriggerEvent.mockReturnValue(true);
-      const to = { q: 2, r: 0 };
       const { result } = renderHook(() => useTravelManagement(baseArgs));
-      act(() => { result.current.setDestinationAndPath(to); });
+      advanceIntoEvent(result);
 
-      let res;
-      act(() => { res = result.current.advanceOneHex(); });
-
-      expect(res.moved).toBe(true);
-      expect(res.event).toBeDefined();
       expect(result.current.travelMode).toBe('paused');
-      expect(result.current.pendingEvent).toBeDefined();
+      expect(result.current.pendingEvent).toEqual({ type: 'encounter', title: 'Random Event' });
       expect(result.current.lastMessage).toContain('Random Event');
     });
   });
@@ -446,12 +456,17 @@ describe('useTravelManagement', () => {
   });
 
   describe('event handling', () => {
-    it('acceptEvent returns the pending event and clears it', () => {
-      const to = { q: 2, r: 0 };
+    it('returns the event from advanceOneHex when an event triggers', () => {
       const { result } = renderHook(() => useTravelManagement(baseArgs));
-      act(() => { result.current.setDestinationAndPath(to); });
-      shouldTriggerEvent.mockReturnValue(true);
-      act(() => { result.current.advanceOneHex(); });
+      const res = advanceIntoEvent(result);
+
+      expect(res.moved).toBe(true);
+      expect(res.event).toEqual({ type: 'encounter', title: 'Random Event' });
+    });
+
+    it('acceptEvent returns the pending event and clears it', () => {
+      const { result } = renderHook(() => useTravelManagement(baseArgs));
+      advanceIntoEvent(result);
 
       let evt;
       act(() => { evt = result.current.acceptEvent(); });
@@ -461,27 +476,66 @@ describe('useTravelManagement', () => {
     });
 
     it('skipEvent clears the pending event without returning it', () => {
-      const to = { q: 2, r: 0 };
       const { result } = renderHook(() => useTravelManagement(baseArgs));
-      act(() => { result.current.setDestinationAndPath(to); });
-      shouldTriggerEvent.mockReturnValue(true);
-      act(() => { result.current.advanceOneHex(); });
+      advanceIntoEvent(result);
 
-      act(() => { result.current.skipEvent(); });
+      let skipped;
+      act(() => { skipped = result.current.skipEvent(); });
+      expect(skipped).toBeUndefined();
       expect(result.current.pendingEvent).toBeNull();
       expect(result.current.travelMode).toBe('planning');
     });
 
     it('rerollEvent generates a new event and decrements rerollsRemaining', () => {
-      const to = { q: 2, r: 0 };
       const { result } = renderHook(() => useTravelManagement(baseArgs));
-      act(() => { result.current.setDestinationAndPath(to); });
-      shouldTriggerEvent.mockReturnValue(true);
-      act(() => { result.current.advanceOneHex(); });
+      advanceIntoEvent(result);
 
       act(() => { result.current.rerollEvent(); });
       expect(result.current.rerollsRemaining).toBe(2);
       expect(result.current.pendingEvent).toEqual({ type: 'encounter', title: 'Random Event' });
+    });
+
+    it('rerollEvent stops once rerolls are exhausted', () => {
+      const { result } = renderHook(() => useTravelManagement(baseArgs));
+      advanceIntoEvent(result);
+
+      for (let i = 0; i < 3; i++) {
+        act(() => { result.current.rerollEvent(); });
+      }
+      expect(result.current.rerollsRemaining).toBe(0);
+      // 1 event from the advance + 3 rerolls; a 4th reroll must not generate more.
+      expect(generateRandomEvent).toHaveBeenCalledTimes(4);
+
+      act(() => { result.current.rerollEvent(); });
+      expect(result.current.rerollsRemaining).toBe(0);
+      expect(generateRandomEvent).toHaveBeenCalledTimes(4);
+    });
+
+    it('enriches combat events with encounter suggestions when monsters are available', () => {
+      shouldTriggerEvent.mockReturnValue(true);
+      generateRandomEvent.mockReturnValue({ type: 'combat', title: 'Ambush' });
+      generateEncounterSuggestions.mockReturnValue([{
+        monsters: [{ index: 'goblin', name: 'Goblin', qty: 2 }],
+        difficultyLabel: 'Easy',
+        totalXP: 50,
+      }]);
+      const { result } = renderHook(() => useTravelManagement({
+        ...baseArgs,
+        monsters: [{ name: 'Goblin' }],
+      }));
+      const res = advanceIntoEvent(result);
+
+      expect(res.event.encounter).toEqual({
+        monsters: [{ index: 'goblin', name: 'Goblin', qty: 2 }],
+        difficultyLabel: 'Easy',
+        totalXP: 50,
+      });
+      // Plains terrain at { q: 1, r: 0 } maps to grassland/desert environments.
+      expect(generateEncounterSuggestions).toHaveBeenCalledWith(expect.objectContaining({
+        monsters: [{ name: 'Goblin' }],
+        playerLevels: baseArgs.playerLevels,
+        environments: ['grassland', 'desert'],
+      }));
     });
   });
 

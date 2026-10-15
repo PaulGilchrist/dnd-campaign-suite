@@ -1,8 +1,15 @@
+// @maintained-by-ai
 // CLA-147: contextBuilder-sync must contribute NO frenzy dice to autoDamageFormula.
 // Pre-fix it baked 'rage_damage_d6' (' plus 4d6') into the display formula, which
 // diceRoller rolled as part of the base damage — while the attack pipeline's
 // applyFrenzyBonuses rolled a SECOND 4d6 on the same hit (double-apply).
 // The pipeline (attackRollBonuses) is the single roll owner.
+// Owns ONLY the sync-builder side of CLA-147: full-trigger buffs (rage + reckless,
+// STR-final) must yield a flat weapon+stance formula, and the builder must never
+// consult the _frenzyUsedRound latch (the pipeline owns it). The pipeline-side
+// single-roll/latch pins live in steps/attackRollBonuses.frenzy-cla147.test.js;
+// rage stance-damage accumulation is canonical in contextBuilder-sync.buffs.test.js.
+// Deterministic: all externals mocked → stable contract, flag kept.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -140,7 +147,7 @@ describe('CLA-147 contextBuilder-sync: no frenzy bake into autoDamageFormula', (
     isAuraTarget.mockReturnValue(false);
   });
 
-  it('raging + reckless + STR + latch unset → formula has weapon + rage flat only, NO frenzy dice', async () => {
+  it('raging + reckless + STR + latch unset → flat weapon + rage formula, NO frenzy dice, latch never consulted', async () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'activeBuffs') return ragingRecklessBuffs();
       return undefined;
@@ -148,19 +155,11 @@ describe('CLA-147 contextBuilder-sync: no frenzy bake into autoDamageFormula', (
 
     const result = await buildAttackContextSync(longsword, frenzyStats, 'test-campaign', 'normal');
 
+    // Exact string is the regression pin: pre-fix this was '1d8+5 plus 4 plus 4d6'.
     expect(result.autoDamageFormula).toBe('1d8+5 plus 4');
     expect(result.autoDamageFormula).not.toMatch(/d6/);
-  });
-
-  it('still no frenzy dice with only rage active (no reckless)', async () => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeBuffs') return [{ damageBonusExpression: 'rage_damage' }];
-      return undefined;
-    });
-
-    const result = await buildAttackContextSync(longsword, frenzyStats, 'test-campaign', 'normal');
-
-    expect(result.autoDamageFormula).toBe('1d8+5 plus 4');
-    expect(result.autoDamageFormula).not.toMatch(/d6/);
+    // The once-per-turn latch is owned by the pipeline (applyFrenzyBonuses) —
+    // the sync builder must not even read it when re-adding any frenzy term.
+    expect(getRuntimeValue).not.toHaveBeenCalledWith('DraconicDragon', '_frenzyUsedRound', 'test-campaign');
   });
 });

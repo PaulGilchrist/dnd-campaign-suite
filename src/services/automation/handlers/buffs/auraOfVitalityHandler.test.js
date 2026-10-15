@@ -1,3 +1,10 @@
+// @maintained-by-ai: 2026-10-15
+// Deterministic contract tests for auraOfVitalityHandler: every external
+// boundary (runtime store, dice, healing, expirations, log, combat data,
+// concentration, targetEffects registry) is mocked at module level, so these
+// tests do not churn when unrelated app code moves.
+// NB: registerTargetEffect update/append/dedup semantics are owned by
+// targetEffectDefinitions.test.js — here we only pin the handler's call shape.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -22,11 +29,17 @@ vi.mock('../../../combat/concentration/concentrationService.js', () => ({
 }));
 
 vi.mock('../../../rules/combat/applyHealing.js', () => ({
-    applyHealingToTarget: vi.fn().mockReturnValue({ actualHeal: 7, oldHp: 10, newHp: 17 }),
+    applyHealingToTarget: vi.fn(),
 }));
 
 vi.mock('../../../dice/diceRoller.js', () => ({
-    rollExpression: vi.fn().mockReturnValue({ total: 7, rolls: [4, 3], modifier: 0, formula: '2d6' }),
+    rollExpression: vi.fn(),
+}));
+
+// registerTargetEffect update/append/dedup semantics are covered directly in
+// targetEffectDefinitions.test.js — here we only pin the handler's call shape.
+vi.mock('../../../combat/conditions/targetEffectDefinitions.js', () => ({
+    registerTargetEffect: vi.fn(),
 }));
 
 import { handle, applyAuraOfVitality, isAuraOfVitalityActive } from './auraOfVitalityHandler.js';
@@ -37,66 +50,45 @@ import * as combatData from '../../../encounters/combatData.js';
 import * as concentrationService from '../../../combat/concentration/concentrationService.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
+import { registerTargetEffect } from '../../../combat/conditions/targetEffectDefinitions.js';
 
 const campaignName = 'test-campaign';
+const casterName = 'Cleric';
 const defaultAction = { name: 'Aura of Vitality', automation: { type: 'aura_of_vitality' } };
-const defaultPlayerStats = { name: 'Cleric', concentrationBonus: 2 };
 
 function makePlayerStats(overrides = {}) {
-    return { ...defaultPlayerStats, ...overrides };
+    return { name: casterName, concentrationBonus: 2, ...overrides };
 }
 
-function makeCombatSummary(creatureNames = []) {
-    return {
-        creatures: creatureNames.map((name) => ({
-            name,
-            maxHp: 50,
-            currentHp: name === 'Cleric' ? 25 : 40,
-        })),
-    };
+function mockCreatures(creatures) {
+    combatData.getCombatSummary.mockReturnValue({ creatures });
 }
 
-function mockPlayerRuntimeValues(entity, hitPoints, currentHitPoints) {
-    vi.mocked(useRuntimeState.getRuntimeValue).mockImplementation((e, key) => {
-        if (e !== entity) return null;
-        if (key === 'hitPoints') return hitPoints;
-        if (key === 'currentHitPoints') return currentHitPoints;
-        return null;
-    });
+function mockDefaultCombat() {
+    mockCreatures([
+        { name: 'Cleric', maxHp: 50, currentHp: 25 },
+        { name: 'Ally1', type: 'npc', maxHp: 50, currentHp: 40 },
+    ]);
 }
 
-function mockCreature(type, maxHp, currentHp) {
-    combatData.getCombatSummary.mockReturnValue({
-        creatures: [{ name: 'Ally1', type, maxHp, currentHp }],
-    });
-}
-
-function defaultMocks(creatureNames) {
-    combatData.getCombatSummary.mockReturnValue(makeCombatSummary(creatureNames || ['Cleric', 'Ally1']));
-}
-
-function mockFullHealth() {
-    combatData.getCombatSummary.mockReturnValue({
-        creatures: [{ name: 'Ally1', type: 'npc', maxHp: 50, currentHp: 50 }],
-    });
-    vi.mocked(diceRoller.rollExpression).mockReturnValue({ total: 10, rolls: [6, 4], modifier: 0, formula: '2d6' });
-}
-
-function mockHealDice(total, rolls) {
-    vi.mocked(diceRoller.rollExpression).mockReturnValue({
-        total, rolls, modifier: 0, formula: '2d6',
-    });
+function mockHealDice(total, rolls = [4, 3]) {
+    diceRoller.rollExpression.mockReturnValue({ total, rolls, modifier: 0, formula: '2d6' });
 }
 
 describe('auraOfVitalityHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(diceRoller.rollExpression).mockReturnValue({ total: 7, rolls: [4, 3], modifier: 0, formula: '2d6' });
+        mockHealDice(7);
     });
 
     describe('handle', () => {
-        it('returns popup with all creature targets', async () => {
-            defaultMocks(['Cleric', 'Ally1', 'Ally2', 'Enemy1']);
+        it('returns popup with all creature targets and maxTargets 1', async () => {
+            mockCreatures([
+                { name: 'Cleric' },
+                { name: 'Ally1' },
+                { name: 'Ally2' },
+                { name: 'Enemy1' },
+            ]);
             const result = await handle(defaultAction, makePlayerStats(), campaignName, null);
             expect(result).toEqual({
                 type: 'popup',
@@ -122,7 +114,7 @@ describe('auraOfVitalityHandler', () => {
         });
 
         it('returns popup with empty creatureTargets when combat has no creatures', async () => {
-            combatData.getCombatSummary.mockReturnValue({ creatures: [] });
+            mockCreatures([]);
             const result = await handle(defaultAction, makePlayerStats(), campaignName, null);
             expect(result).toEqual({
                 type: 'popup',
@@ -134,34 +126,24 @@ describe('auraOfVitalityHandler', () => {
             });
         });
 
-        it('passes empty automation object when action.automation is falsy', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            const action = { name: 'Aura of Vitality' };
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-            expect(result).toEqual({
-                type: 'popup',
-                payload: expect.objectContaining({
-                    type: 'automation_info',
-                    name: 'Aura of Vitality',
-                    automation: {},
-                }),
-            });
-        });
+        it('passes automation through to the popup payload, defaulting to {}', async () => {
+            mockDefaultCombat();
+            const custom = { type: 'aura_of_vitality', healExpression: '3d6', customFlag: true };
+            const withAutomation = await handle({ ...defaultAction, automation: custom }, makePlayerStats(), campaignName, null);
+            expect(withAutomation.payload.automation).toEqual(custom);
 
-        it('passes existing automation object when provided', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            const action = { name: 'Aura of Vitality', automation: { healExpression: '3d6', customFlag: true } };
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-            expect(result.payload.automation).toEqual({ healExpression: '3d6', customFlag: true });
+            const bare = await handle({ name: 'Aura of Vitality' }, makePlayerStats(), campaignName, null);
+            expect(bare.payload.automation).toEqual({});
         });
     });
 
     describe('applyAuraOfVitality', () => {
-        it('returns null for empty or undefined target list', async () => {
-            const result1 = await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, []);
-            expect(result1).toBeNull();
-            const result2 = await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, null);
-            expect(result2).toBeNull();
+        it('returns null without rolling for an empty, null, or non-array target list', async () => {
+            for (const targets of [[], null, 'Ally1']) {
+                expect(await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, targets)).toBeNull();
+            }
+            expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+            expect(registerTargetEffect).not.toHaveBeenCalled();
         });
 
         it('returns error popup when no combat context', async () => {
@@ -177,7 +159,7 @@ describe('auraOfVitalityHandler', () => {
         });
 
         it('returns error popup when target not found in combat', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
+            mockDefaultCombat();
             const result = await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Unknown']);
             expect(result).toEqual({
                 type: 'popup',
@@ -189,8 +171,8 @@ describe('auraOfVitalityHandler', () => {
         });
 
         it('returns error popup when rollExpression fails', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            vi.mocked(diceRoller.rollExpression).mockReturnValue(null);
+            mockDefaultCombat();
+            diceRoller.rollExpression.mockReturnValue(null);
             const result = await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
             expect(result).toEqual({
                 type: 'popup',
@@ -202,15 +184,11 @@ describe('auraOfVitalityHandler', () => {
         });
 
         it.each([
-            ['non-player', 'npc', { maxHp: null, currentHp: 30 }],
-            ['player', 'player', { maxHp: 50, currentHp: 30 }],
-        ])('returns error popup when maxHp is null for %s creature', async (_type, creatureType, creatureData) => {
-            combatData.getCombatSummary.mockReturnValue({
-                creatures: [{ name: 'Ally1', type: creatureType, ...creatureData }],
-            });
-            if (creatureType === 'player') {
-                mockPlayerRuntimeValues('Ally1', null, 30);
-            }
+            ['npc', { type: 'npc', maxHp: null, currentHp: 30 }],
+            ['player', { type: 'player', maxHp: null, currentHp: 30 }],
+        ])('returns error popup when maxHp is null for a %s creature', async (_label, creature) => {
+            mockCreatures([{ name: 'Ally1', ...creature }]);
+            const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
             const result = await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
             expect(result).toEqual({
                 type: 'popup',
@@ -219,18 +197,21 @@ describe('auraOfVitalityHandler', () => {
                     description: expect.stringContaining('Could not determine max HP'),
                 }),
             });
+            consoleSpy.mockRestore();
         });
 
         it.each([
-            ['non-player', 'npc', { maxHp: 50, currentHp: null }],
-            ['player', 'player', { maxHp: 50, currentHp: 30 }],
-        ])('returns error popup when currentHp is null for %s creature', async (_type, creatureType, creatureData) => {
-            combatData.getCombatSummary.mockReturnValue({
-                creatures: [{ name: 'Ally1', type: creatureType, ...creatureData }],
+            ['npc', { type: 'npc', maxHp: 50, currentHp: null }],
+            ['player', { type: 'player', maxHp: 50, currentHp: null }],
+        ])('returns error popup when currentHp is null for a %s creature', async (_label, creature) => {
+            mockCreatures([{ name: 'Ally1', ...creature }]);
+            // Player path reads HP from the runtime store — give it a valid
+            // maxHp so the test exercises the currentHp guard, not maxHp's.
+            useRuntimeState.getRuntimeValue.mockImplementation((entity, key) => {
+                if (entity === 'Ally1' && key === 'hitPoints') return creature.maxHp;
+                return null;
             });
-            if (creatureType === 'player') {
-                mockPlayerRuntimeValues('Ally1', 50, null);
-            }
+            const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
             const result = await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
             expect(result).toEqual({
                 type: 'popup',
@@ -239,283 +220,124 @@ describe('auraOfVitalityHandler', () => {
                     description: expect.stringContaining('Could not determine current HP'),
                 }),
             });
+            consoleSpy.mockRestore();
         });
 
-        it('uses default healExpression when not provided', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockHealDice(5, [3, 2]);
-            await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(diceRoller.rollExpression)).toHaveBeenCalledWith('2d6');
-        });
-
-        it('uses heal_at_slot_level exact match when spell has it', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockHealDice(10, [5, 5]);
-            const action = { ...defaultAction, spell: { heal_at_slot_level: { '3': '2d6', '4': '3d6' } }, spellSlotLevel: 3 };
+        // Heal-expression resolution table: every expected value is distinct
+        // from the '2d6' fallback where a specific branch is under test.
+        it.each([
+            ['default 2d6 when nothing supplies an expression', undefined, undefined, undefined, '2d6'],
+            ['custom automation healExpression', { healExpression: '2d8' }, undefined, undefined, '2d8'],
+            ['spell table exact match beats default', undefined, { heal_at_slot_level: { '3': '3d6' } }, 3, '3d6'],
+            ['spell table highestBelow when no exact match', undefined, { heal_at_slot_level: { '2': '2d6+bonus', '4': '4d6' } }, 3, '2d6+bonus'],
+            ['falls back to default when all table levels are above slot level', undefined, { heal_at_slot_level: { '5': '6d6' } }, 3, '2d6'],
+            ['falls back to default when spell has no heal_at_slot_level', undefined, { someOtherProp: true }, 3, '2d6'],
+            ['spell table beats automation healExpression', { healExpression: '2d8' }, { heal_at_slot_level: { '3': '3d6' } }, 3, '3d6'],
+            ['automation slotLevel overrides spellSlotLevel', { slotLevel: 3 }, { heal_at_slot_level: { '3': '3d6', '5': '5d6' } }, 5, '3d6'],
+            ['defaults to slot level 3 when neither slot source is given', undefined, { heal_at_slot_level: { '3': '3d6' } }, undefined, '3d6'],
+        ])('resolves heal expression: %s', async (_label, automation, spell, spellSlotLevel, expected) => {
+            mockDefaultCombat();
+            mockHealDice(10);
+            const action = {
+                name: 'Aura of Vitality',
+                automation: { type: 'aura_of_vitality', ...automation },
+                ...(spell ? { spell } : {}),
+                ...(spellSlotLevel !== undefined ? { spellSlotLevel } : {}),
+            };
             await applyAuraOfVitality(action, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(diceRoller.rollExpression)).toHaveBeenCalledWith('2d6');
-        });
-
-        it('uses heal_at_slot_level highestBelow when no exact match', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockHealDice(15, [7, 8]);
-            const action = { ...defaultAction, spell: { heal_at_slot_level: { '2': '2d6', '4': '4d6' } }, spellSlotLevel: 3 };
-            await applyAuraOfVitality(action, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(diceRoller.rollExpression)).toHaveBeenCalledWith('2d6');
-        });
-
-        it('falls back to default healExpression when highestBelow is undefined', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockHealDice(7, [4, 3]);
-            const action = { ...defaultAction, spell: { heal_at_slot_level: { '5': '6d6' } }, spellSlotLevel: 3 };
-            await applyAuraOfVitality(action, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(diceRoller.rollExpression)).toHaveBeenCalledWith('2d6');
-        });
-
-        it('falls back to default when action.spell exists but heal_at_slot_level is undefined', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockHealDice(7, [4, 3]);
-            const action = { ...defaultAction, spell: { someOtherProp: true }, spellSlotLevel: 3 };
-            await applyAuraOfVitality(action, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(diceRoller.rollExpression)).toHaveBeenCalledWith('2d6');
-        });
-
-        it('uses custom healExpression from automation when provided', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockHealDice(12, [6, 6]);
-            const action = { ...defaultAction, automation: { ...defaultAction.automation, healExpression: '2d8' } };
-            await applyAuraOfVitality(action, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(diceRoller.rollExpression)).toHaveBeenCalledWith('2d8');
-        });
-
-        it('uses automation slotLevel over spellSlotLevel when both exist', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockHealDice(10, [5, 5]);
-            const action = { ...defaultAction, spell: { heal_at_slot_level: { '3': '2d6', '5': '4d6' } }, spellSlotLevel: 5, automation: { ...defaultAction.automation, slotLevel: 3 } };
-            await applyAuraOfVitality(action, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(diceRoller.rollExpression)).toHaveBeenCalledWith('2d6');
-        });
-
-        it('uses spellSlotLevel when automation has no slotLevel', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockHealDice(10, [5, 5]);
-            const action = { ...defaultAction, spell: { heal_at_slot_level: { '3': '2d6', '5': '4d6' } }, spellSlotLevel: 3 };
-            await applyAuraOfVitality(action, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(diceRoller.rollExpression)).toHaveBeenCalledWith('2d6');
-        });
-
-        it('uses default automation object when action.automation is falsy', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockPlayerRuntimeValues('Ally1', undefined, 30);
-            mockHealDice(8, [5, 3]);
-            const action = { name: 'Aura of Vitality' };
-            const result = await applyAuraOfVitality(action, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(result).toEqual({
-                type: 'popup',
-                payload: expect.objectContaining({
-                    type: 'automation_info',
-                    automation: {},
-                }),
-            });
-            expect(vi.mocked(diceRoller.rollExpression)).toHaveBeenCalledWith('2d6');
-        });
-
-        it('uses empty automation object when action.automation is {}', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockPlayerRuntimeValues('Ally1', undefined, 30);
-            mockHealDice(8, [5, 3]);
-            const action = { name: 'Aura of Vitality', automation: {} };
-            const result = await applyAuraOfVitality(action, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(result).toEqual({
-                type: 'popup',
-                payload: expect.objectContaining({
-                    type: 'automation_info',
-                    automation: {},
-                }),
-            });
-            expect(vi.mocked(diceRoller.rollExpression)).toHaveBeenCalledWith('2d6');
+            expect(diceRoller.rollExpression).toHaveBeenCalledWith(expected);
         });
 
         it('does not call applyHealingToTarget when target is at full health', async () => {
-            mockFullHealth();
+            mockCreatures([{ name: 'Ally1', type: 'npc', maxHp: 50, currentHp: 50 }]);
+            mockHealDice(10);
             const result = await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(result).toEqual({
-                type: 'popup',
-                payload: expect.objectContaining({
-                    type: 'automation_info',
-                    description: expect.stringContaining('Ally1'),
-                }),
-            });
-            expect(vi.mocked(applyHealing.applyHealingToTarget)).not.toHaveBeenCalled();
-            expect(vi.mocked(logService.addEntry)).toHaveBeenCalledTimes(2);
+            expect(result.payload.description).toContain('Ally1');
+            expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
+            expect(logService.addEntry).toHaveBeenCalledTimes(2);
         });
 
         it('clamps healAmount to remaining HP when target is partially healed', async () => {
-            combatData.getCombatSummary.mockReturnValue({
-                creatures: [{ name: 'Ally1', type: 'npc', maxHp: 50, currentHp: 45 }],
-            });
-            mockHealDice(10, [6, 4]);
+            mockCreatures([{ name: 'Ally1', type: 'npc', maxHp: 50, currentHp: 45 }]);
+            mockHealDice(10);
             const result = await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(applyHealing.applyHealingToTarget)).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Ally1',
-                5,
-                campaignName,
-            );
+            expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 5, campaignName);
             expect(result.payload.description).toContain('Target heals 5 HP');
         });
 
-        it('applies healing, targetEffects, concentration, and expirations for target', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockPlayerRuntimeValues('Ally1', undefined, 30);
+        it('applies healing, registers targetEffect on target and caster, adds expirations and concentration', async () => {
+            mockDefaultCombat();
             mockHealDice(8, [5, 3]);
-            const action = { ...defaultAction, spell: { heal_at_slot_level: { '3': '2d6' } }, spellSlotLevel: 3 };
-            const result = await applyAuraOfVitality(action, makePlayerStats(), campaignName, null, ['Ally1']);
+            const result = await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
             expect(result).toEqual({
                 type: 'popup',
                 payload: expect.objectContaining({
                     type: 'automation_info',
                     name: 'Aura of Vitality',
                     description: expect.stringContaining('Ally1'),
+                    automation: defaultAction.automation,
                 }),
             });
-            expect(vi.mocked(applyHealing.applyHealingToTarget)).toHaveBeenCalled();
-            expect(vi.mocked(useRuntimeState.setRuntimeValue))
-                .toHaveBeenCalledWith('campaign', 'targetEffects', expect.arrayContaining([
-                    expect.objectContaining({
-                        target: 'Ally1', effect: 'aura_of_vitality', source: 'Cleric', duration: 'concentration',
-                    }),
-                ]), campaignName, true);
-            expect(vi.mocked(concentrationService.addConcentration)).toHaveBeenCalled();
-            expect(vi.mocked(expirations.addExpiration)).toHaveBeenCalled();
-            expect(vi.mocked(logService.addEntry)).toHaveBeenCalledTimes(2);
-        });
-
-        it('updates existing target effect when aura_of_vitality already exists', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            vi.mocked(useRuntimeState.getRuntimeValue).mockImplementation((entity, key) => {
-                if (entity === 'campaign' && key === 'targetEffects') {
-                    return [{ target: 'Ally1', effect: 'aura_of_vitality', source: 'Cleric', duration: 'concentration' }];
-                }
-                if (entity === 'Ally1' && key === 'currentHitPoints') return 30;
-                return null;
+            expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 8, campaignName);
+            // Badge on the healed creature + same marker on the caster (free-cast check).
+            expect(registerTargetEffect).toHaveBeenCalledTimes(2);
+            expect(registerTargetEffect).toHaveBeenCalledWith(campaignName, 'Ally1', 'aura_of_vitality', casterName);
+            expect(registerTargetEffect).toHaveBeenCalledWith(campaignName, casterName, 'aura_of_vitality', casterName);
+            expect(expirations.addExpiration).toHaveBeenCalledWith({
+                attackerName: casterName,
+                targetName: 'Ally1',
+                effects: [{ type: 'remove_active_buff', buffName: 'Aura of Vitality' }],
+                campaignName,
+                rounds: undefined,
+                expireOnCreatureName: casterName,
             });
-            mockHealDice(8, [5, 3]);
+            expect(concentrationService.addConcentration).toHaveBeenCalledWith(expect.any(Object), casterName, 'Aura of Vitality', 12);
+            expect(logService.addEntry).toHaveBeenCalledTimes(2);
+        });
+
+        it.each([
+            ['player', true],
+            ['npc', false],
+        ])('reads HP from the runtime store for %s creatures: %s', async (type, usesRuntime) => {
+            mockCreatures([{ name: 'Ally1', type, maxHp: 50, currentHp: 30 }]);
+            if (usesRuntime) {
+                useRuntimeState.getRuntimeValue.mockImplementation((entity, key) => {
+                    if (entity !== 'Ally1') return null;
+                    if (key === 'hitPoints') return 50;
+                    if (key === 'currentHitPoints') return 30;
+                    return null;
+                });
+            } else {
+                useRuntimeState.getRuntimeValue.mockReturnValue(null);
+            }
+            mockHealDice(8);
             await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(useRuntimeState.setRuntimeValue)).toHaveBeenCalledWith(
-                'campaign', 'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        target: 'Ally1', effect: 'aura_of_vitality', source: 'Cleric', duration: 'concentration',
-                    }),
-                ]),
-                campaignName, true,
-            );
+            if (usesRuntime) {
+                expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith('Ally1', 'hitPoints');
+                expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith('Ally1', 'currentHitPoints', campaignName);
+            } else {
+                expect(useRuntimeState.getRuntimeValue).not.toHaveBeenCalledWith('Ally1', 'hitPoints');
+                expect(useRuntimeState.getRuntimeValue).not.toHaveBeenCalledWith('Ally1', 'currentHitPoints', campaignName);
+            }
         });
 
-        it('updates existing caster effect when aura_of_vitality already exists on caster', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            vi.mocked(useRuntimeState.getRuntimeValue).mockImplementation((entity, key) => {
-                if (entity === 'campaign' && key === 'targetEffects') {
-                    return [{ target: 'Cleric', effect: 'aura_of_vitality', source: 'Cleric', duration: 'concentration' }];
-                }
-                if (entity === 'Ally1' && key === 'currentHitPoints') return 30;
-                return null;
-            });
-            mockHealDice(8, [5, 3]);
-            await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(useRuntimeState.setRuntimeValue)).toHaveBeenCalledWith(
-                'campaign', 'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        target: 'Cleric', effect: 'aura_of_vitality', source: 'Cleric', duration: 'concentration',
-                    }),
-                ]),
-                campaignName, true,
-            );
-        });
-
-        it('adds both target and caster effects when neither exists', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            vi.mocked(useRuntimeState.getRuntimeValue).mockImplementation((entity, key) => {
-                if (entity === 'campaign' && key === 'targetEffects') return [];
-                if (entity === 'Ally1' && key === 'currentHitPoints') return 30;
-                return null;
-            });
-            mockHealDice(8, [5, 3]);
-            await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
-            const teCalls = vi.mocked(useRuntimeState.setRuntimeValue).mock.calls.filter(
-                (c) => c[0] === 'campaign' && c[1] === 'targetEffects'
-            );
-            const allEffects = teCalls.flatMap((c) => c[2]);
-            expect(allEffects).toContainEqual({ target: 'Ally1', effect: 'aura_of_vitality', source: 'Cleric', duration: 'concentration' });
-            expect(allEffects).toContainEqual({ target: 'Cleric', effect: 'aura_of_vitality', source: 'Cleric', duration: 'concentration' });
-        });
-
-        it('uses player runtime values for player-type creatures', async () => {
-            mockCreature('player', 50, 30);
-            mockPlayerRuntimeValues('Ally1', 50, 30);
-            mockHealDice(8, [5, 3]);
-            await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(useRuntimeState.getRuntimeValue)).toHaveBeenCalledWith('Ally1', 'hitPoints');
-            expect(vi.mocked(useRuntimeState.getRuntimeValue)).toHaveBeenCalledWith('Ally1', 'currentHitPoints', campaignName);
-        });
-
-        it('uses creature properties for non-player creatures', async () => {
-            mockCreature('npc', 50, 30);
-            vi.mocked(useRuntimeState.getRuntimeValue).mockImplementation(() => null);
-            mockHealDice(8, [5, 3]);
-            await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(useRuntimeState.getRuntimeValue)).not.toHaveBeenCalledWith('Ally1', 'hitPoints');
-            expect(vi.mocked(useRuntimeState.getRuntimeValue)).not.toHaveBeenCalledWith('Ally1', 'currentHitPoints', campaignName);
-        });
-
-        it('handles logEntry catch error', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockPlayerRuntimeValues('Ally1', undefined, 30);
-            mockHealDice(8, [5, 3]);
-            const logError = new Error('log failed');
-            vi.mocked(logService.addEntry).mockRejectedValue(logError);
-            const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
-            await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
-            expect(vi.mocked(console.error)).toHaveBeenCalledWith('[auraOfVitality] Error:', logError);
-            consoleSpy.mockRestore();
-        });
-
-        it('passes concentrationBonus=0 to addConcentration when bonus is null', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockPlayerRuntimeValues('Ally1', undefined, 30);
-            mockHealDice(8, [5, 3]);
-            await applyAuraOfVitality(defaultAction, makePlayerStats({ concentrationBonus: null }), campaignName, null, ['Ally1']);
-            expect(vi.mocked(concentrationService.addConcentration)).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Cleric',
-                'Aura of Vitality',
-                10,
-            );
-        });
-
-        it('passes correct concentration DC with bonus', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockPlayerRuntimeValues('Ally1', undefined, 30);
-            mockHealDice(8, [5, 3]);
-            await applyAuraOfVitality(defaultAction, makePlayerStats({ concentrationBonus: 5 }), campaignName, null, ['Ally1']);
-            expect(vi.mocked(concentrationService.addConcentration)).toHaveBeenCalledWith(
-                expect.any(Object),
-                'Cleric',
-                'Aura of Vitality',
-                15,
-            );
+        it.each([
+            [null, 10],
+            [5, 15],
+        ])('passes concentration DC 10+bonus (%s bonus -> DC %s)', async (bonus, expectedDc) => {
+            mockDefaultCombat();
+            mockHealDice(8);
+            await applyAuraOfVitality(defaultAction, makePlayerStats({ concentrationBonus: bonus }), campaignName, null, ['Ally1']);
+            expect(concentrationService.addConcentration).toHaveBeenCalledWith(expect.any(Object), casterName, 'Aura of Vitality', expectedDc);
         });
 
         it('logs ability_use entry with correct description format', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockPlayerRuntimeValues('Ally1', undefined, 30);
+            mockDefaultCombat();
             mockHealDice(8, [5, 3]);
             await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
-            const abilityUseCall = vi.mocked(logService.addEntry).mock.calls[1][1];
+            const abilityUseCall = logService.addEntry.mock.calls[1][1];
             expect(abilityUseCall.type).toBe('ability_use');
-            expect(abilityUseCall.characterName).toBe('Cleric');
+            expect(abilityUseCall.characterName).toBe(casterName);
             expect(abilityUseCall.abilityName).toBe('Aura of Vitality');
             expect(abilityUseCall.description).toContain('Cleric casts Aura of Vitality on Ally1');
             expect(abilityUseCall.description).toContain('Target heals 8 HP');
@@ -523,59 +345,47 @@ describe('auraOfVitalityHandler', () => {
         });
 
         it('logs hp_change entry with correct data', async () => {
-            defaultMocks(['Cleric', 'Ally1']);
-            mockPlayerRuntimeValues('Ally1', undefined, 30);
+            mockDefaultCombat();
             mockHealDice(8, [5, 3]);
             await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
-            const hpChangeCall = vi.mocked(logService.addEntry).mock.calls[0][1];
+            const hpChangeCall = logService.addEntry.mock.calls[0][1];
             expect(hpChangeCall.type).toBe('hp_change');
             expect(hpChangeCall.targetName).toBe('Ally1');
             expect(hpChangeCall.delta).toBe(8);
             expect(hpChangeCall.currentHp).toBe(48);
             expect(hpChangeCall.maxHp).toBe(50);
             expect(hpChangeCall.isHealing).toBe(true);
-            expect(hpChangeCall.sourceName).toBe('Cleric');
+            expect(hpChangeCall.sourceName).toBe(casterName);
             expect(hpChangeCall.formula).toBe('2d6');
+        });
+
+        it('swallows addEntry rejection with console.error (log failure never breaks the heal)', async () => {
+            mockDefaultCombat();
+            mockHealDice(8);
+            const logError = new Error('log failed');
+            logService.addEntry.mockRejectedValue(logError);
+            const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
+            await applyAuraOfVitality(defaultAction, makePlayerStats(), campaignName, null, ['Ally1']);
+            expect(console.error).toHaveBeenCalledWith('[auraOfVitality] Error:', logError);
+            consoleSpy.mockRestore();
         });
     });
 
     describe('isAuraOfVitalityActive', () => {
         it('returns true when aura effect is active on target', () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockImplementation((entity, key) => {
-                if (entity === 'campaign' && key === 'targetEffects') {
-                    return [
-                        { target: 'Ally1', effect: 'aura_of_vitality', source: 'Cleric', duration: 'concentration' },
-                        { target: 'Ally2', effect: 'haste', source: 'Cleric' },
-                    ];
-                }
-                return null;
-            });
+            useRuntimeState.getRuntimeValue.mockReturnValue([
+                { target: 'Ally1', effect: 'aura_of_vitality', source: casterName, duration: 'concentration' },
+                { target: 'Ally2', effect: 'haste', source: casterName },
+            ]);
             expect(isAuraOfVitalityActive('Ally1', campaignName)).toBe(true);
         });
 
-        it('returns false when aura effect is not on target', () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockImplementation((entity, key) => {
-                if (entity === 'campaign' && key === 'targetEffects') {
-                    return [{ target: 'Ally2', effect: 'aura_of_vitality', source: 'Cleric' }];
-                }
-                return null;
-            });
-            expect(isAuraOfVitalityActive('Ally1', campaignName)).toBe(false);
-        });
-
-        it('returns false when no target effects', () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockImplementation((entity, key) => {
-                if (entity === 'campaign' && key === 'targetEffects') return [];
-                return null;
-            });
-            expect(isAuraOfVitalityActive('Ally1', campaignName)).toBe(false);
-        });
-
-        it('returns false when targetEffects is falsy', () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockImplementation((entity, key) => {
-                if (entity === 'campaign' && key === 'targetEffects') return null;
-                return null;
-            });
+        it.each([
+            ['aura is on another target', [{ target: 'Ally2', effect: 'aura_of_vitality', source: casterName }]],
+            ['no target effects', []],
+            ['targetEffects is null', null],
+        ])('returns false when %s', (_label, effects) => {
+            useRuntimeState.getRuntimeValue.mockReturnValue(effects);
             expect(isAuraOfVitalityActive('Ally1', campaignName)).toBe(false);
         });
     });

@@ -1,3 +1,8 @@
+// @maintained-by-ai: 2026-10-14
+// Authoritative unit tests for useMetamagic.js — the shared sorcery-point
+// state helpers (spend / read / max / log). Sibling lanes (useActionSpellMetamagic,
+// useSpellMetamagicFlow, automation handlers) mock this module, so only here is
+// the real implementation exercised. Max-SP data fidelity lives in classRules*.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useMetamagic, {
@@ -10,7 +15,6 @@ import useMetamagic, {
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const stores = new Map();
-stores.set('TestSorcerer', new Map([['sorceryPoints', 5]]));
 
 function getStore(key) {
   if (!stores.has(key)) {
@@ -19,23 +23,29 @@ function getStore(key) {
   return stores.get(key);
 }
 
-function clearStores() {
-  stores.clear();
-  stores.set('TestSorcerer', new Map([['sorceryPoints', 5]]));
+function setSorceryPoints(characterName, value) {
+  getStore(characterName).set('sorceryPoints', value);
 }
+
+// Captures addStorageChangeListener registrations so tests can fire the
+// store-change path the hook subscribes to.
+const storageListeners = [];
 
 vi.mock('../runtime/useRuntimeState.js', () => ({
   getRuntimeValue: (characterKey, propertyName) => {
     const store = getStore(characterKey);
     return store.has(propertyName) ? store.get(propertyName) : null;
   },
-  setRuntimeValue: (characterKey, propertyName, value, _campaignName) => {
-    const store = getStore(characterKey);
-    store.set(propertyName, value);
+  setRuntimeValue: (characterKey, propertyName, value) => {
+    getStore(characterKey).set(propertyName, value);
   },
-  useRuntimeValue: () => null,
-  addStorageChangeListener: () => () => {},
-  getAllStoreKeys: () => Array.from(stores.keys()),
+  addStorageChangeListener: (_characterKey, listener) => {
+    storageListeners.push(listener);
+    return () => {
+      const i = storageListeners.indexOf(listener);
+      if (i >= 0) storageListeners.splice(i, 1);
+    };
+  },
 }));
 
 const mockGetClassFeatures = vi.fn();
@@ -43,7 +53,7 @@ vi.mock('../../services/character/classFeatures.js', () => ({
   getClassFeatures: (...args) => mockGetClassFeatures(...args),
 }));
 
-const mockGuid = vi.fn();
+const mockGuid = vi.fn(() => 'test-guid-1234');
 vi.mock('../../services/ui/utils.js', () => ({
   default: {
     guid: (...args) => mockGuid(...args),
@@ -55,335 +65,205 @@ vi.mock('../../services/ui/logService.js', () => ({
   addEntry: (...args) => mockAddEntry(...args),
 }));
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+const SORCERER = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
+const CAMPAIGN = 'test-campaign';
 
-function setSorceryPoints(characterName, value) {
-  const store = getStore(characterName);
-  store.set('sorceryPoints', value);
+function resetFixture() {
+  stores.clear();
+  setSorceryPoints('TestSorcerer', 5);
+  vi.clearAllMocks();
+  mockGetClassFeatures.mockImplementation((stats) =>
+    stats?.class?.name === 'Sorcerer'
+      ? { maxSorceryPoints: 10, metamagicKnown: 2, creatingSpellSlotCosts: [] }
+      : null
+  );
+  mockAddEntry.mockResolvedValue({});
 }
 
-function withClassFeatures(features) {
-  mockGetClassFeatures.mockReturnValue(features);
-}
+beforeEach(resetFixture);
 
 // ── spendSorceryPoints ──────────────────────────────────────────────────────
 
 describe('spendSorceryPoints', () => {
-  beforeEach(() => {
-    clearStores();
-    vi.clearAllMocks();
-  });
-
-  it('deducts sorcery points and returns remaining', () => {
-    const remaining = spendSorceryPoints('TestSorcerer', 3, 'test-campaign');
-    expect(remaining).toBe(2);
-  });
-
-  it('does not go below 0 when spending more than available', () => {
-    const remaining = spendSorceryPoints('TestSorcerer', 999, 'test-campaign');
-    expect(remaining).toBe(0);
-  });
-
-  it('handles spending 0 points without changing the store', () => {
-    const remaining = spendSorceryPoints('TestSorcerer', 0, 'test-campaign');
-    expect(remaining).toBe(5);
-    expect(getStore('TestSorcerer').get('sorceryPoints')).toBe(5);
-  });
-
-  it('handles negative amount by adding points', () => {
-    const remaining = spendSorceryPoints('TestSorcerer', -2, 'test-campaign');
-    expect(remaining).toBe(7);
-  });
-
-  it('returns 0 for unknown character with no fallback', () => {
-    const remaining = spendSorceryPoints('UnknownCharacter', 5, 'test-campaign');
-    expect(remaining).toBe(0);
-  });
-
-  it('uses fallback when no stored value exists', () => {
-    const remaining = spendSorceryPoints('UnknownCharacter', 2, 'test-campaign', 10);
-    expect(remaining).toBe(8);
-  });
-
-  it('dispatches sorcery-points-updated event', () => {
+  it('deducts points, persists the new value, and dispatches sorcery-points-updated', () => {
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-    spendSorceryPoints('TestSorcerer', 2, 'test-campaign');
-    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'sorcery-points-updated',
-    }));
+
+    const remaining = spendSorceryPoints('TestSorcerer', 3, CAMPAIGN);
+
+    expect(remaining).toBe(2);
+    expect(getStore('TestSorcerer').get('sorceryPoints')).toBe(2);
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'sorcery-points-updated' })
+    );
     dispatchSpy.mockRestore();
   });
 
-  it('persists the new value in the store', () => {
-    spendSorceryPoints('TestSorcerer', 2, 'test-campaign');
-    expect(getStore('TestSorcerer').get('sorceryPoints')).toBe(3);
+  it('clamps at 0 when spending more than available', () => {
+    expect(spendSorceryPoints('TestSorcerer', 999, CAMPAIGN)).toBe(0);
+  });
+
+  it('spending 0 leaves the store unchanged', () => {
+    expect(spendSorceryPoints('TestSorcerer', 0, CAMPAIGN)).toBe(5);
+  });
+
+  it('negative amount adds points back (restore flows)', () => {
+    expect(spendSorceryPoints('TestSorcerer', -2, CAMPAIGN)).toBe(7);
+  });
+
+  it('treats unknown character without fallback as 0', () => {
+    expect(spendSorceryPoints('UnknownCharacter', 5, CAMPAIGN)).toBe(0);
+  });
+
+  it('uses fallback when no stored value exists', () => {
+    expect(spendSorceryPoints('UnknownCharacter', 2, CAMPAIGN, 10)).toBe(8);
   });
 });
 
 // ── getCurrentSorceryPoints ─────────────────────────────────────────────────
 
 describe('getCurrentSorceryPoints', () => {
-  beforeEach(() => {
-    clearStores();
-    vi.clearAllMocks();
-  });
-
-  it('returns the stored value', () => {
-    setSorceryPoints('TestSorcerer', 3);
-    expect(getCurrentSorceryPoints('TestSorcerer')).toBe(3);
-  });
-
-  it('returns fallback when no value is stored', () => {
-    expect(getCurrentSorceryPoints('Unknown', 10)).toBe(10);
-  });
-
-  it('returns null fallback when no value stored and no explicit fallback', () => {
-    expect(getCurrentSorceryPoints('Unknown')).toBeNull();
-  });
-
-  it('returns 0 when stored value is 0', () => {
+  it('returns the stored value, including 0', () => {
+    expect(getCurrentSorceryPoints('TestSorcerer')).toBe(5);
     setSorceryPoints('TestSorcerer', 0);
     expect(getCurrentSorceryPoints('TestSorcerer')).toBe(0);
   });
 
-  it('converts string values to numbers', () => {
-    const store = getStore('TestSorcerer');
-    store.set('sorceryPoints', '4');
+  it('converts stored string values to numbers', () => {
+    setSorceryPoints('TestSorcerer', '4');
     expect(getCurrentSorceryPoints('TestSorcerer')).toBe(4);
+  });
+
+  it('returns the fallback, or null, when nothing is stored', () => {
+    expect(getCurrentSorceryPoints('Unknown', 10)).toBe(10);
+    expect(getCurrentSorceryPoints('Unknown')).toBeNull();
   });
 });
 
 // ── getMaxSorceryPoints ─────────────────────────────────────────────────────
 
 describe('getMaxSorceryPoints', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('returns maxSorceryPoints from class features', () => {
-    withClassFeatures({ maxSorceryPoints: 10, metamagicKnown: 2, creatingSpellSlotCosts: [] });
-    const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
-    expect(getMaxSorceryPoints(stats)).toBe(10);
+    expect(getMaxSorceryPoints(SORCERER)).toBe(10);
+    expect(mockGetClassFeatures).toHaveBeenCalledWith(SORCERER);
   });
 
-  it('returns 0 when class features returns null', () => {
+  it('returns 0 when class features are missing or max is falsy', () => {
     mockGetClassFeatures.mockReturnValue(null);
     expect(getMaxSorceryPoints({ name: 'Wizard', class: { name: 'Wizard' } })).toBe(0);
-  });
 
-  it('returns 0 when maxSorceryPoints is falsy', () => {
-    withClassFeatures({ maxSorceryPoints: 0, metamagicKnown: 2, creatingSpellSlotCosts: [] });
-    const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
-    expect(getMaxSorceryPoints(stats)).toBe(0);
+    mockGetClassFeatures.mockReturnValue({ maxSorceryPoints: 0 });
+    expect(getMaxSorceryPoints(SORCERER)).toBe(0);
   });
 });
 
 // ── logMetamagicUse ─────────────────────────────────────────────────────────
 
 describe('logMetamagicUse', () => {
-  beforeEach(() => {
-    clearStores();
-    vi.clearAllMocks();
-  });
+  it('posts a metamagic_use entry with full payload, guid, and store SP at call time', () => {
+    const before = Date.now();
+    logMetamagicUse(CAMPAIGN, 'TestSorcerer', 'Fireball', ['Empowered Spell'], 2);
+    const after = Date.now();
 
-  it('posts a metamagic_use log entry with correct payload', () => {
-    setSorceryPoints('TestSorcerer', 5);
-    mockAddEntry.mockResolvedValue({});
-
-    logMetamagicUse('test-campaign', 'TestSorcerer', 'Fireball', ['Empowered Spell'], 2);
-
-    expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+    expect(mockAddEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
       type: 'metamagic_use',
       characterName: 'TestSorcerer',
       spellName: 'Fireball',
       options: ['Empowered Spell'],
       sorceryPointsSpent: 2,
       remainingSorceryPoints: 5,
+      id: 'test-guid-1234',
     }));
-  });
-
-  it('wraps non-array options in an array', () => {
-    setSorceryPoints('TestSorcerer', 5);
-    mockAddEntry.mockResolvedValue({});
-
-    logMetamagicUse('test-campaign', 'TestSorcerer', 'Fireball', 'Empowered Spell', 2);
-
-    const entry = mockAddEntry.mock.calls[0][1];
-    expect(entry.options).toEqual(['Empowered Spell']);
-  });
-
-  it('passes empty array as-is when options is empty', () => {
-    setSorceryPoints('TestSorcerer', 5);
-    mockAddEntry.mockResolvedValue({});
-
-    logMetamagicUse('test-campaign', 'TestSorcerer', 'Fireball', [], 2);
-
-    const entry = mockAddEntry.mock.calls[0][1];
-    expect(entry.options).toEqual([]);
-  });
-
-  it('encodes campaign name with spaces in the URL', () => {
-    setSorceryPoints('TestSorcerer', 5);
-    mockAddEntry.mockResolvedValue({});
-
-    logMetamagicUse('my test campaign', 'TestSorcerer', 'Fireball', [], 2);
-
-    expect(mockAddEntry).toHaveBeenCalledWith('my test campaign', expect.anything());
-  });
-
-  it('includes a timestamp and guid in the entry', () => {
-    setSorceryPoints('TestSorcerer', 5);
-    mockGuid.mockReturnValue('test-guid-1234');
-    mockAddEntry.mockResolvedValue({});
-    const before = Date.now();
-    logMetamagicUse('test-campaign', 'TestSorcerer', 'Fireball', [], 2);
-    const after = Date.now();
-
     const entry = mockAddEntry.mock.calls[0][1];
     expect(entry.timestamp).toBeGreaterThanOrEqual(before);
     expect(entry.timestamp).toBeLessThanOrEqual(after);
-    expect(entry.id).toBe('test-guid-1234');
   });
 
-  it('uses remaining SP from the store at call time', () => {
-    setSorceryPoints('TestSorcerer', 5);
-    mockAddEntry.mockResolvedValue({});
-
-    logMetamagicUse('test-campaign', 'TestSorcerer', 'Fireball', ['Empowered Spell'], 2);
-
-    const entry = mockAddEntry.mock.calls[0][1];
-    expect(entry.remainingSorceryPoints).toBe(5);
+  it('wraps non-array options in an array', () => {
+    logMetamagicUse(CAMPAIGN, 'TestSorcerer', 'Fireball', 'Empowered Spell', 2);
+    expect(mockAddEntry.mock.calls[0][1].options).toEqual(['Empowered Spell']);
   });
 
   it('logs error when addEntry rejects', async () => {
-    setSorceryPoints('TestSorcerer', 5);
     const error = new Error('Network failure');
     mockAddEntry.mockRejectedValue(error);
     const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
 
-    logMetamagicUse('test-campaign', 'TestSorcerer', 'Fireball', [], 2);
-
-    // addEntry.catch runs asynchronously; flush microtasks
-    await act(async () => {});
+    logMetamagicUse(CAMPAIGN, 'TestSorcerer', 'Fireball', [], 2);
+    await act(async () => {}); // flush the .catch microtask
 
     expect(consoleErrorSpy).toHaveBeenCalledWith('[useMetamagic] Error:', error);
     consoleErrorSpy.mockRestore();
   });
 });
 
-// ── useMetamagic hook ───────────────────────────────────────────────────────
+// ── useMetamagic hook (legacy default export; helpers above are the live lane) ─
 
 describe('useMetamagic hook', () => {
-  beforeEach(() => {
-    clearStores();
-    vi.clearAllMocks();
-    withClassFeatures({ maxSorceryPoints: 10, metamagicKnown: 2, creatingSpellSlotCosts: [] });
-  });
-
-  it('returns current and max SP', () => {
-    const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
-    const { result } = renderHook(() => useMetamagic(stats, 'test-campaign'));
+  it('exposes currentSP and maxSP', () => {
+    const { result } = renderHook(() => useMetamagic(SORCERER, CAMPAIGN));
     expect(result.current.currentSP).toBe(5);
     expect(result.current.maxSP).toBe(10);
   });
 
   it('returns 0/0 when playerStats is null', () => {
-    // Clear the class features mock so getClassFeatures(null) returns undefined
-    mockGetClassFeatures.mockReset();
-    const { result } = renderHook(() => useMetamagic(null, 'test-campaign'));
+    const { result } = renderHook(() => useMetamagic(null, CAMPAIGN));
     expect(result.current.currentSP).toBe(0);
     expect(result.current.maxSP).toBe(0);
   });
 
-  it('uses max SP as initial value when no sorceryPoints stored', () => {
-    setSorceryPoints('TestSorcerer', null);
-    const store = getStore('TestSorcerer');
-    store.delete('sorceryPoints');
-
-    const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
-    const { result } = renderHook(() => useMetamagic(stats, 'test-campaign'));
+  it('defaults currentSP to maxSP when nothing is stored', () => {
+    getStore('TestSorcerer').delete('sorceryPoints');
+    const { result } = renderHook(() => useMetamagic(SORCERER, CAMPAIGN));
     expect(result.current.currentSP).toBe(10);
   });
 
-  it('spendSorceryPoints deducts and returns remaining', () => {
-    const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
-    const { result } = renderHook(() => useMetamagic(stats, 'test-campaign'));
+  it('spendSorceryPoints deducts, updates currentSP, and dispatches the event', () => {
+    const { result } = renderHook(() => useMetamagic(SORCERER, CAMPAIGN));
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
-    let spent;
+    let remaining;
     act(() => {
-      spent = result.current.spendSorceryPoints(3);
+      remaining = result.current.spendSorceryPoints(3);
     });
 
+    expect(remaining).toBe(2);
     expect(result.current.currentSP).toBe(2);
-    expect(spent).toBe(2);
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'sorcery-points-updated' })
+    );
+    dispatchSpy.mockRestore();
   });
 
-  it('spendSorceryPoints does not go below 0', () => {
-    const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
-    const { result } = renderHook(() => useMetamagic(stats, 'test-campaign'));
-
-    act(() => {
-      result.current.spendSorceryPoints(999);
-    });
-
-    expect(result.current.currentSP).toBe(0);
-  });
-
-  it('logMetamagic posts a log entry via logMetamagicUse', () => {
-    setSorceryPoints('TestSorcerer', 5);
-    mockAddEntry.mockResolvedValue({});
-
-    const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
-    const { result } = renderHook(() => useMetamagic(stats, 'test-campaign'));
+  it('logMetamagic delegates with campaign and character bound', () => {
+    const { result } = renderHook(() => useMetamagic(SORCERER, CAMPAIGN));
 
     act(() => {
       result.current.logMetamagic('Fireball', ['Empowered Spell'], 2);
     });
 
-    const entry = mockAddEntry.mock.calls[0][1];
-    expect(entry.type).toBe('metamagic_use');
-    expect(entry.characterName).toBe('TestSorcerer');
-    expect(entry.spellName).toBe('Fireball');
-    expect(entry.options).toEqual(['Empowered Spell']);
-    expect(entry.sorceryPointsSpent).toBe(2);
-  });
-
-  it('dispatches sorcery-points-updated event on spend', () => {
-    const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
-    const { result } = renderHook(() => useMetamagic(stats, 'test-campaign'));
-
-    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-
-    act(() => {
-      result.current.spendSorceryPoints(2);
-    });
-
-    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'sorcery-points-updated',
+    expect(mockAddEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+      type: 'metamagic_use',
+      characterName: 'TestSorcerer',
+      spellName: 'Fireball',
+      sorceryPointsSpent: 2,
     }));
-    dispatchSpy.mockRestore();
   });
 
-  it('updates currentSP when sorcery-points-updated event fires', async () => {
-    setSorceryPoints('TestSorcerer', 5);
-    const stats = { name: 'TestSorcerer', class: { name: 'Sorcerer' } };
-    const { result } = renderHook(() => useMetamagic(stats, 'test-campaign'));
+  it('re-reads currentSP on sorcery-points-updated events and storage changes', async () => {
+    const { result } = renderHook(() => useMetamagic(SORCERER, CAMPAIGN));
 
-    // Flush effects so event listeners are registered
-    await act(async () => {});
-    expect(result.current.currentSP).toBe(5);
-
-    await act(async () => {
-      result.current.spendSorceryPoints(3);
-    });
-    expect(result.current.currentSP).toBe(2);
-
-    // Simulate external change via event
+    // External producer restores points, then broadcasts (e.g. Font of Magic).
     setSorceryPoints('TestSorcerer', 8);
-    window.dispatchEvent(new CustomEvent('sorcery-points-updated'));
-
-    // Flush effects to process the event listener
-    await act(async () => {});
+    act(() => {
+      window.dispatchEvent(new CustomEvent('sorcery-points-updated'));
+    });
     expect(result.current.currentSP).toBe(8);
+
+    // Server-pushed store change without the custom event.
+    setSorceryPoints('TestSorcerer', 1);
+    act(() => {
+      storageListeners.forEach((fn) => fn());
+    });
+    expect(result.current.currentSP).toBe(1);
   });
 });

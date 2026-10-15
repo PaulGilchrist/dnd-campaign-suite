@@ -1,4 +1,9 @@
+// @maintained-by-ai
 // L5-005 §9.2 — confirmed-ruling apply tests: gated lanes, refusals, audit.
+// Every mutating boundary (runtime store, log, dice, effect registry) is
+// mocked; the oracle lane stubs fetch to pin the server-roll URL contract.
+// Pure dispatcher over a stable applier table — deterministic, no churn
+// expected when the app changes.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -17,7 +22,7 @@ vi.mock('../combat/conditions/targetEffectDefinitions.js', () => ({
 
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../ui/logService.js';
-import { rollExpression, rollAdvantage } from '../dice/diceRoller.js';
+import { rollExpression, rollAdvantage, rollDisadvantage } from '../dice/diceRoller.js';
 import { applyRuling, isAtomicRuling } from './applyRuling.js';
 
 const CN = 'test-campaign';
@@ -44,9 +49,15 @@ describe('applyRuling — atomic ops walk existing lanes', () => {
         expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'roll' }));
     });
 
-    it('d20 advantage uses the advantage lane', async () => {
-        await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'dice', expression: '1d20+5', mode: 'advantage' } });
+    it('d20 advantage and disadvantage use their own lanes', async () => {
+        const adv = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'dice', expression: '1d20+5', mode: 'advantage' } });
         expect(rollAdvantage).toHaveBeenCalled();
+        expect(adv.detail).toMatch(/\(advantage\).*→ 17/);
+
+        const dis = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'dice', expression: '1d20+5', mode: 'disadvantage' } });
+        expect(rollDisadvantage).toHaveBeenCalled();
+        expect(rollAdvantage).toHaveBeenCalledTimes(1);
+        expect(dis.detail).toMatch(/\(disadvantage\).*→ 3/);
     });
 
     it('serverDice ON routes through the oracle (server rolls)', async () => {
@@ -67,6 +78,11 @@ describe('applyRuling — atomic ops walk existing lanes', () => {
         const bad = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'target_effect', effect: 'not_a_real_key', targetName: 'Hero' } });
         expect(bad.applied).toBe(false);
         expect(bad.detail).toMatch(/registry/);
+
+        // Re-applying the same target+effect REPLACES (no stacking).
+        await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'target_effect', effect: 'bless', targetName: 'Hero' } });
+        const payload = setRuntimeValue.mock.calls.at(-1)[2];
+        expect(payload.filter(te => te.effect === 'bless' && te.target === 'Hero')).toHaveLength(1);
     });
 
     it('hp_change applies to runtime HP with a zero floor; no-runtime-track targets REFUSED', async () => {
@@ -88,6 +104,12 @@ describe('applyRuling — never-auto ops', () => {
         expect(r.applied).toBe(false);
         expect(r.detail).toMatch(/parked|own lane/i);
         expect(addEntry).toHaveBeenCalledWith(CN, expect.objectContaining({ type: 'ai_ruling_applied', description: expect.stringContaining('refused') }));
+    });
+
+    it('needs_human passes the referee prompt through untouched, unapplied', async () => {
+        const r = await applyRuling({ campaignName: CN, enforcement: OFF, ruling: { type: 'needs_human', text: 'GM decides' } });
+        expect(r.applied).toBe(false);
+        expect(r.detail).toBe('GM decides');
     });
 
     it('unknown type refused; apply failure captured, never thrown at the console', async () => {

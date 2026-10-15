@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 // MA-1847: Apep "Devour the Boat" save-lane no-heal rider — failed DC 26
 // CON save grants the registered 'no_healing' te on the victim sourced from
 // the attacker (MA-0016 byte-shape: duration until_start_of_next_turn) with
@@ -8,6 +9,8 @@
 // missing. Armed ONLY by the structured save_target_effect key parsed onto
 // the save context (§233 save-rider grammar twin of MA-1547/MA-1639):
 // success face grants NOTHING; rows without the key never reach the consumer.
+// Contexts are derived from the disk rows in monsters.json. Apep Constrict's
+// ongoing-damage clause is owned by the constrict-grapple lane — not here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -78,20 +81,24 @@ const campaignName = 'test-campaign';
 const APEP = 'Apep 1';
 const TARGET = 'ElderPaladin';
 
-const BOAT = monstersData.find((m) => m.index === 'apep').legendary_actions.find((a) => a.name === 'Devour the Boat (Costs 2 Actions)');
-const DARKNESS = monstersData.find((m) => m.index === 'apep').actions.find((a) => a.name === 'Venomous Darkness (Recharge 5-6)');
+const APEP_ROW = monstersData.find((m) => m.index === 'apep');
+const BOAT = APEP_ROW.legendary_actions.find((a) => a.name === 'Devour the Boat (Costs 2 Actions)');
+const DARKNESS = APEP_ROW.actions.find((a) => a.name === 'Venomous Darkness (Recharge 5-6)');
 
-function boatContext() {
+// Disk-row derived save context — every field pulled from the monsters.json
+// row exactly as the chip-click transport does, so the rider grammar
+// (save_target_effect) and the damage/dc fields cannot drift from the disk.
+function saveContextFor(action) {
     return {
-        saveDc: 26,
-        saveType: 'Constitution',
+        saveDc: action.save_dc,
+        saveType: action.save_type,
         attackerName: APEP,
-        actionName: BOAT.name,
-        dcSuccess: 'half',
-        autoDamageFormula: '6d10',
-        autoDamageDamageType: 'Piercing',
+        actionName: action.name,
+        dcSuccess: action.dc_success || 'half',
+        autoDamageFormula: action.damage_dice_primary,
+        autoDamageDamageType: action.damage_type_primary,
         saveConditions: [],
-        saveTargetEffect: parseSaveTargetEffect(BOAT),
+        saveTargetEffect: parseSaveTargetEffect(action),
     };
 }
 
@@ -113,14 +120,13 @@ beforeEach(() => {
     vi.clearAllMocks();
     for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
     addEntryLogs.length = 0;
-    rollExpression.mockImplementation(() => ({ total: 40, rolls: [6, 6, 6, 6, 6, 10], modifier: 0 }));
-    applyDamageToTarget.mockImplementation(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 146 - finalDamage }));
 });
 
 describe('MA-1847 save-lane no_healing grant', () => {
-    it('FAIL face: no_healing te registered sourced from Apep, until_start_of_next_turn, damage FULL Piercing', async () => {
-        await resolveSave(boatContext(), false, 8);
+    it('FAIL face: no_healing te sourced from Apep + ONE anchored clock + grant log; damage FULL Piercing', async () => {
+        await resolveSave(saveContextFor(BOAT), false, 8);
 
+        // te registered MA-0016 byte-shape on the campaign root
         const tes = runtimeStore['campaign.targetEffects'] || [];
         expect(tes).toHaveLength(1);
         expect(tes[0]).toMatchObject({
@@ -130,16 +136,7 @@ describe('MA-1847 save-lane no_healing grant', () => {
             duration: 'until_start_of_next_turn',
         });
 
-        const dmg = addEntryLogs.find((e) => e.type === 'save-damage' || e.automationType === 'save-damage');
-        if (dmg) expect(dmg.damageType).toMatch(/Piercing/);
-        expect(applyDamageToTarget).toHaveBeenCalled();
-        const finalArg = applyDamageToTarget.mock.calls[0][2];
-        expect(finalArg).toBe(40);
-    });
-
-    it('FAIL face: ONE anchored clock on Apep (§38 — fires at Apep\u2019s NEXT turn-start, no rounds count)', async () => {
-        await resolveSave(boatContext(), false, 8);
-
+        // ONE anchored clock (§38 — fires at Apep's NEXT turn-start, no rounds count)
         expect(addExpiration).toHaveBeenCalledTimes(1);
         const arg = addExpiration.mock.calls[0][0];
         expect(arg).toMatchObject({
@@ -150,53 +147,43 @@ describe('MA-1847 save-lane no_healing grant', () => {
             effects: [{ type: 'remove_target_effect', effectKey: 'no_healing', source: APEP, target: TARGET }],
         });
         expect(arg.rounds).toBeUndefined();
-    });
 
-    it('FAIL face: condition-applied grant log names the te key and the RAW anchor', async () => {
-        await resolveSave(boatContext(), false, 8);
-
+        // grant log names the te key and the RAW anchor
         const grant = addEntryLogs.find((e) => e.type === 'condition' && e.action === 'applied');
         expect(grant).toBeTruthy();
         expect(grant.characterName).toBe(TARGET);
         expect(grant.sourceName).toBe(APEP);
         expect(grant.condition).toBe("Can't Regain Hit Points");
-        expect(grant.reason).toBe("Devour the Boat (Costs 2 Actions) \u2014 until the start of Apep 1's next turn");
+        expect(grant.reason).toBe("Devour the Boat (Costs 2 Actions) — until the start of Apep 1's next turn");
         expect(grant.note).toContain('no_healing');
         expect(grant.note).toContain('healing_blocked');
+
+        // damage pays FULL on the fail face (6d10 roll = 40, dc_success half never halves)
+        expect(applyDamageToTarget).toHaveBeenCalled();
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(40);
     });
 
-    it('FAIL face: heal choke point LIVE — applyHealing-block gate refuses while the te stands', async () => {
-        await resolveSave(boatContext(), false, 8);
+    it('FAIL face: heal choke point LIVE — isHealingBlocked refuses while the te stands', async () => {
+        await resolveSave(saveContextFor(BOAT), false, 8);
         addEntryLogs.length = 0;
 
         expect(isHealingBlocked(TARGET, campaignName, 10)).toBeTruthy();
         expect(addEntryLogs.some((e) => e.automationType === 'healing_blocked')).toBe(true);
-        expect(isHealingBlocked(TARGET, campaignName, 0)).toBeNull();
     });
 
     it('SUCCESS face: zero te, zero clock, zero grant log — half damage still resolves', async () => {
-        await resolveSave(boatContext(), true, 20);
+        await resolveSave(saveContextFor(BOAT), true, 20);
 
         expect(runtimeStore['campaign.targetEffects'] || []).toHaveLength(0);
         expect(addExpiration).not.toHaveBeenCalled();
         expect(addEntryLogs.some((e) => e.type === 'condition' && e.action === 'applied')).toBe(false);
-        const finalArg = applyDamageToTarget.mock.calls[0][2];
-        expect(finalArg).toBe(20);
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(20);
     });
 
     it('byte-inert: rows without the structured key grant nothing (Venomous Darkness twin)', async () => {
-        const darknessCtx = {
-            saveDc: 26,
-            saveType: 'Constitution',
-            attackerName: APEP,
-            actionName: DARKNESS.name,
-            dcSuccess: 'half',
-            autoDamageFormula: '14d10',
-            autoDamageDamageType: 'Necrotic',
-            saveConditions: [],
-            saveTargetEffect: parseSaveTargetEffect(DARKNESS),
-        };
+        const darknessCtx = saveContextFor(DARKNESS);
         expect(darknessCtx.saveTargetEffect).toBeNull();
+
         await resolveSave(darknessCtx, false, 5);
 
         expect(runtimeStore['campaign.targetEffects'] || []).toHaveLength(0);

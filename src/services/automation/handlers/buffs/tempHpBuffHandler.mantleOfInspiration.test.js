@@ -1,3 +1,8 @@
+// @maintained-by-ai — deterministic contract tests for the Mantle of Inspiration lane
+// (handle() route detection, handleMantleOfInspiration modal + guard, confirmMantleOfInspiration
+// side effects). Fully mocked, no wall-clock or network. Generic-lane copy
+// (`Could not calculate temp HP`, `No temp HP expression defined`) is owned solely by
+// tempHpBuffHandler.handle.test.js — the negative route guards here pin dispatch shape only.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -43,7 +48,7 @@ function resetMocks() {
 describe('handle — MantleOfInspiration route detection', () => {
   beforeEach(() => resetMocks());
 
-  it('returns mantleOfInspirationTarget modal when bonusMovement is true and expression contains bardic_inspiration_die', async () => {
+  it('routes to mantleOfInspirationTarget modal when bonusMovement is true and expression contains bardic_inspiration_die', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: '2 * bardic_inspiration_die',
@@ -57,6 +62,8 @@ describe('handle — MantleOfInspiration route detection', () => {
     expect(result.modalName).toBe('mantleOfInspirationTarget');
   });
 
+  // Negative guards pin DISPATCH shape only — they fall through to the generic
+  // lane whose copy is owned by tempHpBuffHandler.handle.test.js.
   it('does NOT route to Mantle when bonusMovement is false', async () => {
     const action = makeAction({
       bonusMovement: false,
@@ -68,7 +75,7 @@ describe('handle — MantleOfInspiration route detection', () => {
     const result = await handle(action, ps, campaignName);
 
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Could not calculate temp HP');
+    expect(result.modalName).toBeUndefined();
   });
 
   it('does NOT route to Mantle when expression does not contain bardic_inspiration_die', async () => {
@@ -82,18 +89,18 @@ describe('handle — MantleOfInspiration route detection', () => {
     const result = await handle(action, ps, campaignName);
 
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Could not calculate temp HP');
+    expect(result.modalName).toBeUndefined();
   });
 });
 
 // ────────────────────────────────────────────────────────────────
-// handleMantleOfInspiration — exhausted uses
+// handleMantleOfInspiration — exhausted uses guard
 // ────────────────────────────────────────────────────────────────
 
 describe('handleMantleOfInspiration — exhausted uses', () => {
   beforeEach(() => resetMocks());
 
-  function makeBardStats(uses, chaScore) {
+  function makeBardStats(uses) {
     return makePlayerStats({
       level: 5,
       name: 'Bard',
@@ -107,14 +114,13 @@ describe('handleMantleOfInspiration — exhausted uses', () => {
           { level: 5, bardic_inspiration_uses: uses },
         ],
       },
-      ...(chaScore !== undefined ? { abilities: [{ name: 'Charisma', score: chaScore }] } : {}),
     });
   }
 
-  it('returns popup with no-uses message when current uses is 0', async () => {
+  it('returns popup with no-uses message and zero writes when current uses is 0', async () => {
     const action = makeAction({
       bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
+      tempHpExpression: '2 * bardic_inspiration_die',
     });
     // usesMax = 2 (from class_levels[4].bardic_inspiration_uses), currentUses = 0
     const ps = makeBardStats(2);
@@ -123,23 +129,10 @@ describe('handleMantleOfInspiration — exhausted uses', () => {
     const result = await handle(action, ps, campaignName);
 
     expect(result.type).toBe('popup');
+    expect(result.modalName).toBeUndefined();
     expect(result.payload.description).toContain('no uses remaining');
     expect(result.payload.description).toContain('Long Rest');
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('returns popup when uses are exhausted and runtime value is 0', async () => {
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: '2 * bardic_inspiration_die',
-    });
-    const ps = makeBardStats(3);
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('no uses remaining');
   });
 });
 
@@ -167,7 +160,7 @@ describe('handleMantleOfInspiration — modal payload', () => {
     });
   }
 
-  it('returns modal with creature targets from combat context', async () => {
+  it('returns modal with creature targets mapped from combat context', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: '2 * bardic_inspiration_die',
@@ -194,22 +187,6 @@ describe('handleMantleOfInspiration — modal payload', () => {
       { name: 'Ally1' },
       { name: 'Ally2' },
     ]);
-  });
-
-  it('includes self in creature targets when self is in combat context', async () => {
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-    });
-    const ps = makeBardStats(1, 6, 2);
-    useRuntimeState.getRuntimeValue.mockReturnValue(2);
-    damageUtils.getCombatContext.mockResolvedValue({
-      creatures: [{ name: 'Bard' }],
-    });
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.payload.creatureTargets).toEqual([{ name: 'Bard' }]);
   });
 
   it('returns empty creatureTargets when combat context has no creatures', async () => {
@@ -244,6 +221,7 @@ describe('handleMantleOfInspiration — modal payload', () => {
     resetMocks();
     useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
+    // +0 modifier exercises the Math.max(1, chaMod) floor
     const lowChaPs = makeBardStats(1, 6, 2);
     lowChaPs.abilities = [{ name: 'Charisma', score: 10 }];
 
@@ -332,22 +310,6 @@ describe('handleMantleOfInspiration — modal payload', () => {
     expect(result.payload.dieRoll).toBeGreaterThanOrEqual(1);
     expect(result.payload.dieRoll).toBeLessThanOrEqual(8);
   });
-
-  it('uses cha modifier for maxTargets with floor of 1 — negative cha', async () => {
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-    });
-
-    const negativeChaPs = makeBardStats(1, 6, 2);
-    negativeChaPs.abilities = [{ name: 'Charisma', score: 3 }]; // -4 modifier -> maxTargets = 1
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(2);
-    damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
-
-    const result = await handle(action, negativeChaPs, campaignName);
-    expect(result.payload.maxTargets).toBe(1);
-  });
 });
 
 // ────────────────────────────────────────────────────────────────
@@ -373,10 +335,8 @@ describe('confirmMantleOfInspiration', () => {
     });
   }
 
-  it('applies temp HP to selected targets using max of existing', async () => {
-    useRuntimeState.getRuntimeValue
-      .mockReturnValueOnce(2)
-      .mockReturnValueOnce(5);
+  it('applies temp HP to targets and returns automation_info popup with Reaction/OA copy', async () => {
+    useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const action = makeMantleAction();
     const ps = makeBardStats('Bard1', 16);
@@ -385,9 +345,12 @@ describe('confirmMantleOfInspiration', () => {
       action, playerStats: ps, campaignName,
       selectedTargets: ['Ally1', 'Ally2'],
       dieRoll: 4, bardicDieSize: 6, tempHp: 8
-    })
+    });
 
     expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.name).toBe('Second Wind');
+    expect(result.payload.automationType).toBe('temp_hp_buff');
     expect(result.payload.description).toContain('Ally1, Ally2');
     expect(result.payload.description).toContain('8 temporary hit points');
     expect(result.payload.description).toContain('Reaction');
@@ -411,7 +374,7 @@ describe('confirmMantleOfInspiration', () => {
       action, playerStats: ps, campaignName,
       selectedTargets: ['Ally1', 'Ally2', 'Ally3'],
       dieRoll: 4, bardicDieSize: 6, tempHp: 8
-    })
+    });
 
     const movementCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
       c => c[1] === 'inspiringMovementNoOA'
@@ -434,13 +397,13 @@ describe('confirmMantleOfInspiration', () => {
       action, playerStats: ps, campaignName,
       selectedTargets: ['Ally1', 'Ally2'],
       dieRoll: 4, bardicDieSize: 6, tempHp: 8
-    })
+    });
 
     expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard1', targetName: 'Ally1', effects: [{ type: 'inspiring_movement_no_oa' }], campaignName, rounds: undefined, expireOnCreatureName: 'Bard1' });
     expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard1', targetName: 'Ally2', effects: [{ type: 'inspiring_movement_no_oa' }], campaignName, rounds: undefined, expireOnCreatureName: 'Bard1' });
   });
 
-  it('logs to campaign log with correct details', async () => {
+  it('logs an ability_use entry with roll, die size, temp HP, and targets', async () => {
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const action = makeAction({}, { name: 'Mantle of Inspiration' });
@@ -449,8 +412,8 @@ describe('confirmMantleOfInspiration', () => {
     await confirmMantleOfInspiration({
       action, playerStats: ps, campaignName,
       selectedTargets: ['Ally1'],
-      dieRoll: 4, bardicDieSize: 6, tempHp: 8
-    })
+      dieRoll: 5, bardicDieSize: 8, tempHp: 10
+    });
 
     expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
       type: 'ability_use',
@@ -458,19 +421,6 @@ describe('confirmMantleOfInspiration', () => {
       abilityName: 'Mantle of Inspiration',
       description: expect.stringContaining('Ally1'),
     });
-  });
-
-  it('logs die roll and bardic die size in the log description', async () => {
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const action = makeMantleAction();
-    const ps = makeBardStats('Bard1');
-
-    await confirmMantleOfInspiration({
-      action, playerStats: ps, campaignName,
-      selectedTargets: ['Ally1'],
-      dieRoll: 5, bardicDieSize: 8, tempHp: 10
-    })
 
     const logCall = logService.addEntry.mock.calls[0][1];
     expect(logCall.description).toContain('rolled 5');
@@ -488,81 +438,13 @@ describe('confirmMantleOfInspiration', () => {
       action, playerStats: ps, campaignName,
       selectedTargets: ['Ally1', 'Ally2', 'Ally3'],
       dieRoll: 4, bardicDieSize: 6, tempHp: 8
-    })
+    });
 
     const tempCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
       c => c[1] === 'tempHp'
     );
     expect(tempCalls.length).toBe(1);
     expect(tempCalls[0][0]).toBe('Ally1');
-  });
-
-  it('handles empty selected targets array', async () => {
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const action = makeMantleAction();
-    const ps = makeBardStats('Bard1');
-
-    const result = await confirmMantleOfInspiration({
-      action, playerStats: ps, campaignName,
-      selectedTargets: [],
-      dieRoll: 4, bardicDieSize: 6, tempHp: 8
-    })
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('no targets selected');
-    expect(result.payload.description).not.toContain('Reaction');
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('handles null selected targets', async () => {
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const action = makeMantleAction();
-    const ps = makeBardStats('Bard1');
-
-    const result = await confirmMantleOfInspiration({
-      action, playerStats: ps, campaignName,
-      selectedTargets: null,
-      dieRoll: 4, bardicDieSize: 6, tempHp: 8
-    })
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('no targets selected');
-  });
-
-  it('handles undefined selected targets', async () => {
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const action = makeMantleAction();
-    const ps = makeBardStats('Bard1');
-
-    const result = await confirmMantleOfInspiration({
-      action, playerStats: ps, campaignName,
-      selectedTargets: undefined,
-      dieRoll: 4, bardicDieSize: 6, tempHp: 8
-    })
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('no targets selected');
-  });
-
-  it('returns popup type with automation_info payload', async () => {
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const action = makeMantleAction();
-    const ps = makeBardStats('Bard1');
-
-    const result = await confirmMantleOfInspiration({
-      action, playerStats: ps, campaignName,
-      selectedTargets: ['Ally1'],
-      dieRoll: 4, bardicDieSize: 6, tempHp: 8
-    })
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.name).toBe('Second Wind');
-    expect(result.payload.automationType).toBe('temp_hp_buff');
   });
 
   it('applies temp HP to at least 1 target even with negative CHA modifier', async () => {
@@ -575,7 +457,7 @@ describe('confirmMantleOfInspiration', () => {
       action, playerStats: ps, campaignName,
       selectedTargets: ['Ally1', 'Ally2'],
       dieRoll: 4, bardicDieSize: 6, tempHp: 8
-    })
+    });
 
     // Even with CHA 1 (modifier -5), Math.max(1, -5) = 1 so at least 1 target is selected
     expect(result.payload.description).toContain('Ally1');
@@ -585,5 +467,39 @@ describe('confirmMantleOfInspiration', () => {
     );
     expect(tempCalls.length).toBe(1);
     expect(tempCalls[0][0]).toBe('Ally1');
+  });
+
+  it('returns no-targets popup with zero writes when selectedTargets is empty', async () => {
+    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+
+    const action = makeMantleAction();
+    const ps = makeBardStats('Bard1');
+
+    const result = await confirmMantleOfInspiration({
+      action, playerStats: ps, campaignName,
+      selectedTargets: [],
+      dieRoll: 4, bardicDieSize: 6, tempHp: 8
+    });
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('no targets selected');
+    expect(result.payload.description).not.toContain('Reaction');
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('handles null selected targets via the (selectedTargets || []) fallback', async () => {
+    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+
+    const action = makeMantleAction();
+    const ps = makeBardStats('Bard1');
+
+    const result = await confirmMantleOfInspiration({
+      action, playerStats: ps, campaignName,
+      selectedTargets: null,
+      dieRoll: 4, bardicDieSize: 6, tempHp: 8
+    });
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('no targets selected');
   });
 });

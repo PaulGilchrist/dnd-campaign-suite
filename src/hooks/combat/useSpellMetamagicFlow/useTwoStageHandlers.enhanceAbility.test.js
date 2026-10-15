@@ -1,9 +1,11 @@
-// SP-039: handleEnhanceAbilityConfirm previously called applyEnhanceAbilityEffect
-// with 6 POSITIONAL args against an object-destructure handler signature
-// (enhanceAbilityHandler.applyEnhanceAbility({action, playerStats, campaignName,
-// targetNames, ability})) → targetNames/ability undefined → silent null, te never
-// stamped. CLA-113 call-shape pin: the host MUST pass a single object keyed to the
-// handler signature.
+// @maintained-by-ai: 2026-10-15
+// Enhance Ability handler internals for useTwoStageHandlers (per-handler owner —
+// flow orchestration / stage-machine seam lives in ../useSpellMetamagicFlow.gate-two-stage.test.js).
+// Pins the SP-039/CLA-113 call shape: handleEnhanceAbilityConfirm passes a SINGLE object
+// keyed to enhanceAbilityHandler.applyEnhanceAbility({action, playerStats, campaignName,
+// targetNames, ability}) — the old positional call sent targetNames/ability as undefined,
+// the handler silently returned null and the targetEffect was never stamped.
+// Also owns: confirm target normalization, ability-guard parking, skip slot rollback, popup pass-through.
 import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useTwoStageHandlers } from './useTwoStageHandlers.js'
@@ -34,11 +36,13 @@ const CAMPAIGN = 'test-campaign'
 const CASTER = 'Wild_Sage_Druid'
 const TARGET = 'Wild_Sage_Druid'
 
+// Mirrors public/data/spells.json Enhance Ability (lv2 Transmutation, Touch,
+// concentration, 1 action) plus the automation fallback from triggerSpells.js.
 const eaSpell = {
   name: 'Enhance Ability',
   level: 2,
   concentration: true,
-  casting_time: 'Action',
+  casting_time: '1 action',
   range: 'Touch',
   automation: { type: 'enhance_ability', range: 'Touch' },
 }
@@ -46,10 +50,10 @@ const eaSpell = {
 function makePending() {
   return {
     spell: eaSpell,
-    spellName: 'Enhance Ability',
-    spellLevel: 2,
-    castingTime: 'Action',
-    range: 'Touch',
+    spellName: eaSpell.name,
+    spellLevel: eaSpell.level,
+    castingTime: eaSpell.casting_time,
+    range: eaSpell.range,
     creatureTargets: [CASTER, 'HexWarlock'],
   }
 }
@@ -59,75 +63,95 @@ function renderEA() {
   let cleared = false
   const cfClearPending = vi.fn(() => { cleared = true })
   const getPending = (type) => (type === 'enhanceAbility' && !cleared ? makePending() : null)
+  const setPopupHtml = vi.fn()
   const { result } = renderHook(() =>
-    useTwoStageHandlers({ playerStats: playerStats, campaignName: CAMPAIGN, cfClearPending: cfClearPending, getPending: getPending, setPopupHtml: vi.fn() })
+    useTwoStageHandlers({ playerStats, campaignName: CAMPAIGN, cfClearPending, getPending, setPopupHtml })
   )
-  return { result, playerStats, cfClearPending }
+  return { result, playerStats, cfClearPending, setPopupHtml }
 }
 
-describe('SP-039 handleEnhanceAbilityConfirm — object call-shape into applyEnhanceAbilityEffect', () => {
+// Confirm normalizes its modal result into targetNames (array | {targetName} | bare
+// string) and always calls applyEnhanceAbilityEffect with ONE object argument —
+// never positional args (SP-039/CLA-113).
+const confirmCases = [
+  { name: 'array confirm result', ability: 'CHA', confirmResult: [TARGET], targetNames: [TARGET] },
+  { name: 'object confirm result', ability: 'STR', confirmResult: { targetName: 'HexWarlock' }, targetNames: ['HexWarlock'] },
+  { name: 'bare-string confirm result', ability: 'DEX', confirmResult: 'HexWarlock', targetNames: ['HexWarlock'] },
+]
+
+describe('handleEnhanceAbilityConfirm — object call-shape into applyEnhanceAbilityEffect', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('calls applyEnhanceAbilityEffect once with a single object matching the handler signature', async () => {
-    const { result, playerStats, cfClearPending } = renderEA()
+  for (const testCase of confirmCases) {
+    it(`normalizes ${testCase.name} and applies once with a signature-shaped object`, async () => {
+      const { result, playerStats, cfClearPending } = renderEA()
+
+      await act(async () => {
+        result.current.handleEnhanceAbilityAbilitySelect(testCase.ability)
+      })
+      await act(async () => {
+        await result.current.handleEnhanceAbilityConfirm(testCase.confirmResult)
+      })
+
+      expect(applyEnhanceAbilityEffect).toHaveBeenCalledTimes(1)
+      expect(applyEnhanceAbilityEffect.mock.calls[0].length).toBe(1)
+      const arg = applyEnhanceAbilityEffect.mock.calls[0][0]
+      expect(typeof arg).toBe('object')
+      expect(arg.targetNames).toEqual(testCase.targetNames)
+      expect(arg.ability).toBe(testCase.ability)
+      expect(arg.playerStats).toBe(playerStats)
+      expect(arg.campaignName).toBe(CAMPAIGN)
+      expect(arg.action.name).toBe('Enhance Ability')
+      expect(arg.action.spell).toBe(eaSpell)
+      expect(arg.action.automation).toEqual({ type: 'enhance_ability', range: 'Touch' })
+
+      expect(cfClearPending).toHaveBeenCalledWith('enhanceAbility')
+      expect(result.current.enhanceAbilityStage).toBeNull()
+      expect(result.current.enhanceAbilitySelectedAbility).toBeNull()
+      expect(rollbackSpellSlot).not.toHaveBeenCalled()
+    })
+  }
+
+  it('surfaces the apply result popup via setPopupHtml', async () => {
+    const { result, setPopupHtml } = renderEA()
+    const popup = { type: 'popup', payload: { type: 'automation_info', name: 'Enhance Ability' } }
+    applyEnhanceAbilityEffect.mockResolvedValueOnce(popup)
 
     await act(async () => {
-      result.current.handleEnhanceAbilityAbilitySelect('CHA')
+      result.current.handleEnhanceAbilityAbilitySelect('WIS')
     })
     await act(async () => {
       await result.current.handleEnhanceAbilityConfirm([TARGET])
     })
 
-    expect(applyEnhanceAbilityEffect).toHaveBeenCalledTimes(1)
-    const arg = applyEnhanceAbilityEffect.mock.calls[0][0]
-    expect(typeof arg).toBe('object')
-    expect(applyEnhanceAbilityEffect.mock.calls[0].length).toBe(1)
-    expect(arg.targetNames).toEqual([TARGET])
-    expect(arg.ability).toBe('CHA')
-    expect(arg.playerStats).toBe(playerStats)
-    expect(arg.campaignName).toBe(CAMPAIGN)
-    expect(arg.action.name).toBe('Enhance Ability')
-    expect(arg.action.automation.type).toBe('enhance_ability')
-    expect(cfClearPending).toHaveBeenCalledWith('enhanceAbility')
-    expect(rollbackSpellSlot).not.toHaveBeenCalled()
+    expect(setPopupHtml).toHaveBeenCalledWith(popup.payload)
   })
 
-  it('normalizes a non-array confirm result into targetNames', async () => {
-    const { result } = renderEA()
-
-    await act(async () => {
-      result.current.handleEnhanceAbilityAbilitySelect('STR')
-    })
-    await act(async () => {
-      await result.current.handleEnhanceAbilityConfirm({ targetName: 'HexWarlock' })
-    })
-
-    expect(applyEnhanceAbilityEffect.mock.calls[0][0].targetNames).toEqual(['HexWarlock'])
-    expect(applyEnhanceAbilityEffect.mock.calls[0][0].ability).toBe('STR')
-  })
-
-  it('does not apply when no ability was selected', async () => {
-    const { result } = renderEA()
+  it('confirms without a selected ability are guarded — nothing applied, stage stays parked', async () => {
+    const { result, cfClearPending } = renderEA()
 
     await act(async () => {
       await result.current.handleEnhanceAbilityConfirm([TARGET])
     })
 
     expect(applyEnhanceAbilityEffect).not.toHaveBeenCalled()
+    expect(cfClearPending).not.toHaveBeenCalled()
+    expect(rollbackSpellSlot).not.toHaveBeenCalled()
+    expect(result.current.enhanceAbilityStage).toBe('ability')
   })
 
-  it('skip rolls back the unspent slot and never applies', () => {
-    const { result, cfClearPending } = renderEA()
+  it('skip rolls back the unspent slot, clears pending, and never applies', () => {
+    const { result, playerStats, cfClearPending } = renderEA()
 
     act(() => {
       result.current.handleEnhanceAbilitySkip()
     })
 
-    expect(applyEnhanceAbilityEffect).not.toHaveBeenCalled()
-    expect(rollbackSpellSlot).toHaveBeenCalled()
+    expect(rollbackSpellSlot).toHaveBeenCalledWith(CASTER, 'Enhance Ability', 2, playerStats, CAMPAIGN)
     expect(cfClearPending).toHaveBeenCalledWith('enhanceAbility')
+    expect(applyEnhanceAbilityEffect).not.toHaveBeenCalled()
     expect(result.current.enhanceAbilityStage).toBeNull()
   })
 })

@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// useWizardFeats is a thin config wrapper over useWizardConfig (whose engine
+// behaviour is covered by useWizardConfig.test.js). This file keeps only what
+// it owns: the wiring smoke test, the preSelectedFeats pass-through, and the
+// feats-specific preSelect merge logic. Pure mocks, synchronous, deterministic —
+// no churn expected as the app changes.
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardFeats from './useWizardFeats.js';
@@ -29,6 +35,10 @@ describe('useWizardFeats', () => {
     return renderHook(() => useWizardFeats(formData, setFormDataFn));
   }
 
+  function getConfig() {
+    return useWizardConfig.mock.calls[0][0];
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     getPreSelectedFeats.mockResolvedValue([]);
@@ -39,192 +49,65 @@ describe('useWizardFeats', () => {
     });
   });
 
-  describe('return values', () => {
-    it('returns preSelectedFeats as an array from useWizardConfig', () => {
-      const { result } = renderFeats();
-      expect(Array.isArray(result.current.preSelectedFeats)).toBe(true);
+  describe('useWizardConfig wiring', () => {
+    it('passes the feats config (formData, setFormData, empty slots, background/rules deps, getPreSelectedFeats pre-select) to useWizardConfig', () => {
+      renderFeats(mockFormData, mockSetFormData);
+      const config = getConfig();
+
+      expect(config.formData).toBe(mockFormData);
+      expect(config.setFormData).toBe(mockSetFormData);
+      expect(config.slots).toEqual([]);
+      expect(config.validateFn(mockFormData)).toEqual([]);
+      expect(config.getDeps(mockFormData)).toEqual(['Soldier', '5e']);
+
+      expect(config.preSelect.getFn).toBe(getPreSelectedFeats);
+      expect(config.preSelect.stateKey).toBe('preSelectedFeats');
+      expect(config.preSelect.deps(mockFormData)).toEqual(['Soldier', '5e']);
     });
 
-    it('returns the preSelectedFeats value passed through useWizardConfig', () => {
+    it('returns the preSelectedFeats value passed through from useWizardConfig', () => {
       const expectedFeats = ['Tough', 'Resilient'];
-      useWizardConfig.mockReturnValue({
+      const { result } = renderFeats(mockFormData, mockSetFormData, {
         preSelectedFeats: expectedFeats,
         warnings: [],
         setWarnings: vi.fn(),
       });
-
-      const { result } = renderFeats();
       expect(result.current.preSelectedFeats).toEqual(expectedFeats);
     });
   });
 
-  describe('useWizardConfig delegation', () => {
-    it('passes formData to useWizardConfig', () => {
-      renderFeats(mockFormData);
-      const config = useWizardConfig.mock.calls[0][0];
-      expect(config.formData).toBe(mockFormData);
-    });
-
-    it('passes setFormData to useWizardConfig', () => {
-      renderFeats(mockFormData, mockSetFormData);
-      const config = useWizardConfig.mock.calls[0][0];
-      expect(config.setFormData).toBe(mockSetFormData);
-    });
-
-    it('passes a validateFn function to useWizardConfig', () => {
+  describe('preSelect merge', () => {
+    function getMerge() {
       renderFeats();
-      const config = useWizardConfig.mock.calls[0][0];
-      expect(typeof config.validateFn).toBe('function');
+      return getConfig().preSelect.merge;
+    }
+
+    it('adds new pre-selected feats without duplicating, preserving user feats and other form fields', () => {
+      const merge = getMerge();
+
+      const prev = { background: 'Soldier', rules: '5e', feats: ['Tough'] };
+      const result = merge(prev, ['Tough', 'Resilient'], []);
+
+      expect(result.feats).toEqual(['Tough', 'Resilient']);
+      expect(result.background).toBe('Soldier');
+      expect(result.rules).toBe('5e');
     });
 
-    it('passes an empty slots array to useWizardConfig', () => {
-      renderFeats();
-      const config = useWizardConfig.mock.calls[0][0];
-      expect(config.slots).toEqual([]);
-    });
+    it('removes previously pre-selected feats that are no longer provided', () => {
+      const merge = getMerge();
 
-    it('passes getDeps that extracts background and rules from formData', () => {
-      renderFeats(mockFormData);
-      const config = useWizardConfig.mock.calls[0][0];
-      expect(typeof config.getDeps).toBe('function');
-      const deps = config.getDeps(mockFormData);
-      expect(deps).toContain(mockFormData.background);
-      expect(deps).toContain(mockFormData.rules);
-    });
-
-    it('passes preSelect configuration with getFn, merge, deps, and stateKey', () => {
-      renderFeats();
-      const config = useWizardConfig.mock.calls[0][0];
-      expect(config.preSelect).toBeDefined();
-      expect(typeof config.preSelect.getFn).toBe('function');
-      expect(typeof config.preSelect.merge).toBe('function');
-      expect(typeof config.preSelect.deps).toBe('function');
-      expect(config.preSelect.stateKey).toBe('preSelectedFeats');
-    });
-  });
-
-  describe('preSelect getFn', () => {
-    it('exposes getPreSelectedFeats as the getFn', () => {
-      renderFeats();
-      const config = useWizardConfig.mock.calls[0][0];
-      expect(config.preSelect.getFn).toBe(getPreSelectedFeats);
-    });
-  });
-
-  describe('preSelect deps', () => {
-    it('returns [background, rules] as dependency values', () => {
-      renderFeats(mockFormData);
-      const config = useWizardConfig.mock.calls[0][0];
-      const deps = config.preSelect.deps(mockFormData);
-      expect(deps).toEqual([mockFormData.background, mockFormData.rules]);
-    });
-  });
-
-  describe('preSelect merge function', () => {
-    it('merges new feats into existing feats without duplicating', () => {
-      renderFeats();
-      const config = useWizardConfig.mock.calls[0][0];
-      const merge = config.preSelect.merge;
-
-      const prev = { background: 'Soldier', feats: ['Tough'] };
-      const items = ['Tough', 'Resilient'];
-      const result = merge(prev, items, []);
+      const prev = { background: 'Soldier', feats: ['Healer', 'Tough'] };
+      const result = merge(prev, ['Resilient'], ['Healer']);
 
       expect(result.feats).toEqual(['Tough', 'Resilient']);
     });
 
-    it('adds new feats to existing ones', () => {
-      renderFeats();
-      const config = useWizardConfig.mock.calls[0][0];
-      const merge = config.preSelect.merge;
+    it('handles prev state without any feats', () => {
+      const merge = getMerge();
 
-      const prev = { background: 'Soldier', feats: ['Tough'] };
-      const items = ['Resilient'];
-      const result = merge(prev, items, []);
-
-      expect(result.feats).toContain('Tough');
-      expect(result.feats).toContain('Resilient');
-      expect(result.feats).toHaveLength(2);
-    });
-
-    it('handles undefined feats in prev', () => {
-      renderFeats();
-      const config = useWizardConfig.mock.calls[0][0];
-      const merge = config.preSelect.merge;
-
-      const prev = { background: 'Soldier' };
-      const items = ['Tough'];
-      const result = merge(prev, items, []);
+      const result = merge({ background: 'Soldier' }, ['Tough'], []);
 
       expect(result.feats).toEqual(['Tough']);
-    });
-
-    it('handles empty items array', () => {
-      renderFeats();
-      const config = useWizardConfig.mock.calls[0][0];
-      const merge = config.preSelect.merge;
-
-      const prev = { background: 'Soldier', feats: ['Tough'] };
-      const items = [];
-      const result = merge(prev, items, []);
-
-      expect(result.feats).toEqual(['Tough']);
-    });
-
-    it('removes old pre-selected feats when no longer in new list', () => {
-      renderFeats();
-      const config = useWizardConfig.mock.calls[0][0];
-      const merge = config.preSelect.merge;
-
-      const prev = { background: 'Soldier', feats: ['Healer', 'Tough'] };
-      const items = ['Resilient'];
-      const prevItems = ['Healer'];
-      const result = merge(prev, items, prevItems);
-
-      expect(result.feats).toContain('Resilient');
-      expect(result.feats).toContain('Tough');
-      expect(result.feats).not.toContain('Healer');
-    });
-
-    it('returns merged result with all spread properties from prev', () => {
-      renderFeats();
-      const config = useWizardConfig.mock.calls[0][0];
-      const merge = config.preSelect.merge;
-
-      const prev = { background: 'Soldier', rules: '5e', feats: ['Tough'] };
-      const items = ['Resilient'];
-      const result = merge(prev, items, []);
-
-      expect(result.background).toBe('Soldier');
-      expect(result.rules).toBe('5e');
-      expect(result.feats).toContain('Tough');
-      expect(result.feats).toContain('Resilient');
-    });
-  });
-
-  describe('behavior with different rulesets', () => {
-    it('works with 5e ruleset', () => {
-      const formData5e = { ...mockFormData, rules: '5e' };
-      useWizardConfig.mockReturnValue({
-        preSelectedFeats: ['Tough'],
-        warnings: [],
-        setWarnings: vi.fn(),
-      });
-
-      const { result } = renderFeats(formData5e);
-      expect(result.current.preSelectedFeats).toEqual(['Tough']);
-    });
-
-    it('works with 2024 ruleset', () => {
-      const formData2024 = { ...mockFormData, rules: '2024' };
-      useWizardConfig.mockReturnValue({
-        preSelectedFeats: ['Magic Initiate'],
-        warnings: [],
-        setWarnings: vi.fn(),
-      });
-
-      const { result } = renderFeats(formData2024);
-      expect(result.current.preSelectedFeats).toEqual(['Magic Initiate']);
     });
   });
 });

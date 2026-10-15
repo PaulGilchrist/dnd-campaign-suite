@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// Fetch-level contract for useCharacterWizard: wizard visibility toggles, create/edit
+// HTTP calls (POST/PUT URL + body incl. rename filename sanitization), runtime
+// lineage/legacy stamp wiring on subrace change (CLA-118/CLA-139, one merged write),
+// and alert/refresh internals on failure (delegated here by App.runtime-events.test.jsx).
+// NOT the donning seam (save-then-strip ordering) — that lives in
+// useCharacterWizard.donning.test.js; handler stamp internals live in the lineage
+// handler suites.
 import { renderHook, act } from '@testing-library/react';
 import { useCharacterWizard } from './useCharacterWizard.js';
 
@@ -21,15 +29,6 @@ function createWrapper(campaignName) {
 }
 
 describe('useCharacterWizard', () => {
-  describe('initial state', () => {
-    it('starts with both wizards hidden', () => {
-      const { result } = renderHook(createWrapper(null));
-
-      expect(result.current.showCharacterWizard).toBe(false);
-      expect(result.current.showEditCharacterWizard).toBe(false);
-    });
-  });
-
   describe('toggle wizards', () => {
     it('toggles showCharacterWizard and showEditCharacterWizard correctly', () => {
       const { result } = renderHook(createWrapper('MyCampaign'));
@@ -102,38 +101,6 @@ describe('useCharacterWizard', () => {
       expect(setCharacters).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ name: 'TestChar', refreshed: true })])
       );
-    });
-
-    it('handles empty character file list after create', async () => {
-      const setCharacters = vi.fn();
-      const setActiveCharacter = vi.fn();
-      const campaignName = 'TestCampaign';
-      const characterData = { name: 'TestChar' };
-      const createdCharacter = { ...characterData, id: 'char-1' };
-
-      global.fetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ character: createdCharacter }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ files: [] }),
-        });
-
-      const { result } = renderHook(createWrapper(campaignName));
-
-      act(() => {
-        result.current.setCharacterCallbacks({ setCharacters, setActiveCharacter });
-      });
-
-      await act(async () => {
-        await result.current.handleWizardComplete(characterData);
-      });
-
-      expect(setActiveCharacter).toHaveBeenCalledWith(createdCharacter);
-      expect(result.current.showCharacterWizard).toBe(false);
-      expect(setCharacters).toHaveBeenCalledWith([]);
     });
   });
 

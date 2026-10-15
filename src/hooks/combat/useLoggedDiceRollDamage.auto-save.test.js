@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/rules/features/viciousMockeryService.js', () => ({
@@ -6,25 +7,7 @@ vi.mock('../../services/rules/features/viciousMockeryService.js', () => ({
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
     rollExpressionDoubled: vi.fn(),
-    formatDamageFormula: vi.fn((formula, rolls, isCrit) => {
-        if (!isCrit) return formula;
-        const parsed = formula.match(/^(\d+)?d(\d+)((?:[+-]\d+)+)?$/i);
-        if (!parsed) return formula;
-        const count = parsed[1] || 1;
-        const sides = parsed[2];
-        const modifierStr = parsed[3];
-        let modifier = 0;
-        if (modifierStr) {
-            const segments = modifierStr.match(/([+-]\d+)/g);
-            for (const seg of segments) { modifier += parseInt(seg, 10); }
-        }
-        const dicePart = count === 1 ? `d${sides}` : `${count}d${sides}`;
-        const rollStr = rolls && rolls.length > 0 ? ` (${rolls.join(', ')})` : '';
-        let result = `${dicePart}*2${rollStr}`;
-        if (modifier > 0) result += `+${modifier}`;
-        else if (modifier < 0) result += `${modifier}`;
-        return result;
-    }),
+    formatDamageFormula: vi.fn((formula, _rolls, isCrit) => (isCrit ? `${formula}*2` : formula)),
 }));
 
 vi.mock('../../services/ui/utils.js', () => ({
@@ -35,7 +18,7 @@ vi.mock('../../services/ui/utils.js', () => ({
 }));
 
 vi.mock('../runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
 
@@ -45,15 +28,11 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 }));
 
 vi.mock('../../services/combat/automation/automationService.js', () => ({
-    hasIgnoreResistance: vi.fn(),
+    hasIgnoreResistance: vi.fn(() => false),
     playerIsImmuneToCondition: vi.fn(),
-    hasGreatWeaponFighting: vi.fn(),
+    hasGreatWeaponFighting: vi.fn(() => false),
     applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
-    evaluateAutoExpression: vi.fn((expr) => {
-        const match = expr.match(/^(\d+)d(\d+)\+(\d+)/);
-        if (match) return parseInt(match[1]) + parseInt(match[3]);
-        return 0;
-    }),
+    evaluateAutoExpression: vi.fn(() => 0),
 }));
 
 vi.mock('../../services/rules/features/invisibilityService.js', () => ({
@@ -75,7 +54,7 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
     getParryAcBonus: vi.fn(() => 0),
     readAoeContext: vi.fn(),
     hasPotentCantrip: vi.fn(),
-    isMagicMissileImmune: vi.fn(),
+    isMagicMissileImmune: vi.fn(() => false),
     hasSoulstitchProtection: vi.fn(),
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
@@ -85,10 +64,10 @@ vi.mock('../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
-    computeDamageAfterSave: vi.fn((total, success, _dcSuccess) => success ? Math.floor(total / 2) : total),
+    computeDamageAfterSave: vi.fn((total, success) => (success ? Math.floor(total / 2) : total)),
     computeDamageAfterEvasion: vi.fn((total, success, _dcSuccess, evasion) => (evasion && success ? 0 : (success ? Math.floor(total / 2) : total))),
     rollSaveForCreature: vi.fn(),
-    applyDamageToTarget: vi.fn(),
+    applyDamageToTarget: vi.fn().mockResolvedValue({ finalDamage: 10, newHp: 10, damageReduced: false }),
     clearReTriggeredSequence: vi.fn(),
     normalizeSaveType: (type) => type,
 }));
@@ -102,7 +81,7 @@ vi.mock('../../services/combat/auras/elderChampionAuraUtils.js', () => ({
 }));
 
 vi.mock('../../services/automation/handlers/buffs/circleOfPowerHandler.js', () => ({
-    isCircleOfPowerActive: vi.fn(),
+    isCircleOfPowerActive: vi.fn(() => false),
 }));
 
 vi.mock('../../services/combat/auras/bardicInspirationState.js', () => ({
@@ -142,75 +121,56 @@ vi.mock('../../hooks/useAllySelection.js', () => ({
     getAllyList: vi.fn(),
 }));
 
-import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
-import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
-import { applyMinDamageAdjustment } from './loggedDiceRollUtils.js';
-import { computeDamageAfterSave, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
+import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
 import { sendSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 
+// Contact Other Plane auto-save lane (INT save, psychic, half on "save" per
+// rules data). Owns the createLogDamageAndShow-level contract of the forced
+// success leg in handlePlayerSaveDamage: note, characters:null patron arg,
+// contactPatron popup flag, invisibility end, and no save prompt.
 describe('Contact Other Plane auto-save', () => {
+    const warlock = { name: 'Warlock1', computedStats: { armorClass: 14 } };
+    const contactPassiveStats = {
+        automation: {
+            passives: [{ type: 'passive_rule', effect: 'contact_patron_auto_save' }],
+        },
+    };
+
     const deps = {
         characterName: 'Warlock1',
         campaignName: 'test-campaign',
-        characters: [{ name: 'Warlock1', computedStats: { armorClass: 14 } }],
-        charactersRef: { current: [{ name: 'Warlock1', computedStats: { armorClass: 14 } }] },
+        characters: [warlock],
+        charactersRef: { current: [warlock] },
         setPopupHtml: vi.fn(),
         logEntry: vi.fn(),
         pendingSaves: {},
     };
 
-    const playerStats = {
-        automation: {
-            passives: [
-                { type: 'passive_rule', effect: 'contact_patron_auto_save' },
-            ],
-        },
-    };
-
+    // Spell casting data as autoDamageRoll would deliver it for the spell's
+    // 5e/2024 rules entry (6d6 psychic, INT save).
+    const rollData = { name: 'Contact Other Plane', formula: '6d6', total: 21, rolls: [6, 5, 4, 3, 2, 1], modifier: 0 };
     const autoSaveContext = {
         targetName: 'Warlock1',
         damageType: 'psychic',
         saveDc: 15,
-        saveType: 'WIS',
+        saveType: 'INT',
         dcSuccess: 'half',
-        playerStats,
-    };
-
-    const nonAutoSaveContext = {
-        targetName: 'Warlock1',
-        damageType: 'fire',
-        saveDc: 15,
-        saveType: 'DEX',
-        dcSuccess: 'half',
-        playerStats,
+        playerStats: contactPassiveStats,
     };
 
     beforeEach(() => {
         vi.clearAllMocks();
-
-        getRuntimeValue.mockReturnValue(null);
-        applyMinDamageAdjustment.mockImplementation((d) => d);
-        hasIgnoreResistance.mockReturnValue(false);
-        endInvisibilityOnHostileAction.mockReturnValue(undefined);
-        computeDamageAfterSave.mockImplementation((total, success) =>
-            success ? Math.floor(total / 2) : total
-        );
-        applyDamageToTarget.mockResolvedValue({ finalDamage: 10, newHp: 10, damageReduced: false });
+        deps.pendingSaves = {};
         loadCombatSummary.mockResolvedValue({
             creatures: [{ name: 'Warlock1', type: 'player', ac: 14, currentHp: 20, maxHp: 20 }],
         });
     });
 
-    function createFn() {
-        return createLogDamageAndShow(deps);
-    }
-
-    it('applies auto-save for Contact Other Plane when caster is the target', async () => {
-        const fn = createFn();
-        await fn({ name: 'Contact Other Plane', formula: '4d6', total: 14, rolls: [3, 4, 5, 2], modifier: 0, context: autoSaveContext });
+    it('auto-succeeds when the caster is the target: half damage, contactPatron popup, no prompt', async () => {
+        await createLogDamageAndShow(deps)({ ...rollData, context: autoSaveContext });
 
         expect(deps.logEntry).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -218,39 +178,63 @@ describe('Contact Other Plane auto-save', () => {
                 rollType: 'save-damage',
                 name: 'Contact Other Plane',
                 saveResult: 'success',
+                saveRoll: 20,
                 note: 'contact_patron_damage_roll_before_apply',
                 targetName: 'Warlock1',
                 damageType: 'psychic',
-                formula: '4d6',
-                total: 14,
+                formula: '6d6',
+                total: 21,
             })
         );
 
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Warlock1', 7, ['psychic'], { campaignName: 'test-campaign', characters: null, ignoreResistance: false, attackerName: 'Warlock1', suppressHpLog: false, ...{ isSpellDamage: true } });
+        // Patron contract: characters:null so damage resolves via the runtime store.
+        expect(applyDamageToTarget).toHaveBeenCalledWith(
+            expect.any(Object),
+            'Warlock1',
+            10,
+            ['psychic'],
+            { campaignName: 'test-campaign', characters: null, ignoreResistance: false, attackerName: 'Warlock1', suppressHpLog: false, isSpellDamage: true }
+        );
 
         expect(deps.setPopupHtml).toHaveBeenCalledWith(
             expect.objectContaining({
                 type: 'save-damage',
                 name: 'Contact Other Plane',
                 contactPatron: true,
-                finalDamage: 7,
-                total: 7,
+                finalDamage: 10,
+                total: 10,
                 damageApplied: true,
                 damageReduced: false,
+                saveResult: expect.objectContaining({ success: true }),
             })
         );
 
-        expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith(
-            'Warlock1',
-            'test-campaign'
-        );
-
+        expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('Warlock1', 'test-campaign');
         expect(sendSavePrompt).not.toHaveBeenCalled();
+        expect(deps.pendingSaves).toEqual({});
     });
 
-    it('does not auto-save for other spells and falls through to save prompt', async () => {
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: nonAutoSaveContext });
+    it.each([
+        {
+            title: 'spell name mismatch',
+            roll: { name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0 },
+            context: { ...autoSaveContext, damageType: 'fire', saveType: 'DEX' },
+        },
+        {
+            title: 'target is not the caster',
+            roll: rollData,
+            context: { ...autoSaveContext, targetName: 'Ally1' },
+            summary: { creatures: [{ name: 'Ally1', type: 'player', ac: 16, currentHp: 30, maxHp: 30 }] },
+        },
+        {
+            title: 'caster lacks the contact_patron_auto_save passive',
+            roll: rollData,
+            context: { ...autoSaveContext, playerStats: { automation: { passives: [] } } },
+        },
+    ])('falls through to a normal save prompt on $title', async ({ roll, context, summary }) => {
+        if (summary) loadCombatSummary.mockResolvedValue(summary);
+
+        await createLogDamageAndShow(deps)({ ...roll, context });
 
         expect(applyDamageToTarget).not.toHaveBeenCalled();
         expect(deps.setPopupHtml).not.toHaveBeenCalledWith(
@@ -258,60 +242,16 @@ describe('Contact Other Plane auto-save', () => {
         );
 
         expect(sendSavePrompt).toHaveBeenCalledTimes(1);
-        const savePromptCall = sendSavePrompt.mock.calls[0][1];
-        expect(savePromptCall).toEqual(
+        expect(sendSavePrompt.mock.calls[0][1]).toEqual(
             expect.objectContaining({
                 promptId: 'test-guid-1234',
-                targetName: 'Warlock1',
-                saveType: 'DEX',
-                saveDc: 15,
-                dcSuccess: 'half',
-                damageType: 'fire',
+                targetName: context.targetName,
+                saveType: context.saveType,
+                saveDc: context.saveDc,
+                dcSuccess: context.dcSuccess,
+                damageType: context.damageType,
             })
         );
-
-        expect(deps.pendingSaves).toHaveProperty('test-guid-1234');
-    });
-
-    it('does not auto-save when target is not the caster', async () => {
-        const allyContext = {
-            ...autoSaveContext,
-            targetName: 'Ally1',
-        };
-
-        loadCombatSummary.mockResolvedValue({
-            creatures: [{ name: 'Ally1', type: 'player', ac: 16, currentHp: 30, maxHp: 30 }],
-        });
-
-        const fn = createFn();
-        await fn({ name: 'Contact Other Plane', formula: '4d6', total: 14, rolls: [3, 4, 5, 2], modifier: 0, context: allyContext });
-
-        expect(applyDamageToTarget).not.toHaveBeenCalled();
-        expect(deps.setPopupHtml).not.toHaveBeenCalledWith(
-            expect.objectContaining({ contactPatron: true })
-        );
-
-        expect(sendSavePrompt).toHaveBeenCalledTimes(1);
-        expect(deps.pendingSaves).toHaveProperty('test-guid-1234');
-    });
-
-    it('does not auto-save when character has no contact_patron_auto_save passive', async () => {
-        const noPassiveStats = {
-            automation: {
-                passives: [],
-            },
-        };
-
-        const context = {
-            ...autoSaveContext,
-            playerStats: noPassiveStats,
-        };
-
-        const fn = createFn();
-        await fn({ name: 'Contact Other Plane', formula: '4d6', total: 14, rolls: [3, 4, 5, 2], modifier: 0, context: context });
-
-        expect(applyDamageToTarget).not.toHaveBeenCalled();
-        expect(sendSavePrompt).toHaveBeenCalledTimes(1);
         expect(deps.pendingSaves).toHaveProperty('test-guid-1234');
     });
 });

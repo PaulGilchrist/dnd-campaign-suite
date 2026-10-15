@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+// @maintained-by-ai: 2026-10-14
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 vi.mock('../../services/rules/spells/spellCastService.js', () => ({
   executeSpellCast: vi.fn(),
@@ -8,10 +9,6 @@ import { executeSpellCast } from '../../services/rules/spells/spellCastService.j
 import { renderHook, act } from '@testing-library/react';
 import { useSpellCastExecutor } from './useSpellCastExecutor.js';
 
-function makePlayerStats(overrides = {}) {
-  return { name: 'TestCaster', ...overrides };
-}
-
 function makeSpell(overrides = {}) {
   return { name: 'Fireball', ...overrides };
 }
@@ -20,7 +17,7 @@ function makeProps(overrides = {}) {
   return {
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
-    playerStats: makePlayerStats(),
+    playerStats: { name: 'TestCaster' },
     getTargetInfo: vi.fn(),
     campaignName: 'TestCampaign',
     mapName: 'TestMap',
@@ -31,119 +28,61 @@ function makeProps(overrides = {}) {
   };
 }
 
-describe('useSpellCastExecutor', () => {
+describe('useSpellCastExecutor — error handling', () => {
+  let consoleErrorSpy;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
   });
 
-  describe('error handling — behavior not covered elsewhere', () => {
-    it('does not call setModalState when executeSpellCast throws', async () => {
-      const props = makeProps();
-      const setModalState = vi.fn();
-      executeSpellCast.mockRejectedValue(new Error('Cast failed'));
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+  });
 
-      const { result } = renderHook(() =>
-        useSpellCastExecutor({ ...props, setModalState })
-      );
+  // Authoritative seam: the .catch() in runCast logs the rejection value
+  // VERBATIM (never coerced to e.message) and never renders a popup or modal.
+  it.each([
+    ['Error', new Error('Cast failed')],
+    ['string', 'string error'],
+    ['undefined', undefined],
+    ['null', null],
+  ])('logs %s rejections verbatim without popup or modal', async (_label, value) => {
+    const setModalState = vi.fn();
+    const props = makeProps({ setModalState });
+    executeSpellCast.mockRejectedValue(value);
 
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
+    const { result } = renderHook(() => useSpellCastExecutor(props));
 
-      expect(setModalState).not.toHaveBeenCalled();
-      expect(props.setPopupHtml).not.toHaveBeenCalled();
+    await act(async () => {
+      await result.current.castAction(makeSpell(), {});
     });
 
-    it('hook remains usable after a cast error', async () => {
-      const props = makeProps();
-      executeSpellCast
-        .mockRejectedValueOnce(new Error('First cast failed'))
-        .mockResolvedValueOnce(null);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[useSpellCastExecutor] executeSpellCast error for Fireball:',
+      value,
+    );
+    expect(props.setPopupHtml).not.toHaveBeenCalled();
+    expect(setModalState).not.toHaveBeenCalled();
+  });
 
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(props)
-      );
+  it('remains usable after a cast rejection — next cast routes normally', async () => {
+    const props = makeProps();
+    executeSpellCast
+      .mockRejectedValueOnce(new Error('First cast failed'))
+      .mockResolvedValueOnce({ automationPopup: { type: 'popup', payload: '<div>Recovered</div>' } });
 
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
+    const { result } = renderHook(() => useSpellCastExecutor(props));
 
-      expect(props.setPopupHtml).not.toHaveBeenCalled();
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(props.setPopupHtml).not.toHaveBeenCalled();
+    await act(async () => {
+      await result.current.castAction(makeSpell(), {});
     });
+    expect(props.setPopupHtml).not.toHaveBeenCalled();
 
-    it('handles non-Error rejection values (string)', async () => {
-      const props = makeProps();
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
-      executeSpellCast.mockRejectedValue('string error');
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(props)
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[useSpellCastExecutor] executeSpellCast error for Fireball:',
-        'string error',
-      );
-
-      expect(props.setPopupHtml).not.toHaveBeenCalled();
-
-      consoleErrorSpy.mockRestore();
+    await act(async () => {
+      await result.current.castAction(makeSpell(), {});
     });
-
-    it('handles undefined rejection value', async () => {
-      const props = makeProps();
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
-      executeSpellCast.mockRejectedValue(undefined);
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(props)
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[useSpellCastExecutor] executeSpellCast error for Fireball:',
-        undefined,
-      );
-
-      expect(props.setPopupHtml).not.toHaveBeenCalled();
-
-      consoleErrorSpy.mockRestore();
-    });
-
-    it('handles null rejection value', async () => {
-      const props = makeProps();
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
-      executeSpellCast.mockRejectedValue(null);
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(props)
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[useSpellCastExecutor] executeSpellCast error for Fireball:',
-        null,
-      );
-
-      expect(props.setPopupHtml).not.toHaveBeenCalled();
-
-      consoleErrorSpy.mockRestore();
-    });
+    expect(executeSpellCast).toHaveBeenCalledTimes(2);
+    expect(props.setPopupHtml).toHaveBeenCalledWith('<div>Recovered</div>');
   });
 });

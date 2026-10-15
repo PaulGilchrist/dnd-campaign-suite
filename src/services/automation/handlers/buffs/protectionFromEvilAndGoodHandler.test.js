@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// Handler lane for Protection from Evil and Good (SP-094): deterministic contract
+// tests over fully-mocked collaborators. Pins the popup payload, the single merged
+// store writes (activeBuffs + warded types), exact targetEffects/combatSummary/
+// expiration payloads, skipSync on deactivation writes, and the read-only helpers.
+// The buff-entry shape itself is owned by buffToggle.test.js; consumer seams
+// (contextBuilder-sync.pfeg, automationImmunities, badges, registry) mock this
+// handler and live in their own lanes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -60,6 +68,11 @@ import * as targetResolver from '../../common/targetResolver.js';
 const CAMPAIGN_NAME = 'TestCampaign';
 const PLAYER_NAME = 'TestHero';
 const TARGET_NAME = 'Ally1';
+const SPELL_NAME = 'Protection from Evil and Good';
+const WARDED_TYPES = ['Aberration', 'Celestial', 'Elemental', 'Fey', 'Fiend', 'Undead'];
+const DEFAULT_DURATION = 'Concentration, up to 10 minutes';
+
+const PFEG_BUFF = { name: SPELL_NAME, effect: 'protection_from_evil_and_good' };
 
 function makePlayerStats(overrides = {}) {
   return { name: PLAYER_NAME, ...overrides };
@@ -67,7 +80,7 @@ function makePlayerStats(overrides = {}) {
 
 function makeAction(automation = {}) {
   return {
-    name: 'Protection from Evil and Good',
+    name: SPELL_NAME,
     automation: { type: 'protection_from_evil_and_good', ...automation },
   };
 }
@@ -78,13 +91,17 @@ describe('protectionFromEvilAndGoodHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
+    // Neutral defaults so tests are order-independent.
+    targetResolver.resolveMapPositions.mockResolvedValue(null);
+    runtimeState.getRuntimeValue.mockReturnValue([]);
+    rangeValidation.rangeToFeet.mockReturnValue(30);
+    combatData.getCombatSummary.mockReturnValue({ creatures: [] });
+    buffToggle.toggleBuff.mockReturnValue({ isActive: false, wasActive: false, buffs: [], targetName: null });
   });
 
   describe('handle', () => {
-    it('returns target selection popup with all creatures including caster', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
+    it('returns the full target-selection popup contract for a mapped combat', async () => {
+      targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: { x: 3, y: 4 } });
       rangeValidation.rangeToFeet.mockReturnValue(60);
       combatData.getCombatSummary.mockReturnValue({
         creatures: [
@@ -93,20 +110,29 @@ describe('protectionFromEvilAndGoodHandler', () => {
         ],
       });
 
-      const result = await handle(action, ps, CAMPAIGN_NAME, 'test-map');
+      const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, 'test-map');
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('protectionFromEvilAndGood_target_selection');
-      expect(result.payload.name).toBe('Protection from Evil and Good');
-      expect(result.payload.creatureTargets).toEqual([PLAYER_NAME, TARGET_NAME]);
-      expect(result.payload.range).toBe('Touch');
-      expect(result.payload.rangeFt).toBe(60);
+      // Caster already in the creature list → included once, unchanged order.
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'protectionFromEvilAndGood_target_selection',
+          name: SPELL_NAME,
+          creatureTargets: [PLAYER_NAME, TARGET_NAME],
+          range: 'Touch',
+          rangeFt: 60,
+          duration: DEFAULT_DURATION,
+          attackerPos: { x: 3, y: 4 },
+        },
+      });
+      expect(targetResolver.resolveMapPositions).toHaveBeenCalledWith(
+        CAMPAIGN_NAME,
+        'test-map',
+        PLAYER_NAME
+      );
     });
 
-    it('includes caster at the beginning of the target list', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
+    it('prepends the caster when absent and skips map resolution without a map', async () => {
       combatData.getCombatSummary.mockReturnValue({
         creatures: [
           { name: TARGET_NAME, type: 'creature' },
@@ -114,185 +140,132 @@ describe('protectionFromEvilAndGoodHandler', () => {
         ],
       });
 
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
+      const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
 
-      expect(result.payload.creatureTargets[0]).toBe(PLAYER_NAME);
+      expect(result.payload.creatureTargets).toEqual([PLAYER_NAME, TARGET_NAME, 'OtherCreature']);
+      expect(result.payload.attackerPos).toBe(null);
+      expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
     });
 
-    it('does not duplicate caster when already in creature list', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      combatData.getCombatSummary.mockReturnValue({
-        creatures: [
-          { name: PLAYER_NAME, type: 'player' },
-          { name: TARGET_NAME, type: 'creature' },
-        ],
-      });
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.creatureTargets).toEqual([PLAYER_NAME, TARGET_NAME]);
-      expect(result.payload.creatureTargets.filter((n) => n === PLAYER_NAME).length).toBe(1);
-    });
-
-    it('uses spell.range when provided, falling back to Touch', async () => {
-      const ps = makePlayerStats();
+    it('uses spell.range and spell.duration over defaults', async () => {
       const action = {
-        name: 'Protection from Evil and Good',
-        spell: { range: '30ft' },
+        name: SPELL_NAME,
+        spell: { range: '30ft', duration: 'Up to 1 hour' },
         automation: { type: 'protection_from_evil_and_good' },
       };
-
       rangeValidation.rangeToFeet.mockReturnValue(30);
-      combatData.getCombatSummary.mockReturnValue({ creatures: [] });
 
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
+      const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null);
 
+      expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('30ft');
       expect(result.payload.range).toBe('30ft');
       expect(result.payload.rangeFt).toBe(30);
+      expect(result.payload.duration).toBe('Up to 1 hour');
     });
 
-    it('passes mapName to resolveMapPositions', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      combatData.getCombatSummary.mockReturnValue({ creatures: [] });
-
-      await handle(action, ps, CAMPAIGN_NAME, 'my-map');
-
-      expect(targetResolver.resolveMapPositions).toHaveBeenCalledWith(
-        CAMPAIGN_NAME,
-        'my-map',
-        PLAYER_NAME
-      );
-    });
-
-    it('sets attackerPos to null when no mapName provided', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      combatData.getCombatSummary.mockReturnValue({ creatures: [] });
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.attackerPos).toBe(null);
-    });
-
-    it('handles empty creature list by including only caster', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      combatData.getCombatSummary.mockReturnValue({ creatures: [] });
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.creatureTargets).toEqual([PLAYER_NAME]);
-    });
-
-    it('handles missing combatSummary gracefully', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
+    it('includes only the caster when there is no combat summary', async () => {
       combatData.getCombatSummary.mockReturnValue(null);
 
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
+      const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
 
       expect(result.payload.creatureTargets).toEqual([PLAYER_NAME]);
     });
   });
 
   describe('applyProtectionFromEvilAndGood', () => {
-    it('activates the spell on a new target', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      runtimeState.getRuntimeValue.mockReturnValue([]);
-      combatData.getCombatSummary.mockReturnValue({
-        creatures: [{ name: PLAYER_NAME, type: 'player' }],
-      });
-      rangeValidation.rangeToFeet.mockReturnValue(60);
-
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+    it('activates on a new target with single merged writes and exact registrations', async () => {
+      const combatSummary = { creatures: [{ name: PLAYER_NAME, type: 'player' }] };
+      combatData.getCombatSummary.mockReturnValue(combatSummary);
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
       const result = await applyProtectionFromEvilAndGood(
-        action,
-        ps,
+        makeAction(),
+        makePlayerStats(),
         CAMPAIGN_NAME,
         null,
         TARGET_NAME
       );
 
-      // SP-094: activeBuffs + warded types now land in ONE merged store write.
-      const merged = runtimeState.setRuntimeObject.mock.calls.find(
-        (call) => call[0] === TARGET_NAME
-      );
-      expect(merged).toBeTruthy();
-      expect(merged[1].activeBuffs).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: 'Protection from Evil and Good',
-            effect: 'protection_from_evil_and_good',
-          }),
-        ])
-      );
-      expect(merged[1].protectionFromEvilAndGoodWardedTypes).toEqual([
-        'Aberration',
-        'Celestial',
-        'Elemental',
-        'Fey',
-        'Fiend',
-        'Undead',
-      ]);
-
-      expect(concentrationService.addConcentration).toHaveBeenCalled();
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({
-            target: TARGET_NAME,
-            effect: 'protection_from_evil_and_good',
-            source: PLAYER_NAME,
-            duration: 'concentration',
-          }),
-        ]),
+      // SP-094: activeBuffs + warded types land in ONE merged store write
+      // (no racing per-key toggleBuff POST).
+      expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
+      expect(runtimeState.setRuntimeObject).toHaveBeenCalledWith(
+        TARGET_NAME,
+        {
+          activeBuffs: [
+            expect.objectContaining({
+              name: SPELL_NAME,
+              effect: 'protection_from_evil_and_good',
+              duration: DEFAULT_DURATION,
+              castingTime: '1 action',
+              sourceCharacter: PLAYER_NAME,
+            }),
+          ],
+          protectionFromEvilAndGoodWardedTypes: WARDED_TYPES,
+        },
         CAMPAIGN_NAME
       );
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: PLAYER_NAME, targetName: TARGET_NAME, effects: expect.arrayContaining([
-          expect.objectContaining({ type: 'remove_active_buff' }),
-          expect.objectContaining({ type: 'remove_target_effect' }),
-        ]), campaignName: CAMPAIGN_NAME, rounds: Infinity, expireOnCreatureName: TARGET_NAME });
+      expect(concentrationService.addConcentration).toHaveBeenCalledWith(
+        combatSummary,
+        PLAYER_NAME,
+        SPELL_NAME,
+        0
+      );
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'campaign',
+        'combatSummary',
+        combatSummary,
+        CAMPAIGN_NAME
+      );
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'combat-summary-updated' })
+      );
+
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'campaign',
+        'targetEffects',
+        [
+          { target: TARGET_NAME, effect: 'protection_from_evil_and_good', source: PLAYER_NAME, duration: 'concentration' },
+        ],
+        CAMPAIGN_NAME
+      );
+
+      expect(expirations.addExpiration).toHaveBeenCalledWith({
+        attackerName: PLAYER_NAME,
+        targetName: TARGET_NAME,
+        effects: [
+          { type: 'remove_active_buff', buffName: SPELL_NAME },
+          { type: 'remove_target_effect', effectKey: 'protection_from_evil_and_good', source: PLAYER_NAME },
+        ],
+        campaignName: CAMPAIGN_NAME,
+        rounds: Infinity,
+        expireOnCreatureName: TARGET_NAME,
+      });
 
       expect(logService.addEntry).toHaveBeenCalledWith(
         CAMPAIGN_NAME,
         expect.objectContaining({
           type: 'ability_use',
           characterName: PLAYER_NAME,
-          abilityName: 'Protection from Evil and Good',
+          abilityName: SPELL_NAME,
           description: expect.stringContaining('protected against'),
         })
       );
 
       expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.name).toBe(SPELL_NAME);
       expect(result.payload.description).toContain(`cast on ${TARGET_NAME}`);
     });
 
-    it('activates with self-cast when target equals caster', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      runtimeState.getRuntimeValue.mockReturnValue([]);
+    it('describes self-cast when target equals caster', async () => {
       combatData.getCombatSummary.mockReturnValue({
         creatures: [{ name: PLAYER_NAME, type: 'player' }],
       });
 
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
       const result = await applyProtectionFromEvilAndGood(
-        action,
-        ps,
+        makeAction(),
+        makePlayerStats(),
         CAMPAIGN_NAME,
         null,
         PLAYER_NAME
@@ -302,102 +275,92 @@ describe('protectionFromEvilAndGoodHandler', () => {
       expect(result.payload.description).toContain('self-cast');
     });
 
-    it('deactivates the spell when already active', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      runtimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Protection from Evil and Good', effect: 'protection_from_evil_and_good' },
-      ]);
-      combatData.getCombatSummary.mockReturnValue({
-        creatures: [
-          {
-            name: PLAYER_NAME,
-            type: 'player',
-            concentration: { spell: 'Protection from Evil and Good' },
-          },
-        ],
+    it('deactivates when already active: clears buff, warded types, target effect, and concentration', async () => {
+      runtimeState.getRuntimeValue.mockImplementation((key) => {
+        if (key === TARGET_NAME) return [PFEG_BUFF];
+        if (key === 'campaign') {
+          return [
+            { target: TARGET_NAME, effect: 'protection_from_evil_and_good', source: PLAYER_NAME },
+            { target: 'Other', effect: 'protection_from_evil_and_good', source: 'OtherCaster' },
+            { target: TARGET_NAME, effect: 'shield_of_faith' },
+          ];
+        }
+        return [];
       });
-
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
+      const combatSummary = {
+        creatures: [
+          { name: PLAYER_NAME, type: 'player', concentration: { spell: SPELL_NAME } },
+        ],
+      };
+      combatData.getCombatSummary.mockReturnValue(combatSummary);
 
       const result = await applyProtectionFromEvilAndGood(
-        action,
-        ps,
+        makeAction(),
+        makePlayerStats(),
         CAMPAIGN_NAME,
         null,
         TARGET_NAME
       );
 
       expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
-      const merged = runtimeState.setRuntimeObject.mock.calls.find(
-        (call) => call[0] === TARGET_NAME
+      // SP-094: buff removed + warded types cleared in ONE merged store write.
+      expect(runtimeState.setRuntimeObject).toHaveBeenCalledWith(
+        TARGET_NAME,
+        { activeBuffs: [], protectionFromEvilAndGoodWardedTypes: [] },
+        CAMPAIGN_NAME
       );
-      expect(merged).toBeTruthy();
-      expect(merged[1].activeBuffs.some(b => b.effect === 'protection_from_evil_and_good')).toBe(false);
-      expect(merged[1].protectionFromEvilAndGoodWardedTypes).toEqual([]);
 
-      expect(result.payload.description).toContain('deactivated');
-    });
-
-    it('clears concentration when deactivating and caster has concentration on this spell', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      runtimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Protection from Evil and Good', effect: 'protection_from_evil_and_good' },
-      ]);
-      const combatSummary = {
-        creatures: [
-          {
-            name: PLAYER_NAME,
-            type: 'player',
-            concentration: { spell: 'Protection from Evil and Good' },
-          },
+      // Only this target's pfeag effect is removed; other entries untouched.
+      // skipSync=true because the server already has the data (SSE echo guard).
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'campaign',
+        'targetEffects',
+        [
+          { target: 'Other', effect: 'protection_from_evil_and_good', source: 'OtherCaster' },
+          { target: TARGET_NAME, effect: 'shield_of_faith' },
         ],
-      };
-      combatData.getCombatSummary.mockReturnValue(combatSummary);
+        CAMPAIGN_NAME,
+        true
+      );
 
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      await applyProtectionFromEvilAndGood(action, ps, CAMPAIGN_NAME, null, TARGET_NAME);
-
+      expect(combatSummary.creatures[0].concentration).toBe(null);
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'campaign',
         'combatSummary',
-        expect.objectContaining({
-          creatures: expect.arrayContaining([
-            expect.objectContaining({
-              name: PLAYER_NAME,
-              concentration: null,
-            }),
-          ]),
-        }),
+        combatSummary,
         CAMPAIGN_NAME
+      );
+
+      expect(result.payload.description).toContain('deactivated');
+      expect(logService.addEntry).toHaveBeenCalledWith(
+        CAMPAIGN_NAME,
+        expect.objectContaining({
+          type: 'ability_use',
+          characterName: PLAYER_NAME,
+          abilityName: SPELL_NAME,
+          description: expect.stringContaining('deactivated'),
+        })
       );
     });
 
-    it('does not clear concentration when caster does not have concentration on this spell', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      runtimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Protection from Evil and Good', effect: 'protection_from_evil_and_good' },
-      ]);
-      const combatSummary = {
+    it('does not clear concentration when caster concentrates on another spell', async () => {
+      runtimeState.getRuntimeValue.mockImplementation((key) => {
+        if (key === TARGET_NAME) return [PFEG_BUFF];
+        return [];
+      });
+      combatData.getCombatSummary.mockReturnValue({
         creatures: [
-          {
-            name: PLAYER_NAME,
-            type: 'player',
-            concentration: { spell: 'Other Spell' },
-          },
+          { name: PLAYER_NAME, type: 'player', concentration: { spell: 'Other Spell' } },
         ],
-      };
-      combatData.getCombatSummary.mockReturnValue(combatSummary);
+      });
 
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      await applyProtectionFromEvilAndGood(action, ps, CAMPAIGN_NAME, null, TARGET_NAME);
+      await applyProtectionFromEvilAndGood(
+        makeAction(),
+        makePlayerStats(),
+        CAMPAIGN_NAME,
+        null,
+        TARGET_NAME
+      );
 
       expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
         'campaign',
@@ -407,188 +370,99 @@ describe('protectionFromEvilAndGoodHandler', () => {
       );
     });
 
-    it('returns null when no target is provided', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await applyProtectionFromEvilAndGood(
-        action,
-        ps,
-        CAMPAIGN_NAME,
-        null,
-        null
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when target is empty string', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const result = await applyProtectionFromEvilAndGood(
-        action,
-        ps,
-        CAMPAIGN_NAME,
-        null,
-        ''
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('filters existing target effects before adding new one on activation', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      runtimeState.getRuntimeValue.mockImplementation(
-        (_charKey, _prop, camp) => {
-          if (camp === CAMPAIGN_NAME && _charKey === 'campaign') {
-            return [
-              { target: TARGET_NAME, effect: 'protection_from_evil_and_good', source: 'OldCaster' },
-              { target: 'Other', effect: 'shield_of_faith' },
-            ];
-          }
-          return [];
+    it('replaces the existing target effect for the same target on activation', async () => {
+      runtimeState.getRuntimeValue.mockImplementation((key) => {
+        if (key === 'campaign') {
+          return [
+            { target: TARGET_NAME, effect: 'protection_from_evil_and_good', source: 'OldCaster' },
+            { target: 'Other', effect: 'shield_of_faith' },
+          ];
         }
-      );
+        return [];
+      });
       combatData.getCombatSummary.mockReturnValue({
         creatures: [{ name: PLAYER_NAME, type: 'player' }],
       });
 
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      await applyProtectionFromEvilAndGood(action, ps, CAMPAIGN_NAME, null, TARGET_NAME);
+      await applyProtectionFromEvilAndGood(
+        makeAction(),
+        makePlayerStats(),
+        CAMPAIGN_NAME,
+        null,
+        TARGET_NAME
+      );
 
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'campaign',
         'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({ target: 'Other', effect: 'shield_of_faith' }),
-        ]),
-        CAMPAIGN_NAME
-      );
-      // The old pfeag effect for the same target should be filtered out
-      const targetEffectsCall = runtimeState.setRuntimeValue.mock.calls.find(
-        (call) => call[1] === 'targetEffects'
-      );
-      const effects = targetEffectsCall[2];
-      const pfeagForTarget = effects.filter(
-        (e) => e.target === TARGET_NAME && e.effect === 'protection_from_evil_and_good'
-      );
-      expect(pfeagForTarget).toHaveLength(1);
-      expect(pfeagForTarget[0].source).toBe(PLAYER_NAME);
-    });
-
-    it('filters out only the matching target effect on deactivation', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      runtimeState.getRuntimeValue.mockImplementation(
-        (_charKey, _prop, camp) => {
-          if (camp === CAMPAIGN_NAME && _charKey === 'campaign') {
-            return [
-              { target: TARGET_NAME, effect: 'protection_from_evil_and_good', source: PLAYER_NAME },
-              { target: 'Other', effect: 'protection_from_evil_and_good', source: 'OtherCaster' },
-              { target: TARGET_NAME, effect: 'shield_of_faith' },
-            ];
-          }
-          if (camp === CAMPAIGN_NAME && _charKey === 'campaign') {
-            return [
-              { target: TARGET_NAME, effect: 'protection_from_evil_and_good', source: PLAYER_NAME },
-              { target: 'Other', effect: 'protection_from_evil_and_good', source: 'OtherCaster' },
-            ];
-          }
-          return [
-            { name: 'Protection from Evil and Good', effect: 'protection_from_evil_and_good' },
-          ];
-        }
-      );
-      combatData.getCombatSummary.mockReturnValue({
-        creatures: [{ name: PLAYER_NAME, type: 'player' }],
-      });
-
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      await applyProtectionFromEvilAndGood(action, ps, CAMPAIGN_NAME, null, TARGET_NAME);
-
-      const targetEffectsCall = runtimeState.setRuntimeValue.mock.calls.find(
-        (call) => call[1] === 'targetEffects'
-      );
-      if (targetEffectsCall) {
-        const effects = targetEffectsCall[2];
-        const pfeagForOther = effects.filter(
-          (e) => e.target === 'Other' && e.effect === 'protection_from_evil_and_good'
-        );
-        expect(pfeagForOther).toHaveLength(1);
-      }
-    });
-
-    it('persists combatSummary to runtime when activating with a combatSummary', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      runtimeState.getRuntimeValue.mockReturnValue([]);
-      const combatSummary = {
-        creatures: [{ name: PLAYER_NAME, type: 'player' }],
-      };
-      combatData.getCombatSummary.mockReturnValue(combatSummary);
-
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      await applyProtectionFromEvilAndGood(action, ps, CAMPAIGN_NAME, null, TARGET_NAME);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'combatSummary',
-        combatSummary,
+        [
+          { target: 'Other', effect: 'shield_of_faith' },
+          { target: TARGET_NAME, effect: 'protection_from_evil_and_good', source: PLAYER_NAME, duration: 'concentration' },
+        ],
         CAMPAIGN_NAME
       );
     });
 
-    it('uses spell duration from action.spell when provided', async () => {
-      const ps = makePlayerStats();
+    it('uses spell.duration and spell.casting_time from action.spell', async () => {
       const action = {
-        name: 'Protection from Evil and Good',
-        spell: { duration: 'Up to 1 hour' },
+        name: SPELL_NAME,
+        spell: { duration: 'Up to 1 hour', casting_time: '1 bonus action' },
         automation: { type: 'protection_from_evil_and_good' },
       };
 
-      runtimeState.getRuntimeValue.mockReturnValue([]);
-      combatData.getCombatSummary.mockReturnValue({
-        creatures: [{ name: PLAYER_NAME, type: 'player' }],
-      });
-
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      await applyProtectionFromEvilAndGood(action, ps, CAMPAIGN_NAME, null, TARGET_NAME);
-
-      const merged = runtimeState.setRuntimeObject.mock.calls.find(
-        (call) => call[0] === TARGET_NAME
+      await applyProtectionFromEvilAndGood(
+        action,
+        makePlayerStats(),
+        CAMPAIGN_NAME,
+        null,
+        TARGET_NAME
       );
-      expect(merged[1].activeBuffs).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ name: 'Protection from Evil and Good', duration: 'Up to 1 hour' }),
-        ])
+
+      expect(runtimeState.setRuntimeObject).toHaveBeenCalledWith(
+        TARGET_NAME,
+        expect.objectContaining({
+          activeBuffs: [
+            expect.objectContaining({
+              name: SPELL_NAME,
+              effect: 'protection_from_evil_and_good',
+              duration: 'Up to 1 hour',
+              castingTime: '1 bonus action',
+            }),
+          ],
+        }),
+        CAMPAIGN_NAME
       );
+    });
+
+    it('returns null without any writes when target is missing', async () => {
+      for (const target of [null, '']) {
+        const result = await applyProtectionFromEvilAndGood(
+          makeAction(),
+          makePlayerStats(),
+          CAMPAIGN_NAME,
+          null,
+          target
+        );
+
+        expect(result).toBeNull();
+      }
+      expect(runtimeState.setRuntimeObject).not.toHaveBeenCalled();
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(expirations.addExpiration).not.toHaveBeenCalled();
+      expect(logService.addEntry).not.toHaveBeenCalled();
     });
   });
 
   describe('isProtectionFromEvilAndGoodActive', () => {
-    it('returns true when buff with correct name and effect exists', () => {
-      runtimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Protection from Evil and Good', effect: 'protection_from_evil_and_good' },
-      ]);
-
+    it('returns true only for an exact name+effect buff match', () => {
+      runtimeState.getRuntimeValue.mockReturnValue([PFEG_BUFF]);
       expect(isProtectionFromEvilAndGoodActive(PLAYER_NAME, CAMPAIGN_NAME)).toBe(true);
-    });
 
-    it('returns false when activeBuffs is empty or name/effect mismatch', () => {
       runtimeState.getRuntimeValue.mockReturnValue([]);
       expect(isProtectionFromEvilAndGoodActive(PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
 
       runtimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Protection from Evil and Good', effect: 'some_other_effect' },
+        { name: SPELL_NAME, effect: 'some_other_effect' },
       ]);
       expect(isProtectionFromEvilAndGoodActive(PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
 
@@ -603,115 +477,72 @@ describe('protectionFromEvilAndGoodHandler', () => {
       expect(isProtectionFromEvilAndGoodActive(PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
     });
 
-    it('throws when activeBuffs is not an array', () => {
+    it('throws when activeBuffs is not an array and does not validate playerName', () => {
       runtimeState.getRuntimeValue.mockReturnValue('not-an-array');
       expect(() => isProtectionFromEvilAndGoodActive(PLAYER_NAME, CAMPAIGN_NAME)).toThrow();
-    });
 
-    it('does not guard empty string playerName', () => {
-      runtimeState.getRuntimeValue.mockReturnValue([
-        { name: 'Protection from Evil and Good', effect: 'protection_from_evil_and_good' },
-      ]);
-      // The function does not validate playerName; it passes it to getRuntimeValue
-      expect(() => isProtectionFromEvilAndGoodActive('', CAMPAIGN_NAME)).not.toThrow();
+      // playerName is passed straight through to getRuntimeValue — no guard.
+      runtimeState.getRuntimeValue.mockReturnValue([PFEG_BUFF]);
+      expect(isProtectionFromEvilAndGoodActive('', CAMPAIGN_NAME)).toBe(true);
+      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('', 'activeBuffs', CAMPAIGN_NAME);
     });
   });
 
   describe('isCreatureWarded', () => {
-    const WARDED_TYPES = [
-      'Aberration',
-      'Celestial',
-      'Elemental',
-      'Fey',
-      'Fiend',
-      'Undead',
-    ];
-
-    it('returns true for warded types and false for non-warded, null, or undefined', () => {
+    it('matches warded types case-insensitively', () => {
       runtimeState.getRuntimeValue.mockReturnValue(WARDED_TYPES);
 
       expect(isCreatureWarded('Aberration', PLAYER_NAME, CAMPAIGN_NAME)).toBe(true);
       expect(isCreatureWarded('aberration', PLAYER_NAME, CAMPAIGN_NAME)).toBe(true);
       expect(isCreatureWarded('ABERRATION', PLAYER_NAME, CAMPAIGN_NAME)).toBe(true);
-      expect(isCreatureWarded('Celestial', PLAYER_NAME, CAMPAIGN_NAME)).toBe(true);
+      expect(isCreatureWarded('Undead', PLAYER_NAME, CAMPAIGN_NAME)).toBe(true);
       expect(isCreatureWarded('Humanoid', PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
       expect(isCreatureWarded('Dragon', PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
+    });
+
+    it('returns false for empty ward list, falsy creatureType, or falsy playerName', () => {
+      runtimeState.getRuntimeValue.mockReturnValue(WARDED_TYPES);
+      for (const creatureType of ['', null, undefined]) {
+        expect(isCreatureWarded(creatureType, PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
+      }
+      for (const playerName of ['', null, undefined]) {
+        expect(isCreatureWarded('Aberration', playerName, CAMPAIGN_NAME)).toBe(false);
+      }
 
       runtimeState.getRuntimeValue.mockReturnValue([]);
       expect(isCreatureWarded('Aberration', PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
-
-      expect(isCreatureWarded(null, PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
-      expect(isCreatureWarded(undefined, PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
-      expect(isCreatureWarded('Aberration', null, CAMPAIGN_NAME)).toBe(false);
-      expect(isCreatureWarded('Aberration', undefined, CAMPAIGN_NAME)).toBe(false);
     });
 
-    it('returns false when wardedTypes is null or not an array', () => {
+    it('returns false when stored wardedTypes is null or not an array', () => {
       runtimeState.getRuntimeValue.mockReturnValue(null);
       expect(isCreatureWarded('Aberration', PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
 
       runtimeState.getRuntimeValue.mockReturnValue('not-an-array');
       expect(isCreatureWarded('Aberration', PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
-    });
-
-    it('returns false when creatureType is empty string', () => {
-      runtimeState.getRuntimeValue.mockReturnValue(WARDED_TYPES);
-      expect(isCreatureWarded('', PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
-    });
-
-    it('returns false when playerName is empty string', () => {
-      runtimeState.getRuntimeValue.mockReturnValue(WARDED_TYPES);
-      expect(isCreatureWarded('Aberration', '', CAMPAIGN_NAME)).toBe(false);
     });
   });
 
   describe('getProtectionFromEvilAndGoodWardedTypes', () => {
-    it('returns the warded types array when stored', () => {
-      runtimeState.getRuntimeValue.mockReturnValue([
+    it('returns the stored array read from the warded-types key', () => {
+      runtimeState.getRuntimeValue.mockReturnValue(['Aberration', 'Fiend', 'Undead']);
+
+      expect(getProtectionFromEvilAndGoodWardedTypes(PLAYER_NAME, CAMPAIGN_NAME)).toEqual([
         'Aberration',
         'Fiend',
         'Undead',
       ]);
-
-      const result = getProtectionFromEvilAndGoodWardedTypes(
+      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
         PLAYER_NAME,
+        'protectionFromEvilAndGoodWardedTypes',
         CAMPAIGN_NAME
       );
-
-      expect(result).toEqual(['Aberration', 'Fiend', 'Undead']);
     });
 
-    it('returns empty array when stored value is null', () => {
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-
-      const result = getProtectionFromEvilAndGoodWardedTypes(
-        PLAYER_NAME,
-        CAMPAIGN_NAME
-      );
-
-      expect(result).toEqual([]);
-    });
-
-    it('returns empty array when stored value is not an array', () => {
-      runtimeState.getRuntimeValue.mockReturnValue('not-an-array');
-
-      const result = getProtectionFromEvilAndGoodWardedTypes(
-        PLAYER_NAME,
-        CAMPAIGN_NAME
-      );
-
-      expect(result).toEqual([]);
-    });
-
-    it('returns empty array when stored value is undefined', () => {
-      runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-      const result = getProtectionFromEvilAndGoodWardedTypes(
-        PLAYER_NAME,
-        CAMPAIGN_NAME
-      );
-
-      expect(result).toEqual([]);
+    it('returns empty array when stored value is null, undefined, or not an array', () => {
+      for (const stored of [null, undefined, 'not-an-array']) {
+        runtimeState.getRuntimeValue.mockReturnValue(stored);
+        expect(getProtectionFromEvilAndGoodWardedTypes(PLAYER_NAME, CAMPAIGN_NAME)).toEqual([]);
+      }
     });
   });
 });

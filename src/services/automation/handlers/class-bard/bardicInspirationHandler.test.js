@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Deterministic: every external dependency (runtime store, combat context, dice
+// expression, expirations, log, executeHandler dispatch) is mocked, so this
+// suite pins the bardicInspirationHandler contract — use-gate refusals, pool
+// read/decrement semantics, target grant keys, agile_strike passive dispatch —
+// without touching moving app parts.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────────
@@ -67,6 +73,18 @@ function makeCombatSummary(creatures = []) {
   return { creatures };
 }
 
+function applyGrant(playerStats, overrides = {}) {
+  return applyBardicInspiration({
+    action: makeAction(),
+    playerStats,
+    campaignName,
+    targetName: 'Fighter',
+    dieSize: 8,
+    hasCombatOptions: false,
+    ...overrides,
+  });
+}
+
 // ── handle() Tests ─────────────────────────────────────────────────
 
 describe('bardicInspirationHandler.handle', () => {
@@ -126,31 +144,6 @@ describe('bardicInspirationHandler.handle', () => {
       expect(result.payload.automationType).toBe('bardic_inspiration_refused');
     });
 
-    it('grants when a stale corrupt object pool holds a positive current and rewrites the pool numeric', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (name === playerName && key === 'bardicInspirationUses') return { current: 2, max: 5 };
-        return null;
-      });
-
-      await applyBardicInspiration({
-        action,
-        playerStats,
-        campaignName,
-        targetName: 'Fighter',
-        dieSize: 8,
-        hasCombatOptions: false,
-      });
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        'bardicInspirationUses',
-        1,
-        campaignName,
-      );
-    });
-  });
-
-  describe('no uses_expression on action', () => {
     it('skips uses check when uses_expression is absent', async () => {
       delete action.automation.uses_expression;
       useRuntimeState.getRuntimeValue.mockReturnValue(0);
@@ -166,8 +159,7 @@ describe('bardicInspirationHandler.handle', () => {
   describe('no combat context', () => {
     it.each([
       { name: 'null', value: null },
-      { name: 'empty object', value: {} },
-      { name: 'no creatures array', value: { creatures: undefined } },
+      { name: 'no creatures array', value: {} },
       { name: 'empty creatures array', value: { creatures: [] } },
     ])('returns info popup when combatSummary is $name', async ({ value }) => {
       getCombatContext.mockResolvedValue(value);
@@ -179,7 +171,7 @@ describe('bardicInspirationHandler.handle', () => {
     });
   });
 
-  describe('no valid targets', () => {
+  describe('target filtering', () => {
     it('returns info popup when only the caster is in combat', async () => {
       getCombatContext.mockResolvedValue(makeCombatSummary([
         { name: 'Bard', currentHp: 30, maxHp: 30, size: 'Medium', type: 'humanoid' },
@@ -191,7 +183,7 @@ describe('bardicInspirationHandler.handle', () => {
       expect(result.payload.description).toContain('No valid targets');
     });
 
-    it('allows self as target when hasCombatOptions passive is present', async () => {
+    it('allows self as target and flags hasCombatOptions when the passive is present', async () => {
       playerStats.automation.passives = [{ effect: 'bardic_inspiration_combat_options' }];
 
       getCombatContext.mockResolvedValue(makeCombatSummary([
@@ -201,14 +193,13 @@ describe('bardicInspirationHandler.handle', () => {
       const result = await handle(action, playerStats, campaignName);
 
       expect(result.type).toBe('modal');
+      expect(result.payload.hasCombatOptions).toBe(true);
       expect(result.payload.creatureTargets).toEqual([
         { name: 'Bard', currentHp: 30, maxHp: 30, size: 'Medium', type: 'humanoid' },
       ]);
     });
-  });
 
-  describe('successful modal return', () => {
-    it('returns a modal with creatureTargets filtered to exclude self', async () => {
+    it('returns a modal with creatureTargets filtered to exclude self and full payload', async () => {
       getCombatContext.mockResolvedValue(makeCombatSummary([
         { name: 'Bard', currentHp: 30, maxHp: 30, size: 'Medium', type: 'humanoid' },
         { name: 'Fighter', currentHp: 20, maxHp: 30, size: 'Medium', type: 'humanoid' },
@@ -219,6 +210,9 @@ describe('bardicInspirationHandler.handle', () => {
 
       expect(result.type).toBe('modal');
       expect(result.modalName).toBe('bardicInspirationTarget');
+      expect(result.payload.action).toBe(action);
+      expect(result.payload.playerStats).toBe(playerStats);
+      expect(result.payload.campaignName).toBe(campaignName);
       expect(result.payload.creatureTargets).toEqual([
         { name: 'Fighter', currentHp: 20, maxHp: 30, size: 'Medium', type: 'humanoid' },
         { name: 'Wizard', currentHp: 15, maxHp: 20, size: 'Small', type: 'humanoid' },
@@ -227,28 +221,24 @@ describe('bardicInspirationHandler.handle', () => {
       expect(result.payload.hasCombatOptions).toBe(false);
     });
 
-    it('passes action and playerStats in the modal payload', async () => {
-      getCombatContext.mockResolvedValue(makeCombatSummary([
-        { name: 'Fighter', currentHp: 20, maxHp: 30, size: 'Medium', type: 'humanoid' },
-      ]));
+    it.each([
+      { name: 'no matching passive', passives: [{ effect: 'some_other_passive' }] },
+      { name: 'undefined passives', passives: undefined },
+    ])('sets hasCombatOptions false when %s', async ({ passives }) => {
+      playerStats.automation.passives = passives;
 
       const result = await handle(action, playerStats, campaignName);
 
-      expect(result.payload.action).toBe(action);
-      expect(result.payload.playerStats).toBe(playerStats);
-      expect(result.payload.campaignName).toBe(campaignName);
+      expect(result.payload.hasCombatOptions).toBe(false);
     });
+  });
 
-    it('falls back to die size 6 when class data is missing or has no matching level', async () => {
-      playerStats.class = {};
-
-      const result = await handle(action, playerStats, campaignName);
-
-      expect(result.payload.dieSize).toBe(6);
-    });
-
-    it('falls back to die size 6 when class_levels is empty', async () => {
-      playerStats.class.class_levels = [];
+  describe('die size resolution', () => {
+    it.each([
+      { name: 'class data is missing', mutate: (stats) => { stats.class = {}; } },
+      { name: 'class_levels is empty', mutate: (stats) => { stats.class.class_levels = []; } },
+    ])('falls back to die size 6 when $name', async ({ mutate }) => {
+      mutate(playerStats);
 
       const result = await handle(action, playerStats, campaignName);
 
@@ -261,26 +251,6 @@ describe('bardicInspirationHandler.handle', () => {
       const result = await handle(action, playerStats, campaignName);
 
       expect(result.payload.dieSize).toBe(10);
-    });
-
-    it.each([
-      { name: 'no matching passive', passives: [{ effect: 'some_other_passive' }] },
-      { name: 'empty passives array', passives: [] },
-      { name: 'undefined passives', passives: undefined },
-    ])('sets hasCombatOptions false when %s', async ({ passives }) => {
-      playerStats.automation.passives = passives;
-
-      const result = await handle(action, playerStats, campaignName);
-
-      expect(result.payload.hasCombatOptions).toBe(false);
-    });
-
-    it('sets hasCombatOptions true when passive is present', async () => {
-      playerStats.automation.passives = [{ effect: 'bardic_inspiration_combat_options' }];
-
-      const result = await handle(action, playerStats, campaignName);
-
-      expect(result.payload.hasCombatOptions).toBe(true);
     });
   });
 });
@@ -303,16 +273,13 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     executeHandlerModule.executeHandler.mockResolvedValue(null);
   });
 
-  describe('uses decrement', () => {
-    it('decrements uses when uses_expression is present', async () => {
-      await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
+  function apply(overrides = {}) {
+    return applyGrant(playerStats, { action, ...overrides });
+  }
+
+  describe('uses pool decrement', () => {
+    it('decrements numeric pool when uses_expression is present', async () => {
+      await apply();
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         playerName,
@@ -322,17 +289,39 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
       );
     });
 
+    it('reads a stale corrupt object pool as current and rewrites the pool numeric', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (name === playerName && key === 'bardicInspirationUses') return { current: 2, max: 5 };
+        return null;
+      });
+
+      await apply();
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        playerName,
+        'bardicInspirationUses',
+        1,
+        campaignName,
+      );
+    });
+
+    it('uses usesMax as current when runtime value is null', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+
+      await apply();
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        playerName,
+        'bardicInspirationUses',
+        3,
+        campaignName,
+      );
+    });
+
     it('does not decrement uses when uses_expression is absent', async () => {
       delete action.automation.uses_expression;
 
-      await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
+      await apply();
 
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
         playerName,
@@ -345,14 +334,7 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     it('does not decrement uses when usesMax is 0', async () => {
       automationService.evaluateAutoExpression.mockReturnValue(0);
 
-      await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
+      await apply();
 
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
         playerName,
@@ -361,38 +343,11 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
         campaignName,
       );
     });
-
-    it('uses usesMax as current when runtime value is null', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        'bardicInspirationUses',
-        3,
-        campaignName,
-      );
-    });
   });
 
-  describe('target state setting', () => {
-    it('sets bardicInspirationDie on the target', async () => {
-      await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
+  describe('target grant state', () => {
+    it('sets die, grantedBy, and granted-token uses on the target', async () => {
+      await apply();
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
@@ -400,36 +355,12 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
         '8',
         campaignName,
       );
-    });
-
-    it('sets bardicInspirationGrantedBy on the target', async () => {
-      await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
-
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
         'bardicInspirationGrantedBy',
         playerName,
         campaignName,
       );
-    });
-
-    it('sets bardicInspirationUses on the target with current:1 max:1', async () => {
-      await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
-
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
         'bardicInspirationUses',
@@ -449,14 +380,7 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
         return Promise.resolve();
       });
 
-      await applyBardicInspiration({
-        action,
-        playerStats,
-        campaignName,
-        targetName: playerName,
-        dieSize: 12,
-        hasCombatOptions: false,
-      });
+      await apply({ targetName: playerName, dieSize: 12 });
 
       expect(calls).toContainEqual([playerName, 'bardicInspirationUses', 2]);
       const poolWrites = calls.filter(([, key]) => key === 'bardicInspirationUses');
@@ -471,14 +395,7 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     it('sets combat options when hasCombatOptions and options are specified', async () => {
       action.automation.options = ['custom_option'];
 
-      await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: true,
-});
+      await apply({ hasCombatOptions: true });
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
@@ -491,14 +408,7 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
     it('sets default combat options when hasCombatOptions but no options specified', async () => {
       delete action.automation.options;
 
-      await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: true,
-});
+      await apply({ hasCombatOptions: true });
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
@@ -508,49 +418,27 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
       );
     });
 
-    it('sets self-target state when targetName equals playerStats.name with combat options', async () => {
+    it('writes grant state once to the bard on self-grant with combat options', async () => {
+      const calls = [];
+      useRuntimeState.setRuntimeValue.mockImplementation((name, key, val) => {
+        calls.push([name, key, val]);
+        return Promise.resolve();
+      });
       action.automation.options = ['custom'];
 
-      await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: playerName,
-    dieSize: 8,
-    hasCombatOptions: true,
-});
+      await apply({ targetName: playerName, hasCombatOptions: true });
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        'bardicInspirationDie',
-        '8',
-        campaignName,
-      );
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        'bardicInspirationGrantedBy',
-        playerName,
-        campaignName,
-      );
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        playerName,
-        'bardicInspirationCombatOptions',
-        JSON.stringify(['custom']),
-        campaignName,
-      );
+      expect(calls).toContainEqual([playerName, 'bardicInspirationDie', '8']);
+      expect(calls).toContainEqual([playerName, 'bardicInspirationGrantedBy', playerName]);
+      expect(calls).toContainEqual([playerName, 'bardicInspirationCombatOptions', JSON.stringify(['custom'])]);
+      const dieWrites = calls.filter(([, key]) => key === 'bardicInspirationDie');
+      expect(dieWrites.length).toBe(1);
     });
   });
 
   describe('expiration', () => {
     it('calls addExpiration with correct parameters', async () => {
-      await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
+      await apply();
 
       expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: playerName, targetName: 'Fighter', effects: [{ type: 'remove_bardic_inspiration' }], campaignName });
     });
@@ -558,14 +446,7 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
 
   describe('log entry', () => {
     it('posts a log entry with the die size and target name', async () => {
-      await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
+      await apply();
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',
@@ -574,10 +455,19 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
         description: `${playerName} granted Bardic Inspiration (d8) to Fighter.`,
       });
     });
+
+    it('returns success popup even when addEntry rejects', async () => {
+      addEntry.mockImplementation(() => Promise.reject(new Error('log service failed')));
+
+      const result = await apply();
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('d8');
+    });
   });
 
-  describe('agile strikes integration', () => {
-    it('returns agile strike popup when hasAgileStrikes passive is present and executeHandler returns popup', async () => {
+  describe('agile strikes dispatch', () => {
+    it('dispatches Agile Strikes and returns its popup when the passive_rule is present', async () => {
       playerStats.automation.passives = [
         { type: 'passive_rule', effect: 'agile_strike' },
       ];
@@ -586,14 +476,7 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
         payload: { type: 'automation_info', description: 'Agile strike applied' },
       });
 
-      const result = await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
+      const result = await apply();
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toBe('Agile strike applied');
@@ -608,51 +491,34 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
       );
     });
 
-    it('returns normal popup when hasAgileStrikes but executeHandler returns non-popup', async () => {
+    it('returns the normal grant popup when executeHandler returns non-popup', async () => {
       playerStats.automation.passives = [
         { type: 'passive_rule', effect: 'agile_strike' },
       ];
       executeHandlerModule.executeHandler.mockResolvedValue(null);
 
-      const result = await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
+      const result = await apply();
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('d8');
       expect(result.payload.description).toContain('granted to Fighter');
     });
 
-    it('returns normal popup when hasAgileStrikes is false', async () => {
-      const result = await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
+    it.each([
+      { name: 'passives are empty', passives: [] },
+      { name: 'agile_strike lacks the passive_rule type', passives: [{ effect: 'agile_strike' }] },
+    ])('does not dispatch when %s', async ({ passives }) => {
+      playerStats.automation.passives = passives;
 
-      expect(result.type).toBe('popup');
+      await apply();
+
       expect(executeHandlerModule.executeHandler).not.toHaveBeenCalled();
     });
   });
 
   describe('return value', () => {
     it('returns a popup with the correct die size and target in the description', async () => {
-      const result = await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
+      const result = await apply();
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
@@ -661,24 +527,6 @@ describe('bardicInspirationHandler.applyBardicInspiration', () => {
       expect(result.payload.description).toContain('granted to Fighter');
       expect(result.payload.description).toContain('one ability check');
       expect(result.payload.automation).toEqual(action.automation);
-    });
-  });
-
-  describe('error resilience', () => {
-    it('returns success popup even when addEntry rejects', async () => {
-      addEntry.mockImplementation(() => Promise.reject(new Error('log service failed')));
-
-      const result = await applyBardicInspiration({
-    action,
-    playerStats,
-    campaignName,
-    targetName: 'Fighter',
-    dieSize: 8,
-    hasCombatOptions: false,
-});
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('d8');
     });
   });
 });

@@ -1,7 +1,17 @@
+// @maintained-by-ai: 2026-10-15
+// SP-095: Protection from Poison confirm previously bypassed prepareSpellCast — no
+// slot spent. This file is the PFP custom-handler CONFIRM seam: it runs the REAL
+// prepareSpellCast (slot payment + spend log) and pins the FIVE-POSITIONAL-arg
+// contract of applyProtectionFromPoisonHandler (spell, playerStats, campaignName,
+// mapName, result) plus the RAW 2024 no-concentration rule.
+// Skip-lane money semantics and the guard-before-log empty-payload edges live in
+// ../useSpellMetamagicFlow.special-paths.rollback.test.js; popup payload authority
+// lives in ./confirm-payloads.test.js — not re-pinned here.
+import { readFileSync } from 'fs'
 import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useCustomHandlers } from './useCustomHandlers.js'
-import { applyProtectionFromPoisonHandler } from '../../../services/automation/index.js'
+import { applyProtectionFromPoisonHandler as mockedApply } from '../../../services/automation/index.js'
 import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { addEntry } from '../../../services/ui/logService.js'
 import { addConcentration } from '../../../services/combat/concentration/concentrationService.js'
@@ -62,7 +72,8 @@ vi.mock('../../../services/rules/spells/metamagicRules.js', () => ({
   hasPsionicSorcery: vi.fn(() => false),
 }))
 
-// Ground truth from public/data/2024/spells.json: lv2, concentration:false, 1 hour.
+// 2024 PFP byte-shape (pinned to public/data/2024/spells.json below):
+// lv2, concentration:false, Action, Touch, 1 hour.
 const pfpSpell = {
   name: 'Protection from Poison',
   level: 2,
@@ -73,15 +84,13 @@ const pfpSpell = {
   automation: { type: 'protection_from_poison', duration: '1 hour', casting_time: '1 action', range: 'Touch' },
 }
 
-function makePending() {
-  return {
-    spell: pfpSpell,
-    spellName: 'Protection from Poison',
-    spellLevel: 2,
-    castingTime: 'Action',
-    range: 'Touch',
-    creatureTargets: [TARGET, CASTER],
-  }
+const pending = {
+  spell: pfpSpell,
+  spellName: 'Protection from Poison',
+  spellLevel: 2,
+  castingTime: 'Action',
+  range: 'Touch',
+  creatureTargets: [TARGET, CASTER],
 }
 
 function renderPfp() {
@@ -89,37 +98,63 @@ function renderPfp() {
   const cfClearPending = vi.fn()
   const setPopupHtml = vi.fn()
   const { result } = renderHook(() =>
-    useCustomHandlers({ playerStats: playerStats, campaignName: CAMPAIGN, cfClearPending: cfClearPending, getPending: () => makePending(), setPopupHtml: setPopupHtml, characters: [] })
+    useCustomHandlers({ playerStats, campaignName: CAMPAIGN, cfClearPending, getPending: () => pending, setPopupHtml, characters: [] })
   )
-  return { result, playerStats, setPopupHtml }
+  return { result, cfClearPending, setPopupHtml }
 }
 
-describe('SP-095 handleProtectionFromPoisonConfirm — prepareSpellCast slot consumption', () => {
-  beforeEach(() => {
+const getByPath = (obj, path) => path.split('.').reduce((o, k) => o?.[k], obj)
+
+describe('SP-095 handleProtectionFromPoisonConfirm — pay-at-confirm + apply seam', () => {
+  let ctx, arg
+
+  beforeEach(async () => {
     vi.clearAllMocks()
     for (const k of Object.keys(store)) delete store[k]
     store.spell_slots_level_2 = 3
     sharedCombatSummary.creatures[0].concentration = null
-  })
-
-  it('consumes exactly ONE lv2 spell slot on confirm', async () => {
-    const { result } = renderPfp()
+    ctx = renderPfp()
 
     await act(async () => {
-      await result.current.handleProtectionFromPoisonConfirm([TARGET])
+      await ctx.result.current.handleProtectionFromPoisonConfirm([TARGET])
     })
 
-    expect(setRuntimeValue).toHaveBeenCalledWith(CASTER, 'spell_slots_level_2', 2, CAMPAIGN)
+    expect(mockedApply).toHaveBeenCalledTimes(1)
+    arg = mockedApply.mock.calls[0]
+  })
+
+  it('applies with FIVE positional args, spell passed by reference inside the action wrapper (converting to barkskin\'s single-object contract fails this)', () => {
+    expect(arg.length).toBe(5)
+    expect(arg[0].spell).toBe(pfpSpell)
+  })
+
+  // One row per positional slot of applyProtectionFromPoisonHandler(action, playerStats, campaignName, mapName, result).
+  it.each([
+    ['0.name', 'Protection from Poison'],
+    ['0.automation.type', 'protection_from_poison'],
+    ['1.name', CASTER],
+    ['2', CAMPAIGN],
+    ['3', null],
+    ['4', { targetName: TARGET }],
+  ])('apply arg %s carries the lane context', (path, expected) => {
+    expect(getByPath(arg, path)).toEqual(expected)
+  })
+
+  it('pays exactly ONE lv2 spell slot via the real prepareSpellCast', () => {
+    const slotWrites = setRuntimeValue.mock.calls.filter(c => String(c[1]).startsWith('spell_slots_'))
+    expect(slotWrites).toEqual([[CASTER, 'spell_slots_level_2', 2, CAMPAIGN]])
     expect(store.spell_slots_level_2).toBe(2)
   })
 
-  it('logs a slot-spend ability_use entry when the slot was consumed', async () => {
-    const { result } = renderPfp()
-
-    await act(async () => {
-      await result.current.handleProtectionFromPoisonConfirm([TARGET])
-    })
-
+  it('logs the spell cast and the slot-spend ability_use entry', () => {
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+      type: 'spell',
+      characterName: CASTER,
+      targetName: TARGET,
+      spellName: 'Protection from Poison',
+      spellLevel: 2,
+      castingTime: 'Action',
+    }))
     const spendLog = addEntry.mock.calls
       .map(c => c[1])
       .find(e => e && e.type === 'ability_use' && /Expended a level 2 spell slot/.test(e.description))
@@ -127,59 +162,44 @@ describe('SP-095 handleProtectionFromPoisonConfirm — prepareSpellCast slot con
     expect(spendLog.characterName).toBe(CASTER)
   })
 
-  it('does NOT impose caster concentration (spell data concentration:false, RAW 2024)', async () => {
-    const { result } = renderPfp()
-
-    await act(async () => {
-      await result.current.handleProtectionFromPoisonConfirm([TARGET])
-    })
-
+  it('imposes NO caster concentration (spell data concentration:false, RAW 2024)', () => {
     expect(addConcentration).not.toHaveBeenCalled()
     const caster = getCombatSummary(CAMPAIGN).creatures.find(c => c.name === CASTER)
     expect(caster.concentration).toBeNull()
   })
 
-  it('still applies the protection effect with the confirmed target', async () => {
-    const { result } = renderPfp()
-
-    await act(async () => {
-      await result.current.handleProtectionFromPoisonConfirm([TARGET])
-    })
-
-    expect(applyProtectionFromPoisonHandler).toHaveBeenCalledTimes(1)
-    expect(applyProtectionFromPoisonHandler.mock.calls[0][4]).toEqual({ targetName: TARGET })
-  })
-})
-
-describe('SP-095 handleProtectionFromPoisonSkip — no rollback of an unconsumed slot', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    for (const k of Object.keys(store)) delete store[k]
-    store.spell_slots_level_2 = 3
+  it('resolves the lane: clears pending', () => {
+    expect(ctx.cfClearPending).toHaveBeenCalledWith('protectionFromPoison')
   })
 
-  it('skip never rolls back (inflates) a slot that was never spent', async () => {
-    const { result } = renderPfp()
-
-    await act(async () => {
-      result.current.handleProtectionFromPoisonSkip()
-    })
-
-    expect(rollbackSpellSlot).not.toHaveBeenCalled()
-    expect(store.spell_slots_level_2).toBe(3)
-  })
-
-  it('confirm then skip sequence nets exactly one slot spent', async () => {
-    const { result } = renderPfp()
-
-    await act(async () => {
-      await result.current.handleProtectionFromPoisonConfirm([TARGET])
-    })
-    await act(async () => {
-      result.current.handleProtectionFromPoisonSkip()
+  it('skip AFTER confirm still nets exactly one slot spent (paid slot is never rolled back)', () => {
+    act(() => {
+      ctx.result.current.handleProtectionFromPoisonSkip()
     })
 
     expect(store.spell_slots_level_2).toBe(2)
     expect(rollbackSpellSlot).not.toHaveBeenCalled()
+  })
+})
+
+describe('PFP fixture vs published data', () => {
+  it('fixture byte-shape matches public/data/2024/spells.json Protection from Poison', () => {
+    const spells = JSON.parse(readFileSync('public/data/2024/spells.json', 'utf8'))
+    const data = spells.find(s => s.index === 'protection-from-poison' || s.name === 'Protection from Poison')
+    expect({
+      level: pfpSpell.level,
+      concentration: pfpSpell.concentration,
+      casting_time: pfpSpell.casting_time,
+      range: pfpSpell.range,
+      duration: pfpSpell.duration,
+      automationType: pfpSpell.automation.type,
+    }).toEqual({
+      level: data.level,
+      concentration: data.concentration,
+      casting_time: data.casting_time,
+      range: data.range,
+      duration: data.duration,
+      automationType: data.automation.type,
+    })
   })
 })

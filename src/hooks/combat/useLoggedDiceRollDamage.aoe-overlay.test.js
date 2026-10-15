@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/rules/features/viciousMockeryService.js', () => ({
@@ -198,69 +199,56 @@ describe('AoE overlay path', () => {
         endInvisibilityOnHostileAction.mockReturnValue(undefined);
     });
 
-    function createFn() {
-        return createLogDamageAndShow(deps);
+    const saveCtx = { saveDc: 15, saveType: 'DEX', dcSuccess: 'half' };
+
+    function cast(overrides = {}) {
+        return createLogDamageAndShow(deps)({
+            name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0,
+            context: { targetName: 'overlay-1', damageType: 'fire', ...overrides },
+        });
     }
 
-    it('routes to aoE handler when targetName starts with overlay-', async () => {
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
-            targetName: 'overlay-1',
-            damageType: 'fire',
-            saveDc: 15,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-        } });
-
-        expect(readAoeContext).toHaveBeenCalledWith('test-campaign', '1');
-        expect(getAffectedCreatures).toHaveBeenCalled();
-        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-            rollType: 'aoe-damage',
-            targetName: 'Fireball Zone',
-        }));
-        expect(deps.setPopupHtml).toHaveBeenCalled();
-    });
-
-    it('does nothing when readAoeContext returns null', async () => {
-        readAoeContext.mockResolvedValue(null);
-
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
-            targetName: 'overlay-1',
-            damageType: 'fire',
-        } });
-
-        expect(readAoeContext).toHaveBeenCalledWith('test-campaign', '1');
-        expect(getAffectedCreatures).not.toHaveBeenCalled();
-        expect(processAoeNpcs).not.toHaveBeenCalled();
-        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ rollType: 'aoe-damage' }));
-        expect(deps.setPopupHtml).not.toHaveBeenCalled();
-    });
-
-    it('does nothing when loadCombatSummary returns null', async () => {
-        loadCombatSummary.mockResolvedValue(null);
-
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
-            targetName: 'overlay-1',
-            damageType: 'fire',
-        } });
-
-        expect(getAffectedCreatures).not.toHaveBeenCalled();
-        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ rollType: 'aoe-damage' }));
-    });
-
-    it('handles non-save AoE damage (no saveDc/saveType)', async () => {
+    function affectedNpcAndPlayer() {
         getAffectedCreatures.mockReturnValue([
             { creature: { name: 'Goblin', type: 'npc', ac: 12 } },
             { creature: { name: 'Ally1', type: 'player', ac: 14 } },
         ]);
+    }
 
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
-            targetName: 'overlay-1',
-            damageType: 'fire',
-        } });
+    it('routes overlay- targets to the AoE handler, extracting the overlay id', async () => {
+        await cast({ targetName: 'overlay-42', ...saveCtx });
+
+        expect(readAoeContext).toHaveBeenCalledWith('test-campaign', '42');
+        expect(getAffectedCreatures).toHaveBeenCalled();
+        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+            rollType: 'aoe-damage',
+            targetName: 'Fireball Zone',
+            rolls: [3, 4, 5, 2, 3, 3],
+            total: 20,
+        }));
+        expect(deps.setPopupHtml).toHaveBeenCalled();
+    });
+
+    it.each([
+        ['overlay context', () => readAoeContext.mockResolvedValue(null)],
+        ['combat summary', () => loadCombatSummary.mockResolvedValue(null)],
+    ])('does nothing when %s is missing', async (_label, breakDeps) => {
+        breakDeps();
+
+        await cast(saveCtx);
+
+        expect(getAffectedCreatures).not.toHaveBeenCalled();
+        expect(processAoeNpcs).not.toHaveBeenCalled();
+        expect(sendAoePlayerSaves).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(deps.logEntry).not.toHaveBeenCalled();
+        expect(deps.setPopupHtml).not.toHaveBeenCalled();
+    });
+
+    it('handles non-save AoE damage (no saveDc/saveType)', async () => {
+        affectedNpcAndPlayer();
+
+        await cast();
 
         expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
         expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 20, ['fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard' });
@@ -272,14 +260,7 @@ describe('AoE overlay path', () => {
     });
 
     it('writes lastAttack via setRuntimeValue for AoE', async () => {
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
-            targetName: 'overlay-1',
-            damageType: 'fire',
-            saveDc: 15,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-        } });
+        await cast(saveCtx);
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
@@ -295,14 +276,7 @@ describe('AoE overlay path', () => {
     });
 
     it('uses attackerName from context when provided', async () => {
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
-            targetName: 'overlay-1',
-            damageType: 'fire',
-            saveDc: 15,
-            saveType: 'DEX',
-            attackerName: 'Ally2',
-        } });
+        await cast({ ...saveCtx, attackerName: 'Ally2' });
 
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
@@ -313,20 +287,10 @@ describe('AoE overlay path', () => {
     });
 
     it('registers player save prompts when players are affected', async () => {
-        getAffectedCreatures.mockReturnValue([
-            { creature: { name: 'Goblin', type: 'npc', ac: 12 } },
-            { creature: { name: 'Ally1', type: 'player', ac: 14 } },
-        ]);
+        affectedNpcAndPlayer();
         sendAoePlayerSaves.mockReturnValue([{ promptId: 'save-1', targetName: 'Ally1' }]);
 
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
-            targetName: 'overlay-1',
-            damageType: 'fire',
-            saveDc: 15,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-        } });
+        await cast(saveCtx);
 
         expect(sendAoePlayerSaves).toHaveBeenCalled();
         expect(deps.pendingSaves['save-1']).toEqual(expect.objectContaining({
@@ -338,43 +302,15 @@ describe('AoE overlay path', () => {
     });
 
     it('skips save prompts for soulstitch-protected players', async () => {
-        getAffectedCreatures.mockReturnValue([
-            { creature: { name: 'Goblin', type: 'npc', ac: 12 } },
-            { creature: { name: 'Ally1', type: 'player', ac: 14 } },
-        ]);
+        affectedNpcAndPlayer();
         hasSoulstitchProtection.mockReturnValue(true);
 
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
-            targetName: 'overlay-1',
-            damageType: 'fire',
-            saveDc: 15,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-        } });
+        await cast(saveCtx);
 
         expect(hasSoulstitchProtection).toHaveBeenCalledWith('Ally1', 'TestWizard', 'test-campaign');
         expect(sendAoePlayerSaves).not.toHaveBeenCalled();
         expect(deps.pendingSaves).toEqual({});
         expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 0, ['fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard' });
-    });
-
-    it('applies correct overlay label from overlay context', async () => {
-        readAoeContext.mockResolvedValue({
-            overlay: { label: 'Custom Zone', shape: 'square', radius: 15 },
-            players: [],
-            npcs: [{ name: 'Goblin' }],
-        });
-
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
-            targetName: 'overlay-1',
-            damageType: 'fire',
-        } });
-
-        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-            targetName: 'Custom Zone',
-        }));
     });
 
     it('uses shape as fallback label when overlay has no label', async () => {
@@ -384,40 +320,10 @@ describe('AoE overlay path', () => {
             npcs: [{ name: 'Goblin' }],
         });
 
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
-            targetName: 'overlay-1',
-            damageType: 'fire',
-        } });
+        await cast();
 
         expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             targetName: 'cone',
         }));
-    });
-
-    it('passes displayRolls and adjustedTotal to logEntry', async () => {
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
-            targetName: 'overlay-1',
-            damageType: 'fire',
-            saveDc: 15,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-        } });
-
-        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-            rolls: [3, 4, 5, 2, 3, 3],
-            total: 20,
-        }));
-    });
-
-    it('handles overlay id extraction from various targetName formats', async () => {
-        const fn = createFn();
-        await fn({ name: 'Fireball', formula: '8d6', total: 20, rolls: [3, 4, 5, 2, 3, 3], modifier: 0, context: {
-            targetName: 'overlay-42',
-            damageType: 'fire',
-        } });
-
-        expect(readAoeContext).toHaveBeenCalledWith('test-campaign', '42');
     });
 });

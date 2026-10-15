@@ -1,10 +1,18 @@
+// @maintained-by-ai: 2026-10-14
+// Wrapper-lane lastAttack seam for createLogDamageAndShow — only the stamping
+// paths not owned elsewhere. Plain-damage store/merge and the skip guards
+// (rolls/damageType absent) are authority in handlers/handlePlainDamage.test.js
+// (same wrapper entry point); sanctuary prompt mechanics live in
+// useLoggedDiceRollDamage.sanctuary.test.js; the shield-immunity popup
+// contract lives in useLoggedDiceRollDamage.shield-immunity.test.js.
+// Kept here: the auto-miss stamp (handleAutoMiss, untested elsewhere),
+// early-return paths that must NOT stamp (sanctuary block, magic missile
+// immunity), and stamping when the target is absent from the combat summary.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
-import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
-import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
-import { applyMinDamageAdjustment } from './loggedDiceRollUtils.js';
+import { isMagicMissileImmune } from './loggedDiceRollUtils.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
 
@@ -120,11 +128,7 @@ vi.mock('./handlers/handleOverchannelSelfDamage.js', () => ({
     handleOverchannelSelfDamage: vi.fn(),
 }));
 
-vi.mock('./handlers/handleMagicMissileImmunity.js', () => ({
-    isMagicMissileImmune: vi.fn(),
-}));
-
-describe('useLoggedDiceRollDamage — lastAttack persistence', () => {
+describe('useLoggedDiceRollDamage — lastAttack persistence (wrapper lane)', () => {
     const deps = {
         characterName: 'TestFighter',
         campaignName: 'test-campaign',
@@ -135,110 +139,37 @@ describe('useLoggedDiceRollDamage — lastAttack persistence', () => {
         pendingSaves: {},
     };
 
+    const fireBolt = (context) => ({
+        name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context,
+    });
+    const lastAttackWrites = () =>
+        setRuntimeValue.mock.calls.filter((call) => call[0] === 'campaign' && call[1] === 'lastAttack');
+
     beforeEach(() => {
         vi.clearAllMocks();
 
-        // Default: plain damage handler path (no save, no miss, no aoe, no sanctuary)
-        applyMinDamageAdjustment.mockImplementation((d) => d);
-        hasIgnoreResistance.mockReturnValue(false);
-        endInvisibilityOnHostileAction.mockReturnValue(undefined);
+        // Plain-damage defaults; individual tests opt into their seam.
+        getRuntimeValue.mockImplementation(() => null);
+        isMagicMissileImmune.mockReturnValue(false);
         applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
         loadCombatSummary.mockResolvedValue({
             creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
         });
-        getRuntimeValue.mockImplementation((_key, _subKey, _camp) => null);
-
-        deps.logEntry.mockClear();
-        deps.setPopupHtml.mockClear();
-    });
-
-    function createFn() {
-        return createLogDamageAndShow(deps);
-    }
-
-    // -----------------------------------------------------------------------
-    // Behavior: plain damage — lastAttack is written with correct merged data
-    // -----------------------------------------------------------------------
-    it('writes lastAttack with full context on plain damage', async () => {
-        const fn = createFn();
-
-        await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
-            attackerName: 'TestFighter',
-            targetName: 'Goblin',
-            damageType: 'fire',
-            attackName: 'Fire Bolt',
-        } });
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'lastAttack',
-            expect.objectContaining({
-                attackerName: 'TestFighter',
-                targetName: 'Goblin',
-                attackName: 'Fire Bolt',
-                rawDamage: 5,
-                primaryDamage: 5,
-                primaryDamageType: 'fire',
-                damageTypes: ['fire'],
-                damageApplied: true,
-            }),
-            'test-campaign'
-        );
     });
 
     // -----------------------------------------------------------------------
-    // Behavior: merge — lastAttack merges with existing campaign data
+    // handleAutoMiss stamps lastAttack so counterspell/riposte lanes can
+    // see the miss — the only coverage of that stamp anywhere.
     // -----------------------------------------------------------------------
-    it('merges lastAttack with existing campaign data', async () => {
-        const existingLastAttack = {
-            attackerName: 'TestFighter',
-            rollType: 'attack',
-        };
-        getRuntimeValue.mockImplementation((key, subKey) => {
-            if (key === 'campaign' && subKey === 'lastAttack') return existingLastAttack;
-            if (key === 'campaign') return [];
-            return null;
-        });
-
-        const fn = createFn();
-        await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
-            attackerName: 'TestFighter',
-            targetName: 'Goblin',
-            damageType: 'fire',
-            attackName: 'Fire Bolt',
-        } });
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'lastAttack',
-            expect.objectContaining({
-                attackerName: 'TestFighter',
-                targetName: 'Goblin',
-                attackName: 'Fire Bolt',
-                rolls: expect.any(Array),
-                rawDamage: 5,
-                primaryDamage: 5,
-                primaryDamageType: 'fire',
-                damageTypes: expect.any(Array),
-                damageApplied: true,
-            }),
-            'test-campaign'
-        );
-    });
-
-    // -----------------------------------------------------------------------
-    // Behavior: auto-miss — lastAttack reflects zero damage
-    // -----------------------------------------------------------------------
-    it('writes lastAttack with damageApplied=false on auto-miss', async () => {
-        const fn = createFn();
-
-        await fn({ name: 'Fire Bolt', formula: '1d10', total: 0, rolls: [], modifier: 0, context: {
+    it('auto-miss stamps lastAttack with rollType auto-miss and zero damage', async () => {
+        await createLogDamageAndShow(deps)(fireBolt({
             attackerName: 'TestFighter',
             targetName: 'Goblin',
             damageType: 'fire',
             isAutoMiss: true,
-        } });
+        }));
 
+        expect(lastAttackWrites()).toHaveLength(1);
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
             'lastAttack',
@@ -246,8 +177,11 @@ describe('useLoggedDiceRollDamage — lastAttack persistence', () => {
                 attackerName: 'TestFighter',
                 targetName: 'Goblin',
                 rollType: 'auto-miss',
+                damageName: 'Fire Bolt',
+                damageFormula: '1d10',
                 rawDamage: 0,
                 primaryDamage: 0,
+                primaryDamageType: 'fire',
                 damageApplied: false,
             }),
             'test-campaign'
@@ -255,189 +189,80 @@ describe('useLoggedDiceRollDamage — lastAttack persistence', () => {
     });
 
     // -----------------------------------------------------------------------
-    // Behavior: sanctuary block — lastAttack is NOT written
+    // Wrapper returns before any handler runs when sanctuary blocks the
+    // attack — nothing may stamp lastAttack. (Prompt mechanics are owned
+    // by useLoggedDiceRollDamage.sanctuary.test.js.)
     // -----------------------------------------------------------------------
-    it('does not write lastAttack when sanctuary blocks the attack', async () => {
-        // Mock a sanctuary effect so the attacker must save
+    it('sanctuary block returns early without writing lastAttack', async () => {
         getRuntimeValue.mockImplementation((key, subKey) => {
             if (key === 'campaign' && subKey === 'targetEffects') {
-                return [
-                    {
-                        effect: 'sanctuary',
-                        target: 'Goblin',
-                        source: 'Healer',
-                        saveDc: 13,
-                    },
-                ];
+                return [{ effect: 'sanctuary', target: 'Goblin', source: 'Healer', saveDc: 13 }];
             }
-            if (key === 'campaign' && subKey === 'pendingSavePrompts') {
-                return {};
-            }
-            if (key === 'campaign') {
-                return {};
-            }
-            return null;
+            return key === 'campaign' ? {} : null;
         });
 
-        // Capture promptId from sendSavePrompt mock calls
-        const { sendSavePrompt } = await import('../../services/combat/conditions/savePromptService.js');
-
-        const fn = createFn();
-        const fnPromise = fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
+        const promise = createLogDamageAndShow(deps)(fireBolt({
             targetName: 'Goblin',
             damageType: 'fire',
             saveDc: 13,
-            saveType: 'DEX',
-        } });
+            saveType: 'WIS',
+        }));
 
-        // Wait for sendSavePrompt to be called, then dispatch failure
-        await new Promise((r) => setTimeout(r, 200));
-        const promptId = sendSavePrompt.mock.calls[0]?.[1]?.promptId;
-        if (promptId) {
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId, success: false, roll: 8, bonus: 0, rawRolls: [8] },
-            }));
-        }
+        // The save-result listener registers synchronously inside
+        // handleSanctuarySave and utils.guid is mocked to 'test-guid',
+        // so the failed save can be dispatched immediately — no polling.
+        window.dispatchEvent(new CustomEvent('save-result', {
+            detail: { promptId: 'test-guid', success: false, roll: 8, bonus: 0, rawRolls: [8] },
+        }));
+        await promise;
 
-        await fnPromise;
-
-        // Sanctuary blocked — the function returns early, no lastAttack write.
-        const lastAttackCalls = setRuntimeValue.mock.calls.filter(
-            (call) => call[0] === 'campaign' && call[1] === 'lastAttack'
+        // Sentinel: the block took effect (automation_info popup), yet nothing stamped.
+        expect(deps.setPopupHtml).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'automation_info', name: 'Sanctuary' })
         );
-        expect(lastAttackCalls).toHaveLength(0);
+        expect(lastAttackWrites()).toHaveLength(0);
     });
 
     // -----------------------------------------------------------------------
-    // Behavior: magic missile immunity — popup shows 0 damage, no lastAttack
+    // Magic-missile immunity short-circuits the wrapper before handlers —
+    // popup/log contract is owned by shield-immunity lane; here only the
+    // no-stamp guarantee.
     // -----------------------------------------------------------------------
-    it('shows 0 damage popup when target is immune to magic missile', async () => {
-        const { isMagicMissileImmune } = await import('./loggedDiceRollUtils.js');
+    it('magic missile immunity short-circuits without writing lastAttack', async () => {
         isMagicMissileImmune.mockReturnValue(true);
 
-        const fn = createFn();
-        loadCombatSummary.mockResolvedValue({
-            creatures: [{ name: 'Goblin', type: 'npc', currentHp: 13, maxHp: 13 }],
+        await createLogDamageAndShow(deps)({
+            name: 'Magic Missile', formula: '1d4+1', total: 5, rolls: [4, 1], modifier: 0, context: {
+                attackerName: 'TestFighter',
+                targetName: 'Goblin',
+                damageType: 'force',
+            },
         });
 
-        await fn({ name: 'Magic Missile', formula: '1d4+1', total: 5, rolls: [4, 1], modifier: 0, context: {
-            attackerName: 'TestFighter',
-            targetName: 'Goblin',
-            damageType: 'force',
-        } });
-
-        // Immune path shows popup with 0 finalDamage but does NOT write lastAttack
-        expect(deps.setPopupHtml).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'damage',
-                name: 'Magic Missile',
-                targetName: 'Goblin',
-                finalDamage: 0,
-                damageReduced: true,
-                note: 'Shield: Immune to Magic Missile',
-            })
-        );
-
-        const lastAttackCalls = setRuntimeValue.mock.calls.filter(
-            (call) => call[0] === 'campaign' && call[1] === 'lastAttack'
-        );
-        expect(lastAttackCalls).toHaveLength(0);
+        expect(lastAttackWrites()).toHaveLength(0);
     });
 
     // -----------------------------------------------------------------------
-    // Behavior: no target in combat summary — lastAttack still written
+    // A target missing from the combat summary must not block the stamp —
+    // downstream lanes (executeManeuver, spellThief) key on this record.
     // -----------------------------------------------------------------------
-    it('writes lastAttack even when target is not in combat summary', async () => {
+    it('stamps lastAttack even when the target is not in combat summary', async () => {
         loadCombatSummary.mockResolvedValue({
             creatures: [{ name: 'OtherCreature', type: 'npc', currentHp: 10, maxHp: 10 }],
         });
 
-        const fn = createFn();
-        await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
+        await createLogDamageAndShow(deps)(fireBolt({
             attackerName: 'TestFighter',
             targetName: 'NonExistent',
             damageType: 'fire',
             attackName: 'Fire Bolt',
-        } });
+        }));
 
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'lastAttack',
-            expect.objectContaining({
-                attackerName: 'TestFighter',
-                targetName: 'NonExistent',
-                damageApplied: true,
-            }),
-            'test-campaign'
-        );
-    });
-
-    // -----------------------------------------------------------------------
-    // Behavior: critical hit — lastAttack reflects doubled rolls
-    // -----------------------------------------------------------------------
-    it('writes lastAttack with doubled rolls on critical hit', async () => {
-        const fn = createFn();
-
-        await fn({ name: 'Fire Bolt', formula: '1d10', total: 15, rolls: [5, 5], modifier: 0, context: {
+        expect(lastAttackWrites()).toHaveLength(1);
+        expect(lastAttackWrites()[0][2]).toEqual(expect.objectContaining({
             attackerName: 'TestFighter',
-            targetName: 'Goblin',
-            damageType: 'fire',
-            attackName: 'Fire Bolt',
-            isAutoCrit: true,
-        } });
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'lastAttack',
-            expect.objectContaining({
-                attackerName: 'TestFighter',
-                targetName: 'Goblin',
-                rolls: expect.arrayContaining([5, 5]),
-                rawDamage: expect.any(Number),
-                damageApplied: true,
-            }),
-            'test-campaign'
-        );
-    });
-
-    // -----------------------------------------------------------------------
-    // Behavior: missing context — lastAttack not written (no damageType)
-    // -----------------------------------------------------------------------
-    it('does not write lastAttack when context is missing damageType', async () => {
-        const fn = createFn();
-
-        await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
-            targetName: 'Goblin',
-            // no damageType
-        } });
-
-        // The main function only writes lastAttack when popupData.rolls &&
-        // popupData.damageType are both truthy. Without damageType, it should
-        // not call setRuntimeValue for lastAttack.
-        const lastAttackCalls = setRuntimeValue.mock.calls.filter(
-            (call) => call[0] === 'campaign' && call[1] === 'lastAttack'
-        );
-        expect(lastAttackCalls).toHaveLength(0);
-    });
-
-    // -----------------------------------------------------------------------
-    // Behavior: null target name — lastAttack written with null target
-    // -----------------------------------------------------------------------
-    it('writes lastAttack with undefined targetName when context has no target', async () => {
-        const fn = createFn();
-
-        await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
-            attackerName: 'TestFighter',
-            damageType: 'fire',
-        } });
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'lastAttack',
-            expect.objectContaining({
-                attackerName: 'TestFighter',
-            }),
-            'test-campaign'
-        );
+            targetName: 'NonExistent',
+            damageApplied: true,
+        }));
     });
 });

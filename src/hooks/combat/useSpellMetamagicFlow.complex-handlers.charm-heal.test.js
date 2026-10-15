@@ -1,8 +1,16 @@
+// @maintained-by-ai: 2026-10-15
+// Charm/heal confirm routing for useSpellMetamagicFlow (SIMPLE_SPELL_SPECS lane).
+// Owns: Charm Person / Charm Monster trigger threading (charmPersonTargets /
+// charmMonsterTargets + characters) and Healing Word / Heal object-target confirms
+// incl. missing-target guards. Owned elsewhere: popup payloads → confirm-payloads,
+// skip lanes → skip.test.js, upcast slot levels → cla086-upcast-slot.test.js,
+// no-pending guards → handler-guards.test.js. Spell levels/casting times are
+// disk-derived from public/data/spells.json (Charm Person lv1, Charm Monster lv4,
+// Healing Word lv1 bonus, Heal lv6).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
 import { addEntry } from '../../services/ui/logService.js';
-import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js';
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
@@ -15,8 +23,12 @@ vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
+// useConfirmableFlow.fireConfirmLaneRider imports both riders on every confirm —
+// stub them so the riders seam stays out of this routing lane's assertions.
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
+  triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
+  triggerBewitchingMagic: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../services/npcs/monsterUtils.js', () => ({
@@ -38,6 +50,10 @@ vi.mock('../../services/rules/spells/metamagicRules.js', () => ({
   hasPsionicSorcery: vi.fn(() => false),
 }));
 
+// Full factory mock: automation/index is statically imported by several handler
+// modules. Runners reference members lazily (thunks), so only entries whose
+// handlers execute here (none in this lane — all route through feature
+// services) need meaningful return values.
 vi.mock('../../services/automation/index.js', () => ({
   applyAidEffect: vi.fn(),
   applyHeroesFeastEffect: vi.fn(),
@@ -61,7 +77,6 @@ vi.mock('../../services/automation/index.js', () => ({
   applyFeignDeath: vi.fn(() => Promise.resolve(null)),
   applyLongstriderEffect: vi.fn(() => Promise.resolve(null)),
   applySpareTheDyingEffect: vi.fn(() => Promise.resolve(null)),
-  applyPassWithoutTraceEffect: vi.fn(() => Promise.resolve(null)),
   applyBeaconOfHopeEffect: vi.fn(() => Promise.resolve(null)),
   applyAuraOfLifeEffect: vi.fn(),
   applyAuraOfPurityEffect: vi.fn(),
@@ -74,6 +89,9 @@ vi.mock('../../services/automation/index.js', () => ({
   handleSanctuary: vi.fn(() => Promise.resolve(null)),
 }));
 
+// Feature-service mocks below mirror the static imports of useSimpleSpellHandlers
+// / useComplexSpellHandlers — every statically-imported module must be covered by
+// a factory even when only the charm/heal thunks run here.
 vi.mock('../../services/rules/features/greaterRestorationService.js', () => ({
   confirmGreaterRestoration: vi.fn(),
 }));
@@ -157,25 +175,14 @@ vi.mock('../../services/rules/spells/spellPreparationService.js', () => ({
   incrementFreeCastResource: vi.fn(),
 }));
 
-global.fetch = vi.fn((url) => {
-  if (url && url.includes('combat-summary')) {
-    return Promise.resolve({
-      ok: true,
-      json: () => Promise.resolve({ creatures: [] }),
-    });
-  }
-  return Promise.resolve({
-    ok: true,
-    status: 200,
-    json: () => Promise.resolve({}),
-    text: () => Promise.resolve(''),
-  });
-});
+global.fetch = vi.fn(() => Promise.resolve({
+  ok: true,
+  status: 200,
+  json: () => Promise.resolve({ creatures: [] }),
+  text: () => Promise.resolve(''),
+}));
 
-Object.defineProperty(window, 'dispatchEvent', {
-  value: vi.fn(),
-  writable: true,
-});
+const CAMPAIGN = 'TestCampaign';
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -186,77 +193,78 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Fireball',
-    level: 3,
-    casting_time: '1 Action',
-    range: '150 ft.',
-    ...overrides,
-  };
-}
-
-function renderHookWithSpell(hookSetup, spellName, spellOverrides = {}) {
+// Render the flow and gate the spell so its sheet-confirm pending opens.
+// Spell fields default to the Charm Person disk record; callers override
+// per-spell values straight from public/data/spells.json.
+async function renderGated(spellOverrides = {}, playerOverrides = {}) {
+  const playerStats = makePlayerStats(playerOverrides);
   const onExecute = vi.fn();
+  const setPopupHtml = vi.fn();
   const { result } = renderHook(() =>
-    hookSetup(onExecute)
+    useSpellMetamagicFlow({ playerStats, campaignName: CAMPAIGN, onExecute, setPopupHtml })
   );
-  const spell = makeSpell({ name: spellName, ...spellOverrides });
-  act(() => {
-    result.current.gateMetamagic(spell);
+  const spell = {
+    name: 'Charm Person',
+    level: 1,
+    casting_time: '1 action',
+    range: '30 feet',
+    ...spellOverrides,
+  };
+  await act(async () => {
+    await result.current.gateMetamagic(spell);
   });
-  return { result, onExecute, spell };
+  return { result, onExecute, setPopupHtml, playerStats, spell };
 }
 
-describe('useSpellMetamagicFlow — Charm Person confirm/skip', () => {
+describe('useSpellMetamagicFlow — Charm Person confirm lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('triggers charm person and logs entry on confirm', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
+  it('gates humanoid targets, threads them to triggerCharmPerson, logs the cast, clears pending', async () => {
+    const { result, spell } = await renderGated();
 
-    const monsterUtils = await import('../../services/npcs/monsterUtils.js');
-    monsterUtils.getMonsterData.mockResolvedValue({ type: 'humanoid' });
-
-    await act(async () => {
-      await result.current.gateMetamagic(makeSpell({ name: 'Charm Person', level: 1 }));
-    });
-
+    // gateCharmPerson resolves humanoids (monsterUtils mock) into creatureTargets
     expect(result.current.pendingCharmPerson).not.toBeNull();
+    expect(result.current.pendingCharmPerson.creatureTargets).toEqual(['Goblin A', 'Goblin B', 'Goblin C']);
+
+    const { triggerCharmPerson } = await import('../../services/rules/features/charmPersonService.js');
 
     await act(async () => {
       await result.current.handleCharmPersonConfirm(['Goblin A']);
     });
 
-    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
+    // CLA-219 shape: charm targets + characters ride the trigger metaCtx
+    expect(triggerCharmPerson).toHaveBeenCalledWith(
+      spell,
+      expect.objectContaining({ charmPersonTargets: ['Goblin A'], characters: [] }),
+      expect.objectContaining({ name: 'TestSorcerer' }),
+      CAMPAIGN,
+      null,
+    );
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
       type: 'spell',
       characterName: 'TestSorcerer',
       targetName: 'Goblin A',
       targets: ['Goblin A', 'Goblin B', 'Goblin C'],
       spellName: 'Charm Person',
       spellLevel: 1,
-      castingTime: '1 Action',
+      castingTime: '1 action',
       timestamp: expect.any(Number),
     });
     expect(result.current.pendingCharmPerson).toBeNull();
   });
 });
 
-describe('useSpellMetamagicFlow — Charm Monster confirm/skip', () => {
+describe('useSpellMetamagicFlow — Charm Monster confirm lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('triggers charm monster and logs entry on confirm', async () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Charm Monster',
-      { level: 4 },
-    );
+  it('routes confirm targets to triggerCharmMonster and clears pending', async () => {
+    const { result, spell } = await renderGated({ name: 'Charm Monster', level: 4 });
+
+    expect(result.current.pendingCharmMonster).not.toBeNull();
 
     const { triggerCharmMonster } = await import('../../services/rules/features/charmMonsterService.js');
 
@@ -264,66 +272,26 @@ describe('useSpellMetamagicFlow — Charm Monster confirm/skip', () => {
       await result.current.handleCharmMonsterConfirm(['Goblin A']);
     });
 
-    expect(triggerCharmMonster).toHaveBeenCalled();
+    expect(triggerCharmMonster).toHaveBeenCalledWith(
+      spell,
+      expect.objectContaining({ charmMonsterTargets: ['Goblin A'], characters: [] }),
+      expect.objectContaining({ name: 'TestSorcerer' }),
+      CAMPAIGN,
+      null,
+    );
     expect(result.current.pendingCharmMonster).toBeNull();
   });
 });
 
-describe('useSpellMetamagicFlow — Banishment confirm/skip', () => {
+describe('useSpellMetamagicFlow — Healing Word confirm lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('triggers banishment and logs entry on confirm', async () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Banishment',
-      { level: 4 },
-    );
+  it('threads the object target with the paid slot level to triggerHealingWord and clears pending', async () => {
+    const { result, spell } = await renderGated({ name: 'Healing Word', level: 1, casting_time: '1 bonus action' });
 
-    await act(async () => {
-      await result.current.handleBanishmentConfirm(['Goblin A']);
-    });
-
-    expect(result.current.pendingBanishment).toBeNull();
-  });
-});
-
-describe('useSpellMetamagicFlow — Prismatic Spray confirm/skip', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('calls onExecute with selectedTargets on confirm', async () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-    const spell = makeSpell({ name: 'Prismatic Spray', level: 7 });
-    act(() => {
-      result.current.gateMetamagic(spell);
-    });
-
-    await act(async () => {
-      await result.current.handlePrismaticSprayConfirm(['Goblin A']);
-    });
-
-    expect(onExecute).toHaveBeenCalledWith(spell, { selectedTargets: ['Goblin A'] });
-    expect(result.current.pendingPrismaticSpray).toBeNull();
-  });
-});
-
-describe('useSpellMetamagicFlow — Healing Word confirm/skip', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('triggers healing word and logs entry on confirm', async () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Healing Word',
-      { level: 1 },
-    );
+    expect(result.current.pendingHealingWord).not.toBeNull();
 
     const { triggerHealingWord } = await import('../../services/rules/features/healingWordService.js');
 
@@ -331,91 +299,40 @@ describe('useSpellMetamagicFlow — Healing Word confirm/skip', () => {
       await result.current.handleHealingWordConfirm({ targetName: 'Goblin A' });
     });
 
-    expect(triggerHealingWord).toHaveBeenCalled();
+    // runHealingWord builds metaCtx via healSlotLevel (no upcast → base level 1)
+    expect(triggerHealingWord).toHaveBeenCalledWith(
+      spell,
+      { targetName: 'Goblin A', slotLevel: 1 },
+      expect.objectContaining({ name: 'TestSorcerer' }),
+      CAMPAIGN,
+      null,
+    );
+    expect(result.current.pendingHealingWord).toBeNull();
+  });
+
+  it('does not trigger healing without a selected target', async () => {
+    const { result } = await renderGated({ name: 'Healing Word', level: 1, casting_time: '1 bonus action' });
+
+    const { triggerHealingWord } = await import('../../services/rules/features/healingWordService.js');
+
+    await act(async () => {
+      await result.current.handleHealingWordConfirm({});
+    });
+
+    expect(triggerHealingWord).not.toHaveBeenCalled();
     expect(result.current.pendingHealingWord).toBeNull();
   });
 });
 
-describe('useSpellMetamagicFlow — Regenerate confirm/skip', () => {
+describe('useSpellMetamagicFlow — Heal confirm lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('executes regenerate and logs entry on confirm', async () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Regenerate',
-      { level: 7 },
-    );
+  it('routes the object target to triggerHeal at the pending spell level and clears pending', async () => {
+    const { result } = await renderGated({ name: 'Heal', level: 6, range: '60 feet' });
 
-    await act(async () => {
-      await result.current.handleRegenerateConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(result.current.pendingRegenerate).toBeNull();
-  });
-});
-
-describe('useSpellMetamagicFlow — Protection from Evil and Good confirm/skip', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('consumes material and applies effect on confirm', async () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Protection from Evil and Good',
-      { level: 1 },
-    );
-
-    const automation = await import('../../services/automation/index.js');
-
-    await act(async () => {
-      await result.current.handleProtectionFromEvilAndGoodConfirm(['Goblin A']);
-    });
-
-    expect(automation.applyProtectionFromEvilAndGood).toHaveBeenCalled();
-    expect(result.current.pendingProtectionFromEvilAndGood).toBeNull();
-  });
-});
-
-describe('useSpellMetamagicFlow — Shield of Faith confirm/skip', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('applies shield of faith and logs entry on confirm', async () => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValueOnce(null);
-
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Shield of Faith', level: 1 }));
-    });
-
-    act(() => {
-      result.current.handleShieldOfFaithConfirm(['Goblin A']);
-    });
-
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-});
-
-describe('useSpellMetamagicFlow — Heal confirm/skip', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('triggers heal and logs entry on confirm', async () => {
-    const { result } = renderHookWithSpell(
-      (onExec) => useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'TestCampaign', onExecute: onExec }),
-      'Heal',
-      { level: 6 },
-    );
+    expect(result.current.pendingHeal).not.toBeNull();
 
     const { triggerHeal } = await import('../../services/rules/features/healService.js');
 
@@ -423,7 +340,75 @@ describe('useSpellMetamagicFlow — Heal confirm/skip', () => {
       await result.current.handleHealConfirm({ targetName: 'Goblin A' });
     });
 
-    expect(triggerHeal).toHaveBeenCalled();
+    // runHeal wraps { name, spell, level: pending.spellLevel } for the trigger
+    expect(triggerHeal).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Heal', level: 6 }),
+      { targetName: 'Goblin A' },
+      expect.objectContaining({ name: 'TestSorcerer' }),
+      CAMPAIGN,
+      null,
+    );
     expect(result.current.pendingHeal).toBeNull();
   });
+
+  it('does not heal without a selected target', async () => {
+    const { result } = await renderGated({ name: 'Heal', level: 6, range: '60 feet' });
+
+    const { triggerHeal } = await import('../../services/rules/features/healService.js');
+
+    await act(async () => {
+      await result.current.handleHealConfirm({});
+    });
+
+    expect(triggerHeal).not.toHaveBeenCalled();
+    expect(result.current.pendingHeal).toBeNull();
+  });
+});
+
+// Non-charm/heal routings with no happy-path test in any sibling file —
+// parked here until the spells lanes claim them (they run the same
+// SIMPLE_SPELL_SPECS infra asserted above).
+describe('useSpellMetamagicFlow — retained unique confirm routings', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const routings = [
+    {
+      spell: { name: 'Prismatic Spray', level: 7, range: 'Self' },
+      pending: 'pendingPrismaticSpray',
+      handler: 'handlePrismaticSprayConfirm',
+      arg: ['Goblin A'],
+      // prismatic_spray spec: run = onExecute(spell, { selectedTargets })
+      assert: ({ onExecute, spell }) => expect(onExecute).toHaveBeenCalledWith(spell, { selectedTargets: ['Goblin A'] }),
+    },
+    {
+      spell: { name: 'Protection from Evil and Good', level: 1, range: 'Touch' },
+      pending: 'pendingProtectionFromEvilAndGood',
+      handler: 'handleProtectionFromEvilAndGoodConfirm',
+      arg: ['Goblin A'],
+      // consumeThenApply spec: holy-water material is consumed, then apply runs
+      assert: async ({ playerStats }) => {
+        const automation = await import('../../services/automation/index.js');
+        const { consumeMaterial } = await import('../../services/rules/spells/materialComponents.js');
+        expect(consumeMaterial).toHaveBeenCalledWith(playerStats, 'Flask of Holy Water (25 gp)', CAMPAIGN);
+        expect(automation.applyProtectionFromEvilAndGood).toHaveBeenCalledTimes(1);
+      },
+    },
+  ];
+
+  for (const tc of routings) {
+    it(`${tc.spell.name} confirm applies its effect and clears pending`, async () => {
+      const { result, onExecute, spell, playerStats } = await renderGated(tc.spell);
+
+      expect(result.current[tc.pending]).not.toBeNull();
+
+      await act(async () => {
+        await result.current[tc.handler](tc.arg);
+      });
+
+      await tc.assert({ onExecute, spell, playerStats });
+      expect(result.current[tc.pending]).toBeNull();
+    });
+  }
 });

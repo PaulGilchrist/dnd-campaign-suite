@@ -1,3 +1,12 @@
+// @maintained-by-ai: 2026-10-14
+// Owns the Restore Balance (CLA-295) attack-lane seam of createLogAndShow:
+// maybeCancelForcedMode consults consumeArmedRestoreBalance only for
+// advantage/disadvantage rolls and folds the mode to normal when an armed
+// holder consumes it. Service internals (arming, range, blinded, log content)
+// are owned by restoreBalanceState.test.js; the CLA-134 _restoreBalanceCancelled
+// fold-guard is owned by d20RollComputation.feats-of-chaos.test.js; the
+// save-side 1-vs-2 disadvantage-source boundary is owned by
+// handlePlayerSaveDamage.advantage-disadvantage.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -80,7 +89,7 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
     getBaitAndSwitchAcBonus: vi.fn(() => 0),
     getGuardianProtectionAcBonus: vi.fn(() => 0),
     getParryAcBonus: vi.fn(() => 0),
-  getSlowAcPenalty: () => 0,
+    getSlowAcPenalty: () => 0,
     dispatchUnbreakableMajestySave: vi.fn(),
     hasPotentCantrip: vi.fn(),
     getShieldAcBonus: vi.fn(),
@@ -167,7 +176,7 @@ const defaultDeps = {
     autoDamageSourceRef: { current: null },
 };
 
-function createFn() {
+function createTestFn() {
     return createLogAndShow({ ...defaultDeps });
 }
 
@@ -178,6 +187,7 @@ beforeEach(() => {
     getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
     loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12 }] });
     getRuntimeValue.mockReturnValue(null);
+    // clearAllMocks does not reset implementations — pin the no-holder default
     consumeArmedRestoreBalance.mockResolvedValue(null);
     getManeuversForRules.mockResolvedValue([]);
 });
@@ -186,7 +196,7 @@ describe('Restore Balance seam in logAndShow (CLA-295)', () => {
     it('cancels advantage to normal when an armed holder consumes the roll', async () => {
         consumeArmedRestoreBalance.mockResolvedValue('AberrantSorcerer');
 
-        await createFn()('Longsword', 5, 'attack', { targetName: 'Goblin', forcedMode: 'advantage' });
+        await createTestFn()('Longsword', 5, 'attack', { targetName: 'Goblin', forcedMode: 'advantage' });
 
         expect(consumeArmedRestoreBalance).toHaveBeenCalledWith(
             'test-campaign', expect.anything(), 'TestFighter', 'Longsword', 'attack',
@@ -202,40 +212,33 @@ describe('Restore Balance seam in logAndShow (CLA-295)', () => {
     it('cancels disadvantage to normal when an armed holder consumes the roll', async () => {
         consumeArmedRestoreBalance.mockResolvedValue('AberrantSorcerer');
 
-        await createFn()('Longsword', 5, 'attack', { targetName: 'Goblin', forcedMode: 'disadvantage' });
+        await createTestFn()('Longsword', 5, 'attack', { targetName: 'Goblin', forcedMode: 'disadvantage' });
 
         expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             mode: 'normal',
         }));
+        expect(defaultDeps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+            forcedMode: 'normal',
+        }));
     });
 
-    it('keeps advantage when no holder is armed', async () => {
-        consumeArmedRestoreBalance.mockResolvedValue(null);
-
-        await createFn()('Longsword', 5, 'attack', { targetName: 'Goblin', forcedMode: 'advantage' });
+    it('leaves the roll advantaged when consume misses (no holder / out of range / unseen)', async () => {
+        await createTestFn()('Longsword', 5, 'attack', { targetName: 'Goblin', forcedMode: 'advantage' });
 
         expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             mode: 'advantage',
         }));
+        expect(defaultDeps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+            forcedMode: 'advantage',
+        }));
     });
 
     it('never consults Restore Balance for normal-mode rolls', async () => {
-        await createFn()('Longsword', 5, 'attack', { targetName: 'Goblin' });
+        await createTestFn()('Longsword', 5, 'attack', { targetName: 'Goblin' });
 
         expect(consumeArmedRestoreBalance).not.toHaveBeenCalled();
         expect(defaultDeps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             mode: 'normal',
-        }));
-    });
-
-    it('does not cancel the roll when consume misses (out of range/unseen)', async () => {
-        consumeArmedRestoreBalance.mockResolvedValue(null);
-
-        const context = { targetName: 'Goblin', forcedMode: 'advantage' };
-        await createFn()('Longsword', 5, 'attack', context);
-
-        expect(defaultDeps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-            forcedMode: 'advantage',
         }));
     });
 });

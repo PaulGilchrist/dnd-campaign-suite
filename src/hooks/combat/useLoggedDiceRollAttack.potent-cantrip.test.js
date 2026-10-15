@@ -1,3 +1,11 @@
+// @maintained-by-ai: 2026-10-14
+// Attack-lane seam (createLogAndShow): Potent Cantrip (2024 classes.json Evoker lv3:
+// "miss with attack roll or target succeeds on saving throw → half the cantrip's damage")
+// and Soulknife lv9 Homing Strikes gate wiring. Owns what reaches logEntry /
+// setPopupHtml / lastAttackRoll through the full lane. Unit seams covered elsewhere:
+// attackPostProcessing-cla120-potent-cantrip.test.js (formula folding, idempotency,
+// school gate) and hitResolution.soul-blades.test.js (conversion, die size, energy
+// spend, still-miss, natural 1).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', async (importOriginal) => {
@@ -69,7 +77,7 @@ vi.mock('./loggedDiceRollUtils.js', () => ({
     getBaitAndSwitchAcBonus: vi.fn(() => 0),
     getGuardianProtectionAcBonus: vi.fn(() => 0),
     getParryAcBonus: vi.fn(() => 0),
-  getSlowAcPenalty: () => 0,
+    getSlowAcPenalty: () => 0,
     dispatchUnbreakableMajestySave: vi.fn(),
     hasPotentCantrip: vi.fn(),
     getShieldAcBonus: vi.fn(),
@@ -111,7 +119,7 @@ import {
     hasAttackerTriggeredMajesty,
 } from '../../services/combat/auras/unbreakableMajesty.js';
 
-describe('createLogAndShow - Potent Cantrip & Soulknife', () => {
+describe('createLogAndShow — Potent Cantrip & Soulknife lane', () => {
     const deps = {
         characterName: 'TestWizard',
         campaignName: 'test-campaign',
@@ -154,82 +162,42 @@ describe('createLogAndShow - Potent Cantrip & Soulknife', () => {
         );
     }
 
-    function findLastAttackRollSetCalls() {
+    function findHomingLastAttackRollCalls() {
         return setRuntimeValue.mock.calls.filter(
-            (call) => call[1] === 'lastAttackRoll'
+            (call) => call[1] === 'lastAttackRoll' && call[2]?.homingStrikesBonus
         );
     }
 
     describe('potent cantrip miss-half-damage', () => {
-        it('does not apply potent cantrip when the player lacks the passive', async () => {
-            hasPotentCantrip.mockReturnValue(false);
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
-                damageType: 'fire',
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [] } },
-            });
+        const withPotent = { automation: { passives: [{ type: 'potent_cantrip' }] } };
+        const baseOpts = {
+            targetName: 'Goblin',
+            autoDamageFormula: '1d10',
+            damageType: 'fire',
+            saveDc: 13,
+            saveType: 'DEX',
+            playerStats: withPotent,
+        };
+
+        it.each([
+            ['the player lacks the passive', false, 15, { ...baseOpts, playerStats: { automation: { passives: [] } } }],
+            ['there is no damage formula', true, 15, { ...baseOpts, autoDamageFormula: undefined }],
+            ['the attack hits', true, 10, baseOpts],
+            ['auto miss carries no saveDc', true, 15, { ...baseOpts, isAutoMiss: true, saveDc: undefined }],
+        ])('does not apply potent cantrip when %s', async (_label, hasPotent, ac, opts) => {
+            hasPotentCantrip.mockReturnValue(hasPotent);
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac });
+            await createFn()('Fire Bolt', 3, 'attack', opts);
             expect(findCantripMissHalfDamageLogs()).toHaveLength(0);
             expect(findSaveDamagePopups()).toHaveLength(0);
         });
 
-        it('does not apply potent cantrip when there is no damage formula', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                damageType: 'fire',
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
-            });
-            expect(findCantripMissHalfDamageLogs()).toHaveLength(0);
-        });
-
-        it('does not apply potent cantrip when the attack hits', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 10 });
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
-                damageType: 'fire',
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
-            });
-            expect(findCantripMissHalfDamageLogs()).toHaveLength(0);
-        });
-
-        it('does not apply potent cantrip on auto miss when no saveDc is provided', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
-                damageType: 'fire',
-                isAutoMiss: true,
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
-            });
-            expect(findCantripMissHalfDamageLogs()).toHaveLength(0);
-        });
-
-        it('rolls half damage and logs cantrip-miss-half-damage when potent cantrip misses with stored damage result', async () => {
+        it('rolls half damage from the stored damage result and logs + pops cantrip-miss-half-damage', async () => {
             hasPotentCantrip.mockReturnValue(true);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            const storedResult = { total: 10, rolls: [5, 5], modifier: 0 };
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
-                autoDamageRollResult: storedResult,
-                damageType: 'fire',
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
+            await createFn()('Fire Bolt', 3, 'attack', {
+                ...baseOpts,
+                autoDamageRollResult: { total: 10, rolls: [5, 5], modifier: 0 },
             });
             const missLogs = findCantripMissHalfDamageLogs();
             expect(missLogs).toHaveLength(1);
@@ -238,115 +206,74 @@ describe('createLogAndShow - Potent Cantrip & Soulknife', () => {
                 isPotentCantrip: true,
                 targetName: 'Goblin',
                 damageType: 'fire',
+                total: 5,
             });
-            expect(findSaveDamagePopups()).toHaveLength(1);
-            expect(findSaveDamagePopups()[0][0]).toMatchObject({
+            const popups = findSaveDamagePopups();
+            expect(popups).toHaveLength(1);
+            expect(popups[0][0]).toMatchObject({
                 type: 'save-damage',
                 isPotentCantrip: true,
                 targetName: 'Goblin',
+                total: 5,
+                dcSuccess: 'half',
             });
         });
 
-        it('rolls half damage when potent cantrip misses and rolls fresh (no stored result)', async () => {
+        it('rolls fresh damage when no stored result is present', async () => {
             hasPotentCantrip.mockReturnValue(true);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            rollExpression.mockReturnValue({ total: 10, rolls: [4, 6], modifier: 0 });
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
-                damageType: 'fire',
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
-            });
+            await createFn()('Fire Bolt', 3, 'attack', baseOpts);
+            expect(rollExpression).toHaveBeenCalledWith('1d10');
             const missLogs = findCantripMissHalfDamageLogs();
             expect(missLogs).toHaveLength(1);
             expect(missLogs[0][0]).toMatchObject({
                 rollType: 'cantrip-miss-half-damage',
                 isPotentCantrip: true,
+                total: 5,
             });
-            expect(rollExpression).toHaveBeenCalledWith('1d10');
         });
 
         it('applies half damage on auto miss when saveDc is provided', async () => {
             hasPotentCantrip.mockReturnValue(true);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
-                damageType: 'fire',
-                isAutoMiss: true,
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
-            });
+            await createFn()('Fire Bolt', 3, 'attack', { ...baseOpts, isAutoMiss: true });
             const missLogs = findCantripMissHalfDamageLogs();
             expect(missLogs).toHaveLength(1);
-            expect(missLogs[0][0].isPotentCantrip).toBe(true);
+            expect(missLogs[0][0]).toMatchObject({ isPotentCantrip: true, total: 5 });
         });
 
-        it('applies Empowered Evocation to the half-damage formula for evocation cantrips on miss', async () => {
+        it('folds Empowered Evocation into the miss half-damage formula for evocation cantrips', async () => {
             hasPotentCantrip.mockReturnValue(true);
             getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
             getEmpoweredEvocationIntModifier.mockReturnValue(2);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
+            await createFn()('Fire Bolt', 3, 'attack', {
+                ...baseOpts,
                 autoDamageSchool: 'Evocation',
-                damageType: 'fire',
                 isAutoMiss: true,
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
             });
+            const folded = '1d10 + 2 [Empowered Evocation]';
+            expect(rollExpression).toHaveBeenCalledWith(folded);
             const missLogs = findCantripMissHalfDamageLogs();
             expect(missLogs).toHaveLength(1);
-            expect(missLogs[0][0].formula).toContain('Empowered Evocation');
+            expect(missLogs[0][0].formula).toBe(folded);
             const popups = findSaveDamagePopups();
             expect(popups).toHaveLength(1);
-            expect(popups[0][0].formula).toContain('Empowered Evocation');
+            expect(popups[0][0].formula).toBe(folded);
         });
 
-        it('does not apply Empowered Evocation for non-evocation schools', async () => {
+        it.each([
+            ['a non-evocation school', 'Conjuration', 2],
+            ['a zero INT modifier', 'Evocation', 0],
+        ])('does not fold Empowered Evocation for %s', async (_label, school, intMod) => {
             hasPotentCantrip.mockReturnValue(true);
             getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
-            getEmpoweredEvocationIntModifier.mockReturnValue(2);
+            getEmpoweredEvocationIntModifier.mockReturnValue(intMod);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            const fn = createFn();
-            await fn('Ice Knife', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
-                autoDamageSchool: 'Ice',
-                damageType: 'cold',
+            await createFn()('Fire Bolt', 3, 'attack', {
+                ...baseOpts,
+                autoDamageSchool: school,
                 isAutoMiss: true,
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
-            });
-            const missLogs = findCantripMissHalfDamageLogs();
-            expect(missLogs).toHaveLength(1);
-            expect(missLogs[0][0].formula).toBe('1d10');
-        });
-
-        it('does not apply Empowered Evocation when the int modifier is zero', async () => {
-            hasPotentCantrip.mockReturnValue(true);
-            getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
-            getEmpoweredEvocationIntModifier.mockReturnValue(0);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
-            const fn = createFn();
-            await fn('Fire Bolt', 3, 'attack', {
-                targetName: 'Goblin',
-                autoDamageFormula: '1d10',
-                autoDamageSchool: 'Evocation',
-                damageType: 'fire',
-                isAutoMiss: true,
-                saveDc: 13,
-                saveType: 'DEX',
-                playerStats: { automation: { passives: [{ type: 'potent_cantrip' }] } },
             });
             const missLogs = findCantripMissHalfDamageLogs();
             expect(missLogs).toHaveLength(1);
@@ -355,155 +282,49 @@ describe('createLogAndShow - Potent Cantrip & Soulknife', () => {
     });
 
     describe('soulknife psychic blades homing strikes', () => {
-        function makeSoulknifePs(level) {
-            return {
-                class: { name: 'Rogue', major: { name: 'Soulknife' } },
-                level,
-                class_levels: level >= 9 ? [{ level, energy: { energy_die: 6 } }] : [],
-            };
+        function makePs(classInfo, level) {
+            return { class: classInfo, level };
         }
 
-        it('applies homing strikes bonus when psychic blade misses and psionic energy is available', async () => {
-            const ps = {
-                ...makeSoulknifePs(9),
-                _trackedResources: { psionicEnergy: { max: 6 } },
-            };
-            getRuntimeValue.mockImplementation((name, key) =>
-                key === 'psionicEnergy' ? 6 : null
-            );
+        // Conversion, die size, energy spend, still-miss and natural-1 behaviour are
+        // owned by hitResolution.soul-blades.test.js — the lane owns the gate wiring
+        // and the lastAttackRoll evidence stamp here.
+        it('stamps lastAttackRoll with the homing bonus when a convertible miss converts', async () => {
+            const ps = { ...makePs({ name: 'Rogue', major: { name: 'Soulknife' } }, 9), _trackedResources: { psionicEnergy: { max: 6 } } };
+            getRuntimeValue.mockImplementation((name, key) => (key === 'psionicEnergy' ? 6 : null));
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-            const spyRandom = vi.spyOn(Math, 'random').mockReturnValue(0.999);
-            const fn = createFn();
-            await fn('Psychic Blade', 3, 'attack', {
+            const spyRandom = vi.spyOn(Math, 'random').mockReturnValue(0.999); // lv9 psionic die d8 → 8; 15 + 3 + 8 ≥ 20
+            await createFn()('Psychic Blade', 3, 'attack', {
                 targetName: 'Goblin',
                 isPsychicBlade: true,
                 playerStats: ps,
             });
             spyRandom.mockRestore();
-            const lastAttackCalls = findLastAttackRollSetCalls();
-            const homingCalls = lastAttackCalls.filter(
-                (call) => call[2]?.homingStrikesBonus
-            );
+            const homingCalls = findHomingLastAttackRollCalls();
             expect(homingCalls).toHaveLength(1);
-            expect(homingCalls[0][2].hit).toBe(true);
-            expect(homingCalls[0][2].isCrit).toBe(false);
+            expect(homingCalls[0][2]).toMatchObject({
+                hit: true,
+                isCrit: false,
+                homingStrikesBonus: 8,
+            });
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'psionicEnergy', 5, 'test-campaign');
         });
 
-        it('does not apply homing strikes when isAutoMiss is true', async () => {
-            const ps = makeSoulknifePs(9);
+        const soulknife = { name: 'Rogue', major: { name: 'Soulknife' } };
+        it.each([
+            ['auto miss', makePs(soulknife, 9), { isAutoMiss: true }],
+            ['below level 9', makePs(soulknife, 5), {}],
+            ['a non-soulknife class', makePs({ name: 'Fighter', major: { name: 'Champion' } }, 9), {}],
+            ['a non-psychic-blade attack', makePs(soulknife, 9), { isPsychicBlade: false }],
+        ])('does not apply homing strikes on %s', async (_label, ps, extraOpts) => {
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 21 });
-            const fn = createFn();
-            await fn('Psychic Blade', 3, 'attack', {
+            await createFn()('Psychic Blade', 3, 'attack', {
                 targetName: 'Goblin',
                 isPsychicBlade: true,
                 playerStats: ps,
-                isAutoMiss: true,
+                ...extraOpts,
             });
-            const lastAttackCalls = findLastAttackRollSetCalls();
-            const homingCalls = lastAttackCalls.filter(
-                (call) => call[2]?.homingStrikesBonus
-            );
-            expect(homingCalls).toHaveLength(0);
-        });
-
-        it('does not apply homing strikes when not level 9+', async () => {
-            const ps = makeSoulknifePs(5);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 21 });
-            const fn = createFn();
-            await fn('Psychic Blade', 3, 'attack', {
-                targetName: 'Goblin',
-                isPsychicBlade: true,
-                playerStats: ps,
-            });
-            const lastAttackCalls = findLastAttackRollSetCalls();
-            const homingCalls = lastAttackCalls.filter(
-                (call) => call[2]?.homingStrikesBonus
-            );
-            expect(homingCalls).toHaveLength(0);
-        });
-
-        it('does not apply homing strikes when not a soulknife', async () => {
-            const ps = {
-                class: { name: 'Fighter', major: { name: 'Champion' } },
-                level: 9,
-            };
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 21 });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', {
-                targetName: 'Goblin',
-                isPsychicBlade: true,
-                playerStats: ps,
-            });
-            const lastAttackCalls = findLastAttackRollSetCalls();
-            const homingCalls = lastAttackCalls.filter(
-                (call) => call[2]?.homingStrikesBonus
-            );
-            expect(homingCalls).toHaveLength(0);
-        });
-
-        it('does not apply homing strikes when isPsychicBlade is false', async () => {
-            const ps = makeSoulknifePs(9);
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 21 });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', {
-                targetName: 'Goblin',
-                isPsychicBlade: false,
-                playerStats: ps,
-            });
-            const lastAttackCalls = findLastAttackRollSetCalls();
-            const homingCalls = lastAttackCalls.filter(
-                (call) => call[2]?.homingStrikesBonus
-            );
-            expect(homingCalls).toHaveLength(0);
-        });
-
-        it('does not apply homing strikes when the reroll still misses', async () => {
-            const ps = {
-                ...makeSoulknifePs(9),
-                _trackedResources: { psionicEnergy: { max: 6 } },
-            };
-            getRuntimeValue.mockImplementation((name, key) =>
-                key === 'psionicEnergy' ? 6 : null
-            );
-            // AC is very high so even with max psionic die bonus the attack still misses
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 35 });
-            const spyRandom = vi.spyOn(Math, 'random').mockReturnValue(0.999);
-            const fn = createFn();
-            await fn('Psychic Blade', 3, 'attack', {
-                targetName: 'Goblin',
-                isPsychicBlade: true,
-                playerStats: ps,
-            });
-            spyRandom.mockRestore();
-            const lastAttackCalls = findLastAttackRollSetCalls();
-            const homingCalls = lastAttackCalls.filter(
-                (call) => call[2]?.homingStrikesBonus
-            );
-            expect(homingCalls).toHaveLength(0);
-        });
-
-        it('does not apply homing strikes when psionic energy is depleted', async () => {
-            const ps = {
-                ...makeSoulknifePs(9),
-                _trackedResources: { psionicEnergy: { max: 6 } },
-            };
-            getRuntimeValue.mockImplementation((name, key) =>
-                key === 'psionicEnergy' ? 0 : null
-            );
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
-            const spyRandom = vi.spyOn(Math, 'random').mockReturnValue(0.999);
-            const fn = createFn();
-            await fn('Psychic Blade', 3, 'attack', {
-                targetName: 'Goblin',
-                isPsychicBlade: true,
-                playerStats: ps,
-            });
-            spyRandom.mockRestore();
-            const lastAttackCalls = findLastAttackRollSetCalls();
-            const homingCalls = lastAttackCalls.filter(
-                (call) => call[2]?.homingStrikesBonus
-            );
-            expect(homingCalls).toHaveLength(0);
+            expect(findHomingLastAttackRollCalls()).toHaveLength(0);
         });
     });
 });

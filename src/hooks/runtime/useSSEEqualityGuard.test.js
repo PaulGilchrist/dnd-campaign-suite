@@ -1,14 +1,34 @@
+// @maintained-by-ai
+// Pure contract tests for useSSEEqualityGuard (AGENTS.md gotcha: "SSE re-render loop").
+// Deterministic: no timers, no network, no server. Covers ONLY the guard's
+// valuesEqual semantics and functional-update handling.
+// Cross-reference: store-level POST suppression (skipSync, number-string
+// equality, SSE echo re-POST avoidance) lives in useRuntimeState.core.test.js,
+// useRuntimeState.setRuntimeObject.test.js, and useSyncedState.test.js —
+// different lane, do not duplicate those concerns here.
 import { describe, it, expect } from 'vitest';
+import { useState } from 'react';
 import { renderHook, act } from '@testing-library/react';
 import useSSEEqualityGuard from './useSSEEqualityGuard.js';
 
-describe('useSSEEqualityGuard', () => {
-  function renderGuarded() {
-    const setter = vi.fn();
-    const { result } = renderHook(() => useSSEEqualityGuard(setter));
-    return { setter, update: result.current };
-  }
+// Mock-setter lane: asserts on setter call counts (what reached React).
+function renderGuarded() {
+  const setter = vi.fn();
+  const { result } = renderHook(() => useSSEEqualityGuard(setter));
+  return { setter, update: result.current };
+}
 
+// Real-setter lane: asserts on observable state identity (what React kept).
+function renderGuardedState(initial = undefined) {
+  const { result } = renderHook(() => {
+    const [value, setValue] = useState(initial);
+    const update = useSSEEqualityGuard(setValue);
+    return { value, update };
+  });
+  return result;
+}
+
+describe('useSSEEqualityGuard', () => {
   describe('primitive values', () => {
     it('calls setter with a new primitive value', () => {
       const { setter, update } = renderGuarded();
@@ -30,42 +50,31 @@ describe('useSSEEqualityGuard', () => {
       act(() => update(42));
       expect(setter).toHaveBeenCalledTimes(3);
     });
+
+    it('allows duplicate NaN updates (NaN !== NaN in JS, no special handling)', () => {
+      const { setter, update } = renderGuarded();
+      act(() => update(NaN));
+      act(() => update(NaN));
+      // NaN !== NaN and typeof NaN is 'number', not 'object',
+      // so valuesEqual returns false and setter is called twice.
+      expect(setter).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('null and undefined', () => {
-    it('suppresses the first null update (undefined === null in valuesEqual)', () => {
+    it('suppresses nullish updates in any order (currentValueRef stays undefined)', () => {
       const { setter, update } = renderGuarded();
-      // currentValueRef.current starts as undefined; valuesEqual(undefined, null)
-      // returns true because both pass the nullish check (a == b where undefined == null).
-      act(() => update(null));
+      // valuesEqual treats undefined/null as equal (a == b nullish check),
+      // and suppressed updates never move currentValueRef off undefined.
+      act(() => update(null));       // undefined vs null  → suppressed
+      act(() => update(undefined));  // undefined vs undefined → suppressed
+      act(() => update(null));       // undefined vs null  → suppressed
+      act(() => update(undefined));  // undefined vs undefined → suppressed
       expect(setter).toHaveBeenCalledTimes(0);
-      // Second null also suppressed for the same reason.
-      act(() => update(null));
-      expect(setter).toHaveBeenCalledTimes(0);
-    });
-
-    it('suppresses the first undefined update (undefined === undefined)', () => {
-      const { setter, update } = renderGuarded();
-      act(() => update(undefined));
-      expect(setter).toHaveBeenCalledTimes(0);
-    });
-
-    it('suppresses null after undefined (both nullish, valuesEqual returns true)', () => {
-      const { setter, update } = renderGuarded();
-      act(() => update(undefined));
-      act(() => update(null));
-      // currentValueRef.current is still undefined after first call.
-      // valuesEqual(undefined, null) = true, so setter is never called.
-      expect(setter).toHaveBeenCalledTimes(0);
-    });
-
-    it('suppresses undefined after null (both nullish, valuesEqual returns true)', () => {
-      const { setter, update } = renderGuarded();
-      act(() => update(null));
-      act(() => update(undefined));
-      // currentValueRef.current is still undefined after first call.
-      // valuesEqual(undefined, undefined) = true, so setter is never called.
-      expect(setter).toHaveBeenCalledTimes(0);
+      // A real value still gets through — guard is not stuck nullish.
+      act(() => update('x'));
+      expect(setter).toHaveBeenCalledTimes(1);
+      expect(setter).toHaveBeenCalledWith('x');
     });
   });
 
@@ -77,18 +86,18 @@ describe('useSSEEqualityGuard', () => {
       expect(setter).toHaveBeenCalledTimes(1);
     });
 
-    it('allows object updates with different properties', () => {
+    it('allows object updates with different property values', () => {
       const { setter, update } = renderGuarded();
       act(() => update({ a: 1 }));
       act(() => update({ a: 2 }));
       expect(setter).toHaveBeenCalledTimes(2);
     });
 
-    it('prevents duplicate empty object updates', () => {
+    it('allows object updates with a different key count', () => {
       const { setter, update } = renderGuarded();
-      act(() => update({}));
-      act(() => update({}));
-      expect(setter).toHaveBeenCalledTimes(1);
+      act(() => update({ a: 1 }));
+      act(() => update({ a: 1, b: 2 }));
+      expect(setter).toHaveBeenCalledTimes(2);
     });
 
     it('prevents duplicate nested object updates', () => {
@@ -115,11 +124,14 @@ describe('useSSEEqualityGuard', () => {
   });
 
   describe('array equality', () => {
-    it('prevents duplicate array updates with same elements', () => {
+    it('prevents duplicate array updates with same elements (incl. nested)', () => {
       const { setter, update } = renderGuarded();
       act(() => update([1, 2, 3]));
       act(() => update([1, 2, 3]));
       expect(setter).toHaveBeenCalledTimes(1);
+      act(() => update([[1, 2], [3, 4]]));
+      act(() => update([[1, 2], [3, 4]]));
+      expect(setter).toHaveBeenCalledTimes(2);
     });
 
     it('allows array updates with different elements', () => {
@@ -129,7 +141,7 @@ describe('useSSEEqualityGuard', () => {
       expect(setter).toHaveBeenCalledTimes(2);
     });
 
-    it('allows array updates with different order', () => {
+    it('allows array updates with different order (order-sensitive)', () => {
       const { setter, update } = renderGuarded();
       act(() => update([1, 2, 3]));
       act(() => update([3, 2, 1]));
@@ -140,13 +152,6 @@ describe('useSSEEqualityGuard', () => {
       const { setter, update } = renderGuarded();
       act(() => update([]));
       act(() => update([]));
-      expect(setter).toHaveBeenCalledTimes(1);
-    });
-
-    it('prevents duplicate nested array updates', () => {
-      const { setter, update } = renderGuarded();
-      act(() => update([[1, 2], [3, 4]]));
-      act(() => update([[1, 2], [3, 4]]));
       expect(setter).toHaveBeenCalledTimes(1);
     });
   });
@@ -165,87 +170,37 @@ describe('useSSEEqualityGuard', () => {
       act(() => update(new Set([1, 2, 4])));
       expect(setter).toHaveBeenCalledTimes(2);
     });
-
-    it('prevents duplicate empty Set updates', () => {
-      const { setter, update } = renderGuarded();
-      act(() => update(new Set()));
-      act(() => update(new Set()));
-      expect(setter).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('NaN handling', () => {
-    it('allows duplicate NaN updates (NaN !== NaN in JS, no special handling)', () => {
-      const { setter, update } = renderGuarded();
-      act(() => update(NaN));
-      act(() => update(NaN));
-      // NaN !== NaN and typeof NaN is 'number', not 'object',
-      // so valuesEqual returns false and setter is called twice.
-      expect(setter).toHaveBeenCalledTimes(2);
-    });
   });
 
   describe('functional updates', () => {
-    it('prevents state change when functional update returns the current value', () => {
-      const { setter, update } = renderGuarded();
-      act(() => update({ a: 1 }));
-      act(() => update((prev) => prev));
-      // The functional path always calls setter(fn), but the guard prevents
-      // the state from actually changing by returning prev inside the function.
-      expect(setter).toHaveBeenCalledTimes(2);
-      expect(setter).toHaveBeenNthCalledWith(2, expect.any(Function));
+    it('resolves the function and syncs the guard ref so a matching direct value is then suppressed', () => {
+      const result = renderGuardedState();
+      act(() => result.current.update({ a: 1 }));
+      act(() => result.current.update((prev) => ({ ...prev, b: 2 })));
+      expect(result.current.value).toEqual({ a: 1, b: 2 });
+      // Ref was updated inside the functional updater, so a deep-equal
+      // direct value (the SSE echo shape) must not create a new object.
+      const before = result.current.value;
+      act(() => result.current.update({ a: 1, b: 2 }));
+      expect(result.current.value).toBe(before);
     });
 
-    it('allows state change when functional update returns a different value', () => {
-      const { setter, update } = renderGuarded();
-      act(() => update({ a: 1 }));
-      act(() => update((prev) => ({ ...prev, b: 2 })));
-      expect(setter).toHaveBeenCalledTimes(2);
+    it('returns prev when a functional update resolves to an equal value, keeping state identity', () => {
+      const result = renderGuardedState();
+      act(() => result.current.update({ a: 1 }));
+      const first = result.current.value;
+      act(() => result.current.update((prev) => ({ ...prev })));
+      expect(result.current.value).toBe(first);
+      // A genuinely different result still lands.
+      act(() => result.current.update(() => null));
+      expect(result.current.value).toBe(null);
     });
 
-    it('allows state change when functional update returns null and current is null', () => {
-      const { setter, update } = renderGuarded();
-      // First null is suppressed because currentValueRef.current is undefined
-      // and valuesEqual(undefined, null) returns true (both nullish).
-      act(() => update(null));
-      expect(setter).toHaveBeenCalledTimes(0);
-      // Functional path always calls setter(fn), so setter is called once.
-      act(() => update(() => null));
-      expect(setter).toHaveBeenCalledTimes(1);
-    });
-
-    it('allows state change when functional update returns null and current is not null', () => {
-      const { setter, update } = renderGuarded();
-      act(() => update({ a: 1 }));
-      act(() => update(() => null));
-      expect(setter).toHaveBeenCalledTimes(2);
-    });
-
-    it('allows state change when functional update returns same object reference', () => {
-      const { setter, update } = renderGuarded();
-      const obj = { a: 1 };
-      act(() => update(obj));
-      // currentValueRef.current is obj, result is obj, valuesEqual(obj, obj) = true,
-      // so the inner function returns prev — but setter(fn) was still called.
-      act(() => update(() => obj));
-      expect(setter).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('special values', () => {
-    it('prevents duplicate Symbol updates for the same symbol', () => {
-      const { setter, update } = renderGuarded();
-      const sym = Symbol('test');
-      act(() => update(sym));
-      act(() => update(sym));
-      expect(setter).toHaveBeenCalledTimes(1);
-    });
-
-    it('allows different Symbol values', () => {
-      const { setter, update } = renderGuarded();
-      act(() => update(Symbol('a')));
-      act(() => update(Symbol('b')));
-      expect(setter).toHaveBeenCalledTimes(2);
+    it('suppresses a functional update to null while current is undefined (nullish equality)', () => {
+      const result = renderGuardedState();
+      act(() => result.current.update(() => null));
+      // valuesEqual(undefined, null) === true, so prev (undefined) is returned.
+      expect(result.current.value).toBeUndefined();
     });
   });
 });

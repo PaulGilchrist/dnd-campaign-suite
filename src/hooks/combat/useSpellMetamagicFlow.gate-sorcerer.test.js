@@ -1,16 +1,21 @@
+// @maintained-by-ai: 2026-10-15
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
-import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js';
 
-// ── Minimal mocks for Sorcerer gate path ────────────────────────────────────────
-// The Sorcerer gate path in gateMetamagic only reads from these modules:
-//   - useMetamagic.js (SP values)
-//   - metamagicRules.js (psionic checks)
-//   - materialComponents.js (consumed material check)
-//   - postCastRiderService.js (multi-target spread for Power Word spells)
-// All other mocks are unnecessary noise that obscures what the Sorcerer gate
-// actually depends on.
+// ── Minimal mocks for the Sorcerer gate lane ───────────────────────────────────
+// This file owns the Sorcerer branch of gateMetamagic (queueSorceryMetamagic in
+// useSpellMetamagicGates.js): cantrip auto-leveling, SP/psionic stamping, and
+// metaCtx.slotLevel propagation into the pendingMetamagic payload.
+//   - useMetamagic.js — SP values read by the sorcerer queue
+//   - metamagicRules.js — psionic checks read by the sorcerer queue
+//   - materialComponents.js / spellPreparationService.js — inert here (the
+//     material-block and slot-payment lanes run BEFORE the sorcerer split;
+//     consumed-material coverage lives in the dedicated .gate-material lane)
+//   - postCastRiderService.js / logService.js / combatData.js /
+//     useRuntimeState.js / useAllySelection.js — module-level imports of
+//     useConfirmableFlow / spellGates that must resolve without network I/O
+// window.dispatchEvent is native in jsdom and never fires on this gate path.
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
@@ -34,12 +39,13 @@ vi.mock('../../services/rules/spells/materialComponents.js', () => ({
 vi.mock('../../services/rules/spells/spellPreparationService.js', () => ({
   prepareSpellCast: vi.fn(() => Promise.resolve({ modifiedSpell: {}, metaCtx: {} })),
   isFreeCastAuthorized: vi.fn(() => false),
-  isWizardRitualAdeptSpell: vi.fn(() => false),
   incrementFreeCastResource: vi.fn(),
 }));
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
+  triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
+  triggerBewitchingMagic: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({
@@ -48,6 +54,7 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({ creatures: [] })),
+  loadCombatSummary: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../runtime/useRuntimeState.js', () => ({
@@ -68,21 +75,7 @@ global.fetch = vi.fn(() =>
   })
 );
 
-Object.defineProperty(window, 'dispatchEvent', {
-  value: vi.fn(),
-  writable: true,
-});
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function makeSorcererStats(overrides = {}) {
-  return {
-    name: 'TestSorcerer',
-    class: { name: 'Sorcerer' },
-    level: 5,
-    ...overrides,
-  };
-}
+// ── Helpers ──────────────────────────────────────────────────────────────────────
 
 function makeSpell(overrides = {}) {
   return {
@@ -94,21 +87,28 @@ function makeSpell(overrides = {}) {
   };
 }
 
-// ── Sorcerer gate: cantrip auto-leveling ───────────────────────────────────────
-// These tests verify the Sorcerer-specific cantrip auto-level path.
-// Non-Sorcerer cantrip behavior is covered in other-paths.test.js.
+function renderSorcererFlow(statsOverrides = {}) {
+  const onExecute = vi.fn();
+  const { result } = renderHook(() =>
+    useSpellMetamagicFlow({
+      playerStats: { name: 'TestSorcerer', class: { name: 'Sorcerer' }, level: 5, ...statsOverrides },
+      campaignName: 'test-campaign',
+      onExecute,
+    })
+  );
+  return { result, onExecute };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks(); // factory implementations survive clear — null defaults hold
+});
+
+// ── Sorcerer gate: cantrip auto-leveling ────────────────────────────────────────
+// Non-Sorcerer cantrip behavior is covered in the other-paths lane.
 
 describe('useSpellMetamagicFlow — Sorcerer cantrip auto-leveling', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('sets pendingMetamagic with auto-leveled damage cantrip', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
+  it('auto-levels a damage cantrip from damage_at_character_level', () => {
+    const { result, onExecute } = renderSorcererFlow();
 
     act(() => {
       result.current.gateMetamagic(makeSpell({
@@ -125,11 +125,8 @@ describe('useSpellMetamagicFlow — Sorcerer cantrip auto-leveling', () => {
     expect(result.current.pendingMetamagic.spell.baseLevel).toBe(0);
   });
 
-  it('auto-levels using damage_at_slot_level when damage_at_character_level is absent', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
+  it('falls back to damage_at_slot_level when damage_at_character_level is absent', () => {
+    const { result, onExecute } = renderSorcererFlow();
 
     act(() => {
       result.current.gateMetamagic(makeSpell({
@@ -139,15 +136,13 @@ describe('useSpellMetamagicFlow — Sorcerer cantrip auto-leveling', () => {
       }));
     });
 
-    expect(result.current.pendingMetamagic).not.toBeNull();
+    expect(onExecute).not.toHaveBeenCalled();
     expect(result.current.pendingMetamagic.spell.level).toBe(5);
+    expect(result.current.pendingMetamagic.spell.baseLevel).toBe(0);
   });
 
-  it('does not auto-level cantrip without damage (sets pending with original level)', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
+  it('does not auto-level cantrip without damage (queues at original level)', () => {
+    const { result, onExecute } = renderSorcererFlow();
 
     act(() => {
       result.current.gateMetamagic(makeSpell({ name: 'Friends', level: 0 }));
@@ -159,11 +154,7 @@ describe('useSpellMetamagicFlow — Sorcerer cantrip auto-leveling', () => {
   });
 
   it('does not auto-level when character level is below all damage levels', () => {
-    const lowLevelStats = makeSorcererStats({ level: 4 });
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: lowLevelStats, campaignName: 'TestCampaign', onExecute: onExecute })
-    );
+    const { result, onExecute } = renderSorcererFlow({ level: 4 });
 
     act(() => {
       result.current.gateMetamagic(makeSpell({
@@ -179,126 +170,33 @@ describe('useSpellMetamagicFlow — Sorcerer cantrip auto-leveling', () => {
   });
 });
 
-// ── Sorcerer gate: SP tracking in pendingMetamagic ─────────────────────────────
+// ── Sorcerer gate: pendingMetamagic payload stamping ─────────────────────────────
 
-describe('useSpellMetamagicFlow — Sorcerer SP tracking', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('stores current SP and psionic flags in pendingMetamagic payload', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
+describe('useSpellMetamagicFlow — Sorcerer pendingMetamagic payload', () => {
+  it('stores current SP, psionic flags, and the spell level as default spellLevel', () => {
+    const { result, onExecute } = renderSorcererFlow();
 
     act(() => {
       result.current.gateMetamagic(makeSpell({ name: 'Fireball', level: 3 }));
     });
 
+    expect(onExecute).not.toHaveBeenCalled();
     expect(result.current.pendingMetamagic).not.toBeNull();
     expect(result.current.pendingMetamagic._currentSP).toBe(5);
     expect(result.current.pendingMetamagic.isPsionic).toBe(false);
     expect(result.current.pendingMetamagic.psionicCost).toBe(0);
     expect(result.current.pendingMetamagic.spellLevel).toBe(3);
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-});
-
-// ── Sorcerer gate: consumed material blocks before metamagic pending ───────────
-
-describe('useSpellMetamagicFlow — Sorcerer consumed material blocking', () => {
-  let materialModule;
-
-  beforeEach(async () => {
-    materialModule = await import('../../services/rules/spells/materialComponents.js');
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-    materialModule.getConsumedMaterial.mockReturnValue(null);
-    materialModule.hasMaterial.mockReturnValue(true);
   });
 
-  it('blocks Sorcerer gate when consumed material is missing', async () => {
-    materialModule.getConsumedMaterial.mockReturnValue({ itemName: 'Diamond Dust (100 gp)' });
-    materialModule.hasMaterial.mockReturnValue(false);
-    materialModule.getMaterialRequirementMessage.mockReturnValue('Requires diamond dust.');
-
-    const setPopupHtml = vi.fn();
-    const onExecute = vi.fn();
-
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute, setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-    );
-
-    await act(async () => {
-      result.current.gateMetamagic(makeSpell({ name: 'Greater Restoration', level: 5 }));
-    });
-
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'automation_info',
-      automationType: 'material_required',
-      name: 'Greater Restoration',
-    }));
-    expect(onExecute).not.toHaveBeenCalled();
-    expect(result.current.pendingMetamagic).toBeNull();
-  });
-
-  it('proceeds to metamagic pending when material is present', async () => {
-    materialModule.getConsumedMaterial.mockReturnValue({ itemName: 'Diamond Dust (100 gp)' });
-    materialModule.hasMaterial.mockReturnValue(true);
-
-    const setPopupHtml = vi.fn();
-    const onExecute = vi.fn();
-
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute, setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-    );
-
-    await act(async () => {
-      result.current.gateMetamagic(makeSpell({ name: 'Greater Restoration', level: 5 }));
-    });
-
-    expect(setPopupHtml).not.toHaveBeenCalled();
-    expect(result.current.pendingMetamagic).not.toBeNull();
-    expect(result.current.pendingMetamagic.spellName).toBe('Greater Restoration');
-    expect(onExecute).not.toHaveBeenCalled();
-  });
-});
-
-// ── Sorcerer gate: metaCtx.slotLevel propagation ───────────────────────────────
-
-describe('useSpellMetamagicFlow — Sorcerer slotLevel in pending payload', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('uses metaCtx.slotLevel when provided for spellLevel in pendingMetamagic', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
+  it('uses metaCtx.slotLevel over the spell level for spellLevel', () => {
+    const { result, onExecute } = renderSorcererFlow();
 
     act(() => {
       result.current.gateMetamagic(makeSpell({ name: 'Fireball', level: 3 }), { slotLevel: 5 });
     });
 
+    expect(onExecute).not.toHaveBeenCalled();
     expect(result.current.pendingMetamagic).not.toBeNull();
     expect(result.current.pendingMetamagic.spellLevel).toBe(5);
-  });
-
-  it('uses spell level when metaCtx.slotLevel is absent', () => {
-    const onExecute = vi.fn();
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makeSorcererStats(), campaignName: 'TestCampaign', onExecute: onExecute })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Fireball', level: 3 }));
-    });
-
-    expect(result.current.pendingMetamagic).not.toBeNull();
-    expect(result.current.pendingMetamagic.spellLevel).toBe(3);
   });
 });

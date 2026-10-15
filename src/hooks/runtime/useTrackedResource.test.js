@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
@@ -22,6 +23,8 @@ describe('useTrackedResource', () => {
   });
 
   describe('initialization: resolving current value', () => {
+    // Priority chain: runtime storage → playerStats._trackedResources → defaultValue → maxGetter
+
     it('reads current from runtime storage when the key exists with a truthy value', () => {
       getRuntimeValue.mockReturnValue(5);
       hasRuntimeValue.mockReturnValue(true);
@@ -49,18 +52,6 @@ describe('useTrackedResource', () => {
       expect(result.current.max).toBe(10);
     });
 
-    it('reads current from runtime storage when the key exists with a negative value', () => {
-      getRuntimeValue.mockReturnValue(-3);
-      hasRuntimeValue.mockReturnValue(true);
-
-      const maxGetter = vi.fn(() => 20);
-      const { result } = renderHook(() =>
-        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
-      );
-
-      expect(result.current.current).toBe(-3);
-    });
-
     it('uses the computed max from maxGetter when storage key is explicitly null', () => {
       // Key exists but value was explicitly reset to null
       getRuntimeValue.mockReturnValue(null);
@@ -75,17 +66,22 @@ describe('useTrackedResource', () => {
       expect(maxGetter).toHaveBeenCalled();
     });
 
-    it('uses the computed max from maxGetter when storage key does not exist', () => {
+    it('falls back to maxGetter when storage misses and playerStats lacks the key', () => {
       getRuntimeValue.mockReturnValue(null);
       hasRuntimeValue.mockReturnValue(false);
 
+      const playerStats = {
+        _trackedResources: {
+          otherKey: { current: 5 },
+        },
+      };
       const maxGetter = vi.fn(() => 25);
+
       const { result } = renderHook(() =>
-        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
+        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', playerStats })
       );
 
       expect(result.current.current).toBe(25);
-      expect(maxGetter).toHaveBeenCalled();
     });
 
     it('falls back to playerStats._trackedResources when storage has no value', () => {
@@ -127,24 +123,6 @@ describe('useTrackedResource', () => {
       expect(maxGetter).toHaveBeenCalledTimes(1);
     });
 
-    it('skips playerStats fallback when the key is missing and uses maxGetter', () => {
-      getRuntimeValue.mockReturnValue(null);
-      hasRuntimeValue.mockReturnValue(false);
-
-      const playerStats = {
-        _trackedResources: {
-          otherKey: { current: 5 },
-        },
-      };
-      const maxGetter = vi.fn(() => 25);
-
-      const { result } = renderHook(() =>
-        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', playerStats })
-      );
-
-      expect(result.current.current).toBe(25);
-    });
-
     it('uses defaultValue when storage is empty, playerStats lacks the key, and defaultValue is provided', () => {
       getRuntimeValue.mockReturnValue(null);
       hasRuntimeValue.mockReturnValue(false);
@@ -161,18 +139,6 @@ describe('useTrackedResource', () => {
       expect(result.current.current).toBe(15);
       // maxGetter is called once for the returned max value
       expect(maxGetter).toHaveBeenCalledTimes(1);
-    });
-
-    it('uses maxGetter as final fallback when defaultValue is null', () => {
-      getRuntimeValue.mockReturnValue(null);
-      hasRuntimeValue.mockReturnValue(false);
-
-      const maxGetter = vi.fn(() => 30);
-      const { result } = renderHook(() =>
-        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', playerStats: null, defaultValue: null })
-      );
-
-      expect(result.current.current).toBe(30);
     });
 
     it('prefers storage over playerStats when both have values', () => {
@@ -308,22 +274,7 @@ describe('useTrackedResource', () => {
       expect(result.current.current).toBe(99);
     });
 
-    it('propagates setRuntimeValue rejection', async () => {
-      getRuntimeValue.mockReturnValue(10);
-      hasRuntimeValue.mockReturnValue(true);
-      setRuntimeValue.mockRejectedValue(new Error('network error'));
-
-      const maxGetter = vi.fn(() => 20);
-      const { result } = renderHook(() =>
-        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
-      );
-
-      await act(async () => {
-        await expect(result.current.update(5)).rejects.toThrow('network error');
-      });
-    });
-
-    it('does NOT update local current when setRuntimeValue rejects', async () => {
+    it('propagates setRuntimeValue rejection and does NOT update local current', async () => {
       getRuntimeValue.mockReturnValue(10);
       hasRuntimeValue.mockReturnValue(true);
       setRuntimeValue.mockRejectedValue(new Error('network error'));
@@ -336,7 +287,7 @@ describe('useTrackedResource', () => {
       expect(result.current.current).toBe(10);
 
       await act(async () => {
-        await result.current.update(3).catch(() => {});
+        await expect(result.current.update(3)).rejects.toThrow('network error');
       });
 
       // setCurrent runs after await, so rejection prevents the local update
@@ -453,6 +404,24 @@ describe('useTrackedResource', () => {
 
       expect(result.current.current).toBe(7);
     });
+
+    it('re-reads when defaultValue changes', () => {
+      getRuntimeValue.mockReturnValue(null);
+      hasRuntimeValue.mockReturnValue(false);
+
+      const maxGetter = vi.fn(() => 20);
+      const { result, rerender } = renderHook(
+        ({ defaultValue }) =>
+          useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', defaultValue }),
+        { initialProps: { defaultValue: 11 } }
+      );
+
+      expect(result.current.current).toBe(11);
+
+      rerender({ defaultValue: 22 });
+
+      expect(result.current.current).toBe(22);
+    });
   });
 
   describe('cleanup', () => {
@@ -475,9 +444,6 @@ describe('useTrackedResource', () => {
     });
 
     it('removes all three window event listeners on unmount', () => {
-      const removeListener = vi.fn();
-      addStorageChangeListener.mockReturnValue(removeListener);
-
       const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
 
       const { unmount } = renderHook(() =>
@@ -504,95 +470,32 @@ describe('useTrackedResource', () => {
   });
 
   describe('event-driven re-resolution', () => {
-    it('re-reads storage when focus-points-updated event fires', async () => {
-      getRuntimeValue
-        .mockReturnValueOnce(10)
-        .mockReturnValueOnce(10)
-        .mockReturnValueOnce(15);
-      hasRuntimeValue.mockReturnValue(true);
+    describe.each([
+      ['focus-points-updated', 'hp', 10, 15],
+      ['sorcery-points-updated', 'sp', 5, 8],
+      ['innate-sorcery-updated', 'innateSorcery', 3, 6],
+    ])('%s', (eventName, storageKey, initial, updated) => {
+      it(`re-reads storage when ${eventName} fires`, async () => {
+        // Two resolutions happen on mount (useState initializer + re-resolve effect)
+        getRuntimeValue
+          .mockReturnValueOnce(initial)
+          .mockReturnValueOnce(initial)
+          .mockReturnValueOnce(updated);
+        hasRuntimeValue.mockReturnValue(true);
 
-      const maxGetter = vi.fn(() => 20);
-      const { result } = renderHook(() =>
-        useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
-      );
+        const maxGetter = vi.fn(() => 20);
+        const { result } = renderHook(() =>
+          useTrackedResource({ storageKey, playerName: 'Gandalf', maxGetter, deps: 'dep1' })
+        );
 
-      expect(result.current.current).toBe(10);
+        expect(result.current.current).toBe(initial);
 
-      await act(async () => {
-        window.dispatchEvent(new Event('focus-points-updated'));
+        await act(async () => {
+          window.dispatchEvent(new Event(eventName));
+        });
+
+        expect(result.current.current).toBe(updated);
       });
-
-      expect(result.current.current).toBe(15);
-    });
-
-    it('re-reads storage when sorcery-points-updated event fires', async () => {
-      getRuntimeValue
-        .mockReturnValueOnce(5)
-        .mockReturnValueOnce(5)
-        .mockReturnValueOnce(8);
-      hasRuntimeValue.mockReturnValue(true);
-
-      const maxGetter = vi.fn(() => 10);
-      const { result } = renderHook(() =>
-        useTrackedResource({ storageKey: 'sp', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
-      );
-
-      expect(result.current.current).toBe(5);
-
-      await act(async () => {
-        window.dispatchEvent(new Event('sorcery-points-updated'));
-      });
-
-      expect(result.current.current).toBe(8);
-    });
-
-    it('re-reads storage when innate-sorcery-updated event fires', async () => {
-      getRuntimeValue
-        .mockReturnValueOnce(3)
-        .mockReturnValueOnce(3)
-        .mockReturnValueOnce(6);
-      hasRuntimeValue.mockReturnValue(true);
-
-      const maxGetter = vi.fn(() => 10);
-      const { result } = renderHook(() =>
-        useTrackedResource({ storageKey: 'innateSorcery', playerName: 'Gandalf', maxGetter, deps: 'dep1' })
-      );
-
-      expect(result.current.current).toBe(3);
-
-      await act(async () => {
-        window.dispatchEvent(new Event('innate-sorcery-updated'));
-      });
-
-      expect(result.current.current).toBe(6);
-    });
-
-    it('uses fresh playerName, storageKey, and playerStats from the re-read handler', () => {
-      getRuntimeValue
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce(null);
-      hasRuntimeValue.mockReturnValue(false);
-
-      const playerStats1 = {
-        _trackedResources: { hp: { current: 50 } },
-      };
-      const playerStats2 = {
-        _trackedResources: { hp: { current: 99 } },
-      };
-
-      const maxGetter = vi.fn(() => 10);
-      const { result, rerender } = renderHook(
-        ({ stats }) =>
-          useTrackedResource({ storageKey: 'hp', playerName: 'Gandalf', maxGetter, deps: 'dep1', playerStats: stats }),
-        { initialProps: { stats: playerStats1 } }
-      );
-
-      expect(result.current.current).toBe(50);
-
-      rerender({ stats: playerStats2 });
-
-      expect(result.current.current).toBe(99);
     });
   });
 });

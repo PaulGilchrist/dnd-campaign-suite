@@ -1,6 +1,17 @@
+// @maintained-by-ai
 // CLA-276 Psychic Whispers (Soulknife lv3, 2024): multi-target telepathic
 // speech with psionic energy die cost + free first use after Long Rest.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// Pins the psychic-whispers lane of buffHandler: multiTarget routing to the
+// psychicWhispersTarget picker (cap = proficiency, dieSize from psionic
+// expression), confirm-time cost ledger (free first use / die expenditure /
+// empty-pool refusal), stale-target relink, target slice, and the
+// psychicWhispersFreeUsed long-rest latch. Fully mocked + deterministic
+// (Math.random spied). Single-target telepathic siblings stay routed to the
+// telepathicSpeech modal — anti-regression pin kept here; the single-target
+// telepathicSpeech delegation/confirm contract lives in
+// buffHandler.modal-delegation.test.js; the generic tracked-uses lane
+// (Psychic Veil) lives in buffHandler.psychic-veil.test.js.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../common/buffToggle.js', () => ({
   toggleBuff: vi.fn(() => ({ wasActive: false, isActive: true })),
@@ -105,6 +116,10 @@ describe('CLA-276 Psychic Whispers', () => {
     });
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks(); // undo Math.random spies even if an assertion fails mid-test
+  });
+
   describe('handle (row click → picker)', () => {
     it('opens the multi-target picker modal capped at proficiency bonus', async () => {
       const result = await handle(makeWhispersAction(), makePlayerStats(), campaignName, null);
@@ -125,6 +140,9 @@ describe('CLA-276 Psychic Whispers', () => {
 
       const result = await handle(sibling, makePlayerStats(), campaignName, null);
 
+      // Anti-regression (CLA-276): the picker branch is gated on auto.multiTarget —
+      // siblings without it must never be routed to psychicWhispersTarget.
+      expect(result.type).toBe('modal');
       expect(result.modalName).toBe('telepathicSpeech');
     });
   });
@@ -155,8 +173,6 @@ describe('CLA-276 Psychic Whispers', () => {
       expect(entry.description).toContain('Rolled d10 for 8 hours');
       expect(entry.description).toContain('Ally1, Ally2');
       expect(entry.description).toContain('no Psionic Energy Die expended');
-
-      vi.restoreAllMocks();
     });
 
     it('second use expends 1 psionic energy die and logs the expenditure', async () => {
@@ -179,8 +195,6 @@ describe('CLA-276 Psychic Whispers', () => {
       const entry = logService.addEntry.mock.calls[0][1];
       expect(entry.description).toContain('Expended 1 Psionic Energy Die');
       expect(entry.description).toContain('Psionic Energy: 6/10');
-
-      vi.restoreAllMocks();
     });
 
     it('refuses with popup when pool is empty and use is not free — zero spend, zero buffs', async () => {
@@ -203,8 +217,6 @@ describe('CLA-276 Psychic Whispers', () => {
       await confirmPsychicWhispers(makeWhispersAction(), makePlayerStats(), campaignName, many);
 
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('AasimarTest', 'psychicWhispersTargets', many.slice(0, 6), campaignName);
-
-      vi.restoreAllMocks();
     });
   });
 

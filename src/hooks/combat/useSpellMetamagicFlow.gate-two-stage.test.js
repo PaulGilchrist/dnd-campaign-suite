@@ -1,12 +1,18 @@
+// @maintained-by-ai: 2026-10-15
+// Two-stage flow-orchestration seam for useSpellMetamagicFlow.
+// Owns: gateMetamagic → stage-machine entry, select→advance→confirm→clear+log,
+// and skip semantics for the three two-stage handlers (Enhance Ability:
+// ability→target; Protection from Energy / Resistance: target→type).
+// Per-handler internals (payloads, SP-093 slot pay-at-confirm, popup shape)
+// live in useTwoStageHandlers.* tests. Gate routing → gate.test.js; Sorcerer
+// payment → gate-sorcerer; material gate → gate-material.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
 import { addEntry } from '../../services/ui/logService.js';
-import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js';
 
-// ── Minimal, focused mocking ──────────────────────────────────────────────────
-// Only mock what the two-stage handlers actually use: logService, automation
-// functions, and the postCastRider. Everything else gets no-op defaults.
+// ── Mocks (module-graph boilerplate shared by the lane; keep complete for
+// every named import the flow's handler factories evaluate) ─────────────────
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
@@ -181,7 +187,7 @@ Object.defineProperty(window, 'dispatchEvent', {
   writable: true,
 });
 
-// ── Factories ──────────────────────────────────────────────────────────────────
+// ── Fixtures & helper ─────────────────────────────────────────────────────────
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -192,294 +198,187 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Fireball',
-    level: 3,
-    casting_time: '1 Action',
-    range: '150 ft.',
-    ...overrides,
-  };
-}
-
-// ── Shared helper ──────────────────────────────────────────────────────────────
-// Renders the hook, gates the spell, and returns the result.
-// Callers invoke handlers directly on `result`.
-
-function renderWithSpell(spellName, spellLevel, overrides = {}) {
-  const setPopupHtml = vi.fn();
+// Renders the hook and gates a spell, returning the hook result.
+function renderWithSpell(spellName, spellLevel) {
   const { result } = renderHook(() =>
-    useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
+    useSpellMetamagicFlow({
+      playerStats: makePlayerStats(),
+      campaignName: 'test-campaign',
+      onExecute: vi.fn(),
+      setSecondaryTargetModal: null,
+      characters: [],
+      setPopupHtml: vi.fn(),
+    })
   );
   act(() => {
-    result.current.gateMetamagic(makeSpell({ name: spellName, level: spellLevel, ...overrides }));
+    result.current.gateMetamagic({
+      name: spellName,
+      level: spellLevel,
+      casting_time: '1 Action',
+      range: '150 ft.',
+    });
   });
-  return { result, setPopupHtml };
+  return result;
 }
 
-// ── Enhance Ability two-stage flow ────────────────────────────────────────────
+// The three two-stage lanes share one orchestration shape: gate opens the
+// stage machine at firstStage, a mid select advances to secondStage, and the
+// confirm clears stage + pending and logs the cast cast. Levels/spell names
+// mirror public/data/spells.json (Enhance Ability lv2, Protection From Energy
+// lv3, Resistance cantrip).
+const twoStageFlows = [
+  {
+    spell: 'Enhance Ability',
+    level: 2,
+    pendingKey: 'pendingEnhanceAbility',
+    stageKey: 'enhanceAbilityStage',
+    firstStage: 'ability',
+    secondStage: 'target',
+    midSelect: 'handleEnhanceAbilityAbilitySelect',
+    midSelectArg: 'Bear Might',
+    confirm: 'handleEnhanceAbilityConfirm',
+    confirmArg: { targetName: 'Goblin A' },
+    target: 'Goblin A',
+    skip: 'handleEnhanceAbilitySkip',
+    skipLogs: false, // Enhance Ability skip rolls back the slot silently —
+                    // unlike PfE/Resistance it emits no cast log
+  },
+  {
+    spell: 'Protection from Energy',
+    level: 3,
+    pendingKey: 'pendingProtectionFromEnergy',
+    stageKey: 'protectionFromEnergyStage',
+    firstStage: 'target',
+    secondStage: 'type',
+    midSelect: 'handleProtectionFromEnergyTargetSelect',
+    midSelectArg: 'Goblin B',
+    confirm: 'handleProtectionFromEnergyTypeSelect',
+    confirmArg: 'cold',
+    target: 'Goblin B',
+    skip: 'handleProtectionFromEnergySkip',
+    skipLogs: true,
+  },
+  {
+    spell: 'Resistance',
+    level: 0,
+    pendingKey: 'pendingResistance',
+    stageKey: 'resistanceStage',
+    firstStage: 'target',
+    secondStage: 'type',
+    midSelect: 'handleResistanceTargetSelect',
+    midSelectArg: 'Goblin C',
+    confirm: 'handleResistanceTypeSelect',
+    confirmArg: 'fire',
+    target: 'Goblin C',
+    skip: 'handleResistanceSkip',
+    skipLogs: true,
+  },
+];
 
-describe('useSpellMetamagicFlow — Enhance Ability two-stage flow', () => {
+describe('useSpellMetamagicFlow — two-stage gate flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
   });
 
-  it('enters ability stage when gateMetamagic sets pendingEnhanceAbility', () => {
-    const { result } = renderWithSpell('Enhance Ability', 2);
+  for (const flow of twoStageFlows) {
+    it(`${flow.spell}: gate opens the stage machine at '${flow.firstStage}' with pending state`, () => {
+      const result = renderWithSpell(flow.spell, flow.level);
 
-    expect(result.current.enhanceAbilityStage).toBe('ability');
-    expect(result.current.pendingEnhanceAbility).not.toBeNull();
-  });
-
-  it('transitions to target stage after ability selection and stores the ability', () => {
-    const { result } = renderWithSpell('Enhance Ability', 2);
-
-    act(() => {
-      result.current.handleEnhanceAbilityAbilitySelect('Bear Might');
+      expect(result.current[flow.stageKey]).toBe(flow.firstStage);
+      expect(result.current[flow.pendingKey]).not.toBeNull();
     });
 
-    expect(result.current.enhanceAbilityStage).toBe('target');
-  });
+    it(`${flow.spell}: ${flow.firstStage} → ${flow.secondStage} → confirm clears state and logs the cast`, async () => {
+      const result = renderWithSpell(flow.spell, flow.level);
 
-  it('completes the two-stage flow: ability select → confirm', async () => {
-    const setPopupHtml = vi.fn();
+      act(() => {
+        result.current[flow.midSelect](flow.midSelectArg);
+      });
+      expect(result.current[flow.stageKey]).toBe(flow.secondStage);
+
+      await act(async () => {
+        await result.current[flow.confirm](flow.confirmArg);
+      });
+
+      expect(result.current[flow.stageKey]).toBeNull();
+      expect(result.current[flow.pendingKey]).toBeNull();
+      expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        type: 'spell',
+        characterName: 'TestSorcerer',
+        spellName: flow.spell,
+        targetName: flow.target,
+      }));
+    });
+
+    it(`${flow.spell}: skip clears stage and pending${flow.skipLogs ? ' and logs' : ' without a cast log'}`, () => {
+      const result = renderWithSpell(flow.spell, flow.level);
+
+      act(() => {
+        result.current[flow.skip]();
+      });
+
+      expect(result.current[flow.stageKey]).toBeNull();
+      expect(result.current[flow.pendingKey]).toBeNull();
+      if (flow.skipLogs) {
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+          type: 'spell',
+          spellName: flow.spell,
+        }));
+      } else {
+        expect(addEntry).not.toHaveBeenCalled();
+      }
+    });
+  }
+
+  it('skip without pending state is a no-op for every two-stage handler', () => {
     const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
-    );
-
-    act(() => {
-      result.current.gateMetamagic(makeSpell({ name: 'Enhance Ability', level: 2 }));
-    });
-
-    expect(result.current.enhanceAbilityStage).toBe('ability');
-
-    act(() => {
-      result.current.handleEnhanceAbilityAbilitySelect('Eagle Might');
-    });
-
-    expect(result.current.enhanceAbilityStage).toBe('target');
-
-    await act(async () => {
-      await result.current.handleEnhanceAbilityConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(result.current.enhanceAbilityStage).toBeNull();
-    expect(result.current.pendingEnhanceAbility).toBeNull();
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Enhance Ability',
-      targetName: 'Goblin A',
-    }));
-  });
-
-  it('skips the flow and clears state', () => {
-    const { result } = renderWithSpell('Enhance Ability', 2);
-
-    act(() => {
-      result.current.handleEnhanceAbilitySkip();
-    });
-
-    expect(result.current.enhanceAbilityStage).toBeNull();
-    expect(result.current.pendingEnhanceAbility).toBeNull();
-  });
-
-  it('does nothing when skip is called without pending state', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
+      useSpellMetamagicFlow({
+        playerStats: makePlayerStats(),
+        campaignName: 'test-campaign',
+        onExecute: vi.fn(),
+        setSecondaryTargetModal: null,
+        characters: [],
+        setPopupHtml: vi.fn(),
+      })
     );
 
     expect(result.current.enhanceAbilityStage).toBeNull();
-
-    act(() => {
-      result.current.handleEnhanceAbilitySkip();
-    });
-
-    expect(result.current.enhanceAbilityStage).toBeNull();
-  });
-});
-
-// ── Protection from Energy two-stage flow ─────────────────────────────────────
-
-describe('useSpellMetamagicFlow — Protection from Energy two-stage flow', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('enters target stage when gateMetamagic sets pendingProtectionFromEnergy', () => {
-    const { result } = renderWithSpell('Protection from Energy', 3);
-
-    expect(result.current.protectionFromEnergyStage).toBe('target');
-    expect(result.current.pendingProtectionFromEnergy).not.toBeNull();
-  });
-
-  it('transitions to type stage after target selection', () => {
-    const { result } = renderWithSpell('Protection from Energy', 3);
-
-    act(() => {
-      result.current.handleProtectionFromEnergyTargetSelect('Goblin A');
-    });
-
-    expect(result.current.protectionFromEnergyStage).toBe('type');
-  });
-
-  it('completes the two-stage flow: target select → type select', async () => {
-    const { result } = renderWithSpell('Protection from Energy', 3);
-
-    expect(result.current.protectionFromEnergyStage).toBe('target');
-
-    act(() => {
-      result.current.handleProtectionFromEnergyTargetSelect('Goblin B');
-    });
-
-    expect(result.current.protectionFromEnergyStage).toBe('type');
-
-    await act(async () => {
-      await result.current.handleProtectionFromEnergyTypeSelect('cold');
-    });
-
     expect(result.current.protectionFromEnergyStage).toBeNull();
-    expect(result.current.pendingProtectionFromEnergy).toBeNull();
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Protection from Energy',
-      targetName: 'Goblin B',
-    }));
+    expect(result.current.resistanceStage).toBeNull();
+
+    act(() => {
+      result.current.handleEnhanceAbilitySkip();
+      result.current.handleProtectionFromEnergySkip();
+      result.current.handleResistanceSkip();
+    });
+
+    expect(result.current.enhanceAbilityStage).toBeNull();
+    expect(result.current.protectionFromEnergyStage).toBeNull();
+    expect(result.current.resistanceStage).toBeNull();
+    expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('does nothing when type select is called without a prior target selection', async () => {
-    const { result } = renderWithSpell('Protection from Energy', 3);
+  it('Protection from Energy guards type-select without a prior target selection', async () => {
+    const result = renderWithSpell('Protection from Energy', 3);
 
     await act(async () => {
       await result.current.handleProtectionFromEnergyTypeSelect('fire');
     });
 
-    // Stage should remain 'target' since no target was selected
+    // Guarded: stage machine stays parked at 'target' until a target is chosen
     expect(result.current.protectionFromEnergyStage).toBe('target');
     expect(result.current.pendingProtectionFromEnergy).not.toBeNull();
+    expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('skips the flow and clears state', () => {
-    const { result } = renderWithSpell('Protection from Energy', 3);
-
-    act(() => {
-      result.current.handleProtectionFromEnergySkip();
-    });
-
-    expect(result.current.protectionFromEnergyStage).toBeNull();
-    expect(result.current.pendingProtectionFromEnergy).toBeNull();
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'spell',
-      spellName: 'Protection from Energy',
-    }));
-  });
-
-  it('does nothing when skip is called without pending state', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
-    );
-
-    expect(result.current.protectionFromEnergyStage).toBeNull();
-
-    act(() => {
-      result.current.handleProtectionFromEnergySkip();
-    });
-
-    expect(result.current.protectionFromEnergyStage).toBeNull();
-  });
-});
-
-// ── Resistance two-stage flow ─────────────────────────────────────────────────
-
-describe('useSpellMetamagicFlow — Resistance two-stage flow', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
-  });
-
-  it('enters target stage when gateMetamagic sets pendingResistance', () => {
-    const { result } = renderWithSpell('Resistance', 0);
-
-    expect(result.current.resistanceStage).toBe('target');
-    expect(result.current.pendingResistance).not.toBeNull();
-  });
-
-  it('transitions to type stage after target selection', () => {
-    const { result } = renderWithSpell('Resistance', 0);
-
-    act(() => {
-      result.current.handleResistanceTargetSelect('Goblin A');
-    });
-
-    expect(result.current.resistanceStage).toBe('type');
-  });
-
-  it('completes the two-stage flow: target select → type select', async () => {
-    const { result } = renderWithSpell('Resistance', 0);
-
-    expect(result.current.resistanceStage).toBe('target');
-
-    act(() => {
-      result.current.handleResistanceTargetSelect('Goblin C');
-    });
-
-    expect(result.current.resistanceStage).toBe('type');
-
-    await act(async () => {
-      await result.current.handleResistanceTypeSelect('fire');
-    });
-
-    expect(result.current.resistanceStage).toBeNull();
-    expect(result.current.pendingResistance).toBeNull();
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'spell',
-      characterName: 'TestSorcerer',
-      spellName: 'Resistance',
-      targetName: 'Goblin C',
-    }));
-  });
-
-  it('clears state when type select is called without a prior target selection (no guard)', async () => {
-    const { result } = renderWithSpell('Resistance', 0);
+  it('Resistance has no target guard — type-select without a target proceeds and clears', async () => {
+    const result = renderWithSpell('Resistance', 0);
 
     await act(async () => {
       await result.current.handleResistanceTypeSelect('lightning');
     });
 
-    // Resistance handler has no guard for missing targets — it proceeds anyway
     expect(result.current.resistanceStage).toBeNull();
     expect(result.current.pendingResistance).toBeNull();
-  });
-
-  it('skips the flow and clears state', () => {
-    const { result } = renderWithSpell('Resistance', 0);
-
-    act(() => {
-      result.current.handleResistanceSkip();
-    });
-
-    expect(result.current.resistanceStage).toBeNull();
-    expect(result.current.pendingResistance).toBeNull();
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'spell',
-      spellName: 'Resistance',
-    }));
-  });
-
-  it('does nothing when skip is called without pending state', () => {
-    const { result } = renderHook(() =>
-      useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn() })
-    );
-
-    expect(result.current.resistanceStage).toBeNull();
-
-    act(() => {
-      result.current.handleResistanceSkip();
-    });
-
-    expect(result.current.resistanceStage).toBeNull();
   });
 });

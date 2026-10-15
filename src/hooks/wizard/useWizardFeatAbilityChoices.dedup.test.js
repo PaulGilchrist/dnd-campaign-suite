@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Owns: lastProcessedKey dedup contract of useWizardFeatAbilityChoices —
+// reprocess only when the rules|feats key changes. Sibling suites own
+// grouping, initialization, migration, rollback, choice, and modechange behaviour.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useWizardFeatAbilityChoices from './useWizardFeatAbilityChoices.js';
@@ -28,16 +32,14 @@ describe('useWizardFeatAbilityChoices - deduplication via key tracking', () => {
   const createMockAllFeats = (names = ['Tough', 'Observant']) =>
     names.map((name) => ({ name, benefits: [] }));
 
+  const renderWithFormData = (fd) =>
+    renderHook(
+      ({ fd }) => useWizardFeatAbilityChoices(fd, createMockAllFeats(), mockSetFormData),
+      { initialProps: { fd } }
+    );
+
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSetFormData.mockImplementation((fn) => {
-      if (typeof fn === 'function') {
-        return fn(mockSetFormData.lastFormData || {});
-      }
-    });
-  });
-
-  it('does not reprocess when formData and feats have not changed', () => {
     computeAllFeatBuffs.mockReturnValue({
       abilityScoreIncreases: [
         {
@@ -49,38 +51,29 @@ describe('useWizardFeatAbilityChoices - deduplication via key tracking', () => {
         },
       ],
     });
+  });
 
+  it('does not reprocess when the rules|feats key is unchanged', () => {
     const formData = createBaseFormData({ feats: ['Tough'] });
-    const { rerender } = renderHook(
-      ({ fd }) => useWizardFeatAbilityChoices(fd, createMockAllFeats(), mockSetFormData),
-      { initialProps: { fd: formData } }
-    );
+    const { rerender } = renderWithFormData(formData);
 
     const initialCalls = computeAllFeatBuffs.mock.calls.length;
+    expect(initialCalls).toBeGreaterThan(0);
+
+    // Same object: the effect still re-runs (fresh allFeats identity each
+    // render) but the key guard must prevent reprocessing.
     rerender({ fd: formData });
+    // New object with unrelated field changes: key is unchanged, still no
+    // reprocessing — the key derives solely from rules and feat names.
+    rerender({ fd: { ...formData, name: 'Zzz', abilities: formData.abilities.map(a => ({ ...a, featIncrease: 0 })) } });
     expect(computeAllFeatBuffs.mock.calls.length).toBe(initialCalls);
   });
 
   it('reprocesses when rules change', () => {
-    computeAllFeatBuffs.mockReturnValue({
-      abilityScoreIncreases: [
-        {
-          name: 'any',
-          amount: 1,
-          isChoice: true,
-          description: 'Increase your Strength score',
-          featName: 'Tough',
-        },
-      ],
-    });
-
     const formData1 = createBaseFormData({ rules: '5e', feats: ['Tough'] });
     const formData2 = createBaseFormData({ rules: '2024', feats: ['Tough'] });
 
-    const { rerender } = renderHook(
-      ({ fd }) => useWizardFeatAbilityChoices(fd, createMockAllFeats(), mockSetFormData),
-      { initialProps: { fd: formData1 } }
-    );
+    const { rerender } = renderWithFormData(formData1);
 
     const initialCalls = computeAllFeatBuffs.mock.calls.length;
     rerender({ fd: formData2 });
@@ -88,25 +81,10 @@ describe('useWizardFeatAbilityChoices - deduplication via key tracking', () => {
   });
 
   it('reprocesses when feats change', () => {
-    computeAllFeatBuffs.mockReturnValue({
-      abilityScoreIncreases: [
-        {
-          name: 'any',
-          amount: 1,
-          isChoice: true,
-          description: 'Increase your Strength score',
-          featName: 'Tough',
-        },
-      ],
-    });
-
     const formData1 = createBaseFormData({ feats: ['Tough'] });
     const formData2 = createBaseFormData({ feats: ['Tough', 'Observant'] });
 
-    const { rerender } = renderHook(
-      ({ fd }) => useWizardFeatAbilityChoices(fd, createMockAllFeats(), mockSetFormData),
-      { initialProps: { fd: formData1 } }
-    );
+    const { rerender } = renderWithFormData(formData1);
 
     const initialCalls = computeAllFeatBuffs.mock.calls.length;
     rerender({ fd: formData2 });

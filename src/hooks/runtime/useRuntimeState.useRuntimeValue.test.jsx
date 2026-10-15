@@ -1,7 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// Canonical home for the useRuntimeValue HOOK contract (subscription, equality
+// guard, prop switching, lifecycle, falsy guards). Non-hook store API lives in
+// useRuntimeState.core.test.js; setRuntimeObject lives in
+// useRuntimeState.setRuntimeObject.test.js.
+import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import {
   clearRuntimeState,
+  getRuntimeValue,
   setRuntimeValue,
   seedTrackedResources,
   useRuntimeValue,
@@ -10,7 +16,6 @@ import {
 describe('useRuntimeValue', () => {
   beforeEach(() => {
     clearRuntimeState('test-char');
-    vi.restoreAllMocks();
   });
 
   describe('initial value', () => {
@@ -46,7 +51,7 @@ describe('useRuntimeValue', () => {
   });
 
   describe('subscription to changes', () => {
-    it('updates via setRuntimeValue and seedTrackedResources, supports sequential and rapid changes', () => {
+    it('updates via setRuntimeValue and seedTrackedResources, including falsy round-trips and rapid changes', () => {
       seedTrackedResources('test-char', { hp: 15 });
       const { result } = renderHook(() =>
         useRuntimeValue('test-char', 'hp', 'test-campaign')
@@ -63,10 +68,16 @@ describe('useRuntimeValue', () => {
       });
       expect(result.current).toBe(15);
 
+      // Falsy round-trip: 0 and null propagate through the listener guard.
       act(() => {
         setRuntimeValue('test-char', 'hp', 0, 'test-campaign');
       });
       expect(result.current).toBe(0);
+
+      act(() => {
+        setRuntimeValue('test-char', 'hp', null, 'test-campaign');
+      });
+      expect(result.current).toBeNull();
 
       act(() => {
         seedTrackedResources('test-char', { hp: 25 });
@@ -81,6 +92,34 @@ describe('useRuntimeValue', () => {
       expect(result.current).toBe(40);
     });
 
+    it('is notified by other properties in the same store but does not re-render until its own property changes', () => {
+      let renderCount = 0;
+      seedTrackedResources('test-char', { hp: 15 });
+      const { result } = renderHook(() => {
+        renderCount++;
+        return useRuntimeValue('test-char', 'hp', 'test-campaign');
+      });
+      expect(result.current).toBe(15);
+      const initialRenders = renderCount;
+
+      // Changing a different property fires the store notify; the hook's
+      // valuesEqual guard must suppress the re-render for an unchanged hp.
+      act(() => {
+        seedTrackedResources('test-char', { sp: 10 });
+      });
+      expect(renderCount).toBe(initialRenders);
+      expect(result.current).toBe(15);
+
+      // Now changing hp should update the hook value.
+      act(() => {
+        seedTrackedResources('test-char', { hp: 25 });
+      });
+      expect(renderCount).toBe(initialRenders + 1);
+      expect(result.current).toBe(25);
+    });
+  });
+
+  describe('equality guard (no re-render on equivalent values)', () => {
     it('does not re-render when setting the same value (setRuntimeValue)', () => {
       let renderCount = 0;
       seedTrackedResources('test-char', { hp: 15 });
@@ -99,80 +138,41 @@ describe('useRuntimeValue', () => {
       expect(result.current).toBe(15);
     });
 
-    it('does not re-render when setting the same value (seedTrackedResources)', () => {
+    it('suppresses re-render when a notify delivers a semantically equal value', () => {
+      // seedTrackedResources compares by identity, so seeding equal-content
+      // values with NEW references DOES notify. The hook's own valuesEqual
+      // guard is the only thing preventing a re-render here.
       let renderCount = 0;
-      seedTrackedResources('test-char', { hp: 15 });
+      const stats = { str: 18 };
+      seedTrackedResources('test-char', { hp: 15, stats });
       const { result } = renderHook(() => {
         renderCount++;
-        return useRuntimeValue('test-char', 'hp', 'test-campaign');
+        return useRuntimeValue('test-char', 'stats', 'test-campaign');
       });
-      expect(result.current).toBe(15);
+      expect(result.current).toBe(stats);
       const initialRenders = renderCount;
 
+      // Deep-equal new object reference: store adopts the new object, but
+      // the hook keeps the old one and does not re-render.
+      const freshStats = { str: 18 };
       act(() => {
-        seedTrackedResources('test-char', { hp: 15 });
+        seedTrackedResources('test-char', { stats: freshStats });
       });
-
       expect(renderCount).toBe(initialRenders);
-      expect(result.current).toBe(15);
-    });
+      expect(result.current).toBe(stats);
+      expect(getRuntimeValue('test-char', 'stats')).toBe(freshStats);
 
-    it('does not re-render when value changes from null to a number and back', () => {
-      seedTrackedResources('test-char', { hp: null });
-      const { result } = renderHook(() =>
+      // Number vs string ('15' vs 15): number-string equality matches,
+      // so the displayed value stays the original number.
+      const { result: hpResult } = renderHook(() =>
         useRuntimeValue('test-char', 'hp', 'test-campaign')
       );
-      expect(result.current).toBeNull();
-
+      expect(hpResult.current).toBe(15);
       act(() => {
-        setRuntimeValue('test-char', 'hp', 15, 'test-campaign');
+        seedTrackedResources('test-char', { hp: '15' });
       });
-      expect(result.current).toBe(15);
-
-      act(() => {
-        setRuntimeValue('test-char', 'hp', null, 'test-campaign');
-      });
-      expect(result.current).toBeNull();
-    });
-
-    it('subscribes to changes from other properties in the same store', () => {
-      seedTrackedResources('test-char', { hp: 15 });
-      const { result } = renderHook(() =>
-        useRuntimeValue('test-char', 'hp', 'test-campaign')
-      );
-      expect(result.current).toBe(15);
-
-      // Changing a different property triggers the listener; the hook's
-      // equality guard prevents a re-render when hp itself did not change.
-      act(() => {
-        seedTrackedResources('test-char', { sp: 10 });
-      });
-      expect(result.current).toBe(15);
-
-      // Now changing hp should update the hook value.
-      act(() => {
-        seedTrackedResources('test-char', { hp: 25 });
-      });
-      expect(result.current).toBe(25);
-    });
-
-    it('prevents update when number-string equality matches', () => {
-      let renderCount = 0;
-      seedTrackedResources('test-char', { hp: 15 });
-      const { result } = renderHook(() => {
-        renderCount++;
-        return useRuntimeValue('test-char', 'hp', 'test-campaign');
-      });
-      expect(result.current).toBe(15);
-      const initialRenders = renderCount;
-
-      // '15' (string) equals 15 (number) per valuesEqual
-      act(() => {
-        setRuntimeValue('test-char', 'hp', '15', 'test-campaign');
-      });
-
-      expect(renderCount).toBe(initialRenders);
-      expect(result.current).toBe(15);
+      expect(hpResult.current).toBe(15);
+      expect(getRuntimeValue('test-char', 'hp')).toBe('15');
     });
   });
 

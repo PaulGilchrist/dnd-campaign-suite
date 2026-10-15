@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Blade Ward handler contract: activation/deactivation toggle, bane_penalty
+// targetEffect registration (replace-in-place vs push), expiration, log,
+// popup passthrough, and null/empty guards. Fully mocked and deterministic.
+// The d20 subtraction math lives in d20RollComputation.subtract-die.test.js;
+// dispatch routing in triggerSpells.test.js; new-initiative clearing in
+// useInitiativeEffects.concentrationClearing.test.js — none cover this lane.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -43,6 +50,14 @@ function makeAction(automation = {}) {
   };
 }
 
+function setActive() {
+  buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+}
+
+function setToggledOff() {
+  buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('bladeWardHandler.handle', () => {
@@ -53,7 +68,7 @@ describe('bladeWardHandler.handle', () => {
   describe('activation (wasActive false)', () => {
     it('toggles the buff, registers expiration, creates targetEffect, logs, and returns activation popup', async () => {
       runtimeState.getRuntimeValue.mockReturnValue([]);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+      setActive();
 
       const ps = makePlayerStats();
       const action = makeAction({ duration: '1 minute' });
@@ -104,127 +119,79 @@ describe('bladeWardHandler.handle', () => {
       });
     });
 
-    it('replaces existing bane_penalty effect from the same source', async () => {
-      const existingEffects = [
-        { target: PLAYER_NAME, effect: 'bane_penalty', source: PLAYER_NAME, displayLabel: 'Blade Ward' },
+    it('replaces an existing bane_penalty from the same source in place, preserving unrelated effects', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue([
+        { target: PLAYER_NAME, effect: 'bane_penalty', source: PLAYER_NAME, displayLabel: 'stale' },
         { target: 'Other', effect: 'bless_bonus', source: PLAYER_NAME },
-      ];
-      runtimeState.getRuntimeValue.mockReturnValue(existingEffects);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+      ]);
+      setActive();
 
-      const ps = makePlayerStats();
-      const action = makeAction();
+      await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
 
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({
-            target: PLAYER_NAME,
-            effect: 'bane_penalty',
-            source: PLAYER_NAME,
-            displayLabel: 'Blade Ward',
-            duration: 'concentration',
-          }),
-          expect.objectContaining({
-            target: 'Other',
-            effect: 'bless_bonus',
-            source: PLAYER_NAME,
-          }),
-        ]),
-        CAMPAIGN_NAME,
-        true
-      );
+      const written = runtimeState.setRuntimeValue.mock.calls.at(-1)[2];
+      // Replace-in-place: no stacking — exactly one bane_penalty for this source, list length unchanged.
+      expect(written).toHaveLength(2);
+      const own = written.filter(te => te.target === PLAYER_NAME && te.effect === 'bane_penalty' && te.source === PLAYER_NAME);
+      expect(own).toHaveLength(1);
+      expect(own[0]).toEqual(expect.objectContaining({ displayLabel: 'Blade Ward', duration: 'concentration' }));
+      expect(written).toContainEqual(expect.objectContaining({ target: 'Other', effect: 'bless_bonus' }));
     });
 
-    it('handles null storedEffects by treating it as empty array', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({
-            target: PLAYER_NAME,
-            effect: 'bane_penalty',
-          }),
-        ]),
-        CAMPAIGN_NAME,
-        true
-      );
+    it('treats null or undefined storedEffects as empty when activating', async () => {
+      setActive();
+      for (const stored of [null, undefined]) {
+        runtimeState.getRuntimeValue.mockReturnValue(stored);
+        await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+          'campaign',
+          'targetEffects',
+          expect.arrayContaining([
+            expect.objectContaining({ target: PLAYER_NAME, effect: 'bane_penalty' }),
+          ]),
+          CAMPAIGN_NAME,
+          true
+        );
+      }
     });
 
-    it('handles undefined storedEffects by treating it as empty array', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(undefined);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({
-            target: PLAYER_NAME,
-            effect: 'bane_penalty',
-          }),
-        ]),
-        CAMPAIGN_NAME,
-        true
-      );
-    });
-
-    it('uses the action name in log abilityName and popup fields', async () => {
+    it('threads the action name through the log abilityName and both popup descriptions', async () => {
       runtimeState.getRuntimeValue.mockReturnValue([]);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      const ps = makePlayerStats();
       const action = { ...makeAction(), name: 'Custom Blade Ward' };
 
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
+      setActive();
+      const on = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null);
       expect(logService.addEntry).toHaveBeenCalledWith(
         CAMPAIGN_NAME,
-        expect.objectContaining({
-          abilityName: 'Custom Blade Ward',
-        })
+        expect.objectContaining({ abilityName: 'Custom Blade Ward' })
       );
+      expect(on.payload.description).toBe('Custom Blade Ward activated — attackers subtract 1d4 from attack rolls against you');
+
+      setToggledOff();
+      runtimeState.getRuntimeValue.mockReturnValue([
+        { target: PLAYER_NAME, effect: 'bane_penalty', source: PLAYER_NAME },
+      ]);
+      const off = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null);
+      expect(off.payload.description).toBe('Custom Blade Ward expired');
     });
 
-    it('includes the full automation object in the popup', async () => {
+    it('passes automation.type to popup automationType and the full automation object through the popup', async () => {
       runtimeState.getRuntimeValue.mockReturnValue([]);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+      setActive();
 
-      const ps = makePlayerStats();
-      const action = makeAction({ duration: '1 minute', customField: 'customValue' });
+      const action = { name: 'Blade Ward', automation: { type: 'custom_type', customField: 'customValue' } };
+      const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null);
 
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.automation).toEqual({
-        type: 'buff',
-        duration: '1 minute',
-        customField: 'customValue',
-      });
+      expect(result.payload.automationType).toBe('custom_type');
+      expect(result.payload.automation).toEqual({ type: 'custom_type', customField: 'customValue' });
     });
   });
 
   describe('deactivation (wasActive true)', () => {
-    it('toggles the buff, skips expiration, removes targetEffect, and returns expired popup', async () => {
+    it('toggles the buff, skips expiration, removes the targetEffect, and returns expired popup', async () => {
       runtimeState.getRuntimeValue.mockReturnValue([
         { target: PLAYER_NAME, effect: 'bane_penalty', source: PLAYER_NAME, displayLabel: 'Blade Ward' },
       ]);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
+      setToggledOff();
 
       const ps = makePlayerStats();
       const action = makeAction();
@@ -257,61 +224,31 @@ describe('bladeWardHandler.handle', () => {
       });
     });
 
-    it('does not call setRuntimeValue if no matching targetEffect exists', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue([]);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('does not call setRuntimeValue when other effects exist but none match', async () => {
-      const otherEffects = [
-        { target: 'Other', effect: 'bless_bonus', source: PLAYER_NAME },
-      ];
-      runtimeState.getRuntimeValue.mockReturnValue(otherEffects);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('does not call setRuntimeValue when storedEffects is null or undefined', async () => {
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-      await handle(action, ps, CAMPAIGN_NAME, null);
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-
-      runtimeState.getRuntimeValue.mockReturnValue(undefined);
-      await handle(action, ps, CAMPAIGN_NAME, null);
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+    it('does not write targetEffects when no matching bane_penalty exists (empty, non-matching, null, undefined)', async () => {
+      setToggledOff();
+      for (const stored of [
+        [],
+        [{ target: 'Other', effect: 'bless_bonus', source: PLAYER_NAME }],
+        null,
+        undefined,
+      ]) {
+        runtimeState.getRuntimeValue.mockReturnValue(stored);
+        await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null);
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+      }
     });
   });
 
   describe('edge cases', () => {
-    it('handles empty automation object', async () => {
+    it('spreads an empty automation object but always stamps effect: blade_ward for toggleBuff', async () => {
       runtimeState.getRuntimeValue.mockReturnValue([]);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+      setActive();
 
-      const ps = makePlayerStats();
       const action = { name: 'Blade Ward', automation: {} };
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
+      const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null);
 
       expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
-        ps.name,
+        makePlayerStats().name,
         action.name,
         { effect: 'blade_ward' },
         CAMPAIGN_NAME
@@ -319,42 +256,20 @@ describe('bladeWardHandler.handle', () => {
       expect(result.payload.description).toContain('activated');
     });
 
-    it('uses the action name in the activation description', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue([]);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
+    it('returns a failure popup with no side effects when playerStats is missing', async () => {
+      const result = await handle(makeAction(), null, CAMPAIGN_NAME, null);
 
-      const ps = makePlayerStats();
-      const action = { ...makeAction(), name: 'Custom Blade Ward' };
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.description).toBe(
-        'Custom Blade Ward activated — attackers subtract 1d4 from attack rolls against you'
-      );
-    });
-
-    it('returns expired popup with action name when deactivating', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue([]);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: true });
-
-      const ps = makePlayerStats();
-      const action = { ...makeAction(), name: 'Custom Blade Ward' };
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.description).toBe('Custom Blade Ward expired');
-    });
-
-    it('uses automation.type from action.automation for popup automationType', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue([]);
-      buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
-
-      const ps = makePlayerStats();
-      const action = { name: 'Blade Ward', automation: { type: 'custom_type' } };
-
-      const result = await handle(action, ps, CAMPAIGN_NAME, null);
-
-      expect(result.payload.automationType).toBe('custom_type');
+      expect(result).toEqual(expect.objectContaining({
+        type: 'popup',
+        payload: expect.objectContaining({
+          type: 'automation_info',
+          name: 'Blade Ward',
+          description: 'Failed to execute Blade Ward',
+        }),
+      }));
+      expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(logService.addEntry).not.toHaveBeenCalled();
     });
   });
 });

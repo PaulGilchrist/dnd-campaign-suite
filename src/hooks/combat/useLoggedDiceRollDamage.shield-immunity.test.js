@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/rules/features/viciousMockeryService.js', () => ({
@@ -146,9 +147,15 @@ import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
-import { isMagicMissileImmune, applyMinDamageAdjustment } from './loggedDiceRollUtils.js';
+import { isMagicMissileImmune } from './loggedDiceRollUtils.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
+
+// OWNER lane for the Shield-spell Magic Missile immunity contract in the
+// damage wrapper (createLogDamageAndShow): zero-damage log/popup payloads,
+// exact-lowercase name gate, no HP mutation. 5e + 2024 spells.json both keep
+// the Shield "take no damage from Magic Missile" rule.
+const IMMUNITY_NOTE = 'Shield: Immune to Magic Missile';
 
 describe('Magic Missile shield immunity', () => {
     const deps = {
@@ -160,203 +167,115 @@ describe('Magic Missile shield immunity', () => {
         pendingSaves: {},
     };
 
-    const npcCombatSummary = {
-        creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
+    const magicMissile = {
+        name: 'Magic Missile',
+        formula: '3d4+2',
+        total: 8,
+        rolls: [2, 3, 3],
+        modifier: 2,
+        context: { targetName: 'Goblin', damageType: 'force' },
     };
 
     beforeEach(() => {
         getRuntimeValue.mockReturnValue(null);
         isMagicMissileImmune.mockReturnValue(false);
-        applyMinDamageAdjustment.mockImplementation((d) => d);
         hasIgnoreResistance.mockReturnValue(false);
         endInvisibilityOnHostileAction.mockReturnValue(undefined);
         applyDamageToTarget.mockClear().mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-        loadCombatSummary.mockResolvedValue(npcCombatSummary);
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
+        });
         deps.logEntry.mockClear();
         deps.setPopupHtml.mockClear();
     });
 
-    function createFn() {
-        return createLogDamageAndShow(deps);
-    }
-
     describe('when target has shield buff and spell is Magic Missile', () => {
-        it('logs damage entry with zero damage and immunity note', async () => {
+        it('logs a zero-damage entry with immunity note and skips applyDamageToTarget', async () => {
             isMagicMissileImmune.mockReturnValue(true);
 
-            const fn = createFn();
-            await fn({ name: 'Magic Missile', formula: '3d4+2', total: 8, rolls: [2, 3, 3], modifier: 2, context: {
-                targetName: 'Goblin',
-                damageType: 'force',
-            } });
+            await createLogDamageAndShow(deps)(magicMissile);
 
             expect(deps.logEntry).toHaveBeenCalledTimes(1);
             const logArgs = deps.logEntry.mock.calls[0][0];
-            expect(logArgs.type).toBe('roll');
-            expect(logArgs.rollType).toBe('damage');
-            expect(logArgs.name).toBe('Magic Missile');
-            expect(logArgs.formula).toBe('3d4+2');
-            expect(logArgs.rolls).toEqual([2, 3, 3]);
-            expect(logArgs.total).toBe(8);
-            expect(logArgs.modifier).toBe(2);
-            expect(logArgs.damageType).toBe('force');
-            expect(logArgs.targetName).toBe('Goblin');
-            expect(logArgs.finalDamage).toBe(0);
-            expect(logArgs.note).toBe('Shield: Immune to Magic Missile');
-            expect(logArgs.isCrit).toBe(false);
-        });
-
-        it('shows damage popup with zero finalDamage and damageReduced flag', async () => {
-            isMagicMissileImmune.mockReturnValue(true);
-
-            const fn = createFn();
-            await fn({ name: 'Magic Missile', formula: '3d4+2', total: 8, rolls: [2, 3, 3], modifier: 2, context: {
-                targetName: 'Goblin',
+            expect(logArgs).toMatchObject({
+                type: 'roll',
+                rollType: 'damage',
+                name: 'Magic Missile',
+                formula: '3d4+2',
+                rolls: [2, 3, 3],
+                total: 8,
+                modifier: 2,
                 damageType: 'force',
-            } });
-
-            expect(deps.setPopupHtml).toHaveBeenCalledTimes(1);
-            const popup = deps.setPopupHtml.mock.calls[0][0];
-            expect(popup.type).toBe('damage');
-            expect(popup.name).toBe('Magic Missile');
-            expect(popup.formula).toBe('3d4+2');
-            expect(popup.rolls).toEqual([2, 3, 3]);
-            expect(popup.bonus).toBe(0);
-            expect(popup.modifier).toBe(2);
-            expect(popup.damageType).toBe('force');
-            expect(popup.targetName).toBe('Goblin');
-            expect(popup.total).toBe(8);
-            expect(popup.adjustedTotal).toBe(0);
-            expect(popup.targetCurrentHp).toBe(13);
-            expect(popup.targetMaxHp).toBe(13);
-            expect(popup.damageApplied).toBe(true);
-            expect(popup.finalDamage).toBe(0);
-            expect(popup.damageReduced).toBe(true);
-            expect(popup.note).toBe('Shield: Immune to Magic Missile');
-        });
-
-        it('does not call applyDamageToTarget', async () => {
-            isMagicMissileImmune.mockReturnValue(true);
-
-            const fn = createFn();
-            await fn({ name: 'Magic Missile', formula: '3d4+2', total: 8, rolls: [2, 3, 3], modifier: 2, context: {
                 targetName: 'Goblin',
-                damageType: 'force',
-            } });
-
+                finalDamage: 0,
+                note: IMMUNITY_NOTE,
+                isCrit: false,
+            });
             expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
 
-        it('uses original formula (not doubled) for non-crit log entry', async () => {
+        it('shows damage popup with zero finalDamage, damageReduced, and resolved target HP', async () => {
             isMagicMissileImmune.mockReturnValue(true);
 
-            const fn = createFn();
-            await fn({ name: 'Magic Missile', formula: '3d4+2', total: 8, rolls: [2, 3, 3], modifier: 2, context: {
-                targetName: 'Goblin',
-                damageType: 'force',
-            } });
-
-            const logArgs = deps.logEntry.mock.calls[0][0];
-            expect(logArgs.formula).toBe('3d4+2');
-            expect(logArgs.isCrit).toBe(false);
-        });
-
-        it('calls loadCombatSummary to resolve target HP', async () => {
-            isMagicMissileImmune.mockReturnValue(true);
-
-            const fn = createFn();
-            await fn({ name: 'Magic Missile', formula: '3d4+2', total: 8, rolls: [2, 3, 3], modifier: 2, context: {
-                targetName: 'Goblin',
-                damageType: 'force',
-            } });
+            await createLogDamageAndShow(deps)(magicMissile);
 
             expect(loadCombatSummary).toHaveBeenCalledWith('test-campaign');
-        });
-
-        it('passes through original rolls and total to both log and popup', async () => {
-            isMagicMissileImmune.mockReturnValue(true);
-
-            const fn = createFn();
-            await fn({ name: 'Magic Missile', formula: '4d4+1', total: 11, rolls: [3, 2, 4, 2], modifier: 1, context: {
-                targetName: 'Goblin',
+            expect(deps.setPopupHtml).toHaveBeenCalledTimes(1);
+            expect(deps.setPopupHtml).toHaveBeenCalledWith({
+                type: 'damage',
+                name: 'Magic Missile',
+                formula: '3d4+2',
+                rolls: [2, 3, 3],
+                bonus: 0,
+                modifier: 2,
                 damageType: 'force',
-            } });
-
-            const logArgs = deps.logEntry.mock.calls[0][0];
-            expect(logArgs.rolls).toEqual([3, 2, 4, 2]);
-            expect(logArgs.total).toBe(11);
-            expect(logArgs.modifier).toBe(1);
-
-            const popup = deps.setPopupHtml.mock.calls[0][0];
-            expect(popup.rolls).toEqual([3, 2, 4, 2]);
-            expect(popup.total).toBe(11);
-            expect(popup.modifier).toBe(1);
-        });
-    });
-
-    describe('when target has shield buff but spell is NOT Magic Missile', () => {
-        it('does not apply immunity and proceeds with normal damage flow', async () => {
-            isMagicMissileImmune.mockReturnValue(true);
-
-            const fn = createFn();
-            await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: {
                 targetName: 'Goblin',
-                damageType: 'fire',
-            } });
-
-            expect(applyDamageToTarget).toHaveBeenCalled();
-            expect(deps.logEntry).not.toHaveBeenCalledWith(
-                expect.objectContaining({ note: 'Shield: Immune to Magic Missile' })
-            );
+                total: 8,
+                adjustedTotal: 0,
+                targetCurrentHp: 13,
+                targetMaxHp: 13,
+                damageApplied: true,
+                finalDamage: 0,
+                damageReduced: true,
+                note: IMMUNITY_NOTE,
+            });
         });
 
-        it('applies immunity for lowercase spell name since source uses toLowerCase comparison', async () => {
+        it('applies immunity for lowercase spell name since source compares via toLowerCase', async () => {
             isMagicMissileImmune.mockReturnValue(true);
 
-            const fn = createFn();
-            await fn({ name: 'magic missile', formula: '1d4+1', total: 3, rolls: [2, 1], modifier: 1, context: {
-                targetName: 'Goblin',
-                damageType: 'force',
-            } });
+            await createLogDamageAndShow(deps)({ ...magicMissile, name: 'magic missile', formula: '1d4+1', total: 3, rolls: [2, 1], modifier: 1 });
 
             expect(applyDamageToTarget).not.toHaveBeenCalled();
             expect(deps.setPopupHtml).toHaveBeenCalledWith(
-                expect.objectContaining({ finalDamage: 0, note: 'Shield: Immune to Magic Missile' })
+                expect.objectContaining({ finalDamage: 0, note: IMMUNITY_NOTE })
             );
         });
     });
 
-    describe('edge cases', () => {
-        it('handles missing target in combat summary gracefully', async () => {
+    describe('name gate: only exact "magic missile" is blocked', () => {
+        it('proceeds with normal damage flow for other and similarly named spells', async () => {
             isMagicMissileImmune.mockReturnValue(true);
-            loadCombatSummary.mockResolvedValue({ creatures: [] });
+            const fn = createLogDamageAndShow(deps);
 
-            const fn = createFn();
-            await fn({ name: 'Magic Missile', formula: '1d4+1', total: 3, rolls: [2, 1], modifier: 1, context: {
-                targetName: 'NonExistent',
-                damageType: 'force',
-            } });
+            await fn({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [5], modifier: 0, context: { targetName: 'Goblin', damageType: 'fire' } });
+            await fn({ name: 'Magic Missile Burst', formula: '2d4+1', total: 5, rolls: [3, 2], modifier: 1, context: { targetName: 'Goblin', damageType: 'force' } });
 
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    type: 'damage',
-                    finalDamage: 0,
-                    targetName: 'NonExistent',
-                })
-            );
-            expect(applyDamageToTarget).not.toHaveBeenCalled();
+            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
+            expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ note: IMMUNITY_NOTE }));
+            expect(deps.setPopupHtml).not.toHaveBeenCalledWith(expect.objectContaining({ note: IMMUNITY_NOTE }));
         });
+    });
 
-        it('does not apply immunity for similarly named spells', async () => {
-            isMagicMissileImmune.mockReturnValue(true);
+    it('handles missing target in combat summary gracefully', async () => {
+        isMagicMissileImmune.mockReturnValue(true);
+        loadCombatSummary.mockResolvedValue({ creatures: [] });
 
-            const fn = createFn();
-            await fn({ name: 'Magic Missile Burst', formula: '2d4+1', total: 5, rolls: [3, 2], modifier: 1, context: {
-                targetName: 'Goblin',
-                damageType: 'force',
-            } });
+        await createLogDamageAndShow(deps)({ ...magicMissile, context: { targetName: 'NonExistent', damageType: 'force' } });
 
-            expect(applyDamageToTarget).toHaveBeenCalled();
-        });
+        expect(deps.setPopupHtml).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'damage', finalDamage: 0, targetName: 'NonExistent' })
+        );
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
 });

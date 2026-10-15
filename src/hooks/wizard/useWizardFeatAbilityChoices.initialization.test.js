@@ -1,3 +1,17 @@
+// @maintained-by-ai
+// Owns: saved-choice DEFAULTS written through the setFormData payload when the
+// mount effect initializes featAbilityChoices (needsInit branch of
+// useWizardFeatAbilityChoices.js) — fixed-group default assignment, choice-group
+// default single mode with single/dual assignment defaults, preservation of
+// saved assignments when mode is missing, and the recomputed abilities written
+// alongside the init payload.
+// initialization/initial seam adjudication: useWizardFeatAbilityChoices.initial
+// .test.js owns the RENDERED empty-state contract; this file asserts only the
+// payload handed to setFormData, and neither absorbs the other. Handler-driven
+// payload changes belong to the choice/modechange suites; legacy key migration
+// and removed-feat filtering to the migration suite; key-guard reprocessing to
+// the dedup suite.
+// Fully deterministic (computeAllFeatBuffs fully mocked); stable contract.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useWizardFeatAbilityChoices from './useWizardFeatAbilityChoices.js';
@@ -87,7 +101,7 @@ describe('useWizardFeatAbilityChoices - initializing saved choices', () => {
     expect(saved.assignments.dual).toEqual(['Strength', '']);
   });
 
-  it('initializes choice group with saved dual mode', () => {
+  it('initializes choice group preserving saved assignments and defaulting mode to single', () => {
     computeAllFeatBuffs.mockReturnValue({
       abilityScoreIncreases: [
         {
@@ -120,6 +134,34 @@ describe('useWizardFeatAbilityChoices - initializing saved choices', () => {
     const result = callback(formData);
     const saved = result.featAbilityChoices['Custom-0'];
     expect(saved.mode).toBe('single');
+    expect(saved.assignments.single).toBe('Strength');
     expect(saved.assignments.dual).toEqual(['Dexterity', 'Constitution']);
+  });
+
+  it('initialization payload includes abilities with feat increases recomputed from the default assignment', () => {
+    computeAllFeatBuffs.mockReturnValue({
+      abilityScoreIncreases: [
+        {
+          name: 'any',
+          amount: 1,
+          isChoice: true,
+          description: 'Increase your Strength score',
+          featName: 'Tough',
+        },
+      ],
+    });
+
+    const formData = createBaseFormData({ feats: ['Tough'] });
+    renderHook(() =>
+      useWizardFeatAbilityChoices(formData, createMockAllFeats(), mockSetFormData)
+    );
+
+    const callback = mockSetFormData.mock.calls[0][0];
+    const result = callback(formData);
+    // The same write that seeds featAbilityChoices must carry the recomputed
+    // abilities so the wizard preview matches the default assignment.
+    expect(result.featAbilityChoices['Tough-0'].assignment).toBe('Strength');
+    expect(result.abilities.find((a) => a.name === 'Strength').featIncrease).toBe(1);
+    expect(result.abilities.find((a) => a.name === 'Dexterity').featIncrease).toBe(0);
   });
 });

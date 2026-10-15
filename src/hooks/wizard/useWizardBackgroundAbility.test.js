@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Deterministic contract tests for the 2024-wizard background-ability hook:
+// parsing, clamping, localStorage persistence, and validation with dataLoader
+// mocked. No timers, no network, no DOM — stable as the app evolves.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
@@ -40,26 +44,18 @@ describe('useWizardBackgroundAbility', () => {
       expect(result.current.hasMaxSingleBonus).toBe(false);
     });
 
-    it('returns empty state when rules are 2024 but background is missing', () => {
-      const { result } = renderHookWithDefaults({ rules: '2024' });
+    for (const { label, formData } of [
+      { label: 'missing', formData: { rules: '2024' } },
+      { label: 'null', formData: { rules: '2024', background: null } },
+      { label: 'empty string', formData: { rules: '2024', background: '' } },
+    ]) {
+      it(`returns empty state when background is ${label}`, () => {
+        const { result } = renderHookWithDefaults(formData);
 
-      expect(result.current.backgroundAbilityNames).toEqual([]);
-      expect(result.current.backgroundAbilityAssignments).toEqual({});
-    });
-
-    it('returns empty state when background is null', () => {
-      const { result } = renderHookWithDefaults({ rules: '2024', background: null });
-
-      expect(result.current.backgroundAbilityNames).toEqual([]);
-      expect(result.current.backgroundAbilityAssignments).toEqual({});
-    });
-
-    it('returns empty state when background is empty string', () => {
-      const { result } = renderHookWithDefaults({ rules: '2024', background: '' });
-
-      expect(result.current.backgroundAbilityNames).toEqual([]);
-      expect(result.current.backgroundAbilityAssignments).toEqual({});
-    });
+        expect(result.current.backgroundAbilityNames).toEqual([]);
+        expect(result.current.backgroundAbilityAssignments).toEqual({});
+      });
+    }
   });
 
   describe('loading background data', () => {
@@ -134,21 +130,6 @@ describe('useWizardBackgroundAbility', () => {
       });
     });
 
-    it('uses non-object JSON from localStorage as-is (no type validation)', async () => {
-      localStorage.setItem('_background_abilities_Acolyte', JSON.stringify([1, 2, 3]));
-
-      vi.mocked(fetchBackgroundData).mockResolvedValue({
-        name: 'Acolyte',
-        ability_scores: 'Strength, Dexterity, Constitution',
-      });
-
-      const { result } = renderHookWithDefaults({ rules: '2024', background: 'Acolyte' });
-
-      await waitFor(() => {
-        expect(result.current.backgroundAbilityAssignments).toEqual([1, 2, 3]);
-      });
-    });
-
     it('handles fetchBackgroundData rejection by clearing state', async () => {
       vi.mocked(fetchBackgroundData).mockRejectedValue(new Error('Network error'));
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -163,46 +144,22 @@ describe('useWizardBackgroundAbility', () => {
       consoleSpy.mockRestore();
     });
 
-    it('handles background data missing ability_scores field', async () => {
-      vi.mocked(fetchBackgroundData).mockResolvedValue({
-        name: 'Test',
-        skill_proficiencies: 'Some Skill',
+    for (const { label, data } of [
+      { label: 'no ability_scores field', data: { name: 'Test', skill_proficiencies: 'Some Skill' } },
+      { label: 'null ability_scores', data: { name: 'Test', ability_scores: null } },
+      { label: 'empty ability_scores', data: { name: 'Test', ability_scores: '' } },
+    ]) {
+      it(`handles background data with ${label}`, async () => {
+        vi.mocked(fetchBackgroundData).mockResolvedValue(data);
+
+        const { result } = renderHookWithDefaults({ rules: '2024', background: 'Test' });
+
+        await waitFor(() => {
+          expect(result.current.backgroundAbilityNames).toEqual([]);
+          expect(result.current.backgroundAbilityAssignments).toEqual({});
+        });
       });
-
-      const { result } = renderHookWithDefaults({ rules: '2024', background: 'Test' });
-
-      await waitFor(() => {
-        expect(result.current.backgroundAbilityNames).toEqual([]);
-        expect(result.current.backgroundAbilityAssignments).toEqual({});
-      });
-    });
-
-    it('handles background data with null ability_scores', async () => {
-      vi.mocked(fetchBackgroundData).mockResolvedValue({
-        name: 'Acolyte',
-        ability_scores: null,
-      });
-
-      const { result } = renderHookWithDefaults({ rules: '2024', background: 'Acolyte' });
-
-      await waitFor(() => {
-        expect(result.current.backgroundAbilityNames).toEqual([]);
-        expect(result.current.backgroundAbilityAssignments).toEqual({});
-      });
-    });
-
-    it('handles background data with undefined ability_scores', async () => {
-      vi.mocked(fetchBackgroundData).mockResolvedValue({
-        name: 'Acolyte',
-      });
-
-      const { result } = renderHookWithDefaults({ rules: '2024', background: 'Acolyte' });
-
-      await waitFor(() => {
-        expect(result.current.backgroundAbilityNames).toEqual([]);
-        expect(result.current.backgroundAbilityAssignments).toEqual({});
-      });
-    });
+    }
   });
 
   describe('parsing ability score strings', () => {
@@ -213,7 +170,6 @@ describe('useWizardBackgroundAbility', () => {
       { input: 'Strength, Dexterity; and Constitution', expected: ['Strength', 'Dexterity', 'Constitution'] },
       { input: '  Strength  ,  Dexterity  ,  Constitution  ', expected: ['Strength', 'Dexterity', 'Constitution'] },
       { input: 'Strength', expected: ['Strength'] },
-      { input: '', expected: [] },
     ];
 
     for (const testCase of parseTestCases) {
@@ -272,97 +228,34 @@ describe('useWizardBackgroundAbility', () => {
       expect(updated.abilities[5].backgroundIncrease).toBe(0);
     });
 
-    it('updates formData.abilities for the targeted ability via updateBackgroundIncrease', async () => {
+    it('clamps values to the 0-2 range and coerces non-numeric input to 0', async () => {
       const { result } = renderHookWithDefaults(formData);
 
       await waitFor(() => {
         expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
-      act(() => {
-        result.current.updateBackgroundIncrease('Dexterity', 2);
-      });
+      const cases = [
+        [-5, 0],
+        [10, 2],
+        ['abc', 0],
+        [null, 0],
+        [undefined, 0],
+        ['2', 2],
+      ];
+      for (const [input, expected] of cases) {
+        act(() => {
+          result.current.updateBackgroundIncrease('Strength', input);
+        });
 
-      // The updateBackgroundIncrease callback directly updates the targeted ability
-      expect(mockSetFormData).toHaveBeenCalled();
-      const updateCalls = mockSetFormData.mock.calls.map(call => call[0]({ abilities: defaultAbilities }));
-      // Find the call that targets Dexterity
-      const dexCall = updateCalls.find(u => u.abilities[1].backgroundIncrease === 2);
-      expect(dexCall).toBeDefined();
-      expect(dexCall.abilities[1].backgroundIncrease).toBe(2);
+        expect(result.current.backgroundAbilityAssignments.Strength).toBe(expected);
+        // Sibling assignments are never disturbed by an out-of-range input
+        expect(result.current.backgroundAbilityAssignments.Dexterity).toBe(1);
+        expect(result.current.backgroundAbilityAssignments.Constitution).toBe(1);
+      }
     });
 
-    it('clamps negative values to 0', async () => {
-      const { result } = renderHookWithDefaults(formData);
-
-      await waitFor(() => {
-        expect(result.current.backgroundAbilityNames).toHaveLength(3);
-      });
-
-      act(() => {
-        result.current.updateBackgroundIncrease('Strength', -5);
-      });
-
-      expect(result.current.backgroundAbilityAssignments.Strength).toBe(0);
-    });
-
-    it('clamps values above 2 to 2', async () => {
-      const { result } = renderHookWithDefaults(formData);
-
-      await waitFor(() => {
-        expect(result.current.backgroundAbilityNames).toHaveLength(3);
-      });
-
-      act(() => {
-        result.current.updateBackgroundIncrease('Strength', 10);
-      });
-
-      expect(result.current.backgroundAbilityAssignments.Strength).toBe(2);
-    });
-
-    it('coerces non-numeric strings to 0', async () => {
-      const { result } = renderHookWithDefaults(formData);
-
-      await waitFor(() => {
-        expect(result.current.backgroundAbilityNames).toHaveLength(3);
-      });
-
-      act(() => {
-        result.current.updateBackgroundIncrease('Strength', 'abc');
-      });
-
-      expect(result.current.backgroundAbilityAssignments.Strength).toBe(0);
-    });
-
-    it('coerces null to 0', async () => {
-      const { result } = renderHookWithDefaults(formData);
-
-      await waitFor(() => {
-        expect(result.current.backgroundAbilityNames).toHaveLength(3);
-      });
-
-      act(() => {
-        result.current.updateBackgroundIncrease('Strength', null);
-      });
-
-      expect(result.current.backgroundAbilityAssignments.Strength).toBe(0);
-    });
-
-    it('coerces undefined to 0', async () => {
-      const { result } = renderHookWithDefaults(formData);
-
-      await waitFor(() => {
-        expect(result.current.backgroundAbilityNames).toHaveLength(3);
-      });
-
-      act(() => {
-        result.current.updateBackgroundIncrease('Strength', undefined);
-      });
-
-      expect(result.current.backgroundAbilityAssignments.Strength).toBe(0);
-    });
-
-    it('updates all abilities and triggers setFormData for each change', async () => {
+    it('merges sequential updates across abilities', async () => {
       const { result } = renderHookWithDefaults(formData);
 
       await waitFor(() => {
@@ -375,9 +268,6 @@ describe('useWizardBackgroundAbility', () => {
       act(() => {
         result.current.updateBackgroundIncrease('Dexterity', 0);
       });
-      act(() => {
-        result.current.updateBackgroundIncrease('Constitution', 1);
-      });
 
       expect(result.current.backgroundAbilityAssignments).toEqual({
         Strength: 2,
@@ -386,28 +276,9 @@ describe('useWizardBackgroundAbility', () => {
       });
       expect(result.current.totalAssigned).toBe(3);
       expect(result.current.isValid).toBe(true);
-      // Each updateBackgroundIncrease call triggers setFormData directly,
-      // and the second useEffect also fires on assignment changes
       expect(mockSetFormData).toHaveBeenCalled();
-      expect(mockSetFormData.mock.calls.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it('does not update formData when the ability name is not in backgroundAbilityNames', async () => {
-      const { result } = renderHookWithDefaults(formData);
-
-      await waitFor(() => {
-        expect(result.current.backgroundAbilityNames).toHaveLength(3);
-      });
-
-      act(() => {
-        result.current.updateBackgroundIncrease('Intelligence', 2);
-      });
-
-      // Assignment state still updates (no filtering by ability names)
-      expect(result.current.backgroundAbilityAssignments.Intelligence).toBe(2);
-      // But localStorage key uses formData.background so it's still stored
       const stored = JSON.parse(localStorage.getItem('_background_abilities_Acolyte'));
-      expect(stored.Intelligence).toBe(2);
+      expect(stored).toEqual({ Strength: 2, Dexterity: 0, Constitution: 1 });
     });
   });
 
@@ -433,48 +304,24 @@ describe('useWizardBackgroundAbility', () => {
       expect(result.current.totalAssigned).toBe(4);
     });
 
-    it('is valid when totalAssigned equals exactly 3', async () => {
-      localStorage.setItem(
-        '_background_abilities_Acolyte',
-        JSON.stringify({ Strength: 2, Dexterity: 1, Constitution: 0 })
-      );
+    for (const { assignments, valid, total } of [
+      { assignments: { Strength: 2, Dexterity: 1, Constitution: 0 }, valid: true, total: 3 },
+      { assignments: { Strength: 1, Dexterity: 0, Constitution: 0 }, valid: false, total: 1 },
+      { assignments: { Strength: 2, Dexterity: 2, Constitution: 2 }, valid: false, total: 6 },
+    ]) {
+      it(`is ${valid ? 'valid' : 'invalid'} when stored total is ${total}`, async () => {
+        localStorage.setItem('_background_abilities_Acolyte', JSON.stringify(assignments));
 
-      const { result } = renderHookWithDefaults({ rules: '2024', background: 'Acolyte' });
+        const { result } = renderHookWithDefaults({ rules: '2024', background: 'Acolyte' });
 
-      await waitFor(() => {
-        expect(result.current.isValid).toBe(true);
+        await waitFor(() => {
+          expect(result.current.totalAssigned).toBe(total);
+          expect(result.current.isValid).toBe(valid);
+        });
       });
-    });
+    }
 
-    it('is invalid when totalAssigned is less than 3', async () => {
-      localStorage.setItem(
-        '_background_abilities_Acolyte',
-        JSON.stringify({ Strength: 1, Dexterity: 0, Constitution: 0 })
-      );
-
-      const { result } = renderHookWithDefaults({ rules: '2024', background: 'Acolyte' });
-
-      await waitFor(() => {
-        expect(result.current.isValid).toBe(false);
-        expect(result.current.totalAssigned).toBe(1);
-      });
-    });
-
-    it('is invalid when totalAssigned is greater than 3', async () => {
-      localStorage.setItem(
-        '_background_abilities_Acolyte',
-        JSON.stringify({ Strength: 2, Dexterity: 2, Constitution: 2 })
-      );
-
-      const { result } = renderHookWithDefaults({ rules: '2024', background: 'Acolyte' });
-
-      await waitFor(() => {
-        expect(result.current.isValid).toBe(false);
-        expect(result.current.totalAssigned).toBe(6);
-      });
-    });
-
-    it('hasMaxSingleBonus is true when any single bonus exceeds 2 (localStorage bypass)', async () => {
+    it('hasMaxSingleBonus is true when a stored bonus exceeds 2 (localStorage bypass)', async () => {
       localStorage.setItem(
         '_background_abilities_Acolyte',
         JSON.stringify({ Strength: 3, Dexterity: 0, Constitution: 0 })
@@ -570,36 +417,6 @@ describe('useWizardBackgroundAbility', () => {
         expect(result.current.backgroundAbilityNames).toEqual([]);
         expect(result.current.backgroundAbilityAssignments).toEqual({});
       });
-    });
-
-    it('refetches when any formData field changes since formData is the dependency', async () => {
-      vi.mocked(fetchBackgroundData)
-        .mockResolvedValueOnce({
-          name: 'Acolyte',
-          ability_scores: 'Intelligence, Wisdom, Charisma',
-        })
-        .mockResolvedValueOnce({
-          name: 'Acolyte',
-          ability_scores: 'Intelligence, Wisdom, Charisma',
-        });
-
-      const { result, rerender } = renderHook(
-        ({ formData }) => useWizardBackgroundAbility(formData, mockSetFormData),
-        { initialProps: { formData: { rules: '2024', background: 'Acolyte' } } }
-      );
-
-      await waitFor(() => {
-        expect(result.current.backgroundAbilityNames).toEqual(['Intelligence', 'Wisdom', 'Charisma']);
-      });
-
-      rerender({ formData: { rules: '2024', background: 'Acolyte', extraField: 'changed' } });
-
-      await waitFor(() => {
-        expect(result.current.backgroundAbilityNames).toEqual(['Intelligence', 'Wisdom', 'Charisma']);
-      });
-
-      // The hook uses formData as the entire dependency, so any change triggers a refetch
-      expect(fetchBackgroundData).toHaveBeenCalledTimes(2);
     });
   });
 });

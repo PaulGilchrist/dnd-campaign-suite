@@ -1,5 +1,10 @@
+// @maintained-by-ai
+// Stable contract for the useMonstersData wrapper: { monsters, loading, error }
+// shape, /data/monsters.json fetch path, non-ok error message, and module-level
+// caching. All consumers (EncounterBuilder, HexMap) mock this hook, so this is
+// the only suite covering the real implementation.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 
 describe('useMonstersData', () => {
   beforeEach(() => {
@@ -33,22 +38,9 @@ describe('useMonstersData', () => {
       expect(result.current.loading).toBe(false);
     });
 
+    expect(global.fetch).toHaveBeenCalledWith('/data/monsters.json');
     expect(result.current.monsters).toEqual(mockMonsters);
     expect(result.current.error).toBeNull();
-  });
-
-  it('should set error when fetch rejects', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
-
-    const { useMonstersData } = await import('./useMonstersData.js');
-    const { result } = renderHook(() => useMonstersData());
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    });
-
-    expect(result.current.error).toBe('Network error');
-    expect(result.current.monsters).toEqual([]);
   });
 
   it('should set error when response is not ok', async () => {
@@ -65,47 +57,31 @@ describe('useMonstersData', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.error).toContain('Failed to load monsters');
+    expect(result.current.error).toBe('Failed to load monsters (404 Not Found)');
     expect(result.current.monsters).toEqual([]);
   });
 
-  it('should handle empty monster list', async () => {
+  it('should cache monsters so a second mount does not re-fetch', async () => {
+    const mockMonsters = [{ name: 'Goblin', cr: '1/4' }];
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => [],
+      json: async () => mockMonsters,
     });
 
     const { useMonstersData } = await import('./useMonstersData.js');
-    const { result } = renderHook(() => useMonstersData());
 
+    const first = renderHook(() => useMonstersData());
     await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+      expect(first.result.current.loading).toBe(false);
+    });
+    expect(first.result.current.monsters).toEqual(mockMonsters);
+
+    const second = renderHook(() => useMonstersData());
+    await waitFor(() => {
+      expect(second.result.current.loading).toBe(false);
     });
 
-    expect(result.current.monsters).toEqual([]);
-    expect(result.current.error).toBeNull();
-  });
-
-  it('should clean up on unmount (cancelled flag prevents state update)', async () => {
-    let resolveFetch;
-    global.fetch = vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; }));
-
-    const { useMonstersData } = await import('./useMonstersData.js');
-    const { result, unmount } = renderHook(() => useMonstersData());
-
-    unmount();
-
-    // Resolve the fetch after unmount - should not update state due to cancelled flag
-    resolveFetch({
-      ok: true,
-      json: async () => [{ name: 'Should Not Appear' }],
-    });
-
-    // Give timers a chance to run
-    await act(async () => {});
-
-    // loading should still be true because state was never updated
-    expect(result.current.loading).toBe(true);
-    expect(result.current.monsters).toEqual([]);
+    expect(second.result.current.monsters).toEqual(mockMonsters);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,10 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai: 2026-10-15
+// SP-002 runAnimalFriendship unit seam (useSimpleSpellHandlers): createConfirmHandler
+// already paid the slot at the stamped paid level (stampPaidSlotLevel / CLA-086), so
+// the runner must only forward the PAID level + selection to onExecute — never
+// re-prepare the cast. Downstream triggerAnimalFriendship(spell, metaCtx) consumes
+// exactly this shape: metaCtx.targetNames + metaCtx.slotLevel, lv2 adjudicating 2
+// Beasts via spell.level. Rider stamp (CLA-033 postCastTriggersRan) lives in
+// useSimpleSpellHandlers.cla033-rider-stamps.test.js — not duplicated here.
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import spells2024 from '../../../../public/data/2024/spells.json';
 
-// Any-name Proxy mocks — this test only exercises runAnimalFriendship; every
-// other gated runner's dependency must resolve but never execute.
-
-// Auto-mocks (vi.mock without factory) neutralize every named export of the
-// heavy runner dependencies — this test only exercises runAnimalFriendship.
+// Auto-mocks (vi.mock without factory) neutralize every heavy runner dependency
+// imported by useSimpleSpellHandlers — this test only exercises runAnimalFriendship.
 vi.mock('../../../services/automation/index.js');
 vi.mock('../../../services/rules/features/faerieFireService.js');
 vi.mock('../../../services/rules/features/healService.js');
@@ -26,6 +32,8 @@ vi.mock('../../runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
 }));
+// Regression seam: if the confirm runner ever wires prepareSpellCast back in
+// (SP-002 double-payment regression), this mock catches the re-call.
 vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
   prepareSpellCast: vi.fn(() => Promise.resolve({ modifiedSpell: {}, metaCtx: {} })),
   isFreeCastAuthorized: vi.fn(() => false),
@@ -35,7 +43,9 @@ vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
 import { useSimpleSpellHandlers } from './useSimpleSpellHandlers.js';
 import { prepareSpellCast } from '../../../services/rules/spells/spellPreparationService.js';
 
-const UPCAST_DATA = { 1: '1 target', 2: '2 targets' };
+// Data authority: 2024 Essentials row carries the upcast_at_slot_level ladder
+// (lv1 "1 target", lv2 "2 targets") that the paid-slot threading must honour.
+const AF = spells2024.find(s => s.name === 'Animal Friendship');
 
 function setupRun() {
   const applies = {};
@@ -54,64 +64,89 @@ function setupRun() {
   return { run: applies.animalFriendship, onExecute };
 }
 
-function makePending(overrides = {}) {
-  const { spell: spellOverride, ...rest } = overrides;
+// Fixture mirrors what runAnimalFriendship actually reads: spell, spellLevel, metaCtx.
+function makePending(spell = {}, overrides = {}) {
   return {
     spellName: 'Animal Friendship',
-    spell: { name: 'Animal Friendship', level: 1, casting_time: 'Action', upcast_at_slot_level: UPCAST_DATA, ...(spellOverride || {}) },
+    spell: { ...AF, ...spell },
     spellLevel: 1,
-    castingTime: 'Action',
-    maxTargets: 1,
-    creatureTargets: ['Wolf 1', 'Wolf 2'],
     metaCtx: {},
-    ...rest,
+    ...overrides,
   };
 }
 
+const CONTRACT_ROWS = [
+  {
+    label: 'lv1 base forwards slotLevel 1 and the selected Beast',
+    spell: {},
+    metaCtx: {},
+    selection: ['Wolf 1'],
+    expectLevel: 1,
+    expectBaseLevel: undefined,
+    expectSlotLevel: 1,
+    expectTargetNames: ['Wolf 1'],
+  },
+  {
+    label: 'lv2 upcast forwards the PAID level (2) — trigger resolves 2 Beasts at lv2',
+    spell: { upcastLevel: 2, isUpcast: true },
+    metaCtx: { slotLevel: 2 },
+    selection: ['Wolf 1', 'Wolf 2'],
+    expectLevel: 2,
+    expectBaseLevel: 1,
+    expectSlotLevel: 2,
+    expectTargetNames: ['Wolf 1', 'Wolf 2'],
+  },
+  {
+    label: 'wraps a single non-array selection into targetNames',
+    spell: {},
+    metaCtx: {},
+    selection: 'Wolf 1',
+    expectLevel: 1,
+    expectBaseLevel: undefined,
+    expectSlotLevel: 1,
+    expectTargetNames: ['Wolf 1'],
+  },
+  {
+    label: 'missing metaCtx.slotLevel falls back to pending.spellLevel',
+    spell: {},
+    metaCtx: undefined,
+    selection: ['Wolf 2'],
+    expectLevel: 1,
+    expectBaseLevel: undefined,
+    expectSlotLevel: 1,
+    expectTargetNames: ['Wolf 2'],
+  },
+];
+
 describe('SP-002 runAnimalFriendship — paid-slot threading', () => {
-  it('lv1 lane forwards slotLevel 1 and the selected targets', async () => {
-    const { run, onExecute } = setupRun();
-    const pending = makePending();
-
-    await run(pending, ['Wolf 1']);
-
-    expect(onExecute).toHaveBeenCalledTimes(1);
-    const [spell, metaCtx] = onExecute.mock.calls[0];
-    expect(spell.level).toBe(1);
-    expect(metaCtx.targetNames).toEqual(['Wolf 1']);
-    expect(metaCtx.slotLevel).toBe(1);
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('lv2 upcast forwards the PAID level (2) — handler resolves 2 Beasts at lv2', async () => {
-    const { run, onExecute } = setupRun();
-    const pending = makePending({
-      spell: { upcastLevel: 2, isUpcast: true },
-      maxTargets: 2,
-      metaCtx: { slotLevel: 2 },
-    });
+  it.each(CONTRACT_ROWS)(
+    '$label',
+    async ({ spell, metaCtx, selection, expectLevel, expectBaseLevel, expectSlotLevel, expectTargetNames }) => {
+      const { run, onExecute } = setupRun();
 
-    await run(pending, ['Wolf 1', 'Wolf 2']);
+      await run(makePending(spell, { metaCtx }), selection);
 
-    const [spell, metaCtx] = onExecute.mock.calls[0];
-    expect(spell.level).toBe(2);
-    expect(spell.baseLevel).toBe(1);
-    expect(metaCtx.slotLevel).toBe(2);
-    expect(metaCtx.targetNames).toEqual(['Wolf 1', 'Wolf 2']);
-  });
+      expect(onExecute).toHaveBeenCalledTimes(1);
+      const [sentSpell, sentMeta] = onExecute.mock.calls[0];
+      expect(sentSpell.level).toBe(expectLevel);
+      expect(sentSpell.baseLevel).toBe(expectBaseLevel);
+      expect(sentMeta).toEqual({ targetNames: expectTargetNames, slotLevel: expectSlotLevel });
+      // The confirm lane already paid the slot once — the runner must never re-prepare.
+      expect(prepareSpellCast).not.toHaveBeenCalled();
+    },
+  );
+});
 
-  it('does NOT re-run prepareSpellCast — the confirm lane already paid the slot once', async () => {
-    const { run } = setupRun();
-
-    await run(makePending({ spell: { upcastLevel: 2, isUpcast: true }, metaCtx: { slotLevel: 2 } }), ['Wolf 1', 'Wolf 2']);
-
-    expect(prepareSpellCast).not.toHaveBeenCalled();
-  });
-
-  it('wraps a single non-array selection into targetNames', async () => {
-    const { run, onExecute } = setupRun();
-
-    await run(makePending(), 'Wolf 1');
-
-    expect(onExecute.mock.calls[0][1].targetNames).toEqual(['Wolf 1']);
+describe('data-drift guard — spells.json Animal Friendship', () => {
+  it('2024 row keeps the lv1 Enchantment base + +1 Beast/slot ladder the contract assumes', () => {
+    expect(AF.level).toBe(1);
+    expect(AF.school).toBe('Enchantment');
+    expect(AF.dc.dc_type).toBe('WIS');
+    expect(AF.upcast_at_slot_level['1']).toBe('1 target');
+    expect(AF.upcast_at_slot_level['2']).toBe('2 targets');
   });
 });

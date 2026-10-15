@@ -1,3 +1,11 @@
+// @maintained-by-ai: 2026-10-14
+// Owns the authoritative modalName → modal-state key map for the cast lane:
+// exhaustive coverage of every key in MODAL_STATE_KEYS (useSpellCastExecutor.js,
+// the same map routeCastModal shares with useActionSpellMetamagic).
+// Bare modalName derivation + the unknown-name guard live in
+// useSpellCastExecutor.modalName.test.js; automationPopup precedence lives in
+// useSpellCastExecutor.automationPopup.test.js; cachedPosRef clearing lives in
+// useSpellCastExecutor.castAction.test.js.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 vi.mock('../../services/rules/spells/spellCastService.js', () => ({
@@ -8,32 +16,11 @@ import { executeSpellCast } from '../../services/rules/spells/spellCastService.j
 import { renderHook, act } from '@testing-library/react';
 import { useSpellCastExecutor } from './useSpellCastExecutor.js';
 
-function makePlayerStats(overrides = {}) {
-  return { name: 'TestCaster', ...overrides };
-}
-
-function makeSpell(overrides = {}) {
-  return { name: 'Fireball', ...overrides };
-}
-
-function makeProps(overrides = {}) {
-  return {
-    rollAttack: vi.fn(),
-    rollDamage: vi.fn(),
-    playerStats: makePlayerStats(),
-    getTargetInfo: vi.fn(),
-    campaignName: 'TestCampaign',
-    mapName: 'TestMap',
-    characters: [],
-    setPopupHtml: vi.fn(),
-    extraMeta: {},
-    ...overrides,
-  };
-}
-
 /**
- * Modal routing mappings from handleModalResult switch cases.
- * Each entry: [modalName from executeSpellCast, expected setModalState key]
+ * Exhaustive mirror of MODAL_STATE_KEYS in useSpellCastExecutor.js.
+ * If a key is added to (or removed from) the source map without updating
+ * this table, the missing key's route goes untested — keep them in lockstep.
+ * Each entry: [modalName emitted by executeSpellCast, expected setModalState key]
  */
 const MODAL_ROUTE_MAP = [
   ['massHealTarget', 'massHealModal'],
@@ -44,9 +31,11 @@ const MODAL_ROUTE_MAP = [
   ['saveAttackAoe', 'saveAttackAoeModal'],
   ['aoeCondition', 'aoeConditionModal'],
   ['fear', 'fearModal'],
+  ['sleep', 'sleepModal'],
   ['hypnoticPattern', 'hypnoticPatternModal'],
   ['calmEmotions', 'calmEmotionsModal'],
   ['massSuggestion', 'massSuggestionModal'],
+  ['commandChoice', 'commandModal'],
   ['ArcaneVigor', 'arcaneVigorModal'],
   ['blindnessDeafness', 'blindnessDeafnessModal'],
   ['silenceTargetSelection', 'silenceModal'],
@@ -60,174 +49,76 @@ const MODAL_ROUTE_MAP = [
   ['starryChaliceHeal', 'starryChaliceHealModal'],
 ];
 
-describe('useSpellCastExecutor', () => {
+function makeProps(overrides = {}) {
+  return {
+    rollAttack: vi.fn(),
+    rollDamage: vi.fn(),
+    playerStats: { name: 'TestCaster' },
+    getTargetInfo: vi.fn(),
+    campaignName: 'TestCampaign',
+    mapName: 'TestMap',
+    characters: [],
+    setPopupHtml: vi.fn(),
+    extraMeta: {},
+    ...overrides,
+  };
+}
+
+// Cast with a stubbed bare-modalName result; returns props plus setModalState
+// so tests assert dispatch without repeating the seam setup.
+async function castWithModalNameResult(result, propOverrides = {}) {
+  executeSpellCast.mockResolvedValue(result);
+  const setModalState = propOverrides.setModalState ?? vi.fn();
+  const props = makeProps({ ...propOverrides, setModalState });
+  const { result: hook } = renderHook(() => useSpellCastExecutor(props));
+  await act(async () => {
+    await hook.current.castAction({ name: 'Fireball' }, {});
+  });
+  return { props, setModalState };
+}
+
+describe('useSpellCastExecutor — modal key map routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('handleModalResult — modalName routing', () => {
-    it.each(MODAL_ROUTE_MAP)(
-      'maps modalName "%s" to setModalState key "%s" with correct payload',
-      async (modalName, expectedKey) => {
-        const props = makeProps();
-        const setModalState = vi.fn();
-        const payload = { data: 'payloadData' };
+  it.each(MODAL_ROUTE_MAP)(
+    'routes every known modalName "%s" to setModalState key "%s" (payload unchanged, popup silent)',
+    async (modalName, expectedKey) => {
+      const payload = { data: 'payloadData' };
+      const { props, setModalState } = await castWithModalNameResult({ modalName, payload });
 
-        executeSpellCast.mockResolvedValue({ modalName, payload });
+      expect(setModalState).toHaveBeenCalledWith({ [expectedKey]: payload });
+      expect(props.setPopupHtml).not.toHaveBeenCalled();
+    },
+  );
 
-        const { result } = renderHook(() =>
-          useSpellCastExecutor({ ...props, setModalState }),
-        );
-
-        await act(async () => {
-          await result.current.castAction(makeSpell(), {});
-        });
-
-        expect(setModalState).toHaveBeenCalledWith({ [expectedKey]: payload });
-        expect(props.setPopupHtml).not.toHaveBeenCalled();
-      },
+  // Payload is passed through byte-identical for every shape, including a
+  // missing payload field and a spell name unrelated to the modal key.
+  it.each([
+    ['missing payload field', undefined],
+    ['empty object payload', {}],
+    ['string payload', '<div>Plain</div>'],
+    ['nested payload', { targets: ['A', 'B', 'C'], spellLevel: 3, nested: { key: 'value' } }],
+  ])('passes %s through unchanged', async (_label, payload) => {
+    const { setModalState } = await castWithModalNameResult(
+      { modalName: 'massHealTarget', payload },
     );
 
-    it('passes the payload through unchanged without transformation', async () => {
-      const props = makeProps();
-      const setModalState = vi.fn();
-      const complexPayload = {
-        targets: ['A', 'B', 'C'],
-        spellLevel: 3,
-        customFlag: true,
-        nested: { key: 'value' },
-      };
+    expect(setModalState).toHaveBeenCalledWith({ massHealModal: payload });
+  });
 
-      executeSpellCast.mockResolvedValue({
-        modalName: 'massHealTarget',
-        payload: complexPayload,
-      });
+  it('falls back to setPopupHtml when a bare modalName result arrives without setModalState', async () => {
+    const payload = { action: { name: 'Fear' } };
+    executeSpellCast.mockResolvedValue({ modalName: 'fear', payload });
+    const props = makeProps({ setModalState: undefined });
+    const { result: hook } = renderHook(() => useSpellCastExecutor(props));
 
-      const { result } = renderHook(() =>
-        useSpellCastExecutor({ ...props, setModalState }),
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(setModalState).toHaveBeenCalledWith({ massHealModal: complexPayload });
+    await act(async () => {
+      await hook.current.castAction({ name: 'Fireball' }, {});
     });
 
-    it('passes undefined payload when result has modalName but no payload field', async () => {
-      const props = makeProps();
-      const setModalState = vi.fn();
-
-      executeSpellCast.mockResolvedValue({ modalName: 'fear' });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor({ ...props, setModalState }),
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(setModalState).toHaveBeenCalledWith({ fearModal: undefined });
-    });
-
-    it('passes empty object payload when result has modalName with empty payload', async () => {
-      const props = makeProps();
-      const setModalState = vi.fn();
-
-      executeSpellCast.mockResolvedValue({ modalName: 'calmEmotions', payload: {} });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor({ ...props, setModalState }),
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(setModalState).toHaveBeenCalledWith({ calmEmotionsModal: {} });
-    });
-
-    it('falls back to setPopupHtml when modalName result is received but setModalState is undefined', async () => {
-      const props = makeProps();
-
-      executeSpellCast.mockResolvedValue({
-        modalName: 'fear',
-        payload: { action: { name: 'Fear' } },
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor(props),
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(props.setPopupHtml).toHaveBeenCalledWith({ action: { name: 'Fear' } });
-    });
-
-    it('automationPopup takes priority over modalName in result', async () => {
-      const props = makeProps();
-      const setModalState = vi.fn();
-
-      executeSpellCast.mockResolvedValue({
-        automationPopup: { type: 'popup', payload: '<div>Automation!</div>' },
-        modalName: 'massHealTarget',
-        payload: { action: { name: 'Mass Heal' } },
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor({ ...props, setModalState }),
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(props.setPopupHtml).toHaveBeenCalledWith('<div>Automation!</div>');
-      expect(setModalState).not.toHaveBeenCalled();
-    });
-
-    it('uses different spell names without affecting modal routing', async () => {
-      const props = makeProps();
-      const setModalState = vi.fn();
-
-      executeSpellCast.mockResolvedValue({
-        modalName: 'massHealTarget',
-        payload: { spell: 'DifferentSpell' },
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor({ ...props, setModalState }),
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell({ name: 'Prayer of Healing' }), {});
-      });
-
-      expect(setModalState).toHaveBeenCalledWith({ massHealModal: { spell: 'DifferentSpell' } });
-    });
-
-    it('clears ref.current after modal routing completes', async () => {
-      const props = makeProps();
-      const setModalState = vi.fn();
-      const ref = { current: { attackerPos: { x: 1 } } };
-
-      executeSpellCast.mockResolvedValue({
-        modalName: 'massHealTarget',
-        payload: { data: 'test' },
-      });
-
-      const { result } = renderHook(() =>
-        useSpellCastExecutor({ ...props, cachedPosRef: ref, setModalState }),
-      );
-
-      await act(async () => {
-        await result.current.castAction(makeSpell(), {});
-      });
-
-      expect(ref.current).toBeNull();
-    });
+    expect(props.setPopupHtml).toHaveBeenCalledWith(payload);
+    expect(props.setModalState).toBeUndefined();
   });
 });

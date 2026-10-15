@@ -1,6 +1,11 @@
-// CLA-107: runHex must forward the chooser selection (persisted on pending by
-// gateHex) onto the execute metaCtx — previously dropped, so castHex pinned
-// STR regardless of the chosen ability.
+// @maintained-by-ai: 2026-10-15
+// CLA-107 runHex handoff seam: the ability chosen in HexAbilityModal arrives via
+// metaCtx and is persisted by gateHex (spellGates.js — the ONLY hex-pending producer,
+// stamping hexAbility as a STR..CHA key or null). runHex must forward it verbatim
+// onto the execute metaCtx — previously dropped, so castHex pinned STR regardless of
+// the choice. 2024 Hex data confirms the contract (lv1 Enchantment, Bonus Action,
+// "choose one ability"). Rider-stamp seam (postCastTriggersRan) and empty-selection
+// no-handoff are covered by cla033-rider-stamps.test.js — not duplicated here.
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../../../services/automation/index.js');
@@ -30,46 +35,32 @@ function setupRun() {
   return { applies, onExecute };
 }
 
+// Rows mirror gateHex's pending shape. Selection may be a raw name or the
+// confirm-picker's single-element array; hexAbility is always present
+// (modal key or gateHex's null default) — never coerced, never dropped.
+const HANDOFF_ROWS = [
+  { label: 'string selection forwards the chosen ability', selection: 'Bandit 1', hexAbility: 'DEX' },
+  { label: 'array confirm result keeps the chosen ability', selection: ['Bandit 1'], hexAbility: 'WIS' },
+  { label: 'unselected cast carries gateHex null (no STR coercion)', selection: 'Bandit 1', hexAbility: null },
+];
+
 describe('CLA-107 runHex threads the chosen ability through confirm → onExecute', () => {
-  it('forwards pending.hexAbility on the execute metaCtx', async () => {
-    const { applies, onExecute } = setupRun();
-    const pending = {
-      spellName: 'Hex',
-      spell: { name: 'Hex', level: 1, school: 'Enchantment' },
-      spellLevel: 1,
-      hexAbility: 'DEX',
-    };
+  it.each(HANDOFF_ROWS)(
+    '$label',
+    async ({ selection, hexAbility }) => {
+      const { applies, onExecute } = setupRun();
+      const pending = {
+        spellName: 'Hex',
+        spell: { name: 'Hex', level: 1, school: 'Enchantment' },
+        spellLevel: 1,
+        hexAbility,
+      };
 
-    await applies.hex(pending, 'Bandit 1');
+      await applies.hex(pending, selection);
 
-    expect(onExecute).toHaveBeenCalledTimes(1);
-    expect(onExecute.mock.calls[0][1]).toEqual({ targetName: 'Bandit 1', hexAbility: 'DEX' });
-  });
-
-  it('accepts an array confirm result and keeps the chosen ability', async () => {
-    const { applies, onExecute } = setupRun();
-    const pending = {
-      spellName: 'Hex',
-      spell: { name: 'Hex', level: 1, school: 'Enchantment' },
-      spellLevel: 1,
-      hexAbility: 'WIS',
-    };
-
-    await applies.hex(pending, ['Bandit 1']);
-
-    expect(onExecute.mock.calls[0][1]).toEqual({ targetName: 'Bandit 1', hexAbility: 'WIS' });
-  });
-
-  it('unarmed pending carries null (no STR coercion)', async () => {
-    const { applies, onExecute } = setupRun();
-    const pending = {
-      spellName: 'Hex',
-      spell: { name: 'Hex', level: 1, school: 'Enchantment' },
-      spellLevel: 1,
-    };
-
-    await applies.hex(pending, 'Bandit 1');
-
-    expect(onExecute.mock.calls[0][1]).toEqual({ targetName: 'Bandit 1', hexAbility: undefined });
-  });
+      expect(onExecute).toHaveBeenCalledTimes(1);
+      expect(onExecute.mock.calls[0][0]).toBe(pending.spell);
+      expect(onExecute.mock.calls[0][1]).toEqual({ targetName: 'Bandit 1', hexAbility });
+    },
+  );
 });

@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Unit tests for the Death Ward automation handler (popup builder, buff applier, active-check).
+// Deterministic: only stable service boundaries are mocked (runtime store, log, combat summary,
+// range parser, map resolver) and the handler is pure over them. Other suites (contextBuilder-sync,
+// CharSummary, handlePlayerSaveDamage) mock this module — this file is the only direct coverage of
+// its exports, so it stays self-contained and needs no churn when consumers change.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, applyDeathWard, isDeathWardActive } from './deathWardHandler.js';
@@ -56,119 +62,84 @@ function makeAction(overrides = {}) {
     };
 }
 
+function emptyBuffs() {
+    runtimeState.getRuntimeValue.mockImplementation((_charName, key) =>
+        key === 'activeBuffs' ? [] : undefined);
+}
+
 // ─── handle ───
 
 describe('deathWardHandler.handle', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        rangeValidation.rangeToFeet.mockReturnValue(0);
+        // Distinct non-zero value so the payload assertion proves rangeFt is plumbed
+        // through from rangeToFeet, not a coincidental default.
+        rangeValidation.rangeToFeet.mockReturnValue(5);
         targetResolver.resolveMapPositions.mockResolvedValue(null);
-    });
-
-    it('returns a popup with type death_ward_target_selection', async () => {
-        runtimeState.getRuntimeValue.mockReturnValue(undefined);
         combatData.getCombatSummary.mockReturnValue({ creatures: [] });
-
-        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, []);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('death_ward_target_selection');
-        expect(result.payload.name).toBe('Death Ward');
-        expect(result.payload.range).toBe('Touch');
-        expect(result.payload.duration).toBe('8 hours');
-        expect(result.payload.rangeFt).toBe(0);
-        expect(result.payload.attackerPos).toBeNull();
     });
 
-    it('includes creature targets from combat summary', async () => {
+    it('returns death_ward_target_selection popup with full payload', async () => {
         combatData.getCombatSummary.mockReturnValue({
-            creatures: [
-                { name: 'Cleric1' },
-                { name: 'Fighter1' },
-                { name: 'Goblin' },
-            ],
+            creatures: [{ name: 'Cleric1' }, { name: 'Fighter1' }],
         });
 
         const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, []);
 
-        expect(result.payload.creatureTargets).toEqual(['Cleric1', 'Fighter1', 'Goblin']);
+        expect(result.type).toBe('popup');
+        expect(result.payload).toEqual(expect.objectContaining({
+            type: 'death_ward_target_selection',
+            name: 'Death Ward',
+            creatureTargets: ['Cleric1', 'Fighter1'],
+            range: 'Touch',
+            rangeFt: 5,
+            duration: '8 hours',
+            attackerPos: null,
+        }));
+        // No map supplied → positions are never resolved.
+        expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
     });
 
-    it('returns empty creature list when no combat summary', async () => {
-        combatData.getCombatSummary.mockReturnValue(null);
+    it('reads range and duration from the spell, defaulting to Touch / 8 hours', async () => {
+        const withSpell = await handle(
+            makeAction({ spell: { range: '60 feet', duration: '1 minute' } }),
+            makePlayerStats(), CAMPAIGN_NAME, null, [],
+        );
+        expect(withSpell.payload.range).toBe('60 feet');
+        expect(withSpell.payload.duration).toBe('1 minute');
 
-        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, []);
-
-        expect(result.payload.creatureTargets).toEqual([]);
+        // Missing or null spell falls back to defaults.
+        for (const action of [{ name: 'Death Ward' }, { name: 'Death Ward', spell: null }]) {
+            const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, null, []);
+            expect(result.payload.range).toBe('Touch');
+            expect(result.payload.duration).toBe('8 hours');
+        }
     });
 
-    it('returns empty creature list when combat summary has no creatures property', async () => {
-        combatData.getCombatSummary.mockReturnValue({});
+    it('returns empty creatureTargets when combat summary is missing or has no creatures', async () => {
+        for (const summary of [null, undefined, {}]) {
+            combatData.getCombatSummary.mockReturnValue(summary);
 
-        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, []);
+            const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, []);
 
-        expect(result.payload.creatureTargets).toEqual([]);
+            expect(result.payload.creatureTargets).toEqual([]);
+        }
     });
 
-    it('resolves map positions when mapName is provided', async () => {
+    it('resolves and forwards attacker position when a map is supplied', async () => {
         targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 1, gridY: 2 } });
-        combatData.getCombatSummary.mockReturnValue({ creatures: [] });
 
         const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, 'test-map', []);
 
         expect(targetResolver.resolveMapPositions).toHaveBeenCalledWith(CAMPAIGN_NAME, 'test-map', PLAYER_NAME);
         expect(result.payload.attackerPos).toEqual({ gridX: 1, gridY: 2 });
-    });
 
-    it('sets attackerPos to null when resolveMapPositions resolves to null', async () => {
+        // Resolver finding no position must not break the popup.
         targetResolver.resolveMapPositions.mockResolvedValue(null);
-        combatData.getCombatSummary.mockReturnValue({ creatures: [] });
 
-        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, 'test-map', []);
+        const withoutPos = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, 'test-map', []);
 
-        expect(result.payload.attackerPos).toBeNull();
-    });
-
-    it('uses spell range/duration when present, falls back to defaults when absent', async () => {
-        combatData.getCombatSummary.mockReturnValue({ creatures: [] });
-
-        const result = await handle(
-            makeAction({ spell: { range: '60 feet', duration: '1 minute' } }),
-            makePlayerStats(),
-            CAMPAIGN_NAME,
-            null,
-            [],
-        );
-
-        expect(result.payload.range).toBe('60 feet');
-        expect(result.payload.duration).toBe('1 minute');
-    });
-
-    it('uses defaults when action has no spell property', async () => {
-        combatData.getCombatSummary.mockReturnValue({ creatures: [] });
-
-        const result = await handle({ name: 'Death Ward' }, makePlayerStats(), CAMPAIGN_NAME, null, []);
-
-        expect(result.payload.range).toBe('Touch');
-        expect(result.payload.duration).toBe('8 hours');
-    });
-
-    it('uses defaults when action.spell is null', async () => {
-        combatData.getCombatSummary.mockReturnValue({ creatures: [] });
-
-        const result = await handle({ name: 'Death Ward', spell: null }, makePlayerStats(), CAMPAIGN_NAME, null, []);
-
-        expect(result.payload.range).toBe('Touch');
-        expect(result.payload.duration).toBe('8 hours');
-    });
-
-    it('defaults rangeFt to 0 when range string is unparseable', async () => {
-        rangeValidation.rangeToFeet.mockReturnValue(0);
-        combatData.getCombatSummary.mockReturnValue({ creatures: [] });
-
-        const result = await handle(makeAction({ spell: { range: 'invalid' } }), makePlayerStats(), CAMPAIGN_NAME, null, []);
-
-        expect(result.payload.rangeFt).toBe(0);
+        expect(withoutPos.payload.attackerPos).toBeNull();
     });
 });
 
@@ -178,39 +149,21 @@ describe('deathWardHandler.applyDeathWard', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         logService.addEntry.mockResolvedValue(undefined);
+        emptyBuffs();
     });
 
-    it('returns null when targetNames is null', async () => {
-        const result = await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, null);
-        expect(result).toBeNull();
+    it('returns null for missing, empty, or non-array targetNames', async () => {
+        for (const targetNames of [null, undefined, [], 'Fighter1']) {
+            const result = await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, targetNames);
+
+            expect(result).toBeNull();
+        }
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('returns null when targetNames is undefined', async () => {
-        const result = await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, undefined);
-        expect(result).toBeNull();
-    });
-
-    it('returns null when targetNames is an empty array', async () => {
-        const result = await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, []);
-        expect(result).toBeNull();
-    });
-
-    it('returns null when targetNames is not an array', async () => {
-        const result = await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, 'Fighter1');
-        expect(result).toBeNull();
-    });
-
-    it('adds death_ward buff to target', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_charName, key, _campaign) => {
-            if (key === 'activeBuffs') return [];
-            return undefined;
-        });
-
+    it('adds a death_ward buff to the target and returns automation_info popup', async () => {
         const result = await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Fighter1']);
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.name).toBe('Death Ward');
         expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('Fighter1', 'activeBuffs', CAMPAIGN_NAME);
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
             'Fighter1',
@@ -225,156 +178,82 @@ describe('deathWardHandler.applyDeathWard', () => {
             ]),
             CAMPAIGN_NAME,
         );
-    });
-
-    it('logs ability_use entry for each target', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_charName, key, _campaign) => {
-            if (key === 'activeBuffs') return [];
-            return undefined;
-        });
-
-        await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Fighter1']);
-
-        expect(logService.addEntry).toHaveBeenCalledWith(
-            CAMPAIGN_NAME,
-            expect.objectContaining({
-                type: 'ability_use',
-                characterName: PLAYER_NAME,
-                abilityName: 'Death Ward',
-                description: expect.stringContaining('Death Ward'),
-            }),
-        );
-    });
-
-    it('does not add duplicate buff if already active', async () => {
-        const existingBuff = {
-            name: 'Death Ward',
-            effect: 'death_ward',
-            duration: '8 hours',
-            sourceCharacter: 'OtherCleric',
-        };
-        runtimeState.getRuntimeValue.mockImplementation((_charName, key, _campaign) => {
-            if (key === 'activeBuffs') return [existingBuff];
-            return undefined;
-        });
-
-        const result = await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Fighter1']);
-
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(result.payload.name).toBe('Death Ward');
+        expect(result.payload.description).toBe('Fighter1 gained Death Ward protection from Death Ward.');
     });
 
-    it('handles target with null activeBuffs value', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_charName, key, _campaign) => {
-            if (key === 'activeBuffs') return null;
-            return undefined;
+    it('logs an ability_use entry with exact description per target', async () => {
+        await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Fighter1', 'Ranger1']);
+
+        expect(logService.addEntry).toHaveBeenCalledTimes(2);
+        const logCalls = logService.addEntry.mock.calls;
+        expect(logCalls[0][0]).toBe(CAMPAIGN_NAME);
+        expect(logCalls[0][1]).toEqual({
+            type: 'ability_use',
+            characterName: PLAYER_NAME,
+            abilityName: 'Death Ward',
+            description: `${PLAYER_NAME} cast Death Ward on Fighter1. Target is protected from death.`,
         });
-
-        const result = await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Fighter1']);
-
-        expect(result.type).toBe('popup');
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Fighter1',
-            'activeBuffs',
-            expect.arrayContaining([expect.objectContaining({ name: 'Death Ward' })]),
-            CAMPAIGN_NAME,
-        );
+        expect(logCalls[1][1].description).toBe(`${PLAYER_NAME} cast Death Ward on Ranger1. Target is protected from death.`);
     });
 
-    it('handles target with non-array activeBuffs value', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_charName, key, _campaign) => {
-            if (key === 'activeBuffs') return 'invalid';
-            return undefined;
-        });
-
-        const result = await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Fighter1']);
-
-        expect(result.type).toBe('popup');
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Fighter1',
-            'activeBuffs',
-            expect.arrayContaining([expect.objectContaining({ name: 'Death Ward' })]),
-            CAMPAIGN_NAME,
-        );
-    });
-
-    it('applies to new targets and skips duplicates in multi-target call', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name) => {
-            if (name === 'Fighter1') return [{ name: 'Death Ward', effect: 'death_ward' }];
-            return [];
+    it('skips targets that already have Death Ward but still logs the cast', async () => {
+        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+            if (name === 'Fighter1' && key === 'activeBuffs') {
+                return [{ name: 'Death Ward', effect: 'death_ward', sourceCharacter: 'OtherCleric' }];
+            }
+            return key === 'activeBuffs' ? [] : undefined;
         });
 
         const result = await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Fighter1', 'Ranger1']);
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('2 targets');
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Ranger1', 'activeBuffs', expect.any(Array), CAMPAIGN_NAME);
         expect(logService.addEntry).toHaveBeenCalledTimes(2);
-    });
-
-    it('reports correct target count in description for multiple targets', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_charName, key, _campaign) => {
-            if (key === 'activeBuffs') return [];
-            return undefined;
-        });
-
-        const result = await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Fighter1', 'Ranger1']);
-
         expect(result.payload.description).toContain('2 targets');
-        expect(result.payload.description).toContain('Fighter1');
-        expect(result.payload.description).toContain('Ranger1');
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Fighter1', 'activeBuffs', expect.anything(), CAMPAIGN_NAME);
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Ranger1', 'activeBuffs', expect.anything(), CAMPAIGN_NAME);
+        expect(result.payload.description).toContain('Fighter1, Ranger1');
     });
 
-    it('uses action name in description when spell property is absent', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_charName, key, _campaign) => {
-            if (key === 'activeBuffs') return [];
-            return undefined;
-        });
+    it('coerces null or non-array activeBuffs to a list before appending', async () => {
+        for (const corrupt of [null, 'invalid', 0]) {
+            runtimeState.getRuntimeValue.mockImplementation((_name, key) =>
+                key === 'activeBuffs' ? corrupt : undefined);
 
-        const action = { name: 'Death Ward' };
+            const result = await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Fighter1']);
 
-        const result = await applyDeathWard(action, makePlayerStats(), CAMPAIGN_NAME, null, ['Fighter1']);
-
-        expect(result.payload.description).toContain('Death Ward');
+            expect(result.type).toBe('popup');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                'Fighter1',
+                'activeBuffs',
+                [expect.objectContaining({ name: 'Death Ward', effect: 'death_ward' })],
+                CAMPAIGN_NAME,
+            );
+            runtimeState.setRuntimeValue.mockClear();
+        }
     });
 
-    it('uses duration from spell when present', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_charName, key, _campaign) => {
-            if (key === 'activeBuffs') return [];
-            return undefined;
-        });
-
+    it('uses spell duration when present and defaults to 8 hours without a spell', async () => {
         await applyDeathWard(
             makeAction({ spell: { duration: '1 hour' } }),
-            makePlayerStats(),
-            CAMPAIGN_NAME,
-            null,
-            ['Fighter1'],
+            makePlayerStats(), CAMPAIGN_NAME, null, ['Fighter1'],
         );
-
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
             'Fighter1',
             'activeBuffs',
             expect.arrayContaining([expect.objectContaining({ duration: '1 hour' })]),
             CAMPAIGN_NAME,
         );
-    });
 
-    it('logs with correct description for each target individually', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((_charName, key, _campaign) => {
-            if (key === 'activeBuffs') return [];
-            return undefined;
-        });
-
-        await applyDeathWard(makeAction(), makePlayerStats(), CAMPAIGN_NAME, null, ['Fighter1', 'Ranger1']);
-
-        const logCalls = logService.addEntry.mock.calls;
-        expect(logCalls[0][1].description).toBe(`${PLAYER_NAME} cast Death Ward on Fighter1. Target is protected from death.`);
-        expect(logCalls[1][1].description).toBe(`${PLAYER_NAME} cast Death Ward on Ranger1. Target is protected from death.`);
+        const result = await applyDeathWard({ name: 'Death Ward' }, makePlayerStats(), CAMPAIGN_NAME, null, ['Ranger1']);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'Ranger1',
+            'activeBuffs',
+            expect.arrayContaining([expect.objectContaining({ duration: '8 hours' })]),
+            CAMPAIGN_NAME,
+        );
+        expect(result.payload.name).toBe('Death Ward');
     });
 });
 
@@ -385,79 +264,30 @@ describe('deathWardHandler.isDeathWardActive', () => {
         vi.clearAllMocks();
     });
 
-    it('returns true when death_ward buff is active', () => {
+    it('returns true when a Death Ward / death_ward buff is active', () => {
         runtimeState.getRuntimeValue.mockReturnValue([
+            { name: 'Mage Armor', effect: 'mage_armor' },
             { name: 'Death Ward', effect: 'death_ward', duration: '8 hours' },
         ]);
 
-        const result = isDeathWardActive(PLAYER_NAME, CAMPAIGN_NAME);
-
-        expect(result).toBe(true);
+        expect(isDeathWardActive(PLAYER_NAME, CAMPAIGN_NAME)).toBe(true);
+        expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(PLAYER_NAME, 'activeBuffs', CAMPAIGN_NAME);
     });
 
-    it('returns false when no death_ward buff exists', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Mage Armor', effect: 'mage_armor' },
-        ]);
-
-        const result = isDeathWardActive(PLAYER_NAME, CAMPAIGN_NAME);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns false when buff has different effect type', () => {
+    it('requires both name AND effect to match', () => {
         runtimeState.getRuntimeValue.mockReturnValue([
             { name: 'Death Ward', effect: 'shield_of_faith' },
-        ]);
-
-        const result = isDeathWardActive(PLAYER_NAME, CAMPAIGN_NAME);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns false when buff has same effect but different name', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
             { name: 'Some Other Buff', effect: 'death_ward' },
         ]);
 
-        const result = isDeathWardActive(PLAYER_NAME, CAMPAIGN_NAME);
-
-        expect(result).toBe(false);
+        expect(isDeathWardActive(PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
     });
 
-    it('returns false when no buffs exist', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([]);
+    it('returns false for empty, missing, or malformed buff lists', () => {
+        for (const stored of [[], null, undefined, 'invalid', [{ name: 'Mage Armor', effect: 'mage_armor' }]]) {
+            runtimeState.getRuntimeValue.mockReturnValue(stored);
 
-        const result = isDeathWardActive(PLAYER_NAME, CAMPAIGN_NAME);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns false when activeBuffs is null', () => {
-        runtimeState.getRuntimeValue.mockReturnValue(null);
-
-        const result = isDeathWardActive(PLAYER_NAME, CAMPAIGN_NAME);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns false when activeBuffs is a non-array value', () => {
-        runtimeState.getRuntimeValue.mockReturnValue('invalid');
-
-        const result = isDeathWardActive(PLAYER_NAME, CAMPAIGN_NAME);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns true when death_ward is among multiple buffs', () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-            { name: 'Mage Armor', effect: 'mage_armor' },
-            { name: 'Death Ward', effect: 'death_ward', duration: '8 hours' },
-            { name: 'Bless', effect: 'bless' },
-        ]);
-
-        const result = isDeathWardActive(PLAYER_NAME, CAMPAIGN_NAME);
-
-        expect(result).toBe(true);
+            expect(isDeathWardActive(PLAYER_NAME, CAMPAIGN_NAME)).toBe(false);
+        }
     });
 });

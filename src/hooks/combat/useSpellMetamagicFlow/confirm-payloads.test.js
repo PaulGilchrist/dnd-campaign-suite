@@ -1,34 +1,36 @@
+// @maintained-by-ai: 2026-10-15
+// Folder-confirm-payloads AUTHORITY: every popup-bearing confirm lane of the full
+// useSpellMetamagicFlow hook, exercised end-to-end (gateMetamagic → pending →
+// confirm → setPopupHtml). Levels/ranges are pinned against spells.json (RAW).
+// Deep per-handler internals (slot payment, target threading, rider stamps) live
+// in the per-handler folder lanes (useCustomHandlers.* / useSimpleSpellHandlers.*
+// / useTwoStageHandlers.* .test.js); this file stays breadth: one table row per
+// popup lane, exact-payload pins, table-driven.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from '../useSpellMetamagicFlow.js';
-import { getMultiTargetSpreadForSpell } from '../../../services/rules/spells/postCastRiderService.js';
 
-// ── Minimal mocking strategy ──────────────────────────────────────────────────
-// This test file only verifies that confirm handlers call setPopupHtml with the
-// expected payload string or object. We mock only the modules that those handlers
-// actually import and return controlled popup objects. Unrelated modules (e.g.
-// holdMonster, charmPerson, animalShapes) are mocked with no-ops so they never
-// interfere.
+import * as automation from '../../../services/automation/index.js';
+import { triggerFaerieFire } from '../../../services/rules/features/faerieFireService.js';
+import { triggerHeal } from '../../../services/rules/features/healService.js';
+import { triggerForesight } from '../../../services/rules/features/foresightService.js';
+import { triggerBanishment } from '../../../services/rules/features/banishmentService.js';
+import { triggerRevivify } from '../../../services/rules/features/revivifyService.js';
+import { triggerHealingWord } from '../../../services/rules/features/healingWordService.js';
+import { confirmRemoveCurse } from '../../../services/rules/features/removeCurseService.js';
+import { confirmRegenerate } from '../../../services/rules/features/regenerateService.js';
+import { applyPolymorph } from '../../../services/automation/handlers/spells/polymorphService.js';
+import { applyTruePolymorph } from '../../../services/automation/handlers/spells/truePolymorphService.js';
+import { prepareSpellCast } from '../../../services/rules/spells/spellPreparationService.js';
 
-vi.mock('./useMetamagic.js', () => ({
-  getCurrentSorceryPoints: vi.fn(() => 5),
-  getMaxSorceryPoints: vi.fn(() => 10),
-  spendSorceryPoints: vi.fn(),
-  logMetamagicUse: vi.fn(),
-}));
+// ── Mocking strategy ─────────────────────────────────────────────────────────
+// Mock the full module graph the gated confirm lanes touch, but keep every mock
+// a bare vi.fn() — the payload a lane emits is declared on its row in POPUP_CASES
+// (wired via mockResolvedValueOnce), never baked into the mock. NO_POPUP lanes
+// resolve a payload anyway to prove the runner discards it by design.
 
 vi.mock('../../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../../services/npcs/monsterUtils.js', () => ({
-  getMonsterData: vi.fn(() => Promise.resolve({ type: 'beast' })),
-}));
-
-vi.mock('../../../services/rules/spells/postCastRiderService.js', () => ({
-  getMultiTargetSpreadForSpell: vi.fn(() => null),
-  // CLA-033: fired by the gated confirm lane's rider seam in useConfirmableFlow.
-  triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../../services/encounters/combatData.js', () => ({
@@ -36,15 +38,18 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
     creatures: [
       { name: 'Goblin A' },
       { name: 'Goblin B' },
-      // Dead so the SP-100 Revivify dead-target gate arms pending.
-      { name: 'Goblin C', type: 'monster', currentHp: 0 },
+      // Goblin C sits at 0 HP with fresh death saves: it arms BOTH the SP-100
+      // Revivify dead-target gate and the SP-110 Spare-the-Dying dying gate.
+      { name: 'Goblin C', type: 'monster', currentHp: 0, deathSaves: [] },
     ],
   })),
 }));
 
-vi.mock('../../../services/rules/spells/metamagicRules.js', () => ({
-  isPsionicSpell: vi.fn(() => false),
-  hasPsionicSorcery: vi.fn(() => false),
+// CLA-033/CLA-037 rider seam — fired centrally by every createConfirmHandler.
+vi.mock('../../../services/rules/spells/postCastRiderService.js', () => ({
+  getMultiTargetSpreadForSpell: vi.fn(() => null),
+  triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
+  triggerBewitchingMagic: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../../services/rules/spells/materialComponents.js', () => ({
@@ -57,7 +62,6 @@ vi.mock('../../../services/rules/spells/materialComponents.js', () => ({
 vi.mock('../../../services/rules/spells/spellPreparationService.js', () => ({
   prepareSpellCast: vi.fn(() => Promise.resolve({ modifiedSpell: {}, metaCtx: {} })),
   isFreeCastAuthorized: vi.fn(() => false),
-  isWizardRitualAdeptSpell: vi.fn(() => false),
   incrementFreeCastResource: vi.fn(),
 }));
 
@@ -66,262 +70,210 @@ vi.mock('../../runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
+// gateAnimalShapes ally resolution.
 vi.mock('../../useAllySelection.js', () => ({
   getAllyList: vi.fn((casterName) => [casterName.toLowerCase(), 'goblin a', 'goblin b']),
 }));
 
-// Automation index — each handler that needs a popup result gets a controlled
-// return value. Handlers that don't produce popups get null.
+// Automation index — full named surface so every flow module's imports resolve.
 vi.mock('../../../services/automation/index.js', () => ({
   applyAidEffect: vi.fn(),
   applyHeroesFeastEffect: vi.fn(),
   applyLesserRestorationEffect: vi.fn(),
   applyMageArmorEffect: vi.fn(),
-  applyShieldOfFaithEffect: vi.fn(() => Promise.resolve({ payload: 'shieldOfFaith-popup' })),
-  applyProtectionFromEnergyHandler: vi.fn(),
-  applyProtectionFromPoisonHandler: vi.fn(() => Promise.resolve({ payload: 'protectionFromPoison-popup' })),
-  applyResistanceEffect: vi.fn(),
-  executeHandler: vi.fn(() => Promise.resolve(null)),
-  confirmGreaterRestoration: vi.fn(),
-  applyHolyAuraEffect: vi.fn(() => Promise.resolve(null)),
+  applyProtectionFromEvilAndGood: vi.fn(),
+  applyShieldOfFaithEffect: vi.fn(),
   applyBaneEffect: vi.fn(),
   applyBlessEffect: vi.fn(),
-  applyFaerieFire: vi.fn(() => Promise.resolve(null)),
+  applyBeaconOfHopeEffect: vi.fn(),
+  applyHolyAuraEffect: vi.fn(),
   applyHaste: vi.fn(),
-  applyEnhanceAbilityEffect: vi.fn(() => Promise.resolve(null)),
-  applyBarkskinEffect: vi.fn(() => Promise.resolve({ payload: 'barkskin-popup' })),
   applyInvisibility: vi.fn(),
   applyGreaterInvisibility: vi.fn(),
-  applyFeignDeath: vi.fn(() => Promise.resolve(null)),
-  applyLongstriderEffect: vi.fn(() => Promise.resolve(null)),
-  applySpareTheDyingEffect: vi.fn(() => Promise.resolve(null)),
-  applyPassWithoutTraceEffect: vi.fn(() => Promise.resolve(null)),
-  applyBeaconOfHopeEffect: vi.fn(() => Promise.resolve(null)),
   applyAuraOfLifeEffect: vi.fn(),
   applyAuraOfPurityEffect: vi.fn(),
-  applyCircleOfPowerEffect: vi.fn(() => Promise.resolve({ payload: 'circleOfPower-popup' })),
-  applyCompulsionEffect: vi.fn(() => Promise.resolve(null)),
-  applyAuraOfVitalityEffect: vi.fn(() => Promise.resolve({ payload: 'auraOfVitality-popup' })),
-  applyDeathWardEffect: vi.fn(() => Promise.resolve({ payload: 'deathWard-popup' })),
-  applyHeroism: vi.fn(() => Promise.resolve({ payload: 'heroism-popup' })),
-  applyProtectionFromEvilAndGood: vi.fn(),
-  applyStoneSkinHandler: vi.fn(() => Promise.resolve({ payload: 'stoneSkin-popup' })),
-  handleSanctuary: vi.fn(() => Promise.resolve({ payload: 'sanctuary-popup' })),
-}));
-
-vi.mock('../../../services/rules/features/greaterRestorationService.js', () => ({
-  confirmGreaterRestoration: vi.fn(),
-}));
-
-vi.mock('../../../services/rules/features/removeCurseService.js', () => ({
-  confirmRemoveCurse: vi.fn(() => Promise.resolve({ payload: 'removeCurse-popup' })),
-}));
-
-vi.mock('../../../services/rules/features/regenerateService.js', () => ({
-  confirmRegenerate: vi.fn(() => Promise.resolve({ payload: 'regenerate-popup' })),
-}));
-
-vi.mock('../../../services/rules/features/foresightService.js', () => ({
-  triggerForesight: vi.fn(() => Promise.resolve({ payload: 'foresight-popup' })),
-}));
-
-vi.mock('../../../services/rules/features/holdMonsterService.js', () => ({
-  triggerHoldMonster: vi.fn(),
-}));
-
-vi.mock('../../../services/rules/features/charmPersonService.js', () => ({
-  triggerCharmPerson: vi.fn(),
-}));
-
-vi.mock('../../../services/rules/features/charmMonsterService.js', () => ({
-  triggerCharmMonster: vi.fn(),
-}));
-
-vi.mock('../../../services/rules/features/banishmentService.js', () => ({
-  triggerBanishment: vi.fn(() => Promise.resolve({ payload: 'banishment-popup' })),
+  applyCircleOfPowerEffect: vi.fn(),
+  applyCompulsionEffect: vi.fn(),
+  applyAuraOfVitalityEffect: vi.fn(),
+  applyDeathWardEffect: vi.fn(),
+  applyFeignDeath: vi.fn(),
+  applyHeroism: vi.fn(),
+  applyLongstriderEffect: vi.fn(),
+  applySpareTheDyingEffect: vi.fn(),
+  applyEnhanceAbilityEffect: vi.fn(),
+  applyResistanceEffect: vi.fn(),
+  applyBarkskinEffect: vi.fn(),
+  applyPassWithoutTraceEffect: vi.fn(),
+  applyProtectionFromPoisonHandler: vi.fn(),
+  applyStoneSkinHandler: vi.fn(),
+  handleSanctuary: vi.fn(),
+  executeHandler: vi.fn(),
 }));
 
 vi.mock('../../../services/rules/features/faerieFireService.js', () => ({
-  triggerFaerieFire: vi.fn(() => Promise.resolve(null)),
+  triggerFaerieFire: vi.fn(),
 }));
-
 vi.mock('../../../services/rules/features/healService.js', () => ({
   triggerHeal: vi.fn(),
 }));
-
-vi.mock('../../../services/rules/features/healingWordService.js', () => ({
-  triggerHealingWord: vi.fn(() => Promise.resolve(null)),
+vi.mock('../../../services/rules/features/foresightService.js', () => ({
+  triggerForesight: vi.fn(),
 }));
-
+vi.mock('../../../services/rules/features/holdMonsterService.js', () => ({
+  triggerHoldMonster: vi.fn(),
+}));
+vi.mock('../../../services/rules/features/charmPersonService.js', () => ({
+  triggerCharmPerson: vi.fn(),
+}));
+vi.mock('../../../services/rules/features/charmMonsterService.js', () => ({
+  triggerCharmMonster: vi.fn(),
+}));
+vi.mock('../../../services/rules/features/banishmentService.js', () => ({
+  triggerBanishment: vi.fn(),
+}));
 vi.mock('../../../services/rules/features/revivifyService.js', () => ({
-  triggerRevivify: vi.fn(() => Promise.resolve({ payload: 'revivify-popup' })),
+  triggerRevivify: vi.fn(),
+}));
+vi.mock('../../../services/rules/features/healingWordService.js', () => ({
+  triggerHealingWord: vi.fn(),
+}));
+vi.mock('../../../services/rules/features/greaterRestorationService.js', () => ({
+  confirmGreaterRestoration: vi.fn(),
+}));
+vi.mock('../../../services/rules/features/removeCurseService.js', () => ({
+  confirmRemoveCurse: vi.fn(),
+}));
+vi.mock('../../../services/rules/features/regenerateService.js', () => ({
+  confirmRegenerate: vi.fn(),
 }));
 
 vi.mock('../../../services/automation/handlers/spells/polymorphService.js', () => ({
-  applyPolymorph: vi.fn(() => Promise.resolve(null)),
+  applyPolymorph: vi.fn(),
 }));
-
 vi.mock('../../../services/automation/handlers/spells/animalShapesService.js', () => ({
   applyAnimalShapes: vi.fn(() => Promise.resolve({ ok: false })),
 }));
-
 vi.mock('../../../services/automation/handlers/spells/truePolymorphService.js', () => ({
-  applyTruePolymorph: vi.fn(() => Promise.resolve({ payload: 'true-polymorph-popup' })),
+  applyTruePolymorph: vi.fn(),
 }));
 
-global.fetch = vi.fn((url) => {
-  if (url && url.includes('combat-summary')) {
-    return Promise.resolve({
-      ok: true,
-      json: () => Promise.resolve({ creatures: [] }),
-    });
-  }
-  return Promise.resolve({
-    ok: true,
-    status: 200,
-    json: () => Promise.resolve({}),
-    text: () => Promise.resolve(''),
-  });
-});
-
-Object.defineProperty(window, 'dispatchEvent', {
-  value: vi.fn(),
-  writable: true,
-});
+// Hermetic guard: nothing on these lanes should reach the network.
+global.fetch = vi.fn(() =>
+  Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}), text: () => Promise.resolve('') })
+);
 
 // ── Factories ──────────────────────────────────────────────────────────────────
 
-function makePlayerStats(overrides = {}) {
-  return {
-    name: 'TestSorcerer',
-    class: { name: 'Sorcerer' },
-    level: 5,
-    ...overrides,
-  };
-}
-
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Fireball',
-    level: 3,
-    casting_time: '1 Action',
-    range: '150 ft.',
-    ...overrides,
-  };
-}
-
-// ── Shared test setup helper ───────────────────────────────────────────────────
-// Renders the hook, gates the spell, and returns the result + setPopupHtml spy.
-// Callers invoke confirm handlers on `result` directly.
-
-function renderWithSpell(spellName, spellLevel, overrides = {}) {
+function renderWithSpell(spellName, level, overrides = {}) {
   const setPopupHtml = vi.fn();
+  const onExecute = vi.fn();
+  const spell = { name: spellName, level, casting_time: '1 Action', range: 'Touch', ...overrides };
   const { result } = renderHook(() =>
-    useSpellMetamagicFlow({ playerStats: makePlayerStats(), campaignName: 'test-campaign', onExecute: vi.fn(), setSecondaryTargetModal: null, characters: [], setPopupHtml: setPopupHtml })
+    useSpellMetamagicFlow({
+      playerStats: { name: 'TestSorcerer', class: { name: 'Sorcerer' }, level: 17 },
+      campaignName: 'test-campaign',
+      onExecute,
+      setSecondaryTargetModal: null,
+      characters: [],
+      setPopupHtml,
+    })
   );
   act(() => {
-    result.current.gateMetamagic(makeSpell({ name: spellName, level: spellLevel, ...overrides }));
+    result.current.gateMetamagic(spell);
   });
-  return { result, setPopupHtml };
+  return { result, setPopupHtml, onExecute };
 }
+
+// One row per popup lane: RAW level/range (spells.json), the exported confirm
+// handler, the lane's terminal apply fn, what it resolves, and the exact payload
+// setPopupHtml must receive. popup: NO_POPUP → the lane discards the apply
+// result by design (resolved still carries a payload to prove the discard).
+const NO_POPUP = Symbol('no-popup');
+
+const POPUP_CASES = [
+  // triggerSpell lanes (features/)
+  { spell: 'Banishment', level: 4, range: '60 feet', handler: 'handleBanishmentConfirm', arg: ['Goblin A'], apply: triggerBanishment, popup: 'banishment-popup' },
+  { spell: 'Faerie Fire', level: 1, range: '60 feet', handler: 'handleFaerieFireConfirm', arg: ['Goblin A'], apply: triggerFaerieFire, popup: 'faerie-fire-popup' },
+  // applySpell lanes (automation/) with showPopup wiring
+  { spell: 'Holy Aura', level: 8, range: 'Self', handler: 'handleHolyAuraConfirm', arg: ['Goblin A'], apply: automation.applyHolyAuraEffect, popup: 'holyAura-popup' },
+  { spell: 'Feign Death', level: 3, range: 'Touch', handler: 'handleFeignDeathConfirm', arg: ['Goblin A'], apply: automation.applyFeignDeath, popup: 'feignDeath-popup' },
+  { spell: 'Longstrider', level: 1, range: 'Touch', handler: 'handleLongstriderConfirm', arg: ['Goblin A'], apply: automation.applyLongstriderEffect, popup: 'longstrider-popup' },
+  { spell: 'Beacon of Hope', level: 3, range: '30 feet', handler: 'handleBeaconOfHopeConfirm', arg: ['Goblin A'], apply: automation.applyBeaconOfHopeEffect, popup: 'beaconOfHope-popup' },
+  { spell: 'Spare the Dying', level: 0, range: '15 feet', handler: 'handleSpareTheDyingConfirm', arg: ['Goblin C'], apply: automation.applySpareTheDyingEffect, popup: 'spareTheDying-popup' },
+  { spell: 'Death Ward', level: 4, range: 'Touch', handler: 'handleDeathWardConfirm', arg: ['Goblin A'], apply: automation.applyDeathWardEffect, popup: 'deathWard-popup' },
+  { spell: 'Heroism', level: 1, range: 'Touch', handler: 'handleHeroismConfirm', arg: ['Goblin A'], apply: automation.applyHeroism, popup: 'heroism-popup' },
+  { spell: 'Circle of Power', level: 5, range: 'Self', handler: 'handleCircleOfPowerConfirm', arg: ['Goblin A'], apply: automation.applyCircleOfPowerEffect, popup: 'circleOfPower-popup' },
+  { spell: 'Compulsion', level: 4, range: '30 feet', handler: 'handleCompulsionConfirm', arg: ['Goblin A'], apply: automation.applyCompulsionEffect, popup: 'compulsion-popup' },
+  { spell: 'Aura of Vitality', level: 3, range: 'Self', handler: 'handleAuraOfVitalityConfirm', arg: ['Goblin A'], apply: automation.applyAuraOfVitalityEffect, popup: 'auraOfVitality-popup' },
+  // confirm-service lanes
+  { spell: 'Remove Curse', level: 3, range: 'Touch', handler: 'handleRemoveCurseConfirm', arg: ['Goblin A'], apply: confirmRemoveCurse, popup: 'removeCurse-popup' },
+  { spell: 'Foresight', level: 9, range: 'Touch', handler: 'handleForesightConfirm', arg: ['Goblin A'], apply: triggerForesight, popup: 'foresight-popup' },
+  { spell: 'Regenerate', level: 7, range: 'Touch', handler: 'handleRegenerateConfirm', arg: { targetName: 'Goblin A' }, apply: confirmRegenerate, popup: 'regenerate-popup' },
+  // object-target lane behind the SP-100 dead-target gate (and its rollback guard)
+  { spell: 'Revivify', level: 3, range: 'Touch', handler: 'handleRevivifyConfirm', arg: { targetName: 'Goblin C' }, apply: triggerRevivify, popup: 'revivify-popup' },
+  // polymorph lane
+  { spell: 'Polymorph', level: 4, range: '60 feet', handler: 'handlePolymorphConfirm', arg: ['Goblin A'], apply: applyPolymorph, popup: 'polymorph-popup' },
+  // custom-handler lanes (pay-at-confirm chooser family)
+  { spell: 'Protection from Poison', level: 2, range: 'Touch', handler: 'handleProtectionFromPoisonConfirm', arg: ['Goblin A'], apply: automation.applyProtectionFromPoisonHandler, popup: 'protectionFromPoison-popup' },
+  { spell: 'Barkskin', level: 2, range: 'Touch', handler: 'handleBarkskinConfirm', arg: ['Goblin A'], apply: automation.applyBarkskinEffect, popup: 'barkskin-popup' },
+  { spell: 'Stone Skin', level: 4, range: 'Touch', handler: 'handleStoneSkinConfirm', arg: ['Goblin A'], apply: automation.applyStoneSkinHandler, popup: 'stoneSkin-popup' },
+  // string-target lane
+  { spell: 'Sanctuary', level: 1, range: '30 feet', handler: 'handleSanctuaryConfirm', arg: ['Goblin A'], apply: automation.handleSanctuary, popup: 'sanctuary-popup' },
+  // executeHandler lanes (runConfusion shows; the globe/forcecage/antimagic twins
+  // route through their own area-handler callbacks which also surface the payload)
+  { spell: 'Confusion', level: 4, range: '90 feet', handler: 'handleConfusionConfirm', arg: ['Goblin A'], apply: automation.executeHandler, popup: 'confusion-popup' },
+  { spell: 'Globe of Invulnerability', level: 6, range: 'Self', handler: 'handleGlobeConfirm', arg: ['Goblin A'], apply: automation.executeHandler, popup: 'globe-popup' },
+  { spell: 'Forcecage', level: 7, range: '100 feet', handler: 'handleForcecageConfirm', arg: ['Goblin A'], apply: automation.executeHandler, popup: 'forcecage-popup' },
+  { spell: 'Antimagic Field', level: 8, range: 'Self', handler: 'handleAntimagicFieldConfirm', arg: ['Goblin A'], apply: automation.executeHandler, popup: 'antimagic-popup' },
+  // healing-word object payload (buildHealingWordPopup shape)
+  {
+    spell: 'Healing Word', level: 1, range: '60 feet', handler: 'handleHealingWordConfirm', arg: { targetName: 'Goblin A' },
+    apply: triggerHealingWord,
+    resolved: { formula: '1d4+2', rolls: [3], rawTotal: 5, healAmount: 5, targetName: 'Goblin A', bonusHeal: 2, bonusDetails: [{ amount: 2, name: 'Tavern Heal' }] },
+    popup: expect.objectContaining({ type: 'heal', name: 'Healing Word', formula: '1d4+2', total: 5, finalHeal: 5, bonusHeal: 2, bonusHealDetail: '2 Tavern Heal' }),
+  },
+  // NO_POPUP lanes — spec deliberately omits showPopup wiring (or the runner
+  // discards the result): a payload from apply must never reach setPopupHtml.
+  // (Shield of Faith has no chooser gate — its cast queues generic metamagic —
+  // so its unprompted confirm lane is not armable from gateMetamagic.)
+  { spell: 'Bane', level: 1, range: '30 feet', handler: 'handleBaneConfirm', arg: ['Goblin A'], apply: automation.applyBaneEffect, popup: NO_POPUP },
+  { spell: 'Heal', level: 6, range: '60 feet', handler: 'handleHealConfirm', arg: { targetName: 'Goblin A' }, apply: triggerHeal, popup: NO_POPUP },
+  { spell: 'Web', level: 2, range: '60 feet', handler: 'handleWebConfirm', arg: ['Goblin A'], apply: automation.executeHandler, popup: NO_POPUP },
+];
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
-describe('useSpellMetamagicFlow — confirm handlers set popup html', () => {
+describe('useSpellMetamagicFlow — confirm payload authority', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getMultiTargetSpreadForSpell.mockReturnValue(null);
   });
 
-  // ── Array-target handlers (standard createConfirmHandler) ────────────────
-
-  describe('array-target handlers', () => {
-    const cases = [
-      { spell: 'Banishment', level: 4, handler: 'handleBanishmentConfirm', arg: [['Goblin A']], payload: 'banishment-popup' },
-      { spell: 'Polymorph', level: 4, handler: 'handlePolymorphConfirm', arg: [['Goblin A']], payload: 'polymorph-popup', overridePolymorph: { payload: 'polymorph-popup' } },
-      { spell: 'Protection from Poison', level: 2, handler: 'handleProtectionFromPoisonConfirm', arg: [['Goblin A']], payload: 'protectionFromPoison-popup' },
-      { spell: 'Remove Curse', level: 3, handler: 'handleRemoveCurseConfirm', arg: [['Goblin A']], payload: 'removeCurse-popup' },
-      { spell: 'Foresight', level: 9, handler: 'handleForesightConfirm', arg: [['Goblin A']], payload: 'foresight-popup' },
-      { spell: 'Death Ward', level: 4, handler: 'handleDeathWardConfirm', arg: [['Goblin A']], payload: 'deathWard-popup' },
-      { spell: 'Heroism', level: 2, handler: 'handleHeroismConfirm', arg: [['Goblin A']], payload: 'heroism-popup' },
-      { spell: 'Barkskin', level: 2, handler: 'handleBarkskinConfirm', arg: [['Goblin A']], payload: 'barkskin-popup' },
-      { spell: 'Aura of Vitality', level: 3, handler: 'handleAuraOfVitalityConfirm', arg: [['Goblin A']], payload: 'auraOfVitality-popup' },
-      { spell: 'Circle of Power', level: 7, handler: 'handleCircleOfPowerConfirm', arg: [['Goblin A']], payload: 'circleOfPower-popup' },
-    ];
-
-    for (const c of cases) {
-      it(`calls setPopupHtml(${JSON.stringify(c.payload)}) for ${c.spell}`, async () => {
-        const { result, setPopupHtml } = renderWithSpell(c.spell, c.level);
-
-        if (c.overridePolymorph) {
-          const { applyPolymorph } = await import('../../../services/automation/handlers/spells/polymorphService.js');
-          applyPolymorph.mockResolvedValue(c.overridePolymorph);
-        }
-
-        await act(async () => {
-          await result.current[c.handler](...c.arg);
-        });
-
-        if (c.payload !== null) {
-          expect(setPopupHtml).toHaveBeenCalledWith(c.payload);
-        } else {
-          expect(setPopupHtml).not.toHaveBeenCalled();
-        }
-      });
-    }
-  });
-
-  // ── Object-target handlers (result is { targetName }) ────────────────────
-
-  describe('object-target handlers', () => {
-    const cases = [
-      { spell: 'Revivify', level: 5, handler: 'handleRevivifyConfirm', arg: [{ targetName: 'Goblin A' }], payload: 'revivify-popup' },
-      { spell: 'Regenerate', level: 7, handler: 'handleRegenerateConfirm', arg: [{ targetName: 'Goblin A' }], payload: 'regenerate-popup' },
-    ];
-
-    for (const c of cases) {
-      it(`calls setPopupHtml(${JSON.stringify(c.payload)}) for ${c.spell}`, async () => {
-        const { result, setPopupHtml } = renderWithSpell(c.spell, c.level);
-
-        await act(async () => {
-          await result.current[c.handler](...c.arg);
-        });
-
-        expect(setPopupHtml).toHaveBeenCalledWith(c.payload);
-      });
-    }
-  });
-
-  // ── String-target handlers ───────────────────────────────────────────────
-
-  describe('string-target handlers', () => {
-    it('calls setPopupHtml for Sanctuary with string target', async () => {
-      const { result, setPopupHtml } = renderWithSpell('Sanctuary', 1);
+  for (const c of POPUP_CASES) {
+    const resolved = c.resolved ?? (c.popup === NO_POPUP ? { payload: `${c.handler}-never-shown` } : { payload: c.popup });
+    it(`${c.spell} lv${c.level}: ${c.popup === NO_POPUP ? 'apply runs, no popup' : `popup payload "${typeof c.popup === 'string' ? c.popup : 'object'}"`}`, async () => {
+      const { result, setPopupHtml } = renderWithSpell(c.spell, c.level, { range: c.range });
+      c.apply.mockResolvedValueOnce(resolved);
 
       await act(async () => {
-        await result.current.handleSanctuaryConfirm('Goblin A');
+        await result.current[c.handler](c.arg);
       });
 
-      expect(setPopupHtml).toHaveBeenCalledWith('sanctuary-popup');
+      expect(c.apply).toHaveBeenCalledTimes(1);
+      if (c.popup === NO_POPUP) {
+        expect(setPopupHtml).not.toHaveBeenCalled();
+      } else {
+        expect(setPopupHtml).toHaveBeenCalledWith(c.popup);
+      }
     });
+  }
 
-    it('calls setPopupHtml for Stone Skin with string target', async () => {
-      const { result, setPopupHtml } = renderWithSpell('Stone Skin', 3);
+  // ── Two-stage True Polymorph (path-select pays the lv9 slot; both paths
+  // surface the same applyTruePolymorph payload) ────────────────────────────────
 
-      await act(async () => {
-        await result.current.handleStoneSkinConfirm('Goblin A');
-      });
-
-      expect(setPopupHtml).toHaveBeenCalledWith('stoneSkin-popup');
-    });
-  });
-
-  // ── Two-stage handler (True Polymorph) ───────────────────────────────────
-
-  describe('two-stage True Polymorph handler', () => {
-    it('resolves object_into_creature at path-select (pays slot, no target-confirm needed)', async () => {
-      const { result, setPopupHtml } = renderWithSpell('True Polymorph', 9);
-      const { prepareSpellCast } = await import('../../../services/rules/spells/spellPreparationService.js');
+  describe('two-stage True Polymorph', () => {
+    it('object_into_creature resolves at path-select (pays slot, no target-confirm)', async () => {
+      const { result, setPopupHtml } = renderWithSpell('True Polymorph', 9, { range: '30 feet' });
+      applyTruePolymorph.mockResolvedValueOnce({ payload: 'true-polymorph-popup' });
 
       await act(async () => {
         await result.current.handleTruePolymorphPathSelect('object_into_creature');
@@ -332,14 +284,13 @@ describe('useSpellMetamagicFlow — confirm handlers set popup html', () => {
       expect(result.current.pendingTruePolymorph).toBeNull();
     });
 
-    it('calls setPopupHtml after path select + target confirm for creature_to_creature', async () => {
-      const { result, setPopupHtml } = renderWithSpell('True Polymorph', 9);
-      const { prepareSpellCast } = await import('../../../services/rules/spells/spellPreparationService.js');
+    it('creature_to_creature resolves after path select + target confirm', async () => {
+      const { result, setPopupHtml } = renderWithSpell('True Polymorph', 9, { range: '30 feet' });
+      applyTruePolymorph.mockResolvedValueOnce({ payload: 'true-polymorph-popup' });
 
       await act(async () => {
         result.current.handleTruePolymorphPathSelect('creature_to_creature');
       });
-
       await act(async () => {
         await result.current.handleTruePolymorphTargetConfirm(['Goblin A']);
       });
@@ -350,70 +301,63 @@ describe('useSpellMetamagicFlow — confirm handlers set popup html', () => {
     });
   });
 
-  // ── Area-effect handlers (executeHandler-based with overrides) ───────────
+  // ── Two-stage Resistance (no per-handler lane elsewhere): target→type stages,
+  // per-target apply, result discarded (no popup by design) ─────────────────────
 
-  describe('area-effect handlers with executeHandler overrides', () => {
-    const cases = [
-      { spell: 'Confusion', level: 4, handler: 'handleConfusionConfirm', arg: [['Goblin A']], payload: 'confusion-popup' },
-      { spell: 'Globe of Invulnerability', level: 4, handler: 'handleGlobeConfirm', arg: [['Goblin A']], payload: 'globe-popup' },
-      { spell: 'Forcecage', level: 7, handler: 'handleForcecageConfirm', arg: [['Goblin A']], payload: 'forcecage-popup' },
-      { spell: 'Antimagic Field', level: 4, handler: 'handleAntimagicFieldConfirm', arg: [['Goblin A']], payload: 'antimagic-popup' },
-    ];
+  it('Resistance lv0: target→type two-stage applies per target, shows no popup', async () => {
+    const { result, setPopupHtml } = renderWithSpell('Resistance', 0);
 
-    for (const c of cases) {
-      it(`calls setPopupHtml(${JSON.stringify(c.payload)}) for ${c.spell}`, async () => {
-        const { result, setPopupHtml } = renderWithSpell(c.spell, c.level);
+    expect(result.current.resistanceStage).toBe('target');
+    act(() => {
+      result.current.handleResistanceTargetSelect('Goblin A');
+    });
+    expect(result.current.resistanceStage).toBe('type');
 
-        const { executeHandler } = await import('../../../services/automation/index.js');
-        executeHandler.mockResolvedValue({ payload: c.payload });
+    automation.applyResistanceEffect.mockResolvedValueOnce({ payload: 'resistance-popup' });
+    await act(async () => {
+      await result.current.handleResistanceTypeSelect('Fire');
+    });
 
-        await act(async () => {
-          await result.current[c.handler](...c.arg);
-        });
-
-        expect(setPopupHtml).toHaveBeenCalledWith(c.payload);
-      });
-    }
+    expect(automation.applyResistanceEffect).toHaveBeenCalledTimes(1);
+    expect(setPopupHtml).not.toHaveBeenCalled();
+    expect(result.current.resistanceStage).toBeNull();
   });
 
-  // ── Healing Word — object payload with type field ────────────────────────
+  // ── Animal Shapes first-stage chooser (its own popup object) ────────────────
 
-  describe('healing word partial-match payload', () => {
-    it('calls setPopupHtml with a heal object when triggerHealingWord returns a result', async () => {
-      const { result, setPopupHtml } = renderWithSpell('Healing Word', 1);
+  it('Animal Shapes lv8: target-confirm opens the beast picker payload', async () => {
+    const { result, setPopupHtml } = renderWithSpell('Animal Shapes', 8, { range: '30 feet' });
 
-      const { triggerHealingWord } = await import('../../../services/rules/features/healingWordService.js');
-      triggerHealingWord.mockResolvedValue({
-        formula: '1d4+2',
-        rolls: [3],
-        rawTotal: 5,
-        healAmount: 5,
-        targetName: 'Goblin A',
-        bonusHeal: 2,
-        bonusDetails: [{ amount: 2, name: 'Tavern Heal' }],
-      });
-
-      await act(async () => {
-        await result.current.handleHealingWordConfirm({ targetName: 'Goblin A' });
-      });
-
-      expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-        type: 'heal',
-      }));
+    await act(async () => {
+      await result.current.handleAnimalShapesTargetConfirm(['Goblin A']);
     });
+
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'animal_shapes_target_selection',
+      targets: ['Goblin A'],
+      casterName: 'TestSorcerer',
+      spellLevel: 8,
+      maxCR: 4,
+    }));
+    expect(result.current.pendingAnimalShapes).toBeNull();
   });
 
-  // ── Negative-path: handlers that should NOT produce popups ───────────────
+  // ── Magic Missile distribution (onExecute lane — payload pin at prepareSpellCast) ──
 
-  describe('handlers that produce no popup', () => {
-    it('does not call setPopupHtml when automation returns null', async () => {
-      const { result, setPopupHtml } = renderWithSpell('Bane', 0);
+  it('Magic Missile lv1: confirm threads the dart distribution + paid slot into prepareSpellCast', async () => {
+    const { result, onExecute } = renderWithSpell('Magic Missile', 1, { range: '120 feet' });
+    const distribution = { 'Goblin A': 2, 'Goblin B': 1 };
 
-      await act(async () => {
-        await result.current.handleBaneConfirm(['Goblin A']);
-      });
-
-      expect(setPopupHtml).not.toHaveBeenCalled();
+    await act(async () => {
+      await result.current.handleMagicMissileConfirm({ distribution });
     });
+
+    expect(prepareSpellCast).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Magic Missile' }),
+      expect.objectContaining({ magicMissileDistribution: distribution, slotLevel: 1 }),
+      expect.anything(),
+    );
+    expect(onExecute).toHaveBeenCalledTimes(1);
+    expect(result.current.pendingMagicMissile).toBeNull();
   });
 });

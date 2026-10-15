@@ -1,21 +1,15 @@
-// MA-1872: Cthulhu Madness Whisper — the adjudicated half of the fix. The
-// row (now authored save_dc 24 + save_type Wisdom + damage_dice_primary 4d6
-// Psychic + dc_success none + save_effect "can't take Reactions until the end
-// of its next turn") rides the INLINE block-save seam (single-target "one
-// creature within 120 ft." prose — no shape token, breathAoeShape null, picker
-// never opens §162 accepted degradation):
-//   FAIL face — applySaveDamage rolls the 4d6 pool at FULL (computeDamageAfter
-//   Save raw) + grantSlowedClausesInline grants the registered te
-//   no_reactions (MA-0711/MA-1863 twin), victim-anchored ONE rounds:2 clock
-//   (§216 /next turn/ fork) + `condition applied` "No Reactions" grant log.
-//   SUCCESS face — dc_success:"none" → ZERO damage (§63/MV-20 half-leak
-//   closed; save-damage stamps finalDamage:0 with NO hp_change §335), zero te,
-//   zero clock, zero grant log.
-// Pre-fix the gated press delegated into Psychic Shatter's pool (live:
-// INTELLIGENCE DC 24 half-on-success, 6d10 35 psychic + Stunned applied, te
-// absent) — this file pins both mis-route axes closed: no 6d10 formula, no
-// Stunned condition grant, on EITHER face. Rows without the clause stay
-// byte-inert (Psychic Shatter control).
+// @maintained-by-ai: 2026-10-14
+// MA-1872: Cthulhu Madness Whisper — adjudication contract for the fixed row
+// (monsters.json cthulhu legendary_actions[3]: save_dc 24 Wisdom + 4d6 Psychic
+// + dc_success none + te no_reactions, delegates_to Psychic Shatter removed).
+// Rides the INLINE block-save seam (single-target prose, no shape token):
+//   FAIL face — FULL 4d6 (computeDamageAfterEvasion via dc_success) + the
+//   MA-0711 grantSlowedClausesInline te grant, victim-anchored rounds:2 clock
+//   (/next turn/ fork — the rounds:10 minute fork is pinned in the
+//   euphoria-breath twin) + "No Reactions" grant log.
+//   SUCCESS face — dc_success none → ZERO damage, zero te, zero clock.
+// Mis-route axes stay CLOSED on both faces: no 6d10 pool, no Stunned grant
+// (Psychic Shatter's own lane — its clauseless save_effect byte-inert pin).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -54,8 +48,9 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 const applyDamageToTarget = vi.fn(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 999 - finalDamage }));
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     normalizeSaveType: (t) => String(t || '').toUpperCase(),
-    // REAL computeDamageAfterSave semantics pinned byte-for-byte (§13 §91-101):
-    // fail → raw FULL; 'half' → floor; 'full' → raw; 'none'/else → ZERO.
+    // REAL dc_success semantics pinned byte-for-byte (computeDamageAfterSave /
+    // computeDamageAfterEvasion): fail → raw FULL; 'half' → floor; 'full' →
+    // raw; 'none'/else → ZERO.
     computeDamageAfterSave: (raw, success, dcSuccess) => (!success ? raw : dcSuccess === 'half' ? Math.floor(raw / 2) : dcSuccess === 'full' ? raw : 0),
     computeDamageAfterEvasion: (total, saveSuccess, dcSuccess, evasionActive) =>
         (evasionActive && dcSuccess === 'half') ? (saveSuccess ? 0 : Math.floor(total / 2))
@@ -86,10 +81,9 @@ const campaignName = 'test-campaign';
 const CTHULHU = 'Cthulhu 1';
 const TARGET = 'Bandit 1';
 
-// Cthulhu Madness Whisper (monsters.json cthulhu legendary_actions[3],
-// MA-1872 fix) — DC 24 Wisdom, 4d6 Psychic fail-full/success-none, te
-// no_reactions on the MA-0711 prose lane ("Costs 2 Actions" spend stays
-// advisory engine-side MA-1847 floor).
+// Cthulhu Madness Whisper (MA-1872 fix) — DC 24 Wisdom, 4d6 Psychic
+// fail-full/success-none, te no_reactions on the MA-0711 prose lane
+// ("Costs 2 Actions" spend stays advisory engine-side MA-1847 floor).
 const WHISPER = monstersData.find(m => m.index === 'cthulhu').legendary_actions[3];
 
 const whisperContext = {
@@ -106,21 +100,19 @@ const whisperContext = {
     conditionDurationNote: extractConditionDurationNote(WHISPER.save_effect),
 };
 
-async function resolveSave(context, success, roll) {
-    // EB-NPC inline lane (MA-0695/§211): the dice is rolled upstream by
-    // useLoggedDiceRollSaves and lands pre-stamped on context.effectiveD20 —
-    // processNpcSave never creates a save-prompt listener. DC 24 faces:
-    // nat 20 + bonus 19 = 39 ≥ 24 ✓ | nat 5 + bonus 0 = 5 ✗.
-    const bonus = success ? 19 : 0;
+// EB-NPC inline lane (MA-0695/§211): dice rolled upstream by
+// useLoggedDiceRollSaves, pre-stamped on context.effectiveD20 — DC 24 faces:
+// nat 20 + 19 = 39 ≥ 24 ✓ | 5 + 0 = 5 ✗.
+async function resolveSave(context, effectiveD20, bonus) {
     await processSaveRoll({
         rollType: 'save',
         target: { name: TARGET, type: 'npc' },
         characterName: TARGET,
         campaignName,
-        context: { ...context, effectiveD20: success ? 20 : roll, effectiveBonus: bonus },
+        context: { ...context, effectiveD20, effectiveBonus: bonus },
         bonus,
-        r1: success ? 20 : roll,
-        r2: success ? 20 : roll,
+        r1: effectiveD20,
+        r2: effectiveD20,
         logEntry: (e) => logEntryLogs.push(e),
         setPopupHtml: vi.fn(),
     });
@@ -134,7 +126,7 @@ beforeEach(() => {
 });
 
 describe('MA-1872 Cthulhu Madness Whisper save adjudication', () => {
-    it('parse/field lock: DC 24 Wisdom, 4d6 Psychic, dc_success none, no_reactions te transport', () => {
+    it('parse/field lock: DC 24 Wisdom, 4d6 Psychic, dc_success none, no_reactions te transport; Psychic Shatter row byte-inert to the clause parser', () => {
         expect(WHISPER.save_dc).toBe(24);
         expect(WHISPER.save_type).toBe('Wisdom');
         expect(WHISPER.damage_dice_primary).toBe('4d6');
@@ -143,10 +135,13 @@ describe('MA-1872 Cthulhu Madness Whisper save adjudication', () => {
         expect(WHISPER.delegates_to).toBeUndefined();
         expect(parseSlowedClauses(WHISPER.save_effect)).toEqual({ effects: ['no_reactions'] });
         expect(/next turn/i.test(whisperContext.conditionDurationNote)).toBe(true);
+        // Psychic Shatter's Stunned lane stays its own — its save_effect arms
+        // NO slowedClauses (parser over-match control on the mis-route axis).
+        expect(parseSlowedClauses(monstersData.find(m => m.index === 'cthulhu').actions[3].save_effect)).toBeNull();
     });
 
     it('failed WIS save: FULL 4d6 Psychic applied + te no_reactions on victim + ONE rounds:2 clock + "No Reactions" grant log', async () => {
-        await resolveSave({ ...whisperContext }, false, 5);
+        await resolveSave({ ...whisperContext }, 5, 0);
 
         // damage leg: raw roll pays FULL on fail (dc_success none bites success only)
         expect(applyDamageToTarget).toHaveBeenCalled();
@@ -194,7 +189,7 @@ describe('MA-1872 Cthulhu Madness Whisper save adjudication', () => {
     });
 
     it('successful save: ZERO damage (dc_success none, §63 half-leak closed) + zero te + zero clock + zero grant log', async () => {
-        await resolveSave({ ...whisperContext }, true, 20);
+        await resolveSave({ ...whisperContext }, 20, 19);
 
         expect(applyDamageToTarget).toHaveBeenCalled();
         const [, , finalDamage] = applyDamageToTarget.mock.calls[0];
@@ -210,10 +205,5 @@ describe('MA-1872 Cthulhu Madness Whisper save adjudication', () => {
         expect(addEntryLogs.some(e => e.type === 'condition' && e.action === 'applied')).toBe(false);
         expect(addEntryLogs.some(e => e.condition === 'Stunned')).toBe(false);
         expect([...addEntryLogs, ...logEntryLogs].some(e => e.formula === '6d10')).toBe(false);
-    });
-
-    it('byte-inert control: Psychic Shatter save_effect arms NO slowedClauses (its Stunned lane stays its own)', () => {
-        const shatter = monstersData.find(m => m.index === 'cthulhu').actions[3];
-        expect(parseSlowedClauses(shatter.save_effect)).toBeNull();
     });
 });

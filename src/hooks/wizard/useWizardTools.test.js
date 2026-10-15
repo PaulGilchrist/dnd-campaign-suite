@@ -1,3 +1,13 @@
+// @maintained-by-ai
+// Seam (test-suite trim, 2026-10):
+// - Engine `useWizardConfig.test.js` owns generic config behaviour (slot state,
+//   warnings, preSelect auto-merge mechanics, error logging).
+// - `useWizardTools.integration.test.js` owns the real-engine smoke (2024
+//   end-to-end + 5e short-circuit through the real toolValidation service).
+// - THIS file owns the mock-engine lane: the exact config object the wrapper
+//   passes to useWizardConfig (service-function identities, slot declaration,
+//   dep tuples, preSelect keys) and unit behaviour of the preSelect merge
+//   closure. Deterministic pure-shape assertions — no engine, no data loads.
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -7,6 +17,10 @@ vi.mock('./useWizardConfig.js', () => ({
 
 import useWizardTools from './useWizardTools.js';
 import useWizardConfig from './useWizardConfig.js';
+import {
+  validateTools,
+  getToolLimitsByCategory,
+} from '../../services/character/toolValidation.js';
 
 const mockFormData2024 = {
   name: 'Test Character',
@@ -20,173 +34,111 @@ const mockFormData2024 = {
 };
 
 describe('useWizardTools', () => {
+  let mockSetFormData;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    useWizardConfig.mockClear();
+    mockSetFormData = vi.fn();
   });
 
-  function renderTools(formData, _configOverride) {
-    const mockSetFormData = vi.fn();
-    useWizardConfig.mockReturnValue(
-      _configOverride ?? {
-        toolLimits: new Map(),
-        warnings: [],
-        preSelectedTools: [],
-      }
-    );
+  function renderTools(formData = mockFormData2024, configOverride = null) {
+    useWizardConfig.mockReturnValue(configOverride ?? {
+      toolLimits: new Map(),
+      warnings: [],
+      preSelectedTools: [],
+    });
     return renderHook(() => useWizardTools(formData, mockSetFormData));
   }
 
-  describe('return values', () => {
-    it('returns toolLimits, toolWarnings, and preSelectedTools from useWizardConfig', () => {
-      const { result } = renderTools(mockFormData2024);
-      expect(result.current).toHaveProperty('toolLimits');
-      expect(result.current).toHaveProperty('toolWarnings');
-      expect(result.current).toHaveProperty('preSelectedTools');
-    });
+  function getConfigArg() {
+    renderTools();
+    return useWizardConfig.mock.calls[0][0];
+  }
 
-    it('returns the values passed through useWizardConfig unchanged', () => {
+  describe('return envelope', () => {
+    it('returns toolLimits, warnings renamed to toolWarnings, and preSelectedTools unchanged', () => {
       const { result } = renderTools(mockFormData2024, {
         toolLimits: new Map([['bard', 3]]),
         warnings: ['Too many tools'],
         preSelectedTools: ["Cook's Utensils"],
       });
+      expect(Object.keys(result.current).sort()).toEqual([
+        'preSelectedTools',
+        'toolLimits',
+        'toolWarnings',
+      ]);
       expect(result.current.toolLimits.get('bard')).toBe(3);
       expect(result.current.toolWarnings).toEqual(['Too many tools']);
       expect(result.current.preSelectedTools).toEqual(["Cook's Utensils"]);
     });
-
-    it('returns empty values when useWizardConfig provides empty results', () => {
-      const { result } = renderTools(mockFormData2024, {
-        toolLimits: new Map(),
-        warnings: [],
-        preSelectedTools: [],
-      });
-      expect(result.current.toolWarnings).toEqual([]);
-      expect(result.current.preSelectedTools).toEqual([]);
-    });
   });
 
-  describe('useWizardConfig delegation', () => {
-    it('passes formData and a setFormData function to useWizardConfig', () => {
-      renderTools(mockFormData2024, null);
+  describe('useWizardConfig config shape', () => {
+    it('passes formData and setFormData through unchanged', () => {
+      renderTools(mockFormData2024);
       const callConfig = useWizardConfig.mock.calls[0][0];
       expect(callConfig.formData).toBe(mockFormData2024);
-      expect(typeof callConfig.setFormData).toBe('function');
+      expect(callConfig.setFormData).toBe(mockSetFormData);
     });
 
-    it('passes validateTools as validateFn', () => {
-      renderTools(mockFormData2024, null);
-      const callConfig = useWizardConfig.mock.calls[0][0];
-      expect(typeof callConfig.validateFn).toBe('function');
-    });
-
-    it('passes a single slot for toolLimits with isLimit flag', () => {
-      renderTools(mockFormData2024, null);
-      const callConfig = useWizardConfig.mock.calls[0][0];
+    it('passes the toolValidation service functions as validateFn and slot.get', () => {
+      const callConfig = getConfigArg();
+      expect(callConfig.validateFn).toBe(validateTools);
       expect(callConfig.slots).toHaveLength(1);
-      expect(callConfig.slots[0].state.key).toBe('toolLimits');
+      expect(callConfig.slots[0].get).toBe(getToolLimitsByCategory);
+    });
+
+    it('declares a single toolLimits slot with isLimit flag', () => {
+      const callConfig = getConfigArg();
+      expect(callConfig.slots[0].state).toEqual({ initial: null, key: 'toolLimits' });
       expect(callConfig.slots[0].isLimit).toBe(true);
     });
 
-    it('passes getDeps that extracts all formData dependency fields', () => {
-      renderTools(mockFormData2024, null);
-      const callConfig = useWizardConfig.mock.calls[0][0];
-      const deps = callConfig.getDeps(mockFormData2024);
-      expect(deps).toContain(mockFormData2024.toolProficiencies);
-      expect(deps).toContain(mockFormData2024.class?.name);
-      expect(deps).toContain(mockFormData2024.race?.name);
-      expect(deps).toContain(mockFormData2024.background);
-      expect(deps).toContain(mockFormData2024.rules);
-      expect(deps).toContain(mockFormData2024.feats);
-      expect(deps).toContain(mockFormData2024.level);
+    it('getDeps extracts the exact dependency tuple, null-safe for class/race', () => {
+      const { getDeps } = getConfigArg();
+      expect(getDeps({ ...mockFormData2024, toolProficiencies: ['Bagpipes'] })).toEqual([
+        ['Bagpipes'], 'Bard', undefined, undefined, 'Human',
+        'Acolyte', '2024', ['Skilled'], 1,
+      ]);
+      expect(getDeps({ ...mockFormData2024, class: null, race: null })).toEqual([
+        mockFormData2024.toolProficiencies, undefined, undefined, undefined, undefined,
+        'Acolyte', '2024', ['Skilled'], 1,
+      ]);
     });
 
-    it('passes getDeps that handles null/undefined class and race', () => {
-      const minimalData = { ...mockFormData2024, class: null, race: null };
-      renderTools(minimalData, null);
-      const callConfig = useWizardConfig.mock.calls[0][0];
-      const deps = callConfig.getDeps(minimalData);
-      expect(deps).toContain(undefined);
-      expect(deps).toContain(minimalData.background);
-      expect(deps).toContain(minimalData.rules);
+    it('preSelect exposes getFn, merge, deps and the preSelectedTools state key', () => {
+      const { preSelect } = getConfigArg();
+      expect(typeof preSelect.getFn).toBe('function');
+      expect(typeof preSelect.merge).toBe('function');
+      expect(typeof preSelect.deps).toBe('function');
+      expect(preSelect.stateKey).toBe('preSelectedTools');
     });
 
-    it('passes preSelect configuration with all required keys', () => {
-      renderTools(mockFormData2024, null);
-      const callConfig = useWizardConfig.mock.calls[0][0];
-      expect(typeof callConfig.preSelect.getFn).toBe('function');
-      expect(typeof callConfig.preSelect.merge).toBe('function');
-      expect(typeof callConfig.preSelect.deps).toBe('function');
-      expect(callConfig.preSelect.stateKey).toBe('preSelectedTools');
-    });
-
-    it('passes preSelect.deps that extracts background, class, feats, and rules', () => {
-      renderTools(mockFormData2024, null);
-      const callConfig = useWizardConfig.mock.calls[0][0];
-      const deps = callConfig.preSelect.deps(mockFormData2024);
-      expect(deps).toContain(mockFormData2024.background);
-      expect(deps).toContain(mockFormData2024.class?.name);
-      expect(deps).toContain(mockFormData2024.feats);
-      expect(deps).toContain(mockFormData2024.rules);
+    it('preSelect.deps extracts background, class, feats, and rules', () => {
+      const { preSelect } = getConfigArg();
+      expect(preSelect.deps(mockFormData2024)).toEqual(['Acolyte', 'Bard', ['Skilled'], '2024']);
     });
   });
 
-  describe('preSelect merge function behavior', () => {
+  describe('preSelect merge closure', () => {
     function getMerge() {
-      renderTools(mockFormData2024, null);
-      return useWizardConfig.mock.calls[0][0].preSelect.merge;
+      return getConfigArg().preSelect.merge;
     }
 
-    it('merges pre-selected tools into toolProficiencies without duplicates', () => {
+    it('appends only new tools, preserving existing selections and other prev fields', () => {
       const merge = getMerge();
-      const prev = { toolProficiencies: ["Cook's Utensils"] };
-      const items = ["Cook's Utensils"];
-      const result = merge(prev, items, []);
-      expect(result.toolProficiencies).toEqual(["Cook's Utensils"]);
-    });
-
-    it('adds new pre-selected tools to existing toolProficiencies', () => {
-      const merge = getMerge();
-      const prev = { toolProficiencies: ['Herbalism Kit'] };
-      const items = ["Cook's Utensils"];
-      const result = merge(prev, items, []);
-      expect(result.toolProficiencies).toContain('Herbalism Kit');
-      expect(result.toolProficiencies).toContain("Cook's Utensils");
-      expect(result.toolProficiencies).toHaveLength(2);
-    });
-
-    it('handles undefined toolProficiencies in prev', () => {
-      const merge = getMerge();
-      const prev = {};
-      const items = ["Cook's Utensils"];
-      const result = merge(prev, items, []);
-      expect(result.toolProficiencies).toEqual(["Cook's Utensils"]);
-    });
-
-    it('handles empty items array by preserving existing tools', () => {
-      const merge = getMerge();
-      const prev = { toolProficiencies: ['Herbalism Kit'] };
-      const items = [];
-      const result = merge(prev, items, []);
-      expect(result.toolProficiencies).toEqual(['Herbalism Kit']);
-    });
-
-    it('spreads existing properties from prev into the result', () => {
-      const merge = getMerge();
-      const prev = { name: 'Test' };
-      const items = ["Cook's Utensils"];
-      const result = merge(prev, items, []);
+      const result = merge(
+        { name: 'Test', toolProficiencies: ['Herbalism Kit', "Cook's Utensils"] },
+        ["Cook's Utensils", "Thieves' Tools"],
+        []
+      );
       expect(result.name).toBe('Test');
-      expect(result.toolProficiencies).toEqual(["Cook's Utensils"]);
+      expect(result.toolProficiencies).toEqual(['Herbalism Kit', "Cook's Utensils", "Thieves' Tools"]);
     });
-  });
 
-  describe('setFormData passthrough', () => {
-    it('passes setFormData to useWizardConfig for preSelect merge', () => {
-      renderTools(mockFormData2024, null);
-      const callConfig = useWizardConfig.mock.calls[0][0];
-      expect(typeof callConfig.setFormData).toBe('function');
+    it('defaults toolProficiencies when prev has none', () => {
+      const merge = getMerge();
+      expect(merge({}, ["Cook's Utensils"], []).toolProficiencies).toEqual(["Cook's Utensils"]);
     });
   });
 });

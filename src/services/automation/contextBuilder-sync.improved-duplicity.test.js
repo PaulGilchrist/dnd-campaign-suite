@@ -1,4 +1,10 @@
+// @maintained-by-ai
 // Regression tests for CLA-189 — Improved Duplicity: granted ally Advantage must reach PC attack rolls.
+// Owns the getDuplicityAdvantageAgainst no-map lane of buildAttackContextSync (the create_illusion
+// activeBuffs lane is owned by contextBuilder-sync.buffs.test.js; ordering contracts live in
+// contextBuilder-sync.advantage-priority.test.js). Negative/control and condition-disadvantage-priority
+// coverage was removed as duplicate of contextBuilder-sync.test.js (same forcedMode-undefined path and
+// same `if (forcedMode === undefined)` short-circuit guard). Deterministic: all externals mocked.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContextSync } from './contextBuilder.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -154,21 +160,5 @@ describe('contextBuilder-sync: CLA-189 Improved Duplicity granted ally advantage
     });
     expect(result.forcedMode).toBe('advantage');
     expect(result.advantageReason).toBe('Improved Duplicity');
-  });
-
-  it('does not force advantage when no duplicity grant applies', async () => {
-    getDuplicityAdvantageAgainst.mockResolvedValue({ advantage: false });
-
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'test-campaign', 'normal');
-
-    expect(result.forcedMode).toBeUndefined();
-  });
-
-  it('does not override an already-forced disadvantage from conditions', async () => {
-    getDuplicityAdvantageAgainst.mockResolvedValue({ advantage: true, source: 'Divine_Cleric' });
-
-    const result = await buildAttackContextSync(mockAttack, mockStats, 'test-campaign', 'disadvantage');
-
-    expect(result.forcedMode).toBe('disadvantage');
   });
 });

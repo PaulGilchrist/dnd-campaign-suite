@@ -1,3 +1,10 @@
+// @maintained-by-ai: 2026-10-15
+// Handler-only lane for zealousPresenceHandler.js (producer seam): handle() gating
+// (already-active, uses/rage resource management, range-gated chooser modal) and
+// confirmZealousPresence() (activation marker, toggleBuff producer shape, expiration
+// registration, campaign-log entry, confirmation popup). Consumer seam (per-target buff
+// attribution through the real buffToggle lookup) lives in
+// handlePlayerSaveDamage.zealousPresence.test.js — not duplicated here.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────────
@@ -138,7 +145,9 @@ describe('zealousPresenceHandler.handle', () => {
             );
         });
 
-        it('returns popup when uses are exhausted and no recharge', async () => {
+        it('returns used-up popup when uses exhausted and recharge is not expend_rage', async () => {
+            // Both undefined and any other recharge string hit the same
+            // `auto.recharge !== 'long_rest_or_expend_rage'` guard.
             action.automation.uses = 1;
             useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'zealousPresenceActive') return null;
@@ -146,11 +155,16 @@ describe('zealousPresenceHandler.handle', () => {
                 return undefined;
             });
 
-            const result = await handle(action, playerStats, campaignName, null);
+            for (const recharge of [undefined, 'on_long_rest']) {
+                action.automation.recharge = recharge;
+                const result = await handle(action, playerStats, campaignName, null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('has been used');
+                expect(result.type).toBe('popup');
+                expect(result.payload.type).toBe('automation_info');
+                expect(result.payload.description).toBe(
+                    'Zealous Presence has been used and cannot be used again until a long rest.'
+                );
+            }
             expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
                 playerName,
                 'zealouspresenceUses',
@@ -265,21 +279,6 @@ describe('zealousPresenceHandler.handle', () => {
             );
         });
 
-        it('returns popup when recharge is not long_rest_or_expend_rage and uses exhausted', async () => {
-            action.automation.uses = 1;
-            useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'zealousPresenceActive') return null;
-                if (key === 'zealouspresenceUses') return 0;
-                return undefined;
-            });
-            action.automation.recharge = 'on_long_rest';
-
-            const result = await handle(action, playerStats, campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('cannot be used again');
-        });
-
         it('returns modal when uses is null/undefined but maxUses=0 (no resource tracking)', async () => {
             useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'zealousPresenceActive') return null;
@@ -294,23 +293,28 @@ describe('zealousPresenceHandler.handle', () => {
     });
 
     describe('creature target gathering', () => {
-        it('returns modal with creatureTargets excluding self', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'TestBarbarian' },
-                    { name: 'Enemy1' },
-                    { name: 'Ally1' },
-                ],
-            });
-
+        it('returns modal with full payload, self-excluded gridless-lenient targets, default maxTargets', async () => {
             const result = await handle(action, playerStats, campaignName, null);
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('zealousPresenceTarget');
+            expect(result.payload.action).toEqual(action);
+            expect(result.payload.playerStats).toEqual(playerStats);
+            expect(result.payload.campaignName).toBe(campaignName);
+            // Gridless mode resolves lenient, but the gate is consulted for
+            // every non-self creature (none of the default creatures is self).
             expect(result.payload.creatureTargets).toEqual([
                 { name: 'Enemy1' },
+                { name: 'Enemy2' },
                 { name: 'Ally1' },
             ]);
+            expect(isWithinRange).toHaveBeenCalledTimes(3);
+            expect(result.payload.maxTargets).toBe(10);
+
+            // Fallback to 10 when automation.targets is not set either.
+            delete action.automation.targets;
+            const fallback = await handle(action, playerStats, campaignName, null);
+            expect(fallback.payload.maxTargets).toBe(10);
         });
 
         it('passes maxTargets from automation config', async () => {
@@ -321,7 +325,7 @@ describe('zealousPresenceHandler.handle', () => {
             expect(result.payload.maxTargets).toBe(5);
         });
 
-        it('CLA-394: range-gates chooser targets via isWithinRange at 60 ft (gridless lenient pass)', async () => {
+        it('CLA-394: range-gates chooser targets via isWithinRange at 60 ft, excluding self', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [
                     { name: 'TestBarbarian' },
@@ -341,26 +345,6 @@ describe('zealousPresenceHandler.handle', () => {
             expect(isWithinRange).toHaveBeenCalledWith(playerName, 'AllyNear', 60);
             expect(isWithinRange).toHaveBeenCalledWith(playerName, 'AllyFar', 60);
             expect(isWithinRange).not.toHaveBeenCalledWith(playerName, 'TestBarbarian', expect.anything());
-        });
-
-        it('CLA-394: consults the gate for every non-self creature when gridless (all pass lenient)', async () => {
-            const result = await handle(action, playerStats, campaignName, null);
-
-            expect(result.type).toBe('modal');
-            expect(result.payload.creatureTargets).toEqual([
-                { name: 'Enemy1' },
-                { name: 'Enemy2' },
-                { name: 'Ally1' },
-            ]);
-            expect(isWithinRange).toHaveBeenCalledTimes(3);
-        });
-
-        it('passes action and playerStats into payload', async () => {
-            const result = await handle(action, playerStats, campaignName, null);
-
-            expect(result.payload.action).toEqual(action);
-            expect(result.payload.playerStats).toEqual(playerStats);
-            expect(result.payload.campaignName).toBe(campaignName);
         });
     });
 });
@@ -471,20 +455,18 @@ describe('zealousPresenceHandler.confirmZealousPresence', () => {
             expect(result.payload.automation).toEqual(action.automation);
         });
 
-        it('respects max targets from automation config', async () => {
+        it('caps selected targets at automation.targets', async () => {
+            // Cap 2: third selection dropped. Cap 1: only first survives.
             action.automation.targets = 2;
-
             await confirmZealousPresence(action, playerStats, campaignName, ['Enemy1', 'Enemy2', 'Enemy3']);
 
             expect(toggleBuff).toHaveBeenCalledTimes(2);
             expect(toggleBuff).toHaveBeenCalledWith(playerName, 'Zealous Presence', expect.any(Object), campaignName, 'Enemy1');
             expect(toggleBuff).toHaveBeenCalledWith(playerName, 'Zealous Presence', expect.any(Object), campaignName, 'Enemy2');
             expect(toggleBuff).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), expect.anything(), 'Enemy3');
-        });
 
-        it('caps targets at maxTargets=1 when specified', async () => {
+            vi.clearAllMocks();
             action.automation.targets = 1;
-
             await confirmZealousPresence(action, playerStats, campaignName, ['Enemy1', 'Enemy2']);
 
             expect(toggleBuff).toHaveBeenCalledTimes(1);
