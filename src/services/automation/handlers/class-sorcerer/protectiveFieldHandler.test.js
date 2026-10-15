@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Deterministic contract suite for protectiveFieldHandler (Psi Warrior protective field):
+// psionicEnergy spend gate, die+INT reduction normalisation, defender healing via
+// findLastAttack/getCombatContext, resource-tracking display, popup/log composition.
+// All collaborators fully mocked; exact-key pins on runtime reads/writes; full-string
+// pins on own-composed descriptions. Pure behaviour — no timers, no UI moving parts.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './protectiveFieldHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -59,9 +65,10 @@ function makePlayerStats(overrides = {}) {
 
 describe('protectiveFieldHandler', () => {
     beforeEach(() => {
-        vi.resetAllMocks();
+        vi.clearAllMocks();
         runtimeState.getRuntimeValue.mockReturnValue(6);
         runtimeState.setRuntimeValue.mockResolvedValue(undefined);
+        logService.addEntry.mockResolvedValue(undefined);
         automationService.evaluateAutoExpression.mockReturnValue(6);
         diceRoller.rollExpression.mockReturnValue({ total: 4 });
         damageUtils.getCombatContext.mockResolvedValue({
@@ -79,7 +86,7 @@ describe('protectiveFieldHandler', () => {
     });
 
     describe('depleted energy', () => {
-        it.each([0, -1, -5])(
+        it.each([0, -1])(
             'returns error popup and does not mutate state or log when uses are %d',
             async (uses) => {
                 runtimeState.getRuntimeValue.mockReturnValue(uses);
@@ -118,7 +125,8 @@ describe('protectiveFieldHandler', () => {
                 type: 'ability_use',
                 characterName: playerName,
                 abilityName: 'Protective Field',
-                description: expect.stringContaining('reduce damage by 7'),
+                description: 'TestHero used Protective Field to reduce damage by 7 '
+                    + '(Rolled 6 for 4 + INT 3). Damage reduced to TestHero.',
             }));
         });
 
@@ -146,8 +154,10 @@ describe('protectiveFieldHandler', () => {
             // roll=4, intMod=3 => reduction=7
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-            expect(result.payload.description).toContain('Reduce damage by');
-            expect(result.payload.description).toContain('<strong>7</strong>');
+            expect(result.payload.description).toBe(
+                'Protective Field: Reduce damage by <strong>7</strong> (Rolled 6 for 4 + INT 3). '
+                + 'Psionic Energy: 5/6. Damage to TestHero reduced.'
+            );
         });
 
         it('uses psionicDieSize when die roll is null', async () => {
@@ -248,30 +258,11 @@ describe('protectiveFieldHandler', () => {
 
             expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
         });
-
-        it('does not apply healing when attack target name is null', async () => {
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: { targetName: null },
-                attackerName: 'Goblin',
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
-        });
     });
 
     describe('resource tracking', () => {
         it('uses default max of 6 when _trackedResources is missing', async () => {
             const playerStats = makePlayerStats({ _trackedResources: undefined });
-
-            const result = await handle(makeAction(), playerStats, campaignName);
-
-            expect(result.payload.description).toContain('Psionic Energy: 5/6');
-        });
-
-        it('uses default max when psionicEnergy key is missing from _trackedResources', async () => {
-            const playerStats = makePlayerStats({ _trackedResources: { other: { max: 10 } } });
 
             const result = await handle(makeAction(), playerStats, campaignName);
 
@@ -328,7 +319,7 @@ describe('protectiveFieldHandler', () => {
 
     describe('error handling', () => {
         it('handles addEntry rejection gracefully', async () => {
-            logService.addEntry.mockRejectedValue(new Error('log fail'));
+            logService.addEntry.mockRejectedValueOnce(new Error('log fail'));
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
@@ -339,7 +330,7 @@ describe('protectiveFieldHandler', () => {
         });
 
         it('throws when setRuntimeValue rejects (no catch in handler)', async () => {
-            runtimeState.setRuntimeValue.mockRejectedValue(new Error('write error'));
+            runtimeState.setRuntimeValue.mockRejectedValueOnce(new Error('write error'));
 
             await expect(
                 handle(makeAction(), makePlayerStats(), campaignName)

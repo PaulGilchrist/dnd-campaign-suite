@@ -1,3 +1,5 @@
+// @maintained-by-ai — deterministic: runtime store, logService, rangeCheck all mocked at module;
+// pins handler branch behaviour (guards, range gate, dedupe, share mirroring) and own-composition strings.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, applySpellShare } from './primalCompanionSpellShareHandler.js';
 
@@ -94,17 +96,7 @@ describe('primalCompanionSpellShareHandler', () => {
             expect(result.payload.description).toBe('Pass Without Trace shared with Primal Companion (Beast of the Land).');
         });
 
-        it('consults the 30-ft range gate between caster and companion', async () => {
-            store['RangerBoy.primalCompanionType'] = 'Beast of the Land';
-            store['RangerBoy.primalCompanionAlive'] = true;
-            seedCasterEffect([{ ...PWT_TE }]);
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-            expect(isWithinRange).toHaveBeenCalledWith('RangerBoy', 'Primal Companion (Beast of the Land)', 30);
-        });
-
-        it('denies the share and writes nothing when out of range', async () => {
+        it('consults the 30-ft range gate and denies the share, writing nothing, when out of range', async () => {
             store['RangerBoy.primalCompanionType'] = 'Beast of the Land';
             store['RangerBoy.primalCompanionAlive'] = true;
             seedCasterEffect([{ ...PWT_TE }]);
@@ -112,6 +104,7 @@ describe('primalCompanionSpellShareHandler', () => {
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
+            expect(isWithinRange).toHaveBeenCalledWith('RangerBoy', 'Primal Companion (Beast of the Land)', 30);
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('more than 30 feet');
             expect(store['campaign.targetEffects']).toHaveLength(1);
@@ -184,18 +177,16 @@ describe('primalCompanionSpellShareHandler', () => {
     });
 
     describe('applySpellShare', () => {
-        it('applies the companion effect and logs when confirmed', async () => {
+        it('confirmed share delegates to the same apply path (full pins live in the handle tests)', async () => {
+            // applySpellShare is the modal-confirm entry (wired in automation/index.js);
+            // the share-chain integration only exercises handle, so pin the confirmed delegation here.
             store['RangerBoy.primalCompanionType'] = 'Beast of the Land';
             seedCasterEffect([{ ...PWT_TE }]);
 
             const result = await applySpellShare(makeAction(), makePlayerStats(), 'test-campaign', true);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Share Spells');
-            expect(result.payload.automationType).toBe('primal_companion_spell_share');
             expect(result.payload.description).toBe('Pass Without Trace shared with Primal Companion (Beast of the Land).');
-            expect(store['RangerBoy.lastSpellShare']).toBe('Pass Without Trace');
             expect(store['campaign.targetEffects'].some(
                 te => te.target === 'Primal Companion (Beast of the Land)' && te.effect === 'pass_without_trace_bonus'
             )).toBe(true);

@@ -1,5 +1,10 @@
+// @maintained-by-ai
 // CLA-277: shockwave CON save must use the Monk's Focus save DC (8 + WIS + PB),
 // built data-driven via saveDc:'ability' + saveAbility:'WIS' in classes.json.
+// Real-buildSaveDc lane: siblings mock buildSaveDc (DC 15); only this file runs
+// the real DC resolution end-to-end from classes.json data into the save prompt,
+// the save-damage log entries, and the result popup. Half-on-save damage math
+// lives in quiveringPalmHandler.test.js — not re-pinned here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
@@ -42,7 +47,6 @@ vi.mock('../../../rules/combat/applyDamage.js', () => ({
 import { applyShockwave } from './quiveringPalmHandler.js';
 import { addEntry } from '../../../ui/logService.js';
 import { buildSaveDc, createSaveListener } from '../../../automation/common/savePrompt.js';
-import { rollExpression } from '../../../dice/diceRoller.js';
 
 // ── Fixtures ───────────────────────────────────────────────────
 
@@ -93,8 +97,8 @@ describe('CLA-277 quiveringPalm shockwave save DC', () => {
     expect(buildSaveDc(quiveringPalmAutomation, makeMonkStats())).toBe(18);
   });
 
-  it('applyShockwave threads DC 18 into the save prompt listener', async () => {
-    await applyShockwave(action, makeMonkStats(), campaignName, 'Yuan-Ti Pureblood 1');
+  it('applyShockwave threads DC 18 into the save prompt listener and result popup', async () => {
+    const result = await applyShockwave(action, makeMonkStats(), campaignName, 'Yuan-Ti Pureblood 1');
 
     expect(createSaveListener).toHaveBeenCalledWith(
       campaignName,
@@ -104,6 +108,7 @@ describe('CLA-277 quiveringPalm shockwave save DC', () => {
         saveDc: 18,
       })
     );
+    expect(result.payload.saveDc).toBe(18);
   });
 
   it('applyShockwave logs DC 18 on both save-damage log entries', async () => {
@@ -115,18 +120,5 @@ describe('CLA-277 quiveringPalm shockwave save DC', () => {
     expect(logged.length).toBe(2);
     expect(logged.every(e => e.saveDc === 18)).toBe(true);
     expect(logged[0].description).toContain('DC 18');
-  });
-
-  it('applyShockwave returns result popup carrying DC 18 and half-on-save math intact', async () => {
-    createSaveListener.mockReturnValue({
-      promise: Promise.resolve({ success: true, roll: 19, saveBonus: 0 }),
-    });
-    rollExpression.mockReturnValue({ total: 82, rolls: [8, 8, 9, 9, 8, 8, 9, 9, 7, 7], modifier: 0 });
-
-    const result = await applyShockwave(action, makeMonkStats(), campaignName, 'Cultist Fanatic 1');
-
-    expect(result.payload.saveDc).toBe(18);
-    expect(result.payload.rawDamage).toBe(82);
-    expect(result.payload.finalDamage).toBe(41);
   });
 });

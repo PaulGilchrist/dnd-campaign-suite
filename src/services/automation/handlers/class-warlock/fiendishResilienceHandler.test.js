@@ -1,3 +1,13 @@
+// @maintained-by-ai
+// Canonical internals home for Fiendish Resilience (2024 Warlock Fiend Patron):
+// handle() modal payload + default DAMAGE_TYPES fallback, the once-per-rest refusal
+// latch, applyTypeChoice store + used-latch writes, invalid/falsy rejection with
+// no-side-effect guards, and the "set to"/"changed to" own-composition log copy.
+// Owned elsewhere: CLA-140 short/long-rest clearing of _fiendishResilienceUsed is
+// pinned in restRules-constants.cla140-fiendish-resilience.test.js; passive
+// resistance collection in automationPassives.test.js; consumer modal routing in
+// useCharActionsAutomation.test.js; sorcerer Elemental Affinity delegation to this
+// handler is pinned (delegation only) in elementalAffinityHandler.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, applyTypeChoice } from './fiendishResilienceHandler.js';
@@ -28,11 +38,13 @@ import { addEntry } from '../../../ui/logService.js';
 
 const CAMPAIGN = 'test-campaign';
 
+const DEFAULT_DAMAGE_TYPES = ['Acid', 'Bludgeoning', 'Cold', 'Fire', 'Lightning', 'Necrotic', 'Piercing', 'Poison', 'Psychic', 'Radiant', 'Slashing', 'Thunder'];
+
 function makeFeature(overrides = {}) {
     return {
         name: 'Fiendish Resilience',
         automation: {
-            damageTypes: ['Acid', 'Bludgeoning', 'Cold', 'Fire', 'Lightning', 'Necrotic', 'Piercing', 'Poison', 'Psychic', 'Radiant', 'Slashing', 'Thunder'],
+            damageTypes: DEFAULT_DAMAGE_TYPES,
         },
         ...overrides,
     };
@@ -50,15 +62,15 @@ describe('fiendishResilienceHandler', () => {
     });
 
     describe('handle', () => {
-        it('returns modal with damageTypes when no type has been chosen', async () => {
+        it('returns modal with damageTypes when no type has been chosen and ignores the _mapName parameter', async () => {
             getChosenRuntimeValue.mockReturnValue(null);
             getRuntimeValue.mockReturnValue(null);
 
-            const result = await handle(makeFeature(), makeStats(), CAMPAIGN);
+            const result = await handle(makeFeature(), makeStats(), CAMPAIGN, 'some-map-name');
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('fiendishResilience');
-            expect(result.payload.damageTypes).toHaveLength(12);
+            expect(result.payload.damageTypes).toEqual(DEFAULT_DAMAGE_TYPES);
             expect(result.payload.existingType).toBeUndefined();
             expect(result.payload.action).toEqual(expect.objectContaining({ name: 'Fiendish Resilience' }));
             expect(result.payload.playerStats).toBeInstanceOf(Object);
@@ -75,7 +87,7 @@ describe('fiendishResilienceHandler', () => {
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('fiendishResilience');
             expect(result.payload.existingType).toBe('Fire');
-            expect(result.payload.damageTypes).toHaveLength(12);
+            expect(result.payload.damageTypes).toEqual(DEFAULT_DAMAGE_TYPES);
             expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
                 type: 'ability_use',
                 characterName: 'TestCharacter',
@@ -84,7 +96,18 @@ describe('fiendishResilienceHandler', () => {
             }));
         });
 
-        it('refuses with a short-or-long-rest refusal popup and logs the refusal when used latch stands', async () => {
+        it('treats empty string chosenType as no type chosen', async () => {
+            getChosenRuntimeValue.mockReturnValue('');
+            getRuntimeValue.mockReturnValue(null);
+
+            const result = await handle(makeFeature(), makeStats(), CAMPAIGN);
+
+            expect(result.type).toBe('modal');
+            expect(result.payload.existingType).toBeUndefined();
+            expect(addEntry).not.toHaveBeenCalled();
+        });
+
+        it('refuses with a short-or-long-rest refusal popup and logs the refusal when the used latch stands', async () => {
             getChosenRuntimeValue.mockReturnValue('Fire');
             getRuntimeValue.mockReturnValue(true);
 
@@ -100,21 +123,9 @@ describe('fiendishResilienceHandler', () => {
                 automationType: 'fiendish_resilience_refused',
                 characterName: 'TestCharacter',
             }));
-        });
-
-        // CLA-140: a completed Short Rest nulls _fiendishResilienceUsed via
-        // SHORT_REST_RESOURCES, so the latch reads falsy and handle() must
-        // re-open the chooser instead of refusing.
-        it('re-opens chooser after a short rest clears the used latch (CLA-140)', async () => {
-            getChosenRuntimeValue.mockReturnValue('Fire');
-            getRuntimeValue.mockImplementation((_name, key) =>
-                key === '_fiendishResilienceUsed' ? null : undefined);
-
-            const result = await handle(makeFeature(), makeStats(), CAMPAIGN);
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('fiendishResilience');
-            expect(result.payload.existingType).toBe('Fire');
+            // Refusal must not touch the choice or latch stores.
+            expect(setChosenRuntimeValue).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
         it.each([
@@ -126,37 +137,16 @@ describe('fiendishResilienceHandler', () => {
 
             const result = await handle(makeFeature({ automation: {} }), makeStats(), CAMPAIGN);
 
-            expect(result.payload.damageTypes).toEqual(['Acid', 'Bludgeoning', 'Cold', 'Fire', 'Lightning', 'Necrotic', 'Piercing', 'Poison', 'Psychic', 'Radiant', 'Slashing', 'Thunder']);
-        });
-
-        it('ignores the _mapName parameter', async () => {
-            getChosenRuntimeValue.mockReturnValue(null);
-            getRuntimeValue.mockReturnValue(null);
-
-            const result = await handle(makeFeature(), makeStats(), CAMPAIGN, 'some-map-name');
-
-            expect(result.type).toBe('modal');
-            expect(result.payload.campaignName).toBe(CAMPAIGN);
-        });
-
-        it('treats empty string chosenType as no type chosen', async () => {
-            getChosenRuntimeValue.mockReturnValue('');
-            getRuntimeValue.mockReturnValue(null);
-
-            const result = await handle(makeFeature(), makeStats(), CAMPAIGN);
-
-            expect(result.type).toBe('modal');
-            expect(result.payload.existingType).toBeUndefined();
-            expect(addEntry).not.toHaveBeenCalled();
+            expect(result.payload.damageTypes).toEqual(DEFAULT_DAMAGE_TYPES);
         });
     });
 
     describe('applyTypeChoice', () => {
-        it('stores chosen type and returns popup when valid', async () => {
+        it('stores chosen type, sets the used latch, returns popup and logs "set to"', async () => {
             getChosenRuntimeValue.mockReturnValue(null);
 
             const result = await applyTypeChoice(
-                makeFeature({ automation: { damageTypes: ['Fire', 'Cold'] } }),
+                makeFeature({ automation: { type: 'fiendish_resilience', damageTypes: ['Fire', 'Cold'] } }),
                 makeStats(),
                 CAMPAIGN,
                 'Fire',
@@ -169,67 +159,27 @@ describe('fiendishResilienceHandler', () => {
                 'chosenType',
                 CAMPAIGN,
             );
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Fiendish Resilience');
-            expect(result.payload.description).toContain('Fire');
-            expect(result.payload.description).toContain('resistance');
-            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-                description: 'Fiendish Resilience — damage type set to Fire',
-            }));
-        });
-
-        it('marks feature as used when type is chosen', async () => {
-            getChosenRuntimeValue.mockReturnValue(null);
-
-            await applyTypeChoice(
-                makeFeature({ automation: { damageTypes: ['Fire', 'Cold'] } }),
-                makeStats(),
-                CAMPAIGN,
-                'Fire',
-            );
-
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestCharacter',
                 '_fiendishResilienceUsed',
                 true,
                 CAMPAIGN,
             );
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Fiendish Resilience');
+            expect(result.payload.automationType).toBe('fiendish_resilience');
+            expect(result.payload.description).toContain('Fire');
+            expect(result.payload.description).toContain('resistance');
+            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestCharacter',
+                abilityName: 'Fiendish Resilience',
+                description: 'Fiendish Resilience — damage type set to Fire',
+            }));
         });
 
-        it('rejects invalid damage type', async () => {
-            getChosenRuntimeValue.mockReturnValue(null);
-
-            const result = await applyTypeChoice(
-                makeFeature({ automation: { damageTypes: ['Fire', 'Cold'] } }),
-                makeStats(),
-                CAMPAIGN,
-                'Force',
-            );
-
-            expect(result).toBeNull();
-            expect(setChosenRuntimeValue).not.toHaveBeenCalled();
-            expect(addEntry).not.toHaveBeenCalled();
-        });
-
-        it('rejects falsy chosenType values (undefined, null)', async () => {
-            getChosenRuntimeValue.mockReturnValue(null);
-
-            for (const invalid of [undefined, null]) {
-                vi.clearAllMocks();
-                const result = await applyTypeChoice(
-                    makeFeature(),
-                    makeStats(),
-                    CAMPAIGN,
-                    invalid,
-                );
-
-                expect(result).toBeNull();
-                expect(setChosenRuntimeValue).not.toHaveBeenCalled();
-            }
-        });
-
-        it('logs change when type is switched', async () => {
+        it('logs "changed to" when type is switched', async () => {
             getChosenRuntimeValue.mockReturnValue('Fire');
 
             await applyTypeChoice(
@@ -259,6 +209,27 @@ describe('fiendishResilienceHandler', () => {
             }));
         });
 
+        it.each([
+            { invalid: 'Force', label: 'type not in the list' },
+            { invalid: '', label: 'empty string' },
+            { invalid: undefined, label: 'undefined' },
+            { invalid: null, label: 'null' },
+        ])('rejects invalid chosenType (%s) with no store, latch, or log writes', async ({ invalid }) => {
+            getChosenRuntimeValue.mockReturnValue(null);
+
+            const result = await applyTypeChoice(
+                makeFeature({ automation: { damageTypes: ['Fire', 'Cold'] } }),
+                makeStats(),
+                CAMPAIGN,
+                invalid,
+            );
+
+            expect(result).toBeNull();
+            expect(setChosenRuntimeValue).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+        });
+
         it('uses default DAMAGE_TYPES when automation has no damageTypes', async () => {
             getChosenRuntimeValue.mockReturnValue(null);
 
@@ -272,6 +243,5 @@ describe('fiendishResilienceHandler', () => {
             expect(result).not.toBeNull();
             expect(setChosenRuntimeValue).toHaveBeenCalled();
         });
-
     });
 });

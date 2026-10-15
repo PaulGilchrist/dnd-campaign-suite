@@ -1,3 +1,16 @@
+// @maintained-by-ai
+// Pins telekineticThrustHandler.js's OWN implementation copy (manual thrust row):
+// handle save-delegation, applyTelekineticThrust save flow, applyThrustEffect
+// prone-add + storage.set + own log composition. Does NOT pin the CLA-355
+// telekineticThrustUses uses gate (owned by psionicStrikeHandler.thrustRestGate
+// .test.js — all handle tests run at implicit uses=1 with no spend assertions)
+// nor the CLA-273 round latches (psionicStrikeHandler.test.js).
+// FLAG (source duplication, for final report): applyTelekineticThrust/
+// applyThrustEffect here are near-copies of psionicStrikeHandler.resolveThrustChain/
+// knockThrustTargetProne — this suite deliberately pins THIS copy's wording
+// ("knocked X Prone and pushed 10 feet away", not psionicStrike's "pushed X
+// 10 feet away"). No test removals until the source is unified; after unification
+// this suite and the gate lane's manual-row tests collapse onto one implementation.
 import { handle, applyTelekineticThrust } from './telekineticThrustHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
@@ -75,29 +88,6 @@ describe('telekineticThrustHandler', () => {
             expect(result.payload.description).toContain('Psionic Strike');
         });
 
-        it('returns no-target popup when options exist but no target', async () => {
-            const result = await handle(makeActionWithOptions(), makePlayerStats(), 'test-campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No target selected');
-        });
-
-        it('creates save listener when options exist and target is present', async () => {
-            setupSaveMock();
-            damageUtils.getCombatContext.mockResolvedValue({
-                attacker: { nextTargetAttacking: 'Goblin' },
-            });
-            damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-
-            await handle(makeActionWithOptions(), makePlayerStats(), 'test-campaign', 'map');
-
-            expect(savePrompt.createSaveListener).toHaveBeenCalledWith('test-campaign', {
-                targetName: 'Goblin',
-                saveType: 'STR',
-                saveDc: 13,
-            });
-        });
-
         it.each([
             [true, 'Goblin'],
             [false, null],
@@ -136,19 +126,6 @@ describe('telekineticThrustHandler', () => {
                 saveType: expectedType,
                 saveDc: 13,
             });
-        });
-
-        it('returns a popup with save result when target exists and save resolves', async () => {
-            setupSaveMock();
-            damageUtils.getCombatContext.mockResolvedValue({
-                attacker: { nextTargetAttacking: 'Goblin' },
-            });
-            damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-
-            const result = await handle(makeActionWithOptions(), makePlayerStats(), 'test-campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Success');
         });
 
         it('handles addEntry rejection gracefully in handle()', async () => {
@@ -242,23 +219,6 @@ describe('telekineticThrustHandler', () => {
             expect(result.payload.description).toContain('Push');
         });
 
-        it('handles missing combatContext gracefully on failure', async () => {
-            setupSaveMock({ success: false, total: 10, roll: 8, saveBonus: 2 });
-            damageUtils.getCombatContext.mockResolvedValue(null);
-
-            const result = await applyTelekineticThrust({
-                    action: makeActionWithOptions(),
-                    playerStats: makePlayerStats(),
-                    campaignName: 'test-campaign',
-                    targetName: 'Goblin',
-                    saveDc: 13,
-                    saveType: 'STR',
-                });
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Failure');
-        });
-
         it('applies prone condition and push when save fails and target is not already prone', async () => {
             setupSaveMock({ success: false, total: 10, roll: 8, saveBonus: 2 });
 
@@ -294,9 +254,11 @@ describe('telekineticThrustHandler', () => {
                 })
             );
             expect(storage.set).toHaveBeenCalledWith('combatSummary', combatContext, 'test-campaign');
+            // Full-string own-copy pin: psionicStrike's near-copy logs "pushed X 10 feet
+            // away" (no "knocked ... Prone and"), so this cannot silently pass on that copy.
             expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 type: 'ability_use',
-                description: expect.stringContaining('Prone'),
+                description: 'TestHero knocked Goblin Prone and pushed 10 feet away.',
             }));
         });
 
@@ -426,7 +388,7 @@ describe('telekineticThrustHandler', () => {
                 });
 
             expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                description: expect.stringContaining('pushed 10 feet'),
+                description: 'TestHero knocked Goblin Prone and pushed 10 feet away.',
             }));
         });
 

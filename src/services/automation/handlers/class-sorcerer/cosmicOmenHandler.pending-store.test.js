@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // CLA-065 integration regression: producer (cosmicOmenHandler) and consumers
 // (d20RollComputation attack/check/initiative lane + save lanes) must share
 // ONE canonical runtime store — characterKey 'cosmicOmen', propertyName
@@ -10,7 +11,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { handle } from './cosmicOmenHandler.js';
 import { computeD20Roll } from '../../../../hooks/combat/d20RollComputation.js';
-import { getRuntimeValue, clearRuntimeState } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, clearRuntimeState } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getLongRestResources } from '../../../rules/effects/restRules-constants.js';
 
 const CAMPAIGN = 'test-campaign';
@@ -34,7 +35,6 @@ describe('CLA-065 cosmic omen canonical pending store', () => {
     });
 
     async function arm(omenType, isEven, starMapRoll) {
-        const { setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
         await setRuntimeValue(DRUID, 'cosmicOmenEffect', JSON.stringify({ type: omenType, isEven, starMapRoll }), CAMPAIGN);
         return handle(makeDruidAction(), { name: DRUID }, CAMPAIGN);
     }
@@ -52,7 +52,7 @@ describe('CLA-065 cosmic omen canonical pending store', () => {
         expect(getRuntimeValue(DRUID, 'cosmicOmenPendingBonus', CAMPAIGN)).toBeNull();
     });
 
-    it('initiative lane folds ±pending and consumes it', async () => {
+    it('initiative lane folds +pending (Weal), consumes it one-shot — second roll folds zero', async () => {
         await arm('Weal', true, 14);
         const armed = JSON.parse(readPending());
         const r = computeD20Roll({
@@ -63,6 +63,13 @@ describe('CLA-065 cosmic omen canonical pending store', () => {
         expect(r.effectiveBonus).toBe(-1 + armed.value);
         expect(r.cosmicOmenDetail).toBe(`(+${armed.value} from Weal)`);
         expect(readPending()).toBeNull();
+        // one-shot: nothing re-folds after consumption
+        const second = computeD20Roll({
+            characterName: DRUID, campaignName: CAMPAIGN, name: 'Initiative',
+            rollType: 'initiative', context: {}, bonus: 0, isResilientSphereActive: () => false,
+        });
+        expect(second.cosmicOmenAppliedBonus).toBe(0);
+        expect(second.effectiveBonus).toBe(0);
     });
 
     it('attack lane folds +pending for Weal', async () => {
@@ -90,21 +97,6 @@ describe('CLA-065 cosmic omen canonical pending store', () => {
         expect(readPending()).toBeNull();
     });
 
-    it('pending is one-shot: a second roll after consumption folds zero', async () => {
-        await arm('Weal', true, 8);
-        computeD20Roll({
-            characterName: DRUID, campaignName: CAMPAIGN, name: 'Initiative',
-            rollType: 'initiative', context: {}, bonus: 0, isResilientSphereActive: () => false,
-        });
-        expect(readPending()).toBeNull();
-        const second = computeD20Roll({
-            characterName: DRUID, campaignName: CAMPAIGN, name: 'Initiative',
-            rollType: 'initiative', context: {}, bonus: 0, isResilientSphereActive: () => false,
-        });
-        expect(second.cosmicOmenAppliedBonus).toBe(0);
-        expect(second.effectiveBonus).toBe(0);
-    });
-
     it('d20RollComputation save lane stays inert (save fold belongs to saveProcessing/SavePromptModal)', async () => {
         await arm('Weal', true, 4);
         const r = computeD20Roll({
@@ -113,10 +105,9 @@ describe('CLA-065 cosmic omen canonical pending store', () => {
         });
         expect(r.cosmicOmenAppliedBonus).toBe(0);
         // save lane consumer predicate: same store key + shape (saveProcessing.js:161)
-        const raw = readPending();
-        expect(raw).toBeTruthy();
-        const pending = JSON.parse(raw);
-        expect(pending && typeof pending.value === 'number' && pending.value > 0).toBe(true);
+        const pending = JSON.parse(readPending());
+        expect(typeof pending.value).toBe('number');
+        expect(pending.value).toBeGreaterThan(0);
     });
 
     it('registers cosmicOmenPendingBonus in LONG_REST_RESOURCES', () => {

@@ -1,3 +1,13 @@
+// @maintained-by-ai
+// Hill's Tumble (CLA-169): deterministic contract lock over the shared giantAncestry
+// lane (resolveAncestryUses → ancestryNoUsesPopup → attackerRollGate → exact-key use
+// spend → applyHillsTumbleEffect → logs). Dispatch owns the exact-string refusal table
+// + zero-side-effect guards + te replacement; direct is its thin wiring twin and keeps
+// only its own composition (hardcoded 'hills_tumble' automationType), one
+// attacker-mismatch wiring refusal, and the no-uses shape. Exact-key spend pins
+// ('TestHero','hillsTumbleUses') subsume the removed pure-computation pins.
+// Sibling giantAncestry-hillsTumble.regression.test.js owns miss / no-damage /
+// 0-uses zero-spend, chip-lane routing, and rounds:2 clock locks — not duplicated here.
 import { vi } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -66,6 +76,12 @@ function makeUsesMock(usesKey, value) {
     });
 }
 
+// Zero-side-effect guard: refusals must never spend a use or write targetEffects
+// (CLA-169: refuses on click with ZERO spend).
+function expectNoWrites() {
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+}
+
 describe('giantAncestry selection & dispatch', () => {
     describe('handleHillsTumble', () => {
         const option = { name: "Hill's Tumble", type: 'auto_effect', trigger: 'melee_hit', effect: 'disadvantage_next_attack' };
@@ -109,6 +125,7 @@ describe('giantAncestry selection & dispatch', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('requires a recent attack');
+            expectNoWrites();
         });
 
         it('returns popup when attacker is not the player', async () => {
@@ -123,6 +140,7 @@ describe('giantAncestry selection & dispatch', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('after you make an attack');
+            expectNoWrites();
         });
 
         it('returns popup when rollType is not attack', async () => {
@@ -137,6 +155,7 @@ describe('giantAncestry selection & dispatch', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('after an attack roll');
+            expectNoWrites();
         });
 
         it('returns popup when no targetName in lastAttack', async () => {
@@ -151,6 +170,7 @@ describe('giantAncestry selection & dispatch', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('requires a target');
+            expectNoWrites();
         });
 
         it('replaces existing disadvantage_next_attack from same source', async () => {
@@ -166,15 +186,17 @@ describe('giantAncestry selection & dispatch', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Disadvantage');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'hillsTumbleUses', 2, 'campaign');
-            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.arrayContaining([
-                expect.objectContaining({
-                    target: 'Goblin',
-                    effect: 'disadvantage_next_attack',
-                    source: 'TestHero',
-                    // CLA-169: RAW duration "before the end of its next turn"
-                    duration: 'until_end_of_next_turn',
-                }),
-            ]), 'campaign', true);
+            // Replace (merge-in-place), never append: exactly one te for this target/effect.
+            const teWrite = setRuntimeValue.mock.calls.find(([, key]) => key === 'targetEffects');
+            expect(teWrite).toBeDefined();
+            const disadvantageEffects = teWrite[2].filter(te => te.effect === 'disadvantage_next_attack');
+            expect(disadvantageEffects).toHaveLength(1);
+            expect(disadvantageEffects[0]).toMatchObject({
+                target: 'Goblin',
+                source: 'TestHero',
+                // CLA-169: RAW duration "before the end of its next turn"
+                duration: 'until_end_of_next_turn',
+            });
         });
 
         it('returns info popup when no uses remaining', async () => {
@@ -184,8 +206,14 @@ describe('giantAncestry selection & dispatch', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
             expect(result.payload.description).toContain('Long Rest');
+            expectNoWrites();
         });
     });
+
+    // Direct lane is a thin wiring twin of dispatch over the same shared gate and
+    // effect helpers (giantAncestryUtils.js) — it keeps only its own-composition
+    // success (hardcoded 'hills_tumble' automationType + exact-key spend), one
+    // attacker-mismatch wiring refusal, and the no-uses refusal shape.
     describe('handleHillsTumbleDirect', () => {
         const directAction = {
             name: "Hill's Tumble",
@@ -199,7 +227,7 @@ describe('giantAncestry selection & dispatch', () => {
             },
         };
 
-        it('applies disadvantage_next_attack targetEffect', async () => {
+        it('applies disadvantage_next_attack with own hills_tumble automationType', async () => {
             getRuntimeValue.mockImplementation((_name, key, _campaign) => {
                 if (key === 'hillsTumbleUses') return 3;
                 return null;
@@ -207,8 +235,9 @@ describe('giantAncestry selection & dispatch', () => {
             const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Goblin');
-            expect(result.payload.description).toContain('Disadvantage');
+            expect(result.payload.name).toBe("Hill's Tumble");
+            expect(result.payload.automationType).toBe('hills_tumble');
+            expect(result.payload.description).toBe("Hill's Tumble: <strong>Goblin</strong> has Disadvantage on its next attack roll until the end of its next turn.");
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'hillsTumbleUses', 2, 'campaign');
             expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.arrayContaining([
                 expect.objectContaining({
@@ -231,16 +260,7 @@ describe('giantAncestry selection & dispatch', () => {
             }));
         });
 
-        it('returns popup when no lastAttack', async () => {
-            makeUsesMock('hillsTumbleUses', 3);
-            findLastAttack.mockResolvedValue(null);
-            const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('requires a recent attack');
-        });
-
-        it('returns popup when attacker is not the player', async () => {
+        it('wires the shared attackerRollGate: refuses wrong-attacker with zero spend', async () => {
             makeUsesMock('hillsTumbleUses', 3);
             findLastAttack.mockResolvedValue({
                 attackEvent: { rollType: 'attack' },
@@ -252,58 +272,7 @@ describe('giantAncestry selection & dispatch', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('after you make an attack');
-        });
-
-        it('returns popup when rollType is not attack', async () => {
-            makeUsesMock('hillsTumbleUses', 3);
-            findLastAttack.mockResolvedValue({
-                attackEvent: { rollType: 'check' },
-                attackerName: 'TestHero',
-                targetName: 'Goblin',
-            });
-
-            const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('after an attack roll');
-        });
-
-        it('returns popup when no targetName in lastAttack', async () => {
-            makeUsesMock('hillsTumbleUses', 3);
-            findLastAttack.mockResolvedValue({
-                attackEvent: { rollType: 'attack' },
-                attackerName: 'TestHero',
-                targetName: null,
-            });
-
-            const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('requires a target');
-        });
-
-        it('replaces existing disadvantage_next_attack from same source', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'hillsTumbleUses') return 3;
-                if (key === 'targetEffects') return [
-                    { target: 'Goblin', effect: 'disadvantage_next_attack', source: 'TestHero' },
-                ];
-                return null;
-            });
-            const result = await handleHillsTumbleDirect(directAction, makePlayerStats(), 'campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Disadvantage');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'hillsTumbleUses', 2, 'campaign');
-            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.arrayContaining([
-                expect.objectContaining({
-                    target: 'Goblin',
-                    effect: 'disadvantage_next_attack',
-                    source: 'TestHero',
-                    // CLA-169: RAW duration "before the end of its next turn"
-                    duration: 'until_end_of_next_turn',
-                }),
-            ]), 'campaign', true);
+            expectNoWrites();
         });
 
         it('returns info popup when no uses remaining', async () => {
@@ -313,6 +282,7 @@ describe('giantAncestry selection & dispatch', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
             expect(result.payload.description).toContain('Long Rest');
+            expectNoWrites();
         });
     });
 });

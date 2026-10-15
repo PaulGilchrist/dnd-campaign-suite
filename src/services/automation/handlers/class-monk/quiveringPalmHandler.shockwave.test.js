@@ -1,3 +1,16 @@
+// @maintained-by-ai
+// Deterministic edge-case contract for applyShockwave(): damage defaults
+// ('10d12'/'Force'), exact applyDamageToTarget call args + diceDisplay pin,
+// cs-null damage-skip guard (unique here — nullContext.test.js owns the
+// getCombatContext arm in handle()), resistance-adjust console.error,
+// rollExpression-null rawDamage 0, saveResult ?? payload fallbacks, and the
+// zero-saveBonus saveFormula ('1d20', no '+0') pin. Cluster seam map:
+// addEntry rejection catches and the canonical ?? no-finalDamage detector →
+// errorPaths.test.js; real DC resolution → saveDc.test.js; handle()/refusal
+// lanes → handle.test.js, nullContext.test.js, catchCoverage.test.js,
+// successCatch.test.js; happy popup + half-damage-on-save → .test.js.
+// A full mock baseline is set in beforeEach — tests never rely on mock
+// leakage from a preceding test (clearAllMocks preserves implementations).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────
@@ -37,6 +50,7 @@ vi.mock('../../../rules/combat/applyDamage.js', () => ({
 
 import { applyShockwave } from './quiveringPalmHandler.js';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { buildSaveDc, createSaveListener } from '../../../automation/common/savePrompt.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
@@ -45,6 +59,8 @@ import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 // ── Helpers ────────────────────────────────────────────────────
 
 const campaignName = 'test-campaign';
+
+const DEFAULT_ROLL = { total: 55, rolls: [10, 10, 10, 10, 10, 5, 0, 0, 0, 0], modifier: 0 };
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -78,264 +94,137 @@ function makeAction(automation = {}) {
   };
 }
 
+function makeSaveListener(result) {
+  return { promise: Promise.resolve(result) };
+}
+
 // ── Tests: applyShockwave() edge cases ─────────────────────────
 
 describe('quiveringPalmHandler.applyShockwave — edge cases', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Full baseline: every test runs against a complete, explicit mock set
+    // and overrides only the seam it targets — no order-dependent leakage.
+    buildSaveDc.mockReturnValue(15);
+    createSaveListener.mockReturnValue(makeSaveListener({ roll: 8, saveBonus: 2, total: 10, success: false }));
+    rollExpression.mockReturnValue(DEFAULT_ROLL);
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
+    getRuntimeValue.mockReturnValue([{ name: 'TestMonk' }]);
+    applyDamageToTarget.mockReturnValue({ finalDamage: 55 });
   });
 
-  it('uses default damageExpression when not provided', async () => {
-    const ps = makePlayerStats();
+  it('uses default damageExpression and damageType when automation omits them', async () => {
     const action = makeAction({ damageExpression: undefined, damageType: undefined });
 
-    buildSaveDc.mockReturnValue(15);
-    createSaveListener.mockReturnValue({
-      promise: Promise.resolve({
-        roll: 8,
-        saveBonus: 2,
-        total: 10,
-        success: false,
-      }),
-    });
-    rollExpression.mockReturnValue({ total: 55, rolls: [10, 10, 10, 10, 10, 5, 0, 0, 0, 0], modifier: 0 });
-    applyDamageToTarget.mockReturnValue({ finalDamage: 55 });
+    const result = await applyShockwave(action, makePlayerStats(), campaignName, 'Goblin');
 
-    const result = await applyShockwave(action, ps, campaignName, 'Goblin');
-
+    // The default must actually reach the roller and the damage call.
+    expect(rollExpression).toHaveBeenCalledWith('10d12');
+    expect(applyDamageToTarget).toHaveBeenCalledWith(
+      expect.anything(), 'Goblin', 55, ['Force'],
+      expect.objectContaining({ ignoreResistance: false, attackerName: 'TestMonk' })
+    );
     expect(result.payload.damageExpression).toBe('10d12');
     expect(result.payload.damageType).toBe('Force');
     expect(result.payload.rawDamage).toBe(55);
     expect(result.payload.finalDamage).toBe(55);
   });
 
-  it('applies damage when combatSummary is present', async () => {
-    const ps = makePlayerStats();
+  it('applies full damage on failed save with exact applyDamageToTarget args', async () => {
     const action = makeAction({
       damageExpression: '10d12',
       damageType: 'Force',
     });
 
-    buildSaveDc.mockReturnValue(15);
-    createSaveListener.mockReturnValue({
-      promise: Promise.resolve({
-        roll: 8,
-        saveBonus: 2,
-        total: 10,
-        success: false,
-      }),
-    });
-    rollExpression.mockReturnValue({ total: 55, rolls: [10, 10, 10, 10, 10, 5, 0, 0, 0, 0], modifier: 0 });
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
-    getRuntimeValue.mockReturnValue([{ name: 'TestMonk' }]);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 55 });
+    const result = await applyShockwave(action, makePlayerStats(), campaignName, 'Goblin');
 
-    const result = await applyShockwave(action, ps, campaignName, 'Goblin');
-
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: expect.any(Array) }), 'Goblin', 55, ['Force'], { campaignName, characters: [{ name: 'TestMonk' }], ignoreResistance: false, attackerName: 'TestMonk' });
     expect(result.payload.rawDamage).toBe(55);
     expect(result.payload.finalDamage).toBe(55);
-    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.objectContaining({ creatures: expect.any(Array) }), 'Goblin', 55, ['Force'], { campaignName, characters: [{ name: 'TestMonk' }], ignoreResistance: false, attackerName: 'TestMonk' });
+    expect(result.payload.diceDisplay).toBe(' (10, 10, 10, 10, 10, 5, 0, 0, 0, 0)');
   });
 
   it('handles null combatSummary (skips damage application)', async () => {
-    const ps = makePlayerStats();
     const action = makeAction({
       damageExpression: '10d12',
       damageType: 'Force',
     });
 
-    buildSaveDc.mockReturnValue(15);
-    createSaveListener.mockReturnValue({
-      promise: Promise.resolve({
-        roll: 8,
-        saveBonus: 2,
-        total: 10,
-        success: false,
-      }),
-    });
-    rollExpression.mockReturnValue({ total: 55, rolls: [10, 10, 10, 10, 10, 5, 0, 0, 0, 0], modifier: 0 });
     getCombatSummary.mockReturnValue(null);
 
-    const result = await applyShockwave(action, ps, campaignName, 'Goblin');
+    const result = await applyShockwave(action, makePlayerStats(), campaignName, 'Goblin');
 
     expect(result.payload.rawDamage).toBe(55);
     expect(result.payload.finalDamage).toBe(55);
     expect(applyDamageToTarget).not.toHaveBeenCalled();
   });
 
-  it('handles applyDamageToTarget returning no finalDamage', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      damageExpression: '10d12',
-      damageType: 'Force',
-    });
-
-    buildSaveDc.mockReturnValue(15);
-    createSaveListener.mockReturnValue({
-      promise: Promise.resolve({
-        roll: 8,
-        saveBonus: 2,
-        total: 10,
-        success: false,
-      }),
-    });
-    rollExpression.mockReturnValue({ total: 55, rolls: [10, 10, 10, 10, 10, 5, 0, 0, 0, 0], modifier: 0 });
-    applyDamageToTarget.mockReturnValue({});
-
-    const result = await applyShockwave(action, ps, campaignName, 'Goblin');
-
-    expect(result.payload.finalDamage).toBe(55);
-  });
-
   it('logs console.error when applyDamageToTarget adjusts damage', async () => {
-    const ps = makePlayerStats();
     const action = makeAction({
       damageExpression: '10d12',
       damageType: 'Force',
     });
 
-    buildSaveDc.mockReturnValue(15);
-    createSaveListener.mockReturnValue({
-      promise: Promise.resolve({
-        roll: 8,
-        saveBonus: 2,
-        total: 10,
-        success: false,
-      }),
-    });
-    rollExpression.mockReturnValue({ total: 55, rolls: [10, 10, 10, 10, 10, 5, 0, 0, 0, 0], modifier: 0 });
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
-    getRuntimeValue.mockReturnValue([{ name: 'TestMonk' }]);
     applyDamageToTarget.mockReturnValue({ finalDamage: 27 });
 
     const consoleSpy = vi.spyOn(console, 'error');
 
-    const result = await applyShockwave(action, ps, campaignName, 'Goblin');
+    const result = await applyShockwave(action, makePlayerStats(), campaignName, 'Goblin');
 
     expect(consoleSpy).toHaveBeenCalledWith(
       '[quiveringPalm] Damage adjusted by resistances: 55 → 27'
     );
+    // Popup reports the handler-computed finalDamage; the discrepancy is
+    // surfaced via console.error, not silently rewritten into the payload.
     expect(result.payload.finalDamage).toBe(55);
 
     consoleSpy.mockRestore();
   });
 
   it('handles rollExpression returning null (rawDamage=0)', async () => {
-    const ps = makePlayerStats();
     const action = makeAction({
       damageExpression: '10d12',
       damageType: 'Force',
     });
 
-    buildSaveDc.mockReturnValue(15);
-    createSaveListener.mockReturnValue({
-      promise: Promise.resolve({
-        roll: 8,
-        saveBonus: 2,
-        total: 10,
-        success: false,
-      }),
-    });
     rollExpression.mockReturnValue(null);
     applyDamageToTarget.mockReturnValue({ finalDamage: 0 });
 
-    const result = await applyShockwave(action, ps, campaignName, 'Goblin');
+    const result = await applyShockwave(action, makePlayerStats(), campaignName, 'Goblin');
 
     expect(result.payload.rawDamage).toBe(0);
     expect(result.payload.finalDamage).toBe(0);
-  });
-
-  it('handles saveResult with missing roll and saveBonus', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      damageExpression: '10d12',
-      damageType: 'Force',
-    });
-
-    buildSaveDc.mockReturnValue(15);
-    createSaveListener.mockReturnValue({
-      promise: Promise.resolve({
-        success: false,
-      }),
-    });
-    rollExpression.mockReturnValue({ total: 55, rolls: [10, 10, 10, 10, 10, 5, 0, 0, 0, 0], modifier: 0 });
-    applyDamageToTarget.mockReturnValue({ finalDamage: 55 });
-
-    const result = await applyShockwave(action, ps, campaignName, 'Goblin');
-
-    expect(result.payload.saveRoll).toBe(0);
-    expect(result.payload.saveBonus).toBe(0);
-  });
-
-  it('handles saveResult with saveBonus=0', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      damageExpression: '10d12',
-      damageType: 'Force',
-    });
-
-    buildSaveDc.mockReturnValue(15);
-    createSaveListener.mockReturnValue({
-      promise: Promise.resolve({
-        roll: 8,
-        saveBonus: 0,
-        total: 8,
-        success: false,
-      }),
-    });
-    rollExpression.mockReturnValue({ total: 55, rolls: [10, 10, 10, 10, 10, 5, 0, 0, 0, 0], modifier: 0 });
-    applyDamageToTarget.mockReturnValue({ finalDamage: 55 });
-
-    const result = await applyShockwave(action, ps, campaignName, 'Goblin');
-
-    expect(result.payload.saveBonus).toBe(0);
-  });
-
-  it('handles rollExpression with empty rolls array', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      damageExpression: '10d12',
-      damageType: 'Force',
-    });
-
-    buildSaveDc.mockReturnValue(15);
-    createSaveListener.mockReturnValue({
-      promise: Promise.resolve({
-        roll: 8,
-        saveBonus: 2,
-        total: 10,
-        success: false,
-      }),
-    });
-    rollExpression.mockReturnValue({ total: 55, rolls: [], modifier: 0 });
-    applyDamageToTarget.mockReturnValue({ finalDamage: 55 });
-
-    const result = await applyShockwave(action, ps, campaignName, 'Goblin');
-
     expect(result.payload.diceDisplay).toBe('');
-    expect(result.payload.rawDamage).toBe(55);
   });
 
-  it('handles saveResult with no roll property in return payload', async () => {
-    const ps = makePlayerStats();
+  it('defaults missing roll and saveBonus to 0 via ?? fallback', async () => {
     const action = makeAction({
       damageExpression: '10d12',
       damageType: 'Force',
     });
 
-    buildSaveDc.mockReturnValue(15);
-    createSaveListener.mockReturnValue({
-      promise: Promise.resolve({
-        success: true,
-      }),
-    });
-    rollExpression.mockReturnValue({ total: 50, rolls: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5], modifier: 0 });
-    applyDamageToTarget.mockReturnValue({ finalDamage: 25 });
+    createSaveListener.mockReturnValue(makeSaveListener({ success: false }));
 
-    const result = await applyShockwave(action, ps, campaignName, 'Goblin');
+    const result = await applyShockwave(action, makePlayerStats(), campaignName, 'Goblin');
 
     expect(result.payload.saveRoll).toBe(0);
     expect(result.payload.saveBonus).toBe(0);
-    expect(result.payload.finalDamage).toBe(25);
+  });
+
+  it('preserves an explicit zero saveBonus and omits +0 from the save formula', async () => {
+    const action = makeAction({
+      damageExpression: '10d12',
+      damageType: 'Force',
+    });
+
+    createSaveListener.mockReturnValue(makeSaveListener({ roll: 8, saveBonus: 0, total: 8, success: false }));
+
+    const result = await applyShockwave(action, makePlayerStats(), campaignName, 'Goblin');
+
+    expect(result.payload.saveBonus).toBe(0);
+    const resultLog = addEntry.mock.calls
+      .map(c => c[1])
+      .find(e => e.saveFormula !== undefined);
+    expect(resultLog.saveFormula).toBe('1d20');
   });
 });

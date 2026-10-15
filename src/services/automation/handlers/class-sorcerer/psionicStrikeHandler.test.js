@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// Psionic Strike rider-lane suite: CLA-273 trigger gate, psionicEnergy spend
+// gate, round-keyed once-per-turn latches (psionicStrikeUsedThisTurn + rider
+// telekineticThrustUsedRound), damage math, own-composition wording, and the
+// rider's own prone/push copy. Die-size TIERS are owned by
+// automationExpressions.test.js (getPsionicEnergyDieSize) — not re-pinned here;
+// once-per-rest telekineticThrustUses gate is owned by
+// psionicStrikeHandler.thrustRestGate.test.js (CLA-355).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './psionicStrikeHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -294,6 +302,15 @@ describe('psionicStrikeHandler', () => {
 
             expect(result.payload.description).toContain('Target Goblin');
             expect(result.payload.description).toContain('Psionic Energy: 2/6');
+
+            mockSuccessfulRuntimeValues({ psionicEnergy: 3 });
+            const missingKey = await handle(
+                makeAction(),
+                makePlayerStats({ _trackedResources: { superiorityDie: { max: 8 } } }),
+                'test-campaign'
+            );
+
+            expect(missingKey.payload.description).toContain('Psionic Energy: 2/6');
         });
 
         it('uses custom resource name from automation config', async () => {
@@ -393,25 +410,6 @@ describe('psionicStrikeHandler', () => {
 
             expect(result.payload.description).toContain('Rolled d8: 8');
         });
-    });
-
-    describe('die size by level', () => {
-        function testDieSize(level, expectedDie) {
-            it(`uses 1d${expectedDie} for level ${level}`, async () => {
-                const playerStats = makePlayerStats({ level });
-                mockSuccessfulRuntimeValues({ psionicEnergy: 8 });
-                rollExpression.mockReturnValue(makeRollResult(7, expectedDie));
-
-                await handle(makeAction(), playerStats, 'test-campaign');
-
-                expect(rollExpression).toHaveBeenCalledWith(`1d${expectedDie}`);
-            });
-        }
-
-        testDieSize(1, 6);
-        testDieSize(3, 6);
-        testDieSize(9, 8);
-        testDieSize(17, 12);
     });
 
     describe('popup and log wording', () => {

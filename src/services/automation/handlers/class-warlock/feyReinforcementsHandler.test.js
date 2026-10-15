@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // CLA-138: confirm ARMS the latch at usesMax (never decrements at arm — arm-0 +
 // cast-auth->0 was a dead free-cast). The spell row consumes the latch and honors
 // the runtime no-Concentration choice stamped here.
@@ -121,6 +122,12 @@ describe('feyReinforcementsHandler', () => {
                 1,
                 campaignName
             );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                playerName,
+                '_Fey_Reinforcements_noConcentration',
+                false,
+                campaignName
+            );
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Fey Reinforcements');
@@ -140,12 +147,6 @@ describe('feyReinforcementsHandler', () => {
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
-                '_Fey_Reinforcements_freeCastCount',
-                1,
-                campaignName
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
                 '_Fey_Reinforcements_noConcentration',
                 true,
                 campaignName
@@ -153,19 +154,6 @@ describe('feyReinforcementsHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Concentration skipped');
             expect(result.payload.description).toContain('duration 1 minute');
-        });
-
-        it('stamps the runtime no-Concentration choice false when unchecked', async () => {
-            mockFreeCastCount(1);
-
-            await confirmFeyReinforcement(makeAction(), makePlayerStats(), campaignName, false);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                '_Fey_Reinforcements_noConcentration',
-                false,
-                campaignName
-            );
         });
 
         it('logs the arm as an ability_use entry (automation logging convention)', async () => {

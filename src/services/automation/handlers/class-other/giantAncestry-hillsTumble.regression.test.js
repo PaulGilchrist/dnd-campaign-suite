@@ -1,3 +1,8 @@
+// @maintained-by-ai: 2026-10-15 — deterministic defect lock; runtime/log/
+// expirations/damageUtils are mocked and only the pure findLastAttack parser +
+// attackerRollGate + registerTargetEffect run unmocked, so no churn is needed
+// unless the CLA-169/CLA-141 contracts themselves move.
+//
 // Regression test for CLA-169: Hill's Tumble – Goliath (Hill Giant).
 //
 // Attempt-2 report claimed the feature never offered/fired after a melee hit.
@@ -14,6 +19,12 @@
 //     clock (MA-0038/MA-0073 verified shape),
 //   - getRuntimeValue('campaign','targetEffects') read without campaignName.
 // These tests lock the fixed contract, mirroring the firesBurn lane.
+// Seam vs. giantAncestry-hillsTumble.test.js (main lane): the main lane MOCKS
+// findLastAttack, so it cannot catch parser/record-shape drift — this file is
+// the defect lock keeping the real parser + hit/damage gate (miss, no-damage,
+// zero-spend). The main lane pins the hillsTumbleUses key end-to-end via its
+// exact-key setRuntimeValue spend assertions, so no standalone getRuntimeUsesKey
+// pin lives here (firesBurn.regression family pattern).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -37,7 +48,6 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
 }));
 
 import { handleHillsTumble, handleHillsTumbleDirect } from './giantAncestryHandler.js';
-import { getRuntimeUsesKey } from './giantAncestryOptions.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
@@ -97,10 +107,6 @@ beforeEach(() => {
 });
 
 describe('CLA-169 Hill\'s Tumble regression (verified Fire\'s Burn lane)', () => {
-    it('uses runtime key hillsTumbleUses', () => {
-        expect(getRuntimeUsesKey("Hill's Tumble")).toBe('hillsTumbleUses');
-    });
-
     it('chip lane is reachable: builds info and routes hills_tumble (1 action) into actions', () => {
         const feature = makeDirectAction();
         const info = elementalHandlers.hills_tumble(feature, makePlayerStats());

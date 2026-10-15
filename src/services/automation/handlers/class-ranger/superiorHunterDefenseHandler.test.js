@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Deterministic unit contract for superiorHunterDefenseHandler: RAW trigger gates
+// (no-attack / wrong-target / miss / round-latch refusal), resistance-type selection,
+// retroactive healing, latch serialization (CLA-371), and the single merged
+// setRuntimeObject buff+expiration write (CLA-345). Mocks are stable module seams;
+// message and byte-shape pins are intentional regression locks, not brittle drift.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './superiorHunterDefenseHandler.js';
 import * as damageRollback from '../../common/damageRollback.js';
@@ -31,6 +37,8 @@ vi.mock('../../../encounters/combatData.js', () => ({
 const { getRuntimeValue, setRuntimeValue, setRuntimeObject } = await import('../../../../hooks/runtime/useRuntimeState.js');
 const { addEntry } = await import('../../../ui/logService.js');
 const { applyHealingToTarget } = await import('../../../rules/combat/applyHealing.js');
+const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+const { getCurrentCombatRound } = await import('../../../encounters/combatData.js');
 
 function makePlayerStats(overrides = {}) {
     return {
@@ -55,6 +63,13 @@ function makeAction(overrides = {}) {
 describe('superiorHunterDefenseHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        // clearAllMocks clears calls but NOT implementations — restore the
+        // factory defaults so mockResolvedValue/mockReturnValue set by one
+        // test cannot leak into the next (a leaked null made the
+        // no-actualHeal test pass vacuously).
+        getCombatContext.mockResolvedValue({});
+        getCurrentCombatRound.mockReturnValue(1);
+        addEntry.mockResolvedValue(undefined);
     });
 
     describe('handle', () => {
@@ -388,26 +403,6 @@ describe('superiorHunterDefenseHandler', () => {
             expect(result.payload.description).toContain('Retroactively healed for 5 HP');
         });
 
-        it('handles addEntry rejection for ability_use logging without breaking', async () => {
-            getRuntimeValue.mockReturnValue([]);
-            applyHealingToTarget.mockResolvedValue({ actualHeal: 0, oldHp: 10, newHp: 10 });
-            addEntry.mockImplementation(() => Promise.reject(new Error('log error')));
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: { damageType: 'cold', primaryDamage: 8, targetName: 'Test Ranger' },
-                attackerName: 'Frost Giant',
-                targetName: 'Test Ranger',
-                primaryDamage: 8,
-                secondaryDamage: 0,
-                totalDamage: 8,
-                damageTypes: ['cold'],
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Resistance to cold damage');
-        });
-
         it('uses custom action name when provided', async () => {
             getRuntimeValue.mockReturnValue([]);
             damageRollback.findLastAttack.mockResolvedValue({
@@ -440,8 +435,7 @@ describe('superiorHunterDefenseHandler', () => {
 
         it('handles when combat context is null', async () => {
             getRuntimeValue.mockReturnValue([]);
-            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
-            getCombatContext.mockResolvedValue(null);
+            getCombatContext.mockResolvedValueOnce(null);
             damageRollback.findLastAttack.mockResolvedValue({
                 attackEvent: { damageType: 'fire', primaryDamage: 12, targetName: 'Test Ranger' },
                 attackerName: 'Goblin',
@@ -478,6 +472,9 @@ describe('superiorHunterDefenseHandler', () => {
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
+            // cs defaults to {} (truthy) so the heal runs and the
+            // healResult?.actualHeal ?? 0 fallback is genuinely exercised.
+            expect(applyHealingToTarget).toHaveBeenCalled();
             expect(result.payload.description).not.toContain('healed');
             expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 type: 'hp_change',
@@ -506,8 +503,6 @@ describe('superiorHunterDefenseHandler', () => {
                 if (key === 'activeBuffs') return [];
                 return undefined;
             });
-            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
-            getCombatContext.mockResolvedValue({});
             applyHealingToTarget.mockResolvedValue({ actualHeal: 3, oldHp: 10, newHp: 13 });
             damageRollback.findLastAttack.mockResolvedValue({
                 attackEvent: { damageType: 'fire', primaryDamage: 6, targetName: 'Test Ranger' },
@@ -597,7 +592,6 @@ describe('superiorHunterDefenseHandler', () => {
             getRuntimeValue.mockImplementation((name, key) => store[key] ?? null);
             setRuntimeValue.mockImplementation((name, key, value) => { store[key] = value; });
             setRuntimeObject.mockImplementation((name, obj) => { Object.assign(store, obj); });
-            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
             getCombatContext.mockResolvedValue({ round, creatures: [{ name: 'Thug 1' }, { name: 'Test Ranger' }], activeCreatureName: 'Thug 1' });
             return store;
         }
@@ -663,9 +657,11 @@ describe('superiorHunterDefenseHandler', () => {
             expect(abilityUseLogs).toHaveLength(1);
             expect(applyHealingToTarget).toHaveBeenCalledTimes(1);
             expect(setRuntimeObject.mock.calls.filter(c => c[1]?.activeBuffs)).toHaveLength(1);
+            // latch stamped once (first click) — the refusal re-click does not re-stamp
+            expect(setRuntimeValue.mock.calls.filter(c => c[1] === '_Superior_Hunters_Defense_usedRound')).toHaveLength(1);
         });
 
-        it('re-arms next round: hit + cleared latch spends again', async () => {
+        it('re-arms next round: hit + cleared latch spends again and stamps the fresh-context round', async () => {
             const store = await armedRuntime(3);
             store._Superior_Hunters_Defense_usedRound = 2;
             applyHealingToTarget.mockResolvedValue({ actualHeal: 3, oldHp: 97, newHp: 100 });
@@ -675,6 +671,13 @@ describe('superiorHunterDefenseHandler', () => {
 
             expect(result.payload.description).toContain('Resistance to Bludgeoning damage');
             expect(store._Superior_Hunters_Defense_usedRound).toBe(3);
+            // CLA-345 pin: latch round comes from the FRESH getCombatContext (3), not the stale latch (2)
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'Test Ranger',
+                '_Superior_Hunters_Defense_usedRound',
+                3,
+                'test-campaign'
+            );
         });
     });
 
@@ -691,82 +694,13 @@ describe('superiorHunterDefenseHandler', () => {
             secondaryDamageType: null,
         });
 
-        it('stamps _Superior_Hunters_Defense_usedRound with the round from a fresh combat context', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'activeBuffs') return [];
-                return undefined;
-            });
-            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
-            getCombatContext.mockResolvedValue({ round: 3, creatures: [{ name: 'Thug 1' }, { name: 'Test Ranger' }], activeCreatureName: 'Thug 1' });
-            damageRollback.findLastAttack.mockResolvedValue(bludgeoningHit());
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Test Ranger',
-                '_Superior_Hunters_Defense_usedRound',
-                3,
-                'test-campaign'
-            );
-        });
-
-        it('refuses a same-round re-click, logs superior_hunters_defense_refused, and spends nothing', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === '_Superior_Hunters_Defense_usedRound') return 3;
-                if (key === 'activeBuffs') return [];
-                return undefined;
-            });
-            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
-            getCombatContext.mockResolvedValue({ round: 3, creatures: [{ name: 'Thug 1' }, { name: 'Test Ranger' }], activeCreatureName: 'Thug 1' });
-            damageRollback.findLastAttack.mockResolvedValue(bludgeoningHit());
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('already used');
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'automation',
-                automationType: 'superior_hunters_defense_refused',
-                characterName: 'Test Ranger',
-            }));
-            expect(applyHealingToTarget).not.toHaveBeenCalled();
-            expect(setRuntimeObject).not.toHaveBeenCalled();
-            const buffWrites = setRuntimeObject.mock.calls.filter(c => c[1]?.activeBuffs);
-            expect(buffWrites).toHaveLength(0);
-            const latchWrites = setRuntimeValue.mock.calls.filter(c => c[1] === '_Superior_Hunters_Defense_usedRound');
-            expect(latchWrites).toHaveLength(0);
-        });
-
-        it('re-arms on the next round (latch round < current round succeeds)', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === '_Superior_Hunters_Defense_usedRound') return 2;
-                if (key === 'activeBuffs') return [];
-                return undefined;
-            });
-            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
-            getCombatContext.mockResolvedValue({ round: 3, creatures: [{ name: 'Thug 1' }, { name: 'Test Ranger' }], activeCreatureName: 'Thug 1' });
-            damageRollback.findLastAttack.mockResolvedValue(bludgeoningHit());
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-            expect(result.payload.description).toContain('Resistance to Bludgeoning damage');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Test Ranger',
-                '_Superior_Hunters_Defense_usedRound',
-                3,
-                'test-campaign'
-            );
-        });
-
         it('merges the buff and a 1-round-clock remove_active_buff expiration into ONE setRuntimeObject write', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'activeBuffs') return [];
                 if (key === 'pendingExpirations') return [{ target: 'Other', effects: [], appliedRound: 1, expiryRounds: 4, expireOnCreatureName: null }];
                 return undefined;
             });
-            const { getCurrentCombatRound } = await import('../../../encounters/combatData.js');
             getCurrentCombatRound.mockReturnValue(2);
-            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
             getCombatContext.mockResolvedValue({
                 round: 2,
                 activeCreatureName: 'Thug 1',

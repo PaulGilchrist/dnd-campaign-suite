@@ -1,3 +1,12 @@
+// @maintained-by-ai
+// Celestial Revelation dispatcher contract: level/uses gates (shared via
+// celestialRevelationGates), option storage, buff arming, and exact popup
+// copy. Deterministic — all collaborators mocked, no timers, no DOM.
+// Callee halves owned elsewhere: setCondition internals → conditionHandler
+// (see conditionHandler-necroticShroud.test.js), rest re-arm constants →
+// restRules-constants.cla048-celestial.test.js, rider consumption →
+// attackRollBonuses-cla048-celestial-rider.test.js, modal UI →
+// CelestialRevelationModal.test.jsx (mocks this handler).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, confirmCelestialRevelation } from './celestialRevelationHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -97,7 +106,7 @@ describe('celestialRevelationHandler', () => {
             expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('returns modal when level gate passes', async () => {
+        it('returns modal when level gate passes (null runtime value defaults to maxUses — allows first use)', async () => {
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
             expect(result.type).toBe('modal');
@@ -124,16 +133,6 @@ describe('celestialRevelationHandler', () => {
             expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('returns modal when uses are available', async () => {
-            const action = makeAction({ automation: { uses: 1, usesMax: 1 } });
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('celestialRevelation');
-        });
-
         it('treats maxUses of 0 as unlimited (skips uses check)', async () => {
             const action = makeAction({ automation: { uses: 0, usesMax: 0 } });
             runtimeState.getRuntimeValue.mockReturnValue(0);
@@ -142,6 +141,21 @@ describe('celestialRevelationHandler', () => {
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('celestialRevelation');
+        });
+
+        it('uses usesMax over uses when both are provided', async () => {
+            const action = makeAction({ automation: { uses: 0, usesMax: 1 } });
+            runtimeState.getRuntimeValue.mockReturnValue(0);
+
+            const result = await handle(action, makePlayerStats(), campaignName, null);
+
+            // maxUses must read from usesMax (1), not uses (0): the depletion
+            // check stays active and refuses. If uses won, maxUses would be 0,
+            // the check would be skipped, and the modal would wrongly open.
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toBe(
+                'Celestial Revelation has been used and cannot be used again until a Long Rest.'
+            );
         });
 
         it('uses custom resourceKey when provided', async () => {
@@ -169,24 +183,6 @@ describe('celestialRevelationHandler', () => {
             );
         });
 
-        it('uses usesMax over uses when both are provided', async () => {
-            const action = makeAction({ automation: { uses: 0, usesMax: 1 } });
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('modal');
-        });
-
-        it('uses uses when usesMax is not provided', async () => {
-            const action = makeAction({ automation: { uses: 1 } });
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('modal');
-        });
-
         it('handles string "0" representation of depleted uses from runtime storage', async () => {
             const action = makeAction({ automation: { uses: 1, usesMax: 1 } });
             runtimeState.getRuntimeValue.mockReturnValue('0');
@@ -194,15 +190,6 @@ describe('celestialRevelationHandler', () => {
             const result = await handle(action, makePlayerStats(), campaignName, null);
 
             expect(result.type).toBe('popup');
-        });
-
-        it('handles null runtime value by defaulting to maxUses (allows use)', async () => {
-            const action = makeAction({ automation: { uses: 1, usesMax: 1 } });
-            runtimeState.getRuntimeValue.mockReturnValue(null);
-
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('modal');
         });
     });
 
@@ -315,6 +302,20 @@ describe('celestialRevelationHandler', () => {
             );
         });
 
+        it('falls back to the chosen option name as buff effect for unknown options', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(1);
+
+            await confirmCelestialRevelation(makePlayerStats(), 'Astral Mantle', campaignName);
+
+            expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+                playerName,
+                'Astral Mantle',
+                { effect: 'Astral Mantle', duration: '1_minute' },
+                campaignName,
+                playerName
+            );
+        });
+
         it('returns popup with transformation description for each option', async () => {
             const cases = [
                 {
@@ -422,11 +423,12 @@ describe('celestialRevelationHandler', () => {
             );
         });
 
-        it('adds campaign log entry on successful transformation', async () => {
+        it('CLA-048: logs exactly ONE ability_use entry with correct shape (no attackRiderHandler double log)', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
 
             await confirmCelestialRevelation(makePlayerStats(), 'Heavenly Wings', campaignName);
 
+            expect(logService.addEntry).toHaveBeenCalledTimes(1);
             expect(logService.addEntry).toHaveBeenCalledWith(
                 campaignName,
                 expect.objectContaining({
@@ -436,14 +438,6 @@ describe('celestialRevelationHandler', () => {
                     description: 'Heavenly Wings used',
                 })
             );
-        });
-
-        it('CLA-048: logs exactly ONE ability_use entry (no attackRiderHandler double log)', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            await confirmCelestialRevelation(makePlayerStats(), 'Heavenly Wings', campaignName);
-
-            expect(logService.addEntry).toHaveBeenCalledTimes(1);
         });
 
         it('CLA-048: no handleAttackRider dispatch — rider consumed by pipeline step', async () => {
@@ -457,7 +451,7 @@ describe('celestialRevelationHandler', () => {
 
         it('handles addEntry rejection gracefully', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
-            logService.addEntry.mockRejectedValue(new Error('log fail'));
+            logService.addEntry.mockRejectedValueOnce(new Error('log fail'));
 
             const result = await confirmCelestialRevelation(
                 makePlayerStats(),
@@ -469,31 +463,31 @@ describe('celestialRevelationHandler', () => {
             expect(result.payload.type).toBe('automation_info');
         });
 
-        it('sets innerRadianceActive for Inner Radiance option', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            await confirmCelestialRevelation(makePlayerStats(), 'Inner Radiance', campaignName);
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'innerRadianceActive',
-                true,
-                campaignName
-            );
-        });
-
-        it('BUG CLA-198: does NOT burst aura damage at activation for Inner Radiance option', async () => {
+        it('BUG CLA-198: Inner Radiance arms innerRadianceActive flag only — no burst aura damage at activation', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
 
             await confirmCelestialRevelation(makePlayerStats(), 'Inner Radiance', campaignName);
 
             // The recurring tick is applied by applyTurnStartEffects at the turn
             // boundary — activation must only arm the flag, never damage immediately.
-            expect(expirations.applyAuraDamage).not.toHaveBeenCalled();
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
                 'innerRadianceActive',
                 true,
+                campaignName
+            );
+            expect(expirations.applyAuraDamage).not.toHaveBeenCalled();
+        });
+
+        it('does not arm innerRadianceActive for other transformation options', async () => {
+            runtimeState.getRuntimeValue.mockReturnValue(1);
+
+            await confirmCelestialRevelation(makePlayerStats(), 'Heavenly Wings', campaignName);
+
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+                playerName,
+                'innerRadianceActive',
+                expect.anything(),
                 campaignName
             );
         });

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // CLA-010 regression: Arcane Charge is RAW-gated on "When you use Action
 // Surge" — the surge latch (actionSurgeUsedThisRound === current round from
 // a campaignName-threaded fresh combat-summary read, CLA-004 pattern) is the
@@ -77,6 +78,8 @@ describe('CLA-010 Arcane Charge Action-Surge gate', () => {
     expect(logged[0].characterName).toBe('TestHero');
     expect(logged[0].description).toContain('requires Action Surge used this turn.');
     expect(spends()).toHaveLength(0);
+    // Null latch short-circuits before any combat-summary read.
+    expect(loadCombatSummary).not.toHaveBeenCalled();
   });
 
   it('refuses on a stale surge latch from an earlier round (round-wrap re-gates)', async () => {
@@ -87,18 +90,11 @@ describe('CLA-010 Arcane Charge Action-Surge gate', () => {
 
     expect(result.payload.automationType).toBe('arcane_charge_refused');
     expect(refusals()).toHaveLength(1);
+    expect(spends()).toHaveLength(0);
   });
 
-  it('threads campaignName through the fresh combat-summary round read when a latch exists', async () => {
-    loadCombatSummary.mockResolvedValue({ round: 4, creatures: [] });
-    seedLatch(4);
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-    expect(result.type).toBe('modal');
-    expect(loadCombatSummary).toHaveBeenCalledWith(campaignName);
-  });
-
+  // Fresh-latch match opens the modal; also pins the CLA-004 campaignName
+  // threading of the fresh combat-summary round read.
   it('opens the teleport modal when Action Surge was used this round', async () => {
     loadCombatSummary.mockResolvedValue({ round: 2, creatures: [] });
     seedLatch(2);
@@ -108,6 +104,7 @@ describe('CLA-010 Arcane Charge Action-Surge gate', () => {
     const result = await handle(action, playerStats, campaignName);
 
     expect(result.type).toBe('modal');
+    expect(loadCombatSummary).toHaveBeenCalledWith(campaignName);
     expect(result.modalName).toBe('arcaneCharge');
     expect(result.payload.action).toBe(action);
     expect(result.payload.playerStats).toBe(playerStats);
@@ -128,6 +125,8 @@ describe('CLA-010 Arcane Charge Action-Surge gate', () => {
 });
 
 describe('CLA-010 Arcane Charge teleport resolution logging', () => {
+  // Authored name/distance (default 30 ft) and a custom distance both flow
+  // through popup text and the ability_use log in one pass.
   it('confirm logs ability_use with character, feature name and distance', async () => {
     const result = await confirmArcaneCharge(makeAction(), makePlayerStats(), campaignName);
 
@@ -137,19 +136,16 @@ describe('CLA-010 Arcane Charge teleport resolution logging', () => {
     expect(result.payload.automationType).toBe('arcane_charge');
     expect(result.payload.description).toBe('Arcane Charge: Teleported 30 ft to an unoccupied space you can see.');
 
+    const custom = await confirmArcaneCharge({ name: 'Custom Charge', automation: { type: 'arcane_charge', distance: '45 ft' } }, makePlayerStats(), campaignName);
+    expect(custom.payload.description).toBe('Custom Charge: Teleported 45 ft to an unoccupied space you can see.');
+
     const logged = spends();
-    expect(logged).toHaveLength(1);
+    expect(logged).toHaveLength(2);
     expect(logged[0].characterName).toBe('TestHero');
     expect(logged[0].abilityName).toBe('Arcane Charge');
     expect(logged[0].description).toContain('Teleported 30 ft');
-  });
-
-  it('confirm logs the custom distance and passes through action name', async () => {
-    const action = { name: 'Custom Charge', automation: { type: 'arcane_charge', distance: '45 ft' } };
-
-    const result = await confirmArcaneCharge(action, makePlayerStats(), campaignName);
-
-    expect(result.payload.description).toBe('Custom Charge: Teleported 45 ft to an unoccupied space you can see.');
-    expect(spends()[0].description).toContain('Teleported 45 ft');
+    expect(logged[1].characterName).toBe('TestHero');
+    expect(logged[1].abilityName).toBe('Custom Charge');
+    expect(logged[1].description).toContain('Teleported 45 ft');
   });
 });

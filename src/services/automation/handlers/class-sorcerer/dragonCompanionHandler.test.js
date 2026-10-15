@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// Producer-lane unit tests for dragonCompanionHandler (Summon Dragon free cast):
+// uses-gate (popup vs modal), confirm decrement pinned to the exact runtime key
+// (_<FeatureName>_freeCastCount, spaces → underscores), and popup copy pinned as
+// full-string own-composition. Pure functions over mocked runtime state —
+// deterministic, no DOM, no timers. Modal wiring is covered separately in
+// DragonCompanionModal.test.jsx (which mocks this handler); automation-object
+// construction is owned by automationInfoBuilder/spell.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, confirmDragonCompanion, modalName, confirmType } from './dragonCompanionHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -8,6 +16,9 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 const campaignName = 'test-campaign';
+
+const DEPLETED_DESCRIPTION = 'No free casts remaining. Finish a Long Rest to regain them.';
+const SUCCESS_TAIL = 'normally — no spell slot or material components will be consumed.</em>';
 
 function makeAction(overrides = {}) {
     return {
@@ -45,14 +56,18 @@ describe('dragonCompanionHandler', () => {
         it('returns popup when no uses remaining (count 0)', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(0);
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
+            const action = makeAction();
+            const result = await handle(action, makePlayerStats(), campaignName);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Dragon Companion');
-            expect(result.payload.description).toContain('No free casts remaining');
-            expect(result.payload.description).toContain('Long Rest');
-            expect(result.payload.automation).toEqual(makeAction().automation);
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Dragon Companion',
+                    description: DEPLETED_DESCRIPTION,
+                    automation: action.automation,
+                },
+            });
         });
 
         it('returns modal when uses are available', async () => {
@@ -69,33 +84,24 @@ describe('dragonCompanionHandler', () => {
             expect(result.payload.playerStats).toBe(playerStats);
             expect(result.payload.campaignName).toBe(campaignName);
         });
-
-        it('uses custom action name in popup when runtime value is depleted', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(0);
-
-            const action = makeAction({ name: 'Custom Dragon' });
-            const result = await handle(action, makePlayerStats(), campaignName);
-
-            expect(result.payload.name).toBe('Custom Dragon');
-            expect(result.payload.description).toContain('No free casts remaining');
-        });
     });
 
     describe('confirmDragonCompanion', () => {
         it('decrements counter and returns success popup', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
 
-            const result = await confirmDragonCompanion(makeAction(), makePlayerStats(), campaignName, false);
+            const action = makeAction();
+            const result = await confirmDragonCompanion(action, makePlayerStats(), campaignName, false);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Dragon Companion');
-            expect(result.payload.description).toContain('Free cast of Summon Dragon (0 remaining)');
-            expect(result.payload.description).not.toContain('Does not require Concentration');
-            expect(result.payload.description).not.toContain('Duration: 1 minute');
-            expect(result.payload.description).toContain('no spell slot or material components');
-            expect(result.payload.automation.type).toBe('dragon_companion');
-            expect(result.payload.automation.noConcentration).toBe(false);
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Dragon Companion',
+                    description: `Dragon Companion: Free cast of Summon Dragon (0 remaining).<br/><br/><em>Open your spell sheet and cast Summon Dragon ${SUCCESS_TAIL}`,
+                    automation: { ...action.automation, noConcentration: false },
+                },
+            });
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'SorcererBoy',
                 '_Dragon_Companion_freeCastCount',
@@ -109,30 +115,57 @@ describe('dragonCompanionHandler', () => {
 
             const result = await confirmDragonCompanion(makeAction(), makePlayerStats(), campaignName, true);
 
-            expect(result.payload.description).toContain('Does not require Concentration');
-            expect(result.payload.description).toContain('Duration: 1 minute');
+            expect(result.payload.description).toBe(
+                `Dragon Companion: Free cast of Summon Dragon (0 remaining). Does not require Concentration. Duration: 1 minute.<br/><br/><em>Open your spell sheet and cast Summon Dragon ${SUCCESS_TAIL}`
+            );
             expect(result.payload.automation.noConcentration).toBe(true);
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalled();
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                'SorcererBoy',
+                '_Dragon_Companion_freeCastCount',
+                0,
+                campaignName
+            );
         });
 
         it('returns error popup and does not decrement when no uses remaining', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(0);
 
-            const result = await confirmDragonCompanion(makeAction(), makePlayerStats(), campaignName, false);
+            const action = makeAction();
+            const result = await confirmDragonCompanion(action, makePlayerStats(), campaignName, false);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No free casts remaining');
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Dragon Companion',
+                    description: DEPLETED_DESCRIPTION,
+                    automation: action.automation,
+                },
+            });
             expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('uses custom spell and action names in popup', async () => {
+        it('uses custom spell and action names in popup and runtime key', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
 
             const action = makeAction({ name: 'Custom Dragon', automation: { spell: 'Call Wyrm' } });
             const result = await confirmDragonCompanion(action, makePlayerStats(), campaignName, false);
 
-            expect(result.payload.name).toBe('Custom Dragon');
-            expect(result.payload.description).toContain('Custom Dragon: Free cast of Call Wyrm (0 remaining)');
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Custom Dragon',
+                    description: `Custom Dragon: Free cast of Call Wyrm (0 remaining).<br/><br/><em>Open your spell sheet and cast Call Wyrm ${SUCCESS_TAIL}`,
+                    automation: { ...action.automation, noConcentration: false },
+                },
+            });
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                'SorcererBoy',
+                '_Custom_Dragon_freeCastCount',
+                0,
+                campaignName
+            );
         });
 
         it('decrements from usesMax when runtime value is null', async () => {

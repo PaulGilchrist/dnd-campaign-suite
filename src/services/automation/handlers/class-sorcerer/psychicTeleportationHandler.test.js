@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Handler-lane contract for psychic_teleportation: energy ledger (exact-key
+// runtime pins), dN×10 distance roll (stubbed random), popup/log composition,
+// and the L5-003 §8.1 token-move seam. Dispatch routing is owned by
+// automation/index.psychicTeleportation.test.js; psionic_energy_die
+// resolution is owned by automationExpressions.test.js — not re-pinned here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './psychicTeleportationHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -96,6 +102,7 @@ describe('psychicTeleportationHandler', () => {
             expect(result.payload.description).toContain('Teleport');
             expect(result.payload.description).toContain('80 feet');
             expect(result.payload.description).toContain('4/8');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(playerName, 'psionicEnergy', 4, campaignName);
             expect(result.payload.automation).toEqual(makeAction().automation);
         });
 
@@ -118,7 +125,6 @@ describe('psychicTeleportationHandler', () => {
         });
 
         it.each([
-            { dieSize: 8, random: 0.875, expectedDistance: '80 feet' },
             { dieSize: 6, random: 0.834, expectedDistance: '60 feet' },
             { dieSize: 1, random: 0, expectedDistance: '10 feet' },
         ])('uses correct teleport distance based on die size ($dieSize-sided die)', async ({ dieSize, random, expectedDistance }) => {
@@ -143,6 +149,14 @@ describe('psychicTeleportationHandler', () => {
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('No Psionic Energy remaining');
             expect(result.payload.description).toContain('Recharges on a Short or Long Rest');
+        });
+
+        it('no-side-effect guard: depleted energy writes nothing and logs nothing', async () => {
+            await handle(makeAction(), makePlayerStats(), campaignName, 'battle-arena');
+
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(logService.addEntry).not.toHaveBeenCalled();
+            expect(teleportService.applyTeleportTokenMove).not.toHaveBeenCalled();
         });
     });
 

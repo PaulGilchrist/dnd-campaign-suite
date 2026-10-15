@@ -1,4 +1,11 @@
-// CLA-081: Defensive Tactics verification for 2024 Ranger (Hunter)
+// @maintained-by-ai
+// CLA-081: Defensive Tactics defect-lock/regression lane for 2024 Ranger (Hunter).
+// Steady-state handle/applyChoice composition is owned by defensiveTacticsHandler.test.js.
+// This lane locks the defect seams the main lane leaves open:
+//  - exact runtime-key symmetry (handle derives `_${name.replace(/\s+/g,'_')}_choice`,
+//    applyChoice hardcodes it — if either drifts, the round-trip breaks here first)
+//  - full-string own-composition of both description templates (main lane only uses toContain)
+//  - executeHandler router dispatch through the real automation/index.js registry
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, applyChoice } from './defensiveTacticsHandler.js';
 
@@ -15,6 +22,7 @@ const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/run
 const { addEntry } = await import('../../../ui/logService.js');
 
 const campaignName = 'test-campaign';
+const CHOICE_KEY = '_Defensive_Tactics_choice';
 
 function makePlayerStats(overrides = {}) {
     return {
@@ -41,118 +49,69 @@ describe('CLA-081: Defensive Tactics (2024 Ranger Hunter)', () => {
         vi.clearAllMocks();
     });
 
-    describe('handle - no choice made', () => {
-        it('should return modal when no choice has been made', async () => {
+    describe('exact-key pin', () => {
+        it('handle reads the exact runtime key derived from the action name, with no side effects', async () => {
             getRuntimeValue.mockReturnValue(undefined);
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
+            expect(getRuntimeValue).toHaveBeenCalledWith('RangerTest', CHOICE_KEY, campaignName);
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('defensiveTactics');
-            expect(result.payload.action).toBeDefined();
-            expect(result.payload.playerStats).toBeDefined();
-            expect(result.payload.campaignName).toBe('test-campaign');
-        });
-
-        it('should return modal for falsy runtime values (null, empty string)', async () => {
-            for (const falsy of [null, '']) {
-                vi.clearAllMocks();
-                getRuntimeValue.mockReturnValue(falsy);
-
-                const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-                expect(result.type).toBe('modal');
-                expect(result.modalName).toBe('defensiveTactics');
-            }
-        });
-    });
-
-    describe('handle - choice already made', () => {
-        it.each([
-            ['Escape the Horde'],
-            ['Multiattack Defense'],
-        ])('should return info popup for "%s"', async (choice) => {
-            getRuntimeValue.mockReturnValue(choice);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Defensive Tactics');
-            expect(result.payload.description).toContain(choice);
-            expect(result.payload.description).toContain('Short Rest or Long Rest');
-            expect(result.payload.automation).toBeDefined();
-        });
-    });
-
-    describe('applyChoice', () => {
-        it.each([
-            ['Invalid Choice'],
-            [''],
-            [null],
-            [undefined],
-        ])('should return null for invalid choice: %s', async (choice) => {
-            const result = await applyChoice(makePlayerStats(), campaignName, choice);
-
-            expect(result).toBeNull();
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(addEntry).not.toHaveBeenCalled();
         });
+    });
 
-        it.each([
-            ['Escape the Horde'],
-            ['Multiattack Defense'],
-        ])('should store "%s" and return confirmation popup', async (choice) => {
-            const result = await applyChoice(makePlayerStats(), campaignName, choice);
+    describe('key round-trip through a real in-memory runtime store', () => {
+        it('applyChoice writes and handle reads the same key; both description templates pinned verbatim', async () => {
+            const store = new Map();
+            getRuntimeValue.mockImplementation((_name, key) => store.get(`${_name}::${key}`));
+            setRuntimeValue.mockImplementation(async (name, key, value) => {
+                store.set(`${name}::${key}`, value);
+            });
 
+            const stats = makePlayerStats();
+
+            // Step 1: fresh state — modal, nothing written, nothing logged
+            let result = await handle(makeAction(), stats, campaignName);
+            expect(result.type).toBe('modal');
+            expect(store.size).toBe(0);
+            expect(addEntry).not.toHaveBeenCalled();
+
+            // Step 2: applyChoice persists under the exact key and logs once
+            result = await applyChoice(stats, campaignName, 'Escape the Horde');
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Defensive Tactics');
-            expect(result.payload.description).toContain(choice);
-            expect(result.payload.description).toContain('Short Rest or Long Rest');
-            expect(result.payload.automation).toBeUndefined();
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'RangerTest',
-                '_Defensive_Tactics_choice',
-                choice,
-                campaignName,
+            expect(result.payload.description).toBe(
+                'Selected: <b>Escape the Horde</b>. This choice can be changed on a Short Rest or Long Rest.'
             );
-
+            expect(result.payload.automation).toBeUndefined();
+            expect(store.get(`RangerTest::${CHOICE_KEY}`)).toBe('Escape the Horde');
+            expect(addEntry).toHaveBeenCalledTimes(1);
             expect(addEntry).toHaveBeenCalledWith(campaignName, {
                 type: 'ability_use',
                 characterName: 'RangerTest',
                 abilityName: 'Defensive Tactics',
-                description: `Defensive Tactics choice: ${choice}`,
+                description: 'Defensive Tactics choice: Escape the Horde',
             });
-        });
-    });
 
-    describe('end-to-end flow', () => {
-        it('should flow: modal -> applyChoice -> popup', async () => {
-            // Step 1: No choice yet - modal
-            getRuntimeValue.mockReturnValue(undefined);
-            let result = await handle(makeAction(), makePlayerStats(), campaignName);
-            expect(result.type).toBe('modal');
-
-            // Step 2: Apply a choice
-            result = await applyChoice(makePlayerStats(), campaignName, 'Escape the Horde');
+            // Step 3: handle now resolves that stored choice into a popup (no re-mocking)
+            result = await handle(makeAction(), stats, campaignName);
             expect(result.type).toBe('popup');
-            expect(result.payload.name).toBe('Defensive Tactics');
-
-            // Step 3: Trigger again - should show the popup with existing choice
-            // In the real app, setRuntimeValue persists and getRuntimeValue reads it back
-            getRuntimeValue.mockReturnValue('Escape the Horde');
-            result = await handle(makeAction(), makePlayerStats(), campaignName);
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Escape the Horde');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toBe(
+                '<b>Escape the Horde</b> has been selected. This choice can be changed on a Short Rest or Long Rest.'
+            );
+            expect(result.payload.automation).toEqual(makeAction().automation);
         });
     });
 
     describe('executeHandler integration', () => {
         it('should execute via executeHandler and return modal', async () => {
             const { executeHandler } = await import('../../index.js');
-            getRuntimeValue.mockReturnValue(undefined);
+            getRuntimeValue.mockReset().mockReturnValue(undefined);
 
             const result = await executeHandler(makeAction(), makePlayerStats(), campaignName, null, [makePlayerStats()]);
 

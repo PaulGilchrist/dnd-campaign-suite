@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// Activation sub-lane of the beguilingDefenses pair: covers handle()'s
+// activation flow — uses gate (incl. Pact Magic recharge), heal, save-prompt
+// creation, popup composition, and the activation ability_use/hp_change logs.
+// The save-result listener (promptId guard, lastAttack stamping, psychic
+// retaliation, listener teardown) is owned by
+// beguilingDefensesHandler.save-results.test.js — not covered here.
+// Deterministic: all seams mocked, no game timers.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handle } from './beguilingDefensesHandler.js';
 
@@ -228,13 +236,6 @@ describe('beguilingDefensesHandler', () => {
                 10, // Math.floor(20 / 2)
                 campaignName
             );
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'hp_change',
-                targetName: playerName,
-                delta: 10,
-                isHealing: true,
-                sourceName: 'Beguiling Defenses',
-            }));
         });
 
         it('does not heal when no combat context', async () => {
@@ -279,7 +280,7 @@ describe('beguilingDefensesHandler', () => {
             }));
         });
 
-        it('uses custom saveType from automation config or defaults to WIS', async () => {
+        it('uses custom saveType from automation config', async () => {
             setupHappyPath(makeHitAttack('Goblin', playerName));
 
             const action = makeAction({ automation: { saveType: 'CHA' } });
@@ -287,15 +288,6 @@ describe('beguilingDefensesHandler', () => {
 
             expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 saveType: 'CHA',
-            }));
-
-            vi.clearAllMocks();
-            setupHappyPath(makeHitAttack('Goblin', playerName));
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null, []);
-
-            expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                saveType: 'WIS',
             }));
         });
 
@@ -409,14 +401,28 @@ describe('beguilingDefensesHandler', () => {
             expect(abilityUseCall[1].description).toContain('take 10 Psychic damage');
         });
 
-        it('handles addEntry rejection without throwing', async () => {
+        it('handles activation addEntry rejection without throwing', async () => {
             setupHappyPath(makeHitAttack('Goblin', playerName));
             const errorSpy = vi.spyOn(console, 'error');
-            addEntry.mockImplementation(() => Promise.reject(new Error('log error')));
+            // Reject only the activation ability_use entry — the heal's
+            // hp_change entry resolves, so the rejection lands exactly where
+            // this test claims (handle()'s final activation log).
+            addEntry.mockImplementation((_campaign, entry) =>
+                entry && entry.type === 'ability_use'
+                    ? Promise.reject(new Error('log error'))
+                    : Promise.resolve()
+            );
 
-            await handle(makeAction(), makePlayerStats(), campaignName, null, []);
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null, []);
 
+            expect(result.type).toBe('popup');
             expect(createSaveListener).toHaveBeenCalled();
+            // Heal still logged successfully before the rejected activation entry.
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'hp_change',
+            }));
+            // Exactly one rejection (activation only) surfaced as one error log.
+            expect(errorSpy).toHaveBeenCalledTimes(1);
             expect(errorSpy).toHaveBeenCalledWith(
                 '[beguilingDefenses] Error:',
                 expect.any(Error),

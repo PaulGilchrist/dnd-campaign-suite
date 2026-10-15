@@ -1,3 +1,8 @@
+// @maintained-by-ai
+// Deterministic CLA-155 contract suite for guardedMindHandler (Fighter Psi Warrior lv10):
+// spend gate, condition-entry normalisation, merged-write, meta purge, logging.
+// All runtime reads route through mockRuntime (key-routed, read-order independent);
+// writes/log entries are exact-key pins. Pure behaviour — no timers, no UI moving parts.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './guardedMindHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -37,6 +42,12 @@ function makePlayerStats(overrides = {}) {
     };
 }
 
+// Key-routed runtime mock: dispatches by the key the handler reads, so tests
+// are immune to read-order changes (and a wrong-key read shows as undefined).
+function mockRuntime(values) {
+    runtimeState.getRuntimeValue.mockImplementation((_name, key) => values[key]);
+}
+
 describe('guardedMindHandler (CLA-155)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -49,9 +60,7 @@ describe('guardedMindHandler (CLA-155)', () => {
 
     describe('spend gate', () => {
         it('refuses with zero spend when no psionic energy remains (explicit 0 is honored)', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(0)
-                .mockReturnValueOnce(['charmed']);
+            mockRuntime({ psionicEnergy: 0, activeConditions: ['charmed'] });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
@@ -68,9 +77,7 @@ describe('guardedMindHandler (CLA-155)', () => {
         it('refuses with zero spend when no Charmed/Frightened condition is present (CLA-155: spend-without-effect is FAIL)', async () => {
             const cases = [[], ['blinded', 'poisoned'], null];
             for (const storedConditions of cases) {
-                runtimeState.getRuntimeValue
-                    .mockReturnValueOnce(5)
-                    .mockReturnValueOnce(storedConditions);
+                mockRuntime({ psionicEnergy: 5, activeConditions: storedConditions });
 
                 const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
@@ -90,9 +97,7 @@ describe('guardedMindHandler (CLA-155)', () => {
         });
 
         it('falls back to max instead of refusing when the resource key is null (CLA-027 null = re-armed)', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(null)
-                .mockReturnValueOnce(['charmed']);
+            mockRuntime({ psionicEnergy: null, activeConditions: ['charmed'] });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
@@ -106,9 +111,7 @@ describe('guardedMindHandler (CLA-155)', () => {
         });
 
         it('resolves max from class_levels energy row when tracked resources are stale', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(null)
-                .mockReturnValueOnce(['frightened']);
+            mockRuntime({ psionicEnergy: null, activeConditions: ['frightened'] });
 
             const stats = makePlayerStats({
                 level: 18,
@@ -124,33 +127,50 @@ describe('guardedMindHandler (CLA-155)', () => {
 
             expect(result.payload.description).toContain('Psionic Energy: 11/12');
         });
+
+        it('refuses with zero spend when no max can be resolved (unarmored resource, no fallback row)', async () => {
+            mockRuntime({ psionicEnergy: null, activeConditions: ['charmed'] });
+
+            const stats = makePlayerStats({ _trackedResources: { psionicEnergy: { max: 0 } } });
+            const result = await handle(makeAction(), stats, campaignName);
+
+            expect(result.payload.description).toContain('No Psionic Energy remaining');
+            expect(runtimeState.setRuntimeBatch).not.toHaveBeenCalled();
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                automationType: 'guarded_mind_refused',
+                automationDetail: 'no_psionic_energy',
+            }));
+        });
     });
 
     describe('condition removal', () => {
-        it('clears string-entry conditions and spends exactly one die in one merged write', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(5)
-                .mockReturnValueOnce(['charmed', 'blinded']);
+        it('ends eligible conditions and spends exactly one die in one merged write', async () => {
+            mockRuntime({ psionicEnergy: 5, activeConditions: ['charmed', 'blinded'] });
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
+            const action = makeAction();
+            const result = await handle(action, makePlayerStats(), campaignName);
 
-            expect(result.payload.description).toContain('Ended Charmed');
+            expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(playerName, 'psionicEnergy', campaignName);
+            expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(playerName, 'activeConditions', campaignName);
             expect(runtimeState.setRuntimeBatch).toHaveBeenCalledTimes(1);
             expect(runtimeState.setRuntimeBatch).toHaveBeenCalledWith(
                 playerName,
                 { psionicEnergy: 4, activeConditions: ['blinded'] },
                 campaignName
             );
+            // no activeConditionMeta present → no stray per-key write
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toBe('Guarded Mind: Ended Charmed. Psionic Energy: 4/6.');
         });
 
-        it('clears object-entry conditions ({condition} / {key}) and keeps untouched entries intact', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(5)
-                .mockReturnValueOnce([
-                    { condition: 'charmed' },
-                    { key: 'Frightened' },
-                    { condition: 'blinded' },
-                ]);
+        it('normalises mixed string/object condition entries case-insensitively and keeps untouched entries intact', async () => {
+            mockRuntime({
+                psionicEnergy: 5,
+                activeConditions: ['CHARMED', 'blinded', { condition: 'Frightened' }, { key: 'dazed' }],
+            });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
@@ -159,34 +179,18 @@ describe('guardedMindHandler (CLA-155)', () => {
                 playerName,
                 expect.objectContaining({
                     psionicEnergy: 4,
-                    activeConditions: [{ condition: 'blinded' }],
+                    activeConditions: ['blinded', { key: 'dazed' }],
                 }),
                 campaignName
             );
         });
 
-        it('is case-insensitive for condition entries', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(4)
-                .mockReturnValueOnce(['CHARMED', 'Frightened', 'blinded']);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.payload.description).toContain('Ended Charmed and Frightened');
-            expect(runtimeState.setRuntimeBatch).toHaveBeenCalledWith(
-                playerName,
-                expect.objectContaining({ activeConditions: ['blinded'] }),
-                campaignName
-            );
-        });
-
         it('logs one canonical condition-removed event per removed condition plus ability_use', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(2)
-                .mockReturnValueOnce(['charmed', 'frightened', 'poisoned']);
+            mockRuntime({ psionicEnergy: 2, activeConditions: ['charmed', 'frightened', 'poisoned'] });
 
             await handle(makeAction(), makePlayerStats(), campaignName);
 
+            expect(combatLoggingService.logConditionEvent).toHaveBeenCalledTimes(2);
             expect(combatLoggingService.logConditionEvent).toHaveBeenCalledWith(expect.objectContaining({
                 campaignName, action: 'removed', creatureName: playerName, conditionLabel: 'Charmed',
             }));
@@ -199,14 +203,15 @@ describe('guardedMindHandler (CLA-155)', () => {
                 abilityName: 'Guarded Mind',
             }));
             const useEntry = logService.addEntry.mock.calls.find(([, e]) => e.type === 'ability_use');
-            expect(useEntry[1].description).toContain('ended Charmed and Frightened');
+            expect(useEntry[1].description).toBe('TestHero used Guarded Mind and ended Charmed and Frightened. Psionic Energy: 1/6.');
         });
 
         it('purges activeConditionMeta for removed conditions only', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(3)
-                .mockReturnValueOnce(['charmed', 'blinded'])
-                .mockReturnValueOnce({ charmed: { dc: 10, ability: 'wis' }, blinded: { dc: 12 } });
+            mockRuntime({
+                psionicEnergy: 3,
+                activeConditions: ['charmed', 'blinded'],
+                activeConditionMeta: { charmed: { dc: 10, ability: 'wis' }, blinded: { dc: 12 } },
+            });
 
             await handle(makeAction(), makePlayerStats(), campaignName);
 
@@ -218,9 +223,7 @@ describe('guardedMindHandler (CLA-155)', () => {
 
     describe('custom resource config', () => {
         it('uses custom resource key from automation config', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(8)
-                .mockReturnValueOnce(['charmed']);
+            mockRuntime({ runeCharge: 8, activeConditions: ['charmed'] });
 
             const customAction = makeAction({ automation: { resource: 'runeCharge' } });
 
@@ -235,9 +238,7 @@ describe('guardedMindHandler (CLA-155)', () => {
         });
 
         it('handles addEntry rejection gracefully', async () => {
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce(5)
-                .mockReturnValueOnce(['charmed']);
+            mockRuntime({ psionicEnergy: 5, activeConditions: ['charmed'] });
             logService.addEntry.mockRejectedValueOnce(new Error('log fail'));
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName);

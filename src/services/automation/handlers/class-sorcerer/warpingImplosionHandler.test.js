@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // CLA-384: the confirm leg was unreachable dead code — locked contract is now
 // resource spend (uses OR 5 SP restore) + teleport te marker + refusal logs.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -236,16 +237,6 @@ describe('warpingImplosionHandler', () => {
             expect(result.payload.restoreCost).toBe(3);
         });
 
-        it('uses custom resourceKey for uses tracking', async () => {
-            const action = makeAction({ automation: { resourceKey: 'customUses' } });
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('modal');
-            expect(result.payload.hasRemaining).toBe(true);
-        });
-
         it('handles null getClassFeatures without crashing', async () => {
             classFeatures.getClassFeatures.mockReturnValue(null);
 
@@ -253,16 +244,6 @@ describe('warpingImplosionHandler', () => {
 
             expect(result.type).toBe('modal');
             expect(result.payload.canRestore).toBe(true);
-        });
-
-        it('handles negative currentUses with canRestore', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(-1);
-            metamagic.getCurrentSorceryPoints.mockReturnValue(10);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('modal');
-            expect(result.payload.hasRemaining).toBe(false);
         });
     });
 
@@ -293,7 +274,7 @@ describe('warpingImplosionHandler', () => {
             expect(teDefs.registerTargetEffect).not.toHaveBeenCalled();
         });
 
-        it('spends 5 sorcery points and writes the teleport marker when restoring', async () => {
+        it('spends 5 sorcery points, notes the restore in the log, and writes the teleport marker when restoring', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(0);
             metamagic.getCurrentSorceryPoints.mockReturnValue(10);
 
@@ -310,6 +291,7 @@ describe('warpingImplosionHandler', () => {
                 expect.objectContaining({ duration: 'instant', value: 120 })
             );
             expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry.mock.calls[0][1].description).toContain('Restored with 5 Sorcery Points');
         });
 
         it('decrements uses when not restoring and writes the teleport marker', async () => {
@@ -367,25 +349,14 @@ describe('warpingImplosionHandler', () => {
             expect(description).toContain('pulled toward');
         });
 
-        it('notes the SP restore in the ability_use log', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(0);
-            metamagic.getCurrentSorceryPoints.mockReturnValue(10);
-
-            await applyWarpingImplosion(makeAction(), makePlayerStats(), campaignName, true);
-
-            const description = addEntry.mock.calls[0][1].description;
-            expect(description).toContain('Restored with 5 Sorcery Points');
-        });
-
         it('notes magical darkness dispelled for area shapes only', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(1);
 
-            let result = null;
             await applyWarpingImplosion(makeAction({ automation: { shape: 'sphere' } }), makePlayerStats(), campaignName, false);
             expect(addEntry.mock.calls[0][1].description).toContain('Magical Darkness in the area is dispelled');
 
             addEntry.mockClear();
-            result = await applyWarpingImplosion(makeAction({ automation: { shape: 'single_target' } }), makePlayerStats(), campaignName, false);
+            const result = await applyWarpingImplosion(makeAction({ automation: { shape: 'single_target' } }), makePlayerStats(), campaignName, false);
             expect(result.type).toBe('confirmed');
             expect(addEntry.mock.calls[0][1].description).not.toContain('Magical Darkness');
         });

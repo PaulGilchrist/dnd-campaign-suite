@@ -1,3 +1,10 @@
+// @maintained-by-ai — deterministic unit tests for clairvoyantCombatantHandler.handle()'s
+// own contract: uses/pact-recharge gating, popup composition (exact strings), modal payload
+// shape, and the CLA-053 delegation of saveDc through buildSaveDc. buildSaveDc's internal
+// arithmetic (numeric passthrough, 'ability' math, CON default) is owned by
+// ../../common/savePrompt.test.js; findPactSlotLevel/hasPactSlotAvailable seam coverage lives
+// in the pact-slot test below (no dedicated pactMagicUtils file). Pure behaviour behind mock
+// boundaries; turn-based only, no timers, no network.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -5,20 +12,9 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../ui/logService.js', () => ({
+vi.mock('../../../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
-
-vi.mock('../../common/savePrompt.js', async (importActual) => {
-  const actual = await importActual();
-  return {
-    ...actual,
-    createSaveListener: vi.fn(),
-  };
-});
-// CLA-053: real buildSaveDc via importActual — the handler now routes the
-// data token saveDc:'ability' through it (the old local resolver returned
-// the STRING 'ability', making every save compare always-fail).
 
 import { handle } from './clairvoyantCombatantHandler.js';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -63,8 +59,8 @@ describe('clairvoyantCombatantHandler.handle', () => {
     vi.clearAllMocks();
   });
 
-  describe('early return: no uses remaining', () => {
-    it('should return info popup when no uses remaining without pact magic recharge', async () => {
+  describe('early return: cannot use', () => {
+    it('returns info popup with exact reason when uses are exhausted and no pactMagicRecharge', async () => {
       mockRuntimeValues(1, 'AwakenedTarget');
 
       const result = await handle(makeAction({ pactMagicRecharge: false }), makePlayerStats(), campaignName, null);
@@ -72,11 +68,12 @@ describe('clairvoyantCombatantHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('Clairvoyant Combatant');
-      expect(result.payload.description).toContain('No uses remaining');
-      expect(result.payload.description).toContain('Short or Long Rest');
+      expect(result.payload.description).toBe(
+        'Clairvoyant Combatant: No uses remaining. Recharges on a Short or Long Rest.'
+      );
     });
 
-    it('should return info popup when no uses remaining with pact magic recharge but no slots', async () => {
+    it('returns pact-magic recharge variant of the reason when uses are exhausted but no slots are available', async () => {
       getRuntimeValue.mockImplementation((playerName, key) => {
         if (key === 'clairvoyantCombatantUses') return 1;
         if (key === 'awakenedMindTarget') return 'AwakenedTarget';
@@ -92,20 +89,55 @@ describe('clairvoyantCombatantHandler.handle', () => {
       );
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('Clairvoyant Combatant');
-      expect(result.payload.description).toContain('No Pact Magic slots available');
+      expect(result.payload.description).toBe(
+        'Clairvoyant Combatant: No uses remaining. Recharges on a Short or Long Rest, or expend a Pact Magic spell slot to restore a use. No Pact Magic slots available.'
+      );
+    });
+
+    it('returns info popup requesting Awakened Mind bond when no awakenedMindTarget is stored', async () => {
+      mockRuntimeValues(0, null);
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toBe(
+        'Clairvoyant Combatant requires an active Awakened Mind bond. Activate Awakened Mind first to form a telepathic bond with a creature.'
+      );
+    });
+
+    it('composes the custom feature name into the popup reason', async () => {
+      mockRuntimeValues(1, null);
+
+      const result = await handle(
+        { name: 'My Clairvoyance', automation: { type: 'clairvoyant_combatant', saveType: 'WIS', saveDc: 15, uses: 1 } },
+        makePlayerStats(),
+        campaignName,
+        null,
+      );
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.name).toBe('My Clairvoyance');
+      expect(result.payload.description).toBe(
+        'My Clairvoyance: No uses remaining. Recharges on a Short or Long Rest.'
+      );
     });
   });
 
   describe('modal return', () => {
-    it('should return modal with correct payload for normal use', async () => {
+    it('returns modal with exact payload for normal use', async () => {
       mockRuntimeValues(0, 'AwakenedTarget');
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+      const action = makeAction();
+      const playerStats = makePlayerStats();
+      const result = await handle(action, playerStats, campaignName, null);
 
       expect(result.type).toBe('modal');
       expect(result.modalName).toBe('clairvoyantCombatant');
+      expect(result.payload.action).toBe(action);
+      expect(result.payload.playerStats).toBe(playerStats);
+      expect(result.payload.campaignName).toBe(campaignName);
       expect(result.payload.targetName).toBe('AwakenedTarget');
       expect(result.payload.saveType).toBe('WIS');
       expect(result.payload.saveDc).toBe(15);
@@ -116,7 +148,7 @@ describe('clairvoyantCombatantHandler.handle', () => {
       expect(result.payload.pactSlotsAvailable).toBe(false);
     });
 
-    it('should find highest pact magic slot level when recharge is available', async () => {
+    it('finds highest pact magic slot level and reports recharge availability when uses are exhausted', async () => {
       mockRuntimeValues(1, 'AwakenedTarget');
 
       const result = await handle(
@@ -134,41 +166,27 @@ describe('clairvoyantCombatantHandler.handle', () => {
         null,
       );
 
+      expect(result.type).toBe('modal');
       expect(result.payload.pactSlotLevel).toBe(3);
       expect(result.payload.pactSlotsAvailable).toBe(true);
     });
 
-    it('should use custom feature name in modal action', async () => {
+    it('falls back to WIS saveType when auto.saveType is not provided', async () => {
       mockRuntimeValues(0, 'AwakenedTarget');
 
       const result = await handle(
-        { name: 'My Clairvoyance', automation: { type: 'clairvoyant_combatant', saveType: 'WIS', saveDc: 15, uses: 1 } },
+        { automation: { type: 'clairvoyant_combatant', saveDc: 14 } },
         makePlayerStats(),
         campaignName,
         null,
       );
 
-      expect(result.type).toBe('modal');
-      expect(result.modalName).toBe('clairvoyantCombatant');
-      expect(result.payload.action.name).toBe('My Clairvoyance');
+      expect(result.payload.saveType).toBe('WIS');
     });
   });
 
-  describe('save DC computation (CLA-053: routed through buildSaveDc)', () => {
-    it('should use numeric saveDc passthrough when provided', async () => {
-      mockRuntimeValues(0, 'AwakenedTarget');
-
-      const result = await handle(
-        { automation: { type: 'clairvoyant_combatant', saveDc: 18 } },
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.payload.saveDc).toBe(18);
-    });
-
-    it('should return a NUMBER, never the string "ability", for saveDc:"ability" + saveAbility:"CHA"', async () => {
+  describe('save DC delegation (CLA-053)', () => {
+    it('routes the shipped saveDc:"ability" + saveAbility:"CHA" token through buildSaveDc and returns a NUMBER, never the string "ability"', async () => {
       mockRuntimeValues(0, 'AwakenedTarget');
 
       // The shipped Great Old One lv6 row shape (2024/classes.json).
@@ -181,45 +199,6 @@ describe('clairvoyantCombatantHandler.handle', () => {
 
       expect(typeof result.payload.saveDc).toBe('number');
       expect(result.payload.saveDc).toBe(8 + 3 + 4); // 8 + CHA(3) + proficiency(4)
-    });
-
-    it('should compute DC 16 on the lv14 HexWarlock byte-shape host', async () => {
-      mockRuntimeValues(0, 'Bandit 1');
-
-      const result = await handle(
-        { automation: { type: 'clairvoyant_combatant', saveType: 'WIS', saveDc: 'ability', saveAbility: 'CHA', duration: '1_minute', pactMagicRecharge: true, uses: 1 } },
-        makePlayerStats({ level: 14, proficiency: 5, abilities: [{ name: 'Charisma', bonus: 3 }] }),
-        campaignName,
-        null,
-      );
-
-      expect(result.payload.saveDc).toBe(16); // 8 + PB 5 + CHA 3
-    });
-
-    it('should fallback to WIS saveType when auto.saveType is not provided', async () => {
-      mockRuntimeValues(0, 'AwakenedTarget');
-
-      const result = await handle(
-        { automation: { type: 'clairvoyant_combatant', saveDc: 14 } },
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.payload.saveType).toBe('WIS');
-    });
-
-    it('should default to CON ability when saveDc:"ability" omits saveAbility', async () => {
-      mockRuntimeValues(0, 'AwakenedTarget');
-
-      const result = await handle(
-        { automation: { type: 'clairvoyant_combatant', saveType: 'WIS', saveDc: 'ability' } },
-        makePlayerStats({ abilities: [{ name: 'Charisma', bonus: 3 }, { name: 'Constitution', bonus: 2 }] }),
-        campaignName,
-        null,
-      );
-
-      expect(result.payload.saveDc).toBe(8 + 2 + 4); // CON default per buildSaveDc
     });
   });
 });

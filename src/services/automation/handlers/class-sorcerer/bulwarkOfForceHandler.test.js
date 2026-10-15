@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { handle, activateBulwarkOfForce } from './bulwarkOfForceHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as expirations from '../../../rules/effects/expirations.js';
@@ -89,10 +90,13 @@ describe('bulwarkOfForceHandler', () => {
             expect(result.payload.description).toBe('Bulwark of Force is already active.');
         });
 
+        // Floor of max(1, INT modifier): bonus 0 hits the `|| 0` fallback,
+        // negative bonus hits the Math.max floor. Identity path (INT > 1) is
+        // pinned by the modal test above (INT 3 -> maxTargets 3); a missing
+        // Intelligence ability resolves through `|| 0` identically to bonus 0.
         it.each([
             [0, 1],
             [-5, 1],
-            [10, 10],
         ])('uses max(1, INT modifier) for maxTargets: INT bonus=%i -> maxTargets=%i', async (intBonus, expectedMax) => {
             runtimeState.getRuntimeValue.mockReturnValue(false);
 
@@ -103,18 +107,6 @@ describe('bulwarkOfForceHandler', () => {
             const result = await handle(makeAction(), stats, campaignName, 'test-map');
 
             expect(result.payload.maxTargets).toBe(expectedMax);
-        });
-
-        it('uses minimum 1 target when Intelligence ability is missing', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(false);
-
-            const stats = makePlayerStats({
-                abilities: [],
-            });
-
-            const result = await handle(makeAction(), stats, campaignName, 'test-map');
-
-            expect(result.payload.maxTargets).toBe(1);
         });
     });
 

@@ -1,3 +1,13 @@
+// @maintained-by-ai
+// Main lane for darkOnesLuckHandler: owns popup/description formatting (full-string
+// own-composition pins), rollType branches (check/skill/save, null-saveType label),
+// guard logic (uses-zero, attacker filtering, rollType matching, no-side-effect on
+// rejection), and Cha-clamp/mock-call-arg pins (exact getRuntimeValue keys, exact
+// setRuntimeValue args, log "Uses remaining: X/maxUses" denominator). The real-store
+// seams (absent-key ?? maxUses default, store write-back, 0-roundtrip no-fallback,
+// absent lastAttack) are owned by darkOnesLuckHandler.integration.test.js — do not
+// duplicate them here. Deterministic: runtime, log, and dice are all mocked;
+// turn-based only, no timers.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { handle } from './darkOnesLuckHandler.js';
@@ -93,28 +103,13 @@ describe('darkOnesLuckHandler.handle', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe("Dark One's Own Luck");
-            expect(result.payload.description).toContain('no uses remaining');
-            expect(result.payload.description).toContain('Long Rest');
+            expect(result.payload.description).toBe(
+                "Dark One's Own Luck has no uses remaining. Recharges on a Long Rest."
+            );
+            expect(result.payload.automation).toEqual(makeAction().automation);
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(addEntry).not.toHaveBeenCalled();
         });
-
-    });
-
-    describe('guard: fallback to maxUses when runtime value is null', () => {
-        it('should use maxUses as default when darkOnesLuckUses is null', async () => {
-            mockRuntime(null, makeCheck(), 3);
-
-            mockDieRoll(5);
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Stealth check');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName, 'darkOnesLuckUses', 2, campaignName
-            );
-        });
-
     });
 
     describe('guard: CHA modifier affects maxUses', () => {
@@ -129,6 +124,10 @@ describe('darkOnesLuckHandler.handle', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 playerName, 'darkOnesLuckUses', 0, campaignName
             );
+            // Pin the max(1, chaMod) clamp via the log denominator (would be /-4 unclamped)
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                description: expect.stringContaining('Uses remaining: 0/1.'),
+            }));
         });
 
         it('should use CHA modifier as maxUses when positive', async () => {
@@ -141,29 +140,26 @@ describe('darkOnesLuckHandler.handle', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 playerName, 'darkOnesLuckUses', 4, campaignName
             );
+            // maxUses denominator in the log equals the CHA modifier
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                description: expect.stringContaining('Uses remaining: 4/3.'),
+            }));
         });
     });
 
     describe('guard: no recent check or save', () => {
-        it('should reject when lastAttack is null', async () => {
-            mockRuntime(1, null, 3);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No recent ability check');
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
         it('should reject when lastAttack is by a different character', async () => {
             mockRuntime(1, makeCheck({ attackerName: 'Goblin', checkName: 'Stealth' }), 3);
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No recent ability check');
-            expect(result.payload.description).toContain(playerName);
+            expect(result.payload.description).toBe(
+                `No recent ability check or saving throw found for ${playerName}. ` +
+                'This feature can only be used shortly after an ability check or saving throw.'
+            );
             expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
         it('should reject when lastAttack has no matching rollType', async () => {
@@ -173,6 +169,8 @@ describe('darkOnesLuckHandler.handle', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('No recent ability check');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
     });
 
@@ -186,11 +184,15 @@ describe('darkOnesLuckHandler.handle', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe("Dark One's Own Luck");
-            expect(result.payload.description).toContain('Stealth check');
-            expect(result.payload.description).toContain('d20(8) + 5 = 13');
-            expect(result.payload.description).toContain('1d10(10)');
-            expect(result.payload.description).toContain('1d10(10) = <b>23</b>');
+            // Full-string pin of the popup description template (own composition)
+            expect(result.payload.description).toBe(
+                "<b>Dark One's Own Luck</b><br/>Stealth check: d20(8) + 5 = 13" +
+                ' → Modified: d20(8) + 5 + 1d10(10) = <b>23</b>'
+            );
             expect(result.payload.automation).toEqual(makeAction().automation);
+            // Exact-key pins for the two runtime reads
+            expect(getRuntimeValue).toHaveBeenCalledWith(playerName, 'darkOnesLuckUses', campaignName);
+            expect(getRuntimeValue).toHaveBeenCalledWith('campaign', 'lastAttack', campaignName);
         });
 
         it('should handle rollType skill the same as check', async () => {
@@ -201,6 +203,7 @@ describe('darkOnesLuckHandler.handle', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Athletics check');
+            expect(result.payload.description).toContain('d20(8) + 5 = 13');
             expect(result.payload.description).toContain('1d10(7) = <b>20</b>');
         });
 
@@ -214,20 +217,10 @@ describe('darkOnesLuckHandler.handle', () => {
                 type: 'ability_use',
                 characterName: playerName,
                 abilityName: "Dark One's Own Luck",
-                description: expect.stringContaining('+1d10(7)'),
+                // Full-string pin of the log description (own composition)
+                description: 'TestWarlock used Dark One\'s Own Luck: +1d10(7) to ability check/saving throw. Uses remaining: 0/3.',
                 timestamp: expect.any(Number),
             }));
-        });
-
-        it('should consume one use after processing a check', async () => {
-            mockRuntime(5, makeCheck(), 3);
-            mockDieRoll(5);
-
-            await handle(makeAction(), makePlayerStats(), campaignName);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName, 'darkOnesLuckUses', 4, campaignName
-            );
         });
     });
 
@@ -239,9 +232,8 @@ describe('darkOnesLuckHandler.handle', () => {
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('WIS');
-            expect(result.payload.description).toContain('d20(12) + 3 = 15');
-            expect(result.payload.description).toContain('1d10(3)');
+            // Label is the full uppercased saveType
+            expect(result.payload.description).toContain('WISDOM: d20(12) + 3 = 15');
             expect(result.payload.description).toContain('1d10(3) = <b>18</b>');
         });
 
@@ -252,10 +244,9 @@ describe('darkOnesLuckHandler.handle', () => {
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Save');
+            expect(result.payload.description).toContain('Save: d20(12) + 3 = 15');
             expect(result.payload.description).toContain('1d10(5) = <b>20</b>');
         });
-
     });
 
     describe('priority: check over save', () => {
@@ -266,6 +257,7 @@ describe('darkOnesLuckHandler.handle', () => {
             const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
             expect(result.payload.description).toContain('Arcana check');
+            expect(result.payload.description).toContain('1d10(1) = <b>8</b>');
             expect(result.payload.description).not.toContain('WIS');
             expect(result.payload.description).not.toContain('save');
         });

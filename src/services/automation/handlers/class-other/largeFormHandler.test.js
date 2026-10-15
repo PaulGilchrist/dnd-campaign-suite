@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Contract suite for largeFormHandler (Giant ancestry "Large Form" toggle):
+// exact popup strings, exact runtime-key writes (largeFormActive,
+// largeFormActive_restUsed, activeBuffs), buff-entry shape, and campaign-log
+// pin. Fully deterministic — runtime store and log service mocked, no timers
+// (game is strictly turn-based). Update in step with handler source changes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, isLargeFormActive } from './largeFormHandler.js';
@@ -12,9 +18,13 @@ vi.mock('../../../ui/logService.js', () => ({
 }));
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
 
 const campaignName = 'test-campaign';
 const playerName = 'Test Character';
+
+const ACTIVATED_DESCRIPTION = 'Large Form activated! Size changes to Large, Speed increases by 10 feet, Advantage on Strength checks for 10 minutes.';
+const LOG_DESCRIPTION = `${playerName} activated Large Form! Size changes to Large, Speed increases by 10 feet, Advantage on Strength checks for 10 minutes.`;
 
 function makeAction(overrides = {}) {
     return {
@@ -39,65 +49,42 @@ function makePlayerStats(overrides = {}) {
     };
 }
 
+// Router over the runtime-store keys the handler reads; unlisted keys -> null.
+function mockRuntime(values = {}) {
+    getRuntimeValue.mockImplementation((_name, key) =>
+        Object.prototype.hasOwnProperty.call(values, key) ? values[key] : null,
+    );
+}
+
+function buffWrites() {
+    return vi.mocked(setRuntimeValue).mock.calls.filter(call => call[1] === 'activeBuffs');
+}
+
 describe('largeFormHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
     describe('handle', () => {
-        it('returns info popup when character level is below 5', async () => {
-            const stats = makePlayerStats({ level: 3 });
-            const result = await handle(makeAction(), stats, campaignName, null);
+        it('blocks activation below level 5 — exact info popup, no writes', async () => {
+            const result = await handle(makeAction(), makePlayerStats({ level: 4 }), campaignName, null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toBe('Large Form requires character level 5.');
-            expect(result.payload.automationType).toBe('large_form');
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Large Form',
+                    automationType: 'large_form',
+                    description: 'Large Form requires character level 5.',
+                    automation: makeAction().automation,
+                },
+            });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('ends large form when already active and removes buff', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'largeFormActive') return true;
-                if (key === 'activeBuffs') return [{ name: 'Large Form', effect: 'large_form' }];
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('Large Form ended.');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName, 'largeFormActive', false, campaignName
-            );
-        });
-
-        it('removes large form buff while preserving other buffs', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'largeFormActive') return true;
-                if (key === 'activeBuffs') return [
-                    { name: 'Large Form', effect: 'large_form' },
-                    { name: 'Other Buff', effect: 'other' },
-                ];
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            const buffsCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[1] === 'activeBuffs',
-            );
-            expect(buffsCalls).toHaveLength(1);
-            const newBuffs = buffsCalls[0][2];
-            expect(newBuffs).toHaveLength(1);
-            expect(newBuffs[0].name).toBe('Other Buff');
-        });
-
-        it('blocks activation when long rest mark is set', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'largeFormActive') return false;
-                if (key === 'largeFormActive_restUsed') return true;
-                return null;
-            });
+        it('blocks activation once used until a Long Rest — exact popup, no writes', async () => {
+            mockRuntime({ largeFormActive: false, largeFormActive_restUsed: true });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -105,211 +92,152 @@ describe('largeFormHandler', () => {
             expect(result.payload.description).toBe(
                 'Large Form has been used and cannot be used again until a Long Rest.',
             );
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('adds buff and preserves other buffs on activation', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'largeFormActive') return false;
-                if (key === 'activeBuffs') return [
-                    { name: 'Other Buff', effect: 'other' },
-                ];
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            const buffsCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[1] === 'activeBuffs',
-            );
-            expect(buffsCalls).toHaveLength(1);
-            const newBuffs = buffsCalls[0][2];
-            expect(newBuffs).toHaveLength(2);
-            expect(newBuffs.map(b => b.name)).toEqual(['Other Buff', 'Large Form']);
-        });
-
-        it('does not duplicate buff when it already exists', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'largeFormActive') return false;
-                if (key === 'activeBuffs') return [
+        it('toggles off when active — ends form, clears flag, preserves other buffs', async () => {
+            mockRuntime({
+                largeFormActive: true,
+                activeBuffs: [
                     { name: 'Large Form', effect: 'large_form' },
-                ];
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            const buffsCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[1] === 'activeBuffs',
-            );
-            expect(buffsCalls).toHaveLength(1);
-            const newBuffs = buffsCalls[0][2];
-            expect(newBuffs).toHaveLength(1);
-            expect(newBuffs[0].name).toBe('Large Form');
-        });
-
-        it('returns popup with full payload structure on activation', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'largeFormActive') return false;
-                if (key === 'activeBuffs') return [];
-                return null;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload).toMatchObject({
-                type: 'automation_info',
-                name: 'Large Form',
-                automationType: 'large_form',
-                description: expect.stringContaining('activated'),
-            });
-            expect(result.payload.automation).toEqual(makeAction().automation);
-        });
-
-        it('sets largeFormActive_restUsed flag on activation', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'largeFormActive') return false;
-                if (key === 'activeBuffs') return [];
-                return null;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            const restUsedCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[1] === 'largeFormActive_restUsed',
-            );
-            expect(restUsedCalls).toHaveLength(1);
-            expect(restUsedCalls[0][2]).toBe(true);
-        });
-
-        it('handles non-array activeBuffs when toggling off', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'largeFormActive') return true;
-                if (key === 'activeBuffs') return 'not-an-array';
-                return null;
+                    { name: 'Other Buff', effect: 'other' },
+                ],
             });
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toBe('Large Form ended.');
-            const buffsCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[1] === 'activeBuffs',
+            // Write order pinned: filtered buffs first, then the flag.
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(
+                1, playerName, 'activeBuffs', [{ name: 'Other Buff', effect: 'other' }], campaignName,
             );
-            expect(buffsCalls).toHaveLength(1);
-            expect(buffsCalls[0][2]).toEqual([]);
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(
+                2, playerName, 'largeFormActive', false, campaignName,
+            );
+            expect(setRuntimeValue).toHaveBeenCalledTimes(2);
         });
 
-        it('handles non-array activeBuffs when activating', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'largeFormActive') return false;
-                if (key === 'activeBuffs') return 'not-an-array';
-                return null;
+        it('coerces non-array stored buffs to [] when toggling off', async () => {
+            mockRuntime({ largeFormActive: true, activeBuffs: 'not-an-array' });
+
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            expect(result.payload.description).toBe('Large Form ended.');
+            expect(buffWrites()).toHaveLength(1);
+            expect(buffWrites()[0][2]).toEqual([]);
+        });
+
+        it('activates — full popup, ordered runtime writes, exact buff shape, and log entry', async () => {
+            mockRuntime({ largeFormActive: false, activeBuffs: [{ name: 'Other Buff', effect: 'other' }] });
+            const action = makeAction();
+
+            const result = await handle(action, makePlayerStats(), campaignName, null);
+
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Large Form',
+                    automationType: 'large_form',
+                    description: ACTIVATED_DESCRIPTION,
+                    automation: action.automation,
+                },
             });
+            // Write order pinned: flag, rest-used marker, appended buff list.
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(
+                1, playerName, 'largeFormActive', true, campaignName,
+            );
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(
+                2, playerName, 'largeFormActive_restUsed', true, campaignName,
+            );
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(
+                3, playerName, 'activeBuffs', [
+                    { name: 'Other Buff', effect: 'other' },
+                    { name: 'Large Form', effect: 'large_form', duration: '10_minutes', hasAutomation: true },
+                ], campaignName,
+            );
+            expect(setRuntimeValue).toHaveBeenCalledTimes(3);
+            // AGENTS.md: every automation logs to the campaign log when triggered.
+            expect(addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: 'Large Form',
+                description: LOG_DESCRIPTION,
+                timestamp: expect.any(Number),
+            });
+        });
+
+        it('does not duplicate the buff entry when one already exists', async () => {
+            const existing = [{ name: 'Large Form', effect: 'large_form' }];
+            mockRuntime({ largeFormActive: false, activeBuffs: existing });
 
             await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            const buffsCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[1] === 'activeBuffs',
-            );
-            expect(buffsCalls).toHaveLength(1);
-            expect(buffsCalls[0][2]).toEqual([{ name: 'Large Form', effect: 'large_form', duration: '10_minutes', hasAutomation: true }]);
+            expect(buffWrites()).toHaveLength(1);
+            expect(buffWrites()[0][2]).toHaveLength(1);
+            expect(buffWrites()[0][2]).toEqual(existing);
         });
 
-        it('uses default duration when auto.duration is undefined', async () => {
-            const actionNoDuration = {
-                name: 'Large Form',
-                automation: {
-                    type: 'large_form',
-                    casting_time: '1_bonus_action',
-                    resourceCost: 'long_rest',
-                },
-            };
+        it('coerces non-array stored buffs to a single fresh buff when activating', async () => {
+            mockRuntime({ largeFormActive: false, activeBuffs: 'not-an-array' });
 
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'largeFormActive') return false;
-                if (key === 'activeBuffs') return [];
-                return null;
-            });
+            await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            await handle(actionNoDuration, makePlayerStats(), campaignName, null);
-
-            const buffsCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[1] === 'activeBuffs',
-            );
-            expect(buffsCalls).toHaveLength(1);
-            expect(buffsCalls[0][2][0].duration).toBe('10_minutes');
+            expect(buffWrites()).toHaveLength(1);
+            expect(buffWrites()[0][2]).toHaveLength(1);
+            expect(buffWrites()[0][2][0].name).toBe('Large Form');
         });
 
-        it('uses custom duration when provided', async () => {
-            const actionWithDuration = {
-                name: 'Large Form',
-                automation: {
-                    type: 'large_form',
-                    duration: '1_hour',
-                    casting_time: '1_bonus_action',
-                    resourceCost: 'long_rest',
-                },
-            };
-
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'largeFormActive') return false;
-                if (key === 'activeBuffs') return [];
-                return null;
+        it.each([
+            ['1_hour', '1_hour'],
+            [undefined, '10_minutes'],
+        ])('stamps buff duration from automation (duration: %s)', async (duration, expected) => {
+            mockRuntime({ largeFormActive: false, activeBuffs: [] });
+            const action = makeAction({
+                automation: duration === undefined
+                    ? { type: 'large_form', casting_time: '1_bonus_action', resourceCost: 'long_rest' }
+                    : { duration },
             });
 
-            await handle(actionWithDuration, makePlayerStats(), campaignName, null);
+            await handle(action, makePlayerStats(), campaignName, null);
 
-            const buffsCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[1] === 'activeBuffs',
-            );
-            expect(buffsCalls).toHaveLength(1);
-            expect(buffsCalls[0][2][0].duration).toBe('1_hour');
+            expect(buffWrites()).toHaveLength(1);
+            expect(buffWrites()[0][2][0].duration).toBe(expected);
         });
 
-        it('logs error when addEntry rejects', async () => {
-            const { addEntry } = await import('../../../ui/logService.js');
-            addEntry.mockRejectedValue(new Error('db error'));
-
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'largeFormActive') return false;
-                if (key === 'activeBuffs') return [];
-                return null;
-            });
-
+        it('logs and swallows addEntry rejection — popup still returned', async () => {
+            mockRuntime({ largeFormActive: false, activeBuffs: [] });
+            addEntry.mockRejectedValueOnce(new Error('db error'));
             const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(consoleSpy).toHaveBeenCalledWith('[largeForm] Error:', expect.any(Error));
+            expect(result.type).toBe('popup');
+            expect(consoleSpy).toHaveBeenCalledWith('[largeForm] Error:', new Error('db error'));
             consoleSpy.mockRestore();
         });
     });
 
     describe('isLargeFormActive', () => {
-        it('returns true when largeFormActive is true', () => {
+        // Strict table over the exported helper's === true guard.
+        // NOTE: export currently has no app consumers (only automation/index.js
+        // imports handle); trim alongside the export if it is ever removed.
+        it.each([
+            [true, true],
+            [false, false],
+            [null, false],
+            [undefined, false],
+        ])('returns %s for stored largeFormActive %s', (stored, expected) => {
+            getRuntimeValue.mockReturnValue(stored);
+            expect(isLargeFormActive(playerName, campaignName)).toBe(expected);
+        });
+
+        it('reads exactly the largeFormActive runtime key', () => {
             getRuntimeValue.mockReturnValue(true);
-            const result = isLargeFormActive(playerName, campaignName);
-            expect(result).toBe(true);
+            isLargeFormActive(playerName, campaignName);
             expect(getRuntimeValue).toHaveBeenCalledWith(playerName, 'largeFormActive', campaignName);
-        });
-
-        it('returns false when largeFormActive is false', () => {
-            getRuntimeValue.mockReturnValue(false);
-            const result = isLargeFormActive(playerName, campaignName);
-            expect(result).toBe(false);
-        });
-
-        it('returns false when largeFormActive is null', () => {
-            getRuntimeValue.mockReturnValue(null);
-            const result = isLargeFormActive(playerName, campaignName);
-            expect(result).toBe(false);
-        });
-
-        it('returns false when largeFormActive is undefined', () => {
-            getRuntimeValue.mockReturnValue(undefined);
-            const result = isLargeFormActive(playerName, campaignName);
-            expect(result).toBe(false);
         });
     });
 });

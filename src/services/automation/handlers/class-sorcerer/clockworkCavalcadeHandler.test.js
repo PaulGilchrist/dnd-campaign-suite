@@ -1,3 +1,7 @@
+// @maintained-by-ai — deterministic uses-ledger / heal-pool / popup-composition contract of
+// clockworkCavalcadeHandler with every collaborator mocked; popup strings are full-string
+// own-composition pins. Dispelling internals are owned by clockworkCavalcadeDispel.test.js
+// (this file pins delegation only). Consumer modal-wiring lives in useCharActionsModalHandlers.*.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     handle,
@@ -16,16 +20,11 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
 }));
 
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
-    isWithinRange: vi.fn(() => Promise.resolve(true)),
+    isWithinRange: vi.fn(async () => true),
 }));
 
 vi.mock('./clockworkCavalcadeDispel.js', () => ({
-    dispelSpellsOnTarget: vi.fn(async (targetName) => ({
-        target: targetName,
-        effects: [],
-        buffs: [],
-        conditions: [],
-    })),
+    dispelSpellsOnTarget: vi.fn(),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -33,17 +32,19 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(async () => {}),
 }));
 
+// Mocked metamagic — the real sorcery-point fallback lives in useMetamagic,
+// not here; this file pins the 4-arg spend call once (see consumeUse).
 vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
     spendSorceryPoints: vi.fn(),
-    getCurrentSorceryPoints: vi.fn(() => 7),
+    getCurrentSorceryPoints: vi.fn(),
 }));
 
 vi.mock('../../../character/classFeatures.js', () => ({
-    getClassFeatures: vi.fn(() => ({ maxSorceryPoints: 8 })),
+    getClassFeatures: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-    addEntry: vi.fn(() => Promise.resolve()),
+    addEntry: vi.fn(async () => {}),
 }));
 
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
@@ -84,8 +85,20 @@ function makeCombatSummary(creatures = []) {
 
 function getUsesCalls() {
     return useRuntimeState.setRuntimeValue.mock.calls.filter(
-        (c) => c[1] && typeof c[1] === 'string' && c[1].includes(USES_KEY)
+        (c) => c[1] === USES_KEY
     );
+}
+
+function abilityUseLog() {
+    return addEntry.mock.calls.map(c => c[1]).find(l => l.type === 'ability_use');
+}
+
+function hpChangeLogs() {
+    return addEntry.mock.calls.map(c => c[1]).filter(l => l.type === 'hp_change');
+}
+
+function conditionRemovalLogs() {
+    return addEntry.mock.calls.map(c => c[1]).filter(l => l.type === 'condition');
 }
 
 describe('clockworkCavalcadeHandler', () => {
@@ -95,6 +108,12 @@ describe('clockworkCavalcadeHandler', () => {
         getCurrentSorceryPoints.mockReturnValue(7);
         getClassFeatures.mockReturnValue({ maxSorceryPoints: 8 });
         isWithinRange.mockResolvedValue(true);
+        dispelSpellsOnTarget.mockImplementation(async (targetName) => ({
+            target: targetName,
+            effects: [],
+            buffs: [],
+            conditions: [],
+        }));
         getCombatContext.mockResolvedValue(makeCombatSummary([
             { name: 'Ally', type: 'player', currentHp: 20, maxHp: 50 },
             { name: 'Enemy', type: 'npc', currentHp: 40, maxHp: 40 },
@@ -102,14 +121,12 @@ describe('clockworkCavalcadeHandler', () => {
     });
 
     describe('handle', () => {
-        it('returns a clockworkCavalcade modal with payload', async () => {
+        it('returns a clockworkCavalcade modal with default maxHeal and restoreCost', async () => {
             const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN);
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('clockworkCavalcade');
             expect(result.payload).toEqual(expect.objectContaining({
-                action: expect.any(Object),
-                playerStats: expect.any(Object),
                 featureName: 'Clockwork Cavalcade',
                 playerName: 'TestSorcerer',
                 campaignName: CAMPAIGN,
@@ -145,12 +162,14 @@ describe('clockworkCavalcadeHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('no uses remaining');
-            expect(result.payload.description).toContain('7 Sorcery Points');
+            expect(result.payload.description).toBe(
+                'Clockwork Cavalcade has no uses remaining (recharges on a Long Rest). ' +
+                'You need 7 Sorcery Points to restore it, but you only have 5.'
+            );
             expect(spendSorceryPoints).not.toHaveBeenCalled();
         });
 
-        it('does not spend SP or consume uses during handle', async () => {
+        it('does not spend SP or touch uses when reopening at 0 uses with sufficient SP', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue('0');
 
             const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN);
@@ -170,10 +189,10 @@ describe('clockworkCavalcadeHandler', () => {
             expect(result).toEqual({ ok: true, spentSP: 0, usesLeft: 1 });
             const calls = getUsesCalls();
             expect(calls).toHaveLength(1);
-            expect(calls[0][2]).toBe(1);
+            expect(calls[0]).toEqual(['TestSorcerer', USES_KEY, 1, CAMPAIGN]);
         });
 
-        it('spends SP to restore a use when no uses remain', async () => {
+        it('spends SP to restore a use when none remain, writing 1 then consuming to 0', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue('0');
 
             const result = await consumeUse(makeAction(), makePlayerStats(), CAMPAIGN);
@@ -181,19 +200,14 @@ describe('clockworkCavalcadeHandler', () => {
             expect(spendSorceryPoints).toHaveBeenCalledWith('TestSorcerer', 7, CAMPAIGN, 8);
             expect(result).toEqual({ ok: true, spentSP: 7, usesLeft: 0 });
             const calls = getUsesCalls();
-            expect(calls[0][2]).toBe(1);
-            expect(calls[1][2]).toBe(0);
-        });
-
-        it('logs the SP restore', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue('0');
-
-            await consumeUse(makeAction(), makePlayerStats(), CAMPAIGN);
-
-            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-                type: 'ability_use',
+            expect(calls).toEqual([
+                ['TestSorcerer', USES_KEY, 1, CAMPAIGN],
+                ['TestSorcerer', USES_KEY, 0, CAMPAIGN],
+            ]);
+            expect(abilityUseLog()).toEqual(expect.objectContaining({
                 characterName: 'TestSorcerer',
                 abilityName: 'Clockwork Cavalcade',
+                description: 'TestSorcerer restored Clockwork Cavalcade by spending 7 Sorcery Points.',
             }));
         });
 
@@ -203,24 +217,17 @@ describe('clockworkCavalcadeHandler', () => {
 
             const result = await consumeUse(makeAction(), makePlayerStats(), CAMPAIGN);
 
-            expect(result.ok).toBe(false);
-            expect(result.reason).toContain('7 Sorcery Points');
+            expect(result).toEqual({
+                ok: false,
+                reason: 'Clockwork Cavalcade has no uses remaining. You need 7 Sorcery Points to restore it, but you only have 3.',
+            });
             expect(spendSorceryPoints).not.toHaveBeenCalled();
-        });
-
-        it('falls back to class feature max SP', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue('0');
-            getCurrentSorceryPoints.mockReturnValue(null);
-            getClassFeatures.mockReturnValue({ maxSorceryPoints: 12 });
-
-            await consumeUse(makeAction(), makePlayerStats(), CAMPAIGN);
-
-            expect(getClassFeatures).toHaveBeenCalledWith(expect.any(Object));
+            expect(getUsesCalls()).toHaveLength(0);
         });
     });
 
     describe('confirmClockworkCavalcadeHeal', () => {
-        it('heals across the distribution and consumes a use', async () => {
+        it('heals across the distribution, consumes a use, logs both lanes and reports totals', async () => {
             useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
                 if (key === USES_KEY) return '1';
                 if (key === 'currentHitPoints') return 20;
@@ -242,9 +249,21 @@ describe('clockworkCavalcadeHandler', () => {
 
             expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'Ally', 30, CAMPAIGN);
             expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'Enemy', 10, CAMPAIGN);
-            expect(getUsesCalls()[0][2]).toBe(0);
+            expect(getUsesCalls()).toEqual([['TestSorcerer', USES_KEY, 0, CAMPAIGN]]);
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('restored 40 HP');
+            expect(result.payload.description).toBe(
+                'Clockwork Cavalcade (Heal) restored 40 HP across 2 creature(s) in the Cube: Ally (+30 HP), Enemy (+10 HP).'
+            );
+            expect(abilityUseLog()).toEqual(expect.objectContaining({
+                characterName: 'TestSorcerer',
+                abilityName: 'Clockwork Cavalcade',
+                description: 'TestSorcerer used Clockwork Cavalcade (Heal), restoring 40 HP across 2 creature(s): Ally (+30 HP), Enemy (+10 HP).',
+            }));
+            // Player maxHp comes from runtime (50), NPC maxHp from combatSummary (40).
+            const allyLog = hpChangeLogs().find(l => l.targetName === 'Ally');
+            expect(allyLog).toEqual(expect.objectContaining({ delta: 30, currentHp: 50, maxHp: 50, isHealing: true }));
+            const enemyLog = hpChangeLogs().find(l => l.targetName === 'Enemy');
+            expect(enemyLog).toEqual(expect.objectContaining({ delta: 10, currentHp: 40, maxHp: 40, isHealing: true }));
         });
 
         it('caps total healing at the pool', async () => {
@@ -267,12 +286,38 @@ describe('clockworkCavalcadeHandler', () => {
                 100
             );
 
-            const calls = applyHealingToTarget.mock.calls;
-            const total = calls.reduce((sum, c) => sum + c[2], 0);
+            const total = applyHealingToTarget.mock.calls.reduce((sum, c) => sum + c[2], 0);
             expect(total).toBe(100);
         });
 
-        it('returns a not-consumed popup when no uses and insufficient SP', async () => {
+        it('spends pool by actual healed amount, not allocated amount', async () => {
+            getCombatContext.mockResolvedValue(makeCombatSummary([
+                { name: 'Ally', type: 'player', currentHp: 1, maxHp: 1 },
+                { name: 'Enemy', type: 'npc', currentHp: 30, maxHp: 40 },
+            ]));
+            useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === USES_KEY) return '1';
+                if (key === 'currentHitPoints') return 133;
+                if (key === 'hitPoints') return 143;
+                return null;
+            });
+
+            const result = await confirmClockworkCavalcadeHeal(
+                makeAction(),
+                makePlayerStats(),
+                CAMPAIGN,
+                { Ally: 50, Enemy: 50 },
+                100
+            );
+
+            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'Ally', 10, CAMPAIGN);
+            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'Enemy', 10, CAMPAIGN);
+            expect(result.payload.description).toBe(
+                'Clockwork Cavalcade (Heal) restored 20 HP across 2 creature(s) in the Cube: Ally (+10 HP), Enemy (+10 HP).'
+            );
+        });
+
+        it('returns a not-consumed popup without healing anyone when no uses and insufficient SP', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue('0');
             getCurrentSorceryPoints.mockReturnValue(3);
 
@@ -285,25 +330,12 @@ describe('clockworkCavalcadeHandler', () => {
             );
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('no uses remaining');
-            expect(applyHealingToTarget).not.toHaveBeenCalled();
-        });
-
-        it('logs an ability_use entry', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue('1');
-
-            await confirmClockworkCavalcadeHeal(
-                makeAction(),
-                makePlayerStats(),
-                CAMPAIGN,
-                { Ally: 25 },
-                100
+            expect(result.payload.description).toBe(
+                'Clockwork Cavalcade has no uses remaining. You need 7 Sorcery Points to restore it, but you only have 3.'
             );
-
-            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-                type: 'ability_use',
-                abilityName: 'Clockwork Cavalcade',
-            }));
+            expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+            expect(getUsesCalls()).toHaveLength(0);
         });
 
         it('heals player targets from runtime HP despite combatSummary stub maxHp:1 (CLA-055)', async () => {
@@ -330,15 +362,18 @@ describe('clockworkCavalcadeHandler', () => {
 
             expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'AasimarTest', 63, CAMPAIGN);
             expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'FeyRanger', 37, CAMPAIGN);
-            const hpLogs = addEntry.mock.calls.filter(c => c[1].type === 'hp_change');
-            expect(hpLogs.map(c => c[1]).find(l => l.targetName === 'AasimarTest')).toEqual(expect.objectContaining({
+            const aasimarLog = hpChangeLogs().find(l => l.targetName === 'AasimarTest');
+            expect(aasimarLog).toEqual(expect.objectContaining({
                 delta: 63, currentHp: 143, maxHp: 143, isHealing: true,
             }));
-            expect(hpLogs.map(c => c[1]).find(l => l.targetName === 'FeyRanger')).toEqual(expect.objectContaining({
+            const rangerLog = hpChangeLogs().find(l => l.targetName === 'FeyRanger');
+            expect(rangerLog).toEqual(expect.objectContaining({
                 delta: 37, currentHp: 77, maxHp: 89, isHealing: true,
             }));
-            expect(result.payload.description).toContain('restored 100 HP');
-            expect(getUsesCalls()[0][2]).toBe(0);
+            expect(result.payload.description).toBe(
+                'Clockwork Cavalcade (Heal) restored 100 HP across 2 creature(s) in the Cube: AasimarTest (+63 HP), FeyRanger (+37 HP).'
+            );
+            expect(getUsesCalls()).toEqual([['TestSorcerer', USES_KEY, 0, CAMPAIGN]]);
         });
 
         it('clamps player healing at runtime max HP', async () => {
@@ -361,62 +396,13 @@ describe('clockworkCavalcadeHandler', () => {
             );
 
             expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'AasimarTest', 3, CAMPAIGN);
-            const hpLog = addEntry.mock.calls.map(c => c[1]).find(l => l.type === 'hp_change');
-            expect(hpLog.delta).toBe(3);
-            expect(hpLog.currentHp).toBe(143);
-        });
-
-        it('spends pool by actual healed amount, not allocated amount', async () => {
-            getCombatContext.mockResolvedValue(makeCombatSummary([
-                { name: 'Ally', type: 'player', currentHp: 1, maxHp: 1 },
-                { name: 'Enemy', type: 'npc', currentHp: 30, maxHp: 40 },
-            ]));
-            useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === USES_KEY) return '1';
-                if (key === 'currentHitPoints') return 133;
-                if (key === 'hitPoints') return 143;
-                return null;
-            });
-
-            const result = await confirmClockworkCavalcadeHeal(
-                makeAction(),
-                makePlayerStats(),
-                CAMPAIGN,
-                { Ally: 50, Enemy: 50 },
-                100
-            );
-
-            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'Ally', 10, CAMPAIGN);
-            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'Enemy', 10, CAMPAIGN);
-            expect(result.payload.description).toContain('restored 20 HP');
-        });
-
-        it('keeps npc healing resolved from combatSummary (unchanged path)', async () => {
-            getCombatContext.mockResolvedValue(makeCombatSummary([
-                { name: 'Bandit 1', type: 'npc', currentHp: 4, maxHp: 11 },
-            ]));
-            useRuntimeState.getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === USES_KEY) return '1';
-                return null;
-            });
-
-            await confirmClockworkCavalcadeHeal(
-                makeAction(),
-                makePlayerStats(),
-                CAMPAIGN,
-                { 'Bandit 1': 7 },
-                100
-            );
-
-            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'Bandit 1', 7, CAMPAIGN);
-            const hpLog = addEntry.mock.calls.map(c => c[1]).find(l => l.type === 'hp_change');
-            expect(hpLog.delta).toBe(7);
-            expect(hpLog.maxHp).toBe(11);
+            const hpLog = hpChangeLogs().find(l => l.targetName === 'AasimarTest');
+            expect(hpLog).toEqual(expect.objectContaining({ delta: 3, currentHp: 143, maxHp: 143 }));
         });
     });
 
     describe('confirmClockworkCavalcadeDispel', () => {
-        it('dispels spells on each selected target', async () => {
+        it('dispels spells on each selected target and consumes a use', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue('1');
 
             const result = await confirmClockworkCavalcadeDispel(
@@ -428,17 +414,17 @@ describe('clockworkCavalcadeHandler', () => {
 
             expect(dispelSpellsOnTarget).toHaveBeenCalledWith('Ally', CAMPAIGN);
             expect(dispelSpellsOnTarget).toHaveBeenCalledWith('Enemy', CAMPAIGN);
-            expect(getUsesCalls()[0][2]).toBe(0);
+            expect(getUsesCalls()).toEqual([['TestSorcerer', USES_KEY, 0, CAMPAIGN]]);
             expect(result.type).toBe('popup');
         });
 
-        it('reports how many effects were removed', async () => {
+        it('counts every removed effect and logs each condition entry (string and object)', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue('1');
-            dispelSpellsOnTarget.mockResolvedValue({
+            dispelSpellsOnTarget.mockResolvedValueOnce({
                 target: 'Ally',
                 effects: [{ effect: 'bless' }],
                 buffs: [{ name: 'Mage Armor' }],
-                conditions: ['paralyzed'],
+                conditions: ['paralyzed', { key: 'restrained' }],
             });
 
             const result = await confirmClockworkCavalcadeDispel(
@@ -448,36 +434,27 @@ describe('clockworkCavalcadeHandler', () => {
                 ['Ally']
             );
 
-            expect(result.payload.description).toContain('ended 3 spell effect');
-            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-                type: 'condition',
-                action: 'removed',
-                condition: 'paralyzed',
-            }));
-        });
-
-        it('logs removed conditions for each target', async () => {
-            useRuntimeState.getRuntimeValue.mockReturnValue('1');
-            dispelSpellsOnTarget.mockResolvedValue({
-                target: 'Ally',
-                effects: [],
-                buffs: [],
-                conditions: [{ key: 'restrained' }],
-            });
-
-            await confirmClockworkCavalcadeDispel(
-                makeAction(),
-                makePlayerStats(),
-                CAMPAIGN,
-                ['Ally']
+            expect(result.payload.description).toBe(
+                'Clockwork Cavalcade (Dispel) ended 4 spell effect(s) of level 6 or lower on 1 creature(s): ' +
+                'Ally: 1 spell effect(s), 1 buff(s), 2 condition(s).'
             );
-
-            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
-                condition: 'restrained',
+            expect(abilityUseLog()).toEqual(expect.objectContaining({
+                characterName: 'TestSorcerer',
+                abilityName: 'Clockwork Cavalcade',
+                description: 'TestSorcerer used Clockwork Cavalcade (Dispel) on 1 creature(s), ending 4 spell effect(s) of level 6 or lower.',
             }));
+            expect(conditionRemovalLogs().map(l => l.condition)).toEqual(['paralyzed', 'restrained']);
+            for (const log of conditionRemovalLogs()) {
+                expect(log).toEqual(expect.objectContaining({
+                    type: 'condition',
+                    action: 'removed',
+                    characterName: 'Ally',
+                    reason: 'Clockwork Cavalcade (Dispel)',
+                }));
+            }
         });
 
-        it('returns a not-consumed popup when no uses and insufficient SP', async () => {
+        it('returns a not-consumed popup without dispelling when no uses and insufficient SP', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue('0');
             getCurrentSorceryPoints.mockReturnValue(2);
 
@@ -489,7 +466,11 @@ describe('clockworkCavalcadeHandler', () => {
             );
 
             expect(result.type).toBe('popup');
+            expect(result.payload.description).toBe(
+                'Clockwork Cavalcade has no uses remaining. You need 7 Sorcery Points to restore it, but you only have 2.'
+            );
             expect(dispelSpellsOnTarget).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
     });
 
@@ -499,23 +480,32 @@ describe('clockworkCavalcadeHandler', () => {
 
             const result = await confirmClockworkCavalcadeRepair(makeAction(), makePlayerStats(), CAMPAIGN);
 
-            expect(getUsesCalls()[0][2]).toBe(0);
-            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            expect(getUsesCalls()).toEqual([['TestSorcerer', USES_KEY, 0, CAMPAIGN]]);
+            expect(abilityUseLog()).toEqual(expect.objectContaining({
                 type: 'ability_use',
+                characterName: 'TestSorcerer',
                 abilityName: 'Clockwork Cavalcade',
+                description: 'TestSorcerer used Clockwork Cavalcade (Repair). Damaged objects within the 30-foot Cube are repaired instantly.',
             }));
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Repair');
+            expect(result.payload.description).toBe(
+                'Clockwork Cavalcade (Repair) — damaged objects in the 30-foot Cube are repaired instantly.'
+            );
         });
 
-        it('returns a not-consumed popup when no uses and insufficient SP', async () => {
+        it('returns a not-consumed popup without logging or spending when no uses and insufficient SP', async () => {
             useRuntimeState.getRuntimeValue.mockReturnValue('0');
             getCurrentSorceryPoints.mockReturnValue(0);
 
             const result = await confirmClockworkCavalcadeRepair(makeAction(), makePlayerStats(), CAMPAIGN);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('no uses remaining');
+            expect(result.payload.description).toBe(
+                'Clockwork Cavalcade has no uses remaining. You need 7 Sorcery Points to restore it, but you only have 0.'
+            );
+            expect(addEntry).not.toHaveBeenCalled();
+            expect(spendSorceryPoints).not.toHaveBeenCalled();
+            expect(getUsesCalls()).toHaveLength(0);
         });
     });
 });

@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Handler-only lane for Elemental Affinity (2024 Draconic Sorcery): the damage-type
+// choice modal payload, the valid-type guard, chosenType store + "set to"/"changed to"
+// log copy, and the Fiendish Resilience DELEGATION pins (fiendishResilienceHandler.test.js
+// owns that handler's internals; ElementalAffinityModal.test.jsx and
+// useCharActionsAutomation.test.js mock this handler and own the consumer lane —
+// not re-pinned here).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, applyTypeChoice } from './elementalAffinityHandler.js';
 
@@ -84,13 +91,13 @@ describe('elementalAffinityHandler', () => {
             });
         });
 
-        it('handles falsy chosenType (empty string, null) by showing modal without existingType', async () => {
-            getChosenRuntimeValue.mockReturnValue('');
+        it('passes automation-level damageTypes from action.automation.damageTypes', async () => {
+            getChosenRuntimeValue.mockReturnValue(undefined);
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+            const action = makeAction({ automation: { damageTypes: ['Lightning', 'Poison'] } });
+            const result = await handle(action, makePlayerStats(), 'test-campaign', null);
 
-            expect(result.type).toBe('modal');
-            expect(result.payload.existingType).toBeUndefined();
+            expect(result.payload.damageTypes).toEqual(['Lightning', 'Poison']);
         });
 
         it('delegates to Fiendish Resilience handler when action name is Fiendish Resilience', async () => {

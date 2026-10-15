@@ -1,4 +1,10 @@
+// @maintained-by-ai
 // CLA-335 regression: same-hit refire round latch + honest cap text
+// Lane split (family recipe): direct lane owns latch stamp + cap-text
+// composition; dispatch lane keeps ONE round-refusal mirror only. The
+// stormsThunder entry-point pin lives in giantAncestry-selection.test.js
+// (SEAM DEFECT PIN, giantAncestryEntryPoints.js:112) — nothing here touches
+// stormsThunder routing, so no coordination needed on that pin.
 import { vi } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -40,6 +46,7 @@ import {
 } from './giantAncestryHandler.js';
 import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { makePlayerStats } from './giantAncestry.test.setup.js';
@@ -73,7 +80,7 @@ describe('CLA-335 Stone\'s Endurance refire latch + cap text', () => {
         expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('already used');
         expect(result.payload.description).toContain('Reaction is spent');
-        expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'stonesEnduranceUses', 2, 'campaign');
+        expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(applyHealingToTarget).not.toHaveBeenCalled();
         expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
             type: 'automation',
@@ -81,23 +88,29 @@ describe('CLA-335 Stone\'s Endurance refire latch + cap text', () => {
         }));
     });
 
-    it('stamps the round latch from a fresh combat context on a successful use', async () => {
+    it('stamps the round latch on a successful use (fallback round 1 when combat context is unavailable), uncapped', async () => {
         mockState({ uses: 3, usedRound: null });
 
         const result = await handleStonesEnduranceDirect(directAction, makePlayerStats(), 'campaign');
 
         expect(result.payload.description).toContain('Healed');
+        expect(result.payload.description).not.toContain('capped');
         expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'stonesEnduranceUses', 2, 'campaign');
         expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_Stones_Endurance_usedRound', 1, 'campaign');
     });
 
-    it('allows a use in a LATER round (round advanced past the stamp)', async () => {
-        mockState({ uses: 3, usedRound: 0 });
+    it('re-arms on a LATER round: fresh combat-context round 2 passes a round-1 stamp and re-stamps round 2', async () => {
+        mockState({ uses: 3, usedRound: 1 });
+        // FT-082 pin: currentRound is read from the FRESH getCombatContext,
+        // not the stamp — a stale round-1 stamp must not block round 2.
+        getCombatContext.mockResolvedValue({ round: 2 });
 
         const result = await handleStonesEnduranceDirect(directAction, makePlayerStats(), 'campaign');
 
         expect(result.payload.description).toContain('Healed');
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_Stones_Endurance_usedRound', 1, 'campaign');
+        expect(result.payload.description).not.toContain('already used');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'stonesEnduranceUses', 2, 'campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', '_Stones_Endurance_usedRound', 2, 'campaign');
     });
 
     it('cap text reports the damage-taken cap when roll+CON exceeds damage', async () => {
@@ -140,7 +153,8 @@ describe('CLA-335 Stone\'s Endurance refire latch + cap text', () => {
         const result = await handleStonesEndurance(makeAction(), makePlayerStats(), 'campaign', option);
 
         expect(result.payload.description).toContain('already used');
-        expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'stonesEnduranceUses', 2, 'campaign');
+        expect(result.payload.description).toContain('Reaction is spent');
+        expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(applyHealingToTarget).not.toHaveBeenCalled();
     });
 });

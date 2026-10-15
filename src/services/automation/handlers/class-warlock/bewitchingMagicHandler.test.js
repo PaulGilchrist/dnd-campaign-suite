@@ -1,3 +1,9 @@
+// @maintained-by-ai: 2026-10-15 — deterministic: handle() is pure over mocked
+// getRuntimeValue/getCombatContext/addEntry; every test pins a distinct branch
+// (4 manual-gate refusals, auto-lane bypass/refusal, resolveSchool precedence/
+// fallback/case, CLA-037 unlimited payload, no-counter guard, target filter,
+// null-context grace, save-DC default table). No cross-file overlap — the auto
+// trigger's own gating lives in postCastRiderService.test.js with executeHandler mocked.
 // CLA-037: Bewitching Magic is an unlimited free Misty Step rider. These tests
 // flip the old pins that bound it to the Steps of the Fey uses counter
 // (_Steps_of_the_Fey_freeCastCount) — the handler must never read or write it.

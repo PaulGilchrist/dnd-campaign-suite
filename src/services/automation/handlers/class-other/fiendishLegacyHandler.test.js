@@ -1,3 +1,29 @@
+// @maintained-by-ai
+// fiendishLegacyHandler — unit seam map.
+//
+// This file OWNS:
+// - resolveFiendishLegacy() CLA-139 unified channel: subrace is authoritative
+//   (runtime cache never consulted), runtime _fiendishLegacySelection is the
+//   fallback for subrace-less Tieflings, null for non-Tieflings.
+// - handle() router: popup with subrace-authoritative full-string composition
+//   when already selected, fiendishLegacy modal when unselected.
+// - confirmFiendishLegacy(): invalid-input guard (no write) + one merged
+//   setRuntimeObject write per legacy — the exact runtime keys every other
+//   suite mocks against live here.
+// - stampFiendishLegacyRuntime() CLA-139 wizard seam: suffix-strip, one
+//   merged write, unknown-subrace console.error guard.
+// - restoreUses() + the five getters: API-contract pins (exact key
+//   delegation tables). No production caller today — kept as the handler-lane
+//   rest/getter contract (same convention as elfish/gnomish/stonecunning).
+//
+// Owned ELSEWHERE (do not re-pin here):
+// - FiendishLegacyModal.test.jsx — modal UI (mocks confirmFiendishLegacy).
+// - useCharacterWizard.test.js — wizard POST-body seam through the stamp.
+// - race-rules/2024.js resolveFiendishLegacyName — separate summary resolver.
+//
+// Deterministic: pure functions over an in-memory runtime-store mock, no
+// timers, no DOM, no network. LEGACY_DATA below intentionally mirrors the
+// handler's FIENDISH_LEGACIES so rule-data edits fail here on purpose.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import {
@@ -42,6 +68,7 @@ function makePlayerStats(overrides = {}) {
     };
 }
 
+// Mirrors handler FIENDISH_LEGACIES (races.json:880, 2024 Tiefling).
 const LEGACY_DATA = {
     Infernal: {
         ability: 'Charisma',
@@ -93,49 +120,33 @@ describe('fiendishLegacyHandler.handle', () => {
         vi.clearAllMocks();
     });
 
-    it('returns info popup when a legacy is already selected', async () => {
-        getRuntimeValue.mockReturnValue('Infernal');
+    const action = { name: 'Fiendish Legacy', automation: { type: 'fiendish_legacy' } };
 
-        const result = await handle(
-            { name: 'Fiendish Legacy', automation: { type: 'fiendish_legacy' } },
-            makePlayerStats(),
-            'test-campaign',
-            null
-        );
+    it.each([
+        // runtime-channel selection (no subrace persisted)
+        ['Infernal', makePlayerStats(), 'Infernal'],
+        // CLA-139: subrace-authoritative, never the stale runtime value
+        ['Abyssal', makePlayerStats({ race: { name: 'Tiefling', subrace: { name: 'Abyssal Tiefling' } } }), 'Infernal'],
+    ])('reports %s legacy (already selected) popup, full composition', async (legacy, stats, runtimeValue) => {
+        getRuntimeValue.mockReturnValue(runtimeValue);
+
+        const result = await handle(action, stats, campaignName, null);
 
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('Fiendish Legacy: Infernal (already selected)');
+        expect(result.payload.name).toBe('Fiendish Legacy');
+        expect(result.payload.description).toBe(`Fiendish Legacy: ${legacy} (already selected).`);
         expect(result.payload.automation).toEqual({ type: 'fiendish_legacy' });
-    });
-
-    it('CLA-139: reports the subrace-authoritative legacy, never a stale runtime value', async () => {
-        getRuntimeValue.mockReturnValue('Infernal');
-
-        const result = await handle(
-            { name: 'Fiendish Legacy', automation: { type: 'fiendish_legacy' } },
-            makePlayerStats({ race: { name: 'Tiefling', subrace: { name: 'Abyssal Tiefling' } } }),
-            'test-campaign',
-            null
-        );
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Fiendish Legacy: Abyssal (already selected)');
     });
 
     it('returns modal when no legacy is selected', async () => {
         getRuntimeValue.mockReturnValue(null);
 
-        const result = await handle(
-            { name: 'Fiendish Legacy', automation: { type: 'fiendish_legacy' } },
-            makePlayerStats(),
-            campaignName,
-            null
-        );
+        const result = await handle(action, makePlayerStats(), campaignName, null);
 
         expect(result.type).toBe('modal');
         expect(result.modalName).toBe('fiendishLegacy');
-        expect(result.payload.action).toBeDefined();
+        expect(result.payload.action).toBe(action);
         expect(result.payload.playerStats).toBeInstanceOf(Object);
         expect(result.payload.campaignName).toBe(campaignName);
     });
@@ -146,18 +157,15 @@ describe('confirmFiendishLegacy', () => {
         vi.clearAllMocks();
     });
 
-    it('returns error popup for invalid legacy', async () => {
+    it.each(['Nonexistent', '', undefined])('returns error popup and writes nothing for invalid legacy %s', async (legacy) => {
         getRuntimeValue.mockReturnValue(null);
-        const result = await confirmFiendishLegacy(makePlayerStats(), 'Nonexistent', campaignName);
+        const result = await confirmFiendishLegacy(makePlayerStats(), legacy, campaignName);
+
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.name).toBe('Fiendish Legacy');
         expect(result.payload.description).toBe('No legacy selected.');
         expect(result.payload.automation.type).toBe('fiendish_legacy');
-
-        const emptyResult = await confirmFiendishLegacy(makePlayerStats(), '', campaignName);
-        expect(emptyResult.type).toBe('popup');
-        expect(emptyResult.payload.description).toBe('No legacy selected.');
         expect(setRuntimeObject).not.toHaveBeenCalled();
     });
 
@@ -166,8 +174,7 @@ describe('confirmFiendishLegacy', () => {
         const result = await confirmFiendishLegacy(makePlayerStats(), legacy, campaignName);
 
         expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain(`Selected ${legacy} legacy`);
-        expect(result.payload.description).toContain(`Spellcasting ability: ${data.ability}`);
+        expect(result.payload.description).toBe(`Selected ${legacy} legacy. Spellcasting ability: ${data.ability}.`);
 
         expect(setRuntimeObject).toHaveBeenCalledTimes(1);
         expect(setRuntimeObject).toHaveBeenCalledWith(playerName, {
@@ -210,13 +217,12 @@ describe('stampFiendishLegacyRuntime (CLA-139 wizard seam)', () => {
 
 describe('restoreUses', () => {
     beforeEach(() => {
-        vi.resetAllMocks();
+        vi.clearAllMocks();
     });
 
-    it('clears all legacy runtime values by calling setRuntimeValue with null', () => {
+    it('clears all legacy runtime keys with null in exact order', () => {
         restoreUses(playerName, campaignName);
 
-        expect(setRuntimeValue).toHaveBeenCalledTimes(5);
         const calls = setRuntimeValue.mock.calls;
         const keys = calls.map((c) => c[1]);
         expect(keys).toEqual([
@@ -227,67 +233,27 @@ describe('restoreUses', () => {
             '_fiendishLegacyLevel5',
         ]);
         calls.forEach((c) => {
-            expect(c[2]).toBeNull();
+            expect(c).toEqual([playerName, c[1], null, campaignName]);
         });
     });
 });
 
-describe('getFiendishLegacySelection', () => {
+describe('runtime getters', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    it('returns the stored legacy selection from runtime', () => {
-        const result = getFiendishLegacySelection(makePlayerStats(), campaignName);
-        expect(result).toBe('Infernal');
-        expect(getRuntimeValue).toHaveBeenCalledWith(playerName, '_fiendishLegacySelection', campaignName);
-    });
-});
-
-describe('getFiendishLegacyAbility', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    it('returns the stored spellcasting ability from runtime', () => {
-        const result = getFiendishLegacyAbility(makePlayerStats(), campaignName);
-        expect(result).toBe('Charisma');
-        expect(getRuntimeValue).toHaveBeenCalledWith(playerName, '_fiendishLegacyAbility', campaignName);
-    });
-});
-
-describe('getFiendishLegacyCantrip', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    it('returns the stored cantrip from runtime', () => {
-        const result = getFiendishLegacyCantrip(makePlayerStats(), campaignName);
-        expect(result).toBe('Fire Bolt');
-        expect(getRuntimeValue).toHaveBeenCalledWith(playerName, '_fiendishLegacyCantrip', campaignName);
-    });
-});
-
-describe('getFiendishLegacyLevel3Spell', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    it('returns the stored level 3 spell from runtime', () => {
-        const result = getFiendishLegacyLevel3Spell(makePlayerStats(), campaignName);
-        expect(result).toBe('Hellish Rebuke');
-        expect(getRuntimeValue).toHaveBeenCalledWith(playerName, '_fiendishLegacyLevel3', campaignName);
-    });
-});
-
-describe('getFiendishLegacyLevel5Spell', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    it('returns the stored level 5 spell from runtime', () => {
-        const result = getFiendishLegacyLevel5Spell(makePlayerStats(), campaignName);
-        expect(result).toBe('Darkness');
-        expect(getRuntimeValue).toHaveBeenCalledWith(playerName, '_fiendishLegacyLevel5', campaignName);
+    // Each getter is a one-line delegation to getRuntimeValue on its exact
+    // key — pinned as a table so a renamed key fails here, once, clearly.
+    it.each([
+        ['getFiendishLegacySelection', '_fiendishLegacySelection', getFiendishLegacySelection, 'Infernal'],
+        ['getFiendishLegacyAbility', '_fiendishLegacyAbility', getFiendishLegacyAbility, 'Charisma'],
+        ['getFiendishLegacyCantrip', '_fiendishLegacyCantrip', getFiendishLegacyCantrip, 'Fire Bolt'],
+        ['getFiendishLegacyLevel3Spell', '_fiendishLegacyLevel3', getFiendishLegacyLevel3Spell, 'Hellish Rebuke'],
+        ['getFiendishLegacyLevel5Spell', '_fiendishLegacyLevel5', getFiendishLegacyLevel5Spell, 'Darkness'],
+    ])('%s reads %s verbatim', (_label, key, getter, value) => {
+        getRuntimeValue.mockReturnValue(value);
+        expect(getter(makePlayerStats(), campaignName)).toBe(value);
+        expect(getRuntimeValue).toHaveBeenCalledWith(playerName, key, campaignName);
     });
 });

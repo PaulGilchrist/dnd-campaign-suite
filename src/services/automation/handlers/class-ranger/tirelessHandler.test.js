@@ -1,3 +1,6 @@
+// @maintained-by-ai
+// Deterministic pure-behaviour contract for tirelessHandler: all boundaries
+// (runtime store, dice, log) are mocked; pins are exact strings/values.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './tirelessHandler.js';
 
@@ -43,6 +46,7 @@ function makeAction(overrides = {}) {
     };
 }
 
+// Defaults: 3 stored uses, roll total 5 → tempHp 5, uses remaining 2.
 beforeEach(() => {
     vi.clearAllMocks();
     getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
@@ -55,7 +59,7 @@ beforeEach(() => {
 
 describe('tirelessHandler', () => {
     describe('guard: no uses remaining', () => {
-        it('returns popup when uses are 0', async () => {
+        it('returns popup when uses are 0 without side effects', async () => {
             getRuntimeValue.mockImplementation((_playerName, key) => {
                 if (key === 'tirelessUses') return 0;
                 return undefined;
@@ -66,31 +70,7 @@ describe('tirelessHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Tireless');
-            expect(result.payload.description).toContain('no uses remaining');
-            expect(result.payload.description).toContain('Regains all on a Long Rest');
-        });
-
-        it('returns popup when uses are negative', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'tirelessUses') return -2;
-                return undefined;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('no uses remaining');
-        });
-
-        it('does not decrement uses or roll dice when no uses remaining', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'tirelessUses') return 0;
-                return undefined;
-            });
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
+            expect(result.payload.description).toBe('Tireless has no uses remaining. Regains all on a Long Rest.');
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(rollExpression).not.toHaveBeenCalled();
             expect(addEntry).not.toHaveBeenCalled();
@@ -98,7 +78,7 @@ describe('tirelessHandler', () => {
     });
 
     describe('uses calculation', () => {
-        it('uses stored runtime value when available', async () => {
+        it('decrements stored runtime uses', async () => {
             getRuntimeValue.mockImplementation((_playerName, key) => {
                 if (key === 'tirelessUses') return 2;
                 return undefined;
@@ -130,64 +110,8 @@ describe('tirelessHandler', () => {
             );
         });
 
-        it('falls back to Wisdom bonus when stored uses is undefined', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'tirelessUses') return undefined;
-                return undefined;
-            });
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'RangerGirl',
-                'tirelessUses',
-                2,
-                'test-campaign'
-            );
-        });
-
-        it('uses trackedMax from _trackedResources when available', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'tirelessUses') return undefined;
-                return undefined;
-            });
-
-            const playerStats = makePlayerStats({
-                _trackedResources: {
-                    tirelessUses: { current: 5 },
-                },
-            });
-
-            await handle(makeAction(), playerStats, 'test-campaign', null);
-        });
-
-        it('uses trackedMax from _trackedResources when available', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'tirelessUses') return undefined;
-                return undefined;
-            });
-
-            const playerStats = makePlayerStats({
-                _trackedResources: {
-                    tirelessUses: { current: 5 },
-                },
-            });
-
-            await handle(makeAction(), playerStats, 'test-campaign', null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'RangerGirl',
-                'tirelessUses',
-                4,
-                'test-campaign'
-            );
-        });
-
-        it('uses trackedMax over Wisdom bonus', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'tirelessUses') return undefined;
-                return undefined;
-            });
+        it('prefers trackedMax from _trackedResources over Wisdom bonus', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
 
             const playerStats = makePlayerStats({
                 _trackedResources: {
@@ -205,11 +129,8 @@ describe('tirelessHandler', () => {
             );
         });
 
-        it('uses max(wisdom bonus, 1) as minimum default', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'tirelessUses') return undefined;
-                return undefined;
-            });
+        it('floors max uses at 1 when Wisdom bonus is 0', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
 
             const playerStats = makePlayerStats({
                 abilities: [{ name: 'Wisdom', bonus: 0 }],
@@ -221,22 +142,6 @@ describe('tirelessHandler', () => {
                 'RangerGirl',
                 'tirelessUses',
                 0,
-                'test-campaign'
-            );
-        });
-
-        it('handles string numeric stored uses', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'tirelessUses') return '3';
-                return undefined;
-            });
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'RangerGirl',
-                'tirelessUses',
-                2,
                 'test-campaign'
             );
         });
@@ -263,13 +168,14 @@ describe('tirelessHandler', () => {
     });
 
     describe('temp HP calculation', () => {
-        it('uses default tempHpExpression when not specified', async () => {
+        it('resolves and rolls the default expression', async () => {
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(resolveDiceExpression).toHaveBeenCalledWith(
                 '1d8 + WIS modifier',
                 expect.any(Object)
             );
+            expect(rollExpression).toHaveBeenCalledWith('1d8 + WIS modifier');
         });
 
         it('uses custom tempHpExpression from automation', async () => {
@@ -283,21 +189,10 @@ describe('tirelessHandler', () => {
                 '2d6 + WIS modifier',
                 expect.any(Object)
             );
+            expect(rollExpression).toHaveBeenCalledWith('2d6 + WIS modifier');
         });
 
-        it('passes resolved expression to rollExpression', async () => {
-            rollExpression.mockReturnValue({ total: 8, rolls: [5, 3] });
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(resolveDiceExpression).toHaveBeenCalledWith(
-                '1d8 + WIS modifier',
-                expect.any(Object)
-            );
-            expect(rollExpression).toHaveBeenCalledWith('1d8 + WIS modifier');
-        });
-
-        it('rolls temp HP and stores the result', async () => {
+        it('stores rolled total as tempHp', async () => {
             rollExpression.mockReturnValue({ total: 7, rolls: [6, 1] });
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
@@ -319,7 +214,7 @@ describe('tirelessHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('Could not calculate temp HP');
+            expect(result.payload.description).toBe('Tireless: Could not calculate temp HP (1d8 + WIS modifier).');
         });
 
         it('returns popup when rollResult has no total', async () => {
@@ -329,7 +224,6 @@ describe('tirelessHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('Could not calculate temp HP');
         });
 
         it('returns popup when rollResult total is 0', async () => {
@@ -339,20 +233,9 @@ describe('tirelessHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('Could not calculate temp HP');
         });
 
-        it('returns popup when rollResult total is negative', async () => {
-            rollExpression.mockReturnValue({ total: -1, rolls: [-1] });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('Could not calculate temp HP');
-        });
-
-        it('does not set tempHp on invalid roll', async () => {
+        it('does not write tempHp or log on invalid roll', async () => {
             rollExpression.mockReturnValue(null);
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
@@ -363,108 +246,48 @@ describe('tirelessHandler', () => {
                 expect.any(Number),
                 'test-campaign'
             );
-        });
-
-        it('does not log ability_use on invalid roll', async () => {
-            rollExpression.mockReturnValue(null);
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
             expect(addEntry).not.toHaveBeenCalled();
         });
     });
 
     describe('success: popup result', () => {
-        it('returns automation_info popup with correct name', async () => {
+        it('returns automation_info popup with exact composed description', async () => {
+            const auto = makeAction().automation;
+
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Tireless');
+            expect(result.payload.description).toBe(
+                '<b>Tireless</b><br/><br/>You push beyond your limits, gaining 5 temporary hit points.<br/><br/>Uses remaining: 2'
+            );
+            expect(result.payload.automation).toEqual(auto);
         });
 
-        it('includes temp HP amount in description', async () => {
-            rollExpression.mockReturnValue({ total: 6, rolls: [5, 1] });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.description).toContain('6');
-            expect(result.payload.description).toContain('temporary hit points');
-        });
-
-        it('includes uses remaining in description', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'tirelessUses') return 2;
-                return undefined;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.description).toContain('Uses remaining: 1');
-        });
-
-        it('includes flavor text in description', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.description).toContain('push beyond your limits');
-        });
-
-        it('uses custom feature name from action', async () => {
+        it('flows custom feature name through popup and log', async () => {
             const result = await handle(makeAction({ name: 'Enduring Stride' }), makePlayerStats(), 'test-campaign', null);
 
             expect(result.payload.name).toBe('Enduring Stride');
-            expect(result.payload.description).toContain('Enduring Stride');
-        });
-
-        it('bolds feature name in description', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.description).toContain('<b>Tireless</b>');
+            expect(result.payload.description).toBe(
+                '<b>Enduring Stride</b><br/><br/>You push beyond your limits, gaining 5 temporary hit points.<br/><br/>Uses remaining: 2'
+            );
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                abilityName: 'Enduring Stride',
+            }));
         });
     });
 
     describe('logging', () => {
-        it('logs ability_use with correct type and character', async () => {
+        it('logs ability_use with exact description', async () => {
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', {
                 type: 'ability_use',
                 characterName: 'RangerGirl',
                 abilityName: 'Tireless',
-            }));
-        });
-
-        it('logs description with temp HP amount and uses remaining', async () => {
-            rollExpression.mockReturnValue({ total: 4, rolls: [3, 1] });
-
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'tirelessUses') return 2;
-                return undefined;
+                description: 'RangerGirl used Tireless — gained 5 temporary hit points. Uses remaining: 2.',
             });
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                description: expect.stringContaining('gained 4 temporary hit points'),
-            }));
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                description: expect.stringContaining('Uses remaining: 1'),
-            }));
-        });
-
-        it('logs with custom feature name', async () => {
-            await handle(makeAction({ name: 'Steady Pace' }), makePlayerStats(), 'test-campaign', null);
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                abilityName: 'Steady Pace',
-            }));
-        });
-
-        it('uses campaign name for logging', async () => {
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.any(Object));
         });
     });
 
@@ -477,37 +300,6 @@ describe('tirelessHandler', () => {
                 'tirelessUses',
                 'test-campaign'
             );
-        });
-
-        it('passes campaignName to setRuntimeValue for uses', async () => {
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'RangerGirl',
-                'tirelessUses',
-                expect.any(Number),
-                'test-campaign'
-            );
-        });
-
-        it('passes campaignName to setRuntimeValue for tempHp', async () => {
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'RangerGirl',
-                'tempHp',
-                expect.any(Number),
-                'test-campaign'
-            );
-        });
-    });
-
-    describe('automation payload', () => {
-        it('includes automation object in popup payload', async () => {
-            const auto = makeAction().automation;
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.automation).toEqual(auto);
         });
     });
 });

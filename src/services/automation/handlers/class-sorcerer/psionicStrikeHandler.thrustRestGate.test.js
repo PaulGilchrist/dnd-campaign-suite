@@ -1,4 +1,10 @@
-// CLA-355: Telekinetic Thrust once-per-rest uses gate + rest re-arm registration
+// @maintained-by-ai
+// CLA-355: Telekinetic Thrust once-per-rest uses gate + rest re-arm registration.
+// Owns the telekineticThrustUses sub-lane in both lanes: the psionicStrike
+// chain (resolveThrustChain) and the manual thrust row (telekineticThrustHandler
+// .handle). The CLA-273 round latches (psionicStrikeUsedThisTurn +
+// telekineticThrustUsedRound) are owned by psionicStrikeHandler.test.js —
+// not re-pinned here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle as handleStrike } from './psionicStrikeHandler.js';
 import { handle as handleThrust } from './telekineticThrustHandler.js';
@@ -207,12 +213,13 @@ describe('CLA-355 psionic strike thrust chain gate', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('PsiTester', 'telekineticThrustUses', 0, 'test-campaign');
     });
 
-    it('refuses at 0 uses later round with a refusal log, no save prompt, no spend', async () => {
+    it('refuses at 0 uses later round with a refusal log, no save prompt, no spend, no phantom refill — strike still resolves', async () => {
         stampRuntime({ psionicEnergy: 12, telekineticThrustUses: 0 });
         getCurrentCombatRound.mockReturnValue(2);
 
-        await handleStrike(STRIKE_ACTION, makeStats(), 'test-campaign');
+        const result = await handleStrike(STRIKE_ACTION, makeStats(), 'test-campaign');
 
+        expect(result.payload.description).toContain('Dealt');
         expect(createSaveListener).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalledWith('PsiTester', 'telekineticThrustUses', expect.any(Number), 'test-campaign');
         expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
@@ -220,17 +227,6 @@ describe('CLA-355 psionic strike thrust chain gate', () => {
             automationType: 'telekinetic_thrust_refused',
             characterName: 'PsiTester',
         }));
-    });
-
-    it('does not auto-refill a spent counter (no phantom refill)', async () => {
-        stampRuntime({ psionicEnergy: 12, telekineticThrustUses: 0 });
-        getCurrentCombatRound.mockReturnValue(3);
-
-        const result = await handleStrike(STRIKE_ACTION, makeStats(), 'test-campaign');
-
-        expect(result.payload.description).toContain('Dealt');
-        expect(createSaveListener).not.toHaveBeenCalled();
-        expect(setRuntimeValue).not.toHaveBeenCalledWith('PsiTester', 'telekineticThrustUses', expect.any(Number), 'test-campaign');
     });
 });
 

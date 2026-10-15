@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// starryFormArrowHandler: Archer-gated Luminous Arrow launch.
+// Deterministic seam: activeBuffs gate → buildStarryFormLuminousArrow →
+// target resolution (turnOrder → campaign lastAttack → null) → log → attack_roll.
+// Owns handler orchestration only; starryFormDamage.test.js owns attack construction,
+// starryFormHandler.test.js owns constellation application, targetEffectDefinitions.test.js owns registry internals.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './starryFormArrowHandler.js';
@@ -22,8 +28,10 @@ vi.mock('../../../encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(),
 }));
 
-const campaignName = 'TestCampaign';
-const playerName = 'TestDruid';
+const campaignName = 'test-campaign';
+const playerName = 'TestSorcerer';
+
+const archerBuff = { name: 'Starry Form', effect: 'starry_form', constellation: 'Archer' };
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -46,20 +54,25 @@ const defaultAttack = {
   damage: { damage_dice: '2d8', damage_type: 'Radiant' },
 };
 
+// Keyed runtime router: activeBuffs and lastAttack resolved independently.
+function mockRuntime({ buffs = [archerBuff], lastAttack = null } = {}) {
+  getRuntimeValue.mockImplementation((_caster, key) => {
+    if (key === 'activeBuffs') return buffs;
+    if (key === 'lastAttack') return lastAttack;
+    return null;
+  });
+}
+
 describe('starryFormArrowHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     buildStarryFormLuminousArrow.mockReturnValue(defaultAttack);
     getCombatSummary.mockReturnValue({ creatures: [], turnOrder: [] });
-    getRuntimeValue.mockReturnValue(null);
+    mockRuntime();
   });
 
-  describe('Archer constellation active', () => {
-    it('should return attack_roll with target from turn order when available', async () => {
-      getRuntimeValue.mockImplementation((caster, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Starry Form', effect: 'starry_form', constellation: 'Archer' }];
-        return null;
-      });
+  describe('target resolution', () => {
+    it('returns attack_roll with turn-order target and logs the ability use', async () => {
       getCombatSummary.mockReturnValue({
         creatures: [{ name: playerName }, { name: 'Orc1' }],
         turnOrder: [{ name: playerName, targetName: 'Orc1' }],
@@ -67,33 +80,66 @@ describe('starryFormArrowHandler', () => {
 
       const result = await handle(action, makePlayerStats(), campaignName);
 
-      expect(result.type).toBe('attack_roll');
-      expect(result.payload.targetName).toBe('Orc1');
-      expect(result.payload.attack).toBe(defaultAttack);
-      expect(result.payload.sourceName).toBe(action.name);
+      expect(result).toEqual({
+        type: 'attack_roll',
+        payload: {
+          attack: defaultAttack,
+          targetName: 'Orc1',
+          sourceName: action.name,
+        },
+      });
       expect(buildStarryFormLuminousArrow).toHaveBeenCalledWith(
         expect.objectContaining({ name: playerName }),
         expect.arrayContaining([expect.objectContaining({ constellation: 'Archer' })]),
       );
-      expect(addEntry).toHaveBeenCalled();
+      expect(addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          type: 'ability_use',
+          characterName: playerName,
+          abilityName: action.name,
+          description: `${playerName} fired a Starry Form Luminous Arrow at Orc1.`,
+        }),
+      );
     });
 
-    it('should fall back to lastAttack when turn order provides no target', async () => {
-      getRuntimeValue.mockImplementation((caster, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Starry Form', effect: 'starry_form', constellation: 'Archer' }];
-        if (key === 'lastAttack') return { targetName: 'Orc1' };
-        return null;
+    it('falls back to lastAttack when current actor in turnOrder has no targetName', async () => {
+      getCombatSummary.mockReturnValue({
+        creatures: [{ name: playerName }],
+        turnOrder: [{ name: playerName }],
       });
+      mockRuntime({ lastAttack: { targetName: 'Goblin' } });
 
       const result = await handle(action, makePlayerStats(), campaignName);
 
       expect(result.type).toBe('attack_roll');
-      expect(result.payload.targetName).toBe('Orc1');
+      expect(result.payload.targetName).toBe('Goblin');
     });
 
-    it('should return attack_roll with null targetName when no target is available anywhere', async () => {
-      getRuntimeValue.mockReturnValue([{ name: 'Starry Form', effect: 'starry_form', constellation: 'Archer' }]);
+    it('falls back to lastAttack when combat summary is null', async () => {
+      getCombatSummary.mockReturnValue(null);
+      mockRuntime({ lastAttack: { targetName: 'Goblin' } });
 
+      const result = await handle(action, makePlayerStats(), campaignName);
+
+      expect(result.type).toBe('attack_roll');
+      expect(result.payload.targetName).toBe('Goblin');
+    });
+
+    it('falls back to lastAttack when current actor is not in turnOrder', async () => {
+      getCombatSummary.mockReturnValue({
+        creatures: [{ name: 'OtherPlayer' }],
+        turnOrder: [{ name: 'OtherPlayer', targetName: 'SomethingElse' }],
+      });
+      mockRuntime({ lastAttack: { targetName: 'Goblin' } });
+
+      const result = await handle(action, makePlayerStats(), campaignName);
+
+      expect(result.type).toBe('attack_roll');
+      expect(result.payload.targetName).toBe('Goblin');
+    });
+
+    it('returns null targetName when no target is available anywhere', async () => {
       const result = await handle(action, makePlayerStats(), campaignName);
 
       expect(result.type).toBe('attack_roll');
@@ -101,33 +147,36 @@ describe('starryFormArrowHandler', () => {
     });
   });
 
-  describe('Archer constellation not active', () => {
-    it('should return popup with automation info when Archer constellation is not active', async () => {
-      getRuntimeValue.mockReturnValue([{ name: 'Starry Form', effect: 'starry_form', constellation: 'Chalice' }]);
+  describe('Archer constellation gate', () => {
+    it('returns automation_info popup and logs nothing when a non-Archer constellation is active', async () => {
+      mockRuntime({ buffs: [{ name: 'Starry Form', effect: 'starry_form', constellation: 'Chalice' }] });
 
       const result = await handle(action, makePlayerStats(), campaignName);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe(action.name);
-      expect(result.payload.description).toBe('Starry Form (Archer constellation) is not active.');
-      expect(result.payload.automation).toEqual(action.automation);
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: action.name,
+          description: 'Starry Form (Archer constellation) is not active.',
+          automation: action.automation,
+        },
+      });
+      expect(buildStarryFormLuminousArrow).not.toHaveBeenCalled();
       expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('should return popup when activeBuffs is invalid or empty', async () => {
-      getRuntimeValue.mockReturnValue(null);
+    it('returns popup when activeBuffs is invalid or empty', async () => {
+      mockRuntime({ buffs: null });
 
       const result = await handle(action, makePlayerStats(), campaignName);
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toBe('Starry Form (Archer constellation) is not active.');
+      expect(addEntry).not.toHaveBeenCalled();
     });
-  });
 
-  describe('buildStarryFormLuminousArrow returns null', () => {
-    it('should return popup when buildStarryFormLuminousArrow returns null despite Archer buff being present', async () => {
-      getRuntimeValue.mockReturnValue([{ name: 'Starry Form', effect: 'starry_form', constellation: 'Archer' }]);
+    it('returns popup and logs nothing when buildStarryFormLuminousArrow returns null despite Archer buff', async () => {
       buildStarryFormLuminousArrow.mockReturnValue(null);
 
       const result = await handle(action, makePlayerStats(), campaignName);
@@ -138,71 +187,14 @@ describe('starryFormArrowHandler', () => {
     });
   });
 
-  describe('combat summary edge cases', () => {
-    it('should fall back to lastAttack when combat summary is null', async () => {
-      getRuntimeValue.mockImplementation((caster, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Starry Form', effect: 'starry_form', constellation: 'Archer' }];
-        if (key === 'lastAttack') return { targetName: 'Goblin' };
-        return null;
-      });
-      getCombatSummary.mockReturnValue(null);
+  describe('log failure', () => {
+    it('still returns attack_roll when addEntry rejects', async () => {
+      addEntry.mockRejectedValueOnce(new Error('Log write failed'));
 
       const result = await handle(action, makePlayerStats(), campaignName);
 
       expect(result.type).toBe('attack_roll');
-      expect(result.payload.targetName).toBe('Goblin');
-    });
-
-    it('should fall back to lastAttack when turnOrder is empty', async () => {
-      getRuntimeValue.mockImplementation((caster, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Starry Form', effect: 'starry_form', constellation: 'Archer' }];
-        if (key === 'lastAttack') return { targetName: 'Goblin' };
-        return null;
-      });
-      getCombatSummary.mockReturnValue({ creatures: [], turnOrder: [] });
-
-      const result = await handle(action, makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('attack_roll');
-      expect(result.payload.targetName).toBe('Goblin');
-    });
-
-    it('should fall back to lastAttack when current actor is not in turnOrder', async () => {
-      getRuntimeValue.mockImplementation((caster, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Starry Form', effect: 'starry_form', constellation: 'Archer' }];
-        if (key === 'lastAttack') return { targetName: 'Goblin' };
-        return null;
-      });
-      getCombatSummary.mockReturnValue({
-        creatures: [{ name: 'OtherPlayer' }],
-        turnOrder: [{ name: 'OtherPlayer', targetName: 'SomethingElse' }],
-      });
-
-      const result = await handle(action, makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('attack_roll');
-      expect(result.payload.targetName).toBe('Goblin');
-    });
-
-    it('should return null targetName when combat summary has no turnOrder property', async () => {
-      getRuntimeValue.mockReturnValue([{ name: 'Starry Form', effect: 'starry_form', constellation: 'Archer' }]);
-      getCombatSummary.mockReturnValue({ creatures: [] });
-
-      const result = await handle(action, makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('attack_roll');
-      expect(result.payload.targetName).toBeNull();
-    });
-  });
-
-  describe('addEntry failure', () => {
-    it('should still return attack_roll when addEntry rejects', async () => {
-      getRuntimeValue.mockReturnValue([{ name: 'Starry Form', effect: 'starry_form', constellation: 'Archer' }]);
-      addEntry.mockRejectedValue(new Error('Log write failed'));
-
-      const result = await handle(action, makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('attack_roll');
+      expect(result.payload.attack).toBe(defaultAttack);
       expect(result.payload.targetName).toBeNull();
     });
   });

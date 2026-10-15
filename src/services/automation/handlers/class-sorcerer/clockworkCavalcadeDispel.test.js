@@ -1,3 +1,7 @@
+// @maintained-by-ai — deterministic dispel-implementation contract (level<=6 cut,
+// exact-key runtime writes, null-safety); loadSpells is mocked so real spell data can drift freely.
+// Seam: clockworkCavalcadeHandler.test.js mocks dispelSpellsOnTarget (delegation only);
+// this file owns the implementation.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { dispelSpellsOnTarget, resolveSpellLevel } from './clockworkCavalcadeDispel.js';
 
@@ -71,13 +75,10 @@ describe('clockworkCavalcadeDispel', () => {
             expect(loadSpells).not.toHaveBeenCalled();
         });
 
-        it('falls through to name lookup when spellLevel is null or undefined', async () => {
+        it('resolves level via the spellName/name/label fallback chain when spellLevel is null or undefined', async () => {
             expect(await resolveSpellLevel({ spellLevel: null, spellName: 'Fly' })).toBe(3);
-            expect(await resolveSpellLevel({ spellLevel: undefined, spellName: 'Fly' })).toBe(3);
-        });
-
-        it('looks up spell level by spellName and returns null for unknown', async () => {
-            expect(await resolveSpellLevel({ spellName: 'Wall of Force' })).toBe(5);
+            expect(await resolveSpellLevel({ spellLevel: undefined, spellName: 'Wall of Force' })).toBe(5);
+            expect(await resolveSpellLevel({ label: 'Bane' })).toBe(1);
             expect(await resolveSpellLevel({ spellName: 'Not A Spell' })).toBeNull();
         });
     });
@@ -90,10 +91,13 @@ describe('clockworkCavalcadeDispel', () => {
             expect(result.buffs.map(b => b.name)).toEqual(['Mage Armor', 'Death Ward', 'Invisibility']);
             expect(result.conditions).toEqual(['charmed']);
             const remaining = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'targetEffects');
+            expect(remaining[0]).toBe('campaign');
+            expect(remaining[3]).toBe(CAMPAIGN);
             const remainingForTarget = remaining[2].filter(te => te.target === TARGET);
             expect(remainingForTarget.map(te => te.spellName)).toEqual(['Simulacrum']);
             expect(remaining[2]).toContainEqual(expect.objectContaining({ target: 'Other' }));
             const buffsCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'activeBuffs');
+            expect(buffsCall[0]).toBe(TARGET);
             expect(buffsCall[2].map(b => b.name)).toEqual(['Bardic Inspiration']);
             const condsCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
             expect(condsCall[2]).toEqual(['poisoned']);
@@ -119,15 +123,14 @@ describe('clockworkCavalcadeDispel', () => {
 
             expect(result.effects).toEqual([]);
             expect(result.buffs.map(b => b.name)).toEqual(['Mage Armor']);
+            const effectsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+                c => c[1] === 'targetEffects'
+            );
+            expect(effectsCall).toBeUndefined();
             const buffsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
                 c => c[1] === 'activeBuffs'
             );
             expect(buffsCall[2]).toEqual([]);
-        });
-
-        it('returns a report with the target name', async () => {
-            const result = await dispelSpellsOnTarget(TARGET, CAMPAIGN);
-            expect(result.target).toBe(TARGET);
         });
 
         it('does not call setRuntimeValue when no effects are dispelled', async () => {
@@ -155,66 +158,7 @@ describe('clockworkCavalcadeDispel', () => {
             expect(buffsCall).toBeUndefined();
         });
 
-        it('handles null targetEffects gracefully', async () => {
-            useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign' && prop === 'targetEffects') return null;
-                if (key === TARGET && prop === 'activeBuffs') return [];
-                return [];
-            });
-
-            const result = await dispelSpellsOnTarget(TARGET, CAMPAIGN);
-            expect(result.effects).toEqual([]);
-            expect(result.buffs).toEqual([]);
-            expect(result.conditions).toEqual([]);
-            expect(result.target).toBe(TARGET);
-        });
-
-        it('handles null activeBuffs gracefully', async () => {
-            useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign' && prop === 'targetEffects') return [];
-                if (key === TARGET && prop === 'activeBuffs') return null;
-                return [];
-            });
-
-            const result = await dispelSpellsOnTarget(TARGET, CAMPAIGN);
-            expect(result.effects).toEqual([]);
-            expect(result.buffs).toEqual([]);
-            expect(result.conditions).toEqual([]);
-        });
-
-        it('handles null activeConditions gracefully', async () => {
-            useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign' && prop === 'targetEffects') {
-                    return [{ target: TARGET, effect: 'bless', spellName: 'Bless' }];
-                }
-                if (key === TARGET && prop === 'activeBuffs') return [];
-                if (key === TARGET && prop === 'activeConditions') return null;
-                return {};
-            });
-
-            const result = await dispelSpellsOnTarget(TARGET, CAMPAIGN);
-            expect(result.effects.map(te => te.spellName)).toEqual(['Bless']);
-            expect(result.conditions).toEqual([]);
-        });
-
-        it('keeps buffs with no resolvable spell level', async () => {
-            useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign' && prop === 'targetEffects') return [];
-                if (key === TARGET && prop === 'activeBuffs') {
-                    return [{ name: 'Rage', duration: '1_minute' }];
-                }
-                return [];
-            });
-
-            const result = await dispelSpellsOnTarget(TARGET, CAMPAIGN);
-            expect(result.buffs).toEqual([]);
-            const buffsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-                c => c[1] === 'activeBuffs'
-            );
-            expect(buffsCall).toBeUndefined();
-        });
-
-        it('removes only matching conditions from the condition list', async () => {
+        it('removes only matching conditions and their meta, keeping unrelated conditions', async () => {
             useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
                 if (key === 'campaign' && prop === 'targetEffects') {
                     return [
@@ -238,6 +182,45 @@ describe('clockworkCavalcadeDispel', () => {
                 c => c[1] === 'activeConditions'
             );
             expect(condsCall[2]).toEqual(['poisoned']);
+            const metaCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+                c => c[1] === 'activeConditionMeta'
+            );
+            expect(metaCall[2]).toEqual({ poisoned: { label: 'Poisoned' } });
+        });
+
+        it('handles null runtime values gracefully', async () => {
+            // null targetEffects
+            useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'campaign' && prop === 'targetEffects') return null;
+                return [];
+            });
+            let result = await dispelSpellsOnTarget(TARGET, CAMPAIGN);
+            expect(result).toEqual({ target: TARGET, effects: [], buffs: [], conditions: [] });
+
+            // null activeBuffs
+            useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === TARGET && prop === 'activeBuffs') return null;
+                return [];
+            });
+            result = await dispelSpellsOnTarget(TARGET, CAMPAIGN);
+            expect(result.effects).toEqual([]);
+            expect(result.buffs).toEqual([]);
+
+            // null activeConditions beside a dispellable condition effect:
+            // conditions resolve to nothing, condition stores are never written
+            useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'campaign' && prop === 'targetEffects') {
+                    return [{ target: TARGET, effect: 'charmed', spellName: 'Hold Person', condition: 'charmed' }];
+                }
+                if (key === TARGET && prop === 'activeConditions') return null;
+                return [];
+            });
+            useRuntimeState.setRuntimeValue.mockClear();
+            result = await dispelSpellsOnTarget(TARGET, CAMPAIGN);
+            expect(result.effects.map(te => te.spellName)).toEqual(['Hold Person']);
+            expect(result.conditions).toEqual([]);
+            expect(useRuntimeState.setRuntimeValue.mock.calls.some(c => c[1] === 'activeConditions')).toBe(false);
+            expect(useRuntimeState.setRuntimeValue.mock.calls.some(c => c[1] === 'activeConditionMeta')).toBe(false);
         });
     });
 });

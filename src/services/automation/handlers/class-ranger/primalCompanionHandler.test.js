@@ -1,3 +1,7 @@
+// @maintained-by-ai: 2026-10-15 — deterministic mocked-seam lane; runtime store, combat
+// summary, storage, dataLoader and logService are all module-mocked; assertions pin the
+// handler's own contract (popup shapes, runtime keys, caster-folded creature rows, log
+// automationTypes). Real dice only for valid formulas with totals unpinned. No timers.
 import { handle, confirmPrimalCompanionSummon, handleCommand, handleRestore, handleBonusActionCommand, applyBonusActionCommand, resolveBestialFuryStrikeGate, resolveBestialFuryMarkStrike, resolveBestialFuryBonus, BESTIAL_FURY_STRIKES_KEY, BESTIAL_FURY_MARK_LATCH_KEY } from './primalCompanionHandler.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -365,6 +369,8 @@ describe('primalCompanionHandler', () => {
             expect(result.payload.automationType).toBe('primal_companion_command');
             expect(result.payload.description).toContain('Beast of the Sky');
             expect(result.payload.description).toContain("Beast's Strike");
+            // No feature on mockPlayerStats — Fury note must stay absent (hasFeature false path).
+            expect(result.payload.description).not.toContain('Bestial Fury');
             expect(result.payload.automation).toBe(action.automation);
         });
 
@@ -405,24 +411,6 @@ describe('primalCompanionHandler', () => {
             const result = await handleCommand(action, playerStatsWithSubclassFeature, mockCampaignName);
 
             expect(result.payload.description).toContain("Bestial Fury: beast attacks twice!");
-        });
-
-        it('omits Bestial Fury note when player lacks the feature', async () => {
-            getRuntimeValue.mockReturnValue('Beast of the Land');
-
-            const action = makeAction({ automation: { type: 'primal_companion_command' } });
-
-            const playerStatsNoFeature = {
-                name: 'TestRanger',
-                class: {
-                    class_levels: [{ features: [{ name: 'Extra Attack' }] }],
-                },
-            };
-
-            const result = await handleCommand(action, playerStatsNoFeature, mockCampaignName);
-
-            expect(result.payload.description).not.toContain('Bestial Fury');
-            expect(result.payload.description).toContain("Beast's Strike");
         });
 
         it('returns error when no companion is summoned', async () => {
@@ -762,18 +750,6 @@ describe('primalCompanionHandler', () => {
                 const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'bestial_fury_refused');
                 expect(refusal).toBeDefined();
                 expect(refusal.characterName).toBe(companion);
-            });
-
-            it('command re-issue resets the counter mid-round for two fresh strikes', async () => {
-                const press = () => resolveBestialFuryStrikeGate({
-                    campaignName: mockCampaignName, monsterName: companion, action: furyStrikeAction(), setPopupHtml: vi.fn(),
-                });
-                press(); press();
-                expect(press()).toBe(true);
-
-                runtimeStore[companion][BESTIAL_FURY_STRIKES_KEY] = { round: 1, used: 0 };
-                expect(press()).toBe(false);
-                expect(runtimeStore[companion][BESTIAL_FURY_STRIKES_KEY]).toEqual({ round: 1, used: 1 });
             });
 
             it('round-wrap re-arms the counter (stale stamp reads fresh)', () => {

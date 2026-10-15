@@ -1,5 +1,6 @@
 // @created-by-ai
-// CLA-389: d20 nat-20 gate ordering before the Controlled Chaos branch.
+// @maintained-by-ai
+// CLA-389 gate sub-lane: d20 nat-20 gate ordering before the Controlled Chaos branch.
 // A lv14+ controlled-chaos caster must NOT see the double-roll chooser on a
 // non-20 slot cast — the gate rolls first, the chooser opens only when a
 // surge-table roll actually occurs.
@@ -111,40 +112,12 @@ describe('wildMagicSurgeHandler CLA-389 gate ordering', () => {
         );
     });
 
-    it('nat-20 without controlled chaos: single d100 roll modal', async () => {
-        mockMathRandom(0.99);
-
-        const result = await handle(makeAction(), { name: 'TestSorcerer' }, 'campaign', 'map');
-
-        expect(result.type).toBe('modal');
-        expect(result.payload.mode).toBe('roll');
-        expect(result.payload.roll).toBe(100);
-    });
-
-    it('once-per-turn latch: second call same round refuses with popup+log, no roll', async () => {
-        damageUtils.getCombatContext.mockResolvedValue({ round: 5, activeCreatureName: 'TestSorcerer' });
-        runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-            if (key === 'surgeUsedRound') return { round: 5, activeCreature: 'TestSorcerer' };
-            return null;
-        });
-        mockMathRandom(0.99);
-
-        const result = await handle(makeAction(), lv14PlayerStats(), 'campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(result.modalName).toBeUndefined();
-        expect(logService.addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
-            type: 'ability_use',
-            description: expect.stringContaining('already used this turn'),
-        }));
-    });
-
-    it('autoSurge bypasses the gate and lands on the roll modal even when d20 is not 20', async () => {
-        mockMathRandom(0.2); // d20 = 5
-
-        const result = await handle(makeAction({ autoSurge: true }), lv14PlayerStats(), 'campaign', 'map');
-
-        expect(result.type).toBe('modal');
-        expect(result.payload.mode).toBe('controlledChaos');
-    });
+    // Steady-state coverage lives in the sibling main lane
+    // (wildMagicSurgeHandler.test.js): plain nat-20 roll modal
+    // ('should return modal with roll mode when d20 roll is exactly 20 and
+    // table exists'), once-per-turn latch ('should log once-per-turn refusal
+    // to campaign log (CLA-389)'), and autoSurge bypass ('should skip
+    // once-per-turn check when autoSurge is true'). This gate lane pins only
+    // the gate-vs-chooser orderings the main lane never exercises: armed
+    // flag/passive meeting a gate MISS, and the exact-rolls affirmative pin.
 });

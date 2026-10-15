@@ -1,3 +1,16 @@
+// @maintained-by-ai
+// Main-lane contract for quiveringPalmHandler: handle() happy path (exact popup copy +
+// targetEffects vibration-card write — the card shape pinned nowhere else in the cluster),
+// existingTarget modal path (active target beats current selection), the lastAttack
+// preconditions (not-by-you / not-Unarmed-Strike / did-not-hit refusals + the hit:true
+// pass arm), applyShockwave failed-save popup copy + vibration-clear write, and
+// half-damage-on-success math (owned here per saveDc.test.js header).
+// Seam map siblings: no-target + insufficient-resource refusals and cost/resource default
+// writes → handle.test.js; cs:null ternary arm → nullContext.test.js; exact
+// applyDamageToTarget args and dice/rawDamage edges → shockwave.test.js; real DC-18
+// resolution → saveDc.test.js; cleanup filter table → release.test.js; addEntry rejection
+// catches → catchCoverage.test.js, successCatch.test.js, errorPaths.test.js.
+// Fully mocked with fixed roll fixtures — deterministic, stable rules contract.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────
@@ -41,11 +54,10 @@ import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../../automation/common/savePrompt.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
-import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
-const campaignName = 'TestCampaign';
+const campaignName = 'test-campaign';
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -80,183 +92,179 @@ function makeAction(automation = {}) {
   };
 }
 
-// ── Tests: handle() ───────────────────────────────────────────
+// Successful-preconditions router: no vibrations active, valid last Unarmed Strike hit,
+// ki available. Anything else returns undefined (|| [] / ?? fallbacks engage upstream).
+function okRuntime({ lastAttack } = {}) {
+  return (_a, b, _c) => {
+    if (_a === 'campaign' && b === 'quivering_palm') return null;
+    if (_a === 'campaign' && b === 'lastAttack') return lastAttack ?? {
+      attackerName: 'TestMonk',
+      attackName: 'Unarmed Strike',
+      saveResult: 'success',
+    };
+    if (b === 'kiPoints') return 5;
+    return undefined;
+  };
+}
+
+// ── Tests: handle() — first click, setting vibrations ─────────
 
 describe('quiveringPalmHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('first click — setting vibrations', () => {
-    it('returns a popup when vibrations are successfully set', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
+  it('sets vibrations: success popup copy and targetEffects card are written', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction();
 
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      getRuntimeValue.mockImplementation((_a, b, _c) => {
-        if (_a === 'campaign' && b === 'quivering_palm') return null;
-        if (_a === 'campaign' && b === 'lastAttack') return {
-          attackerName: 'TestMonk',
-          attackName: 'Unarmed Strike',
-          saveResult: 'success',
-        };
-        if (b === 'kiPoints') return 5;
-        return undefined;
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('Quivering Palm set on Goblin');
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'ability_use',
-        characterName: 'TestMonk',
-        abilityName: 'Quivering Palm',
-      }));
+    getCombatContext.mockResolvedValue({
+      creatures: [{ name: 'Goblin', type: 'monster' }],
     });
+    getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+    getRuntimeValue.mockImplementation(okRuntime());
 
-    it('returns a modal when vibrations already active on another target', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
+    const result = await handle(action, ps, campaignName, null);
 
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      getRuntimeValue.mockImplementation((_a, b, _c) => {
-        if (_a === 'campaign' && b === 'quivering_palm') return 'Ogre';
-        return undefined;
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('modal');
-      expect(result.modalName).toBe('quiveringPalm');
-      expect(result.payload.targetName).toBe('Ogre');
-      expect(result.payload.isRelease).toBe(false);
-    });
-
-    it('returns a popup when last attack was not made by the monk', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      getRuntimeValue.mockImplementation((_a, b, _c) => {
-        if (_a === 'campaign' && b === 'quivering_palm') return null;
-        if (_a === 'campaign' && b === 'lastAttack') return { attackerName: 'Goblin', attackName: 'Longsword' };
-        return undefined;
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Last attack was not made by you');
-    });
-
-    it('returns a popup when last attack was not an Unarmed Strike', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      getRuntimeValue.mockImplementation((_a, b, _c) => {
-        if (_a === 'campaign' && b === 'quivering_palm') return null;
-        if (_a === 'campaign' && b === 'lastAttack') return {
-          attackerName: 'TestMonk',
-          attackName: 'Longsword',
-          total: 15,
-          targetAc: 12,
-        };
-        return undefined;
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Unarmed Strike');
-    });
-
-    it('returns a popup when last Unarmed Strike did not hit', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      getRuntimeValue.mockImplementation((_a, b, _c) => {
-        if (_a === 'campaign' && b === 'quivering_palm') return null;
-        if (_a === 'campaign' && b === 'lastAttack') return {
-          attackerName: 'TestMonk',
-          attackName: 'Unarmed Strike',
-          total: 8,
-          targetAc: 15,
-        };
-        return undefined;
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('did not hit');
-    });
-
-    it('returns a popup when not enough resources', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      getRuntimeValue.mockImplementation((_a, b, _c) => {
-        if (_a === 'campaign' && b === 'quivering_palm') return null;
-        if (_a === 'campaign' && b === 'lastAttack') return {
-          attackerName: 'TestMonk',
-          attackName: 'Unarmed Strike',
-          saveResult: 'success',
-        };
-        if (b === 'kiPoints') return 1;
-        return undefined;
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Not enough');
-    });
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    // Canonical success popup copy for the whole cluster (siblings toContain this).
+    expect(result.payload.description).toBe('Quivering Palm set on Goblin. Use the feature again to release the vibrations or trigger a shockwave.');
+    // The vibration targetEffect card — shape owned here (cleanup filter shape is
+    // pinned in release.test.js; the card creation was unpinned until now).
+    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [{
+      target: 'Goblin',
+      source: 'Quivering Palm',
+      option: 'Quivering Palm',
+      effect: 'quivering_palm',
+      value: null,
+      duration: 'until_end',
+      noOpportunityAttacks: false,
+      saveType: null,
+      condition: null,
+    }], campaignName);
   });
 
-  describe('second click — vibrations already active', () => {
-    it('returns a modal for release/shockwave choice', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
+  it('returns a modal when vibrations are already active, targeting the stored creature', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction();
 
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'monster' }],
-      });
-      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      getRuntimeValue.mockImplementation((_a, b, _c) => {
-        if (_a === 'campaign' && b === 'quivering_palm') return 'Goblin';
-        return undefined;
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('modal');
-      expect(result.modalName).toBe('quiveringPalm');
-      expect(result.payload.targetName).toBe('Goblin');
-      expect(result.payload.isRelease).toBe(false);
+    getCombatContext.mockResolvedValue({
+      creatures: [{ name: 'Goblin', type: 'monster' }],
     });
+    getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+    getRuntimeValue.mockImplementation((_a, b, _c) => {
+      if (_a === 'campaign' && b === 'quivering_palm') return 'Ogre';
+      return undefined;
+    });
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result.type).toBe('modal');
+    expect(result.modalName).toBe('quiveringPalm');
+    // Stored vibration target (Ogre) beats the currently-selected target (Goblin).
+    expect(result.payload.targetName).toBe('Ogre');
+    expect(result.payload.isRelease).toBe(false);
+    expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      type: 'ability_use',
+      characterName: 'TestMonk',
+      description: 'Quivering Palm — Vibrations already active against Ogre. Use again to release or trigger shockwave.',
+    }));
+  });
+
+  it('refuses when last attack was not made by the monk', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction();
+
+    getCombatContext.mockResolvedValue({
+      creatures: [{ name: 'Goblin', type: 'monster' }],
+    });
+    getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+    getRuntimeValue.mockImplementation((_a, b, _c) => {
+      if (_a === 'campaign' && b === 'quivering_palm') return null;
+      if (_a === 'campaign' && b === 'lastAttack') return { attackerName: 'Goblin', attackName: 'Longsword' };
+      return undefined;
+    });
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Last attack was not made by you');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('refuses when last attack was not an Unarmed Strike', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction();
+
+    getCombatContext.mockResolvedValue({
+      creatures: [{ name: 'Goblin', type: 'monster' }],
+    });
+    getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+    getRuntimeValue.mockImplementation(okRuntime({
+      lastAttack: {
+        attackerName: 'TestMonk',
+        attackName: 'Longsword',
+        total: 15,
+        targetAc: 12,
+      },
+    }));
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('not an Unarmed Strike');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('refuses when last Unarmed Strike did not hit', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction();
+
+    getCombatContext.mockResolvedValue({
+      creatures: [{ name: 'Goblin', type: 'monster' }],
+    });
+    getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+    getRuntimeValue.mockImplementation(okRuntime({
+      lastAttack: {
+        attackerName: 'TestMonk',
+        attackName: 'Unarmed Strike',
+        total: 8,
+        targetAc: 15,
+      },
+    }));
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('did not hit');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('accepts an explicit hit:true even when total is below the AC', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction();
+
+    getCombatContext.mockResolvedValue({
+      creatures: [{ name: 'Goblin', type: 'monster' }],
+    });
+    getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+    // didLastAttackHit's alternate arm: hit===true passes without saveResult/AC math.
+    getRuntimeValue.mockImplementation(okRuntime({
+      lastAttack: {
+        attackerName: 'TestMonk',
+        attackName: 'Unarmed Strike',
+        hit: true,
+        total: 5,
+        targetAc: 15,
+      },
+    }));
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('set on Goblin');
+    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'quivering_palm', 'Goblin', campaignName);
   });
 });
 
@@ -267,7 +275,7 @@ describe('quiveringPalmHandler.applyShockwave', () => {
     vi.clearAllMocks();
   });
 
-  it('returns a popup with save listener and damage on failed save', async () => {
+  it('reports full damage on failed save and clears the vibration marker', async () => {
     const ps = makePlayerStats();
     const action = makeAction({
       damageExpression: '10d12',
@@ -284,19 +292,18 @@ describe('quiveringPalmHandler.applyShockwave', () => {
       }),
     });
     rollExpression.mockReturnValue({ total: 55, rolls: [10, 10, 10, 10, 10, 5, 0, 0, 0, 0], modifier: 0 });
-    applyDamageToTarget.mockReturnValue({ finalDamage: 55 });
 
     const result = await applyShockwave(action, ps, campaignName, 'Goblin');
 
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.description).toContain('Failure');
-    expect(result.payload.description).toContain('55');
+    // Popup copy lane: full-damage wording (exact applyDamageToTarget args and
+    // rawDamage/finalDamage payload numbers are pinned in shockwave.test.js).
+    expect(result.payload.description).toContain('CON save (DC 15)');
+    expect(result.payload.description).toContain('<strong>Failure</strong>');
+    expect(result.payload.description).toContain('Full damage');
     expect(result.payload.description).toContain('Force');
-    expect(result.payload.rawDamage).toBe(55);
-    expect(result.payload.finalDamage).toBe(55);
-    expect(result.payload.damageExpression).toBe('10d12');
-    expect(result.payload.damageType).toBe('Force');
+    // Vibration marker must be cleared when the shockwave fires.
     expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'quivering_palm', null, campaignName);
   });
 
@@ -317,15 +324,15 @@ describe('quiveringPalmHandler.applyShockwave', () => {
       }),
     });
     rollExpression.mockReturnValue({ total: 50, rolls: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5], modifier: 0 });
-    applyDamageToTarget.mockReturnValue({ finalDamage: 25 });
 
     const result = await applyShockwave(action, ps, campaignName, 'Goblin');
 
-    expect(result.payload.description).toContain('Success');
-    expect(result.payload.description).toContain('25');
-    expect(result.payload.description).toContain('Force');
+    // Half-on-save math owned here (saveDc.test.js header assigns it to this file).
+    expect(result.payload.description).toContain('<strong>Success</strong>');
+    expect(result.payload.description).toContain('Half damage');
     expect(result.payload.rawDamage).toBe(50);
     expect(result.payload.finalDamage).toBe(25);
+    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'quivering_palm', null, campaignName);
   });
 });
 
@@ -342,9 +349,12 @@ describe('quiveringPalmHandler.applyRelease', () => {
 
     const result = await applyRelease(action, ps, campaignName, 'Goblin');
 
+    // Canonical release popup copy (release.test.js owns the cleanup filter table;
+    // catchCoverage.test.js owns the L285 log catch).
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.description).toContain('harmlessly');
+    expect(result.payload.description).toBe('Vibrations released harmlessly against Goblin.');
+    expect(result.payload.isRelease).toBe(true);
     expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'quivering_palm', null, campaignName);
     expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
       type: 'ability_use',

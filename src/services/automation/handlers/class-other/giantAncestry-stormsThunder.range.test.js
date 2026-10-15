@@ -1,4 +1,17 @@
+// @maintained-by-ai
 // CLA-337 regression: 60-ft isWithinRange gate wired + ability_use spend log + honest option text
+//
+// RANGE SEAM LANE. Selection lane (giantAncestry-selection.test.js) pins a live SEAM
+// DEFECT: entry-point handle()/handleDirectType pass `option` into the dispatch
+// handleStormsThunder _mapName slot (giantAncestryEntryPoints.js:54/:112), so range
+// falls back to rangeToFeet(undefined) ?? 60 silently. This lane calls the two
+// sub-handlers directly with proper args — the correct-behaviour counterpart of that
+// defect pin. Keep green: when the arg-slot is fixed upstream, these pins must stay.
+//
+// The two success lanes pin DIFFERENT range sources (not duplicates):
+//   - Direct lane:  rangeFt ← action.automation.range ('60_ft' → 60)
+//   - Dispatch lane: rangeFt ← option.range (makeAction() automation carries no range)
+// Refusal coverage (storms_thunder_refused, zero-spend) exists nowhere else.
 import { vi } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -66,6 +79,10 @@ const directAction = {
 
 const option = { name: "Storm's Thunder", type: 'reaction_damage', damage: '1d8', damageType: 'Thunder', range: '60_ft' };
 
+// Own-composition of stormsThunderRangeRefusal text (giantAncestryUtils.js) with the
+// 60-ft gate interpolated — pins that rangeFt reaches the refusal, not just the gate.
+const REFUSAL_TEXT = "Storm's Thunder requires the attacker to be within 60 feet of you. Orc is out of range.";
+
 function makeUsesMock(usesKey, value) {
     getRuntimeValue.mockImplementation((_name, key) => {
         if (key === usesKey) return value;
@@ -79,6 +96,7 @@ describe('CLA-337 Storms Thunder 60ft gate + spend log', () => {
             makeUsesMock('stormsThunderUses', 3);
             const result = await handleStormsThunderDirect(directAction, makePlayerStats(), 'campaign', 'map');
 
+            // rangeFt sourced from action.automation.range ('60_ft' → 60).
             expect(isWithinRange).toHaveBeenCalledWith('Orc', 'TestHero', 60);
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('damage');
@@ -104,7 +122,7 @@ describe('CLA-337 Storms Thunder 60ft gate + spend log', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('out of range');
+            expect(result.payload.description).toBe(REFUSAL_TEXT);
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'automation',
@@ -120,6 +138,8 @@ describe('CLA-337 Storms Thunder 60ft gate + spend log', () => {
     describe('handleStormsThunder (dispatch/option variant)', () => {
         it('consults isWithinRange with attacker→self and 60ft, and logs ability_use spend on activation', async () => {
             makeUsesMock('stormsThunderUses', 3);
+            // makeAction() automation carries NO range — 60 must come from option.range.
+            // Correct-behaviour counterpart of the entry-point arg-slot defect pin.
             const result = await handleStormsThunder(makeAction(), makePlayerStats(), 'campaign', 'map', option);
 
             expect(isWithinRange).toHaveBeenCalledWith('Orc', 'TestHero', 60);
@@ -141,7 +161,7 @@ describe('CLA-337 Storms Thunder 60ft gate + spend log', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('out of range');
+            expect(result.payload.description).toBe(REFUSAL_TEXT);
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 type: 'automation',

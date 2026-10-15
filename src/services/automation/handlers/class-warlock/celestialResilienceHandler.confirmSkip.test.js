@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Lane: confirm/skip seam of celestialResilienceHandler.js only.
+// grant.test.js owns grantCelestialResilience (patron gate, self temp HP, ally
+// collection, grant-side defaults); handle.test.js owns handle (null-map popup,
+// modal routing, handle-side addEntry rejection). useCharActionsModalHandlers.buffs.test.js
+// owns the caller seam with these functions mocked out.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { confirmCelestialResilience, skipCelestialResilience } from './celestialResilienceHandler.js';
@@ -25,18 +31,22 @@ describe('celestialResilienceHandler - confirmCelestialResilience / skipCelestia
     });
 
     describe('confirmCelestialResilience', () => {
-        it('returns popup and logs when no targets selected', async () => {
+        it.each([
+            [[]],
+            [null],
+            [undefined],
+        ])('short-circuits to popup and logs when selected targets are %j', async (selectedTargets) => {
             const result = await confirmCelestialResilience(
                 makeAction(),
                 makeCelestialStats(),
                 CAMPAIGN,
-                [],
+                selectedTargets,
             );
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Celestial Resilience');
-            expect(result.payload.description).toContain('selected no allies');
+            expect(result.payload.description).toBe('TestHero selected no allies.');
             expect(result.payload.automation).toEqual(makeAction().automation);
             expect(addEntry).toHaveBeenCalledWith(
                 CAMPAIGN,
@@ -44,13 +54,15 @@ describe('celestialResilienceHandler - confirmCelestialResilience / skipCelestia
                     type: 'ability_use',
                     characterName: 'TestHero',
                     abilityName: 'Celestial Resilience',
-                    description: expect.stringContaining('selected no allies'),
+                    description: 'TestHero selected no allies for Celestial Resilience.',
                 }),
             );
+            // no-side-effect guard: branch ends before any evaluation or granting
+            expect(evaluateAutoExpression).not.toHaveBeenCalled();
             expect(setTempHp).not.toHaveBeenCalled();
         });
 
-        it('grants temp HP to all selected allies and returns popup with details', async () => {
+        it('grants temp HP to every selected ally and returns popup with details', async () => {
             evaluateAutoExpression.mockReturnValue(3);
 
             const result = await confirmCelestialResilience(
@@ -63,10 +75,13 @@ describe('celestialResilienceHandler - confirmCelestialResilience / skipCelestia
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Celestial Resilience');
-            expect(result.payload.description).toContain('Ally1');
-            expect(result.payload.description).toContain('Ally2');
-            expect(result.payload.description).toContain('3 temporary hit points');
+            expect(result.payload.description).toBe('TestHero grants 3 temporary hit points to Ally1, Ally2.');
             expect(result.payload.automation).toEqual(makeAction().automation);
+            expect(evaluateAutoExpression).toHaveBeenCalledTimes(1);
+            expect(evaluateAutoExpression).toHaveBeenCalledWith(
+                'floor(warlock level / 2) + CHA modifier',
+                expect.any(Object),
+            );
             expect(setTempHp).toHaveBeenNthCalledWith(1, 'Ally1', 3, CAMPAIGN);
             expect(setTempHp).toHaveBeenNthCalledWith(2, 'Ally2', 3, CAMPAIGN);
             expect(addEntry).toHaveBeenCalledWith(
@@ -75,28 +90,7 @@ describe('celestialResilienceHandler - confirmCelestialResilience / skipCelestia
                     type: 'ability_use',
                     characterName: 'TestHero',
                     abilityName: 'Celestial Resilience',
-                    description: expect.stringContaining('grants 3 temporary hit points'),
-                }),
-            );
-        });
-
-        it('grants temp HP to a single ally', async () => {
-            evaluateAutoExpression.mockReturnValue(5);
-
-            const result = await confirmCelestialResilience(
-                makeAction(),
-                makeCelestialStats(),
-                CAMPAIGN,
-                ['Ally1'],
-            );
-
-            expect(result.type).toBe('popup');
-            expect(setTempHp).toHaveBeenCalledWith('Ally1', 5, CAMPAIGN);
-            expect(addEntry).toHaveBeenCalledWith(
-                CAMPAIGN,
-                expect.objectContaining({
-                    characterName: 'TestHero',
-                    abilityName: 'Celestial Resilience',
+                    description: 'TestHero grants 3 temporary hit points to 2 ally(ies): Ally1, Ally2.',
                 }),
             );
         });
@@ -123,61 +117,18 @@ describe('celestialResilienceHandler - confirmCelestialResilience / skipCelestia
                 ['Ally1'],
             );
 
+            // confirm reads the expression from playerStats feature, with its own fallback
+            expect(evaluateAutoExpression).toHaveBeenCalledTimes(1);
             expect(evaluateAutoExpression).toHaveBeenCalledWith(
                 'floor(warlock level / 2) + CHA modifier',
                 expect.any(Object),
             );
             expect(setTempHp).toHaveBeenCalledWith('Ally1', 4, CAMPAIGN);
         });
-    });
 
-    describe('skipCelestialResilience', () => {
-        it('returns popup and logs when skip is called', async () => {
-            const result = await skipCelestialResilience(
-                makeAction(),
-                makeCelestialStats(),
-                CAMPAIGN,
-            );
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Celestial Resilience');
-            expect(result.payload.description).toContain('skipped granting');
-            expect(result.payload.automation).toEqual(makeAction().automation);
-            expect(addEntry).toHaveBeenCalledWith(
-                CAMPAIGN,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'TestHero',
-                    abilityName: 'Celestial Resilience',
-                    description: expect.stringContaining('skipped granting'),
-                }),
-            );
-        });
-
-        it('handles addEntry rejection without throwing', async () => {
-            addEntry.mockImplementation(() => Promise.reject(new Error('log error')));
-            const errorSpy = vi.spyOn(console, 'error');
-
-            const result = await skipCelestialResilience(
-                makeAction(),
-                makeCelestialStats(),
-                CAMPAIGN,
-            );
-
-            expect(result.type).toBe('popup');
-            expect(errorSpy).toHaveBeenCalledWith(
-                '[celestialResilience] Error:',
-                expect.any(Error),
-            );
-            errorSpy.mockRestore();
-        });
-    });
-
-    describe('confirmCelestialResilience - error handling', () => {
-        it('handles addEntry rejection when granting to allies without throwing', async () => {
+        it('grants before logging: survives addEntry rejection without throwing', async () => {
             evaluateAutoExpression.mockReturnValue(3);
-            addEntry.mockImplementation(() => Promise.reject(new Error('log error')));
+            addEntry.mockRejectedValueOnce(new Error('log error'));
             const errorSpy = vi.spyOn(console, 'error');
 
             const result = await confirmCelestialResilience(
@@ -188,8 +139,54 @@ describe('celestialResilienceHandler - confirmCelestialResilience / skipCelestia
             );
 
             expect(result.type).toBe('popup');
-            // setTempHp should still be called even if logging fails
+            // setTempHp happens before addEntry, so grants land even if logging fails
             expect(setTempHp).toHaveBeenCalledTimes(2);
+            expect(errorSpy).toHaveBeenCalledWith(
+                '[celestialResilience] Error:',
+                expect.any(Error),
+            );
+            errorSpy.mockRestore();
+        });
+    });
+
+    describe('skipCelestialResilience', () => {
+        it('returns popup and logs the skip without evaluating or granting', async () => {
+            const result = await skipCelestialResilience(
+                makeAction(),
+                makeCelestialStats(),
+                CAMPAIGN,
+            );
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Celestial Resilience');
+            expect(result.payload.description).toBe('TestHero skipped granting temporary hit points to allies.');
+            expect(result.payload.automation).toEqual(makeAction().automation);
+            expect(addEntry).toHaveBeenCalledWith(
+                CAMPAIGN,
+                expect.objectContaining({
+                    type: 'ability_use',
+                    characterName: 'TestHero',
+                    abilityName: 'Celestial Resilience',
+                    description: 'TestHero skipped granting temporary hit points to allies via Celestial Resilience.',
+                }),
+            );
+            // no-side-effect guard: skip never evaluates or grants
+            expect(evaluateAutoExpression).not.toHaveBeenCalled();
+            expect(setTempHp).not.toHaveBeenCalled();
+        });
+
+        it('handles addEntry rejection without throwing', async () => {
+            addEntry.mockRejectedValueOnce(new Error('log error'));
+            const errorSpy = vi.spyOn(console, 'error');
+
+            const result = await skipCelestialResilience(
+                makeAction(),
+                makeCelestialStats(),
+                CAMPAIGN,
+            );
+
+            expect(result.type).toBe('popup');
             expect(errorSpy).toHaveBeenCalledWith(
                 '[celestialResilience] Error:',
                 expect.any(Error),

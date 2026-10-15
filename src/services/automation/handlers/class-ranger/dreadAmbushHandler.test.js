@@ -1,3 +1,12 @@
+// @maintained-by-ai
+// Sole owner of dreadAmbushHandler.handle() runtime composition (5e Ranger): uses gate,
+// oncePerTurn gate, findLastAttack attack gates, level scaling resolution, damage apply,
+// uses decrement, log entry, and full-string popup/log description pins.
+// Distinct lanes, do not absorb here: dread_ambush_speed / dreadAmbushSpeedActive turn-start
+// latch (turnStartEffects*.test.js), dread_ambush_initiative (rules-playerStats-initiative),
+// dread_ambush_damage info-builder metadata (automationInfoBuilder/reaction.test.js),
+// dreadambushUses rest regrant (restRules / trackedResources), rogue stealthAttackHandler
+// (stealth-gated sneak dice — separate feature). Uses shared dreadAmbush.test-utils fixtures.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './dreadAmbushHandler.js';
 
@@ -46,7 +55,6 @@ import {
     makePlayerStats,
     makeAction,
     makeHitAttack,
-    defaultCombatRound,
     defaultBeforeEach,
 } from './dreadAmbush.test-utils.js';
 
@@ -63,46 +71,159 @@ describe('dreadAmbushHandler', () => {
         });
     });
 
-    describe('guard: no uses remaining', () => {
-        it('returns popup when uses are 0', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'dreadambushUses') return 0;
-                if (key === 'characters') return [];
-                return undefined;
+    describe('golden path', () => {
+        it('rolls, applies damage to the last attack target, decrements uses, and reports the popup', async () => {
+            // Full automation without damageType — pins the Psychic fallback default.
+            // (makeAction's outer ...overrides spread REPLACES automation wholesale,
+            // so automation variants must be specified in full.)
+            const automation = { type: 'dread_ambush', damageExpression: '2d6', uses_expression: '1' };
+            const action = makeAction({ automation });
+
+            const result = await handle(action, makePlayerStats(), campaignName, null);
+
+            expect(evaluateAutoExpression).toHaveBeenCalledWith('1', expect.objectContaining({ name: playerName }));
+            expect(rollExpression).toHaveBeenCalledWith('2d6');
+            expect(applyDamageToTarget).toHaveBeenCalledWith(
+                {}, 'Goblin', 7, ['Psychic'],
+                { campaignName, characters: [], ignoreResistance: false, attackerName: playerName },
+            );
+            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, 'dreadambushUses', 1, campaignName);
+            // oncePerTurn absent on default action — must not mark.
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                playerName, 'dreadAmbushUsedThisTurn', expect.any(Number), campaignName,
+            );
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Dread Ambush',
+                    targetName: 'Goblin',
+                    description: 'Dread Ambush: Dealt <strong>7</strong> Psychic damage to Goblin. (Rolled 2d6.)',
+                    automation: action.automation,
+                },
             });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe("Dread Ambush");
-            expect(result.payload.description).toContain('no uses remaining');
-            expect(result.payload.description).toContain('Recharges on a Long Rest');
         });
 
-        it('returns popup when uses are negative', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'dreadambushUses') return -1;
-                if (key === 'characters') return [];
-                return undefined;
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('no uses remaining');
-        });
-
-        it('does not roll dice or apply damage when no uses remaining', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'dreadambushUses') return 0;
-                if (key === 'characters') return [];
-                return undefined;
-            });
-
+        it('logs an ability_use entry with full damage details to the campaign', async () => {
             await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+            expect(addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: 'Dread Ambush',
+                description: 'RangerGirl used Dread Ambush to deal 7 Psychic damage to Goblin (rolled 2d6).',
+                targetName: 'Goblin',
+                damageType: 'Psychic',
+                damageTotal: 7,
+                formula: '2d6',
+                timestamp: expect.any(Number),
+            });
+        });
+
+        it('damages the target reported by findLastAttack, not a hardcoded name', async () => {
+            findLastAttack.mockResolvedValue(makeHitAttack({ targetName: 'Orc' }));
+
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            expect(applyDamageToTarget).toHaveBeenCalledWith(
+                {}, 'Orc', 7, ['Psychic'],
+                { campaignName, characters: [], ignoreResistance: false, attackerName: playerName },
+            );
+            expect(result.payload.targetName).toBe('Orc');
+        });
+
+        it('honours a custom damageType from automation', async () => {
+            const result = await handle(
+                makeAction({ automation: { type: 'dread_ambush', damageExpression: '2d6', damageType: 'Force', uses_expression: '1' } }),
+                makePlayerStats(),
+                campaignName,
+                null,
+            );
+
+            expect(applyDamageToTarget).toHaveBeenCalledWith(
+                {}, 'Goblin', 7, ['Force'],
+                { campaignName, characters: [], ignoreResistance: false, attackerName: playerName },
+            );
+            expect(result.payload.description).toBe(
+                'Dread Ambush: Dealt <strong>7</strong> Force damage to Goblin. (Rolled 2d6.)',
+            );
+        });
+
+        it('falls back to 0 damage when the roll returns null', async () => {
+            rollExpression.mockReturnValue(null);
+
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            expect(applyDamageToTarget).toHaveBeenCalledWith(
+                {}, 'Goblin', 0, ['Psychic'],
+                { campaignName, characters: [], ignoreResistance: false, attackerName: playerName },
+            );
+            expect(result.payload.description).toBe(
+                'Dread Ambush: Dealt <strong>0</strong> Psychic damage to Goblin. (Rolled 2d6.)',
+            );
+        });
+    });
+
+    describe('damage expression scaling', () => {
+        it('uses the scaling expression at the exact threshold level (>=)', async () => {
+            const action = makeAction({ automation: { damageExpression: '2d6', scaling: { '5': '3d6' } } });
+
+            await handle(action, makePlayerStats({ level: 5 }), campaignName, null);
+
+            expect(rollExpression).toHaveBeenCalledWith('3d6');
+        });
+
+        it('uses the highest met threshold when multiple are satisfied', async () => {
+            const action = makeAction({
+                automation: { damageExpression: '2d6', scaling: { '5': '3d6', '11': '4d6', '17': '6d6' } },
+            });
+
+            await handle(action, makePlayerStats({ level: 18 }), campaignName, null);
+
+            expect(rollExpression).toHaveBeenCalledWith('6d6');
+        });
+
+        it('uses the base damageExpression when below all thresholds', async () => {
+            const action = makeAction({
+                automation: { damageExpression: '2d6', scaling: { '5': '3d6', '11': '4d6' } },
+            });
+
+            await handle(action, makePlayerStats({ level: 2 }), campaignName, null);
+
+            expect(rollExpression).toHaveBeenCalledWith('2d6');
+        });
+
+        it('skips non-numeric scaling keys', async () => {
+            const action = makeAction({
+                automation: { damageExpression: '2d6', scaling: { 'foo': '99d6', '5': '3d6' } },
+            });
+
+            await handle(action, makePlayerStats({ level: 10 }), campaignName, null);
+
+            expect(rollExpression).toHaveBeenCalledWith('3d6');
+        });
+    });
+
+    describe('guard: no uses remaining', () => {
+        it('refuses with no side effects when uses are 0', async () => {
+            getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
+                if (key === 'dreadambushUses') return 0;
+                if (key === 'characters') return [];
+                return undefined;
+            });
+
+            const action = makeAction();
+            const result = await handle(action, makePlayerStats(), campaignName, null);
+
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Dread Ambush',
+                    description: 'Dread Ambush has no uses remaining. Recharges on a Long Rest.',
+                    automation: action.automation,
+                },
+            });
             expect(rollExpression).not.toHaveBeenCalled();
             expect(applyDamageToTarget).not.toHaveBeenCalled();
             expect(addEntry).not.toHaveBeenCalled();
@@ -111,27 +232,31 @@ describe('dreadAmbushHandler', () => {
     });
 
     describe('guard: once per turn', () => {
-        it('returns popup when already used this turn', async () => {
+        it('refuses with no side effects when already used this turn', async () => {
             getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'dreadAmbushUsedThisTurn') return defaultCombatRound();
+                if (key === 'dreadAmbushUsedThisTurn') return 1;
                 if (key === 'characters') return [];
                 return undefined;
             });
 
-            const result = await handle(
-                makeAction({ automation: { oncePerTurn: true } }),
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
+            const action = makeAction({ automation: { damageExpression: '2d6', oncePerTurn: true } });
+            const result = await handle(action, makePlayerStats(), campaignName, null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('Already used this turn');
-            expect(result.payload.description).toContain('Once per turn');
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Dread Ambush',
+                    description: 'Dread Ambush: Already used this turn. Once per turn.',
+                    automation: action.automation,
+                },
+            });
+            expect(rollExpression).not.toHaveBeenCalled();
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('allows usage when in a different round', async () => {
+        it('allows use in a later round and marks the current round', async () => {
             getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
                 if (key === 'dreadAmbushUsedThisTurn') return 1;
                 if (key === 'characters') return [];
@@ -140,530 +265,76 @@ describe('dreadAmbushHandler', () => {
             getCurrentCombatRound.mockReturnValue(2);
 
             const result = await handle(
-                makeAction({ automation: { oncePerTurn: true } }),
+                makeAction({ automation: { damageExpression: '2d6', oncePerTurn: true } }),
                 makePlayerStats(),
                 campaignName,
                 null,
             );
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
+            expect(rollExpression).toHaveBeenCalledWith('2d6');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                playerName, 'dreadAmbushUsedThisTurn', 2, campaignName,
+            );
             expect(result.payload.description).not.toContain('Already used this turn');
         });
-
-        it('does not roll dice or apply damage when once per turn guard fires', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'dreadAmbushUsedThisTurn') return defaultCombatRound();
-                if (key === 'characters') return [];
-                return undefined;
-            });
-
-            await handle(
-                makeAction({ automation: { oncePerTurn: true } }),
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
-
-            expect(rollExpression).not.toHaveBeenCalled();
-            expect(applyDamageToTarget).not.toHaveBeenCalled();
-            expect(addEntry).not.toHaveBeenCalled();
-        });
     });
 
-    describe('guard: no recent attack', () => {
-        it('returns popup when findLastAttack returns no attackEvent', async () => {
+    describe('guard: attack gates', () => {
+        it('refuses with no dice rolled when no recent attack exists', async () => {
             findLastAttack.mockResolvedValue({ attackEvent: null, targetName: null });
 
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+            const action = makeAction();
+            const result = await handle(action, makePlayerStats(), campaignName, null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('No recent attack found');
-            expect(result.payload.description).toContain('weapon attack');
-        });
-
-        it('does not roll dice when no attack found', async () => {
-            findLastAttack.mockResolvedValue({ attackEvent: null });
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Dread Ambush',
+                    description: 'Dread Ambush: No recent attack found. Must be used after you deal damage with a weapon attack.',
+                    automation: action.automation,
+                },
+            });
             expect(rollExpression).not.toHaveBeenCalled();
             expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
-    });
 
-    describe('guard: attacker mismatch', () => {
-        it('returns popup when another creature made the last attack', async () => {
+        it('refuses when another creature made the last attack', async () => {
             findLastAttack.mockResolvedValue(makeHitAttack({
                 attackEvent: { attackerName: 'Goblin', damageApplied: true },
-                targetName: 'Goblin',
             }));
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('You must be the attacker');
-        });
-
-        it('does not roll dice when attacker mismatch', async () => {
-            findLastAttack.mockResolvedValue(makeHitAttack({
-                attackEvent: { attackerName: 'Goblin', damageApplied: true },
-            }));
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
+            expect(result.payload.description).toBe('Dread Ambush: You must be the attacker to use this feature.');
             expect(rollExpression).not.toHaveBeenCalled();
         });
-    });
 
-    describe('guard: no damage applied', () => {
-        it('returns popup when attackEvent has damageApplied=false', async () => {
+        it('refuses when the last attack applied no damage', async () => {
             findLastAttack.mockResolvedValue(makeHitAttack({
                 attackEvent: { attackerName: playerName, damageApplied: false },
             }));
 
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('No damage was applied');
-        });
-
-        it('does not roll dice when no damage was applied', async () => {
-            findLastAttack.mockResolvedValue(makeHitAttack({
-                attackEvent: { attackerName: playerName, damageApplied: false },
-            }));
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
+            expect(result.payload.description).toBe('Dread Ambush: No damage was applied by your last attack.');
             expect(rollExpression).not.toHaveBeenCalled();
         });
     });
 
-    describe('damage expression scaling', () => {
-        it('uses default damageExpression when no scaling', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(rollExpression).toHaveBeenCalledWith('2d6');
-            expect(result.payload.description).toContain('Rolled 2d6');
-        });
-
-        it('scales up damageExpression based on player level', async () => {
-            const action = makeAction({
-                automation: {
-                    scaling: {
-                        '5': '3d6',
-                        '11': '4d6',
-                        '17': '6d6',
-                    },
-                },
-            });
-            getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'dreadambushUses') return 2;
-                if (key === 'characters') return [];
-                return undefined;
-            });
-
-            await handle(action, makePlayerStats({ level: 10 }), campaignName, null);
-
-            expect(rollExpression).toHaveBeenCalledWith('3d6');
-        });
-
-        it('uses highest scaling level when player meets multiple thresholds', async () => {
-            const action = makeAction({
-                automation: {
-                    scaling: {
-                        '5': '3d6',
-                        '11': '4d6',
-                        '17': '6d6',
-                    },
-                },
-            });
-            getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'dreadambushUses') return 2;
-                if (key === 'characters') return [];
-                return undefined;
-            });
-
-            await handle(action, makePlayerStats({ level: 18 }), campaignName, null);
-
-            expect(rollExpression).toHaveBeenCalledWith('6d6');
-        });
-
-        it('uses base damageExpression when player is below all scaling thresholds', async () => {
-            const action = makeAction({
-                automation: {
-                    damageExpression: '2d6',
-                    scaling: {
-                        '5': '3d6',
-                        '11': '4d6',
-                    },
-                },
-            });
-            getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'dreadambushUses') return 2;
-                if (key === 'characters') return [];
-                return undefined;
-            });
-
-            await handle(action, makePlayerStats({ level: 2 }), campaignName, null);
-
-            expect(rollExpression).toHaveBeenCalledWith('2d6');
-        });
-
-        it('handles non-numeric scaling keys by skipping them', async () => {
-            const action = makeAction({
-                automation: {
-                    damageExpression: '2d6',
-                    scaling: {
-                        'foo': '99d6',
-                        '5': '3d6',
-                    },
-                },
-            });
-            getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'dreadambushUses') return 2;
-                if (key === 'characters') return [];
-                return undefined;
-            });
-
-            await handle(action, makePlayerStats({ level: 10 }), campaignName, null);
-
-            expect(rollExpression).toHaveBeenCalledWith('3d6');
-        });
-    });
-
-    describe('damage type', () => {
-        it('uses default Psychic damage type', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.payload.description).toContain('Psychic');
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', expect.any(Number), ['Psychic'], { campaignName: expect.any(String), characters: expect.any(Array), ignoreResistance: false, attackerName: playerName });
-        });
-
-        it('uses custom damageType from automation', async () => {
-            const action = makeAction({
-                automation: { damageType: 'Force' },
-            });
-
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-
-            expect(result.payload.description).toContain('Force');
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', expect.any(Number), ['Force'], { campaignName: expect.any(String), characters: expect.any(Array), ignoreResistance: false, attackerName: playerName });
-        });
-    });
-
-    describe('successful execution', () => {
-        it('rolls the damage expression', async () => {
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(rollExpression).toHaveBeenCalledWith('2d6');
-        });
-
-        it('uses roll total as damage', async () => {
-            rollExpression.mockReturnValue({ total: 12, rolls: [7, 5] });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.payload.description).toContain('12');
-        });
-
-        it('calls applyDamageToTarget with correct arguments', async () => {
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 7, ['Psychic'], { campaignName, characters: [], ignoreResistance: false, attackerName: playerName });
-        });
-
-        it('uses targetName from findLastAttack result', async () => {
-            findLastAttack.mockResolvedValue(makeHitAttack({ targetName: 'Orc' }));
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Orc', expect.any(Number), expect.any(Array), { campaignName: expect.any(String), characters: expect.any(Array), ignoreResistance: false, attackerName: playerName });
-        });
-
-        it('returns automation_info popup with correct structure', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe("Dread Ambush");
-            expect(result.payload.targetName).toBe('Goblin');
-            expect(result.payload.automation).toBeDefined();
-        });
-
-        it('includes damage total and target in popup description', async () => {
-            rollExpression.mockReturnValue({ total: 9, rolls: [5, 4] });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.payload.description).toContain('9');
-            expect(result.payload.description).toContain('Goblin');
-        });
-
-        it('includes rolled formula in popup description', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.payload.description).toContain('Rolled 2d6');
-        });
-
-        it('bolds damage total in popup description', async () => {
-            rollExpression.mockReturnValue({ total: 5, rolls: [2, 3] });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.payload.description).toContain('<strong>5</strong>');
-        });
-    });
-
-    describe('uses decrement', () => {
-        it('decrements uses when uses_expression is present', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'dreadambushUses') return 3;
-                if (key === 'characters') return [];
-                return undefined;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'dreadambushUses',
-                2,
-                campaignName,
-            );
-        });
-
-        it('does not decrement uses when uses_expression is absent', async () => {
-            const action = makeAction({
-                automation: { uses_expression: undefined },
-            });
+    describe('uses_expression absent', () => {
+        it('deals damage but never writes dreadambushUses when uses_expression is absent', async () => {
+            const action = makeAction({ automation: { type: 'dread_ambush', damageExpression: '2d6', damageType: 'Psychic' } });
 
             await handle(action, makePlayerStats(), campaignName, null);
 
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                playerName,
-                'dreadambushUses',
-                expect.any(Number),
-                campaignName,
-            );
-        });
-
-    });
-
-    describe('oncePerTurn marking', () => {
-        it('marks oncePerTurn when oncePerTurn is true', async () => {
-            getCurrentCombatRound.mockReturnValue(3);
-
-            await handle(
-                makeAction({ automation: { oncePerTurn: true } }),
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'dreadAmbushUsedThisTurn',
-                3,
-                campaignName,
-            );
-        });
-
-        it('does not mark oncePerTurn when oncePerTurn is false', async () => {
-            await handle(
-                makeAction({ automation: { oncePerTurn: false } }),
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
-
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                playerName,
-                'dreadAmbushUsedThisTurn',
-                expect.any(Number),
-                campaignName,
-            );
-        });
-
-        it('does not mark oncePerTurn when oncePerTurn is absent', async () => {
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                playerName,
-                'dreadAmbushUsedThisTurn',
-                expect.any(Number),
-                campaignName,
-            );
+            expect(rollExpression).toHaveBeenCalledWith('2d6');
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
     });
 
-    describe('logging', () => {
-        it('logs ability_use entry on successful execution', async () => {
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'ability_use',
-                characterName: playerName,
-                abilityName: "Dread Ambush",
-                targetName: 'Goblin',
-                damageType: 'Psychic',
-                damageTotal: 7,
-                formula: '2d6',
-                timestamp: expect.any(Number),
-            }));
-        });
-
-        it('includes description with damage details in log', async () => {
-            rollExpression.mockReturnValue({ total: 10, rolls: [6, 4] });
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                description: expect.stringContaining('used Dread Ambush'),
-            }));
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                description: expect.stringContaining('10 Psychic damage'),
-            }));
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                description: expect.stringContaining('rolled 2d6'),
-            }));
-        });
-
-        it('logs with custom feature name', async () => {
-            const result = await handle(
-                { name: 'My Dread Ambush', automation: makeAction().automation },
-                makePlayerStats(),
-                campaignName,
-                null,
-            );
-
-            expect(result.payload.name).toBe('My Dread Ambush');
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                abilityName: 'My Dread Ambush',
-            }));
-        });
-
-        it('does not log on guard failures', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'dreadambushUses') return 0;
-                if (key === 'characters') return [];
-                return undefined;
-            });
-
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(addEntry).not.toHaveBeenCalled();
-        });
-
-        it('handles addEntry error gracefully', async () => {
-            const consoleSpy = vi.spyOn(console, 'error');
-            consoleSpy.mockImplementation(() => {});
-
-            addEntry.mockRejectedValue(new Error('Log service error'));
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(consoleSpy).toHaveBeenCalledWith(
-                '[dreadAmbushHandler] Error:',
-                expect.any(Error),
-            );
-
-            consoleSpy.mockRestore();
-        });
-    });
-
-    describe('campaign name propagation', () => {
-        it('passes campaignName to applyDamageToTarget', async () => {
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), expect.any(String), expect.any(Number), expect.any(Array), { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: expect.any(String) });
-        });
-
-        it('passes campaignName to setRuntimeValue for uses', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-                if (key === 'dreadambushUses') return 2;
-                if (key === 'characters') return [];
-                return undefined;
-            });
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'dreadambushUses',
-                expect.any(Number),
-                'test-campaign',
-            );
-        });
-
-        it('passes campaignName to setRuntimeValue for oncePerTurn', async () => {
-            await handle(
-                makeAction({ automation: { oncePerTurn: true } }),
-                makePlayerStats(),
-                'test-campaign',
-                null,
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerName,
-                'dreadAmbushUsedThisTurn',
-                expect.any(Number),
-                'test-campaign',
-            );
-        });
-
-        it('passes campaignName to addEntry', async () => {
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.any(Object));
-        });
-    });
-
-    describe('automation payload', () => {
-        it('includes automation object in popup payload', async () => {
-            const auto = makeAction().automation;
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.payload.automation).toEqual(auto);
-        });
-    });
-
-    describe('roll edge cases', () => {
-        it('handles rollExpression returning null', async () => {
-            rollExpression.mockReturnValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('0');
-        });
-
-        it('handles rollExpression returning result with no total', async () => {
-            rollExpression.mockReturnValue({ rolls: [3, 4] });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('0');
-        });
-
-        it('uses 0 when roll total is 0', async () => {
-            rollExpression.mockReturnValue({ total: 0, rolls: [0, 0] });
-
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-            expect(result.payload.description).toContain('0');
-        });
-    });
-
-    describe('action name fallback', () => {
-        it('uses "Dread Ambush" as default feature name when action has no name', async () => {
+    describe('feature naming', () => {
+        it('defaults the feature name to "Dread Ambush" when the action has no name', async () => {
             const result = await handle(
                 { automation: makeAction().automation },
                 makePlayerStats(),
@@ -674,7 +345,7 @@ describe('dreadAmbushHandler', () => {
             expect(result.payload.name).toBe('Dread Ambush');
         });
 
-        it('uses custom name from action when provided', async () => {
+        it('uses the action name in popup, description, and log', async () => {
             const result = await handle(
                 { name: 'Ambush Strike', automation: makeAction().automation },
                 makePlayerStats(),
@@ -684,6 +355,23 @@ describe('dreadAmbushHandler', () => {
 
             expect(result.payload.name).toBe('Ambush Strike');
             expect(result.payload.description).toContain('Ambush Strike');
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                abilityName: 'Ambush Strike',
+            }));
+        });
+    });
+
+    describe('error handling', () => {
+        it('surfaces the popup and logs to console when addEntry rejects', async () => {
+            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            addEntry.mockRejectedValueOnce(new Error('Log service error'));
+
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(consoleSpy).toHaveBeenCalledWith('[dreadAmbushHandler] Error:', expect.any(Error));
+
+            consoleSpy.mockRestore();
         });
     });
 });

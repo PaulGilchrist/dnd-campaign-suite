@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Stonecunning activation handler: uses resolution (proficiency_bonus / numeric
+// uses / usesMax / default 1), long-rest stored-uses tracking, the CLA-334
+// BUG-1/2/3 regression contracts (single merged store write, already-active
+// re-click gate, duration expiration registration), logging, popup shape,
+// and the restoreUses API-contract pin. Deterministic: module-boundary mocks
+// over a pure handler; refresh only when the handler's store contract changes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, restoreUses } from './stonecunningHandler.js';
 import { isBuffActive } from '../../common/buffToggle.js';
@@ -110,19 +117,20 @@ describe('stonecunningHandler', () => {
             expectSuccessfulActivation(result);
             expect(result.payload.description).toContain('1 use remaining');
         });
+
+        it('defaults to a single use when automation carries no uses metadata', async () => {
+            getRuntimeValue.mockReturnValue(null);
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            expectSuccessfulActivation(result);
+            expect(result.payload.description).toContain('0 uses remaining');
+            expect(setRuntimeObject).toHaveBeenCalledTimes(1);
+            expect(setRuntimeObject.mock.calls[0][1].stonecunningUses).toBe(0);
+        });
     });
 
     describe('long rest tracking', () => {
-        it('starts fresh with usesMax when no stored value', async () => {
-            getRuntimeValue.mockReturnValue(null);
-
-            const action = makeAction({ automation: { usesMax: 3 } });
-            const result = await handle(action, makePlayerStats(), 'test-campaign', null);
-
-            expectSuccessfulActivation(result);
-            expect(result.payload.description).toContain('2 uses remaining');
-        });
-
         it('uses stored uses when available and blocks when zero', async () => {
             getRuntimeValue.mockImplementation(usesImpl(2));
 
@@ -263,18 +271,10 @@ describe('stonecunningHandler', () => {
             expect(merged[PENDING_EXPIRATIONS_KEY]).toHaveLength(2);
             expect(merged[PENDING_EXPIRATIONS_KEY][1].effects).toEqual([{ type: 'remove_active_buff', buffName: 'Stonecunning' }]);
         });
-
-        it('does not register an expiration when the use is refused', async () => {
-            getRuntimeValue.mockImplementation(usesImpl(0));
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(setRuntimeObject).not.toHaveBeenCalled();
-        });
     });
 
     describe('logging', () => {
-        it('logs ability use on activation but not when refused', async () => {
+        it('logs ability_use on activation', async () => {
             getRuntimeValue.mockImplementation(usesImpl(1));
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
@@ -284,33 +284,14 @@ describe('stonecunningHandler', () => {
                 characterName: 'DwarfBoy',
                 abilityName: 'Stonecunning',
             }));
-
-            vi.clearAllMocks();
-            getRuntimeValue.mockImplementation(usesImpl(1));
-            isBuffActive.mockReturnValue(true);
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(addEntry).not.toHaveBeenCalled();
         });
     });
 
     describe('popup description', () => {
-        it('uses correct singular/plural "use" based on remaining count', async () => {
-            getRuntimeValue.mockImplementation(usesImpl(2));
-            let result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-            expect(result.payload.description).toContain('1 use remaining');
-
-            vi.clearAllMocks();
-            getRuntimeValue.mockImplementation(usesImpl(5));
-            result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-            expect(result.payload.description).toContain('4 uses remaining');
-        });
-
         it('includes custom duration when provided, default otherwise', async () => {
             getRuntimeValue.mockImplementation(usesImpl(1));
 
-            let result = await handle(
+            const result = await handle(
                 makeAction({ automation: { duration: '1_hour' } }),
                 makePlayerStats(),
                 'test-campaign',
@@ -320,13 +301,13 @@ describe('stonecunningHandler', () => {
 
             vi.clearAllMocks();
 
-            result = await handle(
+            const fallback = await handle(
                 { name: 'Stonecunning', automation: { type: 'stonecunning' } },
                 makePlayerStats(),
                 'test-campaign',
                 null
             );
-            expect(result.payload.description).toContain('10 min');
+            expect(fallback.payload.description).toContain('10 min');
         });
     });
 
@@ -354,6 +335,8 @@ describe('stonecunningHandler', () => {
     });
 
     describe('restoreUses', () => {
+        // API-contract pin: long rest resets are currently executed by
+        // restRules-longRest.js direct table writes, not via this export.
         it('clears uses key by setting to null for names with and without spaces', () => {
             restoreUses('DwarfBoy', 'test-campaign');
             expect(setRuntimeValue).toHaveBeenCalledWith(

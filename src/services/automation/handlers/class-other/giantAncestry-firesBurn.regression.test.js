@@ -1,3 +1,7 @@
+// @maintained-by-ai: 2026-10-15 — deterministic defect lock; every external
+// module is mocked and only the pure findLastAttack parser + attackerRollGate
+// run unmocked, so no churn is needed unless the CLA-141 contract itself moves.
+//
 // Regression test for CLA-141: Fire's Burn – Goliath.
 //
 // The original verification stalled because the character's attack did not
@@ -7,6 +11,13 @@
 //   info-builder -> router categorization -> registry handler,
 // using the REAL findLastAttack parser (not mocked) against the exact
 // lastAttack record shapes that `processAttackAfterResult` writes.
+//
+// Seam vs. giantAncestry-firesBurn.test.js (main lane): the main lane MOCKS
+// findLastAttack, so it cannot catch parser/record-shape drift — this file is
+// the defect lock keeping the real parser + hit/damage gate (miss, no-damage,
+// stale skill-roll, missing-target refusals, zero-spend). The main lane also
+// pins the firesBurnUses key end-to-end via its exact-key setRuntimeValue
+// spend assertions, so no standalone getRuntimeUsesKey pin lives here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -36,7 +47,6 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
 }));
 
 import { handleFiresBurn, handleFiresBurnDirect } from './giantAncestryHandler.js';
-import { getRuntimeUsesKey } from './giantAncestryOptions.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
@@ -80,10 +90,6 @@ beforeEach(() => {
 });
 
 describe('CLA-141 Fire Burn regression (real findLastAttack parser)', () => {
-    it('uses runtime key firesBurnUses for Fire Giant ancestry', () => {
-        expect(getRuntimeUsesKey("Fire's Burn")).toBe('firesBurnUses');
-    });
-
     it('routes fire_burn (1 action) into the actions list, not passives/reactions', () => {
         const feature = {
             name: "Fire's Burn",

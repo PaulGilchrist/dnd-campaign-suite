@@ -1,5 +1,14 @@
+// @maintained-by-ai
 // CLA-357 regression: chooser modal + isWithinRange gate + te + refusal log +
 // raw `30_ft` token never leaks into popup/log prose.
+// Both exports are LIVE API surface: handle() is the automation/index.js registry
+// entry for type 'telekinetic_movement'; applyTelekineticMovement() is the modal
+// confirm called by CharActionModals.SecondaryModals.jsx (telekineticMovement
+// chooser). No dead-export flag (unlike the leap sibling). Deterministic: every
+// side-effecting module fully mocked (real rangeToFeet runs — parsing itself is
+// owned by rangeValidation.test.js); popup prose pinned own-composition; te
+// registry internals owned by targetEffectDefinitions.test.js (delegation pins
+// only). Turn-based only — no game timers.
 import { handle, applyTelekineticMovement } from './telekineticMovementHandler.js';
 import * as logService from '../../../ui/logService.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
@@ -65,8 +74,11 @@ describe('telekineticMovementHandler', () => {
             expect(result.payload.rangeFt).toBe(60);
         });
 
-        it('should fall back to popup + ability_use log with no creatures in combat', async () => {
-            damageUtils.getCombatContext.mockResolvedValue({ creatures: [{ name: 'TestHero', type: 'player' }] });
+        it.each([
+            ['only the caster in the creature list', { creatures: [{ name: 'TestHero', type: 'player' }] }],
+            ['combat context resolves null', null],
+        ])('should fall back to popup + ability_use log when %s', async (_label, cs) => {
+            damageUtils.getCombatContext.mockResolvedValue(cs);
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
@@ -79,13 +91,6 @@ describe('telekineticMovementHandler', () => {
                 characterName: 'TestHero',
                 abilityName: 'Telekinetic Movement',
             }));
-        });
-
-        it('should tolerate getCombatContext rejection without throwing', async () => {
-            damageUtils.getCombatContext.mockResolvedValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
-            expect(result.type).toBe('popup');
         });
     });
 
@@ -127,9 +132,10 @@ describe('telekineticMovementHandler', () => {
         });
 
         it('should use custom range from automation in gate, log, and popup', async () => {
-            await applyTelekineticMovement(makeAction({ range: '60_ft' }), makePlayerStats(), 'campaign', 'Thug 1');
+            const result = await applyTelekineticMovement(makeAction({ range: '60_ft' }), makePlayerStats(), 'campaign', 'Thug 1');
 
             expect(rangeCheck.isWithinRange).toHaveBeenCalledWith('TestHero', 'Thug 1', 60);
+            expect(result.payload.description).toBe('Telekinetic Movement: Moved <strong>Thug 1</strong> up to <strong>60</strong> feet.');
             expect(logService.addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
                 description: 'TestHero used Telekinetic Movement to telekinetically move Thug 1 up to 60 feet.',
             }));
@@ -143,7 +149,7 @@ describe('telekineticMovementHandler', () => {
         });
 
         it('should tolerate addEntry rejection without throwing', async () => {
-            logService.addEntry.mockRejectedValue(new Error('network error'));
+            logService.addEntry.mockRejectedValueOnce(new Error('network error'));
 
             await expect(
                 applyTelekineticMovement(makeAction(), makePlayerStats(), 'campaign', 'Thug 1')

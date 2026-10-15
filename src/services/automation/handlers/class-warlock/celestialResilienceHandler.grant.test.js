@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Lane: grantCelestialResilience in celestialResilienceHandler.js — canonical pins for the
+// patron gate, feature/automation gates, self temp HP guard + setTempHp, ALLY_GRANT_SOURCES
+// source gating, ally range collection (map players → combatSummary fallback), and grant-side
+// default expressions/maxAllies/range. confirmSkip.test.js owns confirm/skip; handle.test.js
+// owns handle (null-map popup, modal routing, addEntry rejection); restRules-* mock this
+// function at the caller seam. Fully deterministic: every external seam is mocked.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { grantCelestialResilience } from './celestialResilienceHandler.js';
@@ -89,10 +96,13 @@ describe('celestialResilienceHandler - grantCelestialResilience', () => {
                 expect(setTempHp).not.toHaveBeenCalled();
             });
 
-            it('returns null when feature has null or missing automation', async () => {
+            it.each([
+                [null],
+                [undefined],
+            ])('returns null when feature automation is %j', async (automation) => {
                 const result = await grantCelestialResilience(
                     makeCelestialStats({
-                        specialActions: [{ name: 'Celestial Resilience', automation: null }],
+                        specialActions: [{ name: 'Celestial Resilience', automation }],
                     }),
                     CAMPAIGN,
                     'magical_cunning',
@@ -104,8 +114,12 @@ describe('celestialResilienceHandler - grantCelestialResilience', () => {
         });
 
         describe('self temp HP evaluation', () => {
-            it('returns null when expression evaluates to zero', async () => {
-                evaluateAutoExpression.mockReturnValue(0);
+            it.each([
+                [0, 'zero'],
+                [-3, 'negative'],
+                ['not a number', 'non-number'],
+            ])('returns null when self temp HP expression evaluates to %s (%s)', async (value) => {
+                evaluateAutoExpression.mockReturnValue(value);
 
                 const result = await grantCelestialResilience(
                     makeCelestialStats(),
@@ -129,7 +143,8 @@ describe('celestialResilienceHandler - grantCelestialResilience', () => {
                 );
 
                 expect(result.selfTempHp).toBe(7);
-                expect(result.message).toContain('7 temporary hit points');
+                // full-string own-composition pin: grant owns this message
+                expect(result.message).toBe('TestHero gains 7 temporary hit points from Celestial Resilience.');
                 expect(setTempHp).toHaveBeenCalledWith('TestHero', 7, CAMPAIGN);
             });
         });
@@ -168,6 +183,31 @@ describe('celestialResilienceHandler - grantCelestialResilience', () => {
 
                 expect(result.selfTempHp).toBe(5);
                 expect(result.allyTempHp).toBe(3);
+            });
+
+            it.each([
+                [0, 'zero'],
+                ['not a number', 'non-number'],
+            ])('grants self only when ally temp HP expression evaluates to %s (%s)', async (value) => {
+                evaluateAutoExpression
+                    .mockReturnValueOnce(5)
+                    .mockReturnValueOnce(value);
+
+                const result = await grantCelestialResilience(
+                    makeCelestialStats(),
+                    CAMPAIGN,
+                    'magical_cunning',
+                    MAP,
+                );
+
+                expect(result.selfTempHp).toBe(5);
+                expect(result.allyTempHp).toBeUndefined();
+                expect(result.maxAllies).toBeUndefined();
+                expect(result.allies).toBeUndefined();
+                // no-side-effect guard: attachAllyGrant returns before range collection
+                expect(rangeToFeet).not.toHaveBeenCalled();
+                expect(loadMapData).not.toHaveBeenCalled();
+                expect(isWithinRange).not.toHaveBeenCalled();
             });
         });
 
@@ -275,6 +315,28 @@ describe('celestialResilienceHandler - grantCelestialResilience', () => {
                 expect(result.allyTempHp).toBe(2);
                 expect(result.allies).toHaveLength(1);
                 expect(result.allies[0].name).toBe('Ally1');
+            });
+
+            it('sets ally grant fields with empty allies when range does not resolve to feet', async () => {
+                evaluateAutoExpression
+                    .mockReturnValueOnce(5)
+                    .mockReturnValueOnce(3);
+                rangeToFeet.mockReturnValueOnce(null);
+
+                const result = await grantCelestialResilience(
+                    makeCelestialStats(),
+                    CAMPAIGN,
+                    'magical_cunning',
+                    MAP,
+                );
+
+                expect(result.selfTempHp).toBe(5);
+                expect(result.allyTempHp).toBe(3);
+                expect(result.maxAllies).toBe(5);
+                expect(result.allies).toEqual([]);
+                // range-less grant never consults map or combat summary
+                expect(loadMapData).not.toHaveBeenCalled();
+                expect(isWithinRange).not.toHaveBeenCalled();
             });
         });
 
