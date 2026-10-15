@@ -36,6 +36,7 @@
         "preview": "vite preview --host",
         "start": "npm install && npm run build && node server.js",
         "test": "vitest",
+        "test:count": "vitest list | wc -l",
         "test:run": "vitest run",
         "test:watch": "vitest watch",
         "test:coverage": "vitest run --coverage",

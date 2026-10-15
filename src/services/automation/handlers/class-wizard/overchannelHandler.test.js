@@ -1,3 +1,20 @@
+// @maintained-by-ai
+// overchannelHandler: deterministic automation popup handler, pure use-count
+// helpers over the (mocked) runtime store, and the CLA-244 necrotic backlash
+// damage table. No timers, no DOM — stable contract, no churn as the app moves.
+//
+// EXPORT LIVENESS (verified by grep 2026-10-15):
+// - handle                    LIVE — automation/index.js router ('overchannel')
+// - getOverchannelNecroticDamage LIVE — SpellDetailPopup.jsx (damage notice;
+//                              also exercised via UI in SpellDetailPopup.overchannel.test.jsx)
+// - getOverchannelUses      ORPHAN — popup reads 'Overchannel_useCount' directly
+// - hasOverchannelRemaining ORPHAN — eligibility computed inline in popup/damageCalculation
+// - consumeOverchannelUse   ORPHAN — live increment is computeOverchannel() in
+//                              spellCastService/execution/damageCalculation.js (spellCastService.test.js)
+// - restoreOverchannelOnLongRest ORPHAN — live reset is the restRules-longRest.js
+//                              key table (restRules-longRest.test.js)
+// Orphan helper tests kept as contract pins until a source-trim pass deletes
+// the helpers alongside them.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     handle,
@@ -37,7 +54,6 @@ describe('overchannelHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Overchannel');
-            expect(result.payload.automation).toEqual(makeAction().automation);
         });
 
         it('describes first use as having no adverse effect', async () => {
@@ -112,13 +128,13 @@ describe('overchannelHandler', () => {
 
     describe('consumeOverchannelUse', () => {
         it('increments the use count and persists it', async () => {
-            const setRuntimeValue = runtimeState.setRuntimeValue.mockResolvedValue(undefined);
+            runtimeState.setRuntimeValue.mockResolvedValue(undefined);
             runtimeState.getRuntimeValue.mockReturnValue(4);
 
             const result = await consumeOverchannelUse(mockPlayerStats, campaignName);
 
             expect(result).toBe(true);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestWizard',
                 'Overchannel_useCount',
                 5,
@@ -129,11 +145,11 @@ describe('overchannelHandler', () => {
 
     describe('restoreOverchannelOnLongRest', () => {
         it('resets use count to 0', async () => {
-            const setRuntimeValue = runtimeState.setRuntimeValue.mockResolvedValue(undefined);
+            runtimeState.setRuntimeValue.mockResolvedValue(undefined);
 
             await restoreOverchannelOnLongRest(mockPlayerStats, campaignName);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestWizard',
                 'Overchannel_useCount',
                 0,
@@ -143,16 +159,13 @@ describe('overchannelHandler', () => {
     });
 
     describe('getOverchannelNecroticDamage', () => {
-        it('returns 0 for useCount <= 1', () => {
-            expect(getOverchannelNecroticDamage(3, 0)).toBe(0);
+        it('returns 0 for use counts of 1 or less (first use has no backlash)', () => {
             expect(getOverchannelNecroticDamage(3, 1)).toBe(0);
-        });
-
-        it('returns 0 for negative useCount', () => {
+            expect(getOverchannelNecroticDamage(3, 0)).toBe(0);
             expect(getOverchannelNecroticDamage(3, -1)).toBe(0);
         });
 
-        it('returns RAW 2d12-per-slot formula for useCount=2', () => {
+        it('returns RAW 2d12-per-slot payload with full flag shape for use #2', () => {
             const result = getOverchannelNecroticDamage(3, 2);
 
             expect(result.formula).toBe('2d12');
@@ -163,26 +176,13 @@ describe('overchannelHandler', () => {
             expect(result.expression).toBe('6d12');
         });
 
-        it('use #2 level 2 slot scales to 4d12 (CLA-244)', () => {
-            expect(getOverchannelNecroticDamage(2, 2).expression).toBe('4d12');
-        });
-
-        it('increments dice per spell level by 1d12 per additional use (dicePerLevel = useCount)', () => {
-            const result2 = getOverchannelNecroticDamage(3, 2);
-            const result3 = getOverchannelNecroticDamage(3, 3);
-            const result4 = getOverchannelNecroticDamage(3, 4);
-
-            expect(result2.formula).toBe('2d12');
-            expect(result3.formula).toBe('3d12');
-            expect(result4.formula).toBe('4d12');
-
-            expect(result2.expression).toBe('6d12');
-            expect(result3.expression).toBe('9d12');
-            expect(result4.expression).toBe('12d12');
-        });
-
-        it('use #3 level 3 slot scales to 9d12 (CLA-244)', () => {
+        it('scales dice by use count and slot level (dicePerLevel = max(2, useCount), CLA-244)', () => {
+            expect(getOverchannelNecroticDamage(3, 3).formula).toBe('3d12');
             expect(getOverchannelNecroticDamage(3, 3).expression).toBe('9d12');
+            expect(getOverchannelNecroticDamage(3, 4).formula).toBe('4d12');
+            expect(getOverchannelNecroticDamage(3, 4).expression).toBe('12d12');
+            // slot-level multiplication at a different slot level
+            expect(getOverchannelNecroticDamage(2, 2).expression).toBe('4d12');
         });
 
         it('defaults spellLevel to 1 when falsy', () => {

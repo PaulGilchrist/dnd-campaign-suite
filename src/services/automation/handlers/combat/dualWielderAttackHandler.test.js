@@ -1,5 +1,11 @@
+// @maintained-by-ai
 // FT-104: Dual Wielder dedicated bonus-attack lane — single off-hand attack,
 // own-turn gate, once-per-turn latch, refusal logs, no Flurry multi-fire.
+// Deterministic contract suite: mocks the four seams (runtime store, damageUtils,
+// logService, combatData) and pins the gate/latch/attack_roll contract of
+// dualWielderAttackHandler.js. Round-wrap clearing of _DualWielder_UsedRound is
+// owned by Initiative.jsx / navigationHandlers PLAYER_ROUND_LATCH_KEYS — here we
+// only pin that a stale (prior-round) latch round does not block a new round.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './dualWielderAttackHandler.js';
@@ -67,10 +73,13 @@ describe('dualWielderAttackHandler (FT-104)', () => {
         vi.mocked(getCurrentCombatRound).mockReturnValue(4);
     });
 
-    it('fires exactly ONE attack_roll with the off-hand row dice-only damage vs the armed target', async () => {
+    it('fires exactly ONE attack_roll with the off-hand row dice-only damage vs the armed target — never a Flurry modal', async () => {
         const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME);
 
+        // FT-104 regression: this feature was mis-routed to the monk Flurry
+        // handler (modal + multi-fire). Single adjudicated attack_roll only.
         expect(result.type).toBe('attack_roll');
+        expect(result.modalName).toBeUndefined();
         expect(result.payload.targetName).toBe('Bandit');
         expect(result.payload.attack.damage).toBe('1d6'); // dice only — no ability mod, no Shortbow
         expect(result.payload.attack.damageType).toBe('Piercing');
@@ -82,18 +91,21 @@ describe('dualWielderAttackHandler (FT-104)', () => {
         expect(abilityUse).toBeTruthy();
     });
 
-    it('does NOT route to Flurry: returns no flurryOfBlows modal, numAttacks never exceeds 1', async () => {
-        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME);
-        expect(result.type).not.toBe('modal');
-        expect(result.modalName).toBeUndefined();
-        expect(result.type).toBe('attack_roll');
-    });
-
-    it('stamps _DualWielder_UsedRound awaited with campaignName-threaded round BEFORE the attack returns', async () => {
-        await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME);
+    it('stamps _DualWielder_UsedRound awaited with campaignName-threaded round; a stale prior-round latch re-arms', async () => {
+        // CLA-371 serialize: awaited stamp BEFORE the attack returns, so a
+        // second same-round click reads the stamped round and is refused.
+        const first = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME);
+        expect(first.type).toBe('attack_roll');
         expect(getCurrentCombatRound).toHaveBeenCalledWith(CAMPAIGN_NAME);
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', '_DualWielder_UsedRound', 4, CAMPAIGN_NAME);
-        expect(vi.mocked(setRuntimeValue).mock.results[0]).toBeTruthy();
+
+        // Round-wrap re-arm: a latch stamped in a prior round (3) must not
+        // block the current round (4).
+        vi.mocked(getRuntimeValue).mockImplementation((_n, key) => (key === '_DualWielder_UsedRound' ? 3 : null));
+        vi.mocked(setRuntimeValue).mockClear();
+        const wrapped = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME);
+        expect(wrapped.type).toBe('attack_roll');
+        expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', '_DualWielder_UsedRound', 4, CAMPAIGN_NAME);
     });
 
     it('refuses a second same-turn click: dual_wielder_refused log + popup, zero attack, zero new latch write', async () => {
@@ -153,9 +165,26 @@ describe('dualWielderAttackHandler (FT-104)', () => {
         expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('refuses when no off-hand dual-wielder row exists (single weapon / two-handed)', async () => {
+    it('refuses when no off-hand dual-wielder row exists (single weapon)', async () => {
         const stats = makePlayerStats({
             attacks: [{ name: 'Shortsword', type: 'Action', weaponType: 'melee', hitBonus: 6, damage: '1d6+2', damageType: 'Piercing', range: 5, properties: ['Light'] }],
+        });
+
+        const result = await handle(makeAction(), stats, CAMPAIGN_NAME);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toMatch(/two melee weapons/);
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the dual-wielder row is a Two-Handed weapon (handler-side guard)', async () => {
+        // attackCalc2024 never builds such a row, but pickDualWielderRow guards
+        // defensively — pin the handler branch too.
+        const stats = makePlayerStats({
+            attacks: [
+                { name: 'Scimitar', type: 'Action', weaponType: 'melee', hitBonus: 9, damage: '1d6+6', damageType: 'Slashing', range: 5, properties: ['Light', 'Finesse'] },
+                { name: 'Dual Wielder Extra Attack', type: 'Bonus Action', weaponType: 'melee', weaponName: 'Greatsword', hitBonus: 6, damage: '2d6', damageType: 'Slashing', range: 5, properties: ['Two-Handed'] },
+            ],
         });
 
         const result = await handle(makeAction(), stats, CAMPAIGN_NAME);
@@ -173,15 +202,5 @@ describe('dualWielderAttackHandler (FT-104)', () => {
         expect(result.type).toBe('popup');
         const refusal = vi.mocked(addEntry).mock.calls.map(c => c[1]).find(e => e.automationType === 'dual_wielder_refused');
         expect(refusal).toBeTruthy();
-    });
-
-    it('re-arms after round wrap (latch round differs from current round)', async () => {
-        vi.mocked(getRuntimeValue).mockImplementation((_n, key) => (key === '_DualWielder_UsedRound' ? 3 : null));
-        vi.mocked(getCurrentCombatRound).mockReturnValue(4);
-
-        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME);
-
-        expect(result.type).toBe('attack_roll');
-        expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', '_DualWielder_UsedRound', 4, CAMPAIGN_NAME);
     });
 });

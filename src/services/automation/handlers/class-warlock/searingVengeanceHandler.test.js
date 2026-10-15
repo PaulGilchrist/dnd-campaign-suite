@@ -1,3 +1,18 @@
+// @maintained-by-ai
+// SEARING VENGEANCE HANDLE/SKIP LANE (quad file 3/4). Canonical home of:
+// - handle() routing: exhausted-uses popup, no-combat popup (the handle() twin —
+//   ConfirmPath owns the at-confirm one), 0 HP gate table (alive / dead-flagged /
+//   out-of-range each popup, no use consumed), modal-open payload shape.
+// - use consumption at confirm: searingvengeanceUses 1→0 pin. The '2d8+3'
+//   rollExpression pin here is use-consumption smoke only — ConfirmPath is the
+//   canonical CHA resolution table authority.
+// - blinded expiration fanout: full-args addExpiration pin (ConfirmPath pins
+//   counts only).
+// - skip/refusal flow: declined reaction — no heal, no damage, no roll, no use.
+// - range filtering keyed by target name (the heal lane owns the source-keyed
+//   caster-vs-healed-target gate).
+// Absorbed from the deleted NpcPath sibling: NPC heal-target + burst exclusion.
+// RAW self-inclusion (warlock themselves at 0 HP as heal target) stays here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -84,21 +99,17 @@ function makeAction(automation = {}) {
 }
 
 function mockRuntimeValues(values) {
-  useRuntimeState.getRuntimeValue.mockImplementation((_subject, key, _campaign) => {
+  useRuntimeState.getRuntimeValue.mockImplementation((_subject, key) => {
     if (key === 'searingvengeanceUses') return values.searingvengeanceUses;
-    if (key === 'targetEffects') return values.targetEffects;
-    if (key === 'currentHitPoints') return values.currentHitPoints;
-    if (key === 'hitPoints') return values.hitPoints;
+    if (key === 'currentHitPoints') return values.currentHitPoints ?? null;
     return null;
   });
 }
 
 function mockCreatureHp(creatureName, hp) {
-  useRuntimeState.getRuntimeValue.mockImplementation((_subject, key, _campaign) => {
+  useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
     if (key === 'searingvengeanceUses') return 1;
-    if (key === 'targetEffects') return [];
-    if (key === 'currentHitPoints' && _subject === creatureName) return hp;
-    if (key === 'hitPoints') return null;
+    if (key === 'currentHitPoints' && subject === creatureName) return hp;
     return null;
   });
 }
@@ -108,101 +119,87 @@ describe('searingVengeanceHandler.handle', () => {
     vi.clearAllMocks();
   });
 
-  describe('resource validation', () => {
-    it('returns a popup when uses have been exhausted', async () => {
-      mockRuntimeValues({ searingvengeanceUses: 0 });
+  it('returns a popup when uses have been exhausted', async () => {
+    mockRuntimeValues({ searingvengeanceUses: 0 });
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Searing Vengeance');
-      expect(result.payload.description).toContain('has no uses remaining');
-      expect(result.payload.description).toContain('Long Rest');
-      expect(result.payload.automation).toEqual(makeAction().automation);
-    });
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.name).toBe('Searing Vengeance');
+    expect(result.payload.description).toBe('Searing Vengeance has no uses remaining. Must finish a Long Rest to regain.');
+    expect(result.payload.automation).toEqual(makeAction().automation);
+    // exhausted-use popup short-circuits before any combat read
+    expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
   });
 
-  describe('combat context', () => {
-    it('returns a popup when no combat is active', async () => {
-      mockRuntimeValues({ searingvengeanceUses: 1 });
-      damageUtils.getCombatContext.mockResolvedValue(null);
+  it('returns a popup when no combat is active', async () => {
+    mockRuntimeValues({ searingvengeanceUses: 1 });
+    damageUtils.getCombatContext.mockResolvedValue(null);
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe('No combat active.');
-      expect(result.payload.automation).toEqual(makeAction().automation);
-    });
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.description).toBe('No combat active.');
+    expect(result.payload.automation).toEqual(makeAction().automation);
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
   describe('creature at 0 HP check', () => {
-    it('returns a popup when no creatures at 0 HP are available', async () => {
-      const scenarios = [
-        {
-          name: 'no creatures at 0 HP',
-          creatures: [
-            { name: 'Ally', type: 'player', currentHp: 10, maxHp: 50 },
-            { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 20 },
-          ],
-          mockHp: null,
-          rangeMock: true,
-        },
-        {
-          name: 'only creature at 0 HP is dead',
-          creatures: [
-            { name: 'Ally', type: 'player', currentHp: 0, maxHp: 50 },
-          ],
-          mockHp: 'Ally',
-          mockDead: true,
-          rangeMock: true,
-        },
-        {
-          name: 'all 0 HP creatures are out of range',
-          creatures: [
-            { name: 'Far Ally', type: 'player', currentHp: 0, maxHp: 50 },
-          ],
-          mockHp: 'Far Ally',
-          rangeMock: false,
-        },
-      ];
-
-      for (const scenario of scenarios) {
-        vi.clearAllMocks();
-
-        if (scenario.mockHp) {
-          mockCreatureHp(scenario.mockHp, 0);
-          if (scenario.mockDead) {
-            useRuntimeState.getRuntimeValue.mockImplementation((subject, key, _campaign) => {
-              if (key === 'searingvengeanceUses') return 1;
-              if (key === 'isDead' && subject === scenario.mockHp) return 1;
-              return null;
-            });
-          }
-        } else {
-          mockRuntimeValues({ searingvengeanceUses: 1 });
-        }
-
-        damageUtils.getCombatContext.mockResolvedValue({ creatures: scenario.creatures });
-
-        if (typeof scenario.rangeMock === 'boolean') {
-          rangeCheck.isWithinRange.mockResolvedValue(scenario.rangeMock);
-        }
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('No creatures within 60 feet are at 0 HP');
-      }
-    });
-
-    it('returns a modal when a creature at 0 HP is found', async () => {
-      mockCreatureHp('Ally', 0);
-      damageUtils.getCombatContext.mockResolvedValue({
+    it.each([
+      {
+        label: 'no creatures are at 0 HP',
+        creatures: [
+          { name: 'Ally', type: 'player', currentHp: 10, maxHp: 50 },
+          { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 20 },
+        ],
+        deadName: null,
+        runtimeHp: null,
+        inRange: true,
+      },
+      {
+        label: 'the only creature at 0 HP is dead',
         creatures: [
           { name: 'Ally', type: 'player', currentHp: 0, maxHp: 50 },
+        ],
+        deadName: 'Ally',
+        runtimeHp: null,
+        inRange: true,
+      },
+      {
+        label: 'all 0 HP creatures are out of range',
+        creatures: [
+          { name: 'Far Ally', type: 'player', currentHp: 0, maxHp: 50 },
+        ],
+        deadName: null,
+        runtimeHp: 0,
+        inRange: false,
+      },
+    ])('returns a popup when $label and consumes no use', async ({ creatures, deadName, runtimeHp, inRange }) => {
+      useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
+        if (key === 'searingvengeanceUses') return 1;
+        if (key === 'isDead') return subject === deadName ? 1 : null;
+        if (key === 'currentHitPoints') return runtimeHp;
+        return null;
+      });
+      damageUtils.getCombatContext.mockResolvedValue({ creatures });
+      rangeCheck.isWithinRange.mockResolvedValue(inRange);
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toBe('No creatures within 60 feet are at 0 HP.');
+      // routing popup must not consume the use or touch the board
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('returns a modal when a creature at 0 HP is found (NPC heal target, absorbed from NpcPath lane)', async () => {
+      mockRuntimeValues({ searingvengeanceUses: 1 });
+      damageUtils.getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'Ally', type: 'npc', currentHp: 0, maxHp: 50 },
           { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 20 },
         ],
       });
@@ -214,6 +211,7 @@ describe('searingVengeanceHandler.handle', () => {
       expect(result.modalName).toBe('searingVengeance');
       expect(result.payload.targetName).toBe('Ally');
       expect(result.payload.healAmount).toBe(25);
+      // healed NPC target excluded from its own burst
       expect(result.payload.creatureTargets).toEqual([
         { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 20 },
       ]);
@@ -269,7 +267,6 @@ describe('searingVengeanceHandler.handle', () => {
 
   describe('range filtering', () => {
     it('filters creatures by ally range and attack range', async () => {
-      vi.clearAllMocks();
       mockCreatureHp('Near Ally', 0);
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [
@@ -279,7 +276,7 @@ describe('searingVengeanceHandler.handle', () => {
           { name: 'Far Goblin', type: 'npc', currentHp: 10, maxHp: 30 },
         ],
       });
-      rangeCheck.isWithinRange.mockImplementation(async (source, target) => {
+      rangeCheck.isWithinRange.mockImplementation(async (_source, target) => {
         if (target === 'Near Ally') return true;
         if (target === 'Near Goblin') return true;
         return false;
@@ -341,6 +338,7 @@ describe('confirmSearingVengeance', () => {
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('12 radiant damage');
     expect(result.payload.description).toContain('regains 25 HP');
+    // use-consumption smoke — ConfirmPath owns the canonical CHA table pins
     expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d8+3');
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'TestWarlock',
@@ -349,6 +347,7 @@ describe('confirmSearingVengeance', () => {
       campaignName
     );
     expect(applyDamage.applyDamageToTarget).toHaveBeenCalled();
+    // quad-canonical full-args expiration pin (ConfirmPath pins counts only)
     expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestWarlock', targetName: 'Goblin', effects: [{ type: 'condition', condition: 'blinded' }], campaignName, rounds: 1 });
   });
 
@@ -400,8 +399,6 @@ describe('confirmSearingVengeance', () => {
   });
 
   it('declining (skip) heals nothing and consumes no use', async () => {
-    mockRuntimeValues({ searingvengeanceUses: 1 });
-
     const automation = {
       damageExpression: '2d8 + CHA modifier',
       damageType: 'Radiant',
@@ -422,10 +419,10 @@ describe('confirmSearingVengeance', () => {
     );
 
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('declined');
-    expect(result.payload.description).toContain('no use expended');
+    expect(result.payload.description).toBe('TestWarlock declined Searing Vengeance — no use expended.');
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+    expect(diceRoller.rollExpression).not.toHaveBeenCalled();
     expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
     expect(expirations.addExpiration).not.toHaveBeenCalled();
     expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({

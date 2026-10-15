@@ -4,6 +4,20 @@
 // was searched in specialActions only (it files under reactions at
 // casting_time '1 reaction') AND applyDamageToTarget was called un-awaited
 // (Promise.finalDamage === 0), so the CON save never armed.
+//
+// Lane ownership (bonusAttacksHandler trio):
+// - THIS file owns: heal-formula resolution (incl. no-row fallback), Hand of
+//   Harm automation lookup (specialActions/reactions/built-reactions branches),
+//   scaling/alsoInflicts on save outcome, awaited applyDamageToTarget reading,
+//   the hasFlurryHealingHarm feature gate, and is the SOLE writer pin of the
+//   runtime key 'flurryHealingHarmUses' decrement (single 7→6 and multi-strike
+//   2→1→0 order — absorbed from the main file's embedded
+//   describe('Flurry of Healing and Harm integration') so that block in
+//   bonusAttacksHandler.test.js can be dropped without losing coverage).
+// - cla143 sibling owns: unarmed-die selection (resolveFlurryWeaponStats) +
+//   rolled-vs-applied honesty. turnStartEffects pins the key's turn-start SET;
+//   this lane owns the in-flurry DECREMENT writes.
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../encounters/combatData.js', () => ({
@@ -129,6 +143,12 @@ function dispatchSaveResult(promptId, success) {
   window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId, success, roll: 5, total: 7 } }));
 }
 
+// The handler's save listener removes itself as its LAST act (after any
+// awaited harm application), so spying on removeEventListener gives every
+// save-outcome test an observable condition for vi.waitFor — no bare
+// setTimeout flushes, no unbounded waits.
+let removeListenerSpy;
+
 describe('CLA-144 Hand of Healing — numeric formula resolution', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -158,6 +178,28 @@ describe('CLA-144 Hand of Healing — numeric formula resolution', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith('Disciplined_Monk', 'flurryHealingHarmUses', 6, campaignName);
   });
 
+  // Absorbed from main bonusAttacksHandler.test.js integration block: the
+  // per-strike threading of the uses counter (2→1→0, never re-read) is
+  // pinned ONLY here — single-strike 7→6 above does not cover it.
+  it('decrements flurryHealingHarmUses for each healing strike (2→1→0)', async () => {
+    rollExpression.mockImplementation(f => (/^\d+d\d+ [+-] \d+$/.test(f) ? { total: 15, rolls: [8], modifier: 7 } : null));
+    usesCounter(2);
+
+    await applyFlurryOfBlows({
+      action: flurryAction, playerStats: makeMercyMonk(), campaignName,
+      _mapName: mapName, distribution: { 'Bandit 1': 2 }, numAttacks: 2, healingTarget: 'AasimarTest',
+    });
+
+    expect(applyHealingDirectly).toHaveBeenCalledTimes(2);
+    expect(applyHealingDirectly).toHaveBeenCalledWith(expect.any(Object), 'AasimarTest', 15, campaignName);
+    // Healing strikes never take the damage lane.
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    // The ONLY runtime writes are the threaded decrement, in strict order.
+    expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+    expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'Disciplined_Monk', 'flurryHealingHarmUses', 1, campaignName);
+    expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'Disciplined_Monk', 'flurryHealingHarmUses', 0, campaignName);
+  });
+
   it('falls back to the canonical numeric formula when no Hand of Healing row exists', async () => {
     rollExpression.mockImplementation(f => (/^\d+d\d+ [+-] \d+$/.test(f) ? { total: 15, rolls: [8], modifier: 7 } : null));
 
@@ -168,11 +210,31 @@ describe('CLA-144 Hand of Healing — numeric formula resolution', () => {
 
     expect(rollExpression).toHaveBeenCalledWith('1d12 + 7');
   });
+
+  // Absorbed from main bonusAttacksHandler.test.js integration block: the
+  // hasFlurryHealingHarm gate is pinned ONLY here. Counter readability must
+  // not matter — the gate is the specialActions row, not the uses value.
+  it('does not apply Flurry of Healing and Harm when player lacks the feature', async () => {
+    rollExpression.mockReturnValue({ total: 14, rolls: [9], modifier: 5 });
+
+    const result = await applyFlurryOfBlows({
+      action: flurryAction, playerStats: makeMercyMonk({ specialActions: [] }), campaignName,
+      _mapName: mapName, distribution: { 'Bandit 1': 1 }, numAttacks: 1, healingTarget: 'AasimarTest',
+    });
+
+    // Plain unarmed-strike damage lane only: no heal, no harm save, no uses writes.
+    expect(applyHealingDirectly).not.toHaveBeenCalled();
+    expect(createSaveListener).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('Disciplined_Monk', 'flurryHealingHarmUses', expect.any(Number), campaignName);
+    expect(result.handOfHarmSavePromises).toBeUndefined();
+    expect(applyDamageToTarget).toHaveBeenCalled();
+  });
 });
 
 describe('CLA-144 Hand of Harm — save arms from reactions lookup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    removeListenerSpy = vi.spyOn(window, 'removeEventListener');
     getCombatSummary.mockReturnValue(makeCombatSummary());
     getTargetFromAttacker.mockReturnValue({ name: 'Bandit 1' });
     rollD20.mockReturnValue(18);
@@ -212,7 +274,8 @@ describe('CLA-144 Hand of Harm — save arms from reactions lookup', () => {
     });
 
     dispatchSaveResult('p1', false);
-    await new Promise(r => setTimeout(r, 0));
+    // Listener removes itself after any awaited harm application completes.
+    await vi.waitFor(() => expect(removeListenerSpy).toHaveBeenCalledWith('save-result', expect.any(Function)));
 
     expect(rollExpression).toHaveBeenCalledWith('3d6');
     const harmApply = applyDamageToTarget.mock.calls.find(c => c[2] === 10);
@@ -238,7 +301,8 @@ describe('CLA-144 Hand of Harm — save arms from reactions lookup', () => {
     });
 
     dispatchSaveResult('p2', true);
-    await new Promise(r => setTimeout(r, 0));
+    // Success path does no async work — the self-removal flushes the listener.
+    await vi.waitFor(() => expect(removeListenerSpy).toHaveBeenCalledWith('save-result', expect.any(Function)));
 
     expect(rollExpression).not.toHaveBeenCalledWith('3d6');
     expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), campaignName);

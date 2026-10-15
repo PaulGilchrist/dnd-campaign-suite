@@ -1,11 +1,24 @@
+// @maintained-by-ai
+// Destructive Stride — applyTargetChoice lane (second of quad; siblings cover
+// handle / applyDamageTypeChoice / skipTargetChoice in their own files).
+// Deterministic handler-contract tests over stable seams: target validation
+// against the combat summary, the CLA-113 5-ft gate (isWithinRange) and the
+// once-per-turn-per-creature {round, targets} latch, the damage-execution seam
+// (1d<martialArtsDie> roll → applyDamageToTarget with lowercase type), the
+// players filter, proximity note composition (gridless + measured lanes), the
+// ability_use campaign log, and the automation_info popup consumed by
+// CharActionModals.jsx / CharSpecialActions.jsx modal dispatch.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { applyTargetChoice } from './destructiveStrideHandler.js';
 import * as combatData from '../../../encounters/combatData.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as applyDamage from '../../../rules/combat/applyDamage.js';
 import * as logService from '../../../ui/logService.js';
+import * as mapsService from '../../../maps/mapsService.js';
+import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 
 vi.mock('../../../encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(),
@@ -77,283 +90,131 @@ const combatSummaryWithTargets = {
     ],
 };
 
+// Standard successful-choice args; tests spread over these defaults.
+function strideArgs(overrides = {}) {
+    return {
+        action: makeAction(),
+        playerStats: makePlayerStats(),
+        campaignName,
+        targetName: 'Goblin',
+        chosenType: 'Fire',
+        martialArtsDie: 6,
+        ...overrides,
+    };
+}
+
+function latchRound(round, targets) {
+    runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key === '_Destructive_Stride_usedRound') return { round, targets };
+        return undefined;
+    });
+}
+
 describe('destructiveStrideHandler — applyTargetChoice', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        // clearAllMocks clears call history but keeps implementations — reset
+        // the latch reader to its undefined default so per-test routers never
+        // leak into later tests.
+        runtimeState.getRuntimeValue.mockImplementation(() => undefined);
     });
 
     describe('target validation', () => {
         it('returns null when combatSummary is null', async () => {
             combatData.getCombatSummary.mockReturnValue(null);
 
-            const result = await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Goblin',
-                    chosenType: 'Fire',
-                    martialArtsDie: 6,
-                });
+            const result = await applyTargetChoice(strideArgs());
 
             expect(result).toBeNull();
         });
 
-        it('returns null when target is not found in combatSummary', async () => {
+        it('returns null when target is not in combat (missing or empty name)', async () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
 
-            const result = await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'NonexistentCreature',
-                    chosenType: 'Fire',
-                    martialArtsDie: 6,
-                });
-
-            expect(result).toBeNull();
-        });
-
-        it('returns null for empty string targetName', async () => {
-            combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
-
-            const result = await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: '',
-                    chosenType: 'Fire',
-                    martialArtsDie: 6,
-                });
-
-            expect(result).toBeNull();
+            expect(await applyTargetChoice(strideArgs({ targetName: 'NonexistentCreature' }))).toBeNull();
+            expect(await applyTargetChoice(strideArgs({ targetName: '' }))).toBeNull();
         });
     });
 
     describe('successful target choice', () => {
-        it('rolls dice and returns popup with damage', async () => {
-            combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
-            diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
-
-            const result = await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Goblin',
-                    chosenType: 'Fire',
-                    martialArtsDie: 6,
-                });
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toBe('Goblin takes 4 Fire damage.');
-        });
-
-        it('uses martialArtsDie as damage when roll total is missing', async () => {
-            combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
-            diceRoller.rollExpression.mockReturnValue(null);
-
-            const result = await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Orc',
-                    chosenType: 'Cold',
-                    martialArtsDie: 6,
-                });
-
-            expect(result.payload.description).toBe('Orc takes 6 Cold damage.');
-        });
-
-        it('uses martialArtsDie when rollResult has no total', async () => {
-            combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
-            diceRoller.rollExpression.mockReturnValue({ rolls: [3] });
-
-            const result = await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Orc',
-                    chosenType: 'Cold',
-                    martialArtsDie: 6,
-                });
-
-            expect(result.payload.description).toBe('Orc takes 6 Cold damage.');
-        });
-
-        it('calls rollExpression with correct dice formula', async () => {
+        it('gates on 5 ft, rolls 1d<martialArtsDie>, and returns the full automation_info popup', async () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
 
-            await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Goblin',
-                    chosenType: 'Fire',
-                    martialArtsDie: 6,
-                });
+            const action = makeAction();
+            const result = await applyTargetChoice(strideArgs({ action }));
 
+            expect(rangeCheck.isWithinRange).toHaveBeenCalledWith('TestMonk', 'Goblin', 5);
             expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d6');
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Destructive Stride',
+                    automationType: 'destructive_stride',
+                    description: 'Goblin takes 5 Fire damage.',
+                    automation: action.automation,
+                },
+            });
         });
 
         it('calls applyDamageToTarget with correct parameters', async () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3] });
 
-            await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Goblin',
-                    chosenType: 'Thunder',
-                    martialArtsDie: 6,
-                });
+            await applyTargetChoice(strideArgs({ chosenType: 'Thunder' }));
 
             expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(combatSummaryWithTargets, 'Goblin', 3, ['thunder'], { campaignName, characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestMonk', suppressHpLog: false });
         });
 
-        it('passes damage type as lowercase array to applyDamageToTarget', async () => {
+        it('falls back to martialArtsDie in popup and log when the roll is unavailable', async () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
-            diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3] });
+            diceRoller.rollExpression.mockReturnValue(null);
 
-            await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Goblin',
-                    chosenType: 'Lightning',
-                    martialArtsDie: 6,
-                });
+            const result = await applyTargetChoice(strideArgs({ targetName: 'Orc', chosenType: 'Cold', martialArtsDie: 8 }));
 
-            const args = applyDamage.applyDamageToTarget.mock.calls[0];
-            expect(args[3]).toEqual(['lightning']);
-        });
-
-        it('passes player characters as characters array to applyDamageToTarget', async () => {
-            combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
-            diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3] });
-
-            await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Goblin',
-                    chosenType: 'Fire',
-                    martialArtsDie: 6,
-                });
-
-            const charactersArg = applyDamage.applyDamageToTarget.mock.calls[0][4].characters;
-            expect(charactersArg.length).toBe(1);
-            expect(charactersArg[0].name).toBe('TestMonk');
+            expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d8');
+            expect(result.payload.description).toBe('Orc takes 8 Cold damage.');
+            expect(logService.addEntry.mock.calls[0][1].description).toBe('Destructive Stride — Orc takes 8 Cold damage (1d8 roll: 8; gridless — GM-enforced 5 ft proximity).');
         });
     });
 
-    describe('popup payload structure', () => {
-        it('includes automation in popup payload', async () => {
-            combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
-            diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
-
-            const action = makeAction();
-            const result = await applyTargetChoice({
-                    action,
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Goblin',
-                    chosenType: 'Fire',
-                    martialArtsDie: 6,
-                });
-
-            expect(result.payload.automation).toEqual(action.automation);
-        });
-
-        it('includes automationType in popup payload', async () => {
-            combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
-            diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
-
-            const result = await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Goblin',
-                    chosenType: 'Fire',
-                    martialArtsDie: 6,
-                });
-
-            expect(result.payload.automationType).toBe('destructive_stride');
-        });
-
-        it('includes correct name in popup payload', async () => {
-            combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
-            diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
-
-            const result = await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Goblin',
-                    chosenType: 'Fire',
-                    martialArtsDie: 6,
-                });
-
-            expect(result.payload.name).toBe('Destructive Stride');
-        });
-    });
-
-    describe('logging', () => {
-        it('logs the ability use with target damage details', async () => {
+    describe('campaign logging', () => {
+        it('logs the ability use with full damage details (gridless proximity note)', async () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
             diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
 
-            await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Goblin',
-                    chosenType: 'Fire',
-                    martialArtsDie: 6,
-                });
+            await applyTargetChoice(strideArgs());
 
             expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'ability_use',
                 characterName: 'TestMonk',
                 abilityName: 'Destructive Stride',
                 targetName: 'Goblin',
-                description: expect.stringContaining('Goblin takes 4 Fire damage (1d6 roll: 4;'),
+                description: 'Destructive Stride — Goblin takes 4 Fire damage (1d6 roll: 4; gridless — GM-enforced 5 ft proximity).',
             }));
         });
 
-        it('logs the roll result in description', async () => {
+        it('records measured token distance in the log note when a map with positions is active', async () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
-            diceRoller.rollExpression.mockReturnValue({ total: 2, rolls: [2] });
+            diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
+            runtimeState.getRuntimeValue.mockImplementation((name) => {
+                if (name === '__campaign__') return campaignName;
+                if (name === '__map__') return 'Battlemap';
+                return undefined;
+            });
+            mapsService.loadMapData.mockResolvedValueOnce({
+                players: [
+                    { name: 'TestMonk', gridX: 0, gridY: 0 },
+                    { name: 'Goblin', gridX: 1, gridY: 0 },
+                ],
+            });
+            rangeValidation.getDistanceFeet.mockReturnValueOnce(5);
 
-            await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Orc',
-                    chosenType: 'Acid',
-                    martialArtsDie: 6,
-                });
+            const result = await applyTargetChoice(strideArgs());
 
-            const callArgs = logService.addEntry.mock.calls[0][1];
-            expect(callArgs.description).toContain('roll: 2');
-        });
-
-        it('uses martialArtsDie as roll value when rollResult is null', async () => {
-            combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
-            diceRoller.rollExpression.mockReturnValue(null);
-
-            await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Orc',
-                    chosenType: 'Cold',
-                    martialArtsDie: 6,
-                });
-
-            const callArgs = logService.addEntry.mock.calls[0][1];
-            expect(callArgs.description).toContain('roll: 6');
+            expect(logService.addEntry.mock.calls[0][1].description).toBe('Destructive Stride — Goblin takes 4 Fire damage (1d6 roll: 4; token distance 5 ft).');
+            expect(result.payload.description).toBe('Goblin takes 4 Fire damage.');
         });
 
         it('catches and logs errors from addEntry without throwing', async () => {
@@ -361,16 +222,9 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
 
             const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-            logService.addEntry.mockRejectedValue(new Error('log failure'));
+            logService.addEntry.mockRejectedValueOnce(new Error('log failure'));
 
-            const result = await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Goblin',
-                    chosenType: 'Fire',
-                    martialArtsDie: 6,
-                });
+            const result = await applyTargetChoice(strideArgs());
 
             expect(result.type).toBe('popup');
             expect(consoleErrorSpy).toHaveBeenCalled();
@@ -379,30 +233,16 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
     });
 
     describe('CLA-113: once-per-turn-per-creature latch + 5 ft gate', () => {
-        function latchRound(round, targets) {
-            runtimeState.getRuntimeValue.mockImplementation((name, key) => {
-                if (key === '_Destructive_Stride_usedRound') return { round, targets };
-                return undefined;
-            });
-        }
-
         it('refuses a second Destructive Stride hit on the SAME creature in the SAME round — zero damage', async () => {
             combatData.getCombatSummary.mockReturnValue({ ...combatSummaryWithTargets, round: 3 });
             latchRound(3, ['Goblin']);
 
-            const result = await applyTargetChoice({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                targetName: 'Goblin',
-                chosenType: 'Fire',
-                martialArtsDie: 6,
-            });
+            const result = await applyTargetChoice(strideArgs());
 
             expect(diceRoller.rollExpression).not.toHaveBeenCalled();
             expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('already taken Destructive Stride damage this turn');
+            expect(result.payload.description).toBe('Goblin has already taken Destructive Stride damage this turn — refused (once per turn per creature).');
             expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'automation',
                 automationType: 'destructive_stride_refused',
@@ -415,14 +255,7 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [7] });
             latchRound(3, ['Goblin']);
 
-            const result = await applyTargetChoice({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                targetName: 'Goblin',
-                chosenType: 'Fire',
-                martialArtsDie: 6,
-            });
+            const result = await applyTargetChoice(strideArgs());
 
             expect(applyDamage.applyDamageToTarget).toHaveBeenCalled();
             expect(result.payload.description).toBe('Goblin takes 7 Fire damage.');
@@ -435,14 +268,7 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
             latchRound(2, ['Goblin']);
 
-            await applyTargetChoice({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                targetName: 'Orc',
-                chosenType: 'Fire',
-                martialArtsDie: 6,
-            });
+            await applyTargetChoice(strideArgs({ targetName: 'Orc' }));
 
             expect(applyDamage.applyDamageToTarget).toHaveBeenCalled();
             const latchWrite = runtimeState.setRuntimeValue.mock.calls.find(a => a[1] === '_Destructive_Stride_usedRound');
@@ -451,41 +277,16 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
 
         it('refuses out-of-range targets (measured grid) — zero damage + refused log', async () => {
             combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
-            const { isWithinRange } = await import('../../../rules/combat/rangeCheck.js');
-            isWithinRange.mockResolvedValueOnce(false);
+            rangeCheck.isWithinRange.mockResolvedValueOnce(false);
 
-            const result = await applyTargetChoice({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                targetName: 'Goblin',
-                chosenType: 'Fire',
-                martialArtsDie: 6,
-            });
+            const result = await applyTargetChoice(strideArgs());
 
             expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
-            expect(result.payload.description).toContain('beyond 5 feet');
+            expect(result.payload.description).toBe('Goblin is beyond 5 feet — Destructive Stride refused (no damage).');
             expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 automationType: 'destructive_stride_refused',
                 automationDetail: 'out_of_range_5ft',
             }));
-        });
-
-        it('consults isWithinRange with the monk and 5 ft on the success lane', async () => {
-            combatData.getCombatSummary.mockReturnValue(combatSummaryWithTargets);
-            diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
-            const { isWithinRange } = await import('../../../rules/combat/rangeCheck.js');
-
-            await applyTargetChoice({
-                action: makeAction(),
-                playerStats: makePlayerStats(),
-                campaignName,
-                targetName: 'Goblin',
-                chosenType: 'Thunder',
-                martialArtsDie: 8,
-            });
-
-            expect(isWithinRange).toHaveBeenCalledWith('TestMonk', 'Goblin', 5);
         });
     });
 
@@ -500,14 +301,7 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             });
             diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3] });
 
-            await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Goblin',
-                    chosenType: 'Fire',
-                    martialArtsDie: 6,
-                });
+            await applyTargetChoice(strideArgs());
 
             const charactersArg = applyDamage.applyDamageToTarget.mock.calls[0][4].characters;
             expect(charactersArg.length).toBe(2);
@@ -523,14 +317,7 @@ describe('destructiveStrideHandler — applyTargetChoice', () => {
             });
             diceRoller.rollExpression.mockReturnValue({ total: 3, rolls: [3] });
 
-            await applyTargetChoice({
-                    action: makeAction(),
-                    playerStats: makePlayerStats(),
-                    campaignName,
-                    targetName: 'Goblin',
-                    chosenType: 'Fire',
-                    martialArtsDie: 6,
-                });
+            await applyTargetChoice(strideArgs());
 
             const charactersArg = applyDamage.applyDamageToTarget.mock.calls[0][4].characters;
             expect(charactersArg).toEqual([]);

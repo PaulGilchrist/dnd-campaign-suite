@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// handle() is a deterministic entry guard: one runtime read of
+// elementalEpitomeActive → automation_info popup (falsy) or destructiveStride
+// opener modal (truthy). No writes, no timers, stable contract.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './destructiveStrideHandler.js';
@@ -35,7 +39,7 @@ function makeAction(overrides = {}) {
     };
 }
 
-function setupRuntimeMocks(mocks) {
+function setupRuntimeMocks(mocks = {}) {
     runtimeState.getRuntimeValue.mockImplementation((player, prop, camp) => {
         const key = `${player}:${prop}:${camp}`;
         if (key in mocks) {
@@ -43,53 +47,42 @@ function setupRuntimeMocks(mocks) {
         }
         return undefined;
     });
+    runtimeState.setRuntimeValue.mockResolvedValue(undefined);
 }
 
 describe('destructiveStrideHandler — handle', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        setupRuntimeMocks();
     });
 
     describe('when Elemental Epitome is not active', () => {
-        it('returns a popup with info message when epitomeActive is false', async () => {
-            setupRuntimeMocks({
-                'TestMonk:elementalEpitomeActive:TestCampaign': false,
-            });
-
+        it('returns an automation_info popup with no runtime writes for every falsy epitomeActive state', async () => {
             const action = makeAction();
-            const result = await handle(action, makePlayerStats(), campaignName);
+            // undefined = never stored, null = cleared, false = explicitly off.
+            for (const epitomeActive of [undefined, null, false]) {
+                setupRuntimeMocks({
+                    'TestMonk:elementalEpitomeActive:TestCampaign': epitomeActive,
+                });
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Destructive Stride');
-            expect(result.payload.description).toBe('Elemental Epitome must be active to use Destructive Stride.');
-            expect(result.payload.automation).toEqual(action.automation);
+                const result = await handle(action, makePlayerStats(), campaignName);
+
+                expect(result.type).toBe('popup');
+                expect(result.payload).toEqual({
+                    type: 'automation_info',
+                    name: 'Destructive Stride',
+                    automationType: 'destructive_stride',
+                    description: 'Elemental Epitome must be active to use Destructive Stride.',
+                    automation: action.automation,
+                });
+            }
+            expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
+                'TestMonk', 'elementalEpitomeActive', campaignName,
+            );
             expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('returns a popup when epitomeActive is undefined', async () => {
-            setupRuntimeMocks({});
-
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('Elemental Epitome must be active to use Destructive Stride.');
-        });
-
-        it('returns a popup when epitomeActive is null', async () => {
-            setupRuntimeMocks({
-                'TestMonk:elementalEpitomeActive:TestCampaign': null,
-            });
-
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toBe('Elemental Epitome must be active to use Destructive Stride.');
-        });
-
-        it('passes through action properties in payload', async () => {
+        it('echoes the action name and automation through the popup payload instead of hardcoding them', async () => {
             setupRuntimeMocks({
                 'TestMonk:elementalEpitomeActive:TestCampaign': false,
             });
@@ -100,39 +93,36 @@ describe('destructiveStrideHandler — handle', () => {
             });
             const result = await handle(action, makePlayerStats(), campaignName);
 
+            expect(result.type).toBe('popup');
             expect(result.payload.name).toBe('Custom Destructive Stride');
-            expect(result.payload.automation).toEqual({ type: 'destructive_stride', variant: 'fire' });
+            expect(result.payload.automation).toBe(action.automation);
             expect(result.payload.automationType).toBe('destructive_stride');
         });
     });
 
     describe('when Elemental Epitome is active', () => {
-        it('returns a modal for destructiveStride when epitomeActive is true', async () => {
+        it('opens the destructiveStride modal with the exact pass-through payload and no runtime writes', async () => {
             setupRuntimeMocks({
                 'TestMonk:elementalEpitomeActive:TestCampaign': true,
             });
 
             const action = makeAction();
-            const result = await handle(action, makePlayerStats(), campaignName);
+            // handle() only reads playerStats.name — full and minimal stats
+            // must both open the same modal with identical structure.
+            for (const playerStats of [makePlayerStats(), { name: 'TestMonk' }]) {
+                const result = await handle(action, playerStats, campaignName);
 
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('destructiveStride');
-            expect(result.payload.action).toBe(action);
-            expect(result.payload.playerStats).toBeDefined();
-            expect(result.payload.campaignName).toBe(campaignName);
-        });
-
-        it('works with epitomeActive set to true even with minimal playerStats', async () => {
-            setupRuntimeMocks({
-                'TestMonk:elementalEpitomeActive:TestCampaign': true,
-            });
-
-            const minimalStats = { name: 'TestMonk' };
-            const action = makeAction();
-            const result = await handle(action, minimalStats, campaignName);
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('destructiveStride');
+                expect(result.type).toBe('modal');
+                expect(result.modalName).toBe('destructiveStride');
+                expect(result.payload.action).toBe(action);
+                expect(result.payload.playerStats).toBe(playerStats);
+                expect(result.payload.campaignName).toBe(campaignName);
+            }
+            expect(runtimeState.getRuntimeValue).toHaveBeenCalledTimes(2);
+            expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
+                'TestMonk', 'elementalEpitomeActive', campaignName,
+            );
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         });
     });
 });

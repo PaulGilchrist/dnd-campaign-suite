@@ -1,5 +1,10 @@
 // CLA-143: Flurry of Blows unarmed_strike rows must roll the Unarmed Strike
 // die, not attacks[0] (staff-first sheets rolled 1d6 instead of lv20 1d12).
+// Lane: resolveFlurryWeaponStats die selection (both call sites — handle modal
+// and applyFlurryOfBlows recompute) + the CLA-143 rolled-total honesty in
+// buildFlurryAbilityDesc. Healing/Harm lanes live in the cla144 sibling;
+// generic handle/apply mechanics in the main bonusAttacksHandler.test.js.
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../encounters/combatData.js', () => ({
@@ -117,27 +122,28 @@ describe('CLA-143 resolveFlurryWeaponStats — unarmed_strike die', () => {
     expect(damageLogs[0][1].formula).toBe('1d12+5');
   });
 
+  it('name-matches Unarmed Strike rows when weaponType is absent, before attacks[0]', async () => {
+    const monk = makeStaffFirstMonk();
+    monk.attacks = monk.attacks.map(a => (a.name === 'Unarmed Strike' ? { ...a, weaponType: undefined } : a));
+    const result = await handle(flurryAction, monk, campaignName, mapName);
+    expect(result.payload.damageFormula).toBe('1d12+5');
+    expect(result.payload.attackBonus).toBe(11);
+  });
+
   it('falls back to attacks[0] when no unarmed entry exists', async () => {
     const noUnarmed = { ...makeStaffFirstMonk(), attacks: [makeStaffFirstMonk().attacks[0]] };
     const result = await handle(flurryAction, noUnarmed, campaignName, mapName);
     expect(result.payload.damageFormula).toBe('1d6+5');
   });
 
-  it('attackType-less rows keep attacks[0] behavior byte-identical', async () => {
+  it('non-unarmed_strike rows (no attackType, disengage_dodge) keep attacks[0] behavior byte-identical', async () => {
     const noType = { name: 'Some Flurry', automation: { type: 'bonus_attacks', attacks: 2 } };
     const result = await handle(noType, makeStaffFirstMonk(), campaignName, mapName);
     expect(result.payload.damageFormula).toBe('1d6+5');
-    await applyFlurryOfBlows({
-      action: noType, playerStats: makeStaffFirstMonk(), campaignName,
-      _mapName: mapName, distribution: { 'Bandit 1': 1 }, numAttacks: 1,
-    });
-    expect(rollExpression).toHaveBeenCalledWith('1d6+5');
-  });
 
-  it('disengage_dodge rows keep attacks[0] behavior byte-identical', async () => {
     const pd = { name: 'Patient Defense', automation: { type: 'bonus_attacks', attacks: 2, attackType: 'disengage_dodge' } };
-    const result = await handle(pd, makeStaffFirstMonk(), campaignName, mapName);
-    expect(result.payload.damageFormula).toBe('1d6+5');
+    const pdResult = await handle(pd, makeStaffFirstMonk(), campaignName, mapName);
+    expect(pdResult.payload.damageFormula).toBe('1d6+5');
   });
 
   it('ability_use ledger reports rolled totals honestly when applied death-clamps to 0', async () => {

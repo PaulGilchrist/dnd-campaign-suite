@@ -1,3 +1,24 @@
+// @maintained-by-ai: 2026-10-15
+// damageTypeModifierHandler — deterministic contract pins for the
+// damage_type_modifier (Empowered Strikes, 2024) automation lane.
+//
+// Liveness (verified 2026-10-15):
+// - handle: LIVE — registered as HANDLER_MAP.damage_type_modifier
+//   (automation/index.js) and dispatched via executeHandler from the
+//   CharActions / CharSpecialActions / useCharActionsAutomation rows.
+//   NOTE: its modal branch (modalName 'damageTypeModifier') has no entry in
+//   modalMap / MODAL_DISPATCH / CHOICE_MODAL_EVENTS, so every dispatcher
+//   silently drops it (CLA-384 pattern). Pinned here as the handler's own
+//   contract; the dropped-chooser wiring is reported, not fixed in tests.
+// - applyDamageTypeChoice: NO production caller — the live apply lane is the
+//   inline useModalHandlers.handleDamageTypeModifierChoice (covered by
+//   useModalHandlers-damage.test.js). This export is nonetheless the SOLE
+//   writer of the `empoweredStrikesDamageType` runtime key that
+//   attackRollPostDamage.applyDamageTypeModifiers reads, so the exact runtime
+//   bridge stays pinned; popup/log string plumbing of this dormant export is
+//   kept to one verbatim pin each, and its duplicate addEntry-reject guard
+//   (same .catch idiom as handle) was removed.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import * as combatData from '../../../../services/encounters/combatData.js';
@@ -49,7 +70,7 @@ describe('damageTypeModifierHandler', () => {
     combatData.setCombatSummaryCache(null, campaignName);
   });
 
-  describe('handle', () => {
+  describe('handle (live executeHandler lane)', () => {
     it('returns modal with action, playerStats, and campaignName when options are present', async () => {
       const action = makeAction({
         options: [
@@ -110,13 +131,13 @@ describe('damageTypeModifierHandler', () => {
     it('does not throw when addEntry rejects', async () => {
       const action = makeAction({ options: [] });
       const ps = makePlayerStats();
-      logService.addEntry.mockRejectedValue(new Error('network'));
+      logService.addEntry.mockRejectedValueOnce(new Error('network'));
 
       await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();
     });
   });
 
-  describe('applyDamageTypeChoice', () => {
+  describe('applyDamageTypeChoice (dormant export — sole writer of the empoweredStrikesDamageType bridge key)', () => {
     it('returns null and makes no side effects when chosen option is not found', async () => {
       const action = makeAction({
         options: [
@@ -133,33 +154,48 @@ describe('damageTypeModifierHandler', () => {
       expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
-    it('returns popup with correct structure and description for valid option', async () => {
-      const action = makeAction({
-        options: [{ name: 'Thunder', damageType: 'Thunder' }],
-      });
-      const ps = makePlayerStats();
+    it('writes the pipeline bridge keys verbatim — empoweredStrikesDamageType plus _Empowered_Strikes_usedRound from the round cache, defaulting to 1', async () => {
+      const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
+      const ps = makePlayerStats({ name: 'RogueNine' });
+      const otherCampaign = 'OtherCampaign';
 
-      const result = await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
+      combatData.setCombatSummaryCache({ round: 5 }, otherCampaign);
 
-      expect(result).not.toBeNull();
-      expect(result.type).toBe('popup');
-      expect(result.payload).toEqual({
-        type: 'automation_info',
-        name: 'Empowered Strikes',
-        automationType: 'damage_type_modifier',
-        description: 'Damage type set to Thunder for your next Unarmed Strike.',
-        automation: { type: 'damage_type_modifier', options: [{ name: 'Thunder', damageType: 'Thunder' }] },
-      });
+      await applyDamageTypeChoice(action, ps, otherCampaign, 'Thunder');
+
+      // attackRollPostDamage reads exactly these keys — pin them verbatim.
+      expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+        ['RogueNine', 'empoweredStrikesDamageType', 'Thunder', otherCampaign],
+        ['RogueNine', '_Empowered_Strikes_usedRound', 5, otherCampaign],
+      ]);
+
+      vi.clearAllMocks();
+      combatData.setCombatSummaryCache(null, otherCampaign);
+
+      await applyDamageTypeChoice(action, ps, otherCampaign, 'Thunder');
+
+      expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+        ['RogueNine', 'empoweredStrikesDamageType', 'Thunder', otherCampaign],
+        ['RogueNine', '_Empowered_Strikes_usedRound', 1, otherCampaign],
+      ]);
     });
 
-    it('logs ability_use with chosen damage type in description', async () => {
-      const action = makeAction({
-        options: [{ name: 'Lightning', damageType: 'Lightning' }],
-      });
+    it('returns the automation_info popup verbatim and logs the chosen damage type', async () => {
+      const action = makeAction({ options: [{ name: 'Lightning', damageType: 'Lightning' }] });
       const ps = makePlayerStats();
 
-      await applyDamageTypeChoice(action, ps, campaignName, 'Lightning');
+      const result = await applyDamageTypeChoice(action, ps, campaignName, 'Lightning');
 
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Empowered Strikes',
+          automationType: 'damage_type_modifier',
+          description: 'Damage type set to Lightning for your next Unarmed Strike.',
+          automation: { type: 'damage_type_modifier', options: [{ name: 'Lightning', damageType: 'Lightning' }] },
+        },
+      });
       expect(logService.addEntry).toHaveBeenCalledWith(
         campaignName,
         expect.objectContaining({
@@ -169,55 +205,6 @@ describe('damageTypeModifierHandler', () => {
           description: 'Empowered Strikes — damage type set to Lightning',
         }),
       );
-    });
-
-    it('calls setRuntimeValue with playerStats name and campaignName for valid choice', async () => {
-      const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
-      const ps = makePlayerStats({ name: 'RogueNine' });
-
-      await applyDamageTypeChoice(action, ps, 'OtherCampaign', 'Thunder');
-
-      const calls = useRuntimeState.setRuntimeValue.mock.calls;
-      expect(calls.length).toBe(2);
-      expect(calls[0][0]).toBe('RogueNine');
-      expect(calls[0][3]).toBe('OtherCampaign');
-      expect(calls[1][0]).toBe('RogueNine');
-      expect(calls[1][3]).toBe('OtherCampaign');
-    });
-
-    it('uses current combat round from cache, defaulting to 1', async () => {
-      const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
-      const ps = makePlayerStats();
-
-      combatData.setCombatSummaryCache({ round: 5 }, campaignName);
-
-      await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
-
-      const usedRoundCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        c => c[1].includes('usedRound'),
-      );
-      expect(usedRoundCall[2]).toBe(5);
-
-      vi.clearAllMocks();
-      combatData.setCombatSummaryCache(null, campaignName);
-
-      await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
-
-      const defaultCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        c => c[1].includes('usedRound'),
-      );
-      expect(defaultCall[2]).toBe(1);
-    });
-
-    it('does not throw when addEntry rejects after successful choice', async () => {
-      const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
-      const ps = makePlayerStats();
-      logService.addEntry.mockRejectedValue(new Error('network'));
-
-      const result = await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
-
-      expect(result).not.toBeNull();
-      expect(result.type).toBe('popup');
     });
   });
 });

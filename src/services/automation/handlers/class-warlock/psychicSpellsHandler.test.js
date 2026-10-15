@@ -1,4 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @maintained-by-ai
+// Deterministic handler-contract suite for the psychic_spells popup handler: pins the
+// owned _<FeatureName>_damageType runtime key (exact-key pins, incl. the empty-name
+// '__damageType' seam), the throws-on-undefined-name contract (this handler does NOT
+// default its name, unlike siblings such as mistyWanderer), the skip-when-already-set
+// no-side-effect guard, full-string own popup/log composition, and campaign logging.
+// All dependencies mocked at the module boundary. Only churns if handler behaviour
+// changes on purpose.
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { isPsychicSpellsActive, getPsychicSpellsConfig, handle } from './psychicSpellsHandler.js';
 
@@ -20,10 +28,7 @@ const playerName = 'TestWarlock';
 function makePlayerStats(overrides = {}) {
     return {
         name: playerName,
-        automation: {
-            passives: [],
-            ...overrides,
-        },
+        automation: { passives: [] },
         ...overrides,
     };
 }
@@ -43,10 +48,7 @@ function makeFeature(overrides = {}) {
 
 beforeEach(() => {
     vi.clearAllMocks();
-});
-
-afterEach(() => {
-    vi.restoreAllMocks();
+    setRuntimeValue.mockImplementation(async () => {});
 });
 
 describe('psychicSpellsHandler', () => {
@@ -104,13 +106,14 @@ describe('psychicSpellsHandler', () => {
     });
 
     describe('handle', () => {
-        it('should set runtime damageType when not already set', async () => {
+        it('should set runtime damageType under the exact _Psychic_Spells_damageType key when not already set', async () => {
             getRuntimeValue.mockReturnValue(null);
             const action = makeFeature();
-            const playerStats = makePlayerStats({ automation: { passives: [] } });
+            const playerStats = makePlayerStats();
 
             await handle(action, playerStats, campaignName);
 
+            expect(getRuntimeValue).toHaveBeenCalledWith(playerName, '_Psychic_Spells_damageType', campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
                 '_Psychic_Spells_damageType',
@@ -119,12 +122,12 @@ describe('psychicSpellsHandler', () => {
             );
         });
 
-        it('should use custom damageType from automation config', async () => {
+        it('should use custom damageType from automation config for runtime write and popup', async () => {
             getRuntimeValue.mockReturnValue(null);
             const action = makeFeature({ automation: { damageType: 'Force' } });
-            const playerStats = makePlayerStats({ automation: { passives: [] } });
+            const playerStats = makePlayerStats();
 
-            await handle(action, playerStats, campaignName);
+            const result = await handle(action, playerStats, campaignName);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
@@ -132,77 +135,71 @@ describe('psychicSpellsHandler', () => {
                 'Force',
                 campaignName
             );
+            expect(result.payload.description).toBe(
+                'Psychic Spells: When you cast a Warlock spell that deals damage, you can change its damage type to Force. When you cast a Warlock spell that is an Enchantment or Illusion, you can do so without Verbal or Somatic components.'
+            );
         });
 
-        it('should skip setting runtime damageType when already set', async () => {
+        it('should skip setting runtime damageType when already set (no-side-effect guard)', async () => {
             getRuntimeValue.mockReturnValue('Force');
             const action = makeFeature();
-            const playerStats = makePlayerStats({ automation: { passives: [] } });
+            const playerStats = makePlayerStats();
 
-            await handle(action, playerStats, campaignName);
+            const result = await handle(action, playerStats, campaignName);
 
             expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(result.type).toBe('popup');
         });
 
-        it('should return a popup response with feature description', async () => {
+        it('should return a popup response with full feature description and automation echo', async () => {
             getRuntimeValue.mockReturnValue(null);
             const action = makeFeature();
-            const playerStats = makePlayerStats({ automation: { passives: [] } });
+            const playerStats = makePlayerStats();
 
             const result = await handle(action, playerStats, campaignName);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Psychic Spells');
-            expect(result.payload.description).toContain('Psychic');
-            expect(result.payload.description).toContain('Enchantment');
-            expect(result.payload.description).toContain('Illusion');
-            expect(result.payload.description).toContain('Verbal');
-            expect(result.payload.description).toContain('Somatic');
-            expect(result.payload.automation).toEqual(action.automation);
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Psychic Spells',
+                    description: 'Psychic Spells: When you cast a Warlock spell that deals damage, you can change its damage type to Psychic. When you cast a Warlock spell that is an Enchantment or Illusion, you can do so without Verbal or Somatic components.',
+                    automation: action.automation,
+                },
+            });
         });
 
-        it('should return a popup with custom damageType', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const action = makeFeature({ automation: { damageType: 'Force' } });
-            const playerStats = makePlayerStats({ automation: { passives: [] } });
-
-            const result = await handle(action, playerStats, campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Force');
-        });
-
-        it('should log an ability_use entry to the campaign log', async () => {
+        it('should log an ability_use entry with full description to the campaign log', async () => {
             getRuntimeValue.mockReturnValue(null);
             const action = makeFeature();
-            const playerStats = makePlayerStats({ automation: { passives: [] } });
+            const playerStats = makePlayerStats();
 
             await handle(action, playerStats, campaignName);
 
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            expect(addEntry).toHaveBeenCalledWith(campaignName, {
                 type: 'ability_use',
                 characterName: playerName,
                 abilityName: 'Psychic Spells',
-                description: expect.stringContaining('Psychic'),
-            }));
+                description: 'Psychic Spells: Damage type can be changed to Psychic for Warlock spells that deal damage. Enchantment and Illusion Warlock spells require no Verbal or Somatic components.',
+            });
         });
 
-        it('should throw when action.name is undefined', async () => {
+        it('should throw when action.name is undefined (no default name in this handler)', async () => {
             getRuntimeValue.mockReturnValue(null);
             const action = makeFeature({ name: undefined });
-            const playerStats = makePlayerStats({ automation: { passives: [] } });
+            const playerStats = makePlayerStats();
 
-            await expect(handle(action, playerStats, campaignName)).rejects.toThrow();
+            await expect(handle(action, playerStats, campaignName)).rejects.toThrow(TypeError);
         });
 
-        it('should handle action with empty name', async () => {
+        it('should derive the __damageType runtime key and empty popup name for an empty action name', async () => {
             getRuntimeValue.mockReturnValue(null);
             const action = makeFeature({ name: '' });
-            const playerStats = makePlayerStats({ automation: { passives: [] } });
+            const playerStats = makePlayerStats();
 
             const result = await handle(action, playerStats, campaignName);
 
+            expect(setRuntimeValue).toHaveBeenCalledWith(playerName, '__damageType', 'Psychic', campaignName);
             expect(result.payload.name).toBe('');
         });
     });

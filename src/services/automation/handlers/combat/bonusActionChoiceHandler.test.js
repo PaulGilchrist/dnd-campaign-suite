@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Canonical lane for bonusActionChoiceHandler (Cunning Action via bonus_action_choice,
+// PLUS the live apply-side for Fast Hands: fastHandsHandler.handle opens the shared
+// bonusActionChoice modal whose Apply calls applyBonusActionChoice — applyFastHands has
+// no production caller). Exact-string popup pins, CLA-067 mechanical grants, exact latch
+// keys (latch internals owned by oncePerTurn.test.js — here only the handler seam), and
+// the registry dispatch pin. Data-in/data-out over mocked seams; no timers, no DOM churn.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -17,11 +24,26 @@ vi.mock('../../../ui/logService.js', () => ({
 
 vi.mock('../../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
+    // Full barrel export surface — needed so modules in the automation/index.js
+    // graph (spiritualWeaponService, navigationHandlers, dominateHandler, …) can
+    // link when the router registry is imported. Inert in this lane.
+    KEY: 'pendingExpirations',
+    applyTurnStartEffects: vi.fn(),
+    processExpirationList: vi.fn(),
+    expireForCreature: vi.fn(),
+    expireForTarget: vi.fn(),
+    clearExpirationEffects: vi.fn(),
+    expireStaleEffects: vi.fn(),
+    clearAllExpirationEffects: vi.fn(),
+    applyAuraDamage: vi.fn(),
+    applyHolyNimbusDamage: vi.fn(),
+    applyTurnEndConditionRemoval: vi.fn(),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle, applyBonusActionChoice } from './bonusActionChoiceHandler.js';
+import { executeHandler } from '../../index.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as logService from '../../../ui/logService.js';
@@ -30,6 +52,18 @@ import * as expirations from '../../../rules/effects/expirations.js';
 // ── Helpers ────────────────────────────────────────────────────
 
 const campaignName = 'TestCampaign';
+
+// Order-independent mock defaults for EVERY test: vi.clearAllMocks() resets
+// calls but NOT implementations, so stale getRuntimeValue returns from the
+// once-per-turn tests would otherwise leak into later describes (found when
+// a pass-through test was removed and the leak surfaced in grantDisengage).
+beforeEach(() => {
+    vi.clearAllMocks();
+    useRuntimeState.getRuntimeValue.mockReturnValue(null);
+    useRuntimeState.setRuntimeValue.mockResolvedValue(undefined);
+    damageUtils.getCombatContext.mockResolvedValue({ round: 1, activeCreatureName: 'TestRogue' });
+    logService.addEntry.mockResolvedValue(undefined);
+});
 
 function makePlayerStats(overrides = {}) {
     return {
@@ -73,10 +107,6 @@ function makeFastHandsAction(automation = {}) {
 // ── handle: options flow ───────────────────────────────────────
 
 describe('bonusActionChoiceHandler.handle — options flow', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
     it('returns modal with action and options when options are available', async () => {
         const ps = makePlayerStats();
         const action = makeAction();
@@ -121,9 +151,6 @@ describe('bonusActionChoiceHandler.handle — options flow', () => {
 // ── handle: once-per-turn flow ─────────────────────────────────
 
 describe('bonusActionChoiceHandler.handle — once-per-turn', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
 
     it('returns info popup when oncePerTurn is true and already used this round', async () => {
         const ps = makePlayerStats();
@@ -155,35 +182,17 @@ describe('bonusActionChoiceHandler.handle — once-per-turn', () => {
         expect(result.modalName).toBe('bonusActionChoice');
     });
 
-    it('proceeds to modal when oncePerTurn is true but no stored value exists', async () => {
-        const ps = makePlayerStats();
-        const action = makeAction({ oncePerTurn: true });
-        damageUtils.getCombatContext.mockResolvedValue({ round: 1, activeCreatureName: 'TestRogue' });
-        useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-        const result = await handle(action, ps, campaignName);
-
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('bonusActionChoice');
-    });
-
-    it('proceeds to modal when oncePerTurn is false', async () => {
-        const ps = makePlayerStats();
-        const action = makeAction({ oncePerTurn: false });
-
-        const result = await handle(action, ps, campaignName);
-
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('bonusActionChoice');
-    });
+    // Dedup notes (test-suite trim 2026-10):
+    // - 'oncePerTurn true, no stored value' pass-through removed: same handler seam
+    //   as the retained new-round re-arm case above (checkOncePerTurn null → modal);
+    //   the no-stored-value null path is owned by oncePerTurn.test.js.
+    // - 'oncePerTurn false → modal' removed: same falsy branch already exercised
+    //   by the options-flow modal test (makeAction has no oncePerTurn key).
 });
 
 // ── handle: missing automation ─────────────────────────────────
 
 describe('bonusActionChoiceHandler.handle — missing automation', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
 
     it('throws when action.automation is undefined', async () => {
         const ps = makePlayerStats();
@@ -198,9 +207,6 @@ describe('bonusActionChoiceHandler.handle — missing automation', () => {
 // ── applyBonusActionChoice: known options ──────────────────────
 
 describe('applyBonusActionChoice — known options', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
 
     it.each([
         { action: makeAction(), option: 'Dash', expected: 'Dash selected: You take the Dash bonus action. Speed doubled 30 → 60 ft until the end of the turn.' },
@@ -244,9 +250,6 @@ describe('applyBonusActionChoice — known options', () => {
 // ── applyBonusActionChoice: unknown option ─────────────────────
 
 describe('applyBonusActionChoice — unknown option', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
 
     it.each([
         { action: makeAction(), option: 'Foo', expected: 'Unknown option: Foo' },
@@ -260,14 +263,27 @@ describe('applyBonusActionChoice — unknown option', () => {
 
         expect(result.payload.description).toBe(expected);
     });
+
+    it('falls back to action-name composition for custom options with no special grant', async () => {
+        const ps = makePlayerStats();
+        const action = {
+            name: 'Homebrew Tweak',
+            automation: {
+                type: 'bonus_action_choice',
+                options: [{ name: 'Flip Coin', description: 'Flip a coin.' }],
+            },
+        };
+
+        const result = await applyBonusActionChoice(action, ps, campaignName, 'Flip Coin');
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toBe('Flip Coin selected: Homebrew Tweak: Flip a coin.');
+    });
 });
 
 // ── applyBonusActionChoice: once-per-turn tracking ─────────────
 
 describe('applyBonusActionChoice — once-per-turn tracking', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
 
     it('tracks once-per-turn usage with Cunning Action key when set', async () => {
         const ps = makePlayerStats();
@@ -318,10 +334,6 @@ describe('applyBonusActionChoice — once-per-turn tracking', () => {
 // ── applyBonusActionChoice: CLA-067 mechanical grants ──────────
 
 describe('applyBonusActionChoice — CLA-067 mechanical grants', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        useRuntimeState.getRuntimeValue.mockReturnValue(null);
-    });
 
     it('Dash stamps a speed_boost buff doubling speed and a single expiry clock', async () => {
         const ps = makePlayerStats({ speed: 40 });
@@ -444,9 +456,6 @@ describe('applyBonusActionChoice — CLA-067 mechanical grants', () => {
 // ── applyBonusActionChoice: campaign logging ───────────────────
 
 describe('applyBonusActionChoice — campaign logging', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
 
     it('logs campaign entry for Cunning Action Dash', async () => {
         const ps = makePlayerStats();
@@ -474,21 +483,21 @@ describe('applyBonusActionChoice — campaign logging', () => {
 
     it('returns popup even when addEntry rejects', async () => {
         const ps = makePlayerStats();
-        logService.addEntry.mockRejectedValue(new Error('log failed'));
+        logService.addEntry.mockRejectedValueOnce(new Error('log failed'));
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
         const result = await applyBonusActionChoice(makeAction(), ps, campaignName, 'Dash');
 
         expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('Dash selected');
+        expect(errorSpy).toHaveBeenCalled();
+        errorSpy.mockRestore();
     });
 });
 
 // ── applyBonusActionChoice: missing automation ─────────────────
 
 describe('applyBonusActionChoice — missing automation', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
 
     it('throws when automation is null or undefined', async () => {
         const ps = makePlayerStats();
@@ -500,5 +509,28 @@ describe('applyBonusActionChoice — missing automation', () => {
         await expect(applyBonusActionChoice({ name: 'Cunning Action' }, ps, campaignName, 'Dash')).rejects.toThrow(
             "Cannot read properties of undefined (reading 'options')",
         );
+    });
+});
+
+// ── registry routing ─────────────────────────────────────────────
+// Sole pin that HANDLER_MAP routes bonus_action_choice through this
+// handler (inherited from cla-067-cunning-action.test.js, superseded).
+
+describe('executeHandler — bonus_action_choice dispatch', () => {
+
+    it('routes bonus_action_choice to the modal envelope with action and options', async () => {
+        const ps = makePlayerStats();
+        const action = makeAction();
+
+        const result = await executeHandler(action, ps, campaignName, null, [ps]);
+
+        expect(result).toEqual({
+            type: 'modal',
+            modalName: 'bonusActionChoice',
+            payload: {
+                action,
+                options: action.automation.options,
+            },
+        });
     });
 });

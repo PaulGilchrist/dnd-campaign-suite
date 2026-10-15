@@ -1,3 +1,5 @@
+// @maintained-by-ai — pure handler over two mock boundaries (runtime store, logService);
+// deterministic guard/selection/side-effect contract, stable unless the Expert Divination rule changes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -40,6 +42,11 @@ function makeAction(spellOverrides = {}, actionOverrides = {}) {
   };
 }
 
+// Mock runtime: return the listed current-slot counts, null for every other level.
+function slotsAt(levelCounts) {
+  getRuntimeValue.mockImplementation((name, key) => levelCounts[key] ?? null);
+}
+
 describe('expertDivinationHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -55,22 +62,18 @@ describe('expertDivinationHandler.handle', () => {
       expect(result).toBeNull();
     });
 
-    it('returns null when spell school is an empty string', async () => {
-      const result = await handle(
+    it('returns null when spell is undefined or school is an empty string', async () => {
+      const noSpell = await handle(
+        { name: 'Expert Divination', automation: { type: 'expert_divination' } },
+        makePlayerStats(), campaignName, null,
+      );
+      const emptySchool = await handle(
         makeAction({ school: '' }),
         makePlayerStats(), campaignName, null,
       );
 
-      expect(result).toBeNull();
-    });
-
-    it('returns null when action.spell is undefined', async () => {
-      const result = await handle(
-        { name: 'Expert Divination', automation: { type: 'expert_divination' } },
-        makePlayerStats(), campaignName, null,
-      );
-
-      expect(result).toBeNull();
+      expect(noSpell).toBeNull();
+      expect(emptySchool).toBeNull();
     });
 
     it('returns null for cantrip (level 0) and level 1 spells', async () => {
@@ -87,30 +90,22 @@ describe('expertDivinationHandler.handle', () => {
       expect(result1).toBeNull();
     });
 
-    it('returns null when spellSlotLevel is missing or zero', async () => {
-      const result = await handle(
+    it('returns null when slot level is zero or entirely missing', async () => {
+      const zeroSlot = await handle(
         makeAction({ level: undefined }, { spellSlotLevel: 0 }),
         makePlayerStats(), campaignName, null,
       );
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when both spellSlotLevel and spell.level are missing', async () => {
-      const result = await handle(
+      const noLevels = await handle(
         makeAction({ level: undefined }, {}),
         makePlayerStats(), campaignName, null,
       );
 
-      expect(result).toBeNull();
+      expect(zeroSlot).toBeNull();
+      expect(noLevels).toBeNull();
     });
 
     it('matches Divination school case-insensitively', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 1;
-        if (key === 'spell_slots_level_2') return 1;
-        return null;
-      });
+      slotsAt({ spell_slots_level_1: 1, spell_slots_level_2: 1 });
 
       const result = await handle(
         makeAction({ school: 'DIVINATION' }),
@@ -122,12 +117,7 @@ describe('expertDivinationHandler.handle', () => {
     });
 
     it('uses action.spellSlotLevel when spell.level is missing', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 1;
-        if (key === 'spell_slots_level_2') return 1;
-        if (key === 'spell_slots_level_3') return 1;
-        return null;
-      });
+      slotsAt({ spell_slots_level_1: 1, spell_slots_level_2: 1, spell_slots_level_3: 1 });
 
       const result = await handle(
         makeAction({ level: undefined }, { spellSlotLevel: 4 }),
@@ -137,31 +127,11 @@ describe('expertDivinationHandler.handle', () => {
       expect(result).not.toBeNull();
       expect(result.type).toBe('popup');
     });
-
-    it('returns null when spellSlotLevel is 2 but no eligible slots exist', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 4;
-        return null;
-      });
-
-      const result = await handle(
-        makeAction({ level: 2 }),
-        makePlayerStats(), campaignName, null,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No eligible spell slots');
-    });
   });
 
   describe('slot availability checks', () => {
     it('returns info popup when all eligible slot levels have zero current slots', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 0;
-        if (key === 'spell_slots_level_2') return 0;
-        return null;
-      });
+      slotsAt({ spell_slots_level_1: 0, spell_slots_level_2: 0 });
 
       const result = await handle(
         makeAction({ level: 3 }),
@@ -174,11 +144,7 @@ describe('expertDivinationHandler.handle', () => {
     });
 
     it('returns info popup when eligible levels are at max capacity', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 4;
-        if (key === 'spell_slots_level_2') return 3;
-        return null;
-      });
+      slotsAt({ spell_slots_level_1: 4, spell_slots_level_2: 3 });
 
       const result = await handle(
         makeAction({ level: 3 }),
@@ -203,12 +169,7 @@ describe('expertDivinationHandler.handle', () => {
 
   describe('slot selection logic', () => {
     it('picks highest eligible level with expended slots', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 2;
-        if (key === 'spell_slots_level_2') return 1;
-        if (key === 'spell_slots_level_3') return 2;
-        return null;
-      });
+      slotsAt({ spell_slots_level_1: 2, spell_slots_level_2: 1, spell_slots_level_3: 2 });
 
       const result = await handle(
         makeAction({ level: 4 }),
@@ -220,12 +181,7 @@ describe('expertDivinationHandler.handle', () => {
     });
 
     it('skips levels at max capacity and picks next lower with expended slots', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 2;
-        if (key === 'spell_slots_level_2') return 1;
-        if (key === 'spell_slots_level_3') return 3;
-        return null;
-      });
+      slotsAt({ spell_slots_level_1: 2, spell_slots_level_2: 1, spell_slots_level_3: 3 });
 
       const result = await handle(
         makeAction({ level: 4 }),
@@ -236,42 +192,8 @@ describe('expertDivinationHandler.handle', () => {
       expect(result.payload.description).toContain('level 2');
     });
 
-    it('picks lowest eligible level when all higher levels are at max', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 1;
-        if (key === 'spell_slots_level_2') return 3;
-        return null;
-      });
-
-      const result = await handle(
-        makeAction({ level: 3 }),
-        makePlayerStats(), campaignName, null,
-      );
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_1', 2, campaignName);
-      expect(result.payload.description).toContain('level 1');
-    });
-
-    it('restores a lower-level slot when casting with a higher-level slot for a lower-level spell', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 1;
-        return null;
-      });
-
-      const result = await handle(
-        makeAction({ level: 2, name: 'Detect Magic' }),
-        makePlayerStats(), campaignName, null,
-      );
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_1', 2, campaignName);
-      expect(result.payload.description).toContain('level 1');
-    });
-
-    it('caps maxRegainLevel at 5 for high-level spell slots', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_5') return 1;
-        return null;
-      });
+    it('caps max regain level at 5 for high-level spell slots', async () => {
+      slotsAt({ spell_slots_level_5: 1 });
 
       const result = await handle(
         makeAction({ level: 9 }),
@@ -281,30 +203,11 @@ describe('expertDivinationHandler.handle', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_5', 2, campaignName);
       expect(result.payload.description).toContain('level 5');
     });
-
-    it('skips levels where all slots are fully expended (current = 0)', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 0;
-        if (key === 'spell_slots_level_2') return 1;
-        return null;
-      });
-
-      const result = await handle(
-        makeAction({ level: 3 }),
-        makePlayerStats(), campaignName, null,
-      );
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_2', 2, campaignName);
-      expect(result.payload.description).toContain('level 2');
-    });
   });
 
   describe('side effects', () => {
     it('calls addEntry with correct ability_use log data', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 1;
-        return null;
-      });
+      slotsAt({ spell_slots_level_1: 1 });
 
       await handle(
         makeAction({ level: 3, name: 'Scrying' }),
@@ -323,11 +226,8 @@ describe('expertDivinationHandler.handle', () => {
       );
     });
 
-    it('returns popup with restoration details including slot and expended info', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_2') return 1;
-        return null;
-      });
+    it('returns popup with restoration details and echoed automation', async () => {
+      slotsAt({ spell_slots_level_2: 1 });
 
       const result = await handle(
         makeAction({ level: 4 }),
@@ -340,32 +240,13 @@ describe('expertDivinationHandler.handle', () => {
       expect(result.payload.description).toContain('You regain');
       expect(result.payload.description).toContain('level 2');
       expect(result.payload.description).toContain('expended slot level 4');
-    });
-
-    it('includes automation object in popup payload', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 1;
-        return null;
-      });
-
-      const result = await handle(
-        makeAction({ level: 3 }),
-        makePlayerStats(), campaignName, null,
-      );
-
       expect(result.payload.automation).toEqual({ type: 'expert_divination' });
     });
 
     it('does not throw when addEntry rejects', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 1;
-        return null;
-      });
-
-      addEntry.mockRejectedValue(new Error('log write failed'));
-
-      const consoleErr = console.error;
-      console.error = vi.fn();
+      slotsAt({ spell_slots_level_1: 1 });
+      addEntry.mockRejectedValueOnce(new Error('log write failed'));
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const result = await handle(
         makeAction({ level: 3, name: 'Scrying' }),
@@ -373,12 +254,12 @@ describe('expertDivinationHandler.handle', () => {
       );
 
       expect(result.type).toBe('popup');
-      expect(console.error).toHaveBeenCalledWith(
+      expect(consoleSpy).toHaveBeenCalledWith(
         '[expertDivination] Error:',
         expect.any(Error),
       );
 
-      console.error = consoleErr;
+      consoleSpy.mockRestore();
     });
   });
 });

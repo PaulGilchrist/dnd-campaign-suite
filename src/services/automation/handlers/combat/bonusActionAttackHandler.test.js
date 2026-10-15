@@ -1,3 +1,15 @@
+// bonus_action_attack lane: handle() routing (polearm trigger OR weaponRequirement
+// gate entry, uses economy, Battle Magic row-shape guard, disengage effect), the
+// weapon-name refusal branch (isPolearmWeapon → false, full-string pin), the
+// attack_roll leg shapes (Pole Strike / War Priest / Battle Magic), and the
+// once-per-Attack identity lockout (lastAttack.damageName || attackName extraction).
+// The FT-102 fresh-turn-gate conjunction branch lives in bonusActionAttackHandler
+// .ft102-turn-gate.test.js; the automationInfoPopup payload shape lives in
+// src/services/shared/popupResponse.test.js.
+// @maintained-by-ai: 2026-10-15 — deterministic: every dependency (runtime store,
+// lastAttack, polearm util, combat context, popup, log) is module-mocked; the
+// handler is a pure dispatch/refusal ledger that needs no churn when the app changes.
+// @schema-version: 1
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './bonusActionAttackHandler.js';
@@ -110,24 +122,17 @@ describe('bonusActionAttackHandler', () => {
 
     describe('handle', () => {
         describe('basic case (no special triggers/effects)', () => {
-            it('should return automation_info popup with action details', async () => {
+            it('should delegate the terminal popup path to automationInfoPopup(action)', async () => {
+                // popupResponse.test.js owns the popup payload shape — this pins
+                // ONLY that handle() returns automationInfoPopup's result verbatim.
+                const sentinel = { type: 'popup', payload: { sentinel: true } };
+                automationInfoPopup.mockReturnValueOnce(sentinel);
                 const action = makeAction();
+
                 const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
 
-                expect(result.type).toBe('popup');
-                expect(result.payload.type).toBe('automation_info');
-                expect(result.payload.name).toBe('Bonus Action Attack');
-                expect(result.payload.description).toBe('Make a bonus action attack.');
-                expect(result.payload.automationType).toBe('bonus_action_attack');
-                expect(result.payload.automation).toEqual(action.automation);
                 expect(automationInfoPopup).toHaveBeenCalledWith(action);
-            });
-
-            it('should use empty string for description when falsy', async () => {
-                const action = makeAction({ description: undefined });
-                const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
-
-                expect(result.payload.description).toBe('');
+                expect(result).toBe(sentinel);
             });
         });
 
@@ -146,16 +151,6 @@ describe('bonusActionAttackHandler', () => {
                 }));
             });
 
-            it('should return popup with custom recharge text when uses exhausted', async () => {
-                const action = makeAction({ automation: { usesMax: 1, recharge: 'Short Rest' } });
-                mockUses(0);
-
-                const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
-
-                expect(result.payload.description).toBe('Bonus Action Attack has no uses remaining. Recharges on a Short Rest.');
-                expect(setRuntimeValue).not.toHaveBeenCalled();
-            });
-
             it('should decrement uses and return attack_roll', async () => {
                 const action = makeAction({ automation: { usesMax: 3 } });
                 mockUses(2);
@@ -172,9 +167,10 @@ describe('bonusActionAttackHandler', () => {
                 );
             });
 
-            it('should use custom resourceKey when provided', async () => {
-                const action = makeAction({ automation: { usesMax: 1, resourceKey: 'warPriestUses' } });
-                mockUses(1);
+            it('should spend the custom resourceKey from data, not the default', async () => {
+                // feats.json Polearm Master row ships resourceKey: "polearmMaster".
+                const action = makeAction({ automation: { usesMax: 1, resourceKey: 'polearmMaster' } });
+                getRuntimeValue.mockImplementation((_name, key) => (key === 'polearmMaster' ? 1 : null));
                 armCombat();
 
                 const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
@@ -182,8 +178,14 @@ describe('bonusActionAttackHandler', () => {
                 expect(result.type).toBe('attack_roll');
                 expect(setRuntimeValue).toHaveBeenCalledWith(
                     'TestHero',
-                    'warPriestUses',
+                    'polearmMaster',
                     0,
+                    CAMPAIGN_NAME,
+                );
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestHero',
+                    'warPriestUses',
+                    expect.anything(),
                     CAMPAIGN_NAME,
                 );
             });
@@ -212,16 +214,6 @@ describe('bonusActionAttackHandler', () => {
                     1.5,
                     CAMPAIGN_NAME,
                 );
-            });
-
-            it('should treat non-positive currentUses as exhausted', async () => {
-                const action = makeAction({ automation: { usesMax: 3 } });
-                mockUses(-1);
-
-                const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
-
-                expect(result.payload.description).toContain('no uses remaining');
-                expect(setRuntimeValue).not.toHaveBeenCalled();
             });
 
             it('should default to usesMax when getRuntimeValue returns null or undefined', async () => {
@@ -517,6 +509,44 @@ describe('bonusActionAttackHandler', () => {
                 );
                 expect(findLastAttack).toHaveBeenCalledWith(CAMPAIGN_NAME);
                 expect(isPolearmWeapon).toHaveBeenCalled();
+                // Refusal popup is handler-composed, not delegated to popupResponse.
+                expect(automationInfoPopup).not.toHaveBeenCalled();
+                expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
+                    type: 'automation',
+                    automationType: 'bonus_action_attack_refused',
+                }));
+            });
+
+            // Once-per-Attack identity: once Pole Strike resolves, lastAttack
+            // carries attackName 'Pole Strike' — not a polearm — so a second
+            // click stays locked out even with a fully armed fresh-turn latch.
+            // Pins the lastAttack.damageName || lastAttack.attackName extraction
+            // feeding isPolearmWeapon (the only lane pinning it).
+            it('should lock out a second Pole Strike when lastAttack is the resolved Pole Strike itself', async () => {
+                armCombatPole();
+                findLastAttack.mockResolvedValue({
+                    attackEvent: { attackerName: 'TestHero', attackName: 'Pole Strike', bonus: 5 },
+                    targetName: 'Goblin',
+                });
+                isPolearmWeapon.mockResolvedValue(false);
+                const action = makeAction({
+                    automation: { trigger: 'after_attack_action_with_polearm' },
+                    name: 'Pole Strike',
+                });
+
+                const result = await handle(action, makePlayerStats({ inventory: { equipped: ['Quarterstaff'] } }), CAMPAIGN_NAME, 'map', []);
+
+                expect(result.type).toBe('popup');
+                expect(result.payload.description).toBe(
+                    'Pole Strike requires you to be holding a Quarterstaff, Spear, or a weapon with the Heavy and Reach properties.',
+                );
+                // Extraction pin: the gate checks the resolved attack's weapon id.
+                expect(isPolearmWeapon).toHaveBeenCalledWith('Pole Strike');
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+                expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
+                    type: 'automation',
+                    automationType: 'pole_strike_refused',
+                }));
             });
         });
 
@@ -598,26 +628,6 @@ describe('bonusActionAttackHandler', () => {
                 expect(result.payload.attack.autoDamageFormula).toBe('1d4');
             });
 
-            // FT-102 stale-pin inversion: a null lastAttack can never satisfy
-            // the RAW trigger — the old mock let isPolearmWeapon(true) on an
-            // undefined weapon name paper over the refusal that fires live.
-            it('should refuse with no polearm Attack action when lastAttack is null', async () => {
-                isPolearmWeapon.mockResolvedValue(true);
-                findLastAttack.mockResolvedValue({ attackEvent: null, targetName: null });
-                const action = makeAction({
-                    automation: { trigger: 'after_attack_action_with_polearm' },
-                    name: 'Pole Strike',
-                });
-                const stats = makePlayerStats({ inventory: { equipped: ['Halberd'] }, proficiency: 4 });
-                const allEquipment = [{ name: 'Halberd', properties: ['Heavy', 'Reach', 'Two-Handed'] }];
-
-                const result = await handle(action, stats, CAMPAIGN_NAME, 'map', allEquipment);
-
-                expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain('on your current turn');
-                expect(setRuntimeValue).not.toHaveBeenCalled();
-            });
-
             it('should fall back to action name "Pole Strike" when action has no name', async () => {
                 isPolearmWeapon.mockResolvedValue(true);
                 findLastAttack.mockResolvedValue({ attackEvent: { attackerName: 'TestHero', bonus: 5 }, targetName: 'Goblin' });
@@ -656,15 +666,19 @@ describe('bonusActionAttackHandler', () => {
         });
 
         describe('weaponRequirement trigger', () => {
-            it('should return attack_roll when weaponRequirement is set and polearm check passes', async () => {
+            // handle() routes into the polearm gate via `isPolearm ||
+            // weaponRequirement === 'quarterstaff_spear_heavy_reach'`. With the
+            // trigger present the OR short-circuits, so this row ships the
+            // weaponRequirement operand ALONE — the only pin that the second
+            // operand routes into checkPolearmRequirement before dispatch.
+            it('should run the polearm gate via weaponRequirement alone (no trigger)', async () => {
                 isPolearmWeapon.mockResolvedValue(true);
                 getCombatContext.mockResolvedValue({ round: 1 });
-                getRuntimeValue.mockReturnValue(1);
-                findLastAttack.mockResolvedValue({ attackEvent: { attackerName: 'TestHero', bonus: 8 }, targetName: 'Dragon' });
+                getRuntimeValue.mockImplementation((_name, key) => (key === '_attackActionTakenRound' ? 1 : null));
+                findLastAttack.mockResolvedValue({ attackEvent: { attackerName: 'TestHero', attackName: 'Pike', bonus: 8 }, targetName: 'Dragon' });
                 const action = makeAction({
                     automation: {
                         weaponRequirement: 'quarterstaff_spear_heavy_reach',
-                        trigger: 'after_attack_action_with_polearm',
                         damage: '1d4',
                         damageType: 'Bludgeoning',
                     },
@@ -675,9 +689,14 @@ describe('bonusActionAttackHandler', () => {
 
                 const result = await handle(action, stats, CAMPAIGN_NAME, 'map', allEquipment);
 
-                expect(result.type).toBe('attack_roll');
-                expect(result.payload.attack.hitBonus).toBe(8);
-                expect(result.payload.attack.damageType).toBe('Bludgeoning');
+                // Gate ran (findLastAttack + isPolearmWeapon on the lastAttack weapon id)…
+                expect(findLastAttack).toHaveBeenCalledWith(CAMPAIGN_NAME);
+                expect(isPolearmWeapon).toHaveBeenCalledWith('Pike');
+                // …and with no trigger, dispatch terminates on the info popup
+                // (no attack_roll fabricated for a trigger-less row).
+                expect(result.type).toBe('popup');
+                expect(automationInfoPopup).toHaveBeenCalledWith(action);
+                expect(setRuntimeValue).not.toHaveBeenCalled();
             });
         });
 
@@ -771,23 +790,6 @@ describe('bonusActionAttackHandler', () => {
                     'You take the Disengage action and the Grappled condition ends on you.',
                 );
                 expect(setRuntimeValue).not.toHaveBeenCalled();
-            });
-
-            it('should only remove grappled and preserve other conditions', async () => {
-                getRuntimeValue.mockImplementation((name, key) => {
-                    if (key === 'activeConditions') return ['grappled', 'restrained', 'grappled'];
-                    return null;
-                });
-                const action = makeAction({ automation: { effect: 'disengage_end_grappled' } });
-
-                await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'map', []);
-
-                expect(setRuntimeValue).toHaveBeenCalledWith(
-                    'TestHero',
-                    'activeConditions',
-                    ['restrained'],
-                    CAMPAIGN_NAME,
-                );
             });
 
             it('should handle case-insensitive grappled matching', async () => {

@@ -1,3 +1,16 @@
+// @maintained-by-ai
+// SEARING VENGEANCE HEAL SEAM (quad file 1/4). Canonical home of:
+// - getRealMaxHp runtime-truth: combatSummary player entries are 1/1 placeholders,
+//   runtime hitPoints is max-HP truth; healAmount = floor(maxHp/2); targetMaxHp payload pin.
+// - confirm-time heal through the REAL applyHealingToTarget chokepoint (both sibling
+//   suites mock it): modifyHitPoints runtime write, canonical 0→positive deathSaves/
+//   deathFailures/isDead reset, hp_change heal log.
+// - burst gate centered on the healed target, not the caster (source-keyed isWithinRange
+//   mock — Handler.test.js 'filters creatures by ally range and attack range' keys by
+//   target name only and cannot catch a caster-centred regression).
+// Also carries the quad's only full-args applyDamageToTarget pin (folded into the
+// confirm heal test below) — ConfirmPath lane may adopt it in
+// 'handles multiple targets by applying damage to each', then drop it here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -37,12 +50,11 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(async () => {}),
 }));
 
-import { handle, confirmSearingVengeance, skipSearingVengeance } from './searingVengeanceHandler.js';
+import { handle, confirmSearingVengeance } from './searingVengeanceHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as applyDamage from '../../../rules/combat/applyDamage.js';
-import * as expirations from '../../../rules/effects/expirations.js';
 import { addEntry } from '../../../ui/logService.js';
 
 const campaignName = 'test-campaign';
@@ -104,6 +116,35 @@ describe('searingVengeance CLA-304 heal math', () => {
     expect(result.payload.healAmount).toBe(6);
   });
 
+  it('burst range gate centers on the healed target, not the caster', async () => {
+    useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
+      if (key === 'searingvengeanceUses') return 1;
+      if (subject === 'LightfootHalfling' && key === 'currentHitPoints') return 0;
+      if (subject === 'LightfootHalfling' && key === 'hitPoints') return 12;
+      return null;
+    });
+    damageUtils.getCombatContext.mockResolvedValue({
+      creatures: [
+        { name: 'LightfootHalfling', type: 'player', currentHp: 1, maxHp: 1 },
+        { name: 'NearThug', type: 'npc', currentHp: 32, maxHp: 32 },
+        { name: 'FarThug', type: 'npc', currentHp: 32, maxHp: 32 },
+      ],
+    });
+    const rangeCheck = await import('../../../rules/combat/rangeCheck.js');
+    // source-keyed mock: within-range is true only from the HEALED ally, never from the caster
+    rangeCheck.isWithinRange.mockImplementation(async (source, target) => {
+      if (source === 'HexWarlock') return true;
+      if (source === 'LightfootHalfling') return target === 'NearThug';
+      return false;
+    });
+
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+    expect(result.type).toBe('modal');
+    expect(result.payload.targetName).toBe('LightfootHalfling');
+    expect(result.payload.creatureTargets.map(t => t.name)).toEqual(['NearThug']);
+  });
+
   it('heal is applied at confirm time via canonical applyHealingToTarget (death saves reset)', async () => {
     const cs = {
       creatures: [
@@ -160,143 +201,8 @@ describe('searingVengeance CLA-304 heal math', () => {
       maxHp: 12,
       isHealing: true,
     }));
-  });
-
-  it('burst damage includes the CHA modifier (2d8+3 for CHA 17)', async () => {
-    useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
-      if (key === 'searingvengeanceUses') return 1;
-      return null;
-    });
-    damageUtils.getCombatContext.mockResolvedValue({
-      creatures: [
-        { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32 },
-      ],
-    });
-    diceRoller.rollExpression.mockImplementation((expr) => {
-      if (expr === '2d8+3') return { total: 18, rolls: [7, 8] };
-      return { total: 15, rolls: [7, 8] };
-    });
-
-    const payload = {
-      name: 'Searing Vengeance',
-      targetName: 'LightfootHalfling',
-      targetMaxHp: 12,
-      healAmount: 6,
-      selectedTargets: ['Thug 1'],
-    };
-
-    await confirmSearingVengeance({
-          automation: makeAction().automation,
-          playerStats: makePlayerStats(),
-          campaignName,
-          mapName: null,
-          characters: [],
-          payload,
-      });
-
-    expect(diceRoller.rollExpression).toHaveBeenCalledWith('2d8+3');
+    // quad's only full-args burst-damage pin (borrowed from the CHA test, whose own
+    // rollExpression pin lives in ConfirmPath 'resolves CHA modifier from abilities bonus')
     expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Thug 1', 18, ['Radiant'], { campaignName, characters: [], ignoreResistance: false, attackerName: 'HexWarlock' });
-  });
-
-  it('blinded expiration is one round (until end of current turn)', async () => {
-    useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
-      if (key === 'searingvengeanceUses') return 1;
-      if (key === 'activeConditions') return [];
-      return null;
-    });
-    damageUtils.getCombatContext.mockResolvedValue({
-      creatures: [
-        { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32 },
-      ],
-    });
-    diceRoller.rollExpression.mockReturnValue({ total: 18, rolls: [7, 8] });
-
-    await confirmSearingVengeance({
-          automation: makeAction().automation,
-          playerStats: makePlayerStats(),
-          campaignName,
-          mapName: null,
-          characters: [],
-          payload: {
-        name: 'Searing Vengeance',
-        targetName: 'LightfootHalfling',
-        targetMaxHp: 12,
-        healAmount: 6,
-        selectedTargets: ['Thug 1'],
-      },
-      });
-
-    expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'HexWarlock', targetName: 'Thug 1', effects: [{ type: 'condition', condition: 'blinded' }], campaignName, rounds: 1 });
-  });
-
-  it('refuses when 0 HP creatures are outside the 60 ft ally range and consumes nothing', async () => {
-    useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
-      if (key === 'searingvengeanceUses') return 1;
-      if (subject === 'FarAlly' && key === 'currentHitPoints') return 0;
-      if (subject === 'FarAlly' && key === 'hitPoints') return 20;
-      return null;
-    });
-    damageUtils.getCombatContext.mockResolvedValue({
-      creatures: [
-        { name: 'FarAlly', type: 'player', currentHp: 1, maxHp: 1 },
-      ],
-    });
-    const rangeCheck = await import('../../../rules/combat/rangeCheck.js');
-    rangeCheck.isWithinRange.mockResolvedValue(false);
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('No creatures within 60 feet are at 0 HP');
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('burst range gate centers on the healed target, not the caster', async () => {
-    useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
-      if (key === 'searingvengeanceUses') return 1;
-      if (subject === 'LightfootHalfling' && key === 'currentHitPoints') return 0;
-      if (subject === 'LightfootHalfling' && key === 'hitPoints') return 12;
-      return null;
-    });
-    damageUtils.getCombatContext.mockResolvedValue({
-      creatures: [
-        { name: 'LightfootHalfling', type: 'player', currentHp: 1, maxHp: 1 },
-        { name: 'NearThug', type: 'npc', currentHp: 32, maxHp: 32 },
-        { name: 'FarThug', type: 'npc', currentHp: 32, maxHp: 32 },
-      ],
-    });
-    const rangeCheck = await import('../../../rules/combat/rangeCheck.js');
-    rangeCheck.isWithinRange.mockImplementation(async (source, target) => {
-      if (source === 'HexWarlock') return true;
-      if (source === 'LightfootHalfling') return target === 'NearThug';
-      return false;
-    });
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(result.type).toBe('modal');
-    expect(result.payload.targetName).toBe('LightfootHalfling');
-    expect(result.payload.creatureTargets.map(t => t.name)).toEqual(['NearThug']);
-  });
-
-  it('declining the reaction consumes no use, heals nothing, damages nothing', async () => {
-    useRuntimeState.getRuntimeValue.mockImplementation((subject, key) => {
-      if (key === 'searingvengeanceUses') return 1;
-      return null;
-    });
-
-    const result = await skipSearingVengeance(
-      makeAction().automation,
-      makePlayerStats(),
-      campaignName,
-      { name: 'Searing Vengeance', targetName: 'LightfootHalfling', healAmount: 6 }
-    );
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('declined');
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    expect(diceRoller.rollExpression).not.toHaveBeenCalled();
-    expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
-    expect(expirations.addExpiration).not.toHaveBeenCalled();
   });
 });

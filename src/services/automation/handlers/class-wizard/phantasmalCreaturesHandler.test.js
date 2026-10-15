@@ -1,3 +1,14 @@
+// @maintained-by-ai
+// class-wizard lane — CLA-252 Phantasmal Creatures handler contracts.
+// Deterministic pure behaviour over mocked runtime accessors: no timers, no DOM,
+// no registry internals. Handler stays live via HANDLER_MAP registration in
+// services/automation/index.js ('phantasmal_creatures' / 'phantasmal_creatures_confirm');
+// feature data authored in public/data/2024/classes.json (Illusionist lv6).
+// NOTE (flagged, not acted on): the modal 'phantasmalCreatures' is not wired into any
+// UI dispatch table and this handler's shared key `_Phantasmal_Creatures_freeCastCount`
+// has no consumer/rest-reset — the live CLA-252 free-cast lane uses per-spell keys
+// `_Phantasmal_Creatures_<Spell>_freeCastCount` in spellPreparationService/restRules.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, confirmPhantasmalCreatures, modalName, confirmType } from './phantasmalCreaturesHandler.js';
@@ -36,14 +47,9 @@ describe('phantasmalCreaturesHandler', () => {
     vi.clearAllMocks();
   });
 
-  describe('named exports', () => {
-    it('exports modalName as "phantasmalCreatures"', () => {
-      expect(modalName).toBe('phantasmalCreatures');
-    });
-
-    it('exports confirmType as "phantasmal_creatures_confirm"', () => {
-      expect(confirmType).toBe('phantasmal_creatures_confirm');
-    });
+  it('exports stable lane identifiers (modal + confirm)', () => {
+    expect(modalName).toBe('phantasmalCreatures');
+    expect(confirmType).toBe('phantasmal_creatures_confirm');
   });
 
   describe('handle', () => {
@@ -67,56 +73,44 @@ describe('phantasmalCreaturesHandler', () => {
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('returns info popup when no free casts remaining', async () => {
+    it('returns info popup when free casts are spent (zero or negative), never reading past the guard', async () => {
+      const action = makeAction();
+
       getRuntimeValue.mockReturnValue(0);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result).toEqual({
+      expect(await handle(action, makePlayerStats(), campaignName)).toEqual({
         type: 'popup',
         payload: {
           type: 'automation_info',
           name: 'Phantasmal Creatures',
           description: 'No free casts remaining. Finish a Long Rest to regain them.',
-          automation: expect.objectContaining({ type: 'phantasmal_creatures' }),
+          automation: action.automation,
         },
       });
-    });
 
-    it('returns info popup when free casts are negative', async () => {
       getRuntimeValue.mockReturnValue(-1);
+      const negative = await handle(action, makePlayerStats(), campaignName);
+      expect(negative.type).toBe('popup');
+      expect(negative.payload.description).toBe('No free casts remaining. Finish a Long Rest to regain them.');
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe('No free casts remaining. Finish a Long Rest to regain them.');
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('falls back to usesMax when runtime value is null', async () => {
+    it('falls back to usesMax when runtime value is null or undefined (?? branch)', async () => {
       getRuntimeValue.mockReturnValue(null);
-
-      const action = makeAction({ automation: { usesMax: 2 } });
-      const result = await handle(action, makePlayerStats(), campaignName);
-
+      let result = await handle(makeAction({ automation: { usesMax: 2 } }), makePlayerStats(), campaignName);
       expect(result.type).toBe('modal');
       expect(result.modalName).toBe('phantasmalCreatures');
-    });
 
-    it('falls back to usesMax when runtime value is undefined', async () => {
       getRuntimeValue.mockReturnValue(undefined);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
+      result = await handle(makeAction(), makePlayerStats(), campaignName);
       expect(result.type).toBe('modal');
       expect(result.modalName).toBe('phantasmalCreatures');
     });
 
-    it('falls back to usesMax when runtime value is NaN', async () => {
+    it('opens modal when runtime value is a non-numeric string (Number() → NaN, not ≤ 0)', async () => {
       getRuntimeValue.mockReturnValue('not a number');
 
-      const action = makeAction({ automation: { usesMax: 1 } });
-      const result = await handle(action, makePlayerStats(), campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.type).toBe('modal');
     });
@@ -136,12 +130,11 @@ describe('phantasmalCreaturesHandler', () => {
   });
 
   describe('confirmPhantasmalCreatures', () => {
-    it('decrements free cast count and returns info popup', async () => {
+    it('decrements free cast count and returns the full info popup payload', async () => {
       getRuntimeValue.mockReturnValue(1);
 
       const action = makeAction();
-      const playerStats = makePlayerStats();
-      const result = await confirmPhantasmalCreatures(action, playerStats, campaignName, true);
+      const result = await confirmPhantasmalCreatures(action, makePlayerStats(), campaignName, true);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestWizard',
@@ -149,20 +142,23 @@ describe('phantasmalCreaturesHandler', () => {
         0,
         campaignName,
       );
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Phantasmal Creatures');
-      expect(result.payload.description).toContain('Free cast of Summon Beast or Summon Fey');
-      expect(result.payload.description).toContain('0 remaining');
-      expect(result.payload.description).toContain('Illusion');
-      expect(result.payload.description).toContain('HP is halved');
-      expect(result.payload.automation.halvedHp).toBe(true);
-      expect(result.payload.automation.noConcentration).toBe(true);
-      expect(result.payload.automation.type).toBe('phantasmal_creatures');
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Phantasmal Creatures',
+          description: 'Phantasmal Creatures: Free cast of Summon Beast or Summon Fey (0 remaining). The spell school becomes Illusion and the summoned creature\'s HP is halved.<br/><br/><em>Open your spell sheet and cast Summon Beast or Summon Fey normally — no spell slot will be consumed.</em>',
+          automation: {
+            ...action.automation,
+            noConcentration: true,
+            halvedHp: true,
+          },
+        },
+      });
     });
 
-    it('decrements from custom usesMax value', async () => {
-      getRuntimeValue.mockReturnValue(3);
+    it('decrements a runtime count above one — runtime value, not usesMax, is the source', async () => {
+      getRuntimeValue.mockReturnValue(3); // usesMax stays 1 in makeAction defaults
 
       await confirmPhantasmalCreatures(makeAction(), makePlayerStats(), campaignName, false);
 
@@ -174,34 +170,29 @@ describe('phantasmalCreaturesHandler', () => {
       );
     });
 
-    it('returns info popup when no free casts remaining', async () => {
+    it('returns info popup and never writes when no free casts remain (zero or negative)', async () => {
+      const action = makeAction();
+
       getRuntimeValue.mockReturnValue(0);
-
-      const result = await confirmPhantasmalCreatures(makeAction(), makePlayerStats(), campaignName, true);
-
-      expect(result).toEqual({
+      expect(await confirmPhantasmalCreatures(action, makePlayerStats(), campaignName, true)).toEqual({
         type: 'popup',
         payload: {
           type: 'automation_info',
           name: 'Phantasmal Creatures',
           description: 'No free casts remaining. Finish a Long Rest to regain them.',
-          automation: expect.objectContaining({ type: 'phantasmal_creatures' }),
+          automation: action.automation,
         },
       });
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
 
-    it('returns info popup when free casts are negative', async () => {
       getRuntimeValue.mockReturnValue(-2);
+      const negative = await confirmPhantasmalCreatures(action, makePlayerStats(), campaignName, true);
+      expect(negative.type).toBe('popup');
+      expect(negative.payload.description).toBe('No free casts remaining. Finish a Long Rest to regain them.');
 
-      const result = await confirmPhantasmalCreatures(makeAction(), makePlayerStats(), campaignName, true);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('No free casts remaining. Finish a Long Rest to regain them.');
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('uses noConcentration=false when false is passed', async () => {
+    it('forwards noConcentration=false into payload automation', async () => {
       getRuntimeValue.mockReturnValue(1);
 
       const result = await confirmPhantasmalCreatures(makeAction(), makePlayerStats(), campaignName, false);
@@ -212,18 +203,36 @@ describe('phantasmalCreaturesHandler', () => {
     it('uses default spell names when freeCastSpells is missing', async () => {
       getRuntimeValue.mockReturnValue(1);
 
-      const action = makeAction({ automation: { freeCastSpells: undefined } });
-      const result = await confirmPhantasmalCreatures(action, makePlayerStats(), campaignName, true);
+      const result = await confirmPhantasmalCreatures(
+        makeAction({ automation: { freeCastSpells: undefined } }),
+        makePlayerStats(),
+        campaignName,
+        true,
+      );
 
-      expect(result.payload.description).toContain('Summon Beast or Summon Fey');
+      expect(result.payload.description).toContain('Free cast of Summon Beast or Summon Fey');
       expect(result.payload.automation.halvedHp).toBe(true);
     });
 
-    it('uses custom action.name to build the runtime key', async () => {
+    it('joins custom freeCastSpells with " or " (guidance tail stays hardcoded)', async () => {
+      getRuntimeValue.mockReturnValue(1);
+
+      const result = await confirmPhantasmalCreatures(
+        makeAction({ automation: { freeCastSpells: ['Summon Aberration'] } }),
+        makePlayerStats(),
+        campaignName,
+        true,
+      );
+
+      expect(result.payload.description).toContain('Free cast of Summon Aberration (0 remaining)');
+      expect(result.payload.description).toContain('cast Summon Beast or Summon Fey normally');
+    });
+
+    it('uses custom action.name for the runtime key, popup name, and description prefix', async () => {
       getRuntimeValue.mockReturnValue(1);
 
       const customNameAction = makeAction({ name: 'My Phantasmal Creatures' });
-      await confirmPhantasmalCreatures(customNameAction, makePlayerStats(), campaignName, true);
+      const result = await confirmPhantasmalCreatures(customNameAction, makePlayerStats(), campaignName, true);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestWizard',
@@ -231,16 +240,8 @@ describe('phantasmalCreaturesHandler', () => {
         0,
         campaignName,
       );
-    });
-
-    it('returns automation object containing original type field', async () => {
-      getRuntimeValue.mockReturnValue(1);
-
-      const result = await confirmPhantasmalCreatures(makeAction(), makePlayerStats(), campaignName, true);
-
-      expect(result.payload.automation.type).toBe('phantasmal_creatures');
-      expect(result.payload.automation.casting_time).toBe('passive');
-      expect(result.payload.automation.usesMax).toBe(1);
+      expect(result.payload.name).toBe('My Phantasmal Creatures');
+      expect(result.payload.description).toContain('My Phantasmal Creatures: Free cast of');
     });
   });
 });

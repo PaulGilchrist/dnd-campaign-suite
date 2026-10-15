@@ -1,10 +1,22 @@
+// @maintained-by-ai
+// CLA-004 regression lane: the once-per-turn latch round threading in
+// extraActionHandler's gateOncePerTurn seam. getCurrentCombatRound() without
+// campaignName resolved the cs cache lookup to undefined -> null and pinned
+// round to 1, so the stamp and the comparison were both 1 forever — every
+// turn after the first surge in a combat was refused and the lv17 banked
+// 2nd charge was stranded.
+//
+// Lane map: this file owns ONLY the oncePerTurn latch seam of the extra_action
+// handler — the exact setRuntimeValue(name, 'actionSurgeUsedThisRound',
+// <fresh threaded round>, campaignName, skipSync=true) stamp/compare contract.
+// Generic gate coverage (oncePerCombat, firstRoundOnly, uses limit, custom
+// recharge/resourceKey) lives in extraActionHandler.test.js; the round-wrap
+// latch CLEAR (PLAYER_ROUND_LATCH_KEYS -> null) is pinned by its consumers
+// (navigationHandlers/Initiative + restRules). oncePerTurn.js's
+// { round, activeCreature } object-format latch internals are a different
+// module and are NOT delegated to here — this seam stays a plain round number.
+// Deterministic: every dependency is mocked, all round values are seeded.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// CLA-004 regression: Action Surge once-per-turn latch must never pin the
-// round. getCurrentCombatRound() without campaignName resolved the cs cache
-// lookup to undefined -> null and pinned round to 1, so the stamp and the
-// comparison were both 1 forever — every turn after the first surge in a
-// combat was refused and the lv17 banked 2nd charge was stranded.
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -60,6 +72,8 @@ beforeEach(() => {
 });
 
 describe('CLA-004 once-per-turn latch round threading', () => {
+  // Gate table: (latch vs fresh threaded round) -> refuse | stamp+allow.
+
   it('stamps the fresh threaded round (not pinned 1) and spends a charge', async () => {
     loadCombatSummary.mockResolvedValue({ round: 2, creatures: [] });
     seedStore({ uses: 2, latch: null });
@@ -83,10 +97,10 @@ describe('CLA-004 once-per-turn latch round threading', () => {
     expect(addEntry).not.toHaveBeenCalledWith(campaignName, expect.objectContaining({ type: 'ability_use' }));
   });
 
-  it('re-arms on a later turn: banked 2nd charge spends after round-wrap clear', async () => {
-    // Round 3, latch cleared at the round wrap (PLAYER_ROUND_LATCH_KEYS).
+  it('re-arms by round inequality even when the latch was not cleared at wrap, spending the banked 2nd charge', async () => {
+    // Belt & braces: stale latch stamp 2 must not block in round 3+.
     loadCombatSummary.mockResolvedValue({ round: 3, creatures: [] });
-    seedStore({ uses: 1, latch: null });
+    seedStore({ uses: 1, latch: 2 });
 
     const result = await handle(action, playerStats, campaignName);
 
@@ -95,27 +109,17 @@ describe('CLA-004 once-per-turn latch round threading', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'actionSurgeUses', 0, campaignName, true);
   });
 
-  it('re-arms by round inequality even when the latch was not cleared at wrap', async () => {
-    // Belt & braces: stale latch stamp 2 must not block in round 3+.
-    loadCombatSummary.mockResolvedValue({ round: 3, creatures: [] });
-    seedStore({ uses: 1, latch: 2 });
-
-    const result = await handle(action, playerStats, campaignName);
-
-    expect(result.payload.type).toBe('automation_info');
-    expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'actionSurgeUses', 0, campaignName, true);
-  });
-
-  it('refuses at 0 uses with a logged refusal and zero writes', async () => {
+  it('refuses at 0 uses before the turn gate: no latch stamp, no spend', async () => {
+    // Ordering pin for the oncePerTurn lane: a refusal upstream of
+    // gateOncePerTurn must never touch the latch (message + zero-write
+    // semantics owned by extraActionHandler.test.js uses-limit lane).
     loadCombatSummary.mockResolvedValue({ round: 3, creatures: [] });
     seedStore({ uses: 0, latch: null });
 
-    const result = await handle(action, playerStats, campaignName);
+    await handle(action, playerStats, campaignName);
 
-    expect(result.payload.description).toBe('Action Surge has no uses remaining. Recharges on a short_rest.');
     expect(setRuntimeValue).not.toHaveBeenCalled();
-    expect(refusals()).toHaveLength(1);
-    expect(refusals()[0].characterName).toBe('EvasiveFighter');
+    expect(spends()).toHaveLength(0);
   });
 
   it('post-short-rest null state recomputes from usesMax and logs the spend', async () => {
@@ -125,7 +129,9 @@ describe('CLA-004 once-per-turn latch round threading', () => {
     const result = await handle(action, playerStats, campaignName);
 
     expect(result.payload.type).toBe('automation_info');
+    expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'actionSurgeUsedThisRound', 1, campaignName, true);
     expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', 'actionSurgeUses', 1, campaignName, true);
+    expect(spends()).toHaveLength(1);
   });
 });
 
@@ -140,8 +146,9 @@ describe('CLA-004 logging', () => {
     expect(spend).toHaveLength(1);
     expect(spend[0].characterName).toBe('EvasiveFighter');
     expect(spend[0].abilityName).toBe('Action Surge');
-    expect(spend[0].description).toContain('additional action');
-    expect(spend[0].description).toContain('1 use(s) remain');
+    expect(spend[0].description).toBe(
+      'EvasiveFighter uses Action Surge to take one additional action this turn. 1 use(s) remain until your next short_rest.'
+    );
   });
 
   it('logs action_surge_refused with reason on a same-turn refusal', async () => {

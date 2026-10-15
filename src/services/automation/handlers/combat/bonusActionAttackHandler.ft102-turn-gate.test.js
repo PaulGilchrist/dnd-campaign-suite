@@ -1,12 +1,17 @@
 // FT-102: Polearm Master / Pole Strike "immediately after the Attack action"
-// gate. The old checkPolearmRequirement only matched the weapon name on the
+// turn gate. The old checkPolearmRequirement only matched the weapon name on the
 // campaign-global lastAttack — a stale polearm lastAttack from a previous turn
 // (or another creature's polearm lastAttack) fired the bonus attack with no
 // Attack action this turn. The fix reuses the verified CLA-143 round latch
 // `_attackActionTakenRound` (armed by the Attack-action row lane in
 // useCharActionsAttackHandlers.js) + requires lastAttack.attackerName to be
 // the player, with the round read fresh from getCombatContext (playbook §5).
-// @generated-by-ai
+// This file owns the gate branch only (the armedRound === round === attackerName
+// conjunction). The weapon-name refusal branch (isPolearmWeapon → false) and
+// the attack_roll leg shape belong to the main lane bonusActionAttackHandler.test.js.
+// @maintained-by-ai: 2026-10-15 — deterministic: every dependency (runtime store,
+// lastAttack, polearm util, combat context, log) is module-mocked; the gate is a
+// pure round/identity ledger test that needs no churn when the app changes.
 // @schema-version: 1
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -53,6 +58,8 @@ import { addEntry } from '../../../ui/logService.js';
 
 const CAMPAIGN = 'test-campaign';
 const PLAYER = 'EvasiveFighter';
+
+const TURN_GATE_REFUSAL = 'Pole Strike must be taken immediately after you attack with a Quarterstaff, Spear, or a Heavy and Reach weapon as part of the Attack action on your current turn.';
 
 const poleStrikeAction = () => ({
     name: 'Pole Strike',
@@ -117,7 +124,7 @@ describe('FT-102 Pole Strike Attack-action turn gate', () => {
         const result = await handle(poleStrikeAction(), playerStats(), CAMPAIGN, 'map', []);
 
         expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('on your current turn');
+        expect(result.payload.description).toBe(TURN_GATE_REFUSAL);
         expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
             type: 'automation',
             automationType: 'pole_strike_refused',
@@ -133,6 +140,7 @@ describe('FT-102 Pole Strike Attack-action turn gate', () => {
         const result = await handle(poleStrikeAction(), playerStats(), CAMPAIGN, 'map', []);
 
         expect(result.type).toBe('popup');
+        expect(result.payload.description).toBe(TURN_GATE_REFUSAL);
         expect(refusalLogCalls()).toHaveLength(1);
         expect(setRuntimeValue).not.toHaveBeenCalled();
     });
@@ -147,42 +155,22 @@ describe('FT-102 Pole Strike Attack-action turn gate', () => {
         const result = await handle(poleStrikeAction(), playerStats(), CAMPAIGN, 'map', []);
 
         expect(result.type).toBe('popup');
+        expect(result.payload.description).toBe(TURN_GATE_REFUSAL);
         expect(refusalLogCalls()).toHaveLength(1);
         expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('keeps the byte-identical weapon-refusal popup (and now logs it) for a non-polearm lastAttack', async () => {
+    it('refuses when there is no lastAttack at all (null attackEvent)', async () => {
         armFreshPoleAttack({ round: 2 });
-        isPolearmWeapon.mockResolvedValue(false);
-        findLastAttack.mockResolvedValue({
-            attackEvent: { attackerName: PLAYER, attackName: 'Scimitar' },
-            targetName: 'Bandit 1',
-        });
+        // isPolearmWeapon stays true on the undefined weapon name — without
+        // the attacker-identity leg of the gate a null lastAttack passes.
+        findLastAttack.mockResolvedValue({ attackEvent: null, targetName: null });
 
         const result = await handle(poleStrikeAction(), playerStats(), CAMPAIGN, 'map', []);
 
         expect(result.type).toBe('popup');
-        expect(result.payload.description).toBe(
-            'Pole Strike requires you to be holding a Quarterstaff, Spear, or a weapon with the Heavy and Reach properties.',
-        );
+        expect(result.payload.description).toBe(TURN_GATE_REFUSAL);
         expect(refusalLogCalls()).toHaveLength(1);
-    });
-
-    it('refuses the second click of the same Attack action (lastAttack is now Pole Strike)', async () => {
-        armFreshPoleAttack({ round: 2 });
-
-        const first = await handle(poleStrikeAction(), playerStats(), CAMPAIGN, 'map', []);
-        expect(first.type).toBe('attack_roll');
-
-        // Once Pole Strike resolves, lastAttack.identity is 'Pole Strike' —
-        // not a polearm name — so the existing identity check refuses again.
-        vi.clearAllMocks();
-        armFreshPoleAttack({ round: 2, weapon: 'Pole Strike' });
-        isPolearmWeapon.mockResolvedValue(false);
-
-        const second = await handle(poleStrikeAction(), playerStats(), CAMPAIGN, 'map', []);
-
-        expect(second.type).toBe('popup');
-        expect(refusalLogCalls()).toHaveLength(1);
+        expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 });

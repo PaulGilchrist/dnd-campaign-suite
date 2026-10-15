@@ -1,8 +1,15 @@
+// @maintained-by-ai
 // CLA-356 regression: Telekinetic Master (Psi Warrior lv18) concentration bonus attack.
 // The row was popup-only (no attack resolved). It must now: gate on LIVE cs concentration
 // (refuse + log, spend nothing when absent), latch once per turn, arm the current target,
 // roll a real weapon attack through applyDamageToTarget, log attack/damage/hp_change +
 // ability_use, stamp lastAttack, and refuse re-clicks the same round.
+// Seam map: concentration STATE canon (establish/clear) lives in spellPreparationService +
+// useInitiativeEffects.concentrationClearing.test.js — this lane only READS live cs
+// concentration as a gate and owns the once-per-turn latch (LATCH_KEY) + attack seam.
+// Row SHAPE construction: automationInfoBuilder/attack.test.js; slot surfacing:
+// spellCalc2024-telekinetic-master.test.js; router categorization:
+// automationCollector.types.test.js. applyDamage/hp_change: delegated pin only.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
@@ -105,8 +112,35 @@ describe('concentrationBonusAttackHandler — CLA-356', () => {
             characterName: 'EvasiveFighter',
             abilityName: 'Telekinetic Master',
         }));
+        // lastAttack stamped BEFORE applyDamage so the rider merge keeps the attack seam.
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'lastAttack', expect.objectContaining({
+            attackerName: 'EvasiveFighter',
+            targetName: 'Thug 1',
+            d20: 15,
+            total: 24,
+            hit: true,
+            isCrit: false,
+            targetAc: 11,
+            rollType: 'attack',
+        }), campaignName);
         expect(result.payload.description).toMatch(/HIT/);
         expect(result.payload.description).toMatch(/15\+9=24 vs AC 11/);
+    });
+
+    it('rolls a crit with doubled damage dice on a natural 20', async () => {
+        getCombatContext.mockResolvedValue(csWithConcentration('Telekinesis'));
+        getTargetFromAttacker.mockReturnValue({ name: 'Thug 1', ac: 11, currentHp: 32, maxHp: 32 });
+        rollD20.mockReturnValue(20);
+        applyDamageToTarget.mockResolvedValue({ finalDamage: 12 });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(rollExpressionDoubled).toHaveBeenCalledWith('1d6+3');
+        expect(rollExpression).not.toHaveBeenCalled();
+        // raw doubled total routes through applyDamageToTarget.
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Thug 1', 12, ['Slashing'], { campaignName, characters: expect.any(Array), ignoreResistance: false, attackerName: 'EvasiveFighter' });
+        expect(result.payload.description).toMatch(/CRITICAL HIT/);
+        expect(result.payload.description).toMatch(/20\+9=29 vs AC 11/);
     });
 
     it('refuses (spends nothing, no attack roll) when not concentrating', async () => {
@@ -136,6 +170,21 @@ describe('concentrationBonusAttackHandler — CLA-356', () => {
             automationType: 'concentration_bonus_attack_refused',
         }));
         expect(result.payload.description).toMatch(/already made/i);
+    });
+
+    it('re-arms on a new round — a prior-round latch does not stick', async () => {
+        getCombatContext.mockResolvedValue(csWithConcentration('Telekinesis', 2));
+        getTargetFromAttacker.mockReturnValue({ name: 'Thug 1', ac: 11, currentHp: 32, maxHp: 32 });
+        rollD20.mockReturnValue(15);
+        applyDamageToTarget.mockResolvedValue({ finalDamage: 8 });
+        // Latch from last round survives; only round >= current blocks.
+        getRuntimeValue.mockImplementation((name, key) => (key === '_Telekinetic_Master_attack_usedRound' ? { round: 1, activeCreature: 'EvasiveFighter' } : null));
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(rollD20).toHaveBeenCalled();
+        expect(result.payload.description).toMatch(/HIT/);
+        expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', '_Telekinetic_Master_attack_usedRound', { round: 2, activeCreature: 'EvasiveFighter' }, campaignName);
     });
 
     it('refuses with no armed target and stamps no latch', async () => {

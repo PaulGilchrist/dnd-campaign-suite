@@ -31,6 +31,9 @@ vi.mock('../../../rules/effects/expirationQueue.js', () => ({
 }));
 
 // L5-003 §8.1: token-move seam — default OFF keeps legacy prose byte-identical.
+// Swap-with-illusion (CLA-366) coverage lives in tempTeleportHandler.cla366-transposition.test.js;
+// this file owns the plain/shadow/moonlight main lane, slot economy, and extended-flag contract.
+// @maintained-by-ai
 vi.mock('../../../combat/teleportService.js', () => ({
     applyTeleportTokenMove: vi.fn(async () => ({ moved: false, reason: 'token-moving-off' })),
 }));
@@ -113,7 +116,6 @@ describe('tempTeleportHandler', () => {
             expect(result.payload.playerStats).toBe(stats);
             expect(result.payload.campaignName).toBe(CAMPAIGN_NAME);
         });
-
         it('returns teleport modal when action is null', async () => {
             const stats = makePlayerStats();
             const result = await handle(null, stats, CAMPAIGN_NAME, 'test-map');
@@ -201,6 +203,8 @@ describe('tempTeleportHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Shadow of Moil');
+            expect(result.payload.automationType).toBe('teleport');
             expect(result.payload.description).toContain('Shadow of Moil');
             expect(result.payload.description).toContain('60 ft');
             expect(result.payload.description).toContain('Teleported');
@@ -229,30 +233,6 @@ describe('tempTeleportHandler', () => {
             const result = await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, true);
 
             expect(result.payload.description).toContain('150 ft');
-        });
-
-        it('describes swap with illusion', async () => {
-            const action = makeAction({
-                automation: { effect: 'teleport_swap_with_illusion' },
-            });
-            const result = await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, false);
-
-            expect(result.payload.description).toContain('Swapped places with your illusion');
-        });
-
-        it('describes swap with illusion even when useExtended is true', async () => {
-            const action = makeAction({
-                automation: { effect: 'teleport_swap_with_illusion' },
-            });
-            const result = await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, true);
-
-            expect(result.payload.description).toContain('Swapped places with your illusion');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                PLAYER_NAME,
-                '_teleportExtendedUsed',
-                true,
-                CAMPAIGN_NAME,
-            );
         });
 
         it('adds next_attack_advantage effect for moonlight_step teleport', async () => {
@@ -529,16 +509,6 @@ describe('tempTeleportHandler', () => {
                     abilityName: 'Shadow of Moil',
                 }),
             );
-        });
-
-        it('returns popup with correct metadata fields', async () => {
-            const action = makeAction();
-            const result = await confirmTeleport(action, makePlayerStats(), CAMPAIGN_NAME, false);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Shadow of Moil');
-            expect(result.payload.automationType).toBe('teleport');
         });
     });
 

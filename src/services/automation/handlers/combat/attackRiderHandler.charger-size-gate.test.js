@@ -1,6 +1,11 @@
+// @maintained-by-ai
 // FT-106: applyRiderOption size-gate — Charger Push vs Huge must refuse
 // (logged `<feature>_refused`, latch NOT marked); Small + Damage-Bonus legs
-// preserve the existing accept shape.
+// preserve the existing accept shape. Handler-lane only: the validator
+// matrix (allow/refuse/lenient by size) is canonically pinned in
+// cunningStrikeUtils.test.js — this file pins the applyRiderOption wiring:
+// refusal popup + `<slug>_refused` log token, zero spend, latch semantics,
+// and the accept-path byte shapes. Deterministic, fully mocked, turn-based.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 let mockCombatSummary = null;
@@ -161,14 +166,9 @@ describe('applyRiderOption — Charger size gate (FT-106)', () => {
 
         expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('too large for Trip');
+        const refusalEntry = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'automation');
+        expect(refusalEntry).toBeDefined();
+        expect(refusalEntry.automationType).toBe('cunning_strike_refused');
         expect(markOncePerTurn).not.toHaveBeenCalled();
-    });
-
-    it('unknown-size target stays lenient (cache miss allow-through)', async () => {
-        const result = await applyRiderOption(chargerAction, makePlayerStats(), campaignName, 'Mystery Target', ['Push 10 ft']);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toBe('Mystery Target was pushed 10 feet away.');
-        expect(markOncePerTurn).toHaveBeenCalled();
     });
 });

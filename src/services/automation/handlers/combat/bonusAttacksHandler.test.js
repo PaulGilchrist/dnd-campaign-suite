@@ -1,3 +1,23 @@
+// bonusAttacksHandler main lane — generic handle()/applyFlurryOfBlows mechanics:
+// popup/modal payload structure, 1d4+0 defaults, hit/crit/miss arithmetic, attack
+// and damage log shapes, openHandTargets attach/dedupe, invisibility gating,
+// null-result robustness, pluralization, and total-damage accounting.
+//
+// Lane ownership (bonusAttacksHandler trio):
+// - cla143 sibling owns resolveFlurryWeaponStats unarmed_strike die selection +
+//   rolled-vs-applied honesty in buildFlurryAbilityDesc.
+// - cla144 sibling owns the Flurry of Healing and Harm lane: heal-formula
+//   resolution, Hand of Harm automation lookup branches, scaling/alsoInflicts,
+//   awaited applyDamageToTarget reads, the hasFlurryHealingHarm gate, and the
+//   SOLE flurryHealingHarmUses decrement pins. Its header documents that the
+//   main file's embedded describe('Flurry of Healing and Harm integration') may
+//   be dropped — verified 2026-10-15: 6 of its 7 tests are superseded there.
+//   The 7th (heal→harm lane switch when uses exhaust MID-flurry, uses=1 with
+//   2 strikes) is pinned ONLY below — cla144's heal tests all run uses >=
+//   attacks and its harm tests start at uses=0, so a stale-threaded-counter
+//   bug would slip past cla144. If cla144 absorbs that seam, delete it here.
+// All module boundaries are mocked; pins are deterministic handler contracts.
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -547,177 +567,74 @@ describe('bonusAttacksHandler', () => {
       expect(abilityEntries[0][1].description).toContain('Total damage dealt: 8');
     });
 
-    describe('Flurry of Healing and Harm integration', () => {
-      const actionWithFlurry = {
-        name: 'Heightened Flurry of Blows',
-        automation: {
-          type: 'bonus_attacks',
-          attacks: 3,
-        },
-      };
+    // Kept from the main suite's embedded describe('Flurry of Healing and Harm
+    // integration') — the ONLY pin of the mid-flurry heal→harm lane switch:
+    // healing strikes consume the threaded flurryHealingHarmUses counter and
+    // the FIRST strike after it exhausts must take the damage lane and arm a
+    // Hand of Harm CON save. A getRuntimeValue mock returning a constant uses=1
+    // proves the loop threads the decremented local, not a stale re-read.
+    // cla144 cannot catch this: its heal tests all run uses >= attacks (7/1,
+    // 2/2) and its harm tests all start at uses=0. If cla144 ever absorbs the
+    // seam, delete this test here.
+    it('switches from Hand of Healing to Hand of Harm mid-flurry when uses exhaust', async () => {
+      getCombatSummary.mockReturnValue(combatSummary);
+      vi.mocked(rollD20).mockReturnValue(18);
+      vi.mocked(rollExpression).mockReturnValue({ total: 9, rolls: [6, 3], modifier: 0 });
+      applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 6 });
+      applyHealingDirectly.mockReturnValue({ newHp: 15, actualHeal: 5, maxHp: 20 });
+      buildSaveDc.mockReturnValue(14);
+      createSaveListener.mockReturnValue({
+        promptId: 'switch-prompt',
+        promise: Promise.resolve({ promptId: 'switch-prompt', success: true }),
+      });
+      getRuntimeValue.mockImplementation((key, field, _cn) => {
+        if (key === 'TestMonk' && field === 'flurryHealingHarmUses') return 1;
+        return null;
+      });
 
-      function makeWarriorOfMercyMonk(overrides = {}) {
-        return makePlayerStats({
-          level: 11,
-          abilities: [{ name: 'Wisdom', bonus: 3 }],
-          class: { class_levels: [{ level: 11, martial_arts_die: 6 }] },
-          specialActions: [
-            { name: 'Flurry of Healing and Harm' },
-            {
-              name: 'Hand of Harm',
-              automation: {
-                type: 'reaction_damage',
-                damageExpression: '2d6',
-                damageType: 'Necrotic',
-                saveType: 'CON',
-                saveDc: 14,
-                scaling: { 11: '2d6', 17: '3d6' },
-                alsoInflicts: 'disadvantage_next_attack',
-              },
+      const playerStats = makePlayerStats({
+        level: 11,
+        abilities: [{ name: 'Wisdom', bonus: 3 }],
+        class: { class_levels: [{ level: 11, martial_arts_die: 6 }] },
+        specialActions: [
+          { name: 'Flurry of Healing and Harm' },
+          {
+            name: 'Hand of Harm',
+            automation: {
+              type: 'reaction_damage',
+              damageExpression: '2d6',
+              damageType: 'Necrotic',
+              saveType: 'CON',
+              saveDc: 14,
+              scaling: { 11: '2d6', 17: '3d6' },
+              alsoInflicts: 'disadvantage_next_attack',
             },
-          ],
-          ...overrides,
-        });
-      }
-
-      beforeEach(() => {
-        applyHealingDirectly.mockReturnValue({ newHp: 15, actualHeal: 5, maxHp: 20 });
-        createSaveListener.mockReturnValue({ promptId: 'test-prompt', promise: Promise.resolve({ success: false }) });
-        buildSaveDc.mockReturnValue(14);
+          },
+        ],
       });
 
-      it('applies Hand of Healing when flurryHealingHarmUses > 0 and healingTarget is provided', async () => {
-        getCombatSummary.mockReturnValue(combatSummary);
-        vi.mocked(rollD20).mockReturnValue(18);
-        vi.mocked(rollExpression).mockReturnValue({ total: 9, rolls: [6, 3], modifier: 0 });
-        getRuntimeValue.mockImplementation((key, field, _cn) => {
-          if (key === 'TestMonk' && field === 'flurryHealingHarmUses') return 3;
-          return null;
-        });
+      const result = await applyFlurryOfBlows({ action: action, playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 2 }, numAttacks: 2, healingTarget: 'Goblin' });
 
-        const playerStats = makeWarriorOfMercyMonk();
+      // Strike 1 heals and burns the last use...
+      expect(applyHealingDirectly).toHaveBeenCalledTimes(1);
+      expect(applyHealingDirectly).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 9, campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'flurryHealingHarmUses', 0, campaignName);
 
-        await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1, healingTarget: 'Goblin' });
+      // ...strike 2 takes the harm lane: normal attack damage, CON save armed.
+      expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+      expect(createSaveListener).toHaveBeenCalledTimes(1);
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        targetName: 'Goblin',
+        saveType: 'CON',
+        saveDc: 14,
+      }));
+      expect(result.handOfHarmSavePromises).toHaveLength(1);
 
-        expect(applyHealingDirectly).toHaveBeenCalledWith(
-          expect.any(Object),
-          'Goblin',
-          expect.any(Number),
-          campaignName
-        );
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'flurryHealingHarmUses', 2, campaignName);
-      });
-
-      it('decrements flurryHealingHarmUses for each healing strike', async () => {
-        getCombatSummary.mockReturnValue(combatSummary);
-        vi.mocked(rollD20).mockReturnValue(18);
-        vi.mocked(rollExpression).mockReturnValue({ total: 9, rolls: [6, 3], modifier: 0 });
-        getRuntimeValue.mockImplementation((key, field, _cn) => {
-          if (key === 'TestMonk' && field === 'flurryHealingHarmUses') return 2;
-          return null;
-        });
-
-        const playerStats = makeWarriorOfMercyMonk();
-
-        await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 2 }, numAttacks: 2, healingTarget: 'Goblin' });
-
-        expect(setRuntimeValue).toHaveBeenCalledTimes(2);
-        expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'TestMonk', 'flurryHealingHarmUses', 1, campaignName);
-        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'TestMonk', 'flurryHealingHarmUses', 0, campaignName);
-      });
-
-      it('switches to Hand of Harm after healing uses exhausted', async () => {
-        getCombatSummary.mockReturnValue(combatSummary);
-        vi.mocked(rollD20).mockReturnValue(18);
-        vi.mocked(rollExpression).mockReturnValue({ total: 5, rolls: [3, 2], modifier: 0 });
-        applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 6 });
-        getRuntimeValue.mockImplementation((key, field, _cn) => {
-          if (key === 'TestMonk' && field === 'flurryHealingHarmUses') return 1;
-          return null;
-        });
-
-        const playerStats = makeWarriorOfMercyMonk();
-
-        await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 2 }, numAttacks: 2, healingTarget: 'Goblin' });
-
-        expect(applyHealingDirectly).toHaveBeenCalledTimes(1);
-        expect(createSaveListener).toHaveBeenCalledTimes(1);
-      });
-
-      it('triggers CON save for Hand of Harm strikes on hit', async () => {
-        getCombatSummary.mockReturnValue(combatSummary);
-        vi.mocked(rollD20).mockReturnValue(18);
-        vi.mocked(rollExpression).mockReturnValue({ total: 5, rolls: [3, 2], modifier: 0 });
-        applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 6 });
-        getRuntimeValue.mockImplementation((key, field, _cn) => {
-          if (key === 'TestMonk' && field === 'flurryHealingHarmUses') return 0;
-          return null;
-        });
-
-        const playerStats = makeWarriorOfMercyMonk();
-
-        await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1, healingTarget: 'Ally' });
-
-        expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-          targetName: 'Goblin',
-          saveType: 'CON',
-          saveDc: 14,
-        }));
-      });
-
-      it('does not apply Flurry of Healing and Harm when player lacks the feature', async () => {
-        getCombatSummary.mockReturnValue(combatSummary);
-        vi.mocked(rollD20).mockReturnValue(18);
-        applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 6 });
-        getRuntimeValue.mockReturnValue(null);
-
-        const playerStats = makePlayerStats();
-
-        const result = await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1, healingTarget: 'Goblin' });
-
-        expect(applyHealingDirectly).not.toHaveBeenCalled();
-        expect(createSaveListener).not.toHaveBeenCalled();
-        expect(result.handOfHarmSavePromises).toBeUndefined();
-      });
-
-      it('does not apply Hand of Harm when hit but finalDamage is 0', async () => {
-        getCombatSummary.mockReturnValue(combatSummary);
-        vi.mocked(rollD20).mockReturnValue(18);
-        vi.mocked(rollExpression).mockReturnValue({ total: 5, rolls: [3, 2], modifier: 0 });
-        applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 7 });
-        getRuntimeValue.mockImplementation((key, field, _cn) => {
-          if (key === 'TestMonk' && field === 'flurryHealingHarmUses') return 0;
-          return null;
-        });
-
-        const playerStats = makeWarriorOfMercyMonk();
-
-        await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1, healingTarget: 'Ally' });
-
-        expect(createSaveListener).not.toHaveBeenCalled();
-      });
-
-      it('logs hp_change entry with isHealing: true for Hand of Healing strikes', async () => {
-        getCombatSummary.mockReturnValue(combatSummary);
-        vi.mocked(rollD20).mockReturnValue(18);
-        vi.mocked(rollExpression).mockReturnValue({ total: 9, rolls: [6, 3], modifier: 0 });
-        getRuntimeValue.mockImplementation((key, field, _cn) => {
-          if (key === 'TestMonk' && field === 'flurryHealingHarmUses') return 1;
-          return null;
-        });
-
-        const playerStats = makeWarriorOfMercyMonk();
-
-        await applyFlurryOfBlows({ action: actionWithFlurry, playerStats: playerStats, campaignName, _mapName: mapName, distribution: { Goblin: 1 }, numAttacks: 1, healingTarget: 'Goblin' });
-
-        const hpEntries = addEntry.mock.calls.filter(
-          call => call[1].type === 'hp_change'
-        );
-        const healingEntry = hpEntries.find(entry => entry[1].isHealing === true);
-        expect(healingEntry).toBeDefined();
-        expect(healingEntry[1].targetName).toBe('Goblin');
-        expect(healingEntry[1].note).toContain('Hand of Healing');
-      });
+      // Passing the save lets the handler's listener detach itself — no leak.
+      const removeSpy = vi.spyOn(window, 'removeEventListener');
+      window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: 'switch-prompt', success: true } }));
+      await vi.waitFor(() => expect(removeSpy).toHaveBeenCalledWith('save-result', expect.any(Function)));
+      removeSpy.mockRestore();
     });
   });
 });

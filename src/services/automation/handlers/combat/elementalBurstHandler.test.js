@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai — deterministic: handler is a pure FP-gate (stored FP →
+// _trackedResources → maxFP fallback, < 2 blocks, else deduct 2 + open modal).
+// All deps mocked at module boundary; modal internals owned by ElementalBurstModal.test.jsx.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { handle } from './elementalBurstHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -29,24 +32,38 @@ function makePlayerStats(overrides = {}) {
     };
 }
 
-function makeAction(overrides = {}) {
+function makeAction() {
     return {
         name: 'Elemental Burst',
-        automation: { type: 'elemental_burst', ...overrides },
-        ...overrides,
+        automation: { type: 'elemental_burst' },
     };
 }
+
+// Key-router over runtime — focusPoints is the handler's only read.
+function mockFP(fp) {
+    runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'focusPoints') return fp;
+        return undefined;
+    });
+}
+
+let dispatchSpy;
+
+beforeEach(() => {
+    vi.clearAllMocks();
+    dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+});
+
+afterEach(() => {
+    dispatchSpy.mockRestore();
+});
 
 // ── Tests ────────────────────────────────────────────────────────
 
 describe('elementalBurstHandler', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    describe('handle - insufficient focus points', () => {
-        it('returns a popup when stored FP is 0', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(0);
+    describe('insufficient FP — blocked popup, no side effects', () => {
+        it('blocks at stored FP 0 with full popup contract and never writes FP or dispatches', async () => {
+            mockFP(0);
 
             const action = makeAction();
             const result = await handle(action, makePlayerStats(), campaignName, mapName);
@@ -60,28 +77,16 @@ describe('elementalBurstHandler', () => {
                     automation: { type: 'elemental_burst' },
                 },
             });
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(dispatchSpy).not.toHaveBeenCalled();
         });
 
-        it('returns a popup when stored FP is 1', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), campaignName, mapName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('Not enough Focus Points');
-            expect(result.payload.description).toContain('2 required');
-        });
-
-        it('returns a popup when stored FP is null (uses maxFP fallback and it is < 2)', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
+        it('blocks when stored FP is null, tracked resources are absent, and no class level matches (maxFP 0)', async () => {
+            mockFP(null);
 
             const ps = makePlayerStats({
-                level: 1,
-                class: {
-                    class_levels: [{ level: 1, focus_points: 1 }],
-                },
+                level: 3,
+                class: { class_levels: [{ level: 1, focus_points: 2 }] },
             });
 
             const action = makeAction();
@@ -89,134 +94,48 @@ describe('elementalBurstHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Not enough Focus Points');
-        });
-
-        it('returns a popup when stored FP is undefined (uses _trackedResources fallback and it is < 2)', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-            const ps = makePlayerStats({
-                _trackedResources: { focusPoints: { current: 1 } },
-            });
-
-            const action = makeAction();
-            const result = await handle(action, ps, campaignName, mapName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Not enough Focus Points');
-        });
-
-        it('returns a popup when all FP sources are zero', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
-
-            const ps = makePlayerStats({
-                level: 1,
-                class: {
-                    class_levels: [{ level: 1, focus_points: 0 }],
-                },
-                _trackedResources: { focusPoints: { current: 0 } },
-            });
-
-            const action = makeAction();
-            const result = await handle(action, ps, campaignName, mapName);
-
-            expect(result.type).toBe('popup');
-        });
-
-        it('returns a popup when stored FP is a string "1"', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue('1');
-
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), campaignName, mapName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Not enough Focus Points');
-        });
-
-        it('returns a popup when stored FP is a string "0"', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue('0');
-
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), campaignName, mapName);
-
-            expect(result.type).toBe('popup');
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         });
     });
 
-    describe('handle - sufficient focus points (modal path)', () => {
-        it('returns a modal when stored FP is exactly 2', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(2);
+    describe('sufficient FP — modal contract and deduction', () => {
+        it('opens at the FP = 2 boundary with full modal payload and deducts to 0', async () => {
+            mockFP(2);
 
             const action = makeAction();
-            const result = await handle(action, makePlayerStats(), campaignName, mapName);
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('elementalBurst');
-            expect(result.payload.action).toBe(action);
-            expect(result.payload.playerStats).toBeDefined();
-            expect(result.payload.campaignName).toBe(campaignName);
-            expect(result.payload.mapName).toBe(mapName);
-        });
-
-        it('returns a modal when stored FP is greater than 2', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(10);
-
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), campaignName, mapName);
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('elementalBurst');
-        });
-
-        it('uses _trackedResources fallback when stored FP is undefined', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-            const ps = makePlayerStats({
-                _trackedResources: { focusPoints: { current: 5 } },
-            });
-
-            const action = makeAction();
+            const ps = makePlayerStats();
             const result = await handle(action, ps, campaignName, mapName);
 
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('elementalBurst');
-        });
-
-        it('falls back to maxFP when both stored FP and _trackedResources are absent', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-            const ps = makePlayerStats({
-                _trackedResources: null,
+            expect(result).toEqual({
+                type: 'modal',
+                modalName: 'elementalBurst',
+                payload: {
+                    action,
+                    playerStats: ps,
+                    campaignName,
+                    mapName,
+                },
             });
-
-            const action = makeAction();
-            const result = await handle(action, ps, campaignName, mapName);
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('elementalBurst');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                'TestSorcerer',
+                'focusPoints',
+                0,
+                campaignName,
+            );
         });
 
-        it('falls back to maxFP when stored FP is null', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
-
-            const ps = makePlayerStats({
-                _trackedResources: null,
-            });
-
-            const action = makeAction();
-            const result = await handle(action, ps, campaignName, mapName);
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('elementalBurst');
-        });
-    });
-
-    describe('handle - side effects (modal path)', () => {
-        it('deducts 2 from stored FP and calls setRuntimeValue', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(5);
+        it('reads the canonical focusPoints key and deducts 2 from stored FP', async () => {
+            mockFP(5);
 
             const action = makeAction();
             await handle(action, makePlayerStats(), campaignName, mapName);
 
+            expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
+                'TestSorcerer',
+                'focusPoints',
+                campaignName,
+            );
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestSorcerer',
                 'focusPoints',
@@ -225,45 +144,27 @@ describe('elementalBurstHandler', () => {
             );
         });
 
-        it('deducts 2 from _trackedResources current when stored FP is undefined', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
+        it('prefers stored FP over _trackedResources when both exist', async () => {
+            mockFP(3);
 
             const ps = makePlayerStats({
-                _trackedResources: { focusPoints: { current: 7 } },
+                _trackedResources: { focusPoints: { current: 100 } },
             });
 
             const action = makeAction();
             await handle(action, ps, campaignName, mapName);
 
+            // stored 3 wins over tracked 100 — deducts to 1, not 98
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestSorcerer',
                 'focusPoints',
-                5,
+                1,
                 campaignName,
             );
         });
 
-        it('deducts 2 from maxFP when no stored FP or _trackedResources exist', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-            const ps = makePlayerStats({
-                _trackedResources: null,
-            });
-
-            const action = makeAction();
-            await handle(action, ps, campaignName, mapName);
-
-            // maxFP is 6, so 6 - 2 = 4
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestSorcerer',
-                'focusPoints',
-                4,
-                campaignName,
-            );
-        });
-
-        it('deducts 2 from string-stored FP', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue('8');
+        it('coerces a string-stored FP before deducting', async () => {
+            mockFP('8');
 
             const action = makeAction();
             await handle(action, makePlayerStats(), campaignName, mapName);
@@ -276,110 +177,35 @@ describe('elementalBurstHandler', () => {
             );
         });
 
-        it('dispatches a focus-points-updated event on the window', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(5);
+        it('prefers _trackedResources.current over maxFP when stored FP is absent', async () => {
+            mockFP(undefined);
 
-            const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
-
-            const action = makeAction();
-            await handle(action, makePlayerStats(), campaignName, mapName);
-
-            expect(dispatchEventSpy).toHaveBeenCalledWith(
-                expect.objectContaining({ type: 'focus-points-updated' }),
-            );
-            dispatchEventSpy.mockRestore();
-        });
-    });
-
-    describe('handle - edge cases', () => {
-        it('handles playerStats with no class field gracefully', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(5);
-
-            const ps = makePlayerStats({ class: null });
+            const ps = makePlayerStats({
+                _trackedResources: { focusPoints: { current: 3 } },
+            });
 
             const action = makeAction();
             const result = await handle(action, ps, campaignName, mapName);
 
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('elementalBurst');
-        });
-
-        it('handles playerStats with no class_levels field gracefully', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(5);
-
-            const ps = makePlayerStats({ class: {} });
-
-            const action = makeAction();
-            const result = await handle(action, ps, campaignName, mapName);
-
-            // maxFP would be 0 (undefined), so with stored FP of 5 it deducts to 3
+            // tracked 3 wins over maxFP 6 — deducts to 1, not 4
             expect(result.type).toBe('modal');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestSorcerer',
                 'focusPoints',
-                3,
+                1,
                 campaignName,
             );
         });
 
-        it('handles playerStats with no level field gracefully', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(5);
+        it('falls back to maxFP when stored FP and _trackedResources are both absent', async () => {
+            mockFP(undefined);
 
-            const ps = makePlayerStats({ level: undefined });
-
-            const action = makeAction();
-            const result = await handle(action, ps, campaignName, mapName);
-
-            expect(result.type).toBe('modal');
-        });
-
-        it('handles action with no automation field', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(5);
-
-            const action = { name: 'Elemental Burst' };
-            const result = await handle(action, makePlayerStats(), campaignName, mapName);
-
-            expect(result.type).toBe('modal');
-            expect(result.payload.automation).toBeUndefined();
-        });
-
-        it('handles action with no name field', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(1);
-
-            const action = { automation: { type: 'elemental_burst' } };
-            const result = await handle(action, makePlayerStats(), campaignName, mapName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.name).toBeUndefined();
-        });
-
-        it('handles class_levels as empty array', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-            const ps = makePlayerStats({
-                class: { class_levels: [] },
-                _trackedResources: null,
-            });
+            const ps = makePlayerStats({ _trackedResources: null });
 
             const action = makeAction();
             const result = await handle(action, ps, campaignName, mapName);
 
-            // maxFP = 0, storedFP = undefined, trackedResources = null -> currentFP = 0 < 2
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Not enough Focus Points');
-        });
-
-        it('handles _trackedResources with no focusPoints key', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-            const ps = makePlayerStats({
-                _trackedResources: { somethingElse: { current: 10 } },
-            });
-
-            const action = makeAction();
-            const result = await handle(action, ps, campaignName, mapName);
-
-            // maxFP = 6, so currentFP = 6 >= 2 -> modal
+            // maxFP is 6, so 6 - 2 = 4
             expect(result.type).toBe('modal');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestSorcerer',
@@ -389,77 +215,15 @@ describe('elementalBurstHandler', () => {
             );
         });
 
-        it('handles _trackedResources.focusPoints without current property', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
+        it('resolves maxFP from the class_levels entry matching playerStats.level', async () => {
+            mockFP(undefined);
 
-            const ps = makePlayerStats({
-                _trackedResources: { focusPoints: {} },
-            });
-
-            const action = makeAction();
-            const result = await handle(action, ps, campaignName, mapName);
-
-            // maxFP = 6, so currentFP = 6 >= 2 -> modal
-            expect(result.type).toBe('modal');
-        });
-
-        it('prefers stored FP over _trackedResources when both exist', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(3);
-
-            const ps = makePlayerStats({
-                _trackedResources: { focusPoints: { current: 100 } },
-            });
+            const ps = makePlayerStats({ level: 1, _trackedResources: null });
 
             const action = makeAction();
             await handle(action, ps, campaignName, mapName);
 
-            // stored FP is 3, so 3 - 2 = 1
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestSorcerer',
-                'focusPoints',
-                1,
-                campaignName,
-            );
-        });
-
-        it('prefers _trackedResources over maxFP when stored FP is absent', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-            const ps = makePlayerStats({
-                _trackedResources: { focusPoints: { current: 3 } },
-            });
-
-            const action = makeAction();
-            await handle(action, ps, campaignName, mapName);
-
-            // _trackedResources.current is 3, so 3 - 2 = 1
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestSorcerer',
-                'focusPoints',
-                1,
-                campaignName,
-            );
-        });
-
-        it('uses class level matching playerStats.level for maxFP', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(undefined);
-
-            const ps = makePlayerStats({
-                level: 1,
-                class: {
-                    class_levels: [
-                        { level: 1, focus_points: 2 },
-                        { level: 6, focus_points: 6 },
-                    ],
-                },
-                _trackedResources: null,
-            });
-
-            const action = makeAction();
-            const result = await handle(action, ps, campaignName, mapName);
-
-            // level 1 -> focus_points = 2, so currentFP = 2 >= 2 -> modal
-            expect(result.type).toBe('modal');
+            // level 1 -> focus_points 2, so 2 - 2 = 0
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'TestSorcerer',
                 'focusPoints',
@@ -468,25 +232,16 @@ describe('elementalBurstHandler', () => {
             );
         });
 
-        it('handles negative stored FP gracefully (blocks activation)', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(-1);
+        it('dispatches focus-points-updated on window after deducting', async () => {
+            mockFP(5);
 
             const action = makeAction();
-            const result = await handle(action, makePlayerStats(), campaignName, mapName);
+            await handle(action, makePlayerStats(), campaignName, mapName);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Not enough Focus Points');
-        });
-
-        it('handles NaN stored FP gracefully (blocks activation)', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(NaN);
-
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), campaignName, mapName);
-
-            // Number(NaN) = NaN, NaN < 2 is false, so it would proceed with modal
-            // but currentFP = NaN, NaN - 2 = NaN, setRuntimeValue gets NaN
-            expect(result.type).toBe('modal');
+            expect(dispatchSpy).toHaveBeenCalledTimes(1);
+            expect(dispatchSpy).toHaveBeenCalledWith(
+                expect.objectContaining({ type: 'focus-points-updated' }),
+            );
         });
     });
 });

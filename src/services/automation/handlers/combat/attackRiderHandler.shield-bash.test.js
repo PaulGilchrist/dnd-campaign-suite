@@ -1,3 +1,14 @@
+// @maintained-by-ai
+// attackRiderHandler.handleShieldBash prerequisite-refusal lane: shield equip
+// check (hasEquippedShield — armor_category / equipment_category / magic
+// base-name via the real parseMagicItemName), the full lastAttack guard
+// family (absent / miss / wrong attacker / ranged / no target), and refusal
+// no-side-effect guards (no save prompt, no FT-082 stash, shield check
+// short-circuits before any runtime read). Save-prompt args, DC math, log
+// shapes and FT-082 stash-on-pass are owned by
+// attackRiderHandler.save-flow.test.js; handle() routing + effect dispatch by
+// attackRiderHandler.test.js; the Charger size gate by
+// attackRiderHandler.charger-size-gate.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './attackRiderHandler.js';
@@ -13,6 +24,8 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(async () => {}),
 }));
 
+// Default save resolves FAIL so prerequisite-pass legs land on the
+// shieldBash modal; save-flow outcomes are pinned in save-flow.test.js.
 vi.mock('../../../automation/common/savePrompt.js', () => ({
     buildSaveDc: vi.fn(() => 15),
     createSaveListener: vi.fn(() => ({
@@ -39,12 +52,16 @@ vi.mock('../../common/oncePerTurn.js', () => ({
 
 // ── Re-import after mocking ────────────────────────────────────
 
-import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { createSaveListener } from '../../../automation/common/savePrompt.js';
 import { checkOncePerTurnWithSkip } from '../../common/oncePerTurn.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
+const LAST_ATTACK = { hit: true, attackerName: 'TestHero', weaponType: 'melee', targetName: 'Goblin' };
+
 function makeShieldBashAction(overrides = {}) {
+    const { automation: automationOverrides, ...rest } = overrides;
     return {
         name: 'Shield Bash',
         description: 'Push or knock prone on hit.',
@@ -57,9 +74,9 @@ function makeShieldBashAction(overrides = {}) {
             saveType: 'STR',
             saveAbility: 'STR',
             options: [],
-            ...overrides.automation,
+            ...automationOverrides,
         },
-        ...overrides,
+        ...rest,
     };
 }
 
@@ -80,97 +97,78 @@ function makePlayerStats(overrides = {}) {
     };
 }
 
+function shieldStats() {
+    return makePlayerStats({
+        equipped: ['Shield'],
+        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+    });
+}
+
+function mockLastAttack(lastAttack = LAST_ATTACK) {
+    getRuntimeValue.mockImplementation((_scope, key, _camp) => {
+        if (key === 'lastAttack') return lastAttack;
+        return null;
+    });
+}
+
+function refusalPopup(description) {
+    return { type: 'automation_info', name: 'Shield Bash', description };
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
-describe('attackRiderHandler - Shield Bash (push_or_prone + oncePerTurn)', () => {
+describe('attackRiderHandler - Shield Bash prerequisites', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(checkOncePerTurnWithSkip).mockResolvedValue(null);
     });
 
-    describe('prerequisites - shield check', () => {
+    describe('shield equip check (hasEquippedShield)', () => {
         it.each([
-            [{ equipped: [], equipment: [] }, 'no equipped items'],
-            [{ equipped: ['Longsword', 'Chain Mail'], equipment: [{ name: 'Longsword', armor_category: 'Light Armor' }, { name: 'Chain Mail', armor_category: 'Medium Armor' }] }, 'equipped items that are not shields'],
-            [{ equipped: ['Shield'], equipment: [{ name: 'Shield', armor_category: 'Shield' }] }, 'standard shield'],
-            [{ equipped: ['Tower Shield'], equipment: [{ name: 'Tower Shield', equipment_category: 'Shield' }] }, 'tower shield via equipment_category'],
-            [{ equipped: ['+1 Shield'], equipment: [{ name: 'Shield', armor_category: 'Shield' }] }, 'magic shield (parsed base name)'],
-        ])('should %s', async (config, description) => {
-            const action = makeShieldBashAction();
-            const stats = makePlayerStats(config);
-            const isShield = description.startsWith('standard') || description.startsWith('tower') || description.startsWith('magic');
-            getRuntimeValue.mockImplementation((_scope, key, _camp) => {
-                if (key === 'lastAttack') return { hit: true, attackerName: 'TestHero', weaponType: 'melee', targetName: 'Goblin' };
-                return null;
-            });
+            { description: 'no equipped items', equipped: [], equipment: [], pass: false },
+            { description: 'equipped items that are not shields', equipped: ['Longsword', 'Chain Mail'], equipment: [{ name: 'Longsword', armor_category: 'Light Armor' }, { name: 'Chain Mail', armor_category: 'Medium Armor' }], pass: false },
+            { description: 'standard shield', equipped: ['Shield'], equipment: [{ name: 'Shield', armor_category: 'Shield' }], pass: true },
+            { description: 'tower shield via equipment_category', equipped: ['Tower Shield'], equipment: [{ name: 'Tower Shield', equipment_category: 'Shield' }], pass: true },
+            { description: 'magic shield (parsed base name)', equipped: ['+1 Shield'], equipment: [{ name: 'Shield', armor_category: 'Shield' }], pass: true },
+        ])('should $description', async ({ equipped, equipment, pass }) => {
+            mockLastAttack();
 
-            const result = await handle(action, stats, 'test-campaign', 'map');
+            const result = await handle(makeShieldBashAction(), makePlayerStats({ equipped, equipment }), 'test-campaign', 'map');
 
-            if (isShield) {
+            if (pass) {
+                // Prerequisites satisfied → save flow reached (save-flow.test.js
+                // pins the prompt args and modal payload).
                 expect(result.type).toBe('modal');
                 expect(result.modalName).toBe('shieldBash');
             } else {
                 expect(result.type).toBe('popup');
-                expect(result.payload.description).toContain('Shield Bash requires an equipped shield');
+                expect(result.payload).toEqual(refusalPopup('Shield Bash requires an equipped shield.'));
+                // Shield check is local-only: short-circuits before any runtime
+                // read, save prompt, or FT-082 stash.
+                expect(getRuntimeValue).not.toHaveBeenCalled();
+                expect(createSaveListener).not.toHaveBeenCalled();
+                expect(setRuntimeValue).not.toHaveBeenCalled();
             }
         });
     });
 
-    describe('prerequisites - lastAttack validation', () => {
+    describe('lastAttack guards', () => {
         it.each([
-            [null, 'Shield Bash requires a hit'],
-            [{ hit: false, attackerName: 'TestHero', weaponType: 'melee', targetName: 'Goblin' }, 'Shield Bash requires a hit'],
-        ])('should return popup when lastAttack is %j', async (lastAttack, expectedText) => {
-            const action = makeShieldBashAction();
-            const stats = makePlayerStats({
-                equipped: ['Shield'],
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
+            { name: 'absent', lastAttack: null, reason: 'Shield Bash requires a hit with a melee weapon attack.' },
+            { name: 'a miss', lastAttack: { ...LAST_ATTACK, hit: false }, reason: 'Shield Bash requires a hit with a melee weapon attack.' },
+            { name: "another creature's attack", lastAttack: { ...LAST_ATTACK, attackerName: 'Orc' }, reason: 'Shield Bash requires your own melee weapon attack.' },
+            { name: 'a ranged attack', lastAttack: { ...LAST_ATTACK, weaponType: 'ranged' }, reason: 'Shield Bash requires a melee weapon attack.' },
+            { name: 'missing a targetName', lastAttack: { hit: true, attackerName: 'TestHero', weaponType: 'melee' }, reason: 'Shield Bash: no target found.' },
+        ])('should return popup when lastAttack is $name', async ({ lastAttack, reason }) => {
+            mockLastAttack(lastAttack);
 
-            getRuntimeValue.mockImplementation((_scope, key, _camp) => {
-                if (key === 'lastAttack') return lastAttack;
-                return null;
-            });
-
-            const result = await handle(action, stats, 'test-campaign', 'map');
+            const result = await handle(makeShieldBashAction(), shieldStats(), 'test-campaign', 'map');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain(expectedText);
+            expect(result.payload).toEqual(refusalPopup(reason));
+            // Guard refuses before prompting a save or stashing the base attack.
+            expect(createSaveListener).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
-
-        it('should return popup when lastAttack.attackerName does not match player', async () => {
-            const action = makeShieldBashAction();
-            const stats = makePlayerStats({
-                equipped: ['Shield'],
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
-            getRuntimeValue.mockImplementation((_scope, key, _camp) => {
-                if (key === 'lastAttack') return { hit: true, attackerName: 'Orc', weaponType: 'melee', targetName: 'Goblin' };
-                return null;
-            });
-
-            const result = await handle(action, stats, 'test-campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('your own melee weapon attack');
-        });
-
-        it('should return popup when lastAttack.weaponType is not melee', async () => {
-            const action = makeShieldBashAction();
-            const stats = makePlayerStats({
-                equipped: ['Shield'],
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
-            getRuntimeValue.mockImplementation((_scope, key, _camp) => {
-                if (key === 'lastAttack') return { hit: true, attackerName: 'TestHero', weaponType: 'ranged', targetName: 'Goblin' };
-                return null;
-            });
-
-            const result = await handle(action, stats, 'test-campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('melee weapon attack');
-        });
-
     });
 });

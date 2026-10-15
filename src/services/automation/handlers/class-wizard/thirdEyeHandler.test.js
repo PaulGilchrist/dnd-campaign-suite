@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// Deterministic unit contract for the Third Eye automation handler (2024 wizard feature):
+// already-active popup/refusal-log branches, option-selection modal payload, strict
+// buff-table writes to the runtime store, and unknown-option rejection. Both exports
+// are live: handle -> third_eye in services/automation/index.js router,
+// applyThirdEye -> ThirdEyeModal.jsx. Only direct deps (runtime store, buffToggle)
+// are mocked; no timers, no DOM, pure handler behaviour. Timestamps are destructured
+// out of exact-object pins.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, applyThirdEye } from './thirdEyeHandler.js';
@@ -14,6 +22,7 @@ vi.mock('../../../../services/automation/common/buffToggle.js', () => ({
 }));
 
 const campaignName = 'TestCampaign';
+const DURATION_TEXT = 'Duration: until start of Short or Long Rest';
 
 function makePlayerStats(overrides = {}) {
     return {
@@ -39,52 +48,46 @@ function setupMocks(getBuffsReturnValue, existingBuffs = []) {
     setRuntimeValue.mockResolvedValue(undefined);
 }
 
+// Pin an object exactly, tolerating only the volatile timestamp field.
+function expectExactExceptTimestamp(actual, expected) {
+    const { timestamp, ...rest } = actual;
+    expect(typeof timestamp).toBe('number');
+    expect(rest).toEqual(expected);
+}
+
 describe('thirdEyeHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
     describe('handle', () => {
-        it('returns popup with effect name when Third Eye is already active', async () => {
+        it('returns popup and refusal log when the feature is already active with a known effect', async () => {
             setupMocks([
-                { name: 'The Third Eye', effect: 'darkvision_120' },
+                { name: 'Custom Third Eye', effect: 'see_invisibility' },
             ]);
 
-            const action = makeAction();
+            const action = makeAction({ name: 'Custom Third Eye' });
             const playerStats = makePlayerStats();
 
             const result = await handle(action, playerStats, campaignName);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('The Third Eye');
-            expect(result.payload.description).toContain('Darkvision (120 feet)');
-            expect(result.payload.description).toContain('currently active');
-            expect(result.payload.description).toContain('Duration: until start of Short or Long Rest');
+            expect(result.payload.name).toBe('Custom Third Eye');
+            expect(result.payload.description).toBe(
+                `Custom Third Eye is currently active: See Invisibility. ${DURATION_TEXT}.`
+            );
             expect(result.payload.automation).toBe(action.automation);
-        });
-
-        it('logs a refusal entry when Third Eye is already active', async () => {
-            setupMocks([
-                { name: 'The Third Eye', effect: 'see_invisibility' },
-            ]);
-
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-
-            const result = await handle(action, playerStats, campaignName);
-
-            expect(result.type).toBe('popup');
             expect(result.logEntries).toHaveLength(1);
-            expect(result.logEntries[0].type).toBe('automation');
-            expect(result.logEntries[0].creatureName).toBe('TestWizard');
-            expect(result.logEntries[0].name).toBe('The Third Eye');
-            expect(result.logEntries[0].description).toContain('already active');
-            expect(result.logEntries[0].description).toContain('See Invisibility');
-            expect(result.logEntries[0].description).toContain('no new benefit gained');
+            expectExactExceptTimestamp(result.logEntries[0], {
+                type: 'automation',
+                creatureName: 'TestWizard',
+                name: 'Custom Third Eye',
+                description: `TestWizard's Custom Third Eye is already active (See Invisibility) — no new benefit gained.`,
+            });
         });
 
-        it('returns popup with unknown effect key when buff has unrecognized effect', async () => {
+        it('shows the raw effect key when the active buff effect is unrecognized', async () => {
             setupMocks([
                 { name: 'The Third Eye', effect: 'some_unknown_effect' },
             ]);
@@ -95,14 +98,17 @@ describe('thirdEyeHandler', () => {
             const result = await handle(action, playerStats, campaignName);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('some_unknown_effect');
+            expect(result.payload.description).toBe(
+                `The Third Eye is currently active: some_unknown_effect. ${DURATION_TEXT}.`
+            );
+            expect(result.logEntries[0].description).toContain('some_unknown_effect');
         });
 
-        it('returns popup with Unknown fallback when buff has no effect property', async () => {
-            setupMocks([
-                { name: 'The Third Eye' },
-            ]);
+        it.each([
+            ['missing effect', { name: 'The Third Eye' }],
+            ['null effect', { name: 'The Third Eye', effect: null }],
+        ])('falls back to Unknown when active buff has %s', async (_label, buff) => {
+            setupMocks([buff]);
 
             const action = makeAction();
             const playerStats = makePlayerStats();
@@ -110,25 +116,12 @@ describe('thirdEyeHandler', () => {
             const result = await handle(action, playerStats, campaignName);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('Unknown');
+            expect(result.payload.description).toBe(
+                `The Third Eye is currently active: Unknown. ${DURATION_TEXT}.`
+            );
         });
 
-        it('returns popup with Unknown fallback when buff effect is null', async () => {
-            setupMocks([
-                { name: 'The Third Eye', effect: null },
-            ]);
-
-            const action = makeAction();
-            const playerStats = makePlayerStats();
-
-            const result = await handle(action, playerStats, campaignName);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Unknown');
-        });
-
-        it('returns modal when Third Eye is not active', async () => {
+        it('returns the option modal when the feature is not active', async () => {
             setupMocks([]);
 
             const action = makeAction();
@@ -138,338 +131,160 @@ describe('thirdEyeHandler', () => {
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('thirdEye');
-            expect(result.payload.action).toBe(action);
-            expect(result.payload.playerStats).toBe(playerStats);
-            expect(result.payload.campaignName).toBe(campaignName);
-        });
-
-        it('uses action.name in popup description when feature is active', async () => {
-            setupMocks([
-                { name: 'Custom Third Eye', effect: 'darkvision_120' },
-            ]);
-
-            const action = makeAction({ name: 'Custom Third Eye' });
-            const playerStats = makePlayerStats();
-
-            const result = await handle(action, playerStats, campaignName);
-
-            expect(result.payload.name).toBe('Custom Third Eye');
-            expect(result.payload.description).toContain('Custom Third Eye');
-        });
-
-        it('passes action.automation even when automation is undefined', async () => {
-            setupMocks([]);
-
-            const action = makeAction({ automation: undefined });
-            const playerStats = makePlayerStats();
-
-            const result = await handle(action, playerStats, campaignName);
-
-            expect(result.type).toBe('modal');
-            expect(result.payload.action.automation).toBeUndefined();
+            expect(result.payload).toEqual({ action, playerStats, campaignName });
         });
     });
 
     describe('applyThirdEye', () => {
-        it('applies Darkvision option and stores buff with correct properties', async () => {
+        // Strict option table: option label -> exact buff shape and rules copy.
+        const OPTION_TABLE = [
+            {
+                option: 'Darkvision (120 feet)',
+                effect: 'darkvision_120',
+                darkvisionRange: '120 ft.',
+                seeInvisibleRange: null,
+                benefit: 'You gain Darkvision out to a range of 120 feet.',
+            },
+            {
+                option: 'Greater Comprehension',
+                effect: 'greater_comprehension',
+                darkvisionRange: null,
+                seeInvisibleRange: null,
+                benefit: 'You can read any language.',
+            },
+            {
+                option: 'See Invisibility',
+                effect: 'see_invisibility',
+                darkvisionRange: null,
+                seeInvisibleRange: 10,
+                benefit: 'You can see invisible creatures and objects within 10 feet of you that are within line of sight.',
+            },
+        ];
+
+        it.each(OPTION_TABLE)('applies $option with exact buff shape and popup/log copy', async ({ option, effect, darkvisionRange, seeInvisibleRange, benefit }) => {
             setupMocks([], []);
 
-            const action = {
-                name: 'The Third Eye',
-                automation: { type: 'third_eye', duration: 'short_or_long_rest' },
-            };
+            const action = makeAction({ automation: { type: 'third_eye', duration: 'short_or_long_rest' } });
             const playerStats = makePlayerStats();
 
-            const result = await applyThirdEye(action, playerStats, campaignName, 'Darkvision (120 feet)');
+            const result = await applyThirdEye(action, playerStats, campaignName, option);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('The Third Eye');
-            expect(result.payload.description).toContain('Darkvision');
-            expect(result.payload.description).toContain('120 feet');
-            expect(result.payload.description).toContain('Duration: until start of Short or Long Rest');
-            expect(result.payload.automation).toBe(action.automation);
+            expect(result.payload).toEqual({
+                type: 'automation_info',
+                name: 'The Third Eye',
+                description: `The Third Eye: ${option} chosen. ${benefit} (${DURATION_TEXT})`,
+                automation: action.automation,
+            });
             expect(result.logEntries).toHaveLength(1);
-            expect(result.logEntries[0].characterName).toBe('TestWizard');
-            expect(result.logEntries[0].type).toBe('ability_use');
-            expect(result.logEntries[0].abilityName).toBe('The Third Eye');
-            expect(result.logEntries[0].description).toContain('Darkvision (120 feet)');
-            expect(result.logEntries[0].description).toContain('Darkvision out to a range of 120 feet');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        name: 'The Third Eye',
-                        effect: 'darkvision_120',
-                        darkvisionRange: '120 ft.',
-                        duration: 'short_or_long_rest',
-                        seeInvisibleRange: null,
-                        hasAutomation: true,
-                    }),
-                ]),
-                campaignName,
-            );
+            expectExactExceptTimestamp(result.logEntries[0], {
+                characterName: 'TestWizard',
+                type: 'ability_use',
+                abilityName: 'The Third Eye',
+                description: `TestWizard uses The Third Eye, choosing ${option}. ${benefit} (${DURATION_TEXT})`,
+            });
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'activeBuffs', [
+                {
+                    name: 'The Third Eye',
+                    effect,
+                    duration: 'short_or_long_rest',
+                    darkvisionRange,
+                    seeInvisibleRange,
+                    hasAutomation: true,
+                },
+            ], campaignName);
         });
 
-        it('applies Greater Comprehension option', async () => {
-            setupMocks([], []);
-
-            const action = {
-                name: 'The Third Eye',
-                automation: { type: 'third_eye', duration: 'short_or_long_rest' },
-            };
-            const playerStats = makePlayerStats();
-
-            const result = await applyThirdEye(action, playerStats, campaignName, 'Greater Comprehension');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('read any language');
-            expect(result.payload.description).toContain('Greater Comprehension');
-            expect(result.logEntries[0].abilityName).toBe('The Third Eye');
-            expect(result.logEntries[0].description).toContain('Greater Comprehension');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        name: 'The Third Eye',
-                        effect: 'greater_comprehension',
-                    }),
-                ]),
-                campaignName,
-            );
-        });
-
-        it('applies See Invisibility option', async () => {
-            setupMocks([], []);
-
-            const action = {
-                name: 'The Third Eye',
-                automation: { type: 'third_eye', duration: 'short_or_long_rest' },
-            };
-            const playerStats = makePlayerStats();
-
-            const result = await applyThirdEye(action, playerStats, campaignName, 'See Invisibility');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('invisible');
-            expect(result.payload.description).toContain('10 feet');
-            expect(result.payload.description).toContain('See Invisibility');
-            expect(result.logEntries[0].abilityName).toBe('The Third Eye');
-            expect(result.logEntries[0].description).toContain('See Invisibility');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        name: 'The Third Eye',
-                        effect: 'see_invisibility',
-                        seeInvisibleRange: 10,
-                        darkvisionRange: null,
-                    }),
-                ]),
-                campaignName,
-            );
-        });
-
-        it('removes existing Third Eye buff before adding the new one', async () => {
+        it('replaces an existing Third Eye buff and preserves unrelated buffs', async () => {
             setupMocks([], [
                 { name: 'The Third Eye', effect: 'darkvision_120' },
                 { name: 'Other Buff', effect: 'some_other' },
             ]);
 
-            const action = {
-                name: 'The Third Eye',
-                automation: { type: 'third_eye', duration: 'short_or_long_rest' },
-            };
+            const action = makeAction({ automation: { type: 'third_eye', duration: 'short_or_long_rest' } });
             const playerStats = makePlayerStats();
 
             await applyThirdEye(action, playerStats, campaignName, 'Greater Comprehension');
 
-            const callArgs = setRuntimeValue.mock.calls[0];
-            const newBuffs = callArgs[2];
-            expect(newBuffs).toHaveLength(2);
-            expect(newBuffs.find(b => b.effect === 'darkvision_120')).toBeUndefined();
-            expect(newBuffs.find(b => b.effect === 'greater_comprehension')).toBeDefined();
-            expect(newBuffs.find(b => b.effect === 'some_other')).toBeDefined();
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'activeBuffs', [
+                { name: 'Other Buff', effect: 'some_other' },
+                {
+                    name: 'The Third Eye',
+                    effect: 'greater_comprehension',
+                    duration: 'short_or_long_rest',
+                    darkvisionRange: null,
+                    seeInvisibleRange: null,
+                    hasAutomation: true,
+                },
+            ], campaignName);
         });
 
-        it('uses automation duration when provided, defaults to short_or_long_rest', async () => {
+        it('passes through automation.duration and defaults to short_or_long_rest when omitted', async () => {
             setupMocks([], []);
 
-            const action = {
-                name: 'The Third Eye',
-                automation: { type: 'third_eye', duration: '1 hour' },
-            };
-            const playerStats = makePlayerStats();
+            await applyThirdEye(
+                { name: 'The Third Eye', automation: { type: 'third_eye', duration: '1 hour' } },
+                makePlayerStats(), campaignName, 'Greater Comprehension');
 
-            await applyThirdEye(action, playerStats, campaignName, 'Greater Comprehension');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeValue).toHaveBeenLastCalledWith(
                 'TestWizard',
                 'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        duration: '1 hour',
-                    }),
-                ]),
+                [expect.objectContaining({ duration: '1 hour' })],
+                campaignName,
+            );
+
+            await applyThirdEye(
+                { name: 'The Third Eye', automation: { type: 'third_eye' } },
+                makePlayerStats(), campaignName, 'Greater Comprehension');
+
+            expect(setRuntimeValue).toHaveBeenLastCalledWith(
+                'TestWizard',
+                'activeBuffs',
+                [expect.objectContaining({ duration: 'short_or_long_rest' })],
                 campaignName,
             );
         });
 
-        it('crashes when automation is undefined (no duration fallback)', async () => {
+        it('rejects undefined automation rather than inventing a fallback', async () => {
             setupMocks([], []);
-
-            const action = {
-                name: 'The Third Eye',
-                automation: undefined,
-            };
-            const playerStats = makePlayerStats();
 
             await expect(
-                applyThirdEye(action, playerStats, campaignName, 'Greater Comprehension')
+                applyThirdEye({ name: 'The Third Eye', automation: undefined }, makePlayerStats(), campaignName, 'Greater Comprehension')
             ).rejects.toThrow();
-        });
 
-        it('returns error for unknown option without calling setRuntimeValue', async () => {
-            setupMocks([], []);
-
-            const action = {
-                name: 'The Third Eye',
-                automation: { type: 'third_eye' },
-            };
-            const playerStats = makePlayerStats();
-
-            const result = await applyThirdEye(action, playerStats, campaignName, 'Unknown Option');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('Unknown option: Unknown Option');
-            expect(result.payload.automation).toBe(action.automation);
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('returns error for empty string option', async () => {
+        it.each(['Unknown Option', '', '   '])('returns error popup and never writes for option %j', async option => {
             setupMocks([], []);
 
-            const action = {
-                name: 'The Third Eye',
-                automation: { type: 'third_eye' },
-            };
+            const action = { name: 'The Third Eye', automation: { type: 'third_eye' } };
             const playerStats = makePlayerStats();
 
-            const result = await applyThirdEye(action, playerStats, campaignName, '');
+            const result = await applyThirdEye(action, playerStats, campaignName, option);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Unknown option: ');
+            expect(result.payload).toEqual({
+                type: 'automation_info',
+                name: 'The Third Eye',
+                description: `Unknown option: ${option}`,
+                automation: action.automation,
+            });
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('returns error for whitespace-only option', async () => {
+        it('derives runtime key and log identity from playerStats.name', async () => {
             setupMocks([], []);
 
-            const action = {
-                name: 'The Third Eye',
-                automation: { type: 'third_eye' },
-            };
-            const playerStats = makePlayerStats();
-
-            const result = await applyThirdEye(action, playerStats, campaignName, '   ');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Unknown option:    ');
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('uses playerStats.name in log entry and buff storage', async () => {
-            setupMocks([], []);
-
-            const action = {
-                name: 'The Third Eye',
-                automation: { type: 'third_eye', duration: 'short_or_long_rest' },
-            };
+            const action = makeAction({ automation: { type: 'third_eye', duration: 'short_or_long_rest' } });
             const playerStats = makePlayerStats({ name: 'OtherWizard' });
 
             const result = await applyThirdEye(action, playerStats, campaignName, 'Darkvision (120 feet)');
 
             expect(result.logEntries[0].characterName).toBe('OtherWizard');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'OtherWizard',
-                'activeBuffs',
-                expect.any(Array),
-                campaignName,
-            );
-        });
-
-        it('stores buff with hasAutomation: true for all effect types', async () => {
-            const effectTypes = [
-                'Darkvision (120 feet)',
-                'Greater Comprehension',
-                'See Invisibility',
-            ];
-
-            for (const option of effectTypes) {
-                setupMocks([], []);
-
-                const action = {
-                    name: 'The Third Eye',
-                    automation: { type: 'third_eye', duration: 'short_or_long_rest' },
-                };
-                const playerStats = makePlayerStats();
-
-                await applyThirdEye(action, playerStats, campaignName, option);
-
-                expect(setRuntimeValue).toHaveBeenCalledWith(
-                    'TestWizard',
-                    'activeBuffs',
-                    expect.arrayContaining([
-                        expect.objectContaining({
-                            hasAutomation: true,
-                        }),
-                    ]),
-                    campaignName,
-                );
-            }
-        });
-
-        it('handles null existing activeBuffs', async () => {
-            setupMocks([], null);
-
-            const action = {
-                name: 'The Third Eye',
-                automation: { type: 'third_eye', duration: 'short_or_long_rest' },
-            };
-            const playerStats = makePlayerStats();
-
-            const result = await applyThirdEye(action, playerStats, campaignName, 'Greater Comprehension');
-
-            expect(result.type).toBe('popup');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        effect: 'greater_comprehension',
-                    }),
-                ]),
-                campaignName,
-            );
-        });
-
-        it('uses action.name in popup when action.name is undefined', async () => {
-            setupMocks([], []);
-
-            const action = {
-                name: undefined,
-                automation: { type: 'third_eye', duration: 'short_or_long_rest' },
-            };
-            const playerStats = makePlayerStats();
-
-            const result = await applyThirdEye(action, playerStats, campaignName, 'Greater Comprehension');
-
-            expect(result.payload.name).toBeUndefined();
-            expect(result.logEntries[0].characterName).toBe('TestWizard');
+            const [key, , buffs] = setRuntimeValue.mock.calls[0];
+            expect(key).toBe('OtherWizard');
+            expect(buffs[0].name).toBe('The Third Eye');
         });
     });
 });

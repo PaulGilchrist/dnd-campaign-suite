@@ -1,6 +1,19 @@
+// @maintained-by-ai
+// Destructive Stride — skipTargetChoice lane (last of quad; siblings cover
+// handle / applyDamageTypeChoice / applyTargetChoice in their own files).
+// Production-live: the Skip flow in DestructiveStrideModal.jsx (line 29) and
+// CharActionModals.jsx (line 364) call this directly — component suites mock
+// the handler, so this file is the behavioural oracle for the skip lane.
+// Deterministic contract pins: exact popup return (own popup string per handle
+// lane), exact setRuntimeValue table (active flag + CLA-113 numeric +20
+// speed_boost, CLA-067 lane), name-scoped addExpiration delegation, the own
+// campaign-log line, and addEntry-rejection resilience. grantStrideSpeedBuff
+// dedupe internals are pinned by the applyDamageTypeChoice lane (shared
+// private helper) and are not re-covered here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { skipTargetChoice } from './destructiveStrideHandler.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 
@@ -20,16 +33,17 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
 
 const campaignName = 'TestCampaign';
 
+const SPEED_BUFF = {
+    name: 'Destructive Stride',
+    effect: 'speed_boost',
+    speedBonus: 20,
+    duration: 'until_end_of_turn',
+};
+
+// skipTargetChoice reads only playerStats.name — no level/class dependency.
 function makePlayerStats(overrides = {}) {
     return {
         name: 'TestMonk',
-        level: 5,
-        class: {
-            class_levels: [
-                { level: 1, martial_arts_die: 4 },
-                { level: 5, martial_arts_die: 6 },
-            ],
-        },
         ...overrides,
     };
 }
@@ -50,50 +64,42 @@ describe('destructiveStrideHandler — skipTargetChoice', () => {
         vi.clearAllMocks();
     });
 
-    it('returns a popup with skip description', async () => {
-        const result = await skipTargetChoice(makeAction(), makePlayerStats(), campaignName);
+    it('returns the exact popup contract with the own skip description', async () => {
+        const action = makeAction();
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.name).toBe('Destructive Stride');
-        expect(result.payload.description).toBe('Destructive Stride activated — Speed +20 ft, no damage dealt.');
+        const result = await skipTargetChoice(action, makePlayerStats(), campaignName);
+
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Destructive Stride',
+                automationType: 'destructive_stride',
+                description: 'Destructive Stride activated — Speed +20 ft, no damage dealt.',
+                automation: action.automation,
+            },
+        });
     });
 
-    it('sets destructiveStrideActive to true', async () => {
+    it('writes exactly active flag + CLA-113 speed_buff and registers the name-scoped expiry clock', async () => {
         await skipTargetChoice(makeAction(), makePlayerStats(), campaignName);
 
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'TestMonk',
-            'destructiveStrideActive',
-            true,
-            campaignName,
-        );
-    });
-
-    it('does not call setRuntimeValue for damage type — active flag + CLA-113 speed_buff only', async () => {
-        await skipTargetChoice(makeAction(), makePlayerStats(), campaignName);
-
-        const calledArgs = runtimeState.setRuntimeValue.mock.calls;
-        expect(calledArgs.map(a => a[1])).toEqual(['destructiveStrideActive', 'activeBuffs']);
-    });
-
-    it('CLA-113: grants numeric +20 speed_boost buff with name-scoped expiry clock', async () => {
-        const { addExpiration } = await import('../../../rules/effects/expirations.js');
-        await skipTargetChoice(makeAction(), makePlayerStats(), campaignName);
-
-        const buffsCall = runtimeState.setRuntimeValue.mock.calls.find(a => a[1] === 'activeBuffs');
-        expect(buffsCall[2]).toEqual([
-            { name: 'Destructive Stride', effect: 'speed_boost', speedBonus: 20, duration: 'until_end_of_turn' },
+        // No damage-type write on the skip lane — exact two-set table.
+        expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+            ['TestMonk', 'destructiveStrideActive', true, campaignName],
+            ['TestMonk', 'activeBuffs', [SPEED_BUFF], campaignName],
         ]);
-        expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
+        expect(addExpiration).toHaveBeenCalledWith({
             attackerName: 'TestMonk',
+            targetName: 'TestMonk',
             effects: [{ type: 'remove_active_buff', buffName: 'Destructive Stride' }],
             campaignName,
+            rounds: undefined,
             expireOnCreatureName: 'TestMonk',
-        }));
+        });
     });
 
-    it('logs the ability use to campaign log', async () => {
+    it('logs the skip activation with the exact campaign-log line', async () => {
         await skipTargetChoice(makeAction(), makePlayerStats(), campaignName);
 
         expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
@@ -105,51 +111,31 @@ describe('destructiveStrideHandler — skipTargetChoice', () => {
         }));
     });
 
-    it('includes automation in popup payload', async () => {
-        const result = await skipTargetChoice(makeAction(), makePlayerStats(), campaignName);
-
-        expect(result.payload.automation).toEqual(makeAction().automation);
-    });
-
-    it('includes automationType in popup payload', async () => {
-        const result = await skipTargetChoice(makeAction(), makePlayerStats(), campaignName);
-
-        expect(result.payload.automationType).toBe('destructive_stride');
-    });
-
-    it('catches and logs errors from addEntry without throwing', async () => {
-        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        logService.addEntry.mockRejectedValue(new Error('log failure'));
-
-        const result = await skipTargetChoice(makeAction(), makePlayerStats(), campaignName);
-
-        expect(result.type).toBe('popup');
-        expect(consoleErrorSpy).toHaveBeenCalled();
-        consoleErrorSpy.mockRestore();
-    });
-
-    it('works with custom action name', async () => {
-        const action = { name: 'Custom Stride', automation: { type: 'destructive_stride' } };
-        const result = await skipTargetChoice(action, makePlayerStats(), campaignName);
+    it('passes action and player names through popup and log', async () => {
+        const result = await skipTargetChoice(
+            makeAction({ name: 'Custom Stride' }),
+            makePlayerStats({ name: 'OtherMonk' }),
+            campaignName,
+        );
 
         expect(result.payload.name).toBe('Custom Stride');
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'OtherMonk', 'destructiveStrideActive', true, campaignName,
+        );
         expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            characterName: 'OtherMonk',
             abilityName: 'Custom Stride',
         }));
     });
 
-    it('works with different player name', async () => {
-        const stats = { name: 'OtherMonk', level: 5, class: { class_levels: [] } };
-        await skipTargetChoice(makeAction(), stats, campaignName);
+    it('swallows addEntry rejection — still returns the popup and logs console.error', async () => {
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        logService.addEntry.mockRejectedValueOnce(new Error('log failure'));
 
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'OtherMonk',
-            'destructiveStrideActive',
-            true,
-            campaignName,
-        );
-        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-            characterName: 'OtherMonk',
-        }));
+        const result = await skipTargetChoice(makeAction(), makePlayerStats(), campaignName);
+
+        expect(result.type).toBe('popup');
+        expect(consoleErrorSpy).toHaveBeenCalledWith('[DestructiveStride] Error logging skip:', expect.any(Error));
+        consoleErrorSpy.mockRestore();
     });
 });

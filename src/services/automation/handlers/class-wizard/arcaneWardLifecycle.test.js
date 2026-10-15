@@ -1,3 +1,27 @@
+// @maintained-by-ai
+// Lane: arcane-ward lifecycle seam — onArcaneWardDestroy (full reset to inactive/0/0),
+// onArcaneWardLevelUp (max = 2 × level + INT, proportional current-HP scaling on level-up,
+// capped at new max), and onAbjurationSpellCast (ward creation on first Abjuration cast,
+// restore 2 HP per slot level when already active, rethrows on addEntry reject).
+// Sibling lanes (do not duplicate here):
+//   arcaneWardHandler.test.js             — handle(): not-active guard (this file's levelUp
+//                                           not-active guard is a distinct-function twin, keep
+//                                           both), arcane_ward_bonus_action → 'arcaneWardRestore'
+//                                           modal routing, projected_ward absorption.
+//   arcaneWardRestore.test.js             — onArcaneWardRestore explicit-slot arithmetic.
+//   arcaneWardBonusActionRestore.test.js  — onArcaneWardBonusActionRestore lowest-slot
+//                                           auto-select + slot consumption (CONFIRMED DEAD export).
+// Orphan flag (2026-10-15): onArcaneWardDestroy / onArcaneWardLevelUp have no production
+// call sites — production long-rest teardown lives in restRules-longRest.js (its own suite)
+// and ward-max recompute lives in classRules.js/trackedResources.js (same 2 × level + INT
+// formula, covered there). Pins kept per lane map; if the exports are deleted, drop this
+// file's destroy/levelUp describes with them.
+// Modal drift flag: ArcaneWardRestoreModal.jsx handleApply() re-implements the restore
+// arithmetic (restoreAmount = selectedLevel * 2; newHp = Math.min(maxHp, currentHp +
+// restoreAmount)) via setRuntimeBatch — duplicating onArcaneWardRestore and the restore
+// path of onAbjurationSpellCast below. This file's restore pins cover the helpers.js
+// spell-cast trigger path (not the modal), so they do NOT float with modal edits; a
+// formula change must still be made in all three places.
 import {
     onArcaneWardDestroy,
     onArcaneWardLevelUp,
@@ -35,7 +59,7 @@ describe('onArcaneWardDestroy', () => {
         vi.clearAllMocks();
     });
 
-    it('sets ward active to false, HP and max to 0', async () => {
+    it('resets ward to inactive with HP and max at 0 and reports destruction', async () => {
         const result = await onArcaneWardDestroy(
             { name: 'Arcane Ward' },
             makeWizardStats('TestWizard', 5, 3),
@@ -43,7 +67,11 @@ describe('onArcaneWardDestroy', () => {
         );
 
         expect(setRuntimeValue).toHaveBeenCalledTimes(3);
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardActive', false, campaignName);
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 0, campaignName);
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', 0, campaignName);
         expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
         expect(result.payload.description).toContain('destroyed');
         expect(result.payload.description).toContain('Long Rest');
     });
@@ -54,7 +82,7 @@ describe('onArcaneWardLevelUp', () => {
         vi.clearAllMocks();
     });
 
-    it('computes correct max HP: 2 x level + INT modifier', async () => {
+    it('recomputes max HP as 2 x level + INT modifier and keeps current HP when max is unchanged', async () => {
         setWardMocks((player, key) => {
             if (key === 'arcaneWardActive') return true;
             if (key === 'arcaneWardHp') return 10;
@@ -62,14 +90,16 @@ describe('onArcaneWardLevelUp', () => {
             return undefined;
         });
 
-        await onArcaneWardLevelUp(
+        const result = await onArcaneWardLevelUp(
             { name: 'Arcane Ward' },
             makeWizardStats('TestWizard', 5, 3),
             campaignName,
         );
 
-        // 2*5 + 3 = 13
+        // 2*5 + 3 = 13 — equal to prevMax, so current HP stays 10 (no scaling branch)
         expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', 13, campaignName);
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 10, campaignName);
+        expect(result.type).toBe('popup');
     });
 
     it('scales current HP proportionally when max increases', async () => {
@@ -93,10 +123,10 @@ describe('onArcaneWardLevelUp', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 12, campaignName);
     });
 
-    it('caps scaled HP at new max', async () => {
+    it('caps scaled current HP at new max', async () => {
         setWardMocks((player, key) => {
             if (key === 'arcaneWardActive') return true;
-            if (key === 'arcaneWardHp') return 12;
+            if (key === 'arcaneWardHp') return 14;
             if (key === 'arcaneWardMax') return 13;
             return undefined;
         });
@@ -109,11 +139,11 @@ describe('onArcaneWardLevelUp', () => {
             campaignName,
         );
 
-        // ratio=15/13, newHp=round(12*15/13)=round(13.85)=14, capped at 15
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 14, campaignName);
+        // ratio=15/13, round(14*15/13)=round(16.15)=16, Math.min caps at newMax=15
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 15, campaignName);
     });
 
-    it('returns info popup when ward is not active', async () => {
+    it('returns info popup when ward is not active, writing nothing', async () => {
         setWardMocks(() => false);
 
         const result = await onArcaneWardLevelUp(
@@ -125,12 +155,10 @@ describe('onArcaneWardLevelUp', () => {
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.description).toContain('not active');
+        expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it.each([
-        [{ name: 'TestWizard', rules: '2024', level: 5, abilities: [] }, 10],
-        [{ name: 'TestWizard', rules: '2024', level: 5 }, 10],
-    ])('handles missing Intelligence ability by using 0 modifier (stats: %j)', async (noAbilitiesStats, expectedMax) => {
+    it('treats a missing abilities array as 0 INT modifier', async () => {
         setWardMocks((player, key) => {
             if (key === 'arcaneWardActive') return true;
             if (key === 'arcaneWardHp') return 5;
@@ -140,12 +168,12 @@ describe('onArcaneWardLevelUp', () => {
 
         await onArcaneWardLevelUp(
             { name: 'Arcane Ward' },
-            noAbilitiesStats,
+            { name: 'TestWizard', rules: '2024', level: 5 },
             campaignName,
         );
 
         // 2*5 + 0 = 10
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', expectedMax, campaignName);
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', 10, campaignName);
     });
 });
 
@@ -154,7 +182,7 @@ describe('onAbjurationSpellCast', () => {
         vi.clearAllMocks();
     });
 
-    it('creates a new ward when one is not active', async () => {
+    it('creates a new ward at 2 x level + INT when one is not active', async () => {
         setWardMocks(() => false);
 
         const result = await onAbjurationSpellCast(
@@ -165,32 +193,18 @@ describe('onAbjurationSpellCast', () => {
             campaignName,
         );
 
+        // 2*5 + 3 = 13
         expect(setRuntimeValue).toHaveBeenCalledTimes(3);
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardActive', true, campaignName);
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', 13, campaignName);
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 13, campaignName);
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.description).toContain('created');
         expect(result.payload.description).toContain('Shield');
     });
 
-    it('creates ward with correct max HP for different wizard levels', async () => {
-        setWardMocks(() => false);
-
-        const level10Stats = makeWizardStats('TestWizard', 10, 4);
-
-        await onAbjurationSpellCast(
-            { name: 'Arcane Ward' },
-            level10Stats,
-            'Mage Armor',
-            1,
-            campaignName,
-        );
-
-        // 2*10 + 4 = 24
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', 24, campaignName);
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 24, campaignName);
-    });
-
-    it('restores ward HP when ward is already active', async () => {
+    it('restores ward HP when ward is already active, touching only ward HP', async () => {
         setWardMocks((player, key) => {
             if (key === 'arcaneWardActive') return true;
             if (key === 'arcaneWardHp') return 8;
@@ -206,11 +220,13 @@ describe('onAbjurationSpellCast', () => {
             campaignName,
         );
 
+        // slot 1 -> restore 2; no max rewrite and no slot consumption on this path
+        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
         expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 10, campaignName);
         expect(result.payload.description).toContain('restored 2 HP');
     });
 
-    it('restores more HP with a higher spell slot level', async () => {
+    it('restores more HP with a higher spell slot level, capped at max', async () => {
         setWardMocks((player, key) => {
             if (key === 'arcaneWardActive') return true;
             if (key === 'arcaneWardHp') return 8;

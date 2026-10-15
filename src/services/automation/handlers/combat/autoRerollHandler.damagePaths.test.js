@@ -1,3 +1,32 @@
+// @maintained-by-ai
+// autoRerollHandler — applyMissTurnedHitDamage damage-payload lane (numeric-bonus seam).
+//
+// Seam map for the autoRerollHandler.test.js quint:
+//   autoRerollHandler.test.js             — router dispatch, Guarded Mind, resource costs,
+//                                             bardic/psionic die lanes, ally-range routing
+//   autoRerollHandler.attackRoll.test.js  — handleAttackRoll popup description full-string
+//                                             composition + rerollAttackLeg delegation
+//                                             (exactly-once miss→hit damage)
+//   autoRerollHandler.damagePaths.test.js (this file) — applyMissTurnedHitDamage payload
+//                                             content and rerollAttackLeg damage gating:
+//                                             exact applyDamage args, full damage log entry,
+//                                             skip-guards (formula-missing, total-0, null-AC,
+//                                             still-miss-with-formula), effectiveAc fallback
+//   autoRerollHandler.miscPaths.test.js   — handleAbilityCheck / handleSaveRoll /
+//                                             consumeResourceCost / findAllyMissedAttack /
+//                                             getBardicDieSize internals
+//   autoRerollHandler.soul-blades.test.js — Homing Strikes (CLA-320) gates and economy
+//
+// Deliberately NOT owned here (owned elsewhere — do not absorb): popup full-string
+// composition and exactly-once delegation counts (attackRoll lane), ability_use log
+// content (attackRoll own / main ally routing), registry internals.
+//
+// Production traffic: numeric-bonus auto_reroll rows — e.g. the 2024 channel-divinity
+// ally row in 2024/classes.json (bonus 10, range 30 ft) drives the ally lane; lastAttack
+// events (with effectiveAc/attackName/damageFormula) come from attackPostProcessing's
+// storeCampaignLastAttack. Deterministic by construction: bonus is a fixed authored
+// number, dice are mocked, Math.random die lanes are not entered. Turn-based: no timers.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './autoRerollHandler.js';
@@ -71,245 +100,209 @@ function makePlayerStats(overrides = {}) {
     };
 }
 
-describe('autoRerollHandler - bonus path own attack miss->hit damage', () => {
+function mockLastAttack(attack) {
+    getRuntimeValue.mockImplementation((name, key) => {
+        if (name === 'campaign' && key === 'lastAttack') return attack;
+        return null;
+    });
+}
+
+function mockLiveDamage(total) {
+    vi.mocked(rollExpression).mockReturnValue({ total, rolls: [total - 2, 2], modifier: 0 });
+    const ctx = { creatures: [] };
+    vi.mocked(getCombatContext).mockResolvedValue(ctx);
+    vi.mocked(applyDamageToTarget).mockReturnValue({ finalDamage: total });
+    return ctx;
+}
+
+function damageLogEntries() {
+    return addEntry.mock.calls.map((c) => c[1]).filter((e) => e.rollType === 'damage');
+}
+
+describe('autoRerollHandler - own attack miss→hit damage payload (numeric-bonus lane)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return null;
-            return null;
-        });
+        mockLastAttack(null);
     });
 
-    it('should apply damage when own attack miss turns into hit with bonus', async () => {
-        vi.mocked(rollExpression).mockReturnValue({ total: 10, rolls: [7, 3], modifier: 0 });
-        vi.mocked(getCombatContext).mockResolvedValue({ creatures: [] });
-        vi.mocked(applyDamageToTarget).mockReturnValue({ finalDamage: 10 });
+    it('applies own miss→hit damage with exact applyDamage contract and full damage log entry', async () => {
+        const stats = makePlayerStats();
+        const ctx = mockLiveDamage(10);
+        mockLastAttack({ rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '2d8', damageType: 'piercing', targetName: 'Orc' });
 
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '2d8', damageType: 'piercing', targetName: 'Orc' };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', bonus: 5 },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
+        const action = makeAction({ automation: { type: 'auto_reroll', bonus: 5 } });
+        const result = await handle(action, stats, 'test-campaign', 'map');
 
         expect(result.type).toBe('popup');
         expect(rollExpression).toHaveBeenCalledWith('2d8');
         expect(getCombatContext).toHaveBeenCalledWith('test-campaign');
-        expect(applyDamageToTarget).toHaveBeenCalled();
-        expect(addEntry).toHaveBeenCalledWith(
-            'test-campaign',
-            expect.objectContaining({
+        expect(applyDamageToTarget).toHaveBeenCalledWith(ctx, 'Orc', 10, ['piercing'], {
+            campaignName: [stats],
+            characters: false,
+            ignoreResistance: 'TestHero',
+        });
+        // Full damage-roll log composition (payload of applyMissTurnedHitDamage).
+        expect(damageLogEntries()).toEqual([
+            {
                 type: 'roll',
+                characterName: 'TestHero',
                 rollType: 'damage',
+                name: 'Test Auto Reroll',
+                formula: '2d8',
+                rolls: [8, 2],
+                total: 10,
+                modifier: 0,
+                damageType: 'piercing',
                 targetName: 'Orc',
-            })
-        );
+                finalDamage: 10,
+            },
+        ]);
     });
 
-    it('should skip damage when damageFormula is missing on own attack miss->hit', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false };
-            return null;
-        });
+    it('rolls the formula but applies nothing when damage total is 0', async () => {
+        mockLiveDamage(0);
+        mockLastAttack({ rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '2d6', damageType: 'slashing', targetName: 'Goblin' });
 
-        const action = makeAction({
-            automation: { type: 'auto_reroll', bonus: 5 },
-        });
+        const action = makeAction({ automation: { type: 'auto_reroll', bonus: 10 } });
+        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
+
+        // Popup still reports the conversion verdict (attack-roll truth, not damage truth).
+        expect(result.payload.description).toContain('Miss turned into a hit');
+        expect(rollExpression).toHaveBeenCalledWith('2d6');
+        // Zero total: bail before context lookup, damage application, and any damage log.
+        expect(getCombatContext).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(damageLogEntries()).toHaveLength(0);
+    });
+
+    it('does not roll damage when null AC falls back to the recorded miss verdict', async () => {
+        mockLiveDamage(8);
+        // No targetAc and no effectiveAc: rerollAttackLeg falls back to
+        // attackEvent.hit (false) — the live formula must never touch dice.
+        mockLastAttack({ rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, hit: false, damageFormula: '2d6', damageType: 'slashing', targetName: 'Goblin' });
+
+        const action = makeAction({ automation: { type: 'auto_reroll', bonus: 10 } });
+        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
+
+        expect(result.payload.description).toContain('N/A');
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(getCombatContext).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+    });
+
+    it('never rolls damage dice on a still-miss even when a live formula is present', async () => {
+        mockLiveDamage(8);
+        mockLastAttack({ rollType: 'attack', attackerName: 'TestHero', d20: 2, bonus: 5, targetAc: 20, hit: false, damageFormula: '1d12', damageType: 'slashing', targetName: 'Ogre' });
+
+        const action = makeAction({ automation: { type: 'auto_reroll', bonus: 2 } });
         const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
 
         expect(result.type).toBe('popup');
         expect(rollExpression).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(damageLogEntries()).toHaveLength(0);
     });
 
-    it('should skip damage when damage total is 0', async () => {
-        vi.mocked(rollExpression).mockReturnValue({ total: 0, rolls: [], modifier: 0 });
+    it('converts a miss to a hit via effectiveAc when targetAc is absent', async () => {
+        const stats = makePlayerStats();
+        const ctx = mockLiveDamage(8);
+        // targetAc null, effectiveAc 11 within reach of the boosted total:
+        // the effectiveAc ?? targetAc fallback in rerollAttackLeg is what
+        // makes this apply damage (storeCampaignLastAttack emits effectiveAc).
+        mockLastAttack({ rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 1, effectiveAc: 11, hit: false, damageFormula: '1d8', damageType: 'force', targetName: 'Shade' });
 
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '2d6', damageType: 'slashing', targetName: 'Goblin' };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', bonus: 10 },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
+        const action = makeAction({ automation: { type: 'auto_reroll', bonus: 5 } });
+        const result = await handle(action, stats, 'test-campaign', 'map');
 
         expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Miss turned into a hit');
-        expect(addEntry).toHaveBeenCalledWith(
-            'test-campaign',
-            expect.objectContaining({
-                type: 'ability_use',
-            })
-        );
-    });
-
-    it('should use effectiveAc fallback when targetAc is null', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, effectiveAc: 16, hit: false, damageFormula: '2d6', damageType: 'slashing', targetName: 'Goblin' };
-            return null;
+        expect(rollExpression).toHaveBeenCalledWith('1d8');
+        expect(applyDamageToTarget).toHaveBeenCalledWith(ctx, 'Shade', 8, ['force'], {
+            campaignName: [stats],
+            characters: false,
+            ignoreResistance: 'TestHero',
         });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', bonus: 5 },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('d20(5)');
-    });
-
-    it('should handle null ac in own attack bonus path', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, hit: false, damageFormula: '2d6', targetName: 'Goblin' };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', bonus: 5 },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('N/A');
-    });
-
-    it('should still be a miss when modified total does not reach ac', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'TestHero', d20: 2, bonus: 5, targetAc: 20, hit: false };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', bonus: 2 },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.payload.description).toContain('Still a miss');
+        expect(damageLogEntries()).toHaveLength(1);
+        expect(damageLogEntries()[0]).toMatchObject({ characterName: 'TestHero', targetName: 'Shade', formula: '1d8' });
     });
 });
 
-describe('autoRerollHandler - bonus path ally attack miss->hit damage', () => {
+describe('autoRerollHandler - ally attack miss→hit damage payload (ranged-boost lane)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return null;
-            return null;
-        });
+        mockLastAttack(null);
     });
 
-    it('should apply damage when ally attack miss turns into hit with range', async () => {
-        vi.mocked(rollExpression).mockReturnValue({ total: 12, rolls: [8, 4], modifier: 0 });
-        vi.mocked(getCombatContext).mockResolvedValue({ creatures: [] });
-        vi.mocked(applyDamageToTarget).mockReturnValue({ finalDamage: 12 });
+    it('applies ally damage attributed to the ally with default attack log name', async () => {
+        const stats = makePlayerStats();
+        const ctx = mockLiveDamage(12);
+        // Ally event without attackName/name: logName falls back to 'Attack'.
+        mockLastAttack({ rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '2d10', damageType: 'radiant', targetName: 'Demon' });
 
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '2d10', damageType: 'radiant', targetName: 'Demon' };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', bonus: 5, range: '30_ft' },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
+        const action = makeAction({ automation: { type: 'auto_reroll', bonus: 5, range: '30_ft' } });
+        const result = await handle(action, stats, 'test-campaign', 'map');
 
         expect(result.type).toBe('popup');
         expect(rollExpression).toHaveBeenCalledWith('2d10');
         expect(getCombatContext).toHaveBeenCalledWith('test-campaign');
-        expect(applyDamageToTarget).toHaveBeenCalled();
-        expect(addEntry).toHaveBeenCalledWith(
-            'test-campaign',
-            expect.objectContaining({
+        expect(applyDamageToTarget).toHaveBeenCalledWith(ctx, 'Demon', 12, ['radiant'], {
+            campaignName: [stats],
+            characters: false,
+            ignoreResistance: 'Ally',
+        });
+        // Damage is logged under the ally, not the player who supplied the boost.
+        expect(damageLogEntries()).toEqual([
+            {
                 type: 'roll',
-                rollType: 'damage',
-                targetName: 'Demon',
                 characterName: 'Ally',
-            })
-        );
+                rollType: 'damage',
+                name: 'Attack',
+                formula: '2d10',
+                rolls: [10, 2],
+                total: 12,
+                modifier: 0,
+                damageType: 'radiant',
+                targetName: 'Demon',
+                finalDamage: 12,
+            },
+        ]);
     });
 
-    it('should skip ally damage when damageFormula is missing', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, targetAc: 15, hit: false };
-            return null;
-        });
+    it('skips ally damage when damageFormula is missing', async () => {
+        mockLiveDamage(12);
+        mockLastAttack({ rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, targetAc: 15, hit: false });
 
-        const action = makeAction({
-            automation: { type: 'auto_reroll', bonus: 5, range: '30_ft' },
-        });
+        const action = makeAction({ automation: { type: 'auto_reroll', bonus: 5, range: '30_ft' } });
         const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
 
         expect(result.type).toBe('popup');
         expect(rollExpression).not.toHaveBeenCalled();
+        expect(getCombatContext).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
 
-    it('should skip ally damage when damage total is 0', async () => {
-        vi.mocked(rollExpression).mockReturnValue({ total: 0, rolls: [], modifier: 0 });
+    it('rolls the ally formula but applies nothing when total is 0', async () => {
+        mockLiveDamage(0);
+        mockLastAttack({ rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '2d6', damageType: 'slashing', targetName: 'Goblin' });
 
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, targetAc: 15, hit: false, damageFormula: '2d6', damageType: 'slashing', targetName: 'Goblin' };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', bonus: 10, range: '30_ft' },
-        });
+        const action = makeAction({ automation: { type: 'auto_reroll', bonus: 10, range: '30_ft' } });
         const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
 
-        expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('Miss turned into a hit');
-        expect(addEntry).toHaveBeenCalledWith(
-            'test-campaign',
-            expect.objectContaining({
-                type: 'ability_use',
-            })
-        );
+        expect(rollExpression).toHaveBeenCalledWith('2d6');
+        expect(getCombatContext).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(damageLogEntries()).toHaveLength(0);
     });
 
-    it('should use effectiveAc fallback for ally attack', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, effectiveAc: 16, hit: false, damageFormula: '2d6', damageType: 'slashing', targetName: 'Goblin' };
-            return null;
-        });
+    it('does not roll ally damage when null AC falls back to the recorded miss verdict', async () => {
+        mockLiveDamage(8);
+        mockLastAttack({ rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, hit: false, damageFormula: '2d6', targetName: 'Goblin' });
 
-        const action = makeAction({
-            automation: { type: 'auto_reroll', bonus: 5, range: '30_ft' },
-        });
+        const action = makeAction({ automation: { type: 'auto_reroll', bonus: 5, range: '30_ft' } });
         const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('d20(5)');
-    });
-
-    it('should handle null ac in ally attack bonus path', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, hit: false, damageFormula: '2d6', targetName: 'Goblin' };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', bonus: 5, range: '30_ft' },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('N/A');
-    });
-
-    it('should still be a miss for ally when modified total does not reach ac', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'Ally', d20: 2, bonus: 5, targetAc: 20, hit: false };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', bonus: 2, range: '30_ft' },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.payload.description).toContain('Still a miss');
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
 });

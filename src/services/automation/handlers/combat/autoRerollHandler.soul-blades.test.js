@@ -1,7 +1,13 @@
+// @maintained-by-ai
 // CLA-320: manual Soul Blades Reactions row — RAW gates enforced:
 // trigger is a missed own Psychic Blade attack, natural 1 refuses,
 // already-homed misses refuse (double-dip guard), and the Psionic Energy
 // die is expended ONLY when the boosted roll turns the miss into a hit.
+// Owns handleHomingStrikes/homingStrikeRefusal in autoRerollHandler.js only;
+// hitResolution.soul-blades.test.js owns the automatic resolveHit seam, and
+// the main autoRerollHandler.test.js owns the generic psionic_energy_die path
+// (empty-pool and default-max checks run BEFORE the homing dispatch, so they
+// are main's lane, not this file's).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { handle } from './autoRerollHandler.js';
@@ -144,20 +150,41 @@ describe('autoRerollHandler — Soul Blades Homing Strikes manual row (CLA-320)'
         expect(energyWrites()).toHaveLength(0);
     });
 
-    it('refuses an already-homed miss (double-dip guard) — pool intact', async () => {
-        seedRuntime(makeLastAttack({ homingStrikesAttempted: true }));
+    it.each([
+        ['an attack that already hit', () => makeLastAttack({ hit: true })],
+        ["another creature's miss", () => makeLastAttack({ attackerName: 'Rogue Ally' })],
+        ['a recent saving throw', () => makeLastAttack({ rollType: 'save', saveType: 'Wisdom' })],
+    ])('refuses when no fresh own missed attack — %s — pool intact', async (_label, seedAttack) => {
+        seedRuntime(seedAttack());
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(result.payload.description).toContain('No recent missed attack');
+        expect(energyWrites()).toHaveLength(0);
+    });
+
+    it.each([
+        ['homingStrikesAttempted', { homingStrikesAttempted: true }],
+        ['homingStrikesUsed', { homingStrikesUsed: true }],
+    ])('refuses an already-homed miss (%s) — double-dip guard, pool intact', async (_flag, stamps) => {
+        seedRuntime(makeLastAttack(stamps));
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
         expect(result.payload.description).toContain('already resolved this attack');
         expect(energyWrites()).toHaveLength(0);
     });
 
-    it('refuses when the last attack already hit — pool intact', async () => {
-        seedRuntime(makeLastAttack({ hit: true }));
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+    it.each([
+        ['trigger only', 'condition'],
+        ['condition only', 'trigger'],
+    ])('routes to the Homing Strikes branch on %s (natural 1 refuses — generic psionic lane would consume)', async (_kept, removed) => {
+        const auto = makeAction().automation;
+        delete auto[removed];
+        seedRuntime(makeLastAttack({ d20: 1 }));
+        const result = await handle({ ...makeAction(), automation: auto }, makePlayerStats(), campaignName, null);
 
-        expect(result.payload.description).toContain('No recent missed attack');
+        expect(result.payload.description).toContain('natural 1');
         expect(energyWrites()).toHaveLength(0);
+        expect(rollExpression).not.toHaveBeenCalled();
     });
 
     it('converts to hit: expends exactly 1 die, applies damage, stamps lastAttack', async () => {

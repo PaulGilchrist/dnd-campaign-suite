@@ -1,4 +1,10 @@
+// @maintained-by-ai
 // CLA-378: Vitality of the Tree — rage-activation surge ordering + rage-end THP strip.
+// combatStanceHandler sextet lane: owns grant-BEFORE-buff-POST ordering + the single-deferred-POST
+// count, rage anchor stamps, max-surge pick + rage ability_use log composition (full strings), and the
+// rage-end THP/anchor strip incl. the Rage of the Gods strip. grantTempHpOnRage ARG SHAPE is pinned
+// by the activation/pounce lanes; generic (non-Rage) deactivation by the main lane.
+// Deterministic: runtime/logService/combatData mocked, pure handler, exact pins — no churn expected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './combatStanceHandler.js';
@@ -80,8 +86,10 @@ describe('CLA-378 rage activation', () => {
         await handle(makeRageAction(), makePlayerStats(), campaignName);
 
         expect(tempHpBuff.grantTempHpOnRage).toHaveBeenCalledTimes(1);
-        const buffIdx = runtimeState.setRuntimeValue.mock.calls.findIndex(c => c[1] === 'activeBuffs');
-        expect(buffIdx).toBeGreaterThanOrEqual(0);
+        // Rage DEFERS its activeBuffs write until after the grant — exactly one POST exists.
+        const buffWrites = callsFor('activeBuffs');
+        expect(buffWrites).toHaveLength(1);
+        const buffIdx = runtimeState.setRuntimeValue.mock.calls.indexOf(buffWrites[0]);
         expect(tempHpBuff.grantTempHpOnRage.mock.invocationCallOrder[0])
             .toBeLessThan(runtimeState.setRuntimeValue.mock.invocationCallOrder[buffIdx]);
     });
@@ -113,9 +121,34 @@ describe('CLA-378 rage activation', () => {
             type: 'ability_use',
             characterName: 'TestBarbarian',
             abilityName: 'Rage',
-            description: expect.stringContaining('activated Rage'),
+            description: 'TestBarbarian activated Rage. Vitality of the Tree (Vitality Surge) grants 20 temporary hit points.',
         }));
-        expect(logService.addEntry.mock.calls[0][1].description).toContain('20 temporary hit points');
+    });
+
+    it('dispatches every triggerOnRage feature and names only the largest surge in the log', async () => {
+        setupRuntimeMocks({
+            'TestBarbarian:activeBuffs': [],
+            'TestBarbarian:ragePoints': 6,
+        });
+        const ps = makePlayerStats({
+            automation: {
+                specialActions: [
+                    { name: 'Lesser Surge', triggerOnRage: true },
+                    { name: 'Bigger Surge', triggerOnRage: true },
+                ],
+            },
+        });
+        tempHpBuff.grantTempHpOnRage.mockResolvedValueOnce(8).mockResolvedValueOnce(12);
+
+        await handle(makeRageAction(), ps, campaignName);
+
+        expect(tempHpBuff.grantTempHpOnRage).toHaveBeenCalledTimes(2);
+        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'ability_use',
+            characterName: 'TestBarbarian',
+            abilityName: 'Rage',
+            description: 'TestBarbarian activated Rage. Bigger Surge (Vitality Surge) grants 12 temporary hit points.',
+        }));
     });
 });
 
@@ -179,9 +212,26 @@ describe('CLA-378 rage end', () => {
             type: 'ability_use',
             characterName: 'TestBarbarian',
             abilityName: 'Rage',
-            description: expect.stringContaining("Rage ended"),
+            description: "TestBarbarian's Rage ended. Vitality of the Tree temporary hit points vanish for Thug 1.",
         }));
-        expect(logService.addEntry.mock.calls[0][1].description).toContain('Thug 1');
+    });
+
+    it('strips the dependent Rage of the Gods buff while keeping unrelated stances', async () => {
+        setupRuntimeMocks({
+            'TestBarbarian:activeBuffs': [
+                { name: 'Rage', effect: 'stance' },
+                { name: 'Rage of the Gods', effect: 'stance' },
+                { name: 'Enhanced Ability', effect: 'stance' },
+            ],
+            'TestBarbarian:vitalityOfTheTreeGrantedTargets': null,
+        });
+
+        const result = await handle(makeRageAction(), makePlayerStats(), campaignName);
+
+        expect(result.type).toBe('popup');
+        expect(callsFor('activeBuffs')).toEqual([
+            ['TestBarbarian', 'activeBuffs', [{ name: 'Enhanced Ability', effect: 'stance' }], campaignName],
+        ]);
     });
 
     it('does not strip temp HP when a non-Rage stance ends', async () => {

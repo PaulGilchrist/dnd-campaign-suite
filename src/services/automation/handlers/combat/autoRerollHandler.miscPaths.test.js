@@ -1,3 +1,40 @@
+// @maintained-by-ai
+// autoRerollHandler — misc-paths lane: handleAbilityCheck / handleSaveRoll popup
+// composition, consumeResourceCost gating (refusals + max fallbacks),
+// findAllyMissedAttack internals, getBardicDieSize guard, bardic not-fresh refusal.
+//
+// Seam map for the autoRerollHandler.test.js quint:
+//   autoRerollHandler.test.js             — router dispatch, Guarded Mind, resource costs,
+//                                           bardic/psionic die lanes, ally-range routing
+//   autoRerollHandler.attackRoll.test.js  — handleAttackRoll popup description full-string
+//                                           composition + rerollAttackLeg delegation
+//                                           (exactly-once miss→hit damage)
+//   autoRerollHandler.damagePaths.test.js — applyMissTurnedHitDamage payload content
+//   autoRerollHandler.miscPaths.test.js (this file) — handleAbilityCheck / handleSaveRoll
+//                                           composition, consumeResourceCost internals,
+//                                           findAllyMissedAttack guard ordering,
+//                                           getBardicDieSize guard, bardic not-fresh refusal
+//   autoRerollHandler.soul-blades.test.js — Homing Strikes (CLA-320) gates and economy
+//
+// Production traffic (verified against public/data JSON):
+//   - saving_throw reroll lane: Indomitable / Fanatical Focus / Disciplined Survivor
+//     (2024/classes.json) → handleSavingThrowReroll → consumeResourceCost → handleSaveRoll.
+//   - numeric lane: Guided Strike (bonus 10 + channel_divinity + range) → consume first,
+//     findAllyMissedAttack for the ally leg.
+//   - bardic lane: Peerless Skill → getBardicDieSize / handleBardicInspiration refusal.
+//   - rollType 'skill' check events come from the live skill-popup producers.
+//
+// Honest gaps (do NOT re-add tests for these — they are unreachable via handle()):
+//   - handleAbilityCheck/handleSaveRoll own "No recent ... found" early returns: every
+//     router caller guards freshness/isSave BEFORE calling, so those branches are dead.
+//   - handleGuardedMind branch here is legacy: the authored Guarded Mind row
+//     (2024/feats.json) carries no target:'saving_throw' and runs via SavePromptModal
+//     (findGuardedMindAction). Guarded Mind tests live in the main lane only.
+//
+// Deterministic by construction: fixed authored numbers, mocked dice; the one Math.random
+// consumption (bardic die) is value-independent of every assertion below.
+// Turn-based only: no game timers.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './autoRerollHandler.js';
@@ -5,6 +42,10 @@ import { handle } from './autoRerollHandler.js';
 // Re-import after mocking
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
+import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -49,6 +90,8 @@ vi.mock('../../../../services/character/classFeatures.js', () => ({
     getClassFeatures: vi.fn(),
 }));
 
+const CAMPAIGN = 'test-campaign';
+
 function makeAction(overrides = {}) {
     return {
         name: 'Test Auto Reroll',
@@ -66,271 +109,295 @@ function makePlayerStats(overrides = {}) {
     return {
         name: 'TestHero',
         proficiency: 3,
-        class: { class_levels: [{ level: 1, bardic_inspiration_uses: 3 }] },
+        class: { class_levels: [{ level: 1 }] },
         level: 1,
         resources: {},
         ...overrides,
     };
 }
 
-describe('autoRerollHandler - handleAbilityCheck / handleSaveRoll paths', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return null;
-            return null;
-        });
+// Seed the runtime mock: lastAttack plus any '<name>.<key>' pairs.
+function mockRuntime({ lastAttack = null, ...rest } = {}) {
+    getRuntimeValue.mockImplementation((name, key) => {
+        if (name === 'campaign' && key === 'lastAttack') return lastAttack;
+        return rest[`${name}.${key}`] ?? null;
     });
-
-    it('should return early popup from handleAbilityCheck when lastAttack is not a check', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'TestHero', d20: 10, bonus: 5, targetAc: 15, hit: false };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', target: 'saving_throw', effect: 'override_fail_to_success', oncePer: 'short_rest' },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('should return early popup from handleSaveRoll when lastAttack is not a save', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'TestHero', d20: 10, bonus: 5, targetAc: 15, hit: false };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { target: 'saving_throw', resourceCost: 'channel_divinity' },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('No recent saving throw found');
-    });
-
-    it('should handle saveType fallback when saveType is null', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: null };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { target: 'saving_throw', resourceCost: 'channel_divinity' },
-        });
-        const stats = makePlayerStatsForLevel(5, { channel_divinity: 2 });
-        const result = await handle(action, stats, 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Save');
-    });
-
-    it('should handle checkName fallback when checkName is null', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'check', attackerName: 'TestHero', d20: 10, bonus: 3, checkName: null };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', bonus: 2 },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('d20(10)');
-    });
-});
-
-describe('autoRerollHandler - consumeResourceCost paths', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return null;
-            return null;
-        });
-    });
-
-    it('should reject when no focus points remaining', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'Intelligence' };
-            if (name === 'TestHero' && key === 'focusPoints') return 0;
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { target: 'saving_throw', resourceCost: 'focus_points' },
-        });
-        const stats = makePlayerStats({ level: 1, class: { class_levels: [{ level: 1, focus_points: 5 }] } });
-        const result = await handle(action, stats, 'test-campaign', 'map');
-
-        expect(result.payload.description).toContain('No Focus Points remaining');
-        expect(addEntry).not.toHaveBeenCalled();
-    });
-
-    it('should fallback to getClassFeatures for maxFocusPoints', async () => {
-        vi.mocked(getClassFeatures).mockReturnValue({ maxFocusPoints: 3 });
-
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'Intelligence' };
-            if (name === 'TestHero' && key === 'focusPoints') return 2;
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { target: 'saving_throw', resourceCost: 'focus_points' },
-        });
-        const stats = makePlayerStats({ level: 1, class: { class_levels: [{ level: 1 }] } });
-        const result = await handle(action, stats, 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(getClassFeatures).toHaveBeenCalledWith(stats);
-    });
-
-    it('should consume focus points and decrement', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'Intelligence' };
-            if (name === 'TestHero' && key === 'focusPoints') return 3;
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { target: 'saving_throw', resourceCost: 'focus_points' },
-        });
-        const stats = makePlayerStats({ level: 1, class: { class_levels: [{ level: 1, focus_points: 5 }] } });
-        const result = await handle(action, stats, 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'focusPoints', 2, 'test-campaign');
-    });
-
-    it('should return consumeResourceCost error path in saving throw handler', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'Wisdom' };
-            if (name === 'TestHero' && key === 'channelDivinityCharges') return 0;
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { target: 'saving_throw', resourceCost: 'channel_divinity' },
-        });
-        const stats = makePlayerStatsForLevel(5, { channel_divinity: 2 });
-        const result = await handle(action, stats, 'test-campaign', 'map');
-
-        expect(result.payload.description).toContain('No Channel Divinity charges remaining');
-        expect(addEntry).not.toHaveBeenCalled();
-    });
-});
-
-describe('autoRerollHandler - findAllyMissedAttack / getBardicDieSize paths', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return null;
-            return null;
-        });
-    });
-
-    it('should return null from findAllyMissedAttack when lastAttack is null', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return null;
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', target: 'saving_throw', effect: 'override_fail_to_success', oncePer: 'short_rest' },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('should return null from findAllyMissedAttack when lastAttack is not an attack', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'check', attackerName: 'Ally', d20: 10, bonus: 3, checkName: 'Stealth' };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', target: 'saving_throw', effect: 'override_fail_to_success', oncePer: 'short_rest' },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('should return null from findAllyMissedAttack when lastAttack hit is true', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'Ally', d20: 18, bonus: 5, targetAc: 15, hit: true };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', target: 'saving_throw', effect: 'override_fail_to_success', oncePer: 'short_rest' },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('should return null from findAllyMissedAttack when attackerName is player', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false };
-            return null;
-        });
-
-        const action = makeAction({
-            automation: { type: 'auto_reroll', target: 'saving_throw', effect: 'override_fail_to_success', oncePer: 'short_rest' },
-        });
-        const result = await handle(action, makePlayerStats(), 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('should return 0 from getBardicDieSize when no class_levels', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return null;
-            return null;
-        });
-
-        const stats = makePlayerStats({ class: null });
-        const action = makeAction({
-            automation: { bonusExpression: 'bardic_inspiration_die' },
-        });
-        const result = await handle(action, stats, 'test-campaign', 'map');
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('should reject bardic inspiration when last roll is not player attack or check', async () => {
-        getRuntimeValue.mockImplementation((name, key, _campaign) => {
-            if (name === 'campaign' && key === 'lastAttack') return { rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, targetAc: 15, hit: false };
-            return null;
-        });
-
-        const stats = makePlayerStatsForLevel(1, { bardic_inspiration_uses: 3, bardic_die: 6 });
-        const action = makeAction({
-            automation: { bonusExpression: 'bardic_inspiration_die' },
-        });
-        const result = await handle(action, stats, 'test-campaign', 'map');
-
-        expect(result.payload.description).toContain('No recent failed ability check or attack roll');
-    });
-});
-
-function makePlayerStatsForLevel(level, classOverrides = {}) {
-    return {
-        name: 'TestHero',
-        proficiency: 3,
-        class: { class_levels: [{ level, ...classOverrides }] },
-        level,
-        resources: {},
-    };
 }
+
+describe('autoRerollHandler - handleSaveRoll composition + reroll-lane guards (Indomitable-shaped live row)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockRuntime();
+    });
+
+    it('pins the full handleSaveRoll popup for a named save, free reroll (no runtime writes)', async () => {
+        // Indomitable / Fanatical Focus rows: target saving_throw, no resourceCost →
+        // handleSavingThrowReroll hardcodes bonus 0 into handleSaveRoll.
+        mockRuntime({ lastAttack: { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'Wisdom' } });
+
+        const action = makeAction({
+            automation: { type: 'auto_reroll', target: 'saving_throw', trigger: 'failed_saving_throw' },
+        });
+        const result = await handle(action, makePlayerStats(), CAMPAIGN, 'map');
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.name).toBe('Test Auto Reroll');
+        expect(result.payload.description).toBe(
+            '<b>Test Auto Reroll</b><br/>' +
+            'Bonus: +0<br/>' +
+            'WISDOM: d20(3) + 2 = 5 → Modified: d20(3) + 2 = <b>5</b>'
+        );
+        // No resource cost on this row: the lane must touch nothing.
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(getCombatContext).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the generic "Save" label when saveType is null', async () => {
+        mockRuntime({ lastAttack: { rollType: 'save', targetName: 'TestHero', d20: 8, bonus: 2, saveType: null } });
+
+        const action = makeAction({
+            automation: { type: 'auto_reroll', target: 'saving_throw', trigger: 'failed_saving_throw' },
+        });
+        const result = await handle(action, makePlayerStats(), CAMPAIGN, 'map');
+
+        expect(result.payload.description).toBe(
+            '<b>Test Auto Reroll</b><br/>' +
+            'Bonus: +0<br/>' +
+            'Save: d20(8) + 2 = 10 → Modified: d20(8) + 2 = <b>10</b>'
+        );
+    });
+
+    it('reroll lane refuses a non-save lastAttack (distinct from the main lane Guarded Mind guard)', async () => {
+        // No effect/oncePer on this row, so this dispatches through
+        // handleSavingThrowReroll — not handleGuardedMind (main lane owns that guard).
+        mockRuntime({ lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false } });
+
+        const action = makeAction({
+            automation: { type: 'auto_reroll', target: 'saving_throw', trigger: 'failed_saving_throw' },
+        });
+        const result = await handle(action, makePlayerStats(), CAMPAIGN, 'map');
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toBe(
+            'No recent saving throw found for TestHero. This feature can only be used shortly after a saving throw.'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+
+    it('reroll lane refuses a save that belongs to another creature', async () => {
+        mockRuntime({ lastAttack: { rollType: 'save', targetName: 'OtherPlayer', d20: 3, bonus: 2, saveType: 'Wisdom' } });
+
+        const action = makeAction({
+            automation: { type: 'auto_reroll', target: 'saving_throw', trigger: 'failed_saving_throw' },
+        });
+        const result = await handle(action, makePlayerStats(), CAMPAIGN, 'map');
+
+        expect(result.payload.description).toBe(
+            'No recent saving throw found for TestHero. This feature can only be used shortly after a saving throw.'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+});
+
+describe('autoRerollHandler - consumeResourceCost internals (Disciplined Survivor / Guided Strike rows)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockRuntime();
+    });
+
+    it('refuses focus_points at zero with the exact popup and no writes or logs', async () => {
+        // Disciplined Survivor row: target saving_throw + resourceCost focus_points.
+        mockRuntime({
+            lastAttack: { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'Intelligence' },
+            'TestHero.focusPoints': 0,
+        });
+
+        const action = makeAction({
+            automation: { type: 'auto_reroll', target: 'saving_throw', resourceCost: 'focus_points', trigger: 'failed_saving_throw' },
+        });
+        const stats = makePlayerStats({ class: { class_levels: [{ level: 1, focus_points: 5 }] } });
+        const result = await handle(action, stats, CAMPAIGN, 'map');
+
+        // consume* refusals title the popup with the player name, not the action name.
+        expect(result.payload.name).toBe('TestHero');
+        expect(result.payload.description).toBe('No Focus Points remaining.');
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+
+    it('derives maxFocusPoints from getClassFeatures when class_levels omits focus_points and nothing is stored', async () => {
+        // Runtime empty: maxFocus falls back to getClassFeatures(stats).maxFocusPoints (3),
+        // so the consumption write must be 3 - 1 = 2. Without the fallback current is 0
+        // and the lane refuses — this pins the fallback, not just its invocation.
+        vi.mocked(getClassFeatures).mockReturnValue({ maxFocusPoints: 3 });
+        mockRuntime({ lastAttack: { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'Intelligence' } });
+
+        const action = makeAction({
+            automation: { type: 'auto_reroll', target: 'saving_throw', resourceCost: 'focus_points', trigger: 'failed_saving_throw' },
+        });
+        const stats = makePlayerStats({ class: { class_levels: [{ level: 1 }] } });
+        const result = await handle(action, stats, CAMPAIGN, 'map');
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('INTELLIGENCE: d20(3) + 2 = 5');
+        expect(getClassFeatures).toHaveBeenCalledWith(stats);
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'focusPoints', 2, CAMPAIGN);
+    });
+
+    it('consults channel_divinity before the reroll seam and refuses at zero (Guided Strike shape)', async () => {
+        // Guided Strike row: numeric bonus + channel_divinity (+range in prod).
+        // The miss is own and fresh — the resource gate must refuse anyway,
+        // proving consumeResourceCost is consulted before any reroll work.
+        mockRuntime({
+            lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false },
+            'TestHero.channelDivinityCharges': 0,
+        });
+
+        const action = makeAction({
+            automation: { type: 'auto_reroll', bonus: 10, resourceCost: 'channel_divinity', trigger: 'missed_attack_roll' },
+        });
+        const result = await handle(action, makePlayerStats(), CAMPAIGN, 'map');
+
+        expect(result.payload.name).toBe('TestHero');
+        expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(getCombatContext).not.toHaveBeenCalled();
+    });
+});
+
+describe('autoRerollHandler - handleAbilityCheck composition (numeric-bonus lane)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockRuntime();
+    });
+
+    it('pins the full check popup and the own-failed-check ability_use log', async () => {
+        mockRuntime({ lastAttack: { rollType: 'check', attackerName: 'TestHero', d20: 12, bonus: 3, checkName: 'Stealth' } });
+
+        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN, 'map');
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toBe(
+            '<b>Test Auto Reroll</b><br/>' +
+            'Bonus: +2<br/>' +
+            'Stealth: d20(12) + 3 = 15 → Modified: d20(14) + 3 = <b>17</b>'
+        );
+        // Own failed-check log string is owned by this lane (attackRoll lane owns
+        // the own-attack string; main pins only a substring).
+        expect(addEntry).toHaveBeenCalledWith(
+            CAMPAIGN,
+            expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestHero',
+                abilityName: 'Test Auto Reroll',
+                description: 'TestHero used Test Auto Reroll: +2 to own failed ability check.',
+            })
+        );
+    });
+
+    it('accepts rollType "skill" check events through the same composition', async () => {
+        // Live skill-popup producers emit rollType:'skill' events (see CharSheet handlers).
+        mockRuntime({ lastAttack: { rollType: 'skill', attackerName: 'TestHero', d20: 4, bonus: 5, checkName: "Thieves' Tools" } });
+
+        const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN, 'map');
+
+        expect(result.payload.description).toBe(
+            '<b>Test Auto Reroll</b><br/>' +
+            'Bonus: +2<br/>' +
+            "Thieves' Tools: d20(4) + 5 = 9 → Modified: d20(6) + 5 = <b>11</b>"
+        );
+    });
+});
+
+describe('autoRerollHandler - findAllyMissedAttack guard ordering (ranged row)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockRuntime();
+    });
+
+    const rangedAction = () => makeAction({ automation: { type: 'auto_reroll', bonus: 5, range: '30_ft' } });
+    const fallbackPopupText = 'No recent failed attack roll or ability check found for you or any ally within range.';
+
+    it('short-circuits on null lastAttack before any range check', async () => {
+        mockRuntime({ lastAttack: null });
+
+        const result = await handle(rangedAction(), makePlayerStats(), CAMPAIGN, 'map');
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toBe(fallbackPopupText);
+        expect(isWithinRange).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+
+    it('rejects a hit ally attack by guard — range is never consulted', async () => {
+        mockRuntime({ lastAttack: { rollType: 'attack', attackerName: 'Ally', d20: 18, bonus: 5, targetAc: 15, hit: true } });
+
+        const result = await handle(rangedAction(), makePlayerStats(), CAMPAIGN, 'map');
+
+        expect(result.payload.description).toBe(fallbackPopupText);
+        expect(isWithinRange).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+
+    it('delegates to isWithinRange with exact args and falls back when out of range', async () => {
+        vi.mocked(isWithinRange).mockResolvedValueOnce(false);
+        mockRuntime({ lastAttack: { rollType: 'attack', attackerName: 'Ally', d20: 3, bonus: 5, targetAc: 15, hit: false } });
+
+        const result = await handle(rangedAction(), makePlayerStats(), CAMPAIGN, 'map');
+
+        expect(result.payload.description).toBe(fallbackPopupText);
+        expect(isWithinRange).toHaveBeenCalledWith('TestHero', 'Ally', 30);
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+    });
+});
+
+describe('autoRerollHandler - getBardicDieSize guard + bardic not-fresh refusal (Peerless Skill row)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockRuntime();
+    });
+
+    it('skips the bardic lane entirely when the character has no class_levels', async () => {
+        // Distinct from the main lane's bardic_die:0 test: this pins the
+        // !class?.class_levels guard, then the router fallthrough to automationInfoPopup.
+        mockRuntime({ lastAttack: null });
+
+        const action = makeAction({
+            automation: { type: 'auto_reroll', bonus: undefined, bonusExpression: 'bardic_inspiration_die', trigger: 'failed_ability_check_or_attack_roll' },
+        });
+        const result = await handle(action, makePlayerStats({ class: null }), CAMPAIGN, 'map');
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.name).toBe('Test Auto Reroll');
+        expect(result.payload.automationType).toBe('auto_reroll');
+        expect(result.payload.description).toBe('Reroll ability.');
+        // The bardic handler must never have been entered.
+        expect(getRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'bardicInspirationUses');
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('refuses bardic inspiration when the last roll is not the player\'s failed roll — no expends, no log', async () => {
+        mockRuntime({ lastAttack: { rollType: 'attack', attackerName: 'Ally', d20: 5, bonus: 5, targetAc: 15, hit: false } });
+
+        const stats = makePlayerStats({ class: { class_levels: [{ level: 1, bardic_inspiration_uses: 3, bardic_die: 6 }] } });
+        const action = makeAction({
+            automation: { type: 'auto_reroll', bonus: undefined, bonusExpression: 'bardic_inspiration_die', trigger: 'failed_ability_check_or_attack_roll' },
+        });
+        const result = await handle(action, stats, CAMPAIGN, 'map');
+
+        expect(result.payload.description).toBe(
+            'No recent failed ability check or attack roll found. Test Auto Reroll can only be used shortly after a failure.'
+        );
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+});

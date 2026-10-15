@@ -3,6 +3,7 @@
 // (refusal popup + transposition_refused log when absent) and a confirmed
 // swap must persist a teleport_swap_with_illusion te mirror + ability_use log
 // (CLA-357 telekinetic_movement model).
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, confirmTeleport } from './tempTeleportHandler.js';
@@ -82,8 +83,17 @@ describe('CLA-366 Trickster\'s Transposition', () => {
     });
 
     describe('handle — illusion-active gate', () => {
-        it('refuses with popup + transposition_refused log when no create_illusion buff is active', async () => {
-            setupBuffs([]);
+        // Strict table over the two absent-illusion shapes: an empty
+        // activeBuffs list and the never-written null default (the
+        // Array.isArray normalization leg of isIllusionActive).
+        it.each([
+            ['an empty activeBuffs list', []],
+            ['a null activeBuffs store', null],
+        ])('refuses with popup + transposition_refused log when %s', async (_label, buffs) => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (name === PLAYER_NAME && key === 'activeBuffs') return buffs;
+                return null;
+            });
             const action = makeAction();
 
             const result = await handle(action, makePlayerStats(), CAMPAIGN_NAME, 'test-map');
@@ -99,17 +109,6 @@ describe('CLA-366 Trickster\'s Transposition', () => {
                     automationType: 'transposition_refused',
                     name: "Trickster's Transposition",
                 }),
-            );
-        });
-
-        it('refuses when activeBuffs is null (no illusion entity to swap with)', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const result = await handle(makeAction(), makePlayerStats(), CAMPAIGN_NAME, 'test-map');
-
-            expect(result.type).toBe('popup');
-            expect(addEntry).toHaveBeenCalledWith(
-                CAMPAIGN_NAME,
-                expect.objectContaining({ automationType: 'transposition_refused' }),
             );
         });
 

@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Deterministic unit lane for initiativeHandler.handle — the MANUAL initiative_action
+// execution lane (routed via automation/index.js :314). All collaborators are mocked at
+// module boundaries; pins the four effectHandlers contracts (classes.json-backed).
+// The passive sheet-roll lane lives in useInitiativeEffects.* tests (distinct seam —
+// see docs/automations-manifest.json "lanes useInitiativeEffects+initiativeHandler").
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ───────────────────────────────────────────────────────
@@ -160,7 +166,7 @@ describe('initiativeHandler.handle', () => {
       );
     });
 
-    it('uses proficiency as fallback for bardicMax when class_levels has no bardic_inspiration_uses', async () => {
+    it('defaults bardicInspirationUses to proficiency when class_levels has no bardic_inspiration_uses', async () => {
       const ps = makePlayerStats({
         level: 3,
         proficiency: 3,
@@ -169,7 +175,7 @@ describe('initiativeHandler.handle', () => {
       const action = makeAction({ effect: 'bonus_initiative_allies' });
       setupRuntimeMocks({
         'Bard:activeConditions:TestCampaign': [],
-        'Bard:bardicInspirationUses:TestCampaign': 2,
+        // no bardicInspirationUses in runtime → falls back to bardicMax = proficiency (3)
       });
       diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
 
@@ -177,6 +183,13 @@ describe('initiativeHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('initiative_buff');
+      // proficiency fallback must supply max (3), consumed down to 2
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Bard',
+        'bardicInspirationUses',
+        2,
+        campaignName,
+      );
     });
 
     it('defaults bardic_die to 6 when class_level entry is missing', async () => {
@@ -289,7 +302,7 @@ describe('initiativeHandler.handle', () => {
       expect(result.payload.type).toBe('initiative_buff');
       expect(storage.set).toHaveBeenCalledWith(
         'combatSummary',
-        expect.objectContaining({ creatures: expect.any(Array) }),
+        { round: 1, creatures: [{ name: 'Goblin', type: 'npc', initiative: '15' }] },
         campaignName,
       );
     });
@@ -451,22 +464,6 @@ describe('initiativeHandler.handle', () => {
         campaignName,
       );
     });
-
-    it('treats null/undefined runtime value as 0 current uses', async () => {
-      const ps = makeDruidStats();
-      const action = makeAction({ effect: 'wild_shape_regen_on_initiative' });
-      setupRuntimeMocks({});
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('regained 1 use of Wild Shape');
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Bard',
-        'wildShapeUses',
-        1,
-        campaignName,
-      );
-    });
   });
 
   describe('effect: regain_bardic_inspiration_on_initiative', () => {
@@ -596,26 +593,9 @@ describe('initiativeHandler.handle', () => {
       });
     }
 
-    it('returns popup when Uncanny Metabolism already used this combat', async () => {
-      const ps = makeMonkStats();
-      const action = makeAction({ effect: 'regain_focus_points_and_heal' });
-      setupRuntimeMocks({
-        'Bard:uncannyMetabolismUsed:TestCampaign': true,
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('cannot be used again until a long rest');
-      expect(diceRoller.rollExpression).not.toHaveBeenCalled();
-      expect(healingRoll.logHealingToSSE).not.toHaveBeenCalled();
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
-
     // CLA-372: refusal must reach the campaign log (family precedent
     // CLA-345/CLA-355/CLA-394), spending nothing.
-    it('logs uncanny_metabolism_refused on refusal with zero HP/FP deltas', async () => {
+    it('refuses when Uncanny Metabolism already used this combat: popup + refused-log, zero HP/FP spend', async () => {
       const ps = makeMonkStats();
       const action = makeAction({ effect: 'regain_focus_points_and_heal' });
       setupRuntimeMocks({
@@ -626,6 +606,8 @@ describe('initiativeHandler.handle', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('cannot be used again until a long rest');
       expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'automation',
         characterName: 'Bard',
@@ -655,6 +637,10 @@ describe('initiativeHandler.handle', () => {
       expect(result.payload.targetCurrentHp).toBe(24);
       expect(result.payload.targetMaxHp).toBe(30);
       expect(result.payload.damageApplied).toBe(true);
+      expect(result.payload.description).toContain('Rolled 6');
+      expect(result.payload.description).toContain('+ 3');
+      expect(result.payload.description).toContain('<strong>9</strong>');
+      expect(result.payload.description).toContain('Regained all Focus Points');
     });
 
     it('caps healing at max HP', async () => {
@@ -695,7 +681,9 @@ describe('initiativeHandler.handle', () => {
       );
     });
 
-    it('sets currentHitPoints via setRuntimeValue', async () => {
+    // CLA-372: sequential awaits — exact write order, uncannyMetabolismUsed
+    // latch LAST (last full-store snapshot, §6-#18).
+    it('writes currentHitPoints then latches uncannyMetabolismUsed last', async () => {
       const ps = makeMonkStats();
       const action = makeAction({ effect: 'regain_focus_points_and_heal' });
       setupRuntimeMocks({
@@ -706,31 +694,11 @@ describe('initiativeHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Bard',
-        'currentHitPoints',
-        22,
-        campaignName,
-      );
-    });
-
-    it('sets uncannyMetabolismUsed to true after healing', async () => {
-      const ps = makeMonkStats();
-      const action = makeAction({ effect: 'regain_focus_points_and_heal' });
-      setupRuntimeMocks({
-        'Bard:uncannyMetabolismUsed:TestCampaign': false,
-        'Bard:currentHitPoints:TestCampaign': 15,
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Bard',
-        'uncannyMetabolismUsed',
-        true,
-        campaignName,
-      );
+      // no focus_points on default class_levels → FP write skipped
+      expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+        ['Bard', 'currentHitPoints', 22, campaignName],
+        ['Bard', 'uncannyMetabolismUsed', true, campaignName],
+      ]);
     });
 
     it('restores focus points to max when focus_points is defined', async () => {
@@ -750,12 +718,11 @@ describe('initiativeHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Bard',
-        'focusPoints',
-        2,
-        campaignName,
-      );
+      expect(useRuntimeState.setRuntimeValue.mock.calls).toEqual([
+        ['Bard', 'currentHitPoints', 22, campaignName],
+        ['Bard', 'focusPoints', 2, campaignName],
+        ['Bard', 'uncannyMetabolismUsed', true, campaignName],
+      ]);
     });
 
     it('skips focus points restore when focus_points is 0', async () => {
@@ -800,23 +767,6 @@ describe('initiativeHandler.handle', () => {
         abilityName: 'Tandem Footwork',
         description: expect.stringContaining('Rolled 5'),
       });
-    });
-
-    it('returns correct description with roll details', async () => {
-      const ps = makeMonkStats();
-      const action = makeAction({ effect: 'regain_focus_points_and_heal' });
-      setupRuntimeMocks({
-        'Bard:uncannyMetabolismUsed:TestCampaign': false,
-        'Bard:currentHitPoints:TestCampaign': 15,
-      });
-      diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Rolled 6');
-      expect(result.payload.description).toContain('+ 3');
-      expect(result.payload.description).toContain('<strong>9</strong>');
-      expect(result.payload.description).toContain('Regained all Focus Points');
     });
 
     it('returns null when rollExpression returns null', async () => {

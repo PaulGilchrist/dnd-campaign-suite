@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Lane: save-prompt emission config + saveResults processing (condition writes,
+// dedupe, expiration, mixed results) for resolveMassFear.
+// Sibling lanes: massFearHandler.test.js owns handle() + target selection;
+// massFearHandler.summary.test.js owns popup summary text + buildSaveDc/option
+// defaults (its 'handles single creature (just the primary target)' pins the
+// defaulted createSaveListener config). Fully mocked, deterministic, turn-based.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -60,6 +67,16 @@ function makeCombatSummary(creatures) {
   return { creatures, players: [], placedItems: [] };
 }
 
+function resolve(option) {
+  return resolveMassFear({
+    campaignName,
+    casterName: 'TestCaster',
+    primaryTargetName: 'Goblin',
+    option: { saveDc: 14, range: '20_ft', ...option },
+    playerStats: makePlayerStats(),
+  });
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('massFearHandler.resolveMassFear - save prompts', () => {
@@ -84,13 +101,7 @@ describe('massFearHandler.resolveMassFear - save prompts', () => {
     damageUtils.getCombatContext.mockResolvedValue(cs);
     rangeCheck.isWithinRange.mockResolvedValue(true);
 
-    await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
-          playerStats: makePlayerStats(),
-      });
+    await resolve({ saveType: 'WIS' });
 
     expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(2);
     expect(savePrompt.createSaveListener).toHaveBeenNthCalledWith(1, campaignName, {
@@ -101,83 +112,22 @@ describe('massFearHandler.resolveMassFear - save prompts', () => {
     });
   });
 
-  it('uses custom saveType from option', async () => {
+  // Option → save-listener config passthrough. Defaulted config (WIS/frightened)
+  // is pinned above and by summary lane's single-target exact config pin.
+  it.each([
+    ['saveType', { saveType: 'CON' }, 'CON', 'frightened'],
+    ['condition', { condition: 'charmed' }, 'WIS', 'charmed'],
+  ])('passes custom %s through to save listener config', async (_field, override, saveType, condition) => {
     const cs = makeCombatSummary([
       { name: 'TestCaster', type: 'player' },
       { name: 'Goblin', type: 'monster' },
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 14, saveType: 'CON', range: '20_ft' },
-          playerStats: makePlayerStats(),
-      });
+    await resolve(override);
 
     expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-      targetName: 'Goblin', saveType: 'CON', saveDc: 14, dcSuccess: 'none', condition: 'frightened',
-    });
-  });
-
-  it('defaults saveType to WIS when not specified', async () => {
-    const cs = makeCombatSummary([
-      { name: 'TestCaster', type: 'player' },
-      { name: 'Goblin', type: 'monster' },
-    ]);
-    damageUtils.getCombatContext.mockResolvedValue(cs);
-
-    await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 14, range: '20_ft' },
-          playerStats: makePlayerStats(),
-      });
-
-    expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-      targetName: 'Goblin', saveType: 'WIS', saveDc: 14, dcSuccess: 'none', condition: 'frightened',
-    });
-  });
-
-  it('uses custom condition from option', async () => {
-    const cs = makeCombatSummary([
-      { name: 'TestCaster', type: 'player' },
-      { name: 'Goblin', type: 'monster' },
-    ]);
-    damageUtils.getCombatContext.mockResolvedValue(cs);
-
-    await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 14, saveType: 'WIS', condition: 'charmed', range: '20_ft' },
-          playerStats: makePlayerStats(),
-      });
-
-    expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-      targetName: 'Goblin', saveType: 'WIS', saveDc: 14, dcSuccess: 'none', condition: 'charmed',
-    });
-  });
-
-  it('defaults condition to frightened', async () => {
-    const cs = makeCombatSummary([
-      { name: 'TestCaster', type: 'player' },
-      { name: 'Goblin', type: 'monster' },
-    ]);
-    damageUtils.getCombatContext.mockResolvedValue(cs);
-
-    await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
-          playerStats: makePlayerStats(),
-      });
-
-    expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-      targetName: 'Goblin', saveType: 'WIS', saveDc: 14, dcSuccess: 'none', condition: 'frightened',
+      targetName: 'Goblin', saveType, saveDc: 14, dcSuccess: 'none', condition,
     });
   });
 
@@ -190,13 +140,7 @@ describe('massFearHandler.resolveMassFear - save prompts', () => {
     damageUtils.getCombatContext.mockResolvedValue(cs);
     rangeCheck.isWithinRange.mockResolvedValue(true);
 
-    await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
-          playerStats: makePlayerStats(),
-      });
+    await resolve({ saveType: 'WIS' });
 
     // 2 target log entries + 1 summary log entry = 3 total
     expect(logService.addEntry).toHaveBeenCalledTimes(3);
@@ -223,13 +167,7 @@ describe('massFearHandler.resolveMassFear - save prompts', () => {
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 14, saveType: 'WIS', name: "Tasha's Hideous Laughter", range: '20_ft' },
-          playerStats: makePlayerStats(),
-      });
+    await resolve({ saveType: 'WIS', name: "Tasha's Hideous Laughter" });
 
     expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
       type: 'ability_use',
@@ -262,13 +200,7 @@ describe('massFearHandler.resolveMassFear - save results (failed saves)', () => 
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
-          playerStats: makePlayerStats(),
-      });
+    await resolve({ saveType: 'WIS' });
 
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Goblin', 'activeConditions', ['frightened'], campaignName,
@@ -283,13 +215,7 @@ describe('massFearHandler.resolveMassFear - save results (failed saves)', () => 
     damageUtils.getCombatContext.mockResolvedValue(cs);
     runtimeState.getRuntimeValue.mockReturnValueOnce(['prone', 'blinded']);
 
-    await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
-          playerStats: makePlayerStats(),
-      });
+    await resolve({ saveType: 'WIS' });
 
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Goblin', 'activeConditions', ['prone', 'blinded', 'frightened'], campaignName,
@@ -304,13 +230,7 @@ describe('massFearHandler.resolveMassFear - save results (failed saves)', () => 
     damageUtils.getCombatContext.mockResolvedValue(cs);
     runtimeState.getRuntimeValue.mockReturnValueOnce(['frightened', 'blinded']);
 
-    await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
-          playerStats: makePlayerStats(),
-      });
+    await resolve({ saveType: 'WIS' });
 
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Goblin', 'activeConditions', ['blinded', 'frightened'], campaignName,
@@ -324,13 +244,7 @@ describe('massFearHandler.resolveMassFear - save results (failed saves)', () => 
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
 
-    await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
-          playerStats: makePlayerStats(),
-      });
+    await resolve({ saveType: 'WIS' });
 
     expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: [{ type: 'condition', condition: 'frightened' }], campaignName });
   });
@@ -344,10 +258,6 @@ describe('massFearHandler.resolveMassFear - save results (failed saves)', () => 
     ]);
     damageUtils.getCombatContext.mockResolvedValue(cs);
     rangeCheck.isWithinRange.mockResolvedValue(true);
-    runtimeState.getRuntimeValue.mockReturnValue(undefined);
-    runtimeState.setRuntimeValue.mockResolvedValue(undefined);
-    logService.addEntry.mockResolvedValue({});
-    expirations.addExpiration.mockReturnValue(undefined);
 
     let callIndex = 0;
     const results = [false, true, false]; // Goblin fails, Orc succeeds, Skeleton fails
@@ -360,30 +270,16 @@ describe('massFearHandler.resolveMassFear - save results (failed saves)', () => 
       };
     });
 
-    await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 14, saveType: 'WIS', range: '20_ft' },
-          playerStats: makePlayerStats(),
-      });
+    await resolve({ saveType: 'WIS' });
 
-    // Goblin and Skeleton should have frightened condition
-    const goblinCalls = runtimeState.setRuntimeValue.mock.calls.filter(
-      call => call[0] === 'Goblin' && call[1] === 'activeConditions',
+    // Goblin and Skeleton fail: frightened applied + expiration, exactly once each
+    const conditionWrites = runtimeState.setRuntimeValue.mock.calls.filter(
+      call => call[1] === 'activeConditions',
     );
-    expect(goblinCalls.length).toBe(1);
-    expect(goblinCalls[0][2]).toContain('frightened');
+    expect(conditionWrites.map(call => call[0])).toEqual(['Goblin', 'Skeleton']);
+    expect(conditionWrites.every(call => call[2].join() === 'frightened')).toBe(true);
 
-    const orcCalls = runtimeState.setRuntimeValue.mock.calls.filter(
-      call => call[0] === 'Orc' && call[1] === 'activeConditions',
-    );
-    expect(orcCalls.length).toBe(0);
-
-    const skeletonCalls = runtimeState.setRuntimeValue.mock.calls.filter(
-      call => call[0] === 'Skeleton' && call[1] === 'activeConditions',
-    );
-    expect(skeletonCalls.length).toBe(1);
-    expect(skeletonCalls[0][2]).toContain('frightened');
+    // Orc saved: no condition write, no expiration
+    expect(expirations.addExpiration.mock.calls.map(call => call[0].targetName)).toEqual(['Goblin', 'Skeleton']);
   });
 });

@@ -1,3 +1,17 @@
+// @maintained-by-ai
+// combatStanceHandler sextet — lane: INSTINCTIVE POUNCE (regression CLA-201).
+//
+// Owns (per the six-lane seam map in .activation.test.js): the canonical
+// half-Speed advisory ('up to N feet') composed into the rage-entry popup
+// and the ability_use log — the folded rules-layer speed (40 → 20, NOT the
+// old hardcoded 30 fallback → 15) and the race JSON fallback reaching the
+// player-facing text. Also pins that the advisory LOGS before the
+// teleport_on_rage modal return (the modal ROUTING itself is activation's;
+// the grant arg shape is activation's; grant/buff POST ordering is cla378's;
+// resolveHalfSpeedFeet's internal ladder is speedUtils.cla201's).
+//
+// Deterministic: runtime/logService/combatData mocked, pure handler, exact
+// numeric + fragment pins — no churn expected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './combatStanceHandler.js';
@@ -21,6 +35,10 @@ vi.mock('../class-warlock/tempTeleportHandler.js', () => ({
 
 vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('../../../encounters/combatData.js', () => ({
+    getCurrentCombatRound: vi.fn(() => 1),
 }));
 
 const campaignName = 'test-campaign';

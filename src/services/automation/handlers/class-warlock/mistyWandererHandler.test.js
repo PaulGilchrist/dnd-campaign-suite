@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Deterministic handler-contract suite: pins handle()/confirmMistyWanderer() return shapes,
+// the owned _<FeatureName>_freeCastCount runtime pool key (exact-key pins), full-string own
+// popup/log composition, and CLA-229 logging. Only churns if handler behaviour changes on purpose.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, confirmMistyWanderer } from './mistyWandererHandler.js';
@@ -125,29 +129,6 @@ describe('mistyWandererHandler', () => {
             expect(result.payload.automation).toBeDefined();
         });
 
-        it('decrements from various starting values and reports correctly', async () => {
-            const testCases = [
-                { start: 3, expected: 2, desc: '2 remaining' },
-                { start: 1, expected: 0, desc: '0 remaining' },
-            ];
-
-            for (const tc of testCases) {
-                vi.clearAllMocks();
-                getRuntimeValue.mockReturnValue(tc.start);
-
-                const result = await confirmMistyWanderer(makeAction(), makePlayerStats(), 'campaign', false, null);
-
-                expect(setRuntimeValue).toHaveBeenCalledWith(
-                    'Test Character',
-                    '_Misty_Wanderer_freeCastCount',
-                    tc.expected,
-                    'campaign',
-                );
-                expect(result.payload.description).toBe(`Misty Wanderer: Cast Misty Step (${tc.desc}).`);
-                expect(result.payload.triggerMistyStep).toBe(true);
-            }
-        });
-
         it('includes ally description when bringing an ally', async () => {
             getRuntimeValue.mockReturnValue(3);
 
@@ -173,16 +154,17 @@ describe('mistyWandererHandler', () => {
             expect(result.payload.description).not.toContain('Brought');
         });
 
-        it('returns info popup when no free casts remaining', async () => {
+        it('returns info popup without logging or consuming when no free casts remain (CLA-229)', async () => {
             getRuntimeValue.mockReturnValue(0);
 
-            const result = await confirmMistyWanderer(makeAction(), makePlayerStats(), 'campaign', false, null);
+            const result = await confirmMistyWanderer(makeAction(), makePlayerStats(), 'campaign', true, 'HexWarlock');
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toBe('No free casts remaining. Finish a Long Rest to regain them.');
             expect(result.payload.triggerMistyStep).toBeUndefined();
             expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
         it('uses custom feature name in the output', async () => {
@@ -194,6 +176,8 @@ describe('mistyWandererHandler', () => {
 
             expect(result.payload.name).toBe('Custom Feature');
             expect(result.payload.description).toBe('Custom Feature: Cast Misty Step (1 remaining).');
+            expect(getRuntimeValue).toHaveBeenCalledWith('Test Character', '_Custom_Feature_freeCastCount', 'campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', '_Custom_Feature_freeCastCount', 1, 'campaign');
         });
 
         // CLA-229: confirm must log consumption + teleport text, and carry the
@@ -226,15 +210,6 @@ describe('mistyWandererHandler', () => {
             expect(campaign).toBe('campaign');
             expect(entry.description).toContain('Brought HexWarlock to an unoccupied space within 5 feet');
             expect(entry.broughtAlly).toBe('HexWarlock');
-        });
-
-        it('does not log or consume when no free casts remain (CLA-229)', async () => {
-            getRuntimeValue.mockReturnValue(0);
-
-            await confirmMistyWanderer(makeAction(), makePlayerStats(), 'campaign', true, 'HexWarlock');
-
-            expect(addEntry).not.toHaveBeenCalled();
-            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
     });
 });

@@ -1,4 +1,17 @@
-// CLA-315: Slow Fall — falling trigger gate + _Slow_Fall_usedRound reaction latch.
+// @maintained-by-ai
+// CLA-315: Slow Fall — 'falling' matcher arm (matchesTrigger), gateFallingReaction,
+// and the _Slow_Fall_usedRound reaction latch lane of the damageReduction quint.
+// Lane map (handle() flow in damageReductionHandler.js):
+//   - equipment gates (requiresShield / requiresShieldOrWeapon)  -> damageReductionHandler.test.js
+//   - zero_on_success effect (Intervene Shield)                  -> damageReductionHandler.zero-on-success.test.js
+//   - non-falling matchesTrigger table, deflect heal/log/popup  -> damageReductionHandler.normal.test.js
+//   - damage-reduced-to-0 redirect modal (redirect / executeRedirect / getMonkLevel) -> damageReductionHandler.redirect.test.js
+//   - THIS FILE: triggerRefusal falling-vs-generic wording, falling trigger gate,
+//     reaction round latch (stamp / same-round refusal / re-arm), latch never stamped
+//     for non-falling triggers. Latch is cleared at round-wrap by initiative.jsx /
+//     navigationHandlers.js (covered there). Live producer: combat/fallDamage.js
+//     stamps trigger:'falling' on both the lastAttack header and attackEvent.
+// Turn-based only; no game timers.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -65,6 +78,8 @@ function makeSlowFallAction() {
   };
 }
 
+// Mirrors the live fallDamage.js producer: trigger:'falling' stamped on both
+// the lastAttack chain header and the attackEvent.
 function makeFallingLastAttack() {
   return {
     attackEvent: { weaponType: 'melee', timestamp: 1000, trigger: 'falling' },
@@ -114,12 +129,27 @@ describe('damageReductionHandler — CLA-315 Slow Fall', () => {
       const result = await handle(makeSlowFallAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.payload ?? result.payload).toBeDefined();
       expect(result.payload.description).toContain('You are not falling');
+      expect(result.payload.description).not.toContain('does not match the trigger condition');
       expect(result.payload.description).not.toContain('Reduce damage by');
       expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
       expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
       expect(automationService.evaluateAutoExpression).not.toHaveBeenCalled();
+    });
+
+    it('uses the generic mismatch wording — never the falling wording — for non-falling triggers', async () => {
+      armHappyPath();
+      damageRollback.findLastAttack.mockResolvedValue(makeMaceLastAttack());
+      const action = {
+        name: 'Deflect Missiles',
+        automation: { type: 'damage_reduction', reductionExpression: '1d10 + DEX modifier + monk level', trigger: 'ranged_weapon_attack_hit' },
+      };
+
+      const result = await handle(action, makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('does not match the trigger condition');
+      expect(result.payload.description).not.toContain('You are not falling');
     });
 
     it('logs the refusal to the campaign log without an ability_use application', async () => {
@@ -190,11 +220,9 @@ describe('damageReductionHandler — CLA-315 Slow Fall', () => {
       expect(result.payload.description).toContain('Reduce damage by');
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestHero', LATCH_KEY, 3, campaignName);
     });
-  });
 
-  describe('existing trigger branches unregressed', () => {
-    it('bludgeoning_piercing_slashing_damage still matches bludgeoning attacks', async () => {
-      armHappyPath();
+    it('never stamps the latch for a non-falling trigger, even when its reduction succeeds', async () => {
+      armHappyPath(2);
       damageRollback.findLastAttack.mockResolvedValue(makeMaceLastAttack());
       const action = {
         name: 'Deflect Attacks',
@@ -203,35 +231,10 @@ describe('damageReductionHandler — CLA-315 Slow Fall', () => {
 
       const result = await handle(action, makePlayerStats(), campaignName, null);
 
+      // Success path ran (gateFallingReaction early-returns for non-falling triggers)…
       expect(result.payload.description).toContain('Reduce damage by');
+      // …but the Slow Fall reaction latch stays untouched.
       expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith('TestHero', LATCH_KEY, expect.anything(), campaignName);
-    });
-
-    it('any_damage still matches when damage was dealt', async () => {
-      armHappyPath();
-      damageRollback.findLastAttack.mockResolvedValue({ ...makeMaceLastAttack(), damageTypes: ['Fire'] });
-      const action = {
-        name: 'Deflect Energy',
-        automation: { type: 'damage_reduction', reductionExpression: '1d10 + DEX modifier + monk level', trigger: 'any_damage' },
-      };
-
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('Reduce damage by');
-    });
-
-    it('ranged_weapon_attack_hit still refuses melee attacks with the generic mismatch popup', async () => {
-      armHappyPath();
-      damageRollback.findLastAttack.mockResolvedValue(makeMaceLastAttack());
-      const action = {
-        name: 'Deflect Missiles',
-        automation: { type: 'damage_reduction', reductionExpression: '1d10 + DEX modifier + monk level', trigger: 'ranged_weapon_attack_hit' },
-      };
-
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('does not match the trigger condition');
-      expect(result.payload.description).not.toContain('You are not falling');
     });
   });
 });

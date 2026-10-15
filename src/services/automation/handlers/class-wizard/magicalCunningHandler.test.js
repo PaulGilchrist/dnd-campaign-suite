@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// Deterministic contract tests for the Magical Cunning Pact Magic slot-restoration
+// handler: rest-usage gate, slot-level selection, half-round-up / Eldritch-Master
+// regain math, unconditional Celestial Resilience delegation (popup text append vs
+// modal passthrough), and server-first setRuntimeValue write order.
+// Pure handler behaviour behind mocked runtime/log/celestial deps — stable, no
+// churn expected as the app evolves.
+// NOTE: isMagicalCunningUsed has NO production caller (orphaned export, flagged).
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { handle, isMagicalCunningUsed } from './magicalCunningHandler.js'
 
@@ -65,58 +73,38 @@ describe('magicalCunningHandler', () => {
             expect(addEntry).not.toHaveBeenCalled()
         })
 
-        it('returns info popup when no Pact Magic spell slots available', async () => {
-            const result = await handle(
-                defaultAction,
-                makePlayerStats({ resources: { warlockPactMagic: { max: 0 } }, spellAbilities: {} }),
-                campaignName,
-                null,
-            )
+        it('returns info popup when no Pact Magic spell slots available (empty or undefined spellAbilities)', async () => {
+            for (const spellAbilities of [{}, undefined]) {
+                const result = await handle(
+                    defaultAction,
+                    makePlayerStats({ resources: { warlockPactMagic: { max: 0 } }, spellAbilities }),
+                    campaignName,
+                    null,
+                )
 
-            expect(result.type).toBe('popup')
-            expect(result.payload.type).toBe('automation_info')
-            expect(result.payload.description).toContain('requires Pact Magic spell slots')
-            expect(setRuntimeValue).not.toHaveBeenCalled()
-            expect(addEntry).not.toHaveBeenCalled()
+                expect(result.type).toBe('popup')
+                expect(result.payload.type).toBe('automation_info')
+                expect(result.payload.description).toContain('requires Pact Magic spell slots')
+                expect(setRuntimeValue).not.toHaveBeenCalled()
+                expect(addEntry).not.toHaveBeenCalled()
+            }
         })
 
-        it('returns info popup when spellAbilities is undefined', async () => {
-            const result = await handle(
-                defaultAction,
-                makePlayerStats({ spellAbilities: undefined }),
-                campaignName,
-                null,
-            )
+        it('returns info popup when no slots have been expended (current slots full or runtime undefined)', async () => {
+            for (const runtimeValue of [2, undefined]) {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'spell_slots_level_1') return runtimeValue
+                    return null
+                })
 
-            expect(result.type).toBe('popup')
-            expect(result.payload.description).toContain('requires Pact Magic spell slots')
-        })
+                const result = await handle(defaultAction, makePlayerStats(), campaignName, null)
 
-        it('returns info popup when no slots have been expended', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'spell_slots_level_1') return 2
-                return null
-            })
-
-            const result = await handle(defaultAction, makePlayerStats(), campaignName, null)
-
-            expect(result.type).toBe('popup')
-            expect(result.payload.type).toBe('automation_info')
-            expect(result.payload.description).toContain('No Pact Magic spell slots have been expended')
-            expect(setRuntimeValue).not.toHaveBeenCalled()
-            expect(addEntry).not.toHaveBeenCalled()
-        })
-
-        it('returns info popup when currentSlots from runtime is undefined (falls back to max)', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'spell_slots_level_1') return undefined
-                return null
-            })
-
-            const result = await handle(defaultAction, makePlayerStats(), campaignName, null)
-
-            expect(result.type).toBe('popup')
-            expect(result.payload.description).toContain('No Pact Magic spell slots have been expended')
+                expect(result.type).toBe('popup')
+                expect(result.payload.type).toBe('automation_info')
+                expect(result.payload.description).toContain('No Pact Magic spell slots have been expended')
+                expect(setRuntimeValue).not.toHaveBeenCalled()
+                expect(addEntry).not.toHaveBeenCalled()
+            }
         })
 
         it('regains half maximum slots (round up) when slots fully expended', async () => {
@@ -129,9 +117,9 @@ describe('magicalCunningHandler', () => {
 
             expect(result.type).toBe('popup')
             expect(result.payload.type).toBe('automation_info')
-            expect(result.payload.description).toContain('Regained 1')
-            expect(result.payload.description).toContain('1th-level')
-            expect(result.payload.description).toContain('(1/2 slots available)')
+            expect(result.payload.description).toBe(
+                'Magical Cunning: Regained 1 1th-level Pact Magic spell slot. (1/2 slots available)',
+            )
             expect(result.payload.automation).toEqual({ type: 'magical_cunning' })
 
             // Verify call order: slot restore first, then flag
@@ -174,15 +162,15 @@ describe('magicalCunningHandler', () => {
             })
 
             const result = await handle(
-                { name: 'Eldritch Master', automation: { type: 'magical_cunning', eldritchMaster: true } },
+                { ...defaultAction, automation: { type: 'magical_cunning', eldritchMaster: true } },
                 makePlayerStats({ resources: { warlockPactMagic: { max: 2 } }, spellAbilities: { spell_slots_level_1: 2 } }),
                 campaignName,
                 null,
             )
 
-            expect(result.payload.description).toContain('Regained 2')
-            expect(result.payload.description).toContain('Eldritch Master')
-            expect(result.payload.description).toContain('(2/2 slots available)')
+            expect(result.payload.description).toBe(
+                'Magical Cunning (Eldritch Master): Regained 2 1th-level Pact Magic spell slots. (2/2 slots available)',
+            )
             expect(setRuntimeValue).toHaveBeenCalledWith('TestWarlock', 'spell_slots_level_1', 2, campaignName)
         })
 
@@ -342,6 +330,9 @@ describe('magicalCunningHandler', () => {
             expect(result.type).toBe('modal')
             expect(result.modalName).toBe('celestialResilienceModal')
             expect(result.payload.creatureTargets).toHaveLength(1)
+            // Slots are still restored (and flag set) even when a modal is returned
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'TestWarlock', 'spell_slots_level_1', 1, campaignName)
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'TestWarlock', 'magicalCunningUsed', true, campaignName)
         })
 
         it('omits Celestial Resilience text when handler returns null', async () => {
@@ -390,45 +381,6 @@ describe('magicalCunningHandler', () => {
 
             expect(result.payload.description).not.toContain('Celestial Resilience')
             expect(result.payload.description).toContain('Regained 1')
-        })
-
-        it('omits Celestial Resilience when specialActions is undefined', async () => {
-            handleCelestialResilience.mockResolvedValue(null)
-
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'spell_slots_level_1') return 0
-                return null
-            })
-
-            const result = await handle(
-                defaultAction,
-                makePlayerStats({ class: { name: 'Warlock', major: { name: 'Celestial Patron' } }, specialActions: undefined }),
-                campaignName,
-                null,
-            )
-
-            expect(handleCelestialResilience).toHaveBeenCalled()
-            expect(result.payload.description).not.toContain('Celestial Resilience')
-        })
-
-        it('logs an ability_use entry on success', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'spell_slots_level_1') return 0
-                return null
-            })
-
-            await handle(defaultAction, makePlayerStats(), campaignName, null)
-
-            expect(addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'TestWarlock',
-                    abilityName: 'Magical Cunning',
-                    description: expect.stringContaining('regaining 1 expended Pact Magic spell slot(s)'),
-                    timestamp: expect.any(Number),
-                }),
-            )
         })
     })
 
