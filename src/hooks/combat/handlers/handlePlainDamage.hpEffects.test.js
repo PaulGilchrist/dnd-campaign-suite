@@ -1,27 +1,16 @@
+// @maintained-by-ai: 2026-10-14
+// Plain-damage lane HP-effect contracts (writePlainHpResults): player currentHitPoints
+// writes, hp_change log shape, unconscious boundaries, NPC runtime-write guard.
+// Death-save init is covered by useLoggedDiceRollDamage.death-saves.test.js,
+// resistance reduction by handlePlainDamage.resistanceReArm.test.js, and
+// overchannel self-damage by handleOverchannelSelfDamage.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
     rollExpressionDoubled: vi.fn(),
-    formatDamageFormula: vi.fn((formula, rolls, isCrit) => {
-        if (!isCrit) return formula;
-        const parsed = formula.match(/^(\d+)?d(\d+)((?:[+-]\d+)+)?$/i);
-        if (!parsed) return formula;
-        const count = parsed[1] || 1;
-        const sides = parsed[2];
-        const modifierStr = parsed[3];
-        let modifier = 0;
-        if (modifierStr) {
-            const segments = modifierStr.match(/([+-]\d+)/g);
-            for (const seg of segments) { modifier += parseInt(seg, 10); }
-        }
-        const dicePart = count === 1 ? `d${sides}` : `${count}d${sides}`;
-        const rollStr = rolls && rolls.length > 0 ? ` (${rolls.join(', ')})` : '';
-        let result = `${dicePart}*2${rollStr}`;
-        if (modifier > 0) result += `+${modifier}`;
-        else if (modifier < 0) result += `${modifier}`;
-        return result;
-    }),
+    parseConstant: vi.fn(),
+    formatDamageFormula: vi.fn((formula) => formula),
 }));
 
 vi.mock('../../../services/ui/utils.js', () => ({
@@ -43,9 +32,9 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
 }));
 
 vi.mock('../../../services/combat/automation/automationService.js', () => ({
-    hasIgnoreResistance: vi.fn(),
+    hasIgnoreResistance: vi.fn(() => false),
     playerIsImmuneToCondition: vi.fn(),
-    hasGreatWeaponFighting: vi.fn(),
+    hasGreatWeaponFighting: vi.fn(() => false),
     applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
 }));
 
@@ -57,18 +46,12 @@ vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({
     sendSavePrompt: vi.fn(),
 }));
 
-vi.mock('../../../services/rules/combat/aoeService.js', () => ({
-    getAffectedCreatures: vi.fn(),
-    processAoeNpcs: vi.fn(),
-    sendAoePlayerSaves: vi.fn(),
-}));
-
 vi.mock('../loggedDiceRollUtils.js', () => ({
     getGuardianProtectionAcBonus: vi.fn(() => 0),
     readAoeContext: vi.fn(),
-    hasPotentCantrip: vi.fn(),
-    isMagicMissileImmune: vi.fn(),
-    hasSoulstitchProtection: vi.fn(),
+    hasPotentCantrip: vi.fn(() => false),
+    isMagicMissileImmune: vi.fn(() => false),
+    hasSoulstitchProtection: vi.fn(() => false),
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 
@@ -77,24 +60,26 @@ vi.mock('../../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
-    computeDamageToTarget: vi.fn((total, success, _dcSuccess) => success ? Math.floor(total / 2) : total),
-    rollSaveForCreature: vi.fn(),
     applyDamageToTarget: vi.fn(),
     clearReTriggeredSequence: vi.fn(),
 }));
 
-vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
-    hasBardicInspirationOffense: vi.fn(),
+vi.mock('../auras/bardicInspirationState.js', () => ({
+    hasBardicInspirationOffense: vi.fn(() => false),
     getBardicInspirationDieSize: vi.fn(),
     getBardicInspirationDieSizeFromClass: vi.fn(),
 }));
 
 vi.mock('../../rules/spells/empoweredSpellService.js', () => ({
-    hasEmpoweredSpell: vi.fn(),
+    hasEmpoweredSpell: vi.fn(() => false),
 }));
 
 vi.mock('../../rules/spells/metamagicRules.js', () => ({
-    getChaModifier: vi.fn(),
+    getChaModifier: vi.fn(() => 0),
+}));
+
+vi.mock('./handleOverchannelSelfDamage.js', () => ({
+    handleOverchannelSelfDamage: vi.fn(),
 }));
 
 import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
@@ -103,305 +88,71 @@ import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.
 import { addEntry } from '../../../services/ui/logService.js';
 import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
 
-describe('Plain damage HP/condition effects', () => {
+describe('Plain damage HP effects', () => {
     const deps = {
         characterName: 'TestFighter',
         campaignName: 'test-campaign',
-        characters: [
-            {
-                name: 'TestFighter',
-                computedStats: {
-                    armorClass: 16,
-                    characterAdvancement: [{ name: 'Sentinel' }],
-                },
-            },
-            { name: 'Goblin', computedStats: { armorClass: 12 } },
-        ],
+        characters: [{ name: 'TestFighter' }],
         setPopupHtml: vi.fn(),
         logEntry: vi.fn(),
-        pendingSaves: {},
     };
 
     beforeEach(() => {
         vi.clearAllMocks();
         getRuntimeValue.mockReturnValue(null);
-        applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-        loadCombatSummary.mockResolvedValue({
-            creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-        });
     });
 
-    function createFn() {
-        return createLogDamageAndShow(deps);
+    // Resolve 'Goblin' in the combat summary and pin the applied damage outcome.
+    function stubTarget({ type, maxHp, finalDamage, newHp }) {
+        loadCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type, ac: 12, currentHp: maxHp, maxHp }],
+        });
+        getRuntimeValue.mockImplementation((_key, prop) => (prop === 'hitPoints' ? maxHp : null));
+        applyDamageToTarget.mockReturnValue({ finalDamage, newHp, damageReduced: false });
     }
 
-    describe('death saves for player targets', () => {
-        it('sets deathSaves and deathFailures when player target drops to 0 HP', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [];
-                if (key === 'Goblin' && prop === 'currentHitPoints') return 0;
-                if (key === 'Goblin' && prop === 'hitPoints') return 10;
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 0, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'player', ac: 12, currentHp: 10, maxHp: 10 }],
-            });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 10, rolls: [5, 3, 2], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'deathSaves',
-                [false, false, false],
-                'test-campaign'
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'deathFailures',
-                [false, false, false],
-                'test-campaign'
-            );
+    function attack({ total = 10, rolls = [7], modifier = 3 } = {}) {
+        return createLogDamageAndShow(deps)({
+            name: 'Longsword', formula: '1d8+3', total, rolls, modifier,
+            context: { targetName: 'Goblin', damageType: 'slashing' },
         });
+    }
 
-        it('does not set death saves when NPC target drops to 0 HP', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [];
-                if (key === 'Goblin' && prop === 'currentHitPoints') return 0;
-                if (key === 'Goblin' && prop === 'hitPoints') return 10;
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 0, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 10, maxHp: 10 }],
-            });
+    const hpEntry = () => addEntry.mock.calls.find((c) => c[1]?.type === 'hp_change')?.[1];
+    const runtimeWrites = (prop) => setRuntimeValue.mock.calls.filter((c) => c[1] === prop).map((c) => [c[0], c[2], c[3]]);
 
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 10, rolls: [5, 3, 2], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
+    it('player dropped to 0 HP: logs unconscious hp_change and writes currentHitPoints', async () => {
+        stubTarget({ type: 'player', maxHp: 10, finalDamage: 10, newHp: 0 });
+        await attack();
 
-            const deathSaveCalls = setRuntimeValue.mock.calls.filter(
-                (call) => call[1] === 'deathSaves' || call[1] === 'deathFailures'
-            );
-            expect(deathSaveCalls).toHaveLength(0);
+        expect(hpEntry()).toMatchObject({
+            targetName: 'Goblin', delta: -10, currentHp: 0, maxHp: 10,
+            isHealing: false, isUnconscious: true,
         });
-
-        it('does not set death saves when player target does not drop to 0 HP', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [];
-                if (key === 'Goblin' && prop === 'currentHitPoints') return 3;
-                if (key === 'Goblin' && prop === 'hitPoints') return 10;
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 7, newHp: 3, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'player', ac: 12, currentHp: 10, maxHp: 10 }],
-            });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
-
-            const deathSaveCalls = setRuntimeValue.mock.calls.filter(
-                (call) => call[1] === 'deathSaves' || call[1] === 'deathFailures'
-            );
-            expect(deathSaveCalls).toHaveLength(0);
-        });
+        expect(runtimeWrites('currentHitPoints')).toEqual([['Goblin', 0, 'test-campaign']]);
     });
 
-    describe('isUnconscious flag in hp_change log entry', () => {
-        it('sets isUnconscious true when player target HP drops to 0 or below', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [];
-                if (key === 'Goblin' && prop === 'currentHitPoints') return 0;
-                if (key === 'Goblin' && prop === 'hitPoints') return 10;
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 0, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'player', ac: 12, currentHp: 10, maxHp: 10 }],
-            });
+    it('player driven below 0 HP: logs negative currentHp as unconscious', async () => {
+        stubTarget({ type: 'player', maxHp: 10, finalDamage: 15, newHp: -5 });
+        await attack({ total: 15, rolls: [8, 4] });
 
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 10, rolls: [5, 3, 2], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
-
-            const hpChangeCalls = addEntry.mock.calls.filter(
-                (call) => call[1]?.type === 'hp_change'
-            );
-            expect(hpChangeCalls.length).toBeGreaterThan(0);
-            expect(hpChangeCalls[0][1]).toMatchObject({ isUnconscious: true });
-        });
-
-        it('sets isUnconscious false when target remains above 0 HP', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 3, newHp: 10, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 3, rolls: [3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
-
-            const hpChangeCalls = addEntry.mock.calls.filter(
-                (call) => call[1]?.type === 'hp_change'
-            );
-            expect(hpChangeCalls.length).toBeGreaterThan(0);
-            expect(hpChangeCalls[0][1]).toMatchObject({ isUnconscious: false });
-        });
-
-        it('sets isUnconscious true when player target HP drops below 0', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [];
-                if (key === 'Goblin' && prop === 'currentHitPoints') return -5;
-                if (key === 'Goblin' && prop === 'hitPoints') return 10;
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 15, newHp: -5, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'player', ac: 12, currentHp: 10, maxHp: 10 }],
-            });
-
-            const fn = createFn();
-            await fn({ name: 'Greatclub', formula: '1d4+3', total: 8, rolls: [5], modifier: 3, context: { targetName: 'Goblin', damageType: 'bludgeoning', } });
-
-            const hpChangeCalls = addEntry.mock.calls.filter(
-                (call) => call[1]?.type === 'hp_change'
-            );
-            expect(hpChangeCalls.length).toBeGreaterThan(0);
-            expect(hpChangeCalls[0][1]).toMatchObject({ isUnconscious: true });
-        });
+        expect(hpEntry()).toMatchObject({ delta: -15, currentHp: -5, isUnconscious: true });
+        expect(runtimeWrites('currentHitPoints')).toEqual([['Goblin', -5, 'test-campaign']]);
     });
 
-    describe('Resistance feature activation', () => {
-        it('logs ability_use entry when resistance is triggered on matching damage type', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [
-                    {
-                        effect: 'resistance_damage_reduction',
-                        target: 'Goblin',
-                        chosenType: 'fire',
-                    },
-                ];
-                if (key === 'Goblin' && prop === 'resistanceUsedThisTurn') {
-                    return null;
-                }
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 7, damageReduced: false });
+    it('player surviving above 0 HP: logs conscious hp_change and writes new HP', async () => {
+        stubTarget({ type: 'player', maxHp: 20, finalDamage: 6, newHp: 14 });
+        await attack({ total: 6, rolls: [3] });
 
-            const fn = createFn();
-            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: { targetName: 'Goblin', damageType: 'fire', attackerName: 'TestFighter', } });
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'ability_use',
-                abilityName: 'Resistance',
-            }));
-        });
-
-        it('does not log resistance when damage type does not match', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [
-                    {
-                        effect: 'resistance_damage_reduction',
-                        target: 'Goblin',
-                        chosenType: 'fire',
-                    },
-                ];
-                if (key === 'Goblin' && prop === 'resistanceUsedThisTurn') {
-                    return null;
-                }
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Acid Arrow', formula: '2d4+1', total: 6, rolls: [4, 1], modifier: 1, context: { targetName: 'Goblin', damageType: 'acid', attackerName: 'TestFighter', } });
-
-            const resistanceCalls = addEntry.mock.calls.filter(
-                (call) => call[1]?.type === 'ability_use' && call[1]?.abilityName === 'Resistance'
-            );
-            expect(resistanceCalls).toHaveLength(0);
-        });
-
-        it('does not log resistance when already used this turn', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [
-                    {
-                        effect: 'resistance_damage_reduction',
-                        target: 'Goblin',
-                        chosenType: 'fire',
-                    },
-                ];
-                if (key === 'Goblin' && prop === 'resistanceUsedThisTurn') {
-                    return true;
-                }
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: { targetName: 'Goblin', damageType: 'fire', attackerName: 'TestFighter', } });
-
-            const resistanceCalls = addEntry.mock.calls.filter(
-                (call) => call[1]?.type === 'ability_use' && call[1]?.abilityName === 'Resistance'
-            );
-            expect(resistanceCalls).toHaveLength(0);
-        });
-
-        it('marks resistanceUsedThisTurn true after first use', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [
-                    {
-                        effect: 'resistance_damage_reduction',
-                        target: 'Goblin',
-                        chosenType: 'fire',
-                    },
-                ];
-                if (key === 'Goblin' && prop === 'resistanceUsedThisTurn') {
-                    return false;
-                }
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 7, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: { targetName: 'Goblin', damageType: 'fire', attackerName: 'TestFighter', } });
-
-            const resistanceMarkCalls = setRuntimeValue.mock.calls.filter(
-                (call) => call[1] === 'resistanceUsedThisTurn' && call[2] === true
-            );
-            expect(resistanceMarkCalls).toHaveLength(1);
-        });
+        expect(hpEntry()).toMatchObject({ delta: -6, currentHp: 14, isUnconscious: false });
+        expect(runtimeWrites('currentHitPoints')).toEqual([['Goblin', 14, 'test-campaign']]);
     });
 
-    describe('overchannel self-damage', () => {
-        it('logs hp_change entry when overchannelActive is set', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
+    it('NPC dropped to 0 HP: logs unconscious hp_change with no runtime HP writes', async () => {
+        stubTarget({ type: 'npc', maxHp: 10, finalDamage: 10, newHp: 0 });
+        await attack();
 
-            const fn = createFn();
-            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: { targetName: 'Goblin', damageType: 'fire', overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 3, } });
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'hp_change',
-            }));
-        });
-
-        it('logs hp_change entry when overchannelActive is false', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: { targetName: 'Goblin', damageType: 'fire', overchannelActive: false, } });
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'hp_change',
-            }));
-        });
+        expect(hpEntry()).toMatchObject({ delta: -10, currentHp: 0, maxHp: 10, isUnconscious: true });
+        expect(runtimeWrites('currentHitPoints')).toHaveLength(0);
     });
 });

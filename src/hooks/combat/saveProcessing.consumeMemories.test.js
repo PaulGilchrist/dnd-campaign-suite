@@ -1,7 +1,9 @@
-// MA-0019 provenance + memory-gain clause: failed-save condition writes stamp
-// activeConditionMeta[cond].source = the inflicting monster (backward compat:
-// existing dc/ability keys preserved), and a Consume Memories save that drops
-// a Humanoid target to 0 HP logs the advisory consume_memories automation entry.
+// @maintained-by-ai: 2026-10-14
+// MA-0019 Consume Memories save seam: failed-save condition writes stamp
+// activeConditionMeta[cond].source = the inflicting monster (existing dc/ability
+// keys preserved), and a save-fail that drops a Humanoid target to 0 HP logs the
+// advisory consume_memories automation entry (maybeLogMemoryGainAtZeroHp).
+// Producer-side context flag construction lives in MonsterCardModal — covered there.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -81,18 +83,36 @@ function domContext(extra = {}) {
     };
 }
 
-function resolvePlayerSave(success) {
+const zeroHp = async (_cs, _t, d) => ({ finalDamage: d, newHp: 0 });
+const consumeLogs = () => autoLogs.filter(e => e.automationType === 'consume_memories');
+
+function resolvePlayerSave(success, contextExtra = {}) {
     const promise = processSaveRoll({
         rollType: 'save',
         target: { name: 'TestPC', type: 'player' },
         characterName: 'TestPC',
         campaignName,
-        context: domContext(),
+        context: domContext(contextExtra),
         logEntry,
         setPopupHtml: vi.fn(),
     });
-    pendingSaveResolve({ success, roll: 4, total: 3, saveBonus: -1, rawRolls: [], mode: 'normal' });
+    pendingSaveResolve({ success, roll: success ? 18 : 4, total: success ? 17 : 3, saveBonus: -1, rawRolls: [], mode: 'normal' });
     return promise;
+}
+
+function resolveNpcSave(targetName) {
+    return processSaveRoll({
+        rollType: 'save',
+        target: { name: targetName, type: 'npc' },
+        characterName: 'Aboleth 1',
+        campaignName,
+        context: domContext({ effectiveD20: 4, effectiveBonus: 0 }),
+        bonus: 0,
+        r1: 4,
+        r2: null,
+        logEntry,
+        setPopupHtml: vi.fn(),
+    });
 }
 
 beforeEach(() => {
@@ -102,97 +122,52 @@ beforeEach(() => {
     applyDamageToTarget.mockImplementation(async (_cs, _t, d) => ({ finalDamage: d, newHp: 29 }));
 });
 
-describe('MA-0019 provenance stamp on failed-save conditions', () => {
-    it('damageless save-fail stamps meta source, preserving existing dc/ability', async () => {
-        runtimeStore['TestPC.activeConditionMeta'] = { charmed: { dc: 10, ability: 'wis' } };
-        const promise = processSaveRoll({
-            rollType: 'save',
-            target: { name: 'TestPC', type: 'player' },
-            characterName: 'TestPC',
-            campaignName,
-            context: domContext({ autoDamageFormula: null, saveConditions: ['charmed'] }),
-            logEntry,
-            setPopupHtml: vi.fn(),
-        });
-        pendingSaveResolve({ success: false, roll: 4, total: 3, saveBonus: -1, rawRolls: [], mode: 'normal' });
-        await promise;
+describe('MA-0019 failed-save condition meta provenance stamp', () => {
+    it('success writes no condition/meta; fail stamps source preserving existing dc/ability', async () => {
+        const damageless = { autoDamageFormula: null, saveConditions: ['charmed'] };
 
+        await resolvePlayerSave(true, damageless);
+        expect(runtimeStore['TestPC.activeConditions']).toBeUndefined();
+        expect(runtimeStore['TestPC.activeConditionMeta']).toBeUndefined();
+
+        runtimeStore['TestPC.activeConditionMeta'] = { charmed: { dc: 10, ability: 'wis' } };
+        await resolvePlayerSave(false, damageless);
         expect(runtimeStore['TestPC.activeConditions']).toEqual(['charmed']);
         expect(runtimeStore['TestPC.activeConditionMeta']).toEqual({ charmed: { dc: 10, ability: 'wis', source: 'Aboleth 1' } });
-    });
-
-    it('successful save writes no condition meta', async () => {
-        const promise = processSaveRoll({
-            rollType: 'save',
-            target: { name: 'TestPC', type: 'player' },
-            characterName: 'TestPC',
-            campaignName,
-            context: domContext({ autoDamageFormula: null, saveConditions: ['charmed'] }),
-            logEntry,
-            setPopupHtml: vi.fn(),
-        });
-        pendingSaveResolve({ success: true, roll: 18, total: 17, saveBonus: -1, rawRolls: [], mode: 'normal' });
-        await promise;
-        expect(runtimeStore['TestPC.activeConditionMeta']).toBeUndefined();
     });
 });
 
 describe('MA-0019 memory-gain-at-0-HP advisory log', () => {
-    it('save-fail damage to 0 HP on a Humanoid logs consume_memories', async () => {
-        applyDamageToTarget.mockImplementation(async (_cs, _t, d) => ({ finalDamage: d, newHp: 0 }));
+    it('save-fail damage to 0 HP on a Humanoid player logs consume_memories', async () => {
+        applyDamageToTarget.mockImplementation(zeroHp);
         await resolvePlayerSave(false);
 
-        const entry = autoLogs.find(e => e.automationType === 'consume_memories');
-        expect(entry).toBeTruthy();
-        expect(entry.type).toBe('automation');
-        expect(entry.characterName).toBe('Aboleth 1');
-        expect(entry.targetName).toBe('TestPC');
-        expect(entry.description).toContain('memories');
-        expect(entry.description).toContain('GM-enforced');
-    });
-
-    it('target above 0 HP: no consume_memories log', async () => {
-        await resolvePlayerSave(false);
-        expect(autoLogs.some(e => e.automationType === 'consume_memories')).toBe(false);
-    });
-
-    it('successful save to 0-buffer target: no consume_memories log even at 0 HP', async () => {
-        applyDamageToTarget.mockImplementation(async (_cs, _t, d) => ({ finalDamage: d, newHp: 0 }));
-        await resolvePlayerSave(true);
-        expect(autoLogs.some(e => e.automationType === 'consume_memories')).toBe(false);
-    });
-
-    it('npc beast at 0 HP: not Humanoid, no consume_memories log', async () => {
-        applyDamageToTarget.mockImplementation(async (_cs, _t, d) => ({ finalDamage: d, newHp: 0 }));
-        await processSaveRoll({
-            rollType: 'save',
-            target: { name: 'Guard Beast', type: 'npc' },
+        expect(consumeLogs()).toHaveLength(1);
+        expect(consumeLogs()[0]).toMatchObject({
+            type: 'automation',
             characterName: 'Aboleth 1',
-            campaignName,
-            context: domContext({ effectiveD20: 4, effectiveBonus: 0 }),
-            bonus: 0,
-            r1: 4,
-            r2: null,
-            logEntry,
-            setPopupHtml: vi.fn(),
+            abilityName: 'Consume Memories',
+            targetName: 'TestPC',
         });
-        expect(autoLogs.some(e => e.automationType === 'consume_memories')).toBe(false);
+        expect(consumeLogs()[0].description).toContain('memories');
+        expect(consumeLogs()[0].description).toContain('GM-enforced');
     });
 
-    it('npc humanoid at 0 HP: consume_memories logged', async () => {
-        applyDamageToTarget.mockImplementation(async (_cs, _t, d) => ({ finalDamage: d, newHp: 0 }));
-        await processSaveRoll({
-            rollType: 'save',
-            target: { name: 'Thug 1', type: 'npc' },
-            characterName: 'Aboleth 1',
-            campaignName,
-            context: domContext({ effectiveD20: 4, effectiveBonus: 0 }),
-            bonus: 0,
-            r1: 4,
-            r2: null,
-            logEntry,
-            setPopupHtml: vi.fn(),
-        });
-        expect(autoLogs.some(e => e.automationType === 'consume_memories')).toBe(true);
+    it('no log when the target survives or the save succeeds at 0 HP', async () => {
+        await resolvePlayerSave(false); // survives (newHp 29)
+        expect(consumeLogs()).toHaveLength(0);
+
+        applyDamageToTarget.mockImplementation(zeroHp);
+        await resolvePlayerSave(true); // at 0 HP but save succeeded
+        expect(consumeLogs()).toHaveLength(0);
+    });
+
+    it('creature-type gate: humanoid npc at 0 HP logs, beast does not', async () => {
+        applyDamageToTarget.mockImplementation(zeroHp);
+        await resolveNpcSave('Guard Beast');
+        expect(consumeLogs()).toHaveLength(0);
+
+        await resolveNpcSave('Thug 1');
+        expect(consumeLogs()).toHaveLength(1);
     });
 });

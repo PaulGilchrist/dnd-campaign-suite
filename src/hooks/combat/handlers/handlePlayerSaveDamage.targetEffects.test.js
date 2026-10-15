@@ -1,3 +1,10 @@
+// @maintained-by-ai: 2026-10-14
+// handlePlayerSaveDamage targetEffect lane: verifies the handler's resolveTargetSaveContext
+// wiring — activeBuffs-derived flags, strict-=== true runtime flags, the elder champion
+// attacker self-guard, campaign.targetEffects filtering for the target, rider and
+// ability-scoped save-disadvantage tes (per targetEffectDefinitions.js registry), and
+// Death Ward save advantage on the pending prompt / save prompt.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -99,6 +106,7 @@ vi.mock('../../useAllySelection.js', () => ({
 import { getRuntimeValue } from '../../runtime/useRuntimeState.js';
 import { createPlayerSaveDamageHandler } from './handlePlayerSaveDamage.js';
 import { computeConditionEffects } from '../../../services/combat/conditions/conditionEffects.js';
+import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import { getHolyAuraTargets } from '../../../services/automation/handlers/buffs/holyAuraHandler.js';
 import { getCoronaSaveDisadvantage } from '../../../services/combat/auras/coronaAuraUtils.js';
 import { getElderChampionSaveDisadvantage } from '../../../services/combat/auras/elderChampionAuraUtils.js';
@@ -117,21 +125,17 @@ const BASE_COMBAT_SUMMARY = {
     creatures: [{ name: 'TestWizard', type: 'player' }],
 };
 
-function makeDeps(overrides = {}) {
-    return {
-        characterName: 'TestWizard',
-        campaignName: 'test-campaign',
-        characters: [{ name: 'TestWizard' }],
-        charactersRef: { current: [] },
-        setPopupHtml: vi.fn(),
-        logEntry: vi.fn(),
-        pendingSaves: {},
-        ...overrides,
-    };
+let deps;
+
+function mockRuntimeReads(reads) {
+    // keys are 'storeKey.subKey'; everything else resolves null (handler applies its own defaults)
+    getRuntimeValue.mockImplementation((key, subKey) => reads[`${key}.${subKey}`] ?? null);
 }
 
-function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COMBAT_SUMMARY, gwfBaseRolls, gwfDisplayRolls) {
-    return handler({
+// Runs the full save-prompt path and returns the args passed to computeConditionEffects.
+async function runSave(context = BASE_CONTEXT) {
+    const handler = createPlayerSaveDamageHandler(deps);
+    await handler({
         name: 'Acid Arrow',
         formula: '4d4',
         total: 10,
@@ -139,24 +143,25 @@ function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COM
         modifier: 0,
         context,
         adjustedTotal: 10,
-        combatSummary,
+        combatSummary: BASE_COMBAT_SUMMARY,
         displayRolls: [3, 4, 2, 1],
-        gwfBaseRolls,
-        gwfDisplayRolls,
     });
-}
-
-function extractConditionEffectsCall() {
     expect(computeConditionEffects).toHaveBeenCalledTimes(1);
     return computeConditionEffects.mock.calls[0][0];
 }
 
 describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
-    let deps;
-
     beforeEach(() => {
         vi.clearAllMocks();
-        deps = makeDeps();
+        deps = {
+            characterName: 'TestWizard',
+            campaignName: 'test-campaign',
+            characters: [{ name: 'TestWizard' }],
+            charactersRef: { current: [] },
+            setPopupHtml: vi.fn(),
+            logEntry: vi.fn(),
+            pendingSaves: {},
+        };
         getRuntimeValue.mockReset().mockReturnValue(null);
         computeConditionEffects.mockReturnValue({
             restoreBalance: false,
@@ -172,409 +177,183 @@ describe('handlePlayerSaveDamage - targetEffects and buff flags', () => {
         isDeathWardActive.mockReturnValue(false);
     });
 
-    describe('shape_shift buff detection', () => {
-        it('passes shapeShiftActive=true when target has shape_shift buff', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [{ effect: 'shape_shift' }];
-                return null;
-            });
+    const ALL_FLAGS_FALSE = {
+        shapeShiftActive: false,
+        seeInvisibilityActive: false,
+        isRaging: false,
+        isProtectionFromPoisonActive: false,
+    };
 
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
+    describe('buff flags derived from activeBuffs', () => {
+        it.each([
+            {
+                title: 'shape_shift',
+                buffs: [{ effect: 'shape_shift' }],
+                expected: { ...ALL_FLAGS_FALSE, shapeShiftActive: true },
+            },
+            {
+                title: 'see_invisibility',
+                buffs: [{ effect: 'see_invisibility' }],
+                expected: { ...ALL_FLAGS_FALSE, seeInvisibilityActive: true },
+            },
+            {
+                title: 'damageBonusExpression (rage)',
+                buffs: [{ damageBonusExpression: '2d6' }],
+                expected: { ...ALL_FLAGS_FALSE, isRaging: true },
+            },
+            {
+                title: 'Protection from Poison name+effect match',
+                buffs: [{ name: 'Protection from Poison', effect: 'protection_from_poison' }],
+                expected: { ...ALL_FLAGS_FALSE, isProtectionFromPoisonActive: true },
+            },
+            {
+                title: 'Protection from Poison name mismatch',
+                buffs: [{ name: 'Shield', effect: 'protection_from_poison' }],
+                expected: ALL_FLAGS_FALSE,
+            },
+            {
+                title: 'Protection from Poison effect mismatch',
+                buffs: [{ name: 'Protection from Poison', effect: 'other' }],
+                expected: ALL_FLAGS_FALSE,
+            },
+            {
+                title: 'no buffs',
+                buffs: [],
+                expected: ALL_FLAGS_FALSE,
+            },
+        ])('derives $title flag from activeBuffs', async ({ buffs, expected }) => {
+            mockRuntimeReads({ 'TestWizard.activeBuffs': buffs });
 
-            const { shapeShiftActive } = extractConditionEffectsCall();
-            expect(shapeShiftActive).toBe(true);
-        });
+            const args = await runSave();
 
-        it('passes shapeShiftActive=false when target lacks shape_shift buff', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [{ effect: 'other' }];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { shapeShiftActive } = extractConditionEffectsCall();
-            expect(shapeShiftActive).toBe(false);
-        });
-
-        it('passes shapeShiftActive=false when activeBuffs is empty', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { shapeShiftActive } = extractConditionEffectsCall();
-            expect(shapeShiftActive).toBe(false);
-        });
-    });
-
-    describe('see_invisibility buff detection', () => {
-        it('passes seeInvisibilityActive=true when target has see_invisibility buff', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [{ effect: 'see_invisibility' }];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { seeInvisibilityActive } = extractConditionEffectsCall();
-            expect(seeInvisibilityActive).toBe(true);
-        });
-
-        it('passes seeInvisibilityActive=false when target lacks see_invisibility buff', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [{ effect: 'shape_shift' }];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { seeInvisibilityActive } = extractConditionEffectsCall();
-            expect(seeInvisibilityActive).toBe(false);
+            expect(args).toMatchObject(expected);
+            // unrelated flags must never leak as undefined
+            expect(args.targetEffects).toEqual([]);
         });
     });
 
-    describe('isRaging detection from damageBonusExpression', () => {
-        it('passes isRaging=true when buff has damageBonusExpression', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [{ damageBonusExpression: '2d6' }];
-                return null;
+    describe('livingLegend / elderChampion target flags (strict === true)', () => {
+        it.each([
+            {
+                title: 'true/true',
+                living: true,
+                elder: true,
+                expected: { isLivingLegendActive: true, isElderChampionActive: true },
+            },
+            {
+                title: 'false/null coerce to false',
+                living: false,
+                elder: null,
+                expected: { isLivingLegendActive: false, isElderChampionActive: false },
+            },
+        ])('passes runtime flags ($title)', async ({ living, elder, expected }) => {
+            mockRuntimeReads({
+                'TestWizard.livingLegendActive': living,
+                'TestWizard.elderChampionActive': elder,
             });
 
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
+            const args = await runSave();
 
-            const { isRaging } = extractConditionEffectsCall();
-            expect(isRaging).toBe(true);
-        });
-
-        it('passes isRaging=false when buff lacks damageBonusExpression', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [{ effect: 'shape_shift' }];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { isRaging } = extractConditionEffectsCall();
-            expect(isRaging).toBe(false);
-        });
-
-        it('passes isRaging=false when activeBuffs is empty', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { isRaging } = extractConditionEffectsCall();
-            expect(isRaging).toBe(false);
+            expect(args).toMatchObject(expected);
         });
     });
 
-    describe('livingLegendActive detection', () => {
-        it('passes isLivingLegendActive=true when livingLegendActive is true', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'livingLegendActive') return true;
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
+    describe('isElderChampionAttackerActive (attacker-side flag with self-guard)', () => {
+        it.each([
+            {
+                title: 'active attacker distinct from target',
+                attackerName: 'Goblin',
+                attackerActive: true,
+                expected: true,
+            },
+            {
+                title: 'absent attackerName resolves to self — guard blocks own flag',
+                attackerName: undefined,
+                attackerActive: true,
+                expected: false,
+            },
+            {
+                title: 'distinct but inactive attacker',
+                attackerName: 'Goblin',
+                attackerActive: false,
+                expected: false,
+            },
+        ])('isElderChampionAttackerActive=$expected when $title', async ({ attackerName, attackerActive, expected }) => {
+            mockRuntimeReads({
+                'Goblin.elderChampionActive': attackerActive,
+                'TestWizard.elderChampionActive': false,
             });
 
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
+            const context = { ...BASE_CONTEXT, ...(attackerName ? { attackerName } : {}) };
+            const { isElderChampionAttackerActive } = await runSave(context);
 
-            const { isLivingLegendActive } = extractConditionEffectsCall();
-            expect(isLivingLegendActive).toBe(true);
-        });
-
-        it('passes isLivingLegendActive=false when livingLegendActive is false', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'livingLegendActive') return false;
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { isLivingLegendActive } = extractConditionEffectsCall();
-            expect(isLivingLegendActive).toBe(false);
-        });
-
-        it('passes isLivingLegendActive=false when livingLegendActive is null/undefined', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'livingLegendActive') return null;
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { isLivingLegendActive } = extractConditionEffectsCall();
-            expect(isLivingLegendActive).toBe(false);
+            expect(isElderChampionAttackerActive).toBe(expected);
         });
     });
 
-    describe('elderChampionActive detection', () => {
-        it('passes isElderChampionActive=true when target has elderChampionActive', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'elderChampionActive') return true;
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { isElderChampionActive } = extractConditionEffectsCall();
-            expect(isElderChampionActive).toBe(true);
-        });
-
-        it('passes isElderChampionActive=false when target lacks elderChampionActive', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'elderChampionActive') return false;
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { isElderChampionActive } = extractConditionEffectsCall();
-            expect(isElderChampionActive).toBe(false);
-        });
-    });
-
-    describe('isElderChampionAttackerActive detection', () => {
-        it('passes isElderChampionAttackerActive=true when attacker has elderChampionActive and differs from target', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'Goblin' && subKey === 'elderChampionActive') return true;
-                if (key === 'TestWizard' && subKey === 'elderChampionActive') return false;
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            const context = { ...BASE_CONTEXT, attackerName: 'Goblin' };
-
-            await invokeHandler(handler, context);
-
-            const { isElderChampionAttackerActive } = extractConditionEffectsCall();
-            expect(isElderChampionAttackerActive).toBe(true);
-        });
-
-        it('passes isElderChampionAttackerActive=false when attacker is the same as target', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'elderChampionActive') return true;
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { isElderChampionAttackerActive } = extractConditionEffectsCall();
-            expect(isElderChampionAttackerActive).toBe(false);
-        });
-
-        it('passes isElderChampionAttackerActive=false when attacker lacks elderChampionActive', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'Goblin' && subKey === 'elderChampionActive') return false;
-                if (key === 'TestWizard' && subKey === 'elderChampionActive') return false;
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            const context = { ...BASE_CONTEXT, attackerName: 'Goblin' };
-
-            await invokeHandler(handler, context);
-
-            const { isElderChampionAttackerActive } = extractConditionEffectsCall();
-            expect(isElderChampionAttackerActive).toBe(false);
-        });
-    });
-
-    describe('protection_from_poison buff detection', () => {
-        it('passes isProtectionFromPoisonActive=true when buff matches name and effect', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [{ name: 'Protection from Poison', effect: 'protection_from_poison' }];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { isProtectionFromPoisonActive } = extractConditionEffectsCall();
-            expect(isProtectionFromPoisonActive).toBe(true);
-        });
-
-        it('passes isProtectionFromPoisonActive=false when buff name does not match', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [{ name: 'Shield', effect: 'protection_from_poison' }];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { isProtectionFromPoisonActive } = extractConditionEffectsCall();
-            expect(isProtectionFromPoisonActive).toBe(false);
-        });
-
-        it('passes isProtectionFromPoisonActive=false when buff effect does not match', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [{ name: 'Protection from Poison', effect: 'other' }];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { isProtectionFromPoisonActive } = extractConditionEffectsCall();
-            expect(isProtectionFromPoisonActive).toBe(false);
-        });
-
-        it('passes isProtectionFromPoisonActive=false when activeBuffs is empty', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { isProtectionFromPoisonActive } = extractConditionEffectsCall();
-            expect(isProtectionFromPoisonActive).toBe(false);
-        });
-    });
-
-    describe('targetEffects filtering', () => {
-        it('passes only target-specific effects to computeConditionEffects', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [
+    describe('campaign.targetEffects filtered to the target', () => {
+        it.each([
+            {
+                title: 'mixed targets keep only the target\'s own',
+                te: [
                     { target: 'OtherPlayer', effect: 'some_effect' },
                     { target: 'TestWizard', effect: 'relevant_effect' },
                     { target: 'TestWizard', effect: 'another_effect' },
-                ];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
+                ],
+                expected: [
+                    { target: 'TestWizard', effect: 'relevant_effect' },
+                    { target: 'TestWizard', effect: 'another_effect' },
+                ],
+            },
+            { title: 'other-target-only', te: [{ target: 'OtherPlayer', effect: 'some_effect' }], expected: [] },
+            { title: 'null store', te: null, expected: [] },
+        ])('passes $title', async ({ te, expected }) => {
+            mockRuntimeReads({ 'campaign.targetEffects': te });
 
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
+            const { targetEffects } = await runSave();
 
-            const { targetEffects } = extractConditionEffectsCall();
-            expect(targetEffects).toHaveLength(2);
-            expect(targetEffects).toEqual([
-                { target: 'TestWizard', effect: 'relevant_effect' },
-                { target: 'TestWizard', effect: 'another_effect' },
-            ]);
-        });
-
-        it('passes empty array when no targetEffects exist for target', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [
-                    { target: 'OtherPlayer', effect: 'some_effect' },
-                ];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { targetEffects } = extractConditionEffectsCall();
-            expect(targetEffects).toEqual([]);
-        });
-
-        it('handles null targetEffects gracefully', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return null;
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            const { targetEffects } = extractConditionEffectsCall();
-            expect(targetEffects).toEqual([]);
+            expect(targetEffects).toEqual(expected);
         });
     });
 
-    describe('handler return value', () => {
-        it('returns true when handler completes the main save prompt path', async () => {
-            getRuntimeValue.mockImplementation((key, subKey) => {
-                if (key === 'campaign' && subKey === 'targetEffects') return [];
-                if (key === 'TestWizard' && subKey === 'activeBuffs') return [];
-                return null;
-            });
+    describe('targetEffects applied as save disadvantage', () => {
+        it('disadvantage_on_next_save targeted at the player rides the prompt', async () => {
+            mockRuntimeReads({ 'campaign.targetEffects': [{ target: 'TestWizard', effect: 'disadvantage_on_next_save' }] });
 
-            const handler = createPlayerSaveDamageHandler(deps);
-            const result = await invokeHandler(handler);
+            await runSave();
 
-            expect(result).toBe(true);
+            // buildPendingData carries save disadvantage under the metamagicHeighten key
+            expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('metamagicHeighten', true);
+            expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                promptId: 'test-guid-1234',
+                disadvantage: true,
+            }));
+        });
+
+        // MA-1352: ability-scoped te only bites saves of the chosen ability.
+        it.each([
+            { ability: 'CON', expected: true },
+            { ability: 'INT', expected: false },
+        ])('ability_save_disadvantage(ability=$ability) vs CON save → disadvantage=$expected', async ({ ability, expected }) => {
+            mockRuntimeReads({ 'campaign.targetEffects': [{ target: 'TestWizard', effect: 'ability_save_disadvantage', ability }] });
+
+            await runSave();
+
+            expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('metamagicHeighten', expected);
         });
     });
 
     describe('Death Ward grants advantage on saves', () => {
-        it('passes saveAdvantage=true when target has Death Ward buff', async () => {
+        it('sets saveAdvantage on the pending prompt and advantage on the save prompt', async () => {
             isDeathWardActive.mockReturnValue(true);
 
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
+            await runSave();
 
             expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('saveAdvantage', true);
-        });
-
-        it('passes saveAdvantage=false when target has no Death Ward buff', async () => {
-            isDeathWardActive.mockReturnValue(false);
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('saveAdvantage', false);
-        });
-
-        it('sends advantage=true to save prompt when Death Ward is active', async () => {
-            isDeathWardActive.mockReturnValue(true);
-
-            const handler = createPlayerSaveDamageHandler(deps);
-            await invokeHandler(handler);
-
-            expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('saveAdvantage', true);
+            expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                promptId: 'test-guid-1234',
+                advantage: true,
+            }));
         });
     });
 });

@@ -1,3 +1,9 @@
+// @maintained-by-ai: 2026-10-14
+// Owns the pendingSave data-shape contract: the record written into
+// pendingSaves[promptId] (and handed to pendingSaveRegistry) BEFORE the
+// player's save prompt resolves. Sibling lanes: adv/dis resolution →
+// .advantage-disadvantage, crit/trap arms → .ma0298-crit-trap, popup/log
+// payloads → base + .logging, spell-origin prompt marker → .integration.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -99,10 +105,9 @@ import { getElderChampionSaveDisadvantage } from '../../../services/combat/auras
 import { isCircleOfPowerActive } from '../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { createPlayerSaveDamageHandler } from './handlePlayerSaveDamage.js';
 import { computeConditionEffects } from '../../../services/combat/conditions/conditionEffects.js';
+import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import { registerPendingSavePrompt } from '../../../services/combat/auras/pendingSaveRegistry.js';
-import { registerPendingPopupSetter } from '../../../services/combat/auras/pendingPopupRegistry.js';
-import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 
 const BASE_CONTEXT = {
     saveDc: 13,
@@ -115,6 +120,20 @@ const BASE_CONTEXT = {
 const BASE_COMBAT_SUMMARY = {
     creatures: [{ name: 'TestWizard', type: 'player' }],
 };
+
+// Golden keyset of the pending record (buildPendingData in handlePlayerSaveDamage.js).
+// Downstream save-resolution consumers (savePrompt reply handlers) read these keys —
+// renaming or dropping one without updating consumers breaks the prompt flow.
+const GOLDEN_PENDING_KEYS = [
+    'attackerName', 'autoDamageSecondaryDamageType', 'autoDamageSecondaryFormula',
+    'autoDamageSecondaryName', 'campaignName', 'dcSuccess', 'damageType', 'formula',
+    'infernalWound', 'isAutoCrit', 'isCantrip', 'isSpellDamage', 'metamagicHeighten',
+    'modifier', 'name', 'overchannelActive', 'overchannelSpellLevel',
+    'overchannelUseCount', 'playerStats', 'rawDamage', 'repeatSave', 'rolls',
+    'saveAdvantage', 'saveConditions', 'saveDc', 'saveType', 'setPopupHtml',
+    'soulTomeTrap', 'statusEffects', 'targetName', 'viciousMockeryMapName',
+    'viciousMockerySpell',
+].sort();
 
 function makeDeps(overrides = {}) {
     return {
@@ -129,7 +148,7 @@ function makeDeps(overrides = {}) {
     };
 }
 
-function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COMBAT_SUMMARY, gwfBaseRolls, gwfDisplayRolls) {
+function invokeHandler(handler, context = BASE_CONTEXT) {
     return handler({
         name: 'Fire Bolt',
         formula: '1d10',
@@ -138,19 +157,17 @@ function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COM
         modifier: 0,
         context,
         adjustedTotal: 5,
-        combatSummary,
+        combatSummary: BASE_COMBAT_SUMMARY,
         displayRolls: [6],
-        gwfBaseRolls,
-        gwfDisplayRolls,
     });
 }
 
-describe('handlePlayerSaveDamage - pending data structure', () => {
-    const deps = makeDeps();
+describe('handlePlayerSaveDamage - pending save data shape', () => {
+    let deps;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        deps.pendingSaves = {};
+        deps = makeDeps();
         getRuntimeValue.mockReturnValue(null);
         computeConditionEffects.mockReturnValue({
             restoreBalance: false,
@@ -165,12 +182,13 @@ describe('handlePlayerSaveDamage - pending data structure', () => {
         isCircleOfPowerActive.mockReturnValue(false);
     });
 
-    it('stores core save fields in pending data', async () => {
+    it('writes the exact golden keyset with inert defaults for a plain save spell', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
         await invokeHandler(handler);
 
-        expect(deps.pendingSaves).toHaveProperty('test-guid-1234');
         const pending = deps.pendingSaves['test-guid-1234'];
+        expect(pending).toBeDefined();
+        expect(Object.keys(pending).sort()).toEqual(GOLDEN_PENDING_KEYS);
         expect(pending).toMatchObject({
             targetName: 'TestWizard',
             rawDamage: 5,
@@ -178,334 +196,86 @@ describe('handlePlayerSaveDamage - pending data structure', () => {
             saveType: 'DEX',
             dcSuccess: 'half',
             damageType: 'Fire',
+            attackerName: 'TestWizard',
             name: 'Fire Bolt',
             formula: '1d10',
             modifier: 0,
             rolls: [6],
             campaignName: 'test-campaign',
+            metamagicHeighten: false,
+            saveAdvantage: false,
+            isCantrip: false,
+            overchannelActive: false,
+            overchannelUseCount: 0,
+            overchannelSpellLevel: 1,
+            statusEffects: [],
+            viciousMockerySpell: null,
+            viciousMockeryMapName: null,
+            autoDamageSecondaryFormula: null,
+            autoDamageSecondaryName: null,
+            autoDamageSecondaryDamageType: null,
+            isAutoCrit: false,
+            saveConditions: null,
+            soulTomeTrap: null,
+            repeatSave: null,
+            infernalWound: null,
+            isSpellDamage: true,
         });
+        expect(pending.setPopupHtml).toBe(deps.setPopupHtml);
+        // The registry must hand back the very same record the seam wrote.
+        expect(registerPendingSavePrompt).toHaveBeenCalledWith('test-guid-1234', pending);
     });
 
-    it('defaults metamagicHeighten and saveAdvantage to false when no special sources apply', async () => {
+    it('captures unresolved prompt state — raw damage untouched, no save outcome applied yet', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
         await invokeHandler(handler);
 
         const pending = deps.pendingSaves['test-guid-1234'];
-        expect(pending).toHaveProperty('metamagicHeighten', false);
-        expect(pending).toHaveProperty('saveAdvantage', false);
+        // dcSuccess='half' is stored as the resolution policy, not pre-applied.
+        expect(pending.rawDamage).toBe(5);
+        expect(pending).not.toHaveProperty('saveResult');
+        expect(pending).not.toHaveProperty('finalDamage');
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        // The prompt is outstanding — waiting for the player's answer.
+        expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ promptId: 'test-guid-1234' }));
     });
 
-    it('defaults isCantrip, overchannel, and autoDamage fields to falsy values', async () => {
+    it('rides rider context fields through to pending, preserving object references', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        const pending = deps.pendingSaves['test-guid-1234'];
-        expect(pending).toHaveProperty('isCantrip', false);
-        expect(pending).toHaveProperty('overchannelActive', false);
-        expect(pending).toHaveProperty('overchannelUseCount', 0);
-        expect(pending).toHaveProperty('overchannelSpellLevel', 1);
-        expect(pending).toHaveProperty('autoDamageSecondaryFormula', null);
-        expect(pending).toHaveProperty('autoDamageSecondaryName', null);
-        expect(pending).toHaveProperty('autoDamageSecondaryDamageType', null);
-    });
-
-    it('passes context boolean flags through to pending data', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
+        const statusEffects = ['exhaustion', 'poisoned'];
+        const playerStats = { level: 10, class: { name: 'Wizard' } };
         const context = {
             ...BASE_CONTEXT,
-            metamagicHeighten: true,
             isCantrip: true,
             overchannelActive: true,
             overchannelUseCount: 2,
             overchannelSpellLevel: 3,
-        };
-
-        await invokeHandler(handler, context);
-
-        const pending = deps.pendingSaves['test-guid-1234'];
-        expect(pending).toHaveProperty('metamagicHeighten', true);
-        expect(pending).toHaveProperty('isCantrip', true);
-        expect(pending).toHaveProperty('overchannelActive', true);
-        expect(pending).toHaveProperty('overchannelUseCount', 2);
-        expect(pending).toHaveProperty('overchannelSpellLevel', 3);
-    });
-
-    it('passes context autoDamage fields through to pending data', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        const context = {
-            ...BASE_CONTEXT,
             autoDamageSecondaryFormula: '2d6',
             autoDamageSecondaryName: 'Radiant',
             autoDamageSecondaryDamageType: 'Radiant',
+            viciousMockerySpell: 'Vicious Mockery',
+            viciousMockeryMapName: 'map-1',
+            statusEffects,
+            playerStats,
         };
 
         await invokeHandler(handler, context);
 
         const pending = deps.pendingSaves['test-guid-1234'];
-        expect(pending).toHaveProperty('autoDamageSecondaryFormula', '2d6');
-        expect(pending).toHaveProperty('autoDamageSecondaryName', 'Radiant');
-        expect(pending).toHaveProperty('autoDamageSecondaryDamageType', 'Radiant');
-    });
-
-    it('passes context statusEffects and playerStats through to pending data', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        const context = {
-            ...BASE_CONTEXT,
-            statusEffects: ['exhaustion', 'poisoned'],
-            playerStats: { level: 10, class: { name: 'Wizard' } },
-        };
-
-        await invokeHandler(handler, context);
-
-        const pending = deps.pendingSaves['test-guid-1234'];
-        expect(pending).toHaveProperty('statusEffects', ['exhaustion', 'poisoned']);
-        expect(pending).toHaveProperty('playerStats', { level: 10, class: { name: 'Wizard' } });
-    });
-});
-
-describe('handlePlayerSaveDamage - attackerName resolution', () => {
-    const deps = makeDeps();
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        deps.pendingSaves = {};
-        getRuntimeValue.mockReturnValue(null);
-        computeConditionEffects.mockReturnValue({
-            restoreBalance: false,
-            autoRerollForSaves: false,
-            autoRerollBonus: null,
-            saveAdvantageCount: 0,
-            saveAdvantageAbilities: null,
+        expect(pending).toMatchObject({
+            isCantrip: true,
+            overchannelActive: true,
+            overchannelUseCount: 2,
+            overchannelSpellLevel: 3,
+            autoDamageSecondaryFormula: '2d6',
+            autoDamageSecondaryName: 'Radiant',
+            autoDamageSecondaryDamageType: 'Radiant',
+            viciousMockerySpell: 'Vicious Mockery',
+            viciousMockeryMapName: 'map-1',
         });
-        getHolyAuraTargets.mockReturnValue([]);
-        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
-        isCircleOfPowerActive.mockReturnValue(false);
-    });
-
-    it('uses attackerName from context when provided', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        const context = { ...BASE_CONTEXT, attackerName: 'EnemyMage' };
-
-        await invokeHandler(handler, context);
-
-        const pending = deps.pendingSaves['test-guid-1234'];
-        expect(pending).toHaveProperty('attackerName', 'EnemyMage');
-    });
-
-    it('defaults attackerName to characterName when context lacks attackerName', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        const pending = deps.pendingSaves['test-guid-1234'];
-        expect(pending).toHaveProperty('attackerName', 'TestWizard');
-    });
-});
-
-describe('handlePlayerSaveDamage - GWF tracking in pending data', () => {
-    const deps = makeDeps();
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        deps.pendingSaves = {};
-        getRuntimeValue.mockReturnValue(null);
-        computeConditionEffects.mockReturnValue({
-            restoreBalance: false,
-            autoRerollForSaves: false,
-            autoRerollBonus: null,
-            saveAdvantageCount: 0,
-            saveAdvantageAbilities: null,
-        });
-        getHolyAuraTargets.mockReturnValue([]);
-        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
-        isCircleOfPowerActive.mockReturnValue(false);
-    });
-
-    it('sets gwfApplied false and gwfOriginalRolls null in popup when gwfBaseRolls and gwfDisplayRolls are both undefined', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler, BASE_CONTEXT, BASE_COMBAT_SUMMARY, undefined, undefined);
-
-        expect(deps.setPopupHtml).toHaveBeenCalledWith(
-            expect.objectContaining({
-                gwfApplied: false,
-                gwfOriginalRolls: null,
-            })
-        );
-    });
-
-    it('sets gwfApplied true and gwfOriginalRolls set in popup when gwfBaseRolls and gwfDisplayRolls differ', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler, BASE_CONTEXT, BASE_COMBAT_SUMMARY, [6, 6], [3, 3]);
-
-        expect(deps.setPopupHtml).toHaveBeenCalledWith(
-            expect.objectContaining({
-                gwfApplied: true,
-                gwfOriginalRolls: [6, 6],
-            })
-        );
-    });
-});
-
-describe('handlePlayerSaveDamage - side effects', () => {
-    const deps = makeDeps();
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        deps.pendingSaves = {};
-        getRuntimeValue.mockReturnValue(null);
-        computeConditionEffects.mockReturnValue({
-            restoreBalance: false,
-            autoRerollForSaves: false,
-            autoRerollBonus: null,
-            saveAdvantageCount: 0,
-            saveAdvantageAbilities: null,
-        });
-        getHolyAuraTargets.mockReturnValue([]);
-        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
-        isCircleOfPowerActive.mockReturnValue(false);
-    });
-
-    it('registers pending save prompt with the registry', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        expect(registerPendingSavePrompt).toHaveBeenCalledWith(
-            'test-guid-1234',
-            expect.objectContaining({
-                targetName: 'TestWizard',
-                rawDamage: 5,
-                saveDc: 13,
-                saveType: 'DEX',
-            })
-        );
-    });
-
-    it('registers pending popup setter with the registry', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        expect(registerPendingPopupSetter).toHaveBeenCalledWith(
-            'test-guid-1234',
-            expect.any(Function)
-        );
-    });
-
-    it('sends save prompt via savePromptService', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        expect(sendSavePrompt).toHaveBeenCalledWith(
-            'test-campaign',
-            expect.objectContaining({
-                promptId: 'test-guid-1234',
-                targetName: 'TestWizard',
-                saveType: 'DEX',
-                saveDc: 13,
-                dcSuccess: 'half',
-                damageFormula: '1d10',
-                damageType: 'Fire',
-                sourceName: 'Fire Bolt',
-                rawDamage: 5,
-                disadvantage: false,
-                advantage: false,
-            })
-        );
-    });
-
-    it('calls handleOverchannelSelfDamage at the end of the handler', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        expect(handleOverchannelSelfDamage).toHaveBeenCalledWith(
-            'TestWizard',
-            'test-campaign',
-            expect.any(Object),
-            expect.any(Function),
-            expect.any(Array)
-        );
-    });
-
-    it('logs a save-prompt roll entry', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        expect(deps.logEntry).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'roll',
-                rollType: 'save-prompt',
-                name: 'Fire Bolt',
-                formula: '1d10',
-                total: 5,
-                damageType: 'Fire',
-                targetName: 'TestWizard',
-                saveType: 'DEX',
-                saveDc: 13,
-                dcSuccess: 'half',
-                forcedMode: 'normal',
-            })
-        );
-    });
-
-    it('sets popup with waitingForPlayerSave and promptId', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        expect(deps.setPopupHtml).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'save-damage',
-                waitingForPlayerSave: true,
-                promptId: 'test-guid-1234',
-                rawDamage: 5,
-                gwfApplied: false,
-                gwfOriginalRolls: null,
-                autoReroll: false,
-                autoRerollBonus: null,
-            })
-        );
-    });
-});
-
-describe('handlePlayerSaveDamage - forcedMode in logging', () => {
-    const deps = makeDeps();
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        deps.pendingSaves = {};
-        getRuntimeValue.mockReturnValue(null);
-        computeConditionEffects.mockReturnValue({
-            restoreBalance: false,
-            autoRerollForSaves: false,
-            autoRerollBonus: null,
-            saveAdvantageCount: 0,
-            saveAdvantageAbilities: null,
-        });
-        getHolyAuraTargets.mockReturnValue([]);
-        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
-        isCircleOfPowerActive.mockReturnValue(false);
-    });
-
-    it('logs forcedMode: disadvantage when metamagicHeighten is true', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler, { ...BASE_CONTEXT, metamagicHeighten: true });
-
-        expect(deps.logEntry).toHaveBeenCalledWith(
-            expect.objectContaining({
-                forcedMode: 'disadvantage',
-            })
-        );
-    });
-
-    it('logs forcedMode: normal when metamagicHeighten is false', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        expect(deps.logEntry).toHaveBeenCalledWith(
-            expect.objectContaining({
-                forcedMode: 'normal',
-            })
-        );
+        // CLA-377: the resolved save outcome gates the VM leg downstream —
+        // the arrays/stats ride through by reference, untouched.
+        expect(pending.statusEffects).toBe(statusEffects);
+        expect(pending.playerStats).toBe(playerStats);
     });
 });

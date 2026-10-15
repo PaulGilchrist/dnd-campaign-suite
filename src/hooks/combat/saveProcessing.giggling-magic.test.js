@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -31,8 +32,6 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../services/encounters/combatData.js', () => ({
     loadCombatSummary: async () => ({ creatures: [], activeCreatureName: 'Adult Copper Dragon 1' }),
-    getCurrentCombatRound: () => 1,
-    getCombatSummary: () => null,
 }));
 
 const applyDamageToTarget = vi.fn(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 60 - finalDamage }));

@@ -1,13 +1,18 @@
+// @maintained-by-ai: 2026-10-14
 // MA-1400: Roper "Tentacle" damageless hit-clause consumer proof — the row
 // authors ZERO damage, so the whole rider rides the resolved hit through the
 // dice-less '0' auto-damage arm (MonsterCardModal.buildAutoDamageOptions).
-// This pins the CONSUMER face: handlePlainDamage (via createLogDamageAndShow)
-// with total 0 still reaches maybeApplyHitClause — applyDamageToTarget(0)
-// passes isUsableRawDamage and returns a non-null applyResult — granting
-// Grappled+Poisoned with escape-meta {dc:14, ability:'str', source} +
-// condition-applied log, while damage stays zero. Pre-fix this never ran:
-// buildAutoDamage gated Done on autoDamageFormula and every pre-fix
-// hit_conditions row carried damage dice (MA-1274 otyugh twin: 2d8 + 3).
+// This file owns ONE unique contract: handlePlainDamage (via
+// createLogDamageAndShow) with total 0 still reaches maybeApplyHitClause —
+// applyDamageToTarget(0) returns a non-null applyResult (the guard is
+// !applyResult, never damage > 0) — granting Grappled+Poisoned with
+// escape-meta {dc:14, ability:'str', source} + condition-applied log, while
+// the damage leg pays zero. Trimmed 2026-10-14: disk row shape and the
+// dice-less '0' dispatch arm are locked in
+// MonsterAction.ma1400-roper-tentacle-hit-conditions.test.jsx; the generic
+// miss flow (no hitClause) and null-applyResult guards are damage-agnostic
+// and covered in handlePlainDamage.hitClause.test.js; the damageless
+// consumer lane itself has a byte-twin in the MA-1402 rug-smother file.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -106,8 +111,7 @@ import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
 import { buildHitConditionClause } from '../../../components/encounter/MonsterCardHelpers.js';
 import monsters from '../../../../public/data/monsters.json';
 
-const ROPER = monsters.find((m) => m.index === 'roper');
-const TENTACLE = ROPER.actions[2];
+const TENTACLE = monsters.find((m) => m.index === 'roper').actions[2];
 
 describe('MA-1400 roper Tentacle damageless hit-clause consumer', () => {
     const deps = {
@@ -131,20 +135,20 @@ describe('MA-1400 roper Tentacle damageless hit-clause consumer', () => {
         });
     });
 
-    it('grants Grappled+Poisoned with escape-meta and DC-14 log on a ZERO-damage resolved hit', async () => {
-        const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Tentacle', formula: '0', total: 0, rolls: [], modifier: 0, context: {
-            targetName: 'Bandit 1',
-            damageType: '',
-            attackerName: 'Roper 1',
-            hitClause: buildHitConditionClause(TENTACLE),
-        } });
+    it('ZERO-damage resolved hit grants Grappled+Poisoned (escape DC 14) and pays zero damage', async () => {
+        await createLogDamageAndShow(deps)({
+            name: 'Tentacle', formula: '0', total: 0, rolls: [], modifier: 0, context: {
+                targetName: 'Bandit 1',
+                damageType: '',
+                attackerName: 'Roper 1',
+                hitClause: buildHitConditionClause(TENTACLE),
+            },
+        });
 
         const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
         expect(condCall).toBeTruthy();
         expect(condCall[2]).toEqual(['grappled', 'poisoned']);
-        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
-        expect(metaCall[2]).toMatchObject({
+        expect(setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta')?.[2]).toMatchObject({
             grappled: { dc: 14, ability: 'str', source: 'Roper 1' },
             poisoned: { dc: 14, ability: 'str', source: 'Roper 1' },
         });
@@ -155,40 +159,11 @@ describe('MA-1400 roper Tentacle damageless hit-clause consumer', () => {
             condition: 'Grappled, Poisoned',
             reason: 'Tentacle (escape DC 14)',
         }));
-    });
 
-    it('damage leg pays ZERO: damage log finalDamage 0, HP never moves', async () => {
-        const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Tentacle', formula: '0', total: 0, rolls: [], modifier: 0, context: {
-            targetName: 'Bandit 1',
-            damageType: '',
-            attackerName: 'Roper 1',
-            hitClause: buildHitConditionClause(TENTACLE),
-        } });
-
-        const dmgLog = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.rollType === 'damage');
-        expect(dmgLog).toBeTruthy();
-        expect(dmgLog.formula).toBe('0');
-        expect(dmgLog.total).toBe(0);
-        expect(dmgLog.finalDamage).toBe(0);
-        expect(dmgLog.rolls).toEqual([]);
+        // Damage leg stays honest: the dice-less '0' rides through without
+        // moving HP (applyDamageToTarget receives 0, log finalDamage 0).
         expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Bandit 1', 0, [''], expect.anything());
-    });
-
-    it('writes no condition when no clause reaches the damage leg (miss flow stays byte-inert)', async () => {
-        const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Tentacle', formula: '0', total: 0, rolls: [], modifier: 0, context: {
-            targetName: 'Bandit 1',
-            damageType: '',
-            attackerName: 'Roper 1',
-        } });
-
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
-        );
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
-        );
-        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+        const dmgLog = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.rollType === 'damage');
+        expect(dmgLog).toMatchObject({ formula: '0', total: 0, finalDamage: 0 });
     });
 });

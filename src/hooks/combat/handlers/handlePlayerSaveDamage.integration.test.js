@@ -1,3 +1,9 @@
+// @maintained-by-ai: 2026-10-14
+// Composite coverage only: registration-before-prompt ordering (race guard),
+// the CLA-324 isSpellDamage prompt marker, and simultaneous advantage +
+// disadvantage with a custom attacker. Per-field payload, logging, popup,
+// pending-data, adv/dis and overchannel coverage lives in the lane siblings
+// (.test.js, .logging, .pending-data, .advantage-disadvantage, .targetEffects).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -102,7 +108,6 @@ import { getElderChampionSaveDisadvantage } from '../../../services/combat/auras
 import { isCircleOfPowerActive } from '../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
 import { registerPendingSavePrompt } from '../../../services/combat/auras/pendingSaveRegistry.js';
 import { registerPendingPopupSetter } from '../../../services/combat/auras/pendingPopupRegistry.js';
-import { handleOverchannelSelfDamage } from './handleOverchannelSelfDamage.js';
 
 const DEFAULT_CONTEXT = {
     saveDc: 15,
@@ -116,324 +121,86 @@ const DEFAULT_COMBAT_SUMMARY = {
     creatures: [{ name: 'TestWizard', type: 'player' }],
 };
 
-const DEFAULT_CALL_ARGS = {
-    name: 'Acid Arrow',
-    formula: '4d4',
-    total: 10,
-    rolls: [3, 4, 2, 1],
-    modifier: 0,
-    context: DEFAULT_CONTEXT,
-    adjustedTotal: 10,
-    combatSummary: DEFAULT_COMBAT_SUMMARY,
-    displayRolls: [3, 4, 2, 1],
-};
-
-function makeDeps(overrides = {}) {
-    return {
-        characterName: 'TestWizard',
-        campaignName: 'test-campaign',
-        characters: [{ name: 'TestWizard' }],
-        charactersRef: { current: [] },
-        setPopupHtml: vi.fn(),
-        logEntry: vi.fn(),
-        pendingSaves: {},
-        ...overrides,
-    };
-}
-
-function setupCommonMocks() {
-    getRuntimeValue.mockReturnValue(null);
-    computeConditionEffects.mockReturnValue({
-        restoreBalance: false,
-        autoRerollForSaves: false,
-        autoRerollBonus: null,
-        saveAdvantageCount: 0,
-        saveAdvantageAbilities: null,
+function invokeHandler(handler, context = DEFAULT_CONTEXT) {
+    return handler({
+        name: 'Acid Arrow',
+        formula: '4d4',
+        total: 10,
+        rolls: [3, 4, 2, 1],
+        modifier: 0,
+        context,
+        adjustedTotal: 10,
+        combatSummary: DEFAULT_COMBAT_SUMMARY,
+        displayRolls: [3, 4, 2, 1],
     });
-    getHolyAuraTargets.mockReturnValue([]);
-    getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-    getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
-    isCircleOfPowerActive.mockReturnValue(false);
 }
 
-describe('handlePlayerSaveDamage - complete save prompt flow', () => {
+describe('handlePlayerSaveDamage - composite save prompt flows', () => {
     let deps;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        deps = makeDeps();
-        setupCommonMocks();
+        deps = {
+            characterName: 'TestWizard',
+            campaignName: 'test-campaign',
+            characters: [{ name: 'TestWizard' }],
+            charactersRef: { current: [] },
+            setPopupHtml: vi.fn(),
+            logEntry: vi.fn(),
+            pendingSaves: {},
+        };
+        getRuntimeValue.mockReturnValue(null);
+        computeConditionEffects.mockReturnValue({
+            restoreBalance: false,
+            autoRerollForSaves: false,
+            autoRerollBonus: null,
+            saveAdvantageCount: 0,
+            saveAdvantageAbilities: null,
+        });
+        getHolyAuraTargets.mockReturnValue([]);
+        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
+        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
+        isCircleOfPowerActive.mockReturnValue(false);
     });
 
-    it('emits all four side effects in the correct order for the main save prompt path', async () => {
+    it('registers pending prompt and popup setter before sending, marks the prompt spell-origin, and returns true', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(DEFAULT_CALL_ARGS);
+        const result = await invokeHandler(handler);
 
-        // Verify all four side effects fired
-        expect(registerPendingSavePrompt).toHaveBeenCalledTimes(1);
-        expect(registerPendingPopupSetter).toHaveBeenCalledTimes(1);
-        expect(sendSavePrompt).toHaveBeenCalledTimes(1);
-        expect(deps.logEntry).toHaveBeenCalledTimes(1);
-        expect(deps.setPopupHtml).toHaveBeenCalledTimes(1);
-        expect(handleOverchannelSelfDamage).toHaveBeenCalledTimes(1);
-
-        // All registration happens before the prompt is sent
+        expect(result).toBe(true);
+        // Race guard: a player response must never arrive before registration.
         expect(registerPendingSavePrompt.mock.invocationCallOrder[0]).toBeLessThan(
             sendSavePrompt.mock.invocationCallOrder[0]
         );
         expect(registerPendingPopupSetter.mock.invocationCallOrder[0]).toBeLessThan(
             sendSavePrompt.mock.invocationCallOrder[0]
         );
-    });
-
-    it('populates pendingSaves with all expected fields', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await handler(DEFAULT_CALL_ARGS);
-
-        const pendingData = deps.pendingSaves['test-guid-1234'];
-        expect(pendingData).toBeDefined();
-        expect(pendingData).toMatchObject({
-            targetName: 'TestWizard',
-            rawDamage: 10,
-            saveDc: 15,
-            saveType: 'CON',
-            dcSuccess: 'half',
-            damageType: 'Poison',
-            attackerName: 'TestWizard',
-            name: 'Acid Arrow',
-            formula: '4d4',
-            modifier: 0,
-            rolls: [3, 4, 2, 1],
-            campaignName: 'test-campaign',
-            metamagicHeighten: false,
-            saveAdvantage: false,
-            isCantrip: false,
-            overchannelActive: false,
-            overchannelUseCount: 0,
-            overchannelSpellLevel: 1,
-            statusEffects: [],
-        });
-    });
-
-    it('sends save prompt with correct data to the UI', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await handler(DEFAULT_CALL_ARGS);
-
-        expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', {
-            promptId: 'test-guid-1234',
-            targetName: 'TestWizard',
-            saveType: 'CON',
-            saveDc: 15,
-            dcSuccess: 'half',
-            damageFormula: '4d4',
-            damageType: 'Poison',
-            sourceName: 'Acid Arrow',
-            sourceAttackerName: 'TestWizard',
-            rawDamage: 10,
-            disadvantage: false,
-            advantage: false,
-            isSpellDamage: true,
-        });
-    });
-
-    it('registers pending save prompt with matching data', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await handler(DEFAULT_CALL_ARGS);
-
-        expect(registerPendingSavePrompt).toHaveBeenCalledWith('test-guid-1234', expect.objectContaining({
-            targetName: 'TestWizard',
-            rawDamage: 10,
-            saveDc: 15,
-        }));
-    });
-
-    it('registers pending popup setter with the promptId', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await handler(DEFAULT_CALL_ARGS);
-
-        expect(registerPendingPopupSetter).toHaveBeenCalledWith('test-guid-1234', deps.setPopupHtml);
-    });
-
-    it('logs the save-prompt event with roll details', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await handler(DEFAULT_CALL_ARGS);
-
-        expect(deps.logEntry).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'roll',
-                rollType: 'save-prompt',
-                characterName: 'TestWizard',
-                name: 'Acid Arrow',
-                formula: '4d4',
-                rolls: [3, 4, 2, 1],
-                total: 10,
-                modifier: 0,
-                damageType: 'Poison',
-                targetName: 'TestWizard',
-                saveType: 'CON',
-                saveDc: 15,
-                dcSuccess: 'half',
-                gwfApplied: false,
-                gwfOriginalRolls: null,
-            })
-        );
-    });
-
-    it('sets popup to waiting state with all required fields', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await handler(DEFAULT_CALL_ARGS);
-
-        expect(deps.setPopupHtml).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'save-damage',
-                name: 'Acid Arrow',
-                formula: '4d4',
-                rolls: [3, 4, 2, 1],
-                total: 10,
-                bonus: 0,
-                modifier: 0,
-                damageType: 'Poison',
-                targetName: 'TestWizard',
-                saveDc: 15,
-                saveType: 'CON',
-                dcSuccess: 'half',
-                waitingForPlayerSave: true,
-                promptId: 'test-guid-1234',
-                rawDamage: 10,
-                attackerName: 'TestWizard',
-                gwfApplied: false,
-                gwfOriginalRolls: null,
-                autoReroll: false,
-                autoRerollBonus: null,
-            })
-        );
-    });
-
-    it('calls handleOverchannelSelfDamage with correct arguments', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await handler(DEFAULT_CALL_ARGS);
-
-        expect(handleOverchannelSelfDamage).toHaveBeenCalledWith(
-            'TestWizard',
-            'test-campaign',
-            DEFAULT_CONTEXT,
-            deps.logEntry,
-            deps.characters
-        );
-    });
-
-    it('returns true to indicate the handler completed successfully', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        const result = await handler(DEFAULT_CALL_ARGS);
-
-        expect(result).toBe(true);
-    });
-});
-
-describe('handlePlayerSaveDamage - save prompt with custom attacker', () => {
-    let deps;
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        deps = makeDeps();
-        setupCommonMocks();
-    });
-
-    it('uses context attackerName as sourceAttackerName when provided', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        const context = { ...DEFAULT_CONTEXT, attackerName: 'Goblin' };
-
-        await handler({ name: 'Acid Arrow', formula: '4d4', total: 10, rolls: [3, 4, 2, 1], modifier: 0, context: context, adjustedTotal: 10, combatSummary: DEFAULT_COMBAT_SUMMARY, displayRolls: [3, 4, 2, 1] });
-
+        // CLA-324: player-cast save-spell damage carries the spell-origin marker.
         expect(sendSavePrompt).toHaveBeenCalledWith(
             'test-campaign',
-            expect.objectContaining({ sourceAttackerName: 'Goblin' })
+            expect.objectContaining({ promptId: 'test-guid-1234', isSpellDamage: true })
         );
-        expect(deps.pendingSaves['test-guid-1234']).toMatchObject({
-            attackerName: 'Goblin',
-        });
-    });
-});
-
-describe('handlePlayerSaveDamage - save prompt with disadvantage/advantage', () => {
-    let deps;
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        deps = makeDeps();
-        setupCommonMocks();
     });
 
-    it('passes disadvantage:true when corona aura applies', async () => {
+    it('sends advantage and disadvantage together with a custom attacker name when both sources apply', async () => {
+        isCircleOfPowerActive.mockReturnValue(true);
         getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
 
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler(DEFAULT_CALL_ARGS);
+        await invokeHandler(handler, { ...DEFAULT_CONTEXT, attackerName: 'Goblin' });
 
         expect(sendSavePrompt).toHaveBeenCalledWith(
             'test-campaign',
-            expect.objectContaining({ disadvantage: true })
-        );
-        expect(deps.pendingSaves['test-guid-1234']).toMatchObject({
-            metamagicHeighten: true,
-        });
-    });
-
-    it('passes advantage:true when circle of power grants advantage', async () => {
-        isCircleOfPowerActive.mockReturnValue(true);
-
-        const handler = createPlayerSaveDamageHandler(deps);
-        await handler(DEFAULT_CALL_ARGS);
-
-        expect(sendSavePrompt).toHaveBeenCalledWith(
-            'test-campaign',
-            expect.objectContaining({ advantage: true })
+            expect.objectContaining({
+                advantage: true,
+                disadvantage: true,
+                sourceAttackerName: 'Goblin',
+            })
         );
         expect(deps.pendingSaves['test-guid-1234']).toMatchObject({
             saveAdvantage: true,
+            metamagicHeighten: true,
+            attackerName: 'Goblin',
         });
-    });
-
-    it('passes both advantage and disadvantage correctly when both apply', async () => {
-        isCircleOfPowerActive.mockReturnValue(true);
-        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
-
-        const handler = createPlayerSaveDamageHandler(deps);
-        await handler(DEFAULT_CALL_ARGS);
-
-        expect(sendSavePrompt).toHaveBeenCalledWith(
-            'test-campaign',
-            expect.objectContaining({ advantage: true, disadvantage: true })
-        );
-    });
-});
-
-describe('handlePlayerSaveDamage - integration with registerPendingSavePrompt', () => {
-    let deps;
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        deps = makeDeps();
-        setupCommonMocks();
-    });
-
-    it('passes campaignName to registerPendingSavePrompt via pendingData', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await handler(DEFAULT_CALL_ARGS);
-
-        expect(registerPendingSavePrompt).toHaveBeenCalledWith(
-            'test-guid-1234',
-            expect.objectContaining({ campaignName: 'test-campaign' })
-        );
-    });
-
-    it('passes setPopupHtml to registerPendingSavePrompt via pendingData', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await handler(DEFAULT_CALL_ARGS);
-
-        expect(registerPendingSavePrompt).toHaveBeenCalledWith(
-            'test-guid-1234',
-            expect.objectContaining({ setPopupHtml: deps.setPopupHtml })
-        );
     });
 });

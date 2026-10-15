@@ -1,9 +1,13 @@
+// @maintained-by-ai: 2026-10-14
 // MA-0107: Adult Gold Dragon lair action Dream Plane Banishment authored
 // failed-save grant — distinct te `lair_dream_plane` on the target (not the
-// MA-0104 `banished_demiplane` and not the PC spell `banishment`), rounds:2
-// clock mirroring the verified MA-0104 shape, and a granted log stating the
-// RAW initiative-count-20 expiry, contested-Charisma escape and reappearance
-// as GM-enforced (no initiative lair seam §7).
+// MA-0104 `banished_demiplane` and not the PC spell `banishment`), the
+// rounds:2 clock mirroring the verified MA-0104 shape, and a granted log
+// stating the RAW initiative-count-20 expiry, contested-Charisma escape and
+// reappearance as GM-enforced (no initiative lair seam §7). The mocked
+// runtime store carries no `campaign.enforcement` key, so the legacy
+// rounds:2 / GM-advisory branch is the one under test (L5-003 §8.3 zones
+// enforcement stays dark here).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -16,11 +20,6 @@ vi.mock('../runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../services/ui/utils.js', () => ({
     default: { guid: () => 'id-' + Math.random().toString(36).slice(2) },
-}));
-
-const rollExpression = vi.fn(() => ({ total: 9, rolls: [5, 4], modifier: 0 }));
-vi.mock('../../services/dice/diceRoller.js', () => ({
-    rollExpression: (...args) => rollExpression(...args),
 }));
 
 let pendingSaveResolve = null;
@@ -44,7 +43,6 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 const applyDamageToTarget = vi.fn(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 100 - finalDamage }));
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     normalizeSaveType: (t) => String(t || '').toUpperCase(),
-    computeDamageAfterSave: (raw, success, dcSuccess) => (!success ? raw : dcSuccess === 'half' ? Math.floor(raw / 2) : 0),
     computeDamageAfterEvasion: (total, saveSuccess, dcSuccess, evasionActive) =>
         (evasionActive && dcSuccess === 'half') ? (saveSuccess ? 0 : Math.floor(total / 2))
             : (!saveSuccess ? total : dcSuccess === 'half' ? Math.floor(total / 2) : 0),
@@ -71,8 +69,8 @@ const campaignName = 'test-campaign';
 const DRAGON = 'Adult Gold Dragon 1';
 const TARGET = 'ElderPaladin';
 
-// MA-0107 Adult Gold Dragon Dream Plane Banishment (lair save row shape —
-// damageless, dc_success none, te clause armed by parseDreamPlaneBanishClause).
+// MA-0107 Dream Plane Banishment lair save row shape — damageless,
+// dc_success none, te clause armed by parseDreamPlaneBanishClause.
 const dreamContext = {
     saveDc: 15,
     saveType: 'Charisma',
@@ -106,7 +104,7 @@ beforeEach(() => {
 
 describe('MA-0107 Dream Plane Banishment failed-save lair_dream_plane te', () => {
     it('failed save: lair_dream_plane te on target sourced from dragon + rounds:2 clock + granted log, zero damage', async () => {
-        await resolveSave({ ...dreamContext }, false, 8);
+        await resolveSave(dreamContext, false, 8);
 
         expect(applyDamageToTarget).not.toHaveBeenCalled();
 
@@ -140,7 +138,7 @@ describe('MA-0107 Dream Plane Banishment failed-save lair_dream_plane te', () =>
     });
 
     it('successful save: no te, no expiry, no grant log, no damage — honest success is inert', async () => {
-        await resolveSave({ ...dreamContext }, true, 24);
+        await resolveSave(dreamContext, true, 24);
 
         expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
         expect(addExpiration).not.toHaveBeenCalled();
@@ -149,16 +147,9 @@ describe('MA-0107 Dream Plane Banishment failed-save lair_dream_plane te', () =>
     });
 
     it('rows without the clause are byte-inert: no te even on a failed save', async () => {
-        const claw = { ...dreamContext, actionName: 'Claw', dreamPlaneBanishment: null };
-        await resolveSave(claw, false, 3);
+        await resolveSave({ ...dreamContext, actionName: 'Claw', dreamPlaneBanishment: null }, false, 3);
 
         expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
         expect(addExpiration).not.toHaveBeenCalled();
-    });
-
-    it('never reuses sibling te keys: grant writes neither banishment nor banished_demiplane', async () => {
-        await resolveSave({ ...dreamContext }, false, 4);
-        const tes = runtimeStore['campaign.targetEffects'] || [];
-        expect(tes.every(te => te.effect !== 'banishment' && te.effect !== 'banished_demiplane')).toBe(true);
     });
 });

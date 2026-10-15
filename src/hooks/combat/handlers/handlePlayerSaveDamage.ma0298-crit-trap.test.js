@@ -1,16 +1,13 @@
-// MA-0298: combo attack+save crit doubling — the player save-damage handler
-// must carry the attack popup's crit flag (and the Soul Tome trap arms) into
-// the pending prompt so computeSecondaryRoll doubles the secondary dice via
-// the SAME rollExpressionDoubled consumer plain attacks use, and so the save
-// trap clause parse routes through the MA-0104 te key. Full-path unit lock:
-// nat-20 combo → dice-doubled rawDamage + doubled secondary roll.
+// @maintained-by-ai: 2026-10-14
+// MA-0298 combo attack+save crit + trap arms ride the pending save prompt:
+// the handler must carry the attack popup's crit flag (and the Soul Tome /
+// MA-0367 Infernal Wound trap arms) into pendingSaves via
+// comboCritAndTrapArms() so computeSecondaryRoll doubles the secondary dice
+// at the save-result seam through the SAME rollExpressionDoubled consumer
+// plain attacks use (primary total arrives pre-doubled). Byte-inert
+// (isAutoCrit false, arms null) for every non-combo row — other pending
+// data fields are locked by the pending-data lane.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-vi.mock('../../../services/dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 2], modifier: 5 })),
-    rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 2, 3, 2], modifier: 5 })),
-    formatDamageFormula: vi.fn((formula) => formula),
-}));
 
 vi.mock('../../../services/ui/utils.js', () => ({
     default: {
@@ -26,7 +23,6 @@ vi.mock('../../runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../services/combat/automation/automationService.js', () => ({
     hasIgnoreResistance: vi.fn(() => false),
-    playerIsImmuneToCondition: vi.fn(() => false),
     hasGreatWeaponFighting: vi.fn(() => false),
     applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
     evaluateAutoExpression: vi.fn(),
@@ -37,9 +33,6 @@ vi.mock('../../../services/rules/features/invisibilityService.js', () => ({
 }));
 
 vi.mock('../loggedDiceRollUtils.js', () => ({
-    getGuardianProtectionAcBonus: vi.fn(() => 0),
-    hasPotentCantrip: vi.fn(),
-    hasSoulstitchProtection: vi.fn(() => false),
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 
@@ -69,10 +62,7 @@ vi.mock('../../../services/ui/logService.js', () => ({
 
 vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
     computeDamageAfterSave: vi.fn((total, success, dcSuccess) => (dcSuccess === 'none' ? total : (success ? 0 : total))),
-    computeDamageAfterEvasion: vi.fn((total, success, dcSuccess) => (dcSuccess === 'none' ? total : (success ? 0 : total))),
-    rollSaveForCreature: vi.fn(),
     applyDamageToTarget: vi.fn(),
-    normalizeSaveType: vi.fn((t) => t),
 }));
 
 vi.mock('../../../services/combat/conditions/conditionEffects.js', () => ({
@@ -95,11 +85,9 @@ vi.mock('../../useAllySelection.js', () => ({
     getAllyList: vi.fn(() => []),
 }));
 
-import { rollExpressionDoubled } from '../../../services/dice/diceRoller.js';
 import { getRuntimeValue } from '../../runtime/useRuntimeState.js';
 import { computeConditionEffects } from '../../../services/combat/conditions/conditionEffects.js';
 import { createPlayerSaveDamageHandler } from './handlePlayerSaveDamage.js';
-import { computeDamageAfterEvasion } from '../../../services/rules/combat/applyDamage.js';
 
 const COMBAT_SUMMARY = { creatures: [{ name: 'Wild_Sage_Druid', type: 'player' }] };
 
@@ -133,6 +121,22 @@ function comboCritContext() {
         saveConditions: ['incapacitated'],
         soulTomeTrap: { effect: 'banished_demiplane', soulTome: true },
         repeatSave: { save_type: 'Charisma' },
+        infernalWound: { damage: '1d8+3', damageType: 'Fire' },
+    };
+}
+
+function rollArgs(context, total) {
+    const doubled = !!context.isAutoCrit;
+    return {
+        name: 'Banishing Claw (Requires Soul Tome)',
+        formula: doubled ? '4d4 + 5' : '2d4 + 5',
+        total,
+        rolls: doubled ? [3, 2, 3, 2] : [3, 2],
+        modifier: 5,
+        context,
+        adjustedTotal: total,
+        combatSummary: COMBAT_SUMMARY,
+        displayRolls: doubled ? [3, 2, 3, 2] : [3, 2],
     };
 }
 
@@ -146,56 +150,44 @@ describe('MA-0298 combo crit + trap arms ride the pending save prompt', () => {
             restoreBalance: false,
             autoRerollForSaves: false,
             autoRerollBonus: null,
+            autoRerollCondition: null,
             saveAdvantageCount: 0,
             saveAdvantageAbilities: null,
         });
     });
 
-    it('carries isAutoCrit into pending so the secondary crit doubling consumer fires', async () => {
+    it('carries isAutoCrit + trap arms into pending so the secondary doubling consumer fires', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler({
-            name: 'Banishing Claw (Requires Soul Tome)',
-            formula: '4d4 + 5',
-            total: 20,
-            rolls: [3, 2, 3, 2],
-            modifier: 5,
-            context: comboCritContext(),
-            adjustedTotal: 20,
-            combatSummary: COMBAT_SUMMARY,
-            displayRolls: [3, 2, 3, 2],
-        });
+        await handler(rollArgs(comboCritContext(), 20));
 
         const pending = deps.pendingSaves['test-guid-1234'];
         expect(pending.isAutoCrit).toBe(true);
         expect(pending.rawDamage).toBe(20);
         expect(pending.autoDamageSecondaryFormula).toBe('3d12');
+        expect(pending.autoDamageSecondaryDamageType).toBe('Psychic');
+        expect(pending.saveConditions).toEqual(['incapacitated']);
         expect(pending.soulTomeTrap).toEqual({ effect: 'banished_demiplane', soulTome: true });
         expect(pending.repeatSave).toEqual({ save_type: 'Charisma' });
-        expect(pending.saveConditions).toEqual(['incapacitated']);
+        // MA-0367: Infernal Wound arm rides the same seam.
+        expect(pending.infernalWound).toEqual({ damage: '1d8+3', damageType: 'Fire' });
     });
 
-    it('dc_success none pending computes FULL damage on a save success (MV-20 half-leak stays fixed)', async () => {
-        expect(computeDamageAfterEvasion(30, true, 'none', false)).toBe(30);
-        expect(computeDamageAfterEvasion(30, false, 'none', false)).toBe(30);
-    });
-
-    it('non-crit combo defaults isAutoCrit false and keeps the secondary dice base (regression)', async () => {
-        const context = { ...comboCritContext(), isAutoCrit: false };
+    it('non-combo rows stay byte-inert: crit false, all trap arms null', async () => {
+        const plainContext = {
+            saveDc: 13,
+            saveType: 'DEX',
+            dcSuccess: 'half',
+            damageType: 'Fire',
+            targetName: 'Wild_Sage_Druid',
+        };
         const handler = createPlayerSaveDamageHandler(deps);
-        await handler({
-            name: 'Banishing Claw (Requires Soul Tome)',
-            formula: '2d4 + 5',
-            total: 10,
-            rolls: [3, 2],
-            modifier: 5,
-            context,
-            adjustedTotal: 10,
-            combatSummary: COMBAT_SUMMARY,
-            displayRolls: [3, 2],
-        });
+        await handler({ ...rollArgs(plainContext, 10), name: 'Fireball' });
 
         const pending = deps.pendingSaves['test-guid-1234'];
         expect(pending.isAutoCrit).toBe(false);
-        expect(rollExpressionDoubled).not.toHaveBeenCalled();
+        expect(pending.saveConditions).toBeNull();
+        expect(pending.soulTomeTrap).toBeNull();
+        expect(pending.repeatSave).toBeNull();
+        expect(pending.infernalWound).toBeNull();
     });
 });

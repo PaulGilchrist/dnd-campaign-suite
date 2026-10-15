@@ -1,7 +1,14 @@
-// MA-1352: Psychic Gray Ooze Pseudopod INT-save-Disadvantage rider producer —
-// mirrors the MA-0016 no_healing hit-clause byte-shape (applyHitClauseTarget-
-// Effect) with the new ability payload: register the registered te with
-// ability:"int", ONE attacker-anchored addExpiration clock, one grant log.
+// @maintained-by-ai: 2026-10-14
+// MA-1352 hit-side producer for the ABILITY axis of the Psychic Gray Ooze
+// Pseudopod rider — the ability-scoped wiring the generic hit-clause mega
+// lane cannot cover (no mega-lane row carries hit_target_effect_ability, and
+// no row is psychic-gray-ooze): clause arms with targetEffectAbility:'int',
+// registerTargetEffect payload carries ability:'int', ONE attacker-anchored
+// clock (no ability-row fork), and the grant log names the INT scope
+// (DC-free, advisory anchor). The MA-0016 no_healing byte-shape itself
+// (clock/provenance/single-write) is owned by handlePlainDamage.hitClause
+// .test.js; the save-roll consumption of this te is owned by
+// handleNpcSaveDamage.ma1352-ability-save-disadv.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -69,6 +76,7 @@ vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
     clearReTriggeredSequence: vi.fn(),
 }));
 
+// Registry-faithful labels for the te lane (targetEffectDefinitions.js).
 vi.mock('../../../services/combat/conditions/targetEffectDefinitions.js', () => ({
     registerTargetEffect: vi.fn(),
     getActiveTargetEffect: vi.fn(() => null),
@@ -92,14 +100,16 @@ import monsters from '../../../../public/data/monsters.json';
 
 const OOZE = monsters.find(m => m.index === 'psychic-gray-ooze');
 const PSEUDOPOD_ACTION = OOZE.actions[0];
+const ATTACKER = 'Psychic Gray Ooze 1';
+const TARGET = 'Bandit 1';
 
-describe('MA-1352 Psychic Gray Ooze Pseudopod ability_save_disadvantage producer', () => {
+describe('MA-1352 Pseudopod ability-scoped hit-clause producer', () => {
     const deps = {
-        characterName: 'Psychic Gray Ooze 1',
+        characterName: ATTACKER,
         campaignName: 'test-campaign',
         characters: [
-            { name: 'Psychic Gray Ooze 1', computedStats: { armorClass: 9 } },
-            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+            { name: ATTACKER, computedStats: { armorClass: 9 } },
+            { name: TARGET, computedStats: { armorClass: 12 } },
         ],
         setPopupHtml: vi.fn(),
         logEntry: vi.fn(),
@@ -111,72 +121,75 @@ describe('MA-1352 Psychic Gray Ooze Pseudopod ability_save_disadvantage producer
         getRuntimeValue.mockReturnValue(null);
         applyDamageToTarget.mockReturnValue({ finalDamage: 11, newHp: 1, damageReduced: false });
         loadCombatSummary.mockResolvedValue({
-            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium', ac: 12, currentHp: 12, maxHp: 12 }],
+            creatures: [{ name: TARGET, type: 'npc', size: 'Medium', ac: 12, currentHp: 12, maxHp: 12 }],
         });
     });
 
-    function hitContext() {
-        return {
-            targetName: 'Bandit 1',
-            damageType: 'Acid',
-            attackerName: 'Psychic Gray Ooze 1',
-            hitClause: buildHitConditionClause(PSEUDOPOD_ACTION),
-        };
-    }
-
     async function resolveHit() {
         const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Pseudopod', formula: '3d6 + 1', total: 11, rolls: [3, 4, 3], modifier: 1, context: hitContext() });
+        await fn({
+            name: 'Pseudopod',
+            formula: '3d6 + 1',
+            total: 11,
+            rolls: [3, 4, 3],
+            modifier: 1,
+            context: {
+                targetName: TARGET,
+                damageType: 'Acid',
+                attackerName: ATTACKER,
+                hitClause: buildHitConditionClause(PSEUDOPOD_ACTION),
+            },
+        });
     }
 
-    it('registers ability_save_disadvantage with the int ability payload on a resolved hit', async () => {
+    it('data-lock + arms the INT-scoped te with ability payload and ONE attacker-anchored clock', async () => {
+        // Data axis: the Pseudopod row rides the ability-scoped keys and the
+        // clause parser carries targetEffectAbility through.
+        expect(PSEUDOPOD_ACTION.hit_target_effect).toBe('ability_save_disadvantage');
+        expect(PSEUDOPOD_ACTION.hit_target_effect_ability).toBe('int');
+        expect(buildHitConditionClause(PSEUDOPOD_ACTION)).toEqual({
+            conditions: [],
+            escapeDc: null,
+            attackName: 'Pseudopod',
+            targetEffect: 'ability_save_disadvantage',
+            targetEffectAbility: 'int',
+        });
+
         await resolveHit();
 
         expect(registerTargetEffect).toHaveBeenCalledWith(
             'test-campaign',
-            'Bandit 1',
+            TARGET,
             'ability_save_disadvantage',
-            'Psychic Gray Ooze 1',
+            ATTACKER,
             { duration: 'until_start_of_next_turn', ability: 'int' },
         );
-    });
-
-    it('grants ONE attacker-anchored expiration clock (MA-0016 byte-shape)', async () => {
-        await resolveHit();
-
+        // Ability-row fork guard: the ability payload must NOT mint a second
+        // clock — one MA-0016 anchor, MA-0016 byte-shape.
         expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration).toHaveBeenCalledWith({
-            attackerName: 'Psychic Gray Ooze 1',
-            targetName: 'Bandit 1',
-            effects: [{ type: 'remove_target_effect', effectKey: 'ability_save_disadvantage', source: 'Psychic Gray Ooze 1', target: 'Bandit 1' }],
+            attackerName: ATTACKER,
+            targetName: TARGET,
+            effects: [{ type: 'remove_target_effect', effectKey: 'ability_save_disadvantage', source: ATTACKER, target: TARGET }],
             campaignName: 'test-campaign',
             rounds: undefined,
-            expireOnCreatureName: 'Psychic Gray Ooze 1',
+            expireOnCreatureName: ATTACKER,
         });
     });
 
-    it('logs a condition-applied grant naming the INT scope and the anchor (DC-free, source-anchored)', async () => {
+    it('logs a DC-free INT-scoped grant naming the advisory anchor', async () => {
         await resolveHit();
 
         expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             type: 'condition',
             action: 'applied',
-            characterName: 'Bandit 1',
+            characterName: TARGET,
             condition: 'Save Disadv (Ability) (INT)',
-            reason: "Pseudopod — until the start of Psychic Gray Ooze 1's next turn",
+            reason: `Pseudopod — until the start of ${ATTACKER}'s next turn`,
         }));
         const grantLog = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.type === 'condition' && e.action === 'applied');
         expect(grantLog.note).toContain('(INT saves only)');
         expect(grantLog.note).toContain('advisory');
         expect(grantLog.dc).toBeUndefined();
-    });
-
-    it('writes NO conditions for the te-only rider', async () => {
-        const { setRuntimeValue } = await import('../../runtime/useRuntimeState.js');
-        await resolveHit();
-
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
-        );
     });
 });

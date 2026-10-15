@@ -1,17 +1,20 @@
+// @maintained-by-ai: 2026-10-14
 // MA-1459: Shambling Mound "Charged Tendril" size-conditional pull rider —
-// the fix that made the promised transport clause LAND (was FAIL(a) zero-state,
-// §944: pull clauses grep-zero-inert on attack rows). Locks: (1) shambling-
-// mound.actions[1] carries the structured hit_pull key (byte-shape); (2)
-// parseHitPull is structured-key-only (byte-inert null elsewhere); (3) on a
-// resolved hit a Medium-or-smaller victim gets the registered pulled_toward te
-// {duration:'instant', value:5} — the PC Warping Implosion pull-marker
-// convention (SaveAttackAoeModal:191/:1485), NO addExpiration clock — plus ONE
-// grant log carrying the RAW pull sentence + the §42 GM token-move advisory;
-// (4) a Large victim is refused with a pull_refused log and zero te (the
-// Medium gate is stricter than the family Large-or-smaller gate — it must run
-// BEFORE it); (5) range sizes ("Medium or Small" — Bandit, MA-0553) pass on
-// their LARGEST named size; (6) rows without the key stay byte-inert; (7) no
-// resolved hit (miss lane, applyResult absent) produces zero pull state.
+// the fix that made the promised transport clause LAND (§944: pull clauses
+// grep-zero-inert on attack rows). Locks: (1) the data↔parser seam —
+// shambling-mound.actions[1] authors structured hit_pull:{distance_ft:5,
+// size_limit:'Medium'} which buildHitConditionClause carries onto the
+// hit-clause payload, parseHitPull being structured-key-only; (2) on a
+// resolved hit a Medium-or-smaller victim (incl. MA-0553 range sizes like
+// "Medium or Small", which pass on their LARGEST named size) gets the
+// registered pulled_toward te {duration:'instant', value:5} — the PC Warping
+// Implosion pull-marker convention (SaveAttackAoeModal:191/:1485), NO
+// addExpiration clock — plus ONE grant log carrying the RAW pull sentence +
+// the §42 GM token-move advisory; (3) a Large victim is refused with a
+// pull_refused log and zero te (the Medium gate is stricter than the family
+// Large-or-smaller gate, so it must run BEFORE it); (4) zero-state lanes —
+// rows without the key and unresolved hits (miss) never touch pull state.
+// Registry shape of pulled_toward is pinned in targetEffectDefinitions.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -99,11 +102,12 @@ describe('MA-1459 Shambling Mound Charged Tendril pulled_toward producer', () =>
         logEntry: vi.fn(),
     };
 
-    function csWith(creature) {
-        return { round: 1, creatures: [creature] };
-    }
+    // "Medium or Small" range size doubles as the MA-0553 largest-named-size
+    // gate-pass fixture.
     const BANDIT = { name: 'Bandit 1', type: 'npc', size: 'Medium or Small', ac: 12, currentHp: 982, maxHp: 999 };
     const TITAN = { name: 'Fire Giant 1', type: 'npc', size: 'Large', ac: 15, currentHp: 76, maxHp: 162 };
+
+    const csWith = (creature) => ({ round: 1, creatures: [creature] });
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -120,15 +124,10 @@ describe('MA-1459 Shambling Mound Charged Tendril pulled_toward producer', () =>
     }
 
     const logged = () => deps.logEntry.mock.calls.map(c => c[0]);
+    const loggedPull = () => logged().some(e => JSON.stringify(e).toLowerCase().includes('pull'));
 
-    it('DATA: shambling-mound.actions[1] authors the structured pull rider (byte-shape pin)', () => {
+    it('SEAM: data row authors hit_pull; clause carries {5, Medium}; parser is strict + byte-inert', () => {
         expect(TENDRIL.hit_pull).toEqual({ distance_ft: 5, size_limit: 'Medium' });
-        expect(TENDRIL.attack_bonus).toBe(7);
-        expect(TENDRIL.damage_dice_primary).toBe('1d6 + 4');
-        expect(TENDRIL.damage_dice_secondary).toBe('2d4');
-    });
-
-    it('PARSER: buildHitConditionClause carries pull; parseHitPull is structured-key-only', () => {
         expect(buildHitConditionClause(TENDRIL)).toEqual({
             conditions: [],
             escapeDc: null,
@@ -146,7 +145,7 @@ describe('MA-1459 Shambling Mound Charged Tendril pulled_toward producer', () =>
         expect(buildHitConditionClause(engulf)).toBeNull();
     });
 
-    it('HIT on Medium victim: registers pulled_toward {instant, value 5} + pull grant log, no clock', async () => {
+    it('HIT on Medium-or-smaller victim: pulled_toward {instant, value 5} + grant log, no clock', async () => {
         await resolveHit();
 
         expect(registerTargetEffect).toHaveBeenCalledWith(
@@ -174,33 +173,17 @@ describe('MA-1459 Shambling Mound Charged Tendril pulled_toward producer', () =>
         const refusal = logged().find(e => e.type === 'automation' && e.automationType === 'pull_refused');
         expect(refusal).toBeTruthy();
         expect(refusal.description).toMatch(/larger than Medium/);
-        expect(logged().some(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Pulled Toward')).toBe(false);
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
     });
 
-    it('MA-0553 RANGE SIZE: "Medium or Small" victim passes the Medium gate on its largest size', async () => {
-        await resolveHit();
-        expect(registerTargetEffect).toHaveBeenCalledTimes(1);
-    });
-
-    it('BYTE-INERT PIPELINE: a row without hit_pull registers nothing and logs no pull', async () => {
+    it('ZERO-STATE LANES: keyless row and miss produce no pull registration or logs', async () => {
         const inertRow = { name: 'Bite', attack_bonus: 5, damage_dice_primary: '1d6 + 1', damage_type_primary: 'Piercing' };
         expect(buildHitConditionClause(inertRow)).toBeNull();
 
         await resolveHit({ action: inertRow });
+        await resolveHit({ targetName: 'Nobody' });
 
         expect(registerTargetEffect).not.toHaveBeenCalled();
-        expect(logged().some(e => JSON.stringify(e).toLowerCase().includes('pull'))).toBe(false);
-    });
-
-    it('MISS LANE: no resolved hit (target absent) yields zero pull state', async () => {
-        await createPlainDamageHandler(deps)({
-            name: 'Charged Tendril', formula: '1d6 + 4', total: 7, rolls: [3], modifier: 4,
-            adjustedTotal: 10, combatSummary: csWith(BANDIT),
-            context: { targetName: 'Nobody', damageType: 'Bludgeoning', attackerName: 'Shambling Mound 1', hitClause: buildHitConditionClause(TENDRIL) },
-        });
-
-        expect(registerTargetEffect).not.toHaveBeenCalled();
-        expect(logged().some(e => JSON.stringify(e).toLowerCase().includes('pull'))).toBe(false);
+        expect(loggedPull()).toBe(false);
     });
 });

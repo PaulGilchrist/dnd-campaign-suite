@@ -1,12 +1,18 @@
+// @maintained-by-ai: 2026-10-14
 // MA-1555 grant leg: Swarm of Crawling Claws "Swarm of Grasping Hands" prone rider.
-// hit_conditions:["prone"] (authored with the conditional_damage fix) arms
-// buildHitConditionClause → handlePlainDamage.maybeApplyHitClause → applyHitClauseConditions
-// (:553): prone lands on the victim's activeConditions + meta.source + a condition-applied
-// log on every resolved hit. Consumer size gate is the family-wide Large-or-smaller
-// (§1116/MA-0553 ladder): the Medium-or-smaller RAW cap is NOT expressible on the
-// hit_conditions lane (size_limit lives on hit_pull only) — Medium victims pass
-// byte-identical to MA-1534 Boulder; Huge is refused; Large over-apply is the recorded
-// house caveat. No escape DC, no expiry clock on the pure hit_conditions lane (MA-1541).
+// hit_conditions:["prone"] (authored with the conditional_damage Bloodied twin)
+// arms buildHitConditionClause → handlePlainDamage.maybeApplyHitClause →
+// applyHitClauseConditions: prone lands on the victim's activeConditions +
+// meta.source + a condition-applied log on every resolved hit. No escape DC, no
+// expiry clock on the pure hit_conditions lane (MA-1541).
+//
+// This file owns ONLY the swarm row's unique contract (the swarm is deliberately
+// NOT in the HIT_CLAUSE_ROWS mega-lane in handlePlainDamage.hitClause.test.js):
+// its disk-row data lock and the clause-armed prone grant end-to-end. Generic
+// lane semantics — dup suppression, no-clause miss flow, and the family-wide
+// §1116/MA-0553 Large-or-smaller size-gate ladder (Medium-or-smaller RAW cap is
+// NOT expressible on this lane; Large over-apply is the recorded house caveat,
+// Huge refused) — are covered generically there.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -105,15 +111,19 @@ import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
 import { buildHitConditionClause } from '../../../components/encounter/MonsterCardHelpers.js';
 import monsters from '../../../../public/data/monsters.json';
 
-const GRASPING = monsters.find((m) => m.index === 'swarm-of-crawling-claws').actions.find((a) => a.name === 'Swarm of Grasping Hands');
+const TARGET = 'Bandit 1';
+const ATTACKER = 'Swarm of Crawling Claws 1';
+
+const GRASPING = monsters.find((m) => m.index === 'swarm-of-crawling-claws')
+    .actions.find((a) => a.name === 'Swarm of Grasping Hands');
 
 describe('MA-1555 Swarm of Grasping Hands prone grant leg', () => {
     const deps = {
-        characterName: 'Swarm of Crawling Claws 1',
+        characterName: ATTACKER,
         campaignName: 'test-campaign',
         characters: [
-            { name: 'Swarm of Crawling Claws 1', computedStats: { armorClass: 15 } },
-            { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+            { name: ATTACKER, computedStats: { armorClass: 15 } },
+            { name: TARGET, computedStats: { armorClass: 12 } },
         ],
         setPopupHtml: vi.fn(),
         logEntry: vi.fn(),
@@ -124,90 +134,61 @@ describe('MA-1555 Swarm of Grasping Hands prone grant leg', () => {
         vi.clearAllMocks();
         getRuntimeValue.mockReturnValue(null);
         applyDamageToTarget.mockReturnValue({ finalDamage: 21, newHp: 1, damageReduced: false });
+        // "Medium or Small" range-size victim pins the MA-0553 ladder parse on this lane.
         loadCombatSummary.mockResolvedValue({
-            creatures: [{ name: 'Bandit 1', type: 'player', size: 'Medium or Small', ac: 12, currentHp: 11, maxHp: 11 }],
+            creatures: [{ name: TARGET, type: 'player', size: 'Medium or Small', ac: 12, currentHp: 11, maxHp: 11 }],
         });
     });
 
-    function hitContext(extra = {}) {
-        return {
-            targetName: 'Bandit 1',
-            damageType: 'Necrotic',
-            attackerName: 'Swarm of Crawling Claws 1',
-            hitClause: buildHitConditionClause(GRASPING),
-            ...extra,
-        };
-    }
+    it('data-lock: swarm disk row arms the prone-only clause (escape_dc / hit_target_effect absent)', () => {
+        expect(GRASPING.attack_bonus).toBe(4);
+        expect(GRASPING.damage_dice_primary).toBe('4d8 + 2');
+        expect(GRASPING.damage_type_primary).toBe('Necrotic');
+        expect(GRASPING.conditional_damage).toEqual({ dice: '2d8', modifier: 2, damage_type: 'Necrotic', condition: 'Bloodied' });
+        expect(GRASPING.hit_conditions).toEqual(['prone']);
+        expect(GRASPING.escape_dc).toBeUndefined();
+        expect(GRASPING.hit_target_effect).toBeUndefined();
 
-    it('grants Prone to the Medium-or-Small victim on a resolved hit', async () => {
-        const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Swarm of Grasping Hands', formula: '4d8 + 2', total: 21, rolls: [4, 3, 6, 6], modifier: 2, context: hitContext() });
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'Bandit 1',
-            'activeConditions',
-            expect.arrayContaining(['prone']),
-            'test-campaign'
-        );
+        expect(buildHitConditionClause(GRASPING)).toEqual({
+            conditions: ['prone'],
+            escapeDc: null,
+            attackName: 'Swarm of Grasping Hands',
+            targetEffect: null,
+        });
     });
 
-    it('stamps the swarm into activeConditionMeta source with no escape DC', async () => {
+    it('grants Prone on a resolved hit: exact condition write, swarm provenance with no escape DC, condition-applied log', async () => {
         const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Swarm of Grasping Hands', formula: '4d8 + 2', total: 21, rolls: [4, 3, 6, 6], modifier: 2, context: hitContext() });
+        await fn({
+            name: 'Swarm of Grasping Hands', formula: '4d8 + 2', total: 21, rolls: [4, 3, 6, 6], modifier: 2,
+            context: {
+                targetName: TARGET,
+                damageType: 'Necrotic',
+                attackerName: ATTACKER,
+                hitClause: buildHitConditionClause(GRASPING),
+            },
+        });
+
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+
+        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
+        expect(condCall).toBeTruthy();
+        expect(condCall[0]).toBe(TARGET);
+        expect(condCall[2]).toEqual(['prone']);
+        expect(condCall[3]).toBe('test-campaign');
 
         const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
         expect(metaCall).toBeTruthy();
-        expect(metaCall[2].prone.source).toBe('Swarm of Crawling Claws 1');
+        expect(metaCall[2].prone).toMatchObject({ source: ATTACKER });
         expect(metaCall[2].prone.dc).toBeUndefined();
-    });
-
-    it('logs a condition-applied entry naming the action', async () => {
-        const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Swarm of Grasping Hands', formula: '4d8 + 2', total: 21, rolls: [4, 3, 6, 6], modifier: 2, context: hitContext() });
+        expect(metaCall[2].prone.ability).toBeUndefined();
 
         expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
             type: 'condition',
             action: 'applied',
-            characterName: 'Bandit 1',
+            characterName: TARGET,
             condition: 'Prone',
             reason: 'Swarm of Grasping Hands (escape DC —)',
         }));
-    });
-
-    it('does not duplicate Prone already active on the target', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (key === 'Bandit 1' && prop === 'activeConditions') return ['prone'];
-            return null;
-        });
-        const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Swarm of Grasping Hands', formula: '4d8 + 2', total: 21, rolls: [4, 3, 6, 6], modifier: 2, context: hitContext() });
-
-        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
-        expect(condCall[2].filter(c => String(c).toLowerCase() === 'prone')).toHaveLength(1);
-    });
-
-    it('writes nothing when the clause is absent (plain attack / miss flow)', async () => {
-        const fn = createLogDamageAndShow(deps);
-        await fn({
-            name: 'Swarm of Grasping Hands', formula: '4d8 + 2', total: 21, rolls: [4, 3, 6, 6], modifier: 2,
-            context: { targetName: 'Bandit 1', damageType: 'Necrotic', attackerName: 'Swarm of Crawling Claws 1' },
-        });
-
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
-        );
-        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
-    });
-
-    it('family gate (§1116): Huge victims are refused; Medium passes byte-identical to MA-1534', async () => {
-        loadCombatSummary.mockResolvedValue({
-            creatures: [{ name: 'Bandit 1', type: 'player', size: 'Huge', ac: 12, currentHp: 11, maxHp: 11 }],
-        });
-        const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Swarm of Grasping Hands', formula: '4d8 + 2', total: 21, rolls: [4, 3, 6, 6], modifier: 2, context: hitContext() });
-
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
-        );
     });
 });

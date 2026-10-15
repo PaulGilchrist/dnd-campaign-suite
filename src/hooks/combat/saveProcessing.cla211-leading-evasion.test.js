@@ -1,9 +1,12 @@
+// @maintained-by-ai: 2026-10-14
 // CLA-211: the prompt-save lane folds Leading Evasion ONLY on the GM's
 // chooser selection. saveResult.evasionActive (dispatched synchronously with
 // the save-result event) is preferred; the leadingEvasionSelections stamp is
 // the flagless-lane fallback. Regression: submitResultAndClear prunes the
 // stamp synchronously after dispatch while processPlayerSave's continuation
 // runs later — stamp-only gating would under-grant the ticked sharee.
+// Pure evasion computation is owned by the computeDamageAfterEvasion /
+// resolveAoESaveEvasion lanes — this file pins the saveProcessing fold seam only.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -42,7 +45,6 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 const applyDamageToTarget = vi.fn(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 60 - finalDamage }));
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     normalizeSaveType: (t) => String(t || '').toUpperCase(),
-    computeDamageAfterSave: (raw, success, dcSuccess) => (!success ? raw : dcSuccess === 'half' ? Math.floor(raw / 2) : 0),
     computeDamageAfterEvasion: (total, saveSuccess, dcSuccess, evasionActive) =>
         (evasionActive && dcSuccess === 'half') ? (saveSuccess ? 0 : Math.floor(total / 2))
             : (!saveSuccess ? total : dcSuccess === 'half' ? Math.floor(total / 2) : 0),
@@ -68,6 +70,7 @@ import { stampLeadingEvasionSelections, clearLeadingEvasionSelection } from '../
 const campaignName = 'test-campaign';
 const BH = 'Behir 1';
 const T = 'HexWarlock';
+const PROMPT_ID = 'p1';
 
 const breathContext = {
     saveDc: 16,
@@ -79,6 +82,9 @@ const breathContext = {
     autoDamageDamageType: 'Lightning',
     saveConditions: [],
 };
+
+// Failed DEX save detail (roll 5 vs DC 16); evasionActive omitted = flagless lane.
+const saveDetail = (overrides) => ({ success: false, roll: 5, total: 5, saveBonus: 0, rawRolls: [], mode: 'normal', promptId: PROMPT_ID, ...overrides });
 
 function runSave(detail) {
     const logEntry = vi.fn();
@@ -97,22 +103,21 @@ function runSave(detail) {
 beforeEach(() => {
     vi.clearAllMocks();
     for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
-    applyDamageToTarget.mockImplementation(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 60 - finalDamage }));
 });
 
 describe('CLA-211 saveProcessing prompt-save share gating', () => {
     it('ticked sharee folds half damage even when the stamp is pruned before the continuation runs', async () => {
-        stampLeadingEvasionSelections(campaignName, [['p1', [T]]]);
-        const { promise, logEntry, resolve } = runSave({ success: false, roll: 5, total: 5, saveBonus: 0, rawRolls: [], mode: 'normal', promptId: 'p1', evasionActive: true });
+        stampLeadingEvasionSelections(campaignName, [[PROMPT_ID, [T]]]);
+        const { promise, logEntry, resolve } = runSave(saveDetail({ evasionActive: true }));
         resolve();
-        clearLeadingEvasionSelection(campaignName, 'p1');
+        clearLeadingEvasionSelection(campaignName, PROMPT_ID);
         await promise;
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(16);
         expect(logEntry.mock.calls.some(c => c[0].rollType === 'evasion' && c[0].name === 'Leading Evasion')).toBe(true);
     });
 
     it('unticked sharee pays full damage with no evasion ledger entry', async () => {
-        const { promise, logEntry, resolve } = runSave({ success: false, roll: 5, total: 5, saveBonus: 0, rawRolls: [], mode: 'normal', promptId: 'p1', evasionActive: false });
+        const { promise, logEntry, resolve } = runSave(saveDetail({ evasionActive: false }));
         resolve();
         await promise;
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(32);
@@ -120,8 +125,8 @@ describe('CLA-211 saveProcessing prompt-save share gating', () => {
     });
 
     it('flagless dispatch falls back to the stamp (remote lanes)', async () => {
-        stampLeadingEvasionSelections(campaignName, [['p1', [T]]]);
-        const { promise, resolve } = runSave({ success: false, roll: 5, total: 5, saveBonus: 0, rawRolls: [], mode: 'normal', promptId: 'p1' });
+        stampLeadingEvasionSelections(campaignName, [[PROMPT_ID, [T]]]);
+        const { promise, resolve } = runSave(saveDetail());
         resolve();
         await promise;
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(16);

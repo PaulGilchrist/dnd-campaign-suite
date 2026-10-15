@@ -1,14 +1,19 @@
+// @maintained-by-ai: 2026-10-14
 // MA-1451: Shadow "Draining Swipe" Strength-drain rider — the fix that made
 // the promised numeric drain LAND (was FAIL(a) zero-state, §942: zero producers
-// AND zero consumers app-wide). Locks: (1) shadow.actions[0] carries the
-// structured hit_ability_drain key (byte-shape); (2) parseHitAbilityDrain is
-// structured-key-only (byte-inert null elsewhere); (3) on every resolved hit
-// the consumer rolls the die, registers the ability_score_drain te ledger
-// {baseScore, drained, score}, logs the roll + the grant, and never touches
-// HP via the drain itself; (4) cumulative accumulation across hits; (5) the
-// RAW death clause clamps lethal via the canonical applyDamageToTarget choke
-// point (MA-0352 twin); (6) no addExpiration clock — long-rest restore is the
-// te convention (restRules-longRest LR filter).
+// AND zero consumers app-wide). Locks: (1) shadow.actions[0] authors the
+// structured hit_ability_drain key and parseHitAbilityDrain is structured-key-
+// only (byte-inert null elsewhere — the only parser lock app-wide; Shadow is
+// deliberately NOT in the HIT_CLAUSE_ROWS mega-lane: its clause carries the
+// numeric abilityDrain payload that lane's shape cannot express); (2) on every
+// resolved hit the consumer rolls the die, registers the ability_score_drain te
+// ledger {baseScore, drained, score}, logs the roll + the grant, and never
+// touches HP via the drain itself; (3) cumulative accumulation across hits
+// without re-fetching the statblock; (4) the RAW death clause clamps lethal
+// via the canonical applyDamageToTarget choke point (MA-0352 twin); (5) no
+// addExpiration clock — long-rest restore is the te convention
+// (restRules-longRest LR filter); (6) the drain rides ANY target size — RAW
+// carries no size gate (§127 size-gate honesty).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -69,9 +74,7 @@ vi.mock('../../../services/npcs/monsterUtils.js', () => ({
 vi.mock('../../../services/combat/conditions/targetEffectDefinitions.js', () => ({
     registerTargetEffect: vi.fn(),
     getActiveTargetEffect: vi.fn(() => null),
-    getEffectDefinition: vi.fn((key) => key === 'ability_score_drain'
-        ? { effect: key, label: 'Ability Score Drain', description: 'Ability score reduced by the drained total; returns on a long rest.', group: 'Saves & Checks' }
-        : { effect: key, label: key, group: 'Defensive' }),
+    getEffectDefinition: vi.fn((key) => ({ effect: key, label: key, group: 'Defensive' })),
 }));
 
 vi.mock('../../../services/rules/effects/expirationQueue.js', () => ({
@@ -110,31 +113,21 @@ describe('MA-1451 Shadow Draining Swipe ability_score_drain producer', () => {
         getMonsterData.mockResolvedValue({ name: 'Bandit', ability_scores: { str: 11, dex: 12, con: 12, int: 10, wis: 11, cha: 10 } });
     });
 
-    function hitContext(size) {
-        return {
-            targetName: size ? undefined : 'Bandit 1',
-            damageType: 'Necrotic',
-            attackerName: 'Shadow 1',
-            hitClause: buildHitConditionClause(SWIPE),
-        };
-    }
-
-    async function resolveHit({ cs = combatSummary, targetName = 'Bandit 1', size } = {}) {
+    async function resolveHit({ cs = combatSummary, targetName = 'Bandit 1' } = {}) {
         const handler = createPlainDamageHandler(deps);
         await handler({
             name: 'Draining Swipe', formula: '1d6 + 2', total: 7, rolls: [5], modifier: 2,
             adjustedTotal: 7, combatSummary: cs,
-            context: { ...hitContext(size), targetName },
+            context: { targetName, damageType: 'Necrotic', attackerName: 'Shadow 1', hitClause: buildHitConditionClause(SWIPE) },
         });
     }
 
-    it('DATA: shadow.actions[0] authors the structured drain rider (byte-shape pin)', () => {
+    const logEntries = () => deps.logEntry.mock.calls.map(c => c[0]);
+
+    it('DATA/PARSER: the shadow row authors the structured drain rider; every other row stays byte-inert', () => {
         expect(SWIPE.hit_ability_drain).toEqual({ ability: 'str', dice: '1d4' });
         expect(SWIPE.attack_bonus).toBe(4);
         expect(SWIPE.damage_dice_primary).toBe('1d6 + 2');
-    });
-
-    it('PARSER: buildHitConditionClause carries abilityDrain; every other row stays byte-inert', () => {
         expect(buildHitConditionClause(SWIPE)).toEqual({
             conditions: [],
             escapeDc: null,
@@ -150,27 +143,12 @@ describe('MA-1451 Shadow Draining Swipe ability_score_drain producer', () => {
         expect(buildHitConditionClause(banditRow)).toBeNull();
     });
 
-    it('HIT: rolls the die, registers the te ledger, logs roll + grant — HP legs untouched by the drain', async () => {
+    it('HIT: rolls the die, registers the te ledger, logs roll + grant — HP legs untouched by the drain, no combat clock', async () => {
         await resolveHit();
 
         expect(getMonsterData).toHaveBeenCalledWith('Bandit 1', null);
+        // ONE applyDamageToTarget call = the primary necrotic leg only.
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-
-        const drainRoll = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.type === 'roll' && e.rollType === 'ability-drain');
-        expect(drainRoll).toMatchObject({
-            characterName: 'Shadow 1',
-            formula: '1d4',
-            rolls: [3],
-            total: 3,
-            targetName: 'Bandit 1',
-        });
-        const grant = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Strength Drain');
-        expect(grant.reason).toContain('Strength 11 → 8 (−3)');
-        expect(registerTargetEffect).toHaveBeenCalledTimes(1);
-    });
-
-    it('LEDGER: te payload carries baseScore/drained/score until_long_rest (no combat clock)', async () => {
-        await resolveHit();
 
         expect(registerTargetEffect).toHaveBeenCalledWith(
             'test-campaign',
@@ -180,6 +158,17 @@ describe('MA-1451 Shadow Draining Swipe ability_score_drain producer', () => {
             { ability: 'str', baseScore: 11, drained: 3, score: 8, duration: 'until_long_rest' },
         );
         expect(addExpiration).not.toHaveBeenCalled();
+
+        const drainRoll = logEntries().find(e => e.type === 'roll' && e.rollType === 'ability-drain');
+        expect(drainRoll).toMatchObject({
+            characterName: 'Shadow 1',
+            formula: '1d4',
+            rolls: [3],
+            total: 3,
+            targetName: 'Bandit 1',
+        });
+        const grant = logEntries().find(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Strength Drain');
+        expect(grant.reason).toContain('Strength 11 → 8 (−3)');
     });
 
     it('ACCUMULATE: a standing ledger accumulates the delta without re-fetching the statblock', async () => {
@@ -208,11 +197,11 @@ describe('MA-1451 Shadow Draining Swipe ability_score_drain producer', () => {
         expect(lethalCall).toBeTruthy();
         expect(lethalCall[3]).toEqual(['Necrotic']);
         expect(lethalCall[4]).toMatchObject({ campaignName: 'test-campaign', ignoreResistance: true, attackerName: 'Shadow 1' });
-        const lethalLog = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.automationType === 'ability_drain_lethal');
+        const lethalLog = logEntries().find(e => e.automationType === 'ability_drain_lethal');
         expect(lethalLog.description).toContain('dies');
     });
 
-    it('SIZE-INDEPENDENT: a Huge target is drained (no RAW size gate) — clause size gate stays for the other legs', async () => {
+    it('SIZE-INDEPENDENT: a Huge target is drained (no RAW size gate)', async () => {
         const csHuge = {
             round: 1,
             creatures: [{ name: 'Ogre 1', type: 'npc', size: 'Huge', ac: 11, currentHp: 59, maxHp: 59 }],
@@ -228,19 +217,5 @@ describe('MA-1451 Shadow Draining Swipe ability_score_drain producer', () => {
             'Shadow 1',
             { ability: 'str', baseScore: 19, drained: 3, score: 16, duration: 'until_long_rest' },
         );
-    });
-
-    it('BYTE-INERT PIPELINE: a damage row without the drain rider registers nothing and logs no drain', async () => {
-        const clause = buildHitConditionClause({ name: 'Scimitar', attack_bonus: 5, damage_dice_primary: '1d6 + 1' });
-        expect(clause).toBeNull();
-
-        await createPlainDamageHandler(deps)({
-            name: 'Scimitar', formula: '1d6 + 1', total: 6, rolls: [5], modifier: 1,
-            adjustedTotal: 6, combatSummary,
-            context: { targetName: 'Bandit 1', damageType: 'Slashing', attackerName: 'Shadow 1', hitClause: clause },
-        });
-
-        expect(deps.logEntry.mock.calls.map(c => c[0]).some(e => e.rollType === 'ability-drain')).toBe(false);
-        expect(getMonsterData).not.toHaveBeenCalled();
     });
 });

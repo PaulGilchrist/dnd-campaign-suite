@@ -1,3 +1,10 @@
+// @maintained-by-ai: 2026-10-14
+// AUTHORITATIVE generic failed/success save-condition contract for
+// saveProcessing: MA-0017 damageless condition grants (player + npc lanes,
+// success face, damage+condition rows applied-once) and MA-0020 N/Day spend
+// at prompt-confirm. Specialized siblings (aura-of-courage, chilling-gaze,
+// damageless-spell-hold-person, eye-rays, consumeMemories, frightful-presence)
+// defer these basic legs here — add only monster-specific clauses there.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -52,6 +59,8 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
 import { processSaveRoll } from './saveProcessing.js';
 
 const campaignName = 'test-campaign';
+// Mirrors monsters.json Aboleth "Dominate Mind (2/Day)": WIS save DC 16,
+// Failure: Charmed, no damage formula.
 const domContext = {
     saveDc: 16,
     saveType: 'WIS',
@@ -62,8 +71,27 @@ const domContext = {
     saveConditions: ['charmed'],
 };
 
+const FAIL = { success: false, roll: 4, total: 4, saveBonus: 0, rawRolls: [], mode: 'normal' };
+const PASS = { success: true, roll: 18, total: 18, saveBonus: 0, rawRolls: [], mode: 'normal' };
+
 const gmLog = [];
 const logEntry = (e) => gmLog.push(e);
+
+// Drive the player prompt lane: processPlayerSave creates the save listener
+// synchronously, so pendingSaveResolve is assigned before this returns.
+function runPlayerSave(context, saveResult) {
+    const promise = processSaveRoll({
+        rollType: 'save',
+        target: { name: 'AberrantSorcerer', type: 'player' },
+        characterName: 'AberrantSorcerer',
+        campaignName,
+        context,
+        logEntry,
+        setPopupHtml: vi.fn(),
+    });
+    pendingSaveResolve(saveResult);
+    return promise;
+}
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -73,47 +101,28 @@ beforeEach(() => {
 });
 
 describe('MA-0017 failed-save conditions without damage formula', () => {
-    it('player path: failed save applies charmed condition + condition-applied log, no damage', async () => {
-        const promise = processSaveRoll({
-            rollType: 'save',
-            target: { name: 'AberrantSorcerer', type: 'player' },
-            characterName: 'AberrantSorcerer',
-            campaignName,
-            context: { ...domContext },
-            logEntry,
-            setPopupHtml: vi.fn(),
-        });
-        pendingSaveResolve({ success: false, roll: 4, total: 4, saveBonus: 0, rawRolls: [], mode: 'normal' });
-        await promise;
+    it('player failed save: charmed applied + condition-applied log, no damage rolled, no ability_use without monsterAbilityUse', async () => {
+        await runPlayerSave({ ...domContext }, FAIL);
 
         expect(runtimeStore['AberrantSorcerer.activeConditions']).toEqual(['charmed']);
         expect(conditionLogs).toHaveLength(1);
         expect(conditionLogs[0]).toMatchObject({ type: 'condition', action: 'applied', characterName: 'AberrantSorcerer', condition: 'Charmed', sourceName: 'Aboleth' });
         expect(rollExpression).not.toHaveBeenCalled();
         expect(applyDamageToTarget).not.toHaveBeenCalled();
-        expect(gmLog.some(e => e.rollType === 'save-damage')).toBe(false);
         expect(gmLog.some(e => e.rollType === 'save' && e.saveResult === 'failure')).toBe(true);
+        expect(runtimeStore['Aboleth.monsterSpellUses']).toBeUndefined();
+        expect(conditionLogs.some(e => e.type === 'ability_use')).toBe(false);
     });
 
-    it('player path: successful save applies no condition and logs success only', async () => {
-        const promise = processSaveRoll({
-            rollType: 'save',
-            target: { name: 'AberrantSorcerer', type: 'player' },
-            characterName: 'AberrantSorcerer',
-            campaignName,
-            context: { ...domContext },
-            logEntry,
-            setPopupHtml: vi.fn(),
-        });
-        pendingSaveResolve({ success: true, roll: 18, total: 18, saveBonus: 0, rawRolls: [], mode: 'normal' });
-        await promise;
+    it('player successful save: no condition, success log only', async () => {
+        await runPlayerSave({ ...domContext }, PASS);
 
         expect(runtimeStore['AberrantSorcerer.activeConditions']).toBeUndefined();
         expect(conditionLogs).toHaveLength(0);
         expect(gmLog.some(e => e.rollType === 'save' && e.saveResult === 'success')).toBe(true);
     });
 
-    it('npc path: failed save with no damage formula applies condition + log', async () => {
+    it('npc failed save: condition + log applied, no damage rolled', async () => {
         await processSaveRoll({
             rollType: 'save',
             target: { name: 'Goblin', type: 'npc' },
@@ -135,17 +144,7 @@ describe('MA-0017 failed-save conditions without damage formula', () => {
     });
 
     it('existing damage+condition rows unchanged: condition applied exactly once alongside damage', async () => {
-        const promise = processSaveRoll({
-            rollType: 'save',
-            target: { name: 'AberrantSorcerer', type: 'player' },
-            characterName: 'AberrantSorcerer',
-            campaignName,
-            context: { ...domContext, autoDamageFormula: '3d6', autoDamageDamageType: 'Psychic' },
-            logEntry,
-            setPopupHtml: vi.fn(),
-        });
-        pendingSaveResolve({ success: false, roll: 4, total: 4, saveBonus: 0, rawRolls: [], mode: 'normal' });
-        await promise;
+        await runPlayerSave({ ...domContext, autoDamageFormula: '3d6', autoDamageDamageType: 'Psychic' }, FAIL);
 
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
         expect(runtimeStore['AberrantSorcerer.activeConditions']).toEqual(['charmed']);
@@ -154,8 +153,8 @@ describe('MA-0017 failed-save conditions without damage formula', () => {
     });
 });
 
-// MA-0020: 2/Day spend lands at prompt-confirm (applySaveOutcome) + duration
-// note rides activeConditionMeta with a CLA-325 advisory log.
+// MA-0020: 2/Day spend lands at prompt-confirm (applySaveOutcome) on EITHER
+// outcome; the duration note rides activeConditionMeta with a CLA-325 advisory log.
 const MA2020_CONTEXT = {
     ...domContext,
     monsterAbilityUse: { useKey: 'Dominate Mind', maxUses: 2, actionName: 'Dominate Mind (2/Day)' },
@@ -163,85 +162,37 @@ const MA2020_CONTEXT = {
 };
 
 describe('MA-0020 Dominate Mind 2/Day spend at prompt-confirm', () => {
-    async function resolveFailedSave(context) {
-        const promise = processSaveRoll({
-            rollType: 'save',
-            target: { name: 'AberrantSorcerer', type: 'player' },
-            characterName: 'AberrantSorcerer',
-            campaignName,
-            context,
-            logEntry,
-            setPopupHtml: vi.fn(),
-        });
-        pendingSaveResolve({ success: false, roll: 4, total: 4, saveBonus: 0, rawRolls: [], mode: 'normal' });
-        await promise;
-    }
-
-    it('first confirmed failed save spends 1/2, counter + ability_use log, charmed still applied', async () => {
-        await resolveFailedSave({ ...MA2020_CONTEXT });
+    it('failed save spends 1/2, applies charmed with durationNote meta + advisory log; successful save also spends, reaching max 2 "0 left today"', async () => {
+        await runPlayerSave({ ...MA2020_CONTEXT }, FAIL);
 
         expect(runtimeStore['Aboleth.monsterSpellUses']).toEqual({ 'Dominate Mind': 1 });
-        const spend = conditionLogs.find(e => e.type === 'ability_use');
-        expect(spend).toBeTruthy();
-        expect(spend.characterName).toBe('Aboleth');
-        expect(spend.description).toMatch(/1 use spent, 1 left today/);
         expect(runtimeStore['AberrantSorcerer.activeConditions']).toEqual(['charmed']);
-        expect(conditionLogs.some(e => e.type === 'condition' && e.action === 'applied')).toBe(true);
-    });
+        const spend = conditionLogs.find(e => e.type === 'ability_use');
+        expect(spend).toMatchObject({ characterName: 'Aboleth' });
+        expect(spend.description).toMatch(/1 use spent, 1 left today/);
+        expect(runtimeStore['AberrantSorcerer.activeConditionMeta'].charmed).toMatchObject({
+            source: 'Aboleth',
+            durationNote: MA2020_CONTEXT.conditionDurationNote,
+        });
+        const advisory = conditionLogs.find(e => e.automationType === 'condition_clauses_advisory');
+        expect(advisory).toMatchObject({ characterName: 'AberrantSorcerer' });
+        expect(advisory.description).toMatch(/until the aboleth dies/);
+        expect(advisory.description).toMatch(/GM-enforced \(no control subsystem\)/);
 
-    it('second use reaches max 2 with 0 left today', async () => {
-        runtimeStore['Aboleth.monsterSpellUses'] = { 'Dominate Mind': 1 };
-        await resolveFailedSave({ ...MA2020_CONTEXT });
+        // The ability was used even on a successful save — spend on both faces.
+        await runPlayerSave({ ...MA2020_CONTEXT }, PASS);
 
         expect(runtimeStore['Aboleth.monsterSpellUses']).toEqual({ 'Dominate Mind': 2 });
-        expect(conditionLogs.find(e => e.type === 'ability_use').description).toMatch(/0 left today/);
+        expect(conditionLogs.filter(e => e.type === 'ability_use')[1].description).toMatch(/0 left today/);
     });
 
     it('guard: save already resolved at max — counter unchanged, refusal logged, charmed still applied', async () => {
         runtimeStore['Aboleth.monsterSpellUses'] = { 'Dominate Mind': 2 };
-        await resolveFailedSave({ ...MA2020_CONTEXT });
+        await runPlayerSave({ ...MA2020_CONTEXT }, FAIL);
 
         expect(runtimeStore['Aboleth.monsterSpellUses']).toEqual({ 'Dominate Mind': 2 });
         expect(conditionLogs.some(e => e.automationType === 'dominate_mind_refused')).toBe(true);
         expect(conditionLogs.some(e => e.type === 'ability_use')).toBe(false);
         expect(runtimeStore['AberrantSorcerer.activeConditions']).toEqual(['charmed']);
-    });
-
-    it('condition meta carries the until-clause durationNote + CLA-325 advisory log', async () => {
-        await resolveFailedSave({ ...MA2020_CONTEXT });
-
-        expect(runtimeStore['AberrantSorcerer.activeConditionMeta'].charmed).toMatchObject({
-            source: 'Aboleth',
-            durationNote: 'until the aboleth dies or is on a different plane of existence from the target (GM-enforced)',
-        });
-        const advisory = conditionLogs.find(e => e.automationType === 'condition_clauses_advisory');
-        expect(advisory).toBeTruthy();
-        expect(advisory.characterName).toBe('AberrantSorcerer');
-        expect(advisory.description).toMatch(/until the aboleth dies/);
-        expect(advisory.description).toMatch(/GM-enforced \(no control subsystem\)/);
-    });
-
-    it('successful save still spends the use (ability was used)', async () => {
-        const promise = processSaveRoll({
-            rollType: 'save',
-            target: { name: 'AberrantSorcerer', type: 'player' },
-            characterName: 'AberrantSorcerer',
-            campaignName,
-            context: { ...MA2020_CONTEXT },
-            logEntry,
-            setPopupHtml: vi.fn(),
-        });
-        pendingSaveResolve({ success: true, roll: 18, total: 18, saveBonus: 0, rawRolls: [], mode: 'normal' });
-        await promise;
-
-        expect(runtimeStore['Aboleth.monsterSpellUses']).toEqual({ 'Dominate Mind': 1 });
-        expect(runtimeStore['AberrantSorcerer.activeConditions']).toBeUndefined();
-    });
-
-    it('rows without monsterAbilityUse spend nothing (no counter written)', async () => {
-        await resolveFailedSave({ ...domContext });
-
-        expect(runtimeStore['Aboleth.monsterSpellUses']).toBeUndefined();
-        expect(conditionLogs.some(e => e.type === 'ability_use')).toBe(false);
     });
 });

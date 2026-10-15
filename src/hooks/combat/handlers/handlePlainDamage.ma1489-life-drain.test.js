@@ -1,18 +1,28 @@
-// MA-1489: Specter "Life Drain" HP-max-drain rider — the fix that made the
+// @maintained-by-ai: 2026-10-14
+// MA-1489: Specter "Life Drain" HP-max-drain lane — the fix that made the
 // HIT clause "its Hit Point maximum decreases by an amount equal to the damage
 // taken" LAND (was FAIL(a) zero-state, §947: hpMaxReduction consumers
-// reset-only, no te, no parser, hit_target_effect seam inert). MA-1451
-// byte-twin mocking. Locks: (1) specter.actions[0] authors the structured
-// hit_hp_max_reduce key, existing bytes byte-pinned; (2) parseHitHpMaxReduce
-// is structured-key-only (byte-inert null elsewhere); (3) on every resolved
-// hit the consumer reduces cs maxHp by exactly the damage TAKEN, clamps
-// currentHp, registers the hp_max_reduce te ledger {baseMax, reduced, max},
-// logs the old→new grant — NO addExpiration clock; (4) accumulation across
-// hits; (5) PC victims stamp the hitPoints/currentHitPoints/hpMaxReduction
-// shape greaterRestorationHandler consumes; (6) max reaching 0 clamps lethal
-// via the canonical applyDamageToTarget choke point; (7) zero-damage hit and
-// unauthored rows are zero-state; (8) LONG_REST_TARGET_EFFECT_CLEAR_KEYS
-// pins 'hp_max_reduce' and the LR restore runs before the clear.
+// reset-only, no te, no parser, hit_target_effect seam inert). Primary
+// life-drain lane; MA-1451 byte-twin mocking. Locks the seam this lane OWNS
+// (the drain core lives in hpMaxReduceService.js and is unit-covered by the
+// MA-1547 save-path suite; secondary-pool scoping + attacker regain by
+// MA-1645; wraith row twin by MA-1728):
+// (1) specter.actions[0] authors the structured hit_hp_max_reduce key,
+//     existing bytes byte-pinned, parser structured-key-only / byte-inert
+//     elsewhere; (2) the hp_max_reduce registry spec (only pin app-wide);
+//     (3) on every resolved hit the handler-reached consumer reduces cs
+//     maxHp by exactly the damage TAKEN, clamps currentHp, stamps the
+//     *HitPoints variants the entry carries (§296/§298), registers the
+//     hp_max_reduce te ledger {baseMax, reduced, max}, logs the old→new
+//     grant — NO addExpiration clock; (4) accumulation near the lethal floor
+//     (prevMax from te, reduced sums); (5) PC victims route through the
+//     handler to the hitPoints/currentHitPoints/hpMaxReduction shape
+//     greaterRestorationHandler consumes, never storage.set; (6) max
+//     reaching 0 clamps lethal via the canonical applyDamageToTarget choke
+//     point with the pre-clamp currentHp; (7) zero-damage rider hits and
+//     unauthored rows are zero-write (zero logs honestly);
+//     (8) LONG_REST_TARGET_EFFECT_CLEAR_KEYS pins 'hp_max_reduce' and the LR
+//     restore runs before the clear.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
 
@@ -105,17 +115,20 @@ describe('MA-1489 Specter Life Drain hp_max_reduce producer', () => {
         logEntry: vi.fn(),
     };
 
-    function freshCs() {
+    function freshCs({ variants = false } = {}) {
         return {
             round: 1,
-            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 11 }],
+            creatures: [{
+                name: 'Bandit 1', type: 'npc', size: 'Medium or Small', ac: 12,
+                currentHp: 999, maxHp: 11,
+                ...(variants ? { currentHitPoints: 999, maxHitPoints: 11 } : {}),
+            }],
         };
     }
 
     beforeEach(() => {
         vi.clearAllMocks();
         getRuntimeValue.mockReturnValue(null);
-        applyDamageToTarget.mockResolvedValue({ finalDamage: 7, newHp: 992, damageReduced: false });
     });
 
     async function resolveHit({ cs = freshCs(), targetName = 'Bandit 1', finalDamage = 7 } = {}) {
@@ -128,16 +141,16 @@ describe('MA-1489 Specter Life Drain hp_max_reduce producer', () => {
         return cs.creatures.find(c => c.name === targetName);
     }
 
-    it('DATA: specter.actions[0] authors the structured HP-max rider; existing bytes byte-pinned', () => {
+    const grantLog = () => deps.logEntry.mock.calls.map(c => c[0]).find(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Max HP Reduced');
+
+    it('DATA & PARSER: specter.actions[0] authors the structured HP-max rider (bytes byte-pinned); parser is structured-key-only, byte-inert elsewhere', () => {
         expect(LIFE_DRAIN.hit_hp_max_reduce).toEqual({ equal_to: 'damage' });
         expect(LIFE_DRAIN.attack_bonus).toBe(4);
         expect(LIFE_DRAIN.reach).toBe('5 ft.');
         expect(LIFE_DRAIN.damage_dice_primary).toBe('2d6');
         expect(LIFE_DRAIN.damage_type_primary).toBe('Necrotic');
         expect(LIFE_DRAIN.description).toBe('Melee Attack Roll: +4, reach 5 ft. Hit: 7 (2d6) Necrotic damage. If the target is a creature, its Hit Point maximum decreases by an amount equal to the damage taken.');
-    });
 
-    it('PARSER: buildHitConditionClause carries hpMaxReduce; every other row stays byte-inert', () => {
         expect(buildHitConditionClause(LIFE_DRAIN)).toEqual({
             conditions: [],
             escapeDc: null,
@@ -165,11 +178,12 @@ describe('MA-1489 Specter Life Drain hp_max_reduce producer', () => {
         expect(def.description).toMatch(/long rest/i);
     });
 
-    it('HIT: cs maxHp drops by exactly the damage taken, currentHp clamps, te ledger + old→new grant log land, NO clock', async () => {
+    it('HIT: cs maxHp drops by exactly the damage taken, currentHp clamps, te ledger + old→new grant log land, NO clock; *HitPoints variants stamped too (§296/§298)', async () => {
         const bandit = await resolveHit();
 
         expect(bandit.maxHp).toBe(4);
         expect(bandit.currentHp).toBe(4);
+        expect('currentHitPoints' in bandit).toBe(false);
         expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.objectContaining({ round: 1 }), 'test-campaign');
         expect(registerTargetEffect).toHaveBeenCalledWith(
             'test-campaign',
@@ -178,20 +192,12 @@ describe('MA-1489 Specter Life Drain hp_max_reduce producer', () => {
             'Specter 1',
             { baseMax: 11, reduced: 7, max: 4, duration: 'until_long_rest' },
         );
-        const grant = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Max HP Reduced');
-        expect(grant.reason).toBe('Life Drain — max HP 11 → 4 (−7, equal to damage taken)');
+        expect(grantLog().reason).toBe('Life Drain — max HP 11 → 4 (−7, equal to damage taken)');
         expect(addExpiration).not.toHaveBeenCalled();
-    });
 
-    it('CLAMP VARIANTS: cs entries carrying the *HitPoints variants get them stamped too (§296/§298)', async () => {
-        const cs = {
-            round: 1,
-            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 11, currentHitPoints: 999, maxHitPoints: 11 }],
-        };
-        const bandit = await resolveHit({ cs });
-
-        expect(bandit.maxHitPoints).toBe(4);
-        expect(bandit.currentHitPoints).toBe(4);
+        const variantBandit = await resolveHit({ cs: freshCs({ variants: true }) });
+        expect(variantBandit.maxHitPoints).toBe(4);
+        expect(variantBandit.currentHitPoints).toBe(4);
     });
 
     it('ACCUMULATE: a standing ledger accumulates without re-reading the base (prevMax from te, reduced sums)', async () => {
@@ -208,13 +214,13 @@ describe('MA-1489 Specter Life Drain hp_max_reduce producer', () => {
             'Specter 1',
             { baseMax: 11, reduced: 8, max: 3, duration: 'until_long_rest' },
         );
-        const grant = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Max HP Reduced');
-        expect(grant.reason).toBe('Life Drain — max HP 8 → 3 (−5, equal to damage taken)');
+        expect(grantLog().reason).toBe('Life Drain — max HP 8 → 3 (−5, equal to damage taken)');
     });
 
     it('PC VICTIM: stamps the hitPoints/currentHitPoints/hpMaxReduction shape greaterRestorationHandler consumes', async () => {
         const cs = { round: 1, creatures: [{ name: 'AasimarTest', type: 'player', size: 'Medium', ac: 18, currentHp: 25, maxHp: 27 }] };
         getRuntimeValue.mockImplementation((name, key) => (key === 'hitPoints' ? 27 : key === 'currentHitPoints' ? 25 : null));
+        applyDamageToTarget.mockResolvedValue({ finalDamage: 7, newHp: 18, damageReduced: false });
 
         await createPlainDamageHandler(deps)({
             name: 'Life Drain', formula: '2d6', total: 7, rolls: [3, 4], modifier: 0,
@@ -246,16 +252,16 @@ describe('MA-1489 Specter Life Drain hp_max_reduce producer', () => {
         expect(cs.creatures[0].maxHp).toBe(0);
     });
 
-    it('ZERO DAMAGE: a 0-finalDamage hit reduces nothing (equal-to-damage is 0) but logs — no writes', async () => {
+    it('ZERO STATE: a 0-finalDamage rider hit drains nothing but logs honestly; unauthored rows arm nothing — zero writes, zero drain logs', async () => {
         await resolveHit({ finalDamage: 0 });
 
         expect(registerTargetEffect).not.toHaveBeenCalled();
         expect(storage.set).not.toHaveBeenCalled();
         const zeroLog = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.automationType === 'hp_max_reduce');
         expect(zeroLog.description).toContain('reduced by 0');
-    });
 
-    it('BYTE-INERT PIPELINE: a row without the rider registers nothing, writes nothing, logs no drain', async () => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
         const clause = buildHitConditionClause({ name: 'Scimitar', attack_bonus: 5, damage_dice_primary: '1d6 + 1' });
         expect(clause).toBeNull();
 

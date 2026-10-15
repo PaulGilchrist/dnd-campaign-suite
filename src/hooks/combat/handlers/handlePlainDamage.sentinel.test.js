@@ -1,27 +1,19 @@
+// @maintained-by-ai: 2026-10-14
+// FT-101 Sentinel (Halt) coverage for the handlePlainDamage OA-hit seam
+// (applySentinelHalt) — rules-validated against public/data/2024/feats.json
+// Sentinel: "When you hit a creature with an Opportunity Attack, the
+// creature's Speed becomes 0 for the rest of the current turn" → registry te
+// + activeConditions speed_zero + ONE anchor expiry clock on the target's
+// next turn-start (no-timers policy: expiryRounds Infinity, seam-anchored) +
+// granted log row. Ram-prone / auto-Halt-action lanes live in their own
+// files and never share this producer.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
     rollExpressionDoubled: vi.fn(),
-    formatDamageFormula: vi.fn((formula, rolls, isCrit) => {
-        if (!isCrit) return formula;
-        const parsed = formula.match(/^(\d+)?d(\d+)((?:[+-]\d+)+)?$/i);
-        if (!parsed) return formula;
-        const count = parsed[1] || 1;
-        const sides = parsed[2];
-        const modifierStr = parsed[3];
-        let modifier = 0;
-        if (modifierStr) {
-            const segments = modifierStr.match(/([+-]\d+)/g);
-            for (const seg of segments) { modifier += parseInt(seg, 10); }
-        }
-        const dicePart = count === 1 ? `d${sides}` : `${count}d${sides}`;
-        const rollStr = rolls && rolls.length > 0 ? ` (${rolls.join(', ')})` : '';
-        let result = `${dicePart}*2${rollStr}`;
-        if (modifier > 0) result += `+${modifier}`;
-        else if (modifier < 0) result += `${modifier}`;
-        return result;
-    }),
+    parseConstant: vi.fn(() => null),
+    formatDamageFormula: vi.fn((formula) => formula),
 }));
 
 vi.mock('../../../services/ui/utils.js', () => ({
@@ -105,25 +97,19 @@ import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
 import { KEY } from '../../../services/rules/effects/turnStartEffects.js';
 
 describe('Plain damage sentinel (FT-101 Halt seam)', () => {
-    const sentinelCharacter = {
-        name: 'TestFighter',
-        feats: ['Great Weapon Master', 'Sentinel'],
-        computedStats: { armorClass: 16 },
-    };
     const goblin = { name: 'Goblin', computedStats: { armorClass: 12 } };
 
     const baseDeps = {
         characterName: 'TestFighter',
         campaignName: 'test-campaign',
-        characters: [sentinelCharacter, goblin],
+        characters: [
+            { name: 'TestFighter', feats: ['Great Weapon Master', 'Sentinel'], computedStats: { armorClass: 16 } },
+            goblin,
+        ],
         setPopupHtml: vi.fn(),
         logEntry: vi.fn(),
         pendingSaves: {},
     };
-
-    function buildDeps(overrides = {}) {
-        return { ...baseDeps, ...overrides };
-    }
 
     beforeEach(() => {
         getRuntimeValue.mockReset().mockReturnValue(null);
@@ -135,10 +121,6 @@ describe('Plain damage sentinel (FT-101 Halt seam)', () => {
         });
     });
 
-    function createFn(deps) {
-        return createLogDamageAndShow(deps || baseDeps);
-    }
-
     function makeOpportunityAttackContext(extra = {}) {
         return {
             targetName: 'Goblin',
@@ -149,86 +131,71 @@ describe('Plain damage sentinel (FT-101 Halt seam)', () => {
         };
     }
 
+    const oaRoll = (context) => ({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context });
+
+    // Campaign lastAttack resolved as a TestFighter hit; empty targetEffects.
     function oaHitRuntime(key, prop) {
         if (key === 'campaign' && prop === 'lastAttack') return { hit: true, attackerName: 'TestFighter' };
         if (key === 'campaign') return [];
         return null;
     }
 
-    function targetEffectsCalls() {
-        return setRuntimeValue.mock.calls.filter((call) => call[1] === 'targetEffects');
+    function runtimeWrites(prop) {
+        return setRuntimeValue.mock.calls.filter((call) => call[1] === prop);
     }
 
+    const haltTe = (props = {}) => expect.objectContaining({
+        target: 'Goblin',
+        source: 'TestFighter',
+        effect: 'speed_zero',
+        option: 'Halt',
+        duration: 'end_of_turn',
+        ...props,
+    });
+
+    const grantLogs = () => addEntry.mock.calls.map((c) => c[1]).filter((e) => e && e.automationType === 'speed_zero_granted');
+
     describe('OA hit by Sentinel-holder stamps Halt', () => {
-        it('registers speed_zero te (option Halt, end_of_turn) sourced from the attacker', async () => {
+        it('writes the te, activeConditions, ONE anchored expiry clock, and the grant log', async () => {
             getRuntimeValue.mockImplementation(oaHitRuntime);
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: makeOpportunityAttackContext() });
+            await createLogDamageAndShow(baseDeps)(oaRoll(makeOpportunityAttackContext()));
 
-            expect(targetEffectsCalls()).toHaveLength(1);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        target: 'Goblin',
-                        source: 'TestFighter',
-                        option: 'Halt',
-                        effect: 'speed_zero',
-                        duration: 'end_of_turn',
-                    }),
-                ]),
-                'test-campaign',
-                true
-            );
-        });
+            // ONE registry te write (skipSync=true mirror of MA-0146 shape).
+            expect(runtimeWrites('targetEffects')).toEqual([
+                ['campaign', 'targetEffects', [haltTe()], 'test-campaign', true],
+            ]);
 
-        it('stamps the activeConditions speed_zero enforcement lane', async () => {
-            getRuntimeValue.mockImplementation(oaHitRuntime);
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: makeOpportunityAttackContext() });
+            // Enforcement lane: activeConditions speed_zero on the target.
+            expect(runtimeWrites('activeConditions')).toEqual([
+                ['Goblin', 'activeConditions', ['speed_zero'], 'test-campaign'],
+            ]);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'activeConditions',
-                ['speed_zero'],
-                'test-campaign'
-            );
-        });
-
-        it('adds ONE anchor expiry clock cleared at the target next turn-start', async () => {
-            getRuntimeValue.mockImplementation(oaHitRuntime);
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: makeOpportunityAttackContext() });
-
-            const expirationCalls = setRuntimeValue.mock.calls.filter((call) => call[1] === KEY && call[0] === 'TestFighter');
-            expect(expirationCalls).toHaveLength(1);
-            expect(expirationCalls[0][2]).toHaveLength(1);
-            expect(expirationCalls[0][2][0]).toMatchObject({
+            // ONE anchor clock, no round countdown — cleared at the target's
+            // next turn-start via expireOnCreatureName (no-timers policy).
+            const clocks = runtimeWrites(KEY);
+            expect(clocks).toHaveLength(1);
+            expect(clocks[0][0]).toBe('TestFighter');
+            expect(clocks[0][2]).toEqual([{
                 target: 'Goblin',
                 expireOnCreatureName: 'Goblin',
+                appliedRound: 1,
                 expiryRounds: Infinity,
-            });
-            expect(expirationCalls[0][2][0].effects).toEqual([
-                { type: 'remove_target_effect', effectKey: 'speed_zero', source: 'TestFighter', target: 'Goblin' },
-                { type: 'speed_zero' },
-            ]);
-        });
+                effects: [
+                    { type: 'remove_target_effect', effectKey: 'speed_zero', source: 'TestFighter', target: 'Goblin' },
+                    { type: 'speed_zero' },
+                ],
+            }]);
 
-        it('logs the Halt grant with event details', async () => {
-            getRuntimeValue.mockImplementation(oaHitRuntime);
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: makeOpportunityAttackContext() });
-
-            const grant = addEntry.mock.calls.map(c => c[1]).find(e => e && e.automationType === 'speed_zero_granted');
-            expect(grant).toBeDefined();
-            expect(grant).toMatchObject({
+            // Every automation grants log with event details.
+            const grants = grantLogs();
+            expect(grants).toHaveLength(1);
+            expect(grants[0]).toMatchObject({
                 type: 'automation',
                 characterName: 'Goblin',
                 sourceName: 'TestFighter',
                 abilityName: 'Sentinel',
             });
-            expect(grant.description).toContain('Speed is 0');
+            expect(grants[0].description).toContain('Speed is 0');
         });
 
         it('merges Halt into existing targetEffects', async () => {
@@ -237,24 +204,23 @@ describe('Plain damage sentinel (FT-101 Halt seam)', () => {
                 if (key === 'campaign') return [{ target: 'Goblin', source: 'Other', effect: 'some_effect' }];
                 return null;
             });
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: makeOpportunityAttackContext() });
+            await createLogDamageAndShow(baseDeps)(oaRoll(makeOpportunityAttackContext()));
 
-            const call = targetEffectsCalls().find(c => Array.isArray(c[2]) && c[2].length === 2);
-            expect(call).toBeDefined();
-            expect(call[2][0]).toEqual({ target: 'Goblin', source: 'Other', effect: 'some_effect' });
-            expect(call[2][1]).toMatchObject({ target: 'Goblin', source: 'TestFighter', effect: 'speed_zero' });
+            const writes = runtimeWrites('targetEffects');
+            expect(writes).toHaveLength(1);
+            expect(writes[0][2][0]).toEqual({ target: 'Goblin', source: 'Other', effect: 'some_effect' });
+            expect(writes[0][2][1]).toMatchObject({ target: 'Goblin', source: 'TestFighter', effect: 'speed_zero' });
         });
     });
 
     describe('zero-stamp refusals', () => {
         async function expectNoStamp(deps, context, runtime = oaHitRuntime) {
             getRuntimeValue.mockImplementation(runtime);
-            const fn = createFn(deps);
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context });
-            expect(targetEffectsCalls()).toHaveLength(0);
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'activeConditions', expect.anything(), 'test-campaign');
-            expect(addEntry.mock.calls.map(c => c[1]).some(e => e && e.automationType === 'speed_zero_granted')).toBe(false);
+            await createLogDamageAndShow(deps)(oaRoll(context));
+            expect(runtimeWrites('targetEffects')).toHaveLength(0);
+            expect(runtimeWrites('activeConditions')).toHaveLength(0);
+            expect(runtimeWrites(KEY)).toHaveLength(0);
+            expect(grantLogs()).toHaveLength(0);
         }
 
         it('skips when not an opportunity attack', async () => {
@@ -278,12 +244,13 @@ describe('Plain damage sentinel (FT-101 Halt seam)', () => {
         });
 
         it('skips when the attacker lacks the Sentinel feat', async () => {
-            await expectNoStamp(buildDeps({
+            await expectNoStamp({
+                ...baseDeps,
                 characters: [
                     { name: 'TestFighter', feats: ['Great Weapon Master'], computedStats: { armorClass: 16 } },
                     goblin,
                 ],
-            }), makeOpportunityAttackContext());
+            }, makeOpportunityAttackContext());
         });
     });
 });

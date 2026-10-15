@@ -1,7 +1,10 @@
-// MA-0367 (block-save leg): processSaveRoll failed save arms the Infernal
-// Wound te + ONE rounds:10 clock via infernalWoundService; dc_success "full"
-// keeps the auto-damage unhalved on BOTH outcomes; success grants ZERO wound;
-// an already-wounded target is RAW-skipped (no second wound / no clock refresh).
+// @maintained-by-ai: 2026-10-14
+// MA-0367 inline-save seam (unique lane): processSaveRoll with the REAL
+// infernalWoundService — failed save wires context.infernalWound → te + ONE
+// rounds:10 clock + grant log; dc_success:'full' keeps auto-damage unhalved
+// on BOTH outcomes; success grants ZERO wound. Service internals (te shape,
+// RAW already-wounded guard) live in infernalWoundService.test.js; the
+// save-result DOM-event seam lives in useLoggedDiceRollEventHandlers.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -118,6 +121,7 @@ describe('MA-0367 block-save Infernal Wound grant', () => {
         await resolveSave({ ...glaiveContext }, false, 4);
 
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(7);
+        expect(applyDamageToTarget.mock.calls[0][3]).toEqual(['Slashing']);
 
         const te = woundTe();
         expect(te).toMatchObject({ target: TARGET, effect: 'infernal_wound', source: DEVIL, bleedDie: '1d10', duration: 'until_1_minute' });
@@ -128,6 +132,15 @@ describe('MA-0367 block-save Infernal Wound grant', () => {
         expect(clocks[0].effects[0]).toMatchObject({ type: 'remove_target_effect', effectKey: 'infernal_wound' });
 
         expect(addEntryLogs.some(e => e.automationType === 'infernal_wound_granted')).toBe(true);
+
+        // lane-level idempotence: the lane re-fires the service on every failed
+        // save; the service's RAW guard (service tests) must keep it at ONE
+        // wound / ONE clock and record only a refusal on the re-fire.
+        addEntryLogs.length = 0;
+        await resolveSave({ ...glaiveContext }, false, 3);
+        expect((runtimeStore['campaign.targetEffects'] || []).filter(te2 => te2.effect === 'infernal_wound' && te2.target === TARGET)).toHaveLength(1);
+        expect(runtimeStore[`${DEVIL}.pendingExpirations`] || []).toHaveLength(1);
+        expect(addEntryLogs.some(e => e.automationType === 'infernal_wound_refused')).toBe(true);
     });
 
     it('successful save: FULL unhalved damage, ZERO wound / clock / grant (save gates only the wound)', async () => {
@@ -137,15 +150,5 @@ describe('MA-0367 block-save Infernal Wound grant', () => {
         expect(woundTe()).toBeFalsy();
         expect(runtimeStore[`${DEVIL}.pendingExpirations`] || []).toHaveLength(0);
         expect(addEntryLogs.some(e => e.automationType === 'infernal_wound_granted')).toBe(false);
-    });
-
-    it('already-wounded target on a failed save: RAW skips a second wound, no clock refresh', async () => {
-        await resolveSave({ ...glaiveContext }, false, 4);
-        addEntryLogs.length = 0;
-        await resolveSave({ ...glaiveContext }, false, 3);
-
-        expect((runtimeStore['campaign.targetEffects'] || []).filter(te => te.effect === 'infernal_wound' && te.target === TARGET)).toHaveLength(1);
-        expect(runtimeStore[`${DEVIL}.pendingExpirations`] || []).toHaveLength(1);
-        expect(addEntryLogs.some(e => e.automationType === 'infernal_wound_refused')).toBe(true);
     });
 });

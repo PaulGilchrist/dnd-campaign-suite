@@ -1,7 +1,12 @@
-// CLA-372 regression: rolling initiative must NOT clear the Uncanny Metabolism
-// once-per-Long-Rest latch (uncannyMetabolismUsed). Long Rest
-// (restRules-longRest.js) is the only legitimate reset.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai: 2026-10-14
+// Seam: processInitiativeRoll — the initiative-roll tail: popup rebuild, tracker
+// write, and `initiative-rolled` dispatch. (Roll-side Cosmic Omen / tandem-footwork
+// folding is covered in useLoggedDiceRollAttack.test.js.)
+// CLA-372: rolling initiative must NOT clear the Uncanny Metabolism once-per-Long-Rest
+// latch (uncannyMetabolismUsed) — Long Rest (restRules-longRest.js) is its only reset.
+// CLA-065: the tail popup bonus/bonusDetail and tracker initiative must carry the folded
+// Cosmic Omen ±1d6, not just the base bonus.
+import { describe, it, expect, vi, beforeEach, onTestFinished } from 'vitest';
 
 vi.mock('../runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => 0),
@@ -37,74 +42,81 @@ import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js'
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 
 const campaignName = 'TestCampaign';
+const characterName = 'Disciplined_Monk';
 
-describe('processInitiativeRoll — CLA-372 once-per-Long-Rest latch', () => {
+function armedCombatSummary() {
+  const summary = { round: 1, creatures: [{ type: 'player', name: characterName, initiative: '' }] };
+  loadCombatSummary.mockResolvedValue(summary);
+  return summary;
+}
+
+function rollInitiative(overrides = {}) {
+  const setPopupHtml = vi.fn();
+  const dispatched = [];
+  const listener = (e) => dispatched.push(e.detail);
+  window.addEventListener('initiative-rolled', listener);
+  onTestFinished(() => window.removeEventListener('initiative-rolled', listener));
+
+  return processInitiativeRoll({
+    characterName,
+    campaignName,
+    context: {},
+    bonus: 3,
+    effectiveD20Roll: 12,
+    r1: 9,
+    r2: 3,
+    setPopupHtml,
+    availableSuperiorityManeuvers: [],
+    cosmicOmenAppliedBonus: 0,
+    characters: [],
+    ...overrides,
+  }).then(() => ({ setPopupHtml, dispatched }));
+}
+
+describe('processInitiativeRoll', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getRuntimeValue.mockReturnValue(0);
+    // Neutralize any mockResolvedValue armed by a previous test.
     loadCombatSummary.mockResolvedValue(null);
   });
 
-  it('does not clear uncannyMetabolismUsed on initiative roll', async () => {
-    const setPopupHtml = vi.fn();
+  it('writes tracker initiative, dispatches initiative-rolled, and never touches the CLA-372 uncannyMetabolismUsed latch (no omen)', async () => {
+    const combatSummary = armedCombatSummary();
+    const { setPopupHtml, dispatched } = await rollInitiative();
 
-    await processInitiativeRoll({ characterName: 'Disciplined_Monk', campaignName: campaignName, context: {}, bonus: 3, effectiveD20Roll: 12, r1: 9, r2: 3, setPopupHtml: setPopupHtml, availableSuperiorityManeuvers: [], cosmicOmenAppliedBonus: 0, characters: [] });
-
-    expect(setRuntimeValue).not.toHaveBeenCalledWith(
-      'Disciplined_Monk',
-      'uncannyMetabolismUsed',
-      false,
-      campaignName,
-    );
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+      rollType: 'initiative',
+      rolls: [9, 3],
+      bonus: 3,
+      bonusDetail: undefined,
+    }));
+    expect(combatSummary.creatures[0].initiative).toBe('15');
+    expect(dispatched).toEqual([{ characterName, roll: 15 }]);
     expect(setRuntimeValue.mock.calls.filter(c => c[1] === 'uncannyMetabolismUsed')).toHaveLength(0);
   });
 
-  // CLA-065: the tail popup + tracker initiative must carry the folded
-  // Cosmic Omen ±1d6, not just the base bonus.
-  describe('CLA-065 cosmic omen fold', () => {
-    it('folds +omen into popup bonus, bonusDetail and tracker initiative', async () => {
-      const combatSummary = { round: 1, creatures: [{ type: 'player', name: 'Disciplined_Monk', initiative: '' }] };
-      loadCombatSummary.mockResolvedValue(combatSummary);
-      const setPopupHtml = vi.fn();
-      const dispatched = [];
-      window.addEventListener('initiative-rolled', (e) => dispatched.push(e.detail));
-
-      await processInitiativeRoll({ characterName: 'Disciplined_Monk', campaignName: campaignName, context: {}, bonus: -1, effectiveD20Roll: 6, r1: 6, r2: 11, setPopupHtml: setPopupHtml, availableSuperiorityManeuvers: [], cosmicOmenAppliedBonus: 4, cosmicOmenDetail: '(+4 from Weal)', characters: [] });
-
-      const popup = setPopupHtml.mock.calls[0][0];
-      expect(popup.bonus).toBe(3);
-      expect(popup.bonusDetail).toBe('(+4 from Weal)');
-      expect(combatSummary.creatures[0].initiative).toBe('9');
-      expect(dispatched[dispatched.length - 1]).toEqual({ characterName: 'Disciplined_Monk', roll: 9 });
+  it.each([
+    { omen: 4, detail: '(+4 from Weal)' },
+    { omen: -2, detail: '(-2 from Woe)' },
+  ])('CLA-065: folds Cosmic Omen $omen into popup, tracker, and event', async ({ omen, detail }) => {
+    const combatSummary = armedCombatSummary();
+    const roll = 6 - 1 + omen; // d20 6 + base bonus −1 ± omen
+    const { setPopupHtml, dispatched } = await rollInitiative({
+      bonus: -1,
+      effectiveD20Roll: 6,
+      r1: 6,
+      r2: 11,
+      cosmicOmenAppliedBonus: omen,
+      cosmicOmenDetail: detail,
     });
 
-    it('folds −omen (Woe)', async () => {
-      const setPopupHtml = vi.fn();
-      await processInitiativeRoll({ characterName: 'Disciplined_Monk', campaignName: campaignName, context: {}, bonus: -1, effectiveD20Roll: 6, r1: 6, r2: 11, setPopupHtml: setPopupHtml, availableSuperiorityManeuvers: [], cosmicOmenAppliedBonus: -2, cosmicOmenDetail: '(-2 from Woe)', characters: [] });
-      const popup = setPopupHtml.mock.calls[0][0];
-      expect(popup.bonus).toBe(-3);
-      expect(popup.bonusDetail).toBe('(-2 from Woe)');
-    });
-
-    it('is byte-identical with no omen armed', async () => {
-      const setPopupHtml = vi.fn();
-      await processInitiativeRoll({ characterName: 'Disciplined_Monk', campaignName: campaignName, context: {}, bonus: 3, effectiveD20Roll: 12, r1: 9, r2: 3, setPopupHtml: setPopupHtml, availableSuperiorityManeuvers: [], cosmicOmenAppliedBonus: 0, characters: [] });
-      const popup = setPopupHtml.mock.calls[0][0];
-      expect(popup.bonus).toBe(3);
-      expect(popup.bonusDetail).toBeUndefined();
-    });
-  });
-
-  it('still writes initiative and fires initiative-rolled', async () => {
-    const combatSummary = { round: 1, creatures: [{ type: 'player', name: 'Disciplined_Monk', initiative: '' }] };
-    loadCombatSummary.mockResolvedValue(combatSummary);
-    const setPopupHtml = vi.fn();
-    const dispatched = [];
-    window.addEventListener('initiative-rolled', (e) => dispatched.push(e.detail));
-
-    await processInitiativeRoll({ characterName: 'Disciplined_Monk', campaignName: campaignName, context: {}, bonus: 3, effectiveD20Roll: 12, r1: 9, r2: 3, setPopupHtml: setPopupHtml, availableSuperiorityManeuvers: [], cosmicOmenAppliedBonus: 0, characters: [] });
-
-    expect(combatSummary.creatures[0].initiative).toBe('15');
-    expect(dispatched).toEqual([{ characterName: 'Disciplined_Monk', roll: 15 }]);
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+      bonus: -1 + omen,
+      bonusDetail: detail,
+      cosmicOmenAppliedBonus: omen,
+    }));
+    expect(combatSummary.creatures[0].initiative).toBe(String(roll));
+    expect(dispatched).toEqual([{ characterName, roll }]);
   });
 });

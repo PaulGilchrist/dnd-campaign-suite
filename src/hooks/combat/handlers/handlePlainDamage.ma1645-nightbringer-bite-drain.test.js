@@ -1,22 +1,28 @@
-// MA-1645: Vampire Nightbringer "Bite" attack-lane drain + regain consumers —
-// the fix that made "The target's Hit Point maximum decreases by an amount
-// equal to the Necrotic damage taken, and the vampire regains Hit Points
-// equal to that amount" LAND on the dual-damage attack row. Locks:
-// (1) equal_to:"secondary" drain consumes secondaryFinalDamage (Necrotic),
+// @maintained-by-ai: 2026-10-14
+// MA-1645: Vampire Nightbringer "Bite" attack-lane drain + regain CONSUMER
+// lane (handlePlainDamage). Row bytes, parseHitHpMaxReduce magnitude scope,
+// parseHitAttackerRecover grammar and buildHitConditionClause threading are
+// byte-pinned by the companion suite MonsterCardHelpers.ma1645-...test.js;
+// the hp_max_reduce drain core, ledger/clamp/registry/LR semantics and the
+// clauseless-row zero-state producer are owned by the MA-1489 suite +
+// hpMaxReduceService. This file locks only what the MA-1645 attack lane owns:
+// (1) equal_to:"secondary" drain consumes secondaryFinalDamage (NECROTIC),
 //     NEVER applyResult.finalDamage (PRIMARY Piercing — the honesty flag in
 //     the bug file: the plain byte-twin drains the WRONG pool);
-// (2) hit_attacker_recover heals the ATTACKER by the SAME RAW amount via the
+// (2) hit_attacker_recover heals the ATTACKER the SAME RAW amount via the
 //     canonical applyHealingToTarget choke point (real service, fake cs —
-//     MA-1639 applySaveAttackerRecoverLeg mirror) with the recover log;
+//     MA-1639 applySaveAttackerRecoverLeg mirror): cs currentHp + storage.set
+//     + recover log, full amount (disk RAW "equal to that amount", NOT half);
 // (3) accumulation: the te ledger {baseMax,reduced,max} sums across hits and
 //     the regain re-reads the attacker's raised currentHp;
 // (4) byte-inertia: the Specter equal_to:"damage" twin keeps consuming
-//     finalDamage with NO attacker heal, and clauseless rows are zero-state.
+//     finalDamage with NO attacker heal; clauseless rows arm neither rider;
+// (5) a zero NECROTIC pool pays zero drain + zero regain, both logged honestly.
 // MA-1489/MA-1451 byte-twin mocking.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
-    rollExpression: vi.fn((formula) => (formula === '3d6' ? { rolls: [3, 3, 3], total: 9 } : { rolls: [2], total: 2 })),
+    rollExpression: vi.fn(),
     rollExpressionDoubled: vi.fn(),
     parseConstant: vi.fn(),
     formatDamageFormula: vi.fn((formula) => formula),
@@ -120,7 +126,7 @@ describe('MA-1645 Nightbringer Bite attack-lane drain + regain', () => {
 
     async function resolveHit({ cs = freshCs(), primary = 6, secondary = 9, clause = buildHitConditionClause(NIGHTBRINGER_BITE), includeSecondary = true, primaryFinal = null } = {}) {
         // Secondary leg rolls through resolveSecondaryRoll → rollExpression(secondaryFormula); drive its total per-test.
-        rollExpression.mockImplementation((formula) => (formula === '3d6' ? { rolls: [secondary], total: secondary } : { rolls: [2], total: 2 }));
+        rollExpression.mockImplementation((formula) => (formula === '3d6' ? { rolls: [secondary], total: secondary } : null));
         applyDamageToTarget.mockImplementation(async (_cs, _name, dmg) => {
             const finalDamage = primaryFinal != null && dmg === primary ? primaryFinal : dmg;
             return { finalDamage, newHp: 999 - finalDamage, damageReduced: false };
@@ -139,22 +145,12 @@ describe('MA-1645 Nightbringer Bite attack-lane drain + regain', () => {
         };
     }
 
+    const logs = () => deps.logEntry.mock.calls.map(c => c[0]);
+    const recoverLogs = () => logs().filter(e => e.automationType === 'hit_attacker_recover');
+
     beforeEach(() => {
         vi.clearAllMocks();
         getRuntimeValue.mockReturnValue(null);
-    });
-
-    it('DATA lock: the row authors both riders scoped to the NECROTIC secondary pool', () => {
-        expect(NIGHTBRINGER_BITE.hit_hp_max_reduce).toEqual({ equal_to: 'secondary' });
-        expect(NIGHTBRINGER_BITE.hit_attacker_recover).toEqual({ equal_to: 'secondary' });
-        expect(buildHitConditionClause(NIGHTBRINGER_BITE)).toEqual({
-            conditions: [],
-            escapeDc: null,
-            attackName: 'Bite',
-            targetEffect: null,
-            hpMaxReduce: { equalTo: 'secondary' },
-            attackerRecover: { equalTo: 'secondary' },
-        });
     });
 
     it('HIT: victim maxHp drops by secondaryFinalDamage (NOT finalDamage), te ledger + drain log + attacker regain via canonical heal', async () => {
@@ -162,8 +158,6 @@ describe('MA-1645 Nightbringer Bite attack-lane drain + regain', () => {
 
         expect(victim.maxHp).toBe(990);
         expect(victim.currentHp).toBe(990);
-        expect(attacker.currentHp).toBe(109);
-        expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.objectContaining({ round: 1 }), 'test-campaign');
         expect(registerTargetEffect).toHaveBeenCalledWith(
             'test-campaign',
             VICTIM,
@@ -171,14 +165,23 @@ describe('MA-1645 Nightbringer Bite attack-lane drain + regain', () => {
             ATTACKER,
             { baseMax: 999, reduced: 9, max: 990, duration: 'until_long_rest' },
         );
-        const entries = deps.logEntry.mock.calls.map(c => c[0]);
-        const grant = entries.find(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Max HP Reduced');
+        expect(addExpiration).not.toHaveBeenCalled();
+        const grant = logs().find(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Max HP Reduced');
         expect(grant.reason).toBe('Bite — max HP 999 → 990 (−9, equal to damage taken)');
-        const recover = entries.find(e => e.type === 'automation' && e.automationType === 'hit_attacker_recover');
+
+        // Attacker regain: full RAW amount through applyHealingToTarget (cs + storage.set).
+        expect(attacker.currentHp).toBe(109);
+        expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.objectContaining({ round: 1 }), 'test-campaign');
+        const recover = recoverLogs()[0];
         expect(recover.characterName).toBe(ATTACKER);
         expect(recover.description).toContain('regains 9 Hit Points');
         expect(recover.description).toContain('100 → 109');
-        expect(addExpiration).not.toHaveBeenCalled();
+    });
+
+    it('NECROTIC-EQUAL HONESTY: drain amount never reads applyResult.finalDamage on secondary-scoped rows', async () => {
+        // Primary reduced (resistance) to 2 while NECROTIC pays full 9 — the drain MUST follow the 9.
+        const { victim } = await resolveHit({ primary: 6, secondary: 9, primaryFinal: 2 });
+        expect(victim.maxHp).toBe(990);
     });
 
     it('ACCUMULATE: standing ledger + second hit — max drops another 16, attacker climbs 109 → 125', async () => {
@@ -192,6 +195,7 @@ describe('MA-1645 Nightbringer Bite attack-lane drain + regain', () => {
         const { victim, attacker } = await resolveHit({ cs, primary: 5, secondary: 16 });
 
         expect(victim.maxHp).toBe(974);
+        expect(victim.currentHp).toBe(974);
         expect(registerTargetEffect).toHaveBeenCalledWith(
             'test-campaign',
             VICTIM,
@@ -200,34 +204,23 @@ describe('MA-1645 Nightbringer Bite attack-lane drain + regain', () => {
             { baseMax: 999, reduced: 25, max: 974, duration: 'until_long_rest' },
         );
         expect(attacker.currentHp).toBe(125);
-        const recover = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.automationType === 'hit_attacker_recover');
-        expect(recover.description).toContain('regains 16 Hit Points');
-        expect(recover.description).toContain('109 → 125');
+        expect(recoverLogs()[0].description).toContain('regains 16 Hit Points');
+        expect(recoverLogs()[0].description).toContain('109 → 125');
     });
 
-    it('NECROTIC-EQUAL HONESTY: drain amount never reads applyResult.finalDamage on secondary-scoped rows', async () => {
-        // Primary reduced (resistance) to 2 while NECROTIC pays full 9 — the drain MUST follow the 9.
-        const { victim } = await resolveHit({ primary: 6, secondary: 9, primaryFinal: 2 });
-        expect(victim.maxHp).toBe(990);
-    });
-
-    it('BYTE-INERT TWIN: Specter equal_to:"damage" drains finalDamage, regains NOTHING (no key)', async () => {
+    it('BYTE-INERTIA: Specter equal_to:"damage" twin drains finalDamage with NO regain; clauseless rows arm neither rider', async () => {
         const { victim, attacker } = await resolveHit({ clause: buildHitConditionClause(SPECTER_DRAIN), includeSecondary: false });
 
         expect(victim.maxHp).toBe(993);
         expect(attacker.currentHp).toBe(100);
-        const entries = deps.logEntry.mock.calls.map(c => c[0]);
-        expect(entries.some(e => e.automationType === 'hit_attacker_recover')).toBe(false);
-    });
+        expect(recoverLogs()).toHaveLength(0);
 
-    it('ZERO-STATE: clauseless rows arm neither rider', async () => {
-        const banditRow = monsters.find(m => m.name === 'Bandit').actions.find(a => a.attack_bonus != null);
-        expect(buildHitConditionClause(banditRow)).toBeNull();
-        const { victim, attacker } = await resolveHit({ clause: null });
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(null);
+        await resolveHit({ clause: null });
 
-        expect(victim.maxHp).toBe(999);
-        expect(attacker.currentHp).toBe(100);
         expect(registerTargetEffect).not.toHaveBeenCalled();
+        expect(logs().some(e => (e.automationType || '').startsWith('hp_max_reduce') || e.automationType === 'hit_attacker_recover' || e.condition === 'Max HP Reduced')).toBe(false);
     });
 
     it('SECONDARY ZERO: necrotic pool reduced to 0 pays zero drain + zero regain, both logged honestly', async () => {
@@ -235,8 +228,7 @@ describe('MA-1645 Nightbringer Bite attack-lane drain + regain', () => {
 
         expect(victim.maxHp).toBe(999);
         expect(attacker.currentHp).toBe(100);
-        const entries = deps.logEntry.mock.calls.map(c => c[0]);
-        expect(entries.some(e => e.automationType === 'hp_max_reduce' && /reduced by 0/.test(e.description))).toBe(true);
-        expect(entries.some(e => e.automationType === 'hit_attacker_recover' && /regains 0 Hit Points/.test(e.description))).toBe(true);
+        expect(logs().some(e => e.automationType === 'hp_max_reduce' && /reduced by 0/.test(e.description))).toBe(true);
+        expect(recoverLogs().some(e => /regains 0 Hit Points/.test(e.description))).toBe(true);
     });
 });

@@ -1,12 +1,23 @@
+// @maintained-by-ai: 2026-10-14
+// MA-0048 frightful-presence-specific seam ONLY: the Adult Blue Dracolich
+// "Frightful Presence" disk row (monsters.json, DC 18 WIS, dc_success none,
+// legacy repeat_save with NO `effect` key) byte-builds the save context
+// through extractConditionsFromSaveEffect and the FAILED-save player-prompt
+// lane routes armRepeatSaveClause down the FP-specific trackFrightfulPresence
+// leg — frightful_presence te + ONE merged 10-round clock (1 minute, CLA-334)
+// that strips te + Frightened then grants the 24h immunity via the
+// frightful_presence_immunity_grant clause, zero damage.
+// Generic legs are owned elsewhere: fail/success condition grants —
+// saveProcessing.failed-save-conditions.test.js; FP success face + refusal
+// gate on disk rows — saveProcessing.ma1997-smaug-frightful-presence.test.js
+// (+ ma2026-tiamat twin); immunity_grant expiry —
+// services/rules/effects/clearExpirationEffects.frightful-presence.test.js;
+// turn-END repeat-save consumer + row shape —
+// services/rules/features/frightfulPresenceService.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// MA-0048: Adult Blue Dracolich Frightful Presence — damageless save row.
-// Fail: MA-0017 seam applies Frightened + repeat-save marker armed.
-// Success: MA-0030 seam grants frightful_presence_immunity te (24h = 14400
-// rounds, CLA-334 minutes×10). Mirrors the chilling-gaze-immunity harness.
-
 const runtimeStore = {};
-const addEntryLogs = [];
+const conditionLogs = [];
 
 vi.mock('../runtime/useRuntimeState.js', () => ({
     getRuntimeValue: (name, key) => runtimeStore[`${name}.${key}`],
@@ -17,8 +28,9 @@ vi.mock('../../services/ui/utils.js', () => ({
     default: { guid: () => 'id-' + Math.random().toString(36).slice(2) },
 }));
 
+const rollExpression = vi.fn(() => ({ total: 17, rolls: [5, 6, 6], modifier: 0 }));
 vi.mock('../../services/dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(),
+    rollExpression: (...args) => rollExpression(...args),
 }));
 
 let pendingSaveResolve = null;
@@ -30,22 +42,17 @@ vi.mock('../../services/automation/common/savePrompt.js', () => ({
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({
-    addEntry: (campaignName, entry) => { addEntryLogs.push(entry); return Promise.resolve(); },
+    addEntry: (campaignName, entry) => { conditionLogs.push(entry); return Promise.resolve(); },
 }));
 
 vi.mock('../../services/encounters/combatData.js', () => ({
     loadCombatSummary: async () => ({ creatures: [], activeCreatureName: 'Adult Blue Dracolich 1' }),
-    getCurrentCombatRound: () => 1,
-    getCombatSummary: () => null,
 }));
 
 const applyDamageToTarget = vi.fn(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 224 }));
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
-    normalizeSaveType: (t) => String(t || '').toUpperCase(),
-    computeDamageAfterSave: (raw, success, dcSuccess) => (!success ? raw : dcSuccess === 'half' ? Math.floor(raw / 2) : 0),
-    computeDamageAfterEvasion: (total, saveSuccess, dcSuccess, evasionActive) =>
-        (evasionActive && dcSuccess === 'half') ? (saveSuccess ? 0 : Math.floor(total / 2))
-            : (!saveSuccess ? total : dcSuccess === 'half' ? Math.floor(total / 2) : 0),
+    normalizeSaveType: (t) => String(t || '').toLowerCase(),
+    computeDamageAfterEvasion: (total, saveSuccess) => (saveSuccess ? Math.floor(total / 2) : total),
     applyDamageToTarget: (...args) => applyDamageToTarget(...args),
 }));
 
@@ -64,73 +71,86 @@ vi.mock('../../services/rules/effects/expirationQueue.js', () => ({
 }));
 
 import { processSaveRoll } from './saveProcessing.js';
+import { extractConditionsFromSaveEffect } from '../../components/encounter/MonsterCardHelpers.js';
+import monstersData from '../../../public/data/monsters.json';
 
 const campaignName = 'test-campaign';
 const DRACOLICH = 'Adult Blue Dracolich 1';
 const TARGET = 'ElderPaladin';
+const FP_ROW = monstersData.find(m => m.index === 'adult-blue-dracolich').actions.find(a => a.name === 'Frightful Presence');
 
-const fpContext = {
-    saveDc: 18,
-    saveType: 'Wisdom',
+// Context byte-built from the DATA row itself — the modal forwards exactly
+// these fields (buildAbilitySaveRollContext: save_dc/dc_success/
+// success_immunity/repeat_save verbatim, saveConditions via the extractor),
+// so the kept test locks row → FP-arm end to end.
+const fpContext = () => ({
+    saveDc: FP_ROW.save_dc,
+    saveType: FP_ROW.save_type,
     attackerName: DRACOLICH,
-    actionName: 'Frightful Presence',
-    dcSuccess: 'none',
+    actionName: FP_ROW.name,
+    dcSuccess: FP_ROW.dc_success,
     autoDamageFormula: null,
-    saveConditions: ['frightened'],
-    successImmunity: { effect: 'frightful_presence_immunity', duration: '24_hours', duration_minutes: 1440 },
-    repeatSave: { condition: 'frightened', save_type: 'Wisdom', duration_minutes: 1 },
-};
-
-async function resolveSave(context, success, roll) {
-    const promise = processSaveRoll({
-        rollType: 'save',
-        target: { name: TARGET, type: 'player' },
-        characterName: TARGET,
-        campaignName,
-        context,
-        logEntry: vi.fn(),
-        setPopupHtml: vi.fn(),
-    });
-    pendingSaveResolve({ success, roll, total: roll, saveBonus: 10, rawRolls: [], mode: 'normal' });
-    await promise;
-}
+    saveConditions: extractConditionsFromSaveEffect(FP_ROW.save_effect),
+    successImmunity: FP_ROW.success_immunity,
+    repeatSave: FP_ROW.repeat_save,
+});
 
 beforeEach(() => {
     vi.clearAllMocks();
     for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
-    addEntryLogs.length = 0;
+    conditionLogs.length = 0;
 });
 
-describe('MA-0048 FP damageless save — application + immunity + repeat-save arm', () => {
-    it('failed save: Frightened applied + logged (MA-0017 seam), repeat-save marker te + merged 10-round clock armed, zero damage', async () => {
-        await resolveSave({ ...fpContext }, false, 4);
+describe('MA-0048 Frightful Presence adjudication', () => {
+    it('failed save vs disk-row context (DC 18 WIS, fail-only fear, legacy repeat_save): grants Frightened, FP te + merged 10-round clock with 24h-immunity-grant leg armed, zero damage, no success-face immunity', async () => {
+        const promise = processSaveRoll({
+            rollType: 'save',
+            target: { name: TARGET, type: 'player' },
+            characterName: TARGET,
+            campaignName,
+            context: fpContext(),
+            logEntry: vi.fn(),
+            setPopupHtml: vi.fn(),
+        });
+        pendingSaveResolve({ success: false, roll: 4, total: 4, saveBonus: 0, rawRolls: [], mode: 'normal' });
+        await promise;
 
+        // Row → context extraction lock (DC 18, fail-only fear, legacy FP
+        // fork: repeat_save names NO te `effect` → trackFrightfulPresence).
+        expect(fpContext()).toMatchObject({
+            saveDc: 18,
+            dcSuccess: 'none',
+            saveConditions: ['frightened'],
+            successImmunity: { effect: 'frightful_presence_immunity', duration: '24_hours', duration_minutes: 1440 },
+            repeatSave: { condition: 'frightened', save_type: 'Wisdom' },
+        });
+        expect(FP_ROW.repeat_save.effect).toBeUndefined();
+
+        expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['frightened']);
+        const applied = conditionLogs.find(e => e.type === 'condition' && e.action === 'applied');
+        expect(applied).toMatchObject({ characterName: TARGET, condition: 'Frightened', sourceName: DRACOLICH });
+
+        const tes = runtimeStore['campaign.targetEffects'] || [];
+        expect(tes).toEqual([expect.objectContaining({
+            target: TARGET, effect: 'frightful_presence', source: DRACOLICH,
+            condition: 'frightened', saveType: 'Wisdom', dc: FP_ROW.save_dc, rounds: 10,
+        })]);
+        // ONE merged clock (CLA-334 1 minute = 10 rounds): strip te +
+        // Frightened, then grant the 24h immunity ("or the effect ends").
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        const clock = addExpiration.mock.calls[0][0];
+        expect(clock.rounds).toBe(10);
+        expect(clock.effects).toEqual(expect.arrayContaining([
+            { type: 'remove_target_effect', effectKey: 'frightful_presence', source: DRACOLICH, target: TARGET },
+            { type: 'condition', condition: 'frightened' },
+            { type: 'frightful_presence_immunity_grant', immunityEffect: 'frightful_presence_immunity' },
+        ]));
+        expect(conditionLogs.some(e => e.automationType === 'frightful_presence_tracked')).toBe(true);
+        // success-immunity must NOT fire on the fail face
+        expect(tes.some(te => te.effect === 'frightful_presence_immunity')).toBe(false);
+        expect(conditionLogs.some(e => e.automationType === 'frightful_presence_immunity_granted')).toBe(false);
+
+        expect(rollExpression).not.toHaveBeenCalled();
         expect(applyDamageToTarget).not.toHaveBeenCalled();
-        expect(runtimeStore[`${TARGET}.activeConditions`]).toContain('frightened');
-        expect(addEntryLogs.some(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Frightened')).toBe(true);
-
-        const tes = runtimeStore['campaign.targetEffects'] || [];
-        expect(tes).toEqual([expect.objectContaining({
-            target: TARGET, effect: 'frightful_presence', source: DRACOLICH, dc: 18, condition: 'frightened',
-        })]);
-        expect(addExpiration).toHaveBeenCalledTimes(1);
-        const xp = addExpiration.mock.calls[0][0];
-        expect(xp.rounds).toBe(10);
-        expect(xp.effects.map(e => e.type)).toEqual(expect.arrayContaining(['remove_target_effect', 'condition', 'frightful_presence_immunity_grant']));
-        expect(addEntryLogs.some(e => e.automationType === 'frightful_presence_tracked')).toBe(true);
-    });
-
-    it('successful save: zero damage, frightful_presence_immunity te sourced from dracolich, 14400-round expiry (24h), NO repeat-save arm', async () => {
-        await resolveSave({ ...fpContext }, true, 12);
-
-        expect(runtimeStore[`${TARGET}.activeConditions`]).toBeUndefined();
-        const tes = runtimeStore['campaign.targetEffects'] || [];
-        expect(tes).toEqual([expect.objectContaining({
-            target: TARGET, effect: 'frightful_presence_immunity', source: DRACOLICH, duration: '24_hours', rounds: 14400,
-        })]);
-        expect(addExpiration).toHaveBeenCalledTimes(1);
-        expect(addExpiration.mock.calls[0][0].rounds).toBe(14400);
-        expect(addEntryLogs.some(e => e.automationType === 'frightful_presence_immunity_granted')).toBe(true);
-        expect(addEntryLogs.some(e => e.automationType === 'frightful_presence_tracked')).toBe(false);
     });
 });

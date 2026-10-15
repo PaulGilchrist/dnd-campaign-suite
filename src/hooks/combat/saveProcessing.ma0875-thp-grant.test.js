@@ -1,11 +1,13 @@
-// MA-0875: Gnoll Demoniac "Hunger of Yeenoghu" — INLINE block-save seam.
-// context.tempHpGrant (parseTempHpGrantClause, forwarded by
-// buildAbilitySaveRollContext) arms grantFailedSaveFailOnly THP: failed
-// save → tempHpService replace-if-larger on the ATTACKER (MA-0275 Fortify
-// producer twin, self-grant default, chooser GM-enforced) + one
-// temp_hp_granted log; successful save grants ZERO; clauseless contexts are
-// byte-inert. Cube rows normally route the picker (its own seam) — this is
-// the inline gap-fixed twin demanded by the MA-0875 mandate.
+// @maintained-by-ai: 2026-10-14
+// MA-0875: Gnoll Demoniac "Hunger of Yeenoghu" — INLINE block-save THP-grant
+// seam, authoritative home for the generic grant-on-save rules (replace-if-
+// larger, stacking; the MA-0275 animal-spirit lane explicitly delegates here).
+// context.tempHpGrant (parseTempHpGrantClause over the live monsters.json row,
+// forwarded by buildAbilitySaveRollContext) arms grantFailedSaveTempHp:
+// failed save → real tempHpService replace-if-larger on the ATTACKER
+// (MA-0275 Fortify producer twin, self-grant default, "creature of its choice"
+// chooser GM-enforced) + one temp_hp_granted log, no expiration clock;
+// successful save grants ZERO; clauseless contexts are byte-inert.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -20,7 +22,7 @@ vi.mock('../../services/ui/utils.js', () => ({
     default: { guid: () => 'id-' + Math.random().toString(36).slice(2) },
 }));
 
-const rollExpression = vi.fn(() => ({ total: 26, rolls: [5, 6, 1, 5, 4, 4, 1, 1], modifier: 0 }));
+const rollExpression = vi.fn(() => ({ total: 26, rolls: [4, 4, 4, 4, 3, 3, 2, 2], modifier: 0 }));
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: (...args) => rollExpression(...args),
 }));
@@ -46,6 +48,7 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 const applyDamageToTarget = vi.fn(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 999 - finalDamage }));
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     normalizeSaveType: (t) => String(t || '').toUpperCase(),
+    // MonsterCardHelpers (imported by saveProcessing) needs this export to exist on the mock.
     computeDamageAfterSave: (raw, success, dcSuccess) => (!success ? raw : dcSuccess === 'half' ? Math.floor(raw / 2) : 0),
     computeDamageAfterEvasion: (total, saveSuccess, dcSuccess, evasionActive) =>
         (evasionActive && dcSuccess === 'half') ? (saveSuccess ? 0 : Math.floor(total / 2))
@@ -68,23 +71,28 @@ vi.mock('../../services/rules/effects/expirationQueue.js', () => ({
 }));
 
 import { processSaveRoll } from './saveProcessing.js';
+import { parseTempHpGrantClause } from '../../components/encounter/MonsterCardHelpers.js';
+import monstersData from '../../../public/data/monsters.json';
 
 const campaignName = 'test-campaign';
 const GNOLL = 'Gnoll Demoniac 1';
 const TARGET = 'AberrantSorcerer';
 
-// MA-0875 Hunger of Yeenoghu inline context shape (cube rows normally ride
-// the picker; this proves the inline seam grant with the same clause).
+// Context built from the LIVE data row + the live parser, so the whole
+// clause chain (row → parse → save context → grant seam) stays in sync.
+const HUNGER_ROW = monstersData.find(m => m.name === 'Gnoll Demoniac').actions.find(a => a.name === 'Hunger of Yeenoghu');
+const GRANT_HP = parseTempHpGrantClause(HUNGER_ROW.save_effect)?.tempHp;
+
 const hungerContext = {
-    saveDc: 14,
-    saveType: 'Dexterity',
+    saveDc: HUNGER_ROW.save_dc,
+    saveType: HUNGER_ROW.save_type,
     attackerName: GNOLL,
     actionName: 'Hunger of Yeenoghu',
     dcSuccess: 'half',
-    autoDamageFormula: '8d6',
-    autoDamageDamageType: 'Necrotic',
+    autoDamageFormula: HUNGER_ROW.damage_dice_primary,
+    autoDamageDamageType: HUNGER_ROW.damage_type_primary,
     saveConditions: [],
-    tempHpGrant: { tempHp: 10 },
+    tempHpGrant: { tempHp: GRANT_HP },
 };
 
 async function resolveSave(context, success, roll) {
@@ -101,50 +109,55 @@ async function resolveSave(context, success, roll) {
     await promise;
 }
 
-beforeEach(() => {
+const grantLog = () => addEntryLogs.find(e => e.automationType === 'temp_hp_granted');
+
+function resetState() {
     vi.clearAllMocks();
     for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
     addEntryLogs.length = 0;
-});
+}
+
+beforeEach(resetState);
 
 describe('MA-0875 inline saveProcessing THP grant (Hunger of Yeenoghu clause)', () => {
-    it('failed save: attacker tempHp 10 via replace-if-larger + temp_hp_granted log; full damage applied', async () => {
+    it('failed save: full damage + replace-if-larger THP on the ATTACKER, grant log, no clock', async () => {
+        expect(GRANT_HP).toBe(10); // data pin: row still authors "gains 10 Temporary Hit Points"
         await resolveSave({ ...hungerContext }, false, 5);
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(26);
-        expect(runtimeStore[`${GNOLL}.tempHp`]).toBe(10);
+        expect(runtimeStore[`${GNOLL}.tempHp`]).toBe(GRANT_HP);
         expect(runtimeStore[`${TARGET}.tempHp`]).toBeUndefined();
-        const grant = addEntryLogs.find(e => e.automationType === 'temp_hp_granted');
+        // No addExpiration clock rides the grant — THP is consumed by damage (Fortify twin).
+        expect(addExpiration).not.toHaveBeenCalled();
+        const grant = grantLog();
         expect(grant).toBeTruthy();
-        expect(grant.characterName).toBe(GNOLL);
-        expect(grant.abilityName).toBe('Hunger of Yeenoghu');
-        expect(grant.description).toMatch(/gains 10 temporary hit points/);
+        expect(grant).toMatchObject({ characterName: GNOLL, abilityName: 'Hunger of Yeenoghu' });
+        expect(grant.description).toMatch(new RegExp(`gains ${GRANT_HP} temporary hit points \\(now ${GRANT_HP} THP, replace-if-larger\\)`));
     });
 
-    it('standing 15 THP pool is NOT lowered by the 10-THP grant; held value logged', async () => {
+    it('replace-if-larger stacking: standing 15 pool held (logged "now 15 THP"), standing 5 pool replaced up', async () => {
         runtimeStore[`${GNOLL}.tempHp`] = 15;
         await resolveSave({ ...hungerContext }, false, 5);
         expect(runtimeStore[`${GNOLL}.tempHp`]).toBe(15);
-        const grant = addEntryLogs.find(e => e.automationType === 'temp_hp_granted');
-        expect(grant.description).toMatch(/now 15 THP/);
+        expect(grantLog().description).toMatch(/now 15 THP/);
+
+        resetState();
+        runtimeStore[`${GNOLL}.tempHp`] = 5;
+        await resolveSave({ ...hungerContext }, false, 5);
+        expect(runtimeStore[`${GNOLL}.tempHp`]).toBe(GRANT_HP);
+        expect(grantLog().description).toMatch(/now 10 THP/);
     });
 
     it('successful save: ZERO THP, zero grant log', async () => {
         await resolveSave({ ...hungerContext }, true, 20);
         expect(runtimeStore[`${GNOLL}.tempHp`]).toBeUndefined();
-        expect(addEntryLogs.find(e => e.automationType === 'temp_hp_granted')).toBeFalsy();
+        expect(grantLog()).toBeFalsy();
     });
 
     it('clauseless context is byte-inert: no THP write, no grant log', async () => {
         const legacy = { ...hungerContext };
         delete legacy.tempHpGrant;
         await resolveSave(legacy, false, 5);
-        expect(applyDamageToTarget.mock.calls[0][2]).toBe(26);
         expect(runtimeStore[`${GNOLL}.tempHp`]).toBeUndefined();
-        expect(addEntryLogs.find(e => e.automationType === 'temp_hp_granted')).toBeFalsy();
-    });
-
-    it('no addExpiration clock rides the THP grant (THP is consumed by damage, Fortify twin)', async () => {
-        await resolveSave({ ...hungerContext }, false, 5);
-        expect(addExpiration).not.toHaveBeenCalled();
+        expect(grantLog()).toBeFalsy();
     });
 });

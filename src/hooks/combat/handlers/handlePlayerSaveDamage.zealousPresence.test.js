@@ -1,5 +1,11 @@
-// CLA-394: Zealous Presence buff (advantage_attacks_and_saves) must produce
-// saveAdvantage=true on the player save-prompt path (handlePlayerSaveDamage:205 seam).
+// @maintained-by-ai: 2026-10-14
+// CLA-394: Zealous Presence (2024 Barbarian, buffExpression advantage_attacks_and_saves
+// stored on the target's activeBuffs by buffToggle.toggleBuff) must grant advantage on
+// the player save-prompt path: handlePlayerSaveDamage computePlayerSaveAdvantage →
+// pendingSaves.saveAdvantage + sendSavePrompt(advantage). buffToggle.js stays unmocked
+// so the seam exercised is the real hasBuffEffect lookup. Absent-buff control lives in
+// handlePlayerSaveDamage.advantage-disadvantage.test.js; NPC auto-save lane lives in
+// handleNpcSaveDamage.zealousPresence.test.js — neither is duplicated here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -147,17 +153,25 @@ describe('handlePlayerSaveDamage — CLA-394 Zealous Presence save advantage', (
         isCircleOfPowerActive.mockReturnValue(false);
     });
 
+    // Producer shape (zealousPresenceHandler → toggleBuff): name + effect +
+    // duration + sourceCharacter = the buff-bearing Barbarian.
+    function targetBuffs(buffs) {
+        getRuntimeValue.mockImplementation((name, key) => (name === 'War_Cleric' && key === 'activeBuffs' ? buffs : null));
+    }
+
     it('sends advantage:true when the target carries the Zealous Presence buff', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (name === 'War_Cleric' && key === 'activeBuffs') {
-                return [{ name: 'Zealous Presence', effect: 'advantage_attacks_and_saves' }];
-            }
-            return null;
-        });
+        targetBuffs([{
+            name: 'Zealous Presence',
+            effect: 'advantage_attacks_and_saves',
+            duration: 'until_start_of_next_turn',
+            sourceCharacter: 'DraconicDragon',
+        }]);
 
         const handler = createPlayerSaveDamageHandler(deps);
         await invokeHandler(handler);
 
+        // Pins the campaign arg through the unmocked buffToggle.hasBuffEffect lookup.
+        expect(getRuntimeValue).toHaveBeenCalledWith('War_Cleric', 'activeBuffs', 'test-campaign');
         expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('saveAdvantage', true);
         expect(sendSavePrompt).toHaveBeenCalledWith(
             'test-campaign',
@@ -165,7 +179,13 @@ describe('handlePlayerSaveDamage — CLA-394 Zealous Presence save advantage', (
         );
     });
 
-    it('control: sends advantage:false when the buff is absent', async () => {
+    it('per-target gate: a buff on another creature grants this target no advantage', async () => {
+        // CLA-394 live fix was per-target attribution — only chosen targets carry
+        // the buff, so the consumer must read activeBuffs of the save target only.
+        getRuntimeValue.mockImplementation((name, key) => (name === 'OtherPlayer' && key === 'activeBuffs'
+            ? [{ name: 'Zealous Presence', effect: 'advantage_attacks_and_saves', duration: 'until_start_of_next_turn', sourceCharacter: 'DraconicDragon' }]
+            : null));
+
         const handler = createPlayerSaveDamageHandler(deps);
         await invokeHandler(handler);
 

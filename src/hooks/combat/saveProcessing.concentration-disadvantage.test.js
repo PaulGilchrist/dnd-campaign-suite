@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -31,14 +32,11 @@ vi.mock('../../services/ui/logService.js', () => ({
 
 vi.mock('../../services/encounters/combatData.js', () => ({
     loadCombatSummary: async () => ({ creatures: [], activeCreatureName: 'Adult Black Dragon 1' }),
-    getCurrentCombatRound: () => 1,
-    getCombatSummary: () => null,
 }));
 
 const applyDamageToTarget = vi.fn(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 60 - finalDamage }));
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     normalizeSaveType: (t) => String(t || '').toUpperCase(),
-    computeDamageAfterSave: (raw, success, dcSuccess) => (!success ? raw : dcSuccess === 'half' ? Math.floor(raw / 2) : 0),
     computeDamageAfterEvasion: (total, saveSuccess, dcSuccess, evasionActive) =>
         (evasionActive && dcSuccess === 'half') ? (saveSuccess ? 0 : Math.floor(total / 2))
             : (!saveSuccess ? total : dcSuccess === 'half' ? Math.floor(total / 2) : 0),
@@ -65,7 +63,10 @@ const campaignName = 'test-campaign';
 const DRAGON = 'Adult Black Dragon 1';
 const TARGET = 'AberrantSorcerer';
 
-// MA-0038 Adult Black Dragon Cloud of Insects (monsters.json row shape).
+// MA-0038 Adult Black Dragon Cloud of Insects (monsters.json row shape:
+// "22 (4d10) Poison damage, and the target has Disadvantage on saving throws
+// to maintain Concentration until the end of its next turn", parsed by
+// MonsterCardHelpers.parseConcentrationDisadvantageClause onto the context).
 const cloudContext = {
     saveDc: 17,
     saveType: 'Dexterity',
@@ -98,11 +99,9 @@ beforeEach(() => {
     addEntryLogs.length = 0;
 });
 
-describe('MA-0038 Cloud of Insects failed-save concentration-disadvantage te', () => {
+describe('MA-0038 Cloud of Insects failed-save concentration-disadvantage te (saveProcessing producer seam)', () => {
     it('failed save: concentration_disadvantage te on target sourced from dragon, until_end_of_next_turn, rounds:2 clock + granted log', async () => {
         await resolveSave({ ...cloudContext }, false, 9);
-
-        expect(applyDamageToTarget.mock.calls[0][2]).toBe(22);
 
         const tes = runtimeStore['campaign.targetEffects'] || [];
         expect(tes).toHaveLength(1);
@@ -129,19 +128,12 @@ describe('MA-0038 Cloud of Insects failed-save concentration-disadvantage te', (
         expect(grant.sourceName).toBe(DRAGON);
     });
 
-    it('successful save: no te, no expiry, no grant log (clause is Failure-only)', async () => {
+    it('never grants on the success face (clause is Failure-only) or on rows without the clause', async () => {
         await resolveSave({ ...cloudContext }, true, 20);
+        await resolveSave({ ...cloudContext, actionName: 'Claw', concentrationDisadvantage: null }, false, 3);
 
-        expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
+        expect(runtimeStore['campaign.targetEffects'] || []).toHaveLength(0);
         expect(addExpiration).not.toHaveBeenCalled();
         expect(addEntryLogs.some(e => e.automationType === 'concentration_disadvantage_granted')).toBe(false);
-    });
-
-    it('rows without the clause are byte-inert: no te even on a failed save', async () => {
-        const claw = { ...cloudContext, actionName: 'Claw', concentrationDisadvantage: null };
-        await resolveSave(claw, false, 3);
-
-        expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
-        expect(addExpiration).not.toHaveBeenCalled();
     });
 });

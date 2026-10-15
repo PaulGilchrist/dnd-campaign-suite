@@ -1,39 +1,39 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai: 2026-10-14
+// Guard/early-return coverage for handlePlayerSaveDamage at the DIRECT handler
+// seam: target resolution, non-player target, and the careful-spell not-in-ally-list
+// bail-out (the seam where the handler must touch nothing — via the
+// useLoggedDiceRollDamage wrapper these fall through to plain damage and cannot be
+// observed as "no side effects"). Positive careful/contact-patron application,
+// invisibility seams, pending-save payloads, advantage/disadvantage and logging
+// legs live in the sibling handlePlayerSaveDamage.*.test.js files and
+// ../useLoggedDiceRollDamage.{careful-spell,auto-save}.test.js.
 
-vi.mock('../../../services/dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(),
-    rollExpressionDoubled: vi.fn(),
-    formatDamageFormula: vi.fn((formula) => formula),
+vi.mock('../../runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(),
+    // Real buffToggle/deathWardHandler modules import setRuntimeValue from here.
+    setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../services/ui/utils.js', () => ({
     default: {
-        getName: vi.fn((n) => n || 'Unknown'),
         guid: vi.fn(() => 'test-guid-1234'),
     },
 }));
 
-vi.mock('../../runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(),
-    setRuntimeValue: vi.fn(() => Promise.resolve()),
-}));
-
+// Consumers: handlePlayerSaveDamage + damageHandlerUtils — keep every named export.
 vi.mock('../../../services/combat/automation/automationService.js', () => ({
-    hasIgnoreResistance: vi.fn(),
-    playerIsImmuneToCondition: vi.fn(),
-    hasGreatWeaponFighting: vi.fn(),
-    applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
+    hasIgnoreResistance: vi.fn(() => false),
     evaluateAutoExpression: vi.fn(),
+    hasGreatWeaponFighting: vi.fn(() => false),
+    applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
 }));
 
 vi.mock('../../../services/rules/features/invisibilityService.js', () => ({
     endInvisibilityOnHostileAction: vi.fn(),
 }));
 
-vi.mock('../loggedDiceRollUtils.js', () => ({
-    getGuardianProtectionAcBonus: vi.fn(() => 0),
-    hasPotentCantrip: vi.fn(),
-    hasSoulstitchProtection: vi.fn(),
+// Consumer: damageHandlerUtils (applyMinDamageAdjustment only).
+vi.mock('../../loggedDiceRollUtils.js', () => ({
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 
@@ -46,34 +46,37 @@ vi.mock('../../../services/combat/auras/elderChampionAuraUtils.js', () => ({
 }));
 
 vi.mock('../../../services/automation/handlers/buffs/circleOfPowerHandler.js', () => ({
-    isCircleOfPowerActive: vi.fn(),
+    isCircleOfPowerActive: vi.fn(() => false),
 }));
 
 vi.mock('../../../services/automation/handlers/buffs/holyAuraHandler.js', () => ({
-    getHolyAuraTargets: vi.fn(),
+    getHolyAuraTargets: vi.fn(() => []),
 }));
 
 vi.mock('./handleOverchannelSelfDamage.js', () => ({
     handleOverchannelSelfDamage: vi.fn(),
 }));
 
+// Consumer: real deathWardHandler module.
 vi.mock('../../../services/ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
-    computeDamageAfterSave: vi.fn((total, success, _dcSuccess) => success ? 0 : total),
-    computeDamageAfterEvasion: vi.fn((total, success, dcSuccess, evasion) => {
-        if (evasion && dcSuccess === 'half') return success ? 0 : Math.floor(total / 2);
-        return success ? 0 : total;
-    }),
-    rollSaveForCreature: vi.fn(),
+    computeDamageAfterSave: vi.fn((total, success) => (success ? 0 : total)),
     applyDamageToTarget: vi.fn(),
-    normalizeSaveType: vi.fn((t) => t),
 }));
 
+// Must return an object — resolveTargetSaveContext reads its fields before the guards.
 vi.mock('../../../services/combat/conditions/conditionEffects.js', () => ({
-    computeConditionEffects: vi.fn(),
+    computeConditionEffects: vi.fn(() => ({
+        restoreBalance: false,
+        autoRerollForSaves: false,
+        autoRerollBonus: null,
+        autoRerollCondition: null,
+        saveAdvantageCount: 0,
+        saveAdvantageAbilities: null,
+    })),
 }));
 
 vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({
@@ -89,23 +92,20 @@ vi.mock('../../../services/combat/auras/pendingPopupRegistry.js', () => ({
 }));
 
 vi.mock('../../useAllySelection.js', () => ({
-    getAllyList: vi.fn(),
+    getAllyList: vi.fn(() => []),
 }));
 
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { getRuntimeValue } from '../../runtime/useRuntimeState.js';
-import { hasIgnoreResistance } from '../../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../../services/rules/features/invisibilityService.js';
-import { getCoronaSaveDisadvantage } from '../../../services/combat/auras/coronaAuraUtils.js';
-import { getElderChampionSaveDisadvantage } from '../../../services/combat/auras/elderChampionAuraUtils.js';
-import { isCircleOfPowerActive } from '../../../services/automation/handlers/buffs/circleOfPowerHandler.js';
-import { getHolyAuraTargets } from '../../../services/automation/handlers/buffs/holyAuraHandler.js';
-import { createPlayerSaveDamageHandler } from './handlePlayerSaveDamage.js';
-import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
-import { computeConditionEffects } from '../../../services/combat/conditions/conditionEffects.js';
 import { getAllyList } from '../../useAllySelection.js';
+import { createPlayerSaveDamageHandler } from './handlePlayerSaveDamage.js';
+import { applyDamageToTarget, computeDamageAfterSave } from '../../../services/rules/combat/applyDamage.js';
+import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 
 describe('handlePlayerSaveDamage - early returns', () => {
-    const makeDeps = (overrides = {}) => ({
+    const makeDeps = () => ({
         characterName: 'TestWizard',
         campaignName: 'test-campaign',
         characters: [{ name: 'TestWizard' }],
@@ -113,305 +113,61 @@ describe('handlePlayerSaveDamage - early returns', () => {
         setPopupHtml: vi.fn(),
         logEntry: vi.fn(),
         pendingSaves: {},
-        ...overrides,
     });
 
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getRuntimeValue.mockReturnValue(null);
+    const invoke = (handler, context, combatSummary) => handler({
+        name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0,
+        context, adjustedTotal: 5, combatSummary, displayRolls: [6],
     });
 
-    it('returns undefined when combatSummary is null', async () => {
-        const handler = createPlayerSaveDamageHandler(makeDeps());
-        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'TestWizard' } });
-        expect(result).toBeUndefined();
-    });
-
-    it('returns undefined when combatSummary.creatures is missing', async () => {
-        const handler = createPlayerSaveDamageHandler(makeDeps());
-        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'TestWizard' }, adjustedTotal: 5, combatSummary: {} });
-        expect(result).toBeUndefined();
-    });
-
-    it('returns undefined when target is not found in combatSummary', async () => {
-        const handler = createPlayerSaveDamageHandler(makeDeps());
-        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'Goblin' }, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'TestWizard', type: 'player' }] } });
-        expect(result).toBeUndefined();
-    });
-
-    it('returns undefined when target type is not player', async () => {
-        const handler = createPlayerSaveDamageHandler(makeDeps());
-        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'Goblin' }, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'Goblin', type: 'npc' }] } });
-        expect(result).toBeUndefined();
-    });
-});
-
-describe('handlePlayerSaveDamage - careful ally path', () => {
-    let logEntry;
-    let setPopupHtml;
-    let pendingSaves;
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getRuntimeValue.mockReturnValue(null);
-        hasIgnoreResistance.mockReturnValue(false);
-        applyDamageToTarget.mockResolvedValue({ newHp: 15, finalDamage: 2 });
-        getAllyList.mockReturnValue(['Ally1']);
-        computeConditionEffects.mockReturnValue({
-            restoreBalance: false,
-            autoRerollForSaves: false,
-            autoRerollBonus: null,
-            saveAdvantageCount: 0,
-            saveAdvantageAbilities: null,
-        });
-        getHolyAuraTargets.mockReturnValue([]);
-        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
-        isCircleOfPowerActive.mockReturnValue(false);
-        logEntry = vi.fn();
-        setPopupHtml = vi.fn();
-        pendingSaves = {};
-    });
-
-    it('returns undefined when careful ally target is NOT in ally list', async () => {
-        getAllyList.mockReturnValue(['OtherAlly']);
-
-        const handler = createPlayerSaveDamageHandler({
-            characterName: 'TestWizard',
-            campaignName: 'test-campaign',
-            characters: [{ name: 'TestWizard' }],
-            charactersRef: { current: [] },
-            setPopupHtml,
-            logEntry,
-            pendingSaves,
-        });
-        const context = {
-            saveDc: 11,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-            damageType: 'Fire',
-            targetName: 'Ally1',
-            metamagicCareful: true,
-        };
-
-        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: context, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'Ally1', type: 'player' }] }, displayRolls: [6] });
-
-        expect(result).toBeUndefined();
+    const expectUntouched = (deps) => {
         expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(computeDamageAfterSave).not.toHaveBeenCalled();
         expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
-    });
-
-    it('applies careful spell damage when target is in ally list', async () => {
-        const handler = createPlayerSaveDamageHandler({
-            characterName: 'TestWizard',
-            campaignName: 'test-campaign',
-            characters: [{ name: 'TestWizard' }],
-            charactersRef: { current: [] },
-            setPopupHtml,
-            logEntry,
-            pendingSaves,
-        });
-        const context = {
-            saveDc: 11,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-            damageType: 'Fire',
-            targetName: 'Ally1',
-            metamagicCareful: true,
-        };
-
-        const result = await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: context, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'Ally1', type: 'player' }] }, displayRolls: [6] });
-
-        expect(result).toBe(true);
-        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', 0, ['Fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
-        expect(logEntry).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'roll',
-                rollType: 'save-damage',
-                note: 'careful_spell_damage_roll_before_apply',
-            })
-        );
-        expect(setPopupHtml).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'save-damage',
-                carefulSpell: true,
-                finalDamage: 0,
-                damageApplied: true,
-            })
-        );
-    });
-
-    it('applies ignoreResistance when context.playerStats has it', async () => {
-        hasIgnoreResistance.mockReturnValue(true);
-
-        const handler = createPlayerSaveDamageHandler({
-            characterName: 'TestWizard',
-            campaignName: 'test-campaign',
-            characters: [{ name: 'TestWizard' }],
-            charactersRef: { current: [] },
-            setPopupHtml,
-            logEntry,
-            pendingSaves,
-        });
-        const context = {
-            saveDc: 11,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-            damageType: 'Fire',
-            targetName: 'Ally1',
-            metamagicCareful: true,
-            playerStats: { automation: { passives: [] } },
-        };
-
-        await handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: context, adjustedTotal: 5, combatSummary: { creatures: [{ name: 'Ally1', type: 'player' }] }, displayRolls: [6] });
-
-        expect(hasIgnoreResistance).toHaveBeenCalledWith(context.playerStats, 'Fire');
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Ally1', expect.any(Number), ['Fire'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: true, attackerName: 'TestWizard', suppressHpLog: false, ...{ isSpellDamage: true } });
-    });
-});
-
-describe('handlePlayerSaveDamage - contact patron path', () => {
-    let logEntry;
-    let setPopupHtml;
-    let pendingSaves;
+        expect(sendSavePrompt).not.toHaveBeenCalled();
+        expect(deps.setPopupHtml).not.toHaveBeenCalled();
+        expect(deps.logEntry).not.toHaveBeenCalled();
+    };
 
     beforeEach(() => {
         vi.clearAllMocks();
         getRuntimeValue.mockReturnValue(null);
-        hasIgnoreResistance.mockReturnValue(false);
-        applyDamageToTarget.mockResolvedValue({ newHp: 15, finalDamage: 3 });
-        computeConditionEffects.mockReturnValue({
-            restoreBalance: false,
-            autoRerollForSaves: false,
-            autoRerollBonus: null,
-            saveAdvantageCount: 0,
-            saveAdvantageAbilities: null,
-        });
-        getHolyAuraTargets.mockReturnValue([]);
-        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
-        isCircleOfPowerActive.mockReturnValue(false);
-        logEntry = vi.fn();
-        setPopupHtml = vi.fn();
-        pendingSaves = {};
     });
 
-    it('applies contact patron auto save when conditions match', async () => {
-        const handler = createPlayerSaveDamageHandler({
-            characterName: 'TestWizard',
-            campaignName: 'test-campaign',
-            characters: [{ name: 'TestWizard' }],
-            charactersRef: { current: [] },
-            setPopupHtml,
-            logEntry,
-            pendingSaves,
-        });
-        const context = {
-            saveDc: 13,
-            saveType: 'INT',
-            dcSuccess: 'half',
-            damageType: 'Psychic',
-            targetName: 'TestWizard',
-            playerStats: {
-                automation: {
-                    passives: [{ type: 'passive_rule', effect: 'contact_patron_auto_save' }],
-                },
-            },
-        };
+    it('returns undefined when the target cannot be resolved from the combat summary', async () => {
+        const deps = makeDeps();
+        const handler = createPlayerSaveDamageHandler(deps);
+        const context = { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'TestWizard' };
 
-        const result = await handler({ name: 'Contact Other Plane', formula: '4d6', total: 14, rolls: [3, 5, 2, 4], modifier: 0, context: context, adjustedTotal: 14, combatSummary: { creatures: [{ name: 'TestWizard', type: 'player' }] }, displayRolls: [3, 5, 2, 4] });
-
-        expect(result).toBe(true);
-        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-        expect(logEntry).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'roll',
-                rollType: 'save-damage',
-                note: 'contact_patron_damage_roll_before_apply',
-            })
-        );
-        expect(setPopupHtml).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'save-damage',
-                contactPatron: true,
-                finalDamage: 0,
-                damageApplied: true,
-            })
-        );
+        // Missing combat summary, missing creatures list, and a name that matches
+        // no creature all resolve via findTargetByContext to no target.
+        for (const combatSummary of [undefined, {}, { creatures: [{ name: 'SomeoneElse', type: 'player' }] }]) {
+            expect(await invoke(handler, context, combatSummary)).toBeUndefined();
+        }
+        expectUntouched(deps);
     });
 
-    it('falls through to main save prompt when spell name does not match', async () => {
-        const handler = createPlayerSaveDamageHandler({
-            characterName: 'TestWizard',
-            campaignName: 'test-campaign',
-            characters: [{ name: 'TestWizard' }],
-            charactersRef: { current: [] },
-            setPopupHtml,
-            logEntry,
-            pendingSaves,
-        });
-        const context = {
-            saveDc: 13,
-            saveType: 'INT',
-            dcSuccess: 'half',
-            damageType: 'Psychic',
-            targetName: 'TestWizard',
-            playerStats: {
-                automation: {
-                    passives: [{ type: 'passive_rule', effect: 'contact_patron_auto_save' }],
-                },
-            },
-        };
+    it('returns undefined when the resolved target is not a player', async () => {
+        const deps = makeDeps();
+        const handler = createPlayerSaveDamageHandler(deps);
+        const context = { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'Goblin' };
 
-        const result = await handler({ name: 'Mind Sliver', formula: '1d6', total: 3, rolls: [3], modifier: 0, context: context, adjustedTotal: 3, combatSummary: { creatures: [{ name: 'TestWizard', type: 'player' }] }, displayRolls: [3] });
+        const result = await invoke(handler, context, { creatures: [{ name: 'Goblin', type: 'npc' }] });
 
-        expect(result).toBe(true);
-        expect(pendingSaves).toHaveProperty('test-guid-1234');
-        expect(setPopupHtml).toHaveBeenCalledWith(
-            expect.objectContaining({
-                waitingForPlayerSave: true,
-            })
-        );
-        const popupCall = setPopupHtml.mock.calls[0][0];
-        expect(popupCall).not.toHaveProperty('contactPatron');
-        expect(popupCall).not.toHaveProperty('carefulSpell');
+        expect(result).toBeUndefined();
+        expectUntouched(deps);
     });
 
-    it('falls through to main save prompt when target is not the caster', async () => {
-        const handler = createPlayerSaveDamageHandler({
-            characterName: 'TestWizard',
-            campaignName: 'test-campaign',
-            characters: [{ name: 'TestWizard' }],
-            charactersRef: { current: [] },
-            setPopupHtml,
-            logEntry,
-            pendingSaves,
-        });
-        const context = {
-            saveDc: 13,
-            saveType: 'INT',
-            dcSuccess: 'half',
-            damageType: 'Psychic',
-            targetName: 'Ally1',
-            playerStats: {
-                automation: {
-                    passives: [{ type: 'passive_rule', effect: 'contact_patron_auto_save' }],
-                },
-            },
-        };
+    it('returns undefined for a careful spell on an ally outside the ally list, without applying damage', async () => {
+        getAllyList.mockReturnValue(['OtherAlly']);
+        const deps = makeDeps();
+        const handler = createPlayerSaveDamageHandler(deps);
+        const context = { saveDc: 11, saveType: 'DEX', dcSuccess: 'half', damageType: 'Fire', targetName: 'Ally1', metamagicCareful: true };
 
-        const result = await handler({ name: 'Contact Other Plane', formula: '4d6', total: 14, rolls: [3, 5, 2, 4], modifier: 0, context: context, adjustedTotal: 14, combatSummary: { creatures: [{ name: 'Ally1', type: 'player' }] }, displayRolls: [3, 5, 2, 4] });
+        const result = await invoke(handler, context, { creatures: [{ name: 'Ally1', type: 'player' }] });
 
-        expect(result).toBe(true);
-        expect(pendingSaves).toHaveProperty('test-guid-1234');
-        expect(setPopupHtml).toHaveBeenCalledWith(
-            expect.objectContaining({
-                waitingForPlayerSave: true,
-            })
-        );
-        const popupCall = setPopupHtml.mock.calls[0][0];
-        expect(popupCall).not.toHaveProperty('contactPatron');
-        expect(popupCall).not.toHaveProperty('carefulSpell');
+        expect(result).toBeUndefined();
+        expect(getAllyList).toHaveBeenCalledWith('TestWizard');
+        expectUntouched(deps);
     });
 });

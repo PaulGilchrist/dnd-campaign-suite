@@ -1,19 +1,16 @@
-// CLA-364 BUG-C: handlePlayerSaveDamage hardcoded isTranceOfOrderActive:false,
-// so a Trance of Order holder's save-prompt rolls never got the d20-floor-10
-// leg. These tests pin the seam to the real runtime flag and to the real
-// computeConditionEffects consumer (d20Floor10 → applyD20Floor in
-// d20RollComputation.js:189, automationModifiers.js trance_of_order entry).
+// @maintained-by-ai: 2026-10-14
+// CLA-364 BUG-C lane: handlePlayerSaveDamage hardcoded isTranceOfOrderActive:false,
+// so a Trance of Order holder's save-prompt rolls never got the d20-floor-10 leg.
+// Pins the seam (getRuntimeValue(target, 'tranceOfOrderActive', campaign) === true →
+// computeConditionEffects option) and the real consumer: the trance modifiers emitted
+// by automationModifiers.js trance_of_order (validated against public/data/2024/
+// classes.json Enchantment L14) are gated by the 'trance_of_order_active' pre-target
+// check in conditionEffectsInternal.js → d20Floor10/noAdvantageAgainst
+// (→ applyD20Floor in d20RollComputation.js).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-vi.mock('../../../services/dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(() => 10),
-    rollExpressionDoubled: vi.fn(() => 20),
-    formatDamageFormula: vi.fn((f) => f),
-}));
 
 vi.mock('../../../services/ui/utils.js', () => ({
     default: {
-        getName: vi.fn((n) => n || 'Unknown'),
         guid: vi.fn(() => 'test-guid-1'),
     },
 }));
@@ -77,7 +74,7 @@ vi.mock('./handleOverchannelSelfDamage.js', () => ({
 }));
 
 vi.mock('./damageHandlerUtils.js', () => ({
-    findTargetByContext: vi.fn(() => ({ name: 'ClockworkSorcerer', type: 'player' })),
+    findTargetByContext: vi.fn(() => ({ name: targetName, type: 'player' })),
 }));
 
 vi.mock('../../../services/combat/conditions/targetEffectDefinitions.js', () => ({
@@ -89,7 +86,7 @@ vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
     applyDamageToTarget: vi.fn(async () => {}),
 }));
 
-vi.mock('../../../useAllySelection.js', () => ({
+vi.mock('../../useAllySelection.js', () => ({
     getAllyList: vi.fn(() => []),
 }));
 
@@ -113,35 +110,27 @@ const tranceModifiers = [
     { source: 'Trance of Order', target: 'd20', condition: 'trance_of_order_active', effect: 'd20_floor_10' },
 ];
 
-function makeCharsRef() {
-    return {
-        current: [{
-            name: targetName,
-            computedStats: { level: 20, saveModifiers: tranceModifiers },
-        }],
-    };
-}
-
 function runHandler(activeFlag) {
     getRuntimeValue.mockImplementation((key, prop) => {
-        if (key !== targetName) return null;
-        if (prop === 'tranceOfOrderActive') return activeFlag;
+        if (key === targetName && prop === 'tranceOfOrderActive') return activeFlag;
         return null;
     });
-    const pendingSaves = {};
-    const deps = {
+    const charactersRef = {
+        current: [{ name: targetName, computedStats: { level: 20, saveModifiers: tranceModifiers } }],
+    };
+    return createPlayerSaveDamageHandler({
         characterName: targetName,
         campaignName,
-        characters: makeCharsRef().current,
-        charactersRef: makeCharsRef(),
+        characters: charactersRef.current,
+        charactersRef,
         setPopupHtml: vi.fn(),
         logEntry: vi.fn(),
-        pendingSaves,
-    };
-    return createPlayerSaveDamageHandler(deps)({
+        pendingSaves: {},
+    })({
         name: 'Fireball',
         formula: '8d6',
         total: 28,
+        adjustedTotal: 28,
         rolls: [5],
         modifier: 0,
         context: { saveDc: 15, saveType: 'DEX', dcSuccess: 'half', damageType: 'fire' },
@@ -157,26 +146,33 @@ describe('CLA-364 BUG-C: player save context carries the real tranceOfOrderActiv
         vi.clearAllMocks();
     });
 
-    it('passes isTranceOfOrderActive:true and sets d20Floor10 when the trance is active', async () => {
+    it('reads the runtime flag and threads it ===true into computeConditionEffects', async () => {
         await runHandler(true);
-
+        expect(getRuntimeValue).toHaveBeenCalledWith(targetName, 'tranceOfOrderActive', campaignName);
         expect(computeConditionEffects).toHaveBeenCalledWith(
             expect.objectContaining({ isTranceOfOrderActive: true }),
         );
-    });
 
-    it('passes isTranceOfOrderActive:false and leaves d20Floor10 false when not active', async () => {
+        // Strict === true gate (mirrors tranceOfOrderHandler.isActive /
+        // CharSheet.conditionEffects.js) — non-boolean truthy stays false.
         await runHandler(null);
+        expect(computeConditionEffects).toHaveBeenLastCalledWith(
+            expect.objectContaining({ isTranceOfOrderActive: false }),
+        );
 
-        expect(computeConditionEffects).toHaveBeenCalledWith(
+        await runHandler('yes');
+        expect(computeConditionEffects).toHaveBeenLastCalledWith(
             expect.objectContaining({ isTranceOfOrderActive: false }),
         );
     });
 
-    it('consumer: active flag + trance modifiers yields d20Floor10; inactive stays false', () => {
+    it('consumer: trance modifiers gated on the flag — active sets d20Floor10 + noAdvantageAgainst, inactive neither', () => {
         const active = computeConditionEffects({ saveModifiers: tranceModifiers, isTranceOfOrderActive: true });
         expect(active.d20Floor10).toBe(true);
+        expect(active.noAdvantageAgainst).toBe(true);
+
         const inactive = computeConditionEffects({ saveModifiers: tranceModifiers, isTranceOfOrderActive: false });
         expect(inactive.d20Floor10).toBe(false);
+        expect(inactive.noAdvantageAgainst).toBe(false);
     });
 });

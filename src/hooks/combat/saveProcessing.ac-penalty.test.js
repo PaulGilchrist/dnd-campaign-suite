@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 // MA-0115: Adult Green Dragon Noxious Miasma failed-save AC-penalty clause
 // — "the target takes a −2 penalty to AC until the end of its next turn".
 // The single-target save seam arms context.acPenaltyClause (MA-0073 shape);
@@ -44,7 +45,6 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 const applyDamageToTarget = vi.fn(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 224 - finalDamage }));
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     normalizeSaveType: (t) => String(t || '').toUpperCase(),
-    computeDamageAfterSave: (raw, success, dcSuccess) => (!success ? raw : dcSuccess === 'half' ? Math.floor(raw / 2) : 0),
     computeDamageAfterEvasion: (total, saveSuccess, dcSuccess, evasionActive) =>
         (evasionActive && dcSuccess === 'half') ? (saveSuccess ? 0 : Math.floor(total / 2))
             : (!saveSuccess ? total : dcSuccess === 'half' ? Math.floor(total / 2) : 0),

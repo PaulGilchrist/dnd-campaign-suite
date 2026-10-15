@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai: 2026-10-14
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../services/ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
@@ -24,8 +25,14 @@ import { sendSavePrompt } from '../../../services/combat/conditions/savePromptSe
 import { addEntry } from '../../../services/ui/logService.js';
 import { handleSanctuarySave } from './handleSanctuarySave.js';
 
-// Shared mock implementation for the "sanctuary active" scenario
-const makeSanctuaryEffect = (overrides = {}) => ({
+// Seam only: casting/removal of the sanctuary targetEffect is owned by
+// automation/handlers/spells/sanctuaryHandler.js — this file guards the
+// WIS-save gate that blocks save-based damage until the prompt resolves.
+
+const PROMPT_ID = 'test-guid-1234';
+const CONTEXT = { targetName: 'Ally', saveDc: 12, saveType: 'dex' };
+
+const sanctuaryEffect = (overrides = {}) => ({
     effect: 'sanctuary',
     target: 'Ally',
     source: 'Cleric',
@@ -33,125 +40,85 @@ const makeSanctuaryEffect = (overrides = {}) => ({
     ...overrides,
 });
 
-const makeContext = (overrides = {}) => ({
-    targetName: 'Ally',
-    saveDc: 12,
-    saveType: 'dex',
-    ...overrides,
-});
-
-// Minimal mock setup: sanctuary effect exists, no pending prompts
-const setupSanctuaryActive = () => {
+// Sanctuary active on Ally (cast by Cleric); pending prompts fresh per read,
+// like the serialized runtime store.
+const mockSanctuaryActive = (pending = {}) => {
     getRuntimeValue.mockImplementation((key, prop) => {
-        if (key === 'campaign' && prop === 'targetEffects') return [makeSanctuaryEffect()];
-        if (key === 'campaign' && prop === 'pendingSavePrompts') return {};
+        if (key === 'campaign' && prop === 'targetEffects') return [sanctuaryEffect()];
+        if (key === 'campaign' && prop === 'pendingSavePrompts') return { ...pending };
         return null;
     });
 };
 
+// The handler registers its save-result listener synchronously before
+// awaiting, so dispatching in the same tick resolves it.
+const dispatchSaveResult = (detail) => {
+    window.dispatchEvent(new CustomEvent('save-result', { detail }));
+};
+
+// Value passed to the LAST setRuntimeValue('campaign', 'pendingSavePrompts', ...) call
+const lastPendingWrite = () =>
+    setRuntimeValue.mock.calls.filter(c => c[0] === 'campaign' && c[1] === 'pendingSavePrompts').at(-1)[2];
+
 describe('handleSanctuarySave', () => {
+    let consoleSpy;
+
     beforeEach(() => {
         vi.clearAllMocks();
+        consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
-    describe('early returns — no sanctuary check performed', () => {
+    afterEach(() => {
+        consoleSpy.mockRestore();
+    });
+
+    describe('no sanctuary check performed', () => {
         it.each([
             [undefined, 'undefined context'],
             [null, 'null context'],
-        ])('returns { blocked: false } when context is %s (%s)', async (context) => {
-            const result = await handleSanctuarySave('Goblin', 'test-campaign', context, null);
-            expect(result).toEqual({ blocked: false });
-            expect(sendSavePrompt).not.toHaveBeenCalled();
-            expect(getRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects');
-        });
-
-        it('returns { blocked: false } when context is missing targetName', async () => {
-            const result = await handleSanctuarySave('Goblin', 'test-campaign', { saveDc: 12, saveType: 'wis' }, null);
-            expect(result).toEqual({ blocked: false });
-            expect(sendSavePrompt).not.toHaveBeenCalled();
-        });
-
-        it('returns { blocked: false } when context is missing saveDc', async () => {
-            const result = await handleSanctuarySave('Goblin', 'test-campaign', { targetName: 'Ally', saveType: 'wis' }, null);
-            expect(result).toEqual({ blocked: false });
-            expect(sendSavePrompt).not.toHaveBeenCalled();
-        });
-
-        it('returns { blocked: false } when context is missing saveType', async () => {
-            const result = await handleSanctuarySave('Goblin', 'test-campaign', { targetName: 'Ally', saveDc: 12 }, null);
-            expect(result).toEqual({ blocked: false });
-            expect(sendSavePrompt).not.toHaveBeenCalled();
+            [{ saveDc: 12, saveType: 'wis' }, 'missing targetName'],
+            [{ targetName: 'Ally', saveType: 'wis' }, 'missing saveDc'],
+            [{ targetName: 'Ally', saveDc: 12 }, 'missing saveType'],
+        ])('returns { blocked: false } for %s without reading effects', (context, _label) => {
+            return handleSanctuarySave('Goblin', 'test-campaign', context, null).then((result) => {
+                expect(result).toEqual({ blocked: false });
+                expect(getRuntimeValue).not.toHaveBeenCalled();
+                expect(sendSavePrompt).not.toHaveBeenCalled();
+            });
         });
     });
 
-    describe('sanctuary effect lookup — no match found', () => {
-        it('returns { blocked: false } when no targetEffects exist', async () => {
-            getRuntimeValue.mockReturnValue([]);
-            const result = await handleSanctuarySave('Goblin', 'test-campaign', makeContext(), null);
-            expect(result).toEqual({ blocked: false });
-            expect(sendSavePrompt).not.toHaveBeenCalled();
-        });
+    describe('no matching sanctuary effect', () => {
+        it.each([
+            ['null targetEffects', () => null],
+            ['empty targetEffects', () => []],
+            ['sanctuary on a different target', () => [sanctuaryEffect({ target: 'OtherAlly' })]],
+            ['sanctuary cast by the attacker', () => [sanctuaryEffect({ source: 'Goblin' })]],
+            ['a different (non-sanctuary) effect on the target', () => [{ effect: 'shield', target: 'Ally', source: 'Cleric' }]],
+        ])('returns { blocked: false } when %s', (_label, effects) => {
+            getRuntimeValue.mockImplementation((key, prop) =>
+                key === 'campaign' && prop === 'targetEffects' ? effects() : null);
 
-        it('returns { blocked: false } when targetEffects is null', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const result = await handleSanctuarySave('Goblin', 'test-campaign', makeContext(), null);
-            expect(result).toEqual({ blocked: false });
-            expect(sendSavePrompt).not.toHaveBeenCalled();
-        });
-
-        it('returns { blocked: false } when sanctuary targets a different creature', async () => {
-            getRuntimeValue.mockReturnValue([
-                { effect: 'sanctuary', target: 'OtherAlly', source: 'Cleric' },
-            ]);
-            const result = await handleSanctuarySave('Goblin', 'test-campaign', makeContext(), null);
-            expect(result).toEqual({ blocked: false });
-            expect(sendSavePrompt).not.toHaveBeenCalled();
-        });
-
-        it('returns { blocked: false } when sanctuary source is the attacking character', async () => {
-            getRuntimeValue.mockReturnValue([
-                { effect: 'sanctuary', target: 'Ally', source: 'Goblin' },
-            ]);
-            const result = await handleSanctuarySave('Goblin', 'test-campaign', makeContext(), null);
-            expect(result).toEqual({ blocked: false });
-            expect(sendSavePrompt).not.toHaveBeenCalled();
-        });
-
-        it('finds sanctuary even when saveType differs', async () => {
-            // The handler does NOT compare saveType on the sanctuary effect — only target and source matter
-            getRuntimeValue.mockReturnValue([
-                { effect: 'sanctuary', target: 'Ally', source: 'Cleric', saveType: 'str' },
-            ]);
-            setupSanctuaryActive();
-            // The mock above already sets sanctuary active, so this tests that the effect is found
-            // and the save flow proceeds despite saveType mismatch
-            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', makeContext(), null);
-
-            // The handler is synchronous up to the event listener — no setTimeout needed
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'test-guid-1234', success: false },
-            }));
-
-            const result = await invokePromise;
-            expect(result.blocked).toBe(true);
-            expect(sendSavePrompt).toHaveBeenCalled();
+            return handleSanctuarySave('Goblin', 'test-campaign', CONTEXT, null).then((result) => {
+                expect(result).toEqual({ blocked: false });
+                expect(sendSavePrompt).not.toHaveBeenCalled();
+            });
         });
     });
 
-    describe('sanctuary found — save prompt flow', () => {
-        it('creates a pending save prompt and sends it', async () => {
-            setupSanctuaryActive();
+    describe('sanctuary save prompt flow', () => {
+        // NOTE: in the prompt, targetName is the ATTACKER (Goblin) making the
+        // WIS save to be allowed to harm the warded Ally.
+        it('prompts a WIS save, blocks damage and logs when the save fails', async () => {
+            mockSanctuaryActive({ 'other-prompt': { promptId: 'other-prompt' } });
 
-            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', makeContext(), null);
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'test-guid-1234', success: false },
-            }));
+            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', CONTEXT, null);
+            dispatchSaveResult({ promptId: PROMPT_ID, success: false });
 
             const result = await invokePromise;
 
             expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                promptId: 'test-guid-1234',
+                promptId: PROMPT_ID,
                 targetName: 'Goblin',
                 attackerName: 'Cleric',
                 saveType: 'WIS',
@@ -161,94 +128,8 @@ describe('handleSanctuarySave', () => {
 
             expect(result).toEqual({
                 blocked: true,
-                description: expect.stringContaining('failed WIS save against Sanctuary'),
+                description: 'Goblin failed WIS save against Sanctuary on Ally. The spell is lost.',
             });
-        });
-
-        it('removes the pending save prompt after resolution', async () => {
-            let pendingPrompts = { 'other-prompt': { promptId: 'other-prompt' } };
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign' && prop === 'targetEffects') return [makeSanctuaryEffect()];
-                if (key === 'campaign' && prop === 'pendingSavePrompts') return pendingPrompts;
-                return null;
-            });
-
-            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', makeContext(), null);
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'test-guid-1234', success: false },
-            }));
-
-            await invokePromise;
-
-            // The handler deletes the promptId it created from pendingSavePrompts
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'pendingSavePrompts',
-                expect.objectContaining({ 'other-prompt': expect.any(Object) }),
-                'test-campaign'
-            );
-        });
-
-        it('ignores save-result events with a mismatched promptId', async () => {
-            setupSanctuaryActive();
-
-            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', makeContext(), null);
-
-            // Dispatch wrong promptId — should be ignored
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'wrong-id', success: false },
-            }));
-
-            // Dispatch correct promptId — should resolve
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'test-guid-1234', success: true },
-            }));
-
-            const result = await invokePromise;
-            expect(result).toEqual({ blocked: false });
-        });
-    });
-
-    describe('save result handling', () => {
-        it('returns { blocked: false } when save succeeds', async () => {
-            setupSanctuaryActive();
-
-            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', makeContext(), null);
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'test-guid-1234', success: true },
-            }));
-
-            const result = await invokePromise;
-
-            expect(result).toEqual({ blocked: false });
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'save_result',
-                success: true,
-                characterName: 'Cleric',
-                targetName: 'Goblin',
-                saveDc: 13,
-                saveType: 'WIS',
-            }));
-        });
-
-        it('returns { blocked: true } with description when save fails', async () => {
-            setupSanctuaryActive();
-
-            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', makeContext(), null);
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'test-guid-1234', success: false },
-            }));
-
-            const result = await invokePromise;
-
-            expect(result.blocked).toBe(true);
-            expect(result.description).toContain('Goblin');
-            expect(result.description).toContain('Ally');
-            expect(result.description).toContain('failed WIS save against Sanctuary');
-            expect(result.description).toContain('The spell is lost');
 
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 type: 'save_result',
@@ -258,32 +139,57 @@ describe('handleSanctuarySave', () => {
                 saveDc: 13,
                 saveType: 'WIS',
             }));
-        });
-    });
 
-    describe('saveDc fallback', () => {
-        let consoleSpy;
-
-        beforeEach(() => {
-            consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            // Resolution removes this prompt but preserves unrelated pending prompts
+            const finalPending = lastPendingWrite();
+            expect(finalPending).not.toHaveProperty(PROMPT_ID);
+            expect(finalPending).toHaveProperty('other-prompt');
         });
 
-        afterEach(() => {
-            consoleSpy.mockRestore();
+        it('allows damage and logs when the save succeeds', async () => {
+            mockSanctuaryActive({ 'other-prompt': { promptId: 'other-prompt' } });
+
+            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', CONTEXT, null);
+            dispatchSaveResult({ promptId: PROMPT_ID, success: true });
+
+            const result = await invokePromise;
+
+            expect(result).toEqual({ blocked: false });
+
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'save_result',
+                success: true,
+                characterName: 'Cleric',
+                targetName: 'Goblin',
+                saveDc: 13,
+                saveType: 'WIS',
+            }));
+
+            expect(lastPendingWrite()).not.toHaveProperty(PROMPT_ID);
         });
 
-        it('defaults saveDc to 8 when targetEffect has no saveDc', async () => {
+        it('ignores save-result events with a mismatched promptId', async () => {
+            mockSanctuaryActive();
+
+            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', CONTEXT, null);
+
+            dispatchSaveResult({ promptId: 'wrong-id', success: false });
+
+            dispatchSaveResult({ promptId: PROMPT_ID, success: true });
+
+            const result = await invokePromise;
+            expect(result).toEqual({ blocked: false });
+        });
+
+        it('defaults saveDc to 8 and logs when the targetEffect has no saveDc', async () => {
             getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign' && prop === 'targetEffects') return [makeSanctuaryEffect({ saveDc: undefined })];
+                if (key === 'campaign' && prop === 'targetEffects') return [sanctuaryEffect({ saveDc: undefined })];
                 if (key === 'campaign' && prop === 'pendingSavePrompts') return {};
                 return null;
             });
 
-            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', makeContext(), null);
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'test-guid-1234', success: false },
-            }));
+            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', CONTEXT, null);
+            dispatchSaveResult({ promptId: PROMPT_ID, success: false });
 
             await invokePromise;
 
@@ -292,77 +198,24 @@ describe('handleSanctuarySave', () => {
                 'Ally',
                 '— defaulting to 8'
             );
-
             expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 saveDc: 8,
             }));
         });
     });
 
-    describe('error handling', () => {
-        let consoleSpy;
-
-        beforeEach(() => {
-            consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        });
-
-        afterEach(() => {
-            consoleSpy.mockRestore();
-        });
-
-        it('handles addEntry rejection on failed save gracefully', async () => {
+    describe('log failures never break the damage lane', () => {
+        it.each([true, false])('resolves normally when addEntry rejects (save success=%s)', async (success) => {
             addEntry.mockRejectedValue(new Error('DB error'));
-            setupSanctuaryActive();
+            mockSanctuaryActive();
 
-            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', makeContext(), null);
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'test-guid-1234', success: false },
-            }));
+            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', CONTEXT, null);
+            dispatchSaveResult({ promptId: PROMPT_ID, success });
 
             const result = await invokePromise;
 
-            expect(result.blocked).toBe(true);
+            expect(result.blocked).toBe(!success);
             expect(consoleSpy).toHaveBeenCalled();
-        });
-
-        it('handles addEntry rejection on successful save gracefully', async () => {
-            addEntry.mockRejectedValue(new Error('DB error'));
-            setupSanctuaryActive();
-
-            const invokePromise = handleSanctuarySave('Goblin', 'test-campaign', makeContext(), null);
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'test-guid-1234', success: true },
-            }));
-
-            const result = await invokePromise;
-
-            expect(result).toEqual({ blocked: false });
-            expect(consoleSpy).toHaveBeenCalled();
-        });
-    });
-
-    describe('campaign name propagation', () => {
-        it('uses the provided campaignName in setRuntimeValue and addEntry', async () => {
-            setupSanctuaryActive();
-
-            const invokePromise = handleSanctuarySave('Goblin', 'my-campaign', makeContext(), null);
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'test-guid-1234', success: false },
-            }));
-
-            await invokePromise;
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'pendingSavePrompts',
-                expect.any(Object),
-                'my-campaign'
-            );
-
-            expect(addEntry).toHaveBeenCalledWith('my-campaign', expect.any(Object));
         });
     });
 });

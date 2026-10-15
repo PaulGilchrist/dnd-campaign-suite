@@ -1,14 +1,14 @@
+// @maintained-by-ai: 2026-10-14
 // MA-0711: Faerie Dragon Euphoria Breath — the MA-0087 slowed-rider clause
 // ("can't take reactions" → registered te no_reactions) was picker-only; the
 // shapeless inline block-save row (no range, picker never opens) left ZERO
-// state on a failed save (§53 MA-0090 fingerprint). The inline seam arm in
-// buildAbilitySaveRollContext now rides the same parseSlowedClauses output to
-// saveProcessing.applyFailedSaveClauseGrants (MA-0146 speedZeroClause
-// both-seams twin shape): failed save grants the registered te with ONE
-// merged §37 clock (1 minute → rounds:10) + a 'condition applied' grant log
-// + a §70 GM-enforced advisory naming the d6 behavior-table/repeat-save legs
-// (MA-0706 durationNote advisory precedent). Success grants nothing; rows
-// without the clause stay byte-inert.
+// state on a failed save. The inline seam arm in applyFailedSaveClauseGrants
+// → grantSlowedClausesInline rides parseSlowedClauses output to grant the
+// registered te with ONE merged §37 clock (1 minute → rounds:10) + a
+// 'condition applied' grant log + a §70 GM-enforced advisory naming the d6
+// behavior-table/repeat-save legs. Success grants nothing; rows without the
+// clause stay byte-inert. The rounds:2 /next-turn/ fork of the same lane is
+// pinned on live data by saveProcessing.ma1872-cthulhu-madness-whisper.test.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -78,17 +78,16 @@ const campaignName = 'test-campaign';
 const DRAGON = 'Faerie Dragon 1';
 const TARGET = 'Bandit 1';
 
-// Faerie Dragon Euphoria Breath (monsters.json faerie-dragon actions[1],
-// byte-exact save_effect) — the slowed-clause parse arms no_reactions only
-// (no Speed-halved / action-not-both regex hit).
+// Faerie Dragon Euphoria Breath (monsters.json faerie-dragon) — the
+// slowed-clause parse arms no_reactions only (no Speed-halved / action-not-
+// both regex hit); DC/type/action derived from the row, never hardcoded.
 const faerieRow = monstersData.find(m => m.index === 'faerie-dragon').actions.find(a => a.name === 'Euphoria Breath');
 
 const euphoriaContext = {
-    saveDc: 11,
-    saveType: 'Wisdom',
+    saveDc: faerieRow.save_dc,
+    saveType: faerieRow.save_type,
     attackerName: DRAGON,
-    actionName: 'Euphoria Breath',
-    dcSuccess: 'half',
+    actionName: faerieRow.name,
     saveConditions: [],
     slowedClauses: parseSlowedClauses(faerieRow.save_effect),
 };
@@ -107,6 +106,13 @@ async function resolveSave(context, success, roll) {
     await promise;
 }
 
+function expectNothingGranted() {
+    expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
+    expect(addExpiration).not.toHaveBeenCalled();
+    expect(addEntryLogs.some(e => e.type === 'condition' && e.action === 'applied')).toBe(false);
+    expect(addEntryLogs.some(e => e.automationType === 'condition_clauses_advisory')).toBe(false);
+}
+
 beforeEach(() => {
     vi.clearAllMocks();
     for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
@@ -114,11 +120,9 @@ beforeEach(() => {
 });
 
 describe('MA-0711 Euphoria Breath inline failed-save no_reactions te', () => {
-    it('parse lock: Faerie save_effect arms no_reactions only', () => {
-        expect(parseSlowedClauses(faerieRow.save_effect)).toEqual({ effects: ['no_reactions'] });
-    });
+    it('failed save: parse locks no_reactions only → te sourced from dragon, rounds:10 clock, grant + advisory logs', async () => {
+        expect(euphoriaContext.slowedClauses).toEqual({ effects: ['no_reactions'] });
 
-    it('failed save: no_reactions te on target sourced from dragon, rounds:10 clock, grant + advisory logs', async () => {
         await resolveSave({ ...euphoriaContext }, false, 6);
 
         const tes = runtimeStore['campaign.targetEffects'] || [];
@@ -156,34 +160,13 @@ describe('MA-0711 Euphoria Breath inline failed-save no_reactions te', () => {
         expect(advisory.description).toMatch(/GM-enforced/i);
     });
 
-    it('successful save: no te, no expiry, no grant/advisory logs (clause is Failure-only)', async () => {
+    it('successful save: nothing granted (clause is Failure-only)', async () => {
         await resolveSave({ ...euphoriaContext }, true, 20);
-
-        expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
-        expect(addExpiration).not.toHaveBeenCalled();
-        expect(addEntryLogs.some(e => e.type === 'condition' && e.action === 'applied')).toBe(false);
-        expect(addEntryLogs.some(e => e.automationType === 'condition_clauses_advisory')).toBe(false);
+        expectNothingGranted();
     });
 
     it('rows without the clause are byte-inert: no te even on a failed save', async () => {
-        const bite = { ...euphoriaContext, actionName: 'Bite', slowedClauses: null };
-        await resolveSave(bite, false, 2);
-
-        expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
-        expect(addExpiration).not.toHaveBeenCalled();
-        expect(addEntryLogs.some(e => e.automationType === 'condition_clauses_advisory')).toBe(false);
-    });
-
-    it('MA-0073-shape twin honesty: an "until next turn" clause row keeps the rounds:2 clock (Spectator Confusion Ray)', async () => {
-        const spectator = {
-            ...euphoriaContext,
-            actionName: 'Confusion Ray',
-            conditionDurationNote: 'until the end of its next turn (GM-enforced)',
-        };
-        await resolveSave(spectator, false, 4);
-
-        const tes = runtimeStore['campaign.targetEffects'] || [];
-        expect(tes[0]).toMatchObject({ effect: 'no_reactions', duration: 'until_end_of_next_turn' });
-        expect(addExpiration.mock.calls[0][0].rounds).toBe(2);
+        await resolveSave({ ...euphoriaContext, actionName: 'Bite', slowedClauses: null }, false, 2);
+        expectNothingGranted();
     });
 });

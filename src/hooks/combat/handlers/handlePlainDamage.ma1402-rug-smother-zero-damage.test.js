@@ -1,16 +1,19 @@
+// @maintained-by-ai: 2026-10-14
 // MA-1402: Rug of Smothering "Smother" damageless hit-clause consumer proof —
-// RAW grants Grappled (escape DC 13) + Restrained + Blinded ON HIT with ZERO
-// immediate damage (the 2d6 + 3 is target-turn-start DoT, §70 advisory parked).
-// Post-fix the row authors hit_conditions triple + escape_dc 13 and NO damage,
-// so the whole rider rides the resolved hit through the dice-less '0'
-// auto-damage arm (MonsterCardModal.buildAutoDamageOptions, MA-1400 lineage).
-// This pins the CONSUMER face: handlePlainDamage (via createLogDamageAndShow)
-// with total 0 still reaches maybeApplyHitClause — applyDamageToTarget(0)
-// passes isUsableRawDamage and returns a non-null applyResult — granting
+// the ONE rug-specific contract: handlePlainDamage (via createLogDamageAndShow)
+// consumes the REAL rug disk row end-to-end — buildHitConditionClause(SMOTHER)
+// with ZERO damage still reaches maybeApplyHitClause, granting the RAW triple
 // Grappled+Restrained+Blinded with escape-meta {dc:13, ability:'str', source}
-// + condition-applied log, while damage stays zero. Pre-fix the triple could
-// only ever arrive via the RAW-nonexistent save lane (save-fail spray) and
-// the attack chip paid 2d6 + 3 FULL on every hit.
+// + condition-applied log "Smother (escape DC 13)", while the damage leg pays
+// zero (pre-fix bug: the target-turn-start DoT 2d6 + 3 was paid FULL on every
+// +5 hit; the DoT itself is §70 advisory parked — no swallowed-state machinery
+// exists, MA-1578 precedent). Trimmed 2026-10-14: the generic zero-damage
+// consumer guard is owned by handlePlainDamage.ma1400-roper-tentacle-zero-damage
+// .test.js (dice-less '0' reaches maybeApplyHitClause, applyDamageToTarget(0)
+// non-null, damage leg pays zero); the generic miss flow (no hitClause) and
+// null-applyResult guards live in handlePlainDamage.hitClause.test.js; disk row
+// shape, clause arming, and the dice-less '0' dispatch arm are locked in
+// MonsterAction.ma1402-rug-smother-hit-conditions.test.jsx.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -134,20 +137,20 @@ describe('MA-1402 rug-of-smothering Smother damageless hit-clause consumer', () 
         });
     });
 
-    it('grants Grappled+Restrained+Blinded with escape-meta and DC-13 log on a ZERO-damage resolved hit', async () => {
-        const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Smother', formula: '0', total: 0, rolls: [], modifier: 0, context: {
-            targetName: 'Bandit 1',
-            damageType: '',
-            attackerName: 'Rug of Smothering 1',
-            hitClause: buildHitConditionClause(SMOTHER),
-        } });
+    it('ZERO-damage resolved hit from the rug disk row grants the escape-DC-13 triple and pays zero', async () => {
+        await createLogDamageAndShow(deps)({
+            name: 'Smother', formula: '0', total: 0, rolls: [], modifier: 0, context: {
+                targetName: 'Bandit 1',
+                damageType: '',
+                attackerName: 'Rug of Smothering 1',
+                hitClause: buildHitConditionClause(SMOTHER),
+            },
+        });
 
         const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
         expect(condCall).toBeTruthy();
         expect(condCall[2]).toEqual(['grappled', 'restrained', 'blinded']);
-        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
-        expect(metaCall[2]).toMatchObject({
+        expect(setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta')?.[2]).toMatchObject({
             grappled: { dc: 13, ability: 'str', source: 'Rug of Smothering 1' },
             restrained: { dc: 13, ability: 'str', source: 'Rug of Smothering 1' },
             blinded: { dc: 13, ability: 'str', source: 'Rug of Smothering 1' },
@@ -159,40 +162,11 @@ describe('MA-1402 rug-of-smothering Smother damageless hit-clause consumer', () 
             condition: 'Grappled, Restrained, Blinded',
             reason: 'Smother (escape DC 13)',
         }));
-    });
 
-    it('damage leg pays ZERO: damage log finalDamage 0, HP never moves', async () => {
-        const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Smother', formula: '0', total: 0, rolls: [], modifier: 0, context: {
-            targetName: 'Bandit 1',
-            damageType: '',
-            attackerName: 'Rug of Smothering 1',
-            hitClause: buildHitConditionClause(SMOTHER),
-        } });
-
-        const dmgLog = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.rollType === 'damage');
-        expect(dmgLog).toBeTruthy();
-        expect(dmgLog.formula).toBe('0');
-        expect(dmgLog.total).toBe(0);
-        expect(dmgLog.finalDamage).toBe(0);
-        expect(dmgLog.rolls).toEqual([]);
+        // Damage leg stays honest: no 2d6 + 3 paid on the hit (the DoT is
+        // turn-start advisory), HP never moves.
         expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Bandit 1', 0, [''], expect.anything());
-    });
-
-    it('writes no condition when no clause reaches the damage leg (miss flow stays byte-inert)', async () => {
-        const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Smother', formula: '0', total: 0, rolls: [], modifier: 0, context: {
-            targetName: 'Bandit 1',
-            damageType: '',
-            attackerName: 'Rug of Smothering 1',
-        } });
-
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
-        );
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-            'Bandit 1', 'activeConditionMeta', expect.anything(), 'test-campaign'
-        );
-        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
+        const dmgLog = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.rollType === 'damage');
+        expect(dmgLog).toMatchObject({ formula: '0', total: 0, finalDamage: 0 });
     });
 });

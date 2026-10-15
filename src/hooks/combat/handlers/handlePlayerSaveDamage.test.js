@@ -1,3 +1,14 @@
+// @maintained-by-ai: 2026-10-14
+// BASE lane: the honest core prompt flow of createPlayerSaveDamageHandler —
+// prompt sequence fires once with a shared promptId, the full sendSavePrompt
+// payload, the waiting-popup essentials (attacker fallback + GWF tracking).
+// Owned elsewhere: pendingSave golden shape + rider/statusEffects/playerStats
+// propagation → .pending-data; save-prompt log row → .logging; adv/dis
+// resolution → .advantage-disadvantage; registration order + spell-origin
+// marker + custom-attacker prompt → .integration; early returns → .early-paths;
+// autoReroll kill-switches/bonus → .indomitable; crit/trap arms →
+// .ma0298-crit-trap; endInvisibility + forced-success halving/apply →
+// .endInvisibility + .logging; targetEffects → .targetEffects.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -61,6 +72,8 @@ vi.mock('../../../services/ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
+// Inert for the base prompt path — the handler only prompts here; the
+// compute*/apply* legs run on save resolution (see .endInvisibility lane).
 vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
     computeDamageAfterSave: vi.fn((total, success, _dcSuccess) => success ? 0 : total),
     computeDamageAfterEvasion: vi.fn((total, success, dcSuccess, evasion) => {
@@ -116,6 +129,8 @@ const BASE_COMBAT_SUMMARY = {
     creatures: [{ name: 'TestWizard', type: 'player' }],
 };
 
+const PROMPT_ID = 'test-guid-1234';
+
 function makeDeps(overrides = {}) {
     return {
         characterName: 'TestWizard',
@@ -129,7 +144,7 @@ function makeDeps(overrides = {}) {
     };
 }
 
-function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COMBAT_SUMMARY, gwfBaseRolls, gwfDisplayRolls) {
+function invokeHandler(handler, context = BASE_CONTEXT, eventOverrides = {}) {
     return handler({
         name: 'Fire Bolt',
         formula: '1d10',
@@ -138,182 +153,48 @@ function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COM
         modifier: 0,
         context,
         adjustedTotal: 5,
-        combatSummary,
+        combatSummary: BASE_COMBAT_SUMMARY,
         displayRolls: [6],
-        gwfBaseRolls,
-        gwfDisplayRolls,
+        ...eventOverrides,
     });
 }
 
-function setupCommonMocks() {
-    getRuntimeValue.mockReturnValue(null);
-    computeConditionEffects.mockReturnValue({
-        restoreBalance: false,
-        autoRerollForSaves: false,
-        autoRerollBonus: null,
-        saveAdvantageCount: 0,
-        saveAdvantageAbilities: null,
-    });
-    getHolyAuraTargets.mockReturnValue([]);
-    getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
-    getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
-    isCircleOfPowerActive.mockReturnValue(false);
-}
-
-describe('handlePlayerSaveDamage - main save prompt happy path', () => {
+describe('handlePlayerSaveDamage - core save prompt flow', () => {
     let deps;
 
     beforeEach(() => {
         vi.clearAllMocks();
         deps = makeDeps();
-        setupCommonMocks();
+        getRuntimeValue.mockReturnValue(null);
+        computeConditionEffects.mockReturnValue({
+            restoreBalance: false,
+            autoRerollForSaves: false,
+            autoRerollBonus: null,
+            autoRerollCondition: null,
+            saveAdvantageCount: 0,
+            saveAdvantageAbilities: null,
+        });
+        getHolyAuraTargets.mockReturnValue([]);
+        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
+        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
+        isCircleOfPowerActive.mockReturnValue(false);
     });
 
-    it('returns true and triggers all four side effects when no special paths apply', async () => {
+    it('runs the full prompt sequence once with a shared promptId and returns true', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
         const result = await invokeHandler(handler);
 
         expect(result).toBe(true);
+        // Every side effect is keyed by the same utils.guid promptId.
         expect(registerPendingSavePrompt).toHaveBeenCalledTimes(1);
-        expect(registerPendingPopupSetter).toHaveBeenCalledTimes(1);
+        expect(registerPendingSavePrompt).toHaveBeenCalledWith(PROMPT_ID, expect.any(Object));
+        expect(registerPendingPopupSetter).toHaveBeenCalledWith(PROMPT_ID, deps.setPopupHtml);
         expect(sendSavePrompt).toHaveBeenCalledTimes(1);
+        expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ promptId: PROMPT_ID }));
+        expect(deps.pendingSaves).toHaveProperty(PROMPT_ID);
+        // The turn always logs and pops.
         expect(deps.logEntry).toHaveBeenCalledTimes(1);
         expect(deps.setPopupHtml).toHaveBeenCalledTimes(1);
-        expect(handleOverchannelSelfDamage).toHaveBeenCalledTimes(1);
-    });
-
-    it('uses the utils.guid output as the promptId across all side effects', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        expect(registerPendingSavePrompt).toHaveBeenCalledWith('test-guid-1234', expect.any(Object));
-        expect(registerPendingPopupSetter).toHaveBeenCalledWith('test-guid-1234', expect.any(Function));
-        expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ promptId: 'test-guid-1234' }));
-        expect(deps.pendingSaves).toHaveProperty('test-guid-1234');
-    });
-
-    it('sets popup to waiting state with promptId and core fields', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        expect(deps.setPopupHtml).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'save-damage',
-                name: 'Fire Bolt',
-                formula: '1d10',
-                rolls: [6],
-                total: 5,
-                bonus: 0,
-                modifier: 0,
-                damageType: 'Fire',
-                targetName: 'TestWizard',
-                saveDc: 13,
-                saveType: 'DEX',
-                dcSuccess: 'half',
-                waitingForPlayerSave: true,
-                promptId: 'test-guid-1234',
-                rawDamage: 5,
-                attackerName: 'TestWizard',
-                gwfApplied: false,
-                gwfOriginalRolls: null,
-                autoReroll: false,
-                autoRerollBonus: null,
-            })
-        );
-    });
-
-    it('sends save prompt with disadvantage:false and advantage:false when no sources apply', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        expect(sendSavePrompt).toHaveBeenCalledWith(
-            'test-campaign',
-            expect.objectContaining({
-                promptId: 'test-guid-1234',
-                targetName: 'TestWizard',
-                saveType: 'DEX',
-                saveDc: 13,
-                dcSuccess: 'half',
-                damageFormula: '1d10',
-                damageType: 'Fire',
-                sourceName: 'Fire Bolt',
-                sourceAttackerName: 'TestWizard',
-                rawDamage: 5,
-                disadvantage: false,
-                advantage: false,
-            })
-        );
-    });
-
-    it('logs a save-prompt roll entry with all roll details', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        expect(deps.logEntry).toHaveBeenCalledWith(
-            expect.objectContaining({
-                type: 'roll',
-                characterName: 'TestWizard',
-                rollType: 'save-prompt',
-                name: 'Fire Bolt',
-                formula: '1d10',
-                rolls: [6],
-                total: 5,
-                modifier: 0,
-                bonus: 0,
-                damageType: 'Fire',
-                targetName: 'TestWizard',
-                saveType: 'DEX',
-                saveDc: 13,
-                dcSuccess: 'half',
-                forcedMode: 'normal',
-                gwfApplied: false,
-                gwfOriginalRolls: null,
-            })
-        );
-    });
-
-    it('stores pending save data with all core fields', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        const pending = deps.pendingSaves['test-guid-1234'];
-        expect(pending).toMatchObject({
-            targetName: 'TestWizard',
-            rawDamage: 5,
-            saveDc: 13,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-            damageType: 'Fire',
-            attackerName: 'TestWizard',
-            name: 'Fire Bolt',
-            formula: '1d10',
-            modifier: 0,
-            rolls: [6],
-            campaignName: 'test-campaign',
-            metamagicHeighten: false,
-            saveAdvantage: false,
-            isCantrip: false,
-            overchannelActive: false,
-            overchannelUseCount: 0,
-            overchannelSpellLevel: 1,
-            statusEffects: [],
-        });
-    });
-
-    it('passes setPopupHtml into pendingData for the registries', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        expect(registerPendingSavePrompt).toHaveBeenCalledWith(
-            'test-guid-1234',
-            expect.objectContaining({ setPopupHtml: deps.setPopupHtml })
-        );
-    });
-
-    it('calls handleOverchannelSelfDamage with correct arguments at the end', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
         expect(handleOverchannelSelfDamage).toHaveBeenCalledWith(
             'TestWizard',
             'test-campaign',
@@ -322,110 +203,88 @@ describe('handlePlayerSaveDamage - main save prompt happy path', () => {
             deps.characters
         );
     });
-});
 
-describe('handlePlayerSaveDamage - context flags propagate to pending data', () => {
-    let deps;
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        deps = makeDeps();
-        setupCommonMocks();
-    });
-
-    it('propagates metamagicHeighten, isCantrip, overchannel, and autoDamage fields from context', async () => {
+    it('sends the plain save prompt with the exact core payload', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        const context = {
-            ...BASE_CONTEXT,
-            metamagicHeighten: true,
-            isCantrip: true,
-            overchannelActive: true,
-            overchannelUseCount: 2,
-            overchannelSpellLevel: 3,
-            autoDamageSecondaryFormula: '2d6',
-            autoDamageSecondaryName: 'Radiant',
-            autoDamageSecondaryDamageType: 'Radiant',
-        };
+        await invokeHandler(handler);
 
-        await invokeHandler(handler, context);
-
-        const pending = deps.pendingSaves['test-guid-1234'];
-        expect(pending).toMatchObject({
-            metamagicHeighten: true,
-            isCantrip: true,
-            overchannelActive: true,
-            overchannelUseCount: 2,
-            overchannelSpellLevel: 3,
-            autoDamageSecondaryFormula: '2d6',
-            autoDamageSecondaryName: 'Radiant',
-            autoDamageSecondaryDamageType: 'Radiant',
+        // Full payload contract of the sendSavePrompt call (adv/dis flags →
+        // .advantage-disadvantage; the spell-origin marker → .integration).
+        expect(sendSavePrompt).toHaveBeenCalledWith('test-campaign', {
+            promptId: PROMPT_ID,
+            targetName: 'TestWizard',
+            saveType: 'DEX',
+            saveDc: 13,
+            dcSuccess: 'half',
+            damageFormula: '1d10',
+            damageType: 'Fire',
+            sourceName: 'Fire Bolt',
+            sourceAttackerName: 'TestWizard',
+            rawDamage: 5,
+            disadvantage: false,
+            advantage: false,
+            isSpellDamage: true,
         });
     });
 
-    it('propagates statusEffects and playerStats from context', async () => {
+    it('shows a waiting popup with the core roll/save fields, attacker fallback, and inert GWF/reroll flags', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        const context = {
-            ...BASE_CONTEXT,
-            statusEffects: ['exhaustion', 'poisoned'],
-            playerStats: { level: 10, class: { name: 'Wizard' } },
-        };
+        await invokeHandler(handler);
 
-        await invokeHandler(handler, context);
-
-        const pending = deps.pendingSaves['test-guid-1234'];
-        expect(pending).toMatchObject({
-            statusEffects: ['exhaustion', 'poisoned'],
-            playerStats: { level: 10, class: { name: 'Wizard' } },
+        expect(deps.setPopupHtml).toHaveBeenCalledWith({
+            type: 'save-damage',
+            name: 'Fire Bolt',
+            formula: '1d10',
+            rolls: [6],
+            total: 5,
+            bonus: 0,
+            modifier: 0,
+            damageType: 'Fire',
+            targetName: 'TestWizard',
+            saveDc: 13,
+            saveType: 'DEX',
+            dcSuccess: 'half',
+            waitingForPlayerSave: true,
+            promptId: PROMPT_ID,
+            rawDamage: 5,
+            attackerName: 'TestWizard',
+            gwfApplied: false,
+            gwfOriginalRolls: null,
+            autoReroll: false,
+            autoRerollBonus: null,
+            autoRerollCondition: null,
         });
     });
 
-    it('uses context attackerName when provided, falling back to characterName', async () => {
+    it('surfaces a context attackerName in the waiting popup and prompt instead of the casting character', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        const context = { ...BASE_CONTEXT, attackerName: 'EnemyMage' };
-
-        await invokeHandler(handler, context);
-
-        const pending = deps.pendingSaves['test-guid-1234'];
-        expect(pending).toHaveProperty('attackerName', 'EnemyMage');
-
-        expect(sendSavePrompt).toHaveBeenCalledWith(
-            'test-campaign',
-            expect.objectContaining({ sourceAttackerName: 'EnemyMage' })
-        );
+        await invokeHandler(handler, { ...BASE_CONTEXT, attackerName: 'EnemyMage' });
 
         expect(deps.setPopupHtml).toHaveBeenCalledWith(
             expect.objectContaining({ attackerName: 'EnemyMage' })
         );
-    });
-});
-
-describe('handlePlayerSaveDamage - GWF tracking in popup', () => {
-    let deps;
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        deps = makeDeps();
-        setupCommonMocks();
-    });
-
-    it('sets gwfApplied:false and gwfOriginalRolls:null when GWF rolls are not provided', async () => {
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler, BASE_CONTEXT, BASE_COMBAT_SUMMARY);
-
-        expect(deps.setPopupHtml).toHaveBeenCalledWith(
-            expect.objectContaining({
-                gwfApplied: false,
-                gwfOriginalRolls: null,
-            })
+        expect(sendSavePrompt).toHaveBeenCalledWith(
+            'test-campaign',
+            expect.objectContaining({ sourceAttackerName: 'EnemyMage' })
         );
     });
 
-    it('sets gwfApplied:true and gwfOriginalRolls when base and display rolls differ', async () => {
+    it('tracks applied GWF rolls in the waiting popup and the log row', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler, BASE_CONTEXT, BASE_COMBAT_SUMMARY, [6, 6], [3, 3]);
+        await invokeHandler(handler, BASE_CONTEXT, {
+            gwfBaseRolls: [6, 6],
+            gwfDisplayRolls: [3, 3],
+        });
 
         expect(deps.setPopupHtml).toHaveBeenCalledWith(
             expect.objectContaining({
+                gwfApplied: true,
+                gwfOriginalRolls: [6, 6],
+            })
+        );
+        expect(deps.logEntry).toHaveBeenCalledWith(
+            expect.objectContaining({
+                rollType: 'save-prompt',
                 gwfApplied: true,
                 gwfOriginalRolls: [6, 6],
             })

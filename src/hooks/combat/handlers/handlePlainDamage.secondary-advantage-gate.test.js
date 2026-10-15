@@ -1,10 +1,20 @@
+// @maintained-by-ai: 2026-10-14
 // MA-0889: advantage-gated secondary rider consumer — Goblin Boss
-// Scimitar/Shortbow "plus 1d4 … if the attack roll had Advantage". With
-// context.secondaryCondition === 'advantage' the rider fires ONLY when the
-// resolved campaign lastAttack.forcedMode === 'advantage' (same post-hit
-// channel the advantage-rig te stamps); a normal-mode hit pays primary-only
-// with an honest `secondary_damage_skipped` log. Legacy always-roll rows
-// (condition null/absent) stay byte-identical — rider rolls on every hit.
+// Scimitar/Shortbow "plus 1d4 … if the attack roll had Advantage" and the
+// MA-1444/1445 Scout Captain Shortsword/Longbow "plus 3d6 … with Advantage"
+// family. The gate is context-driven (handlePlainDamage
+// secondaryRiderBlockedByAdvantageGate): with context.secondaryCondition ===
+// 'advantage' the rider fires ONLY when the resolved campaign
+// lastAttack.forcedMode === 'advantage' (same post-hit channel the
+// advantage-rig te stamps); a non-advantage hit pays primary-only with an
+// honest `secondary_damage_skipped` log. Legacy always-roll rows (condition
+// null/absent) stay byte-identical — rider rolls on every hit.
+//
+// Lane: PLAIN damage only. The SAVE-handler twin (twin/multi secondary
+// patches) lives in handleNpcSaveDamage.metamagic.test.js; the row→context
+// transport (secondaryCondition forwarding) lives in
+// MonsterCardModal.ma0889-goblin-boss-advantage-rider.test.js. Weapons are
+// parameterized here — the gate itself is weapon-agnostic.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -93,8 +103,18 @@ import { addEntry } from '../../../services/ui/logService.js';
 import { loadCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget, clearReTriggeredSequence } from '../../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
+import monstersData from '../../../../public/data/monsters.json';
 
-describe('MA-0889 advantage-gated secondary rider', () => {
+// Row shapes mirror monsters.json (guarded below): Goblin Boss
+// Scimitar/Shortbow 1d4, Scout Captain Shortsword/Longbow 3d6, all
+// secondary_condition:"advantage".
+const WEAPONS = {
+    scimitar: { name: 'Scimitar', formula: '1d6 + 2', total: 5, modifier: 2, damageType: 'Slashing', secondaryFormula: '1d4', secondaryDamageType: 'Slashing' },
+    shortsword: { name: 'Shortsword', formula: '1d6 + 3', total: 6, modifier: 3, damageType: 'Piercing', secondaryFormula: '3d6', secondaryDamageType: 'Piercing' },
+    longbow: { name: 'Longbow', formula: '1d8 + 3', total: 6, modifier: 3, damageType: 'Piercing', secondaryFormula: '3d6', secondaryDamageType: 'Piercing' },
+};
+
+describe('MA-0889 advantage-gated secondary rider (plain damage)', () => {
     const deps = {
         characterName: 'Goblin Boss',
         campaignName: 'test-campaign',
@@ -107,17 +127,21 @@ describe('MA-0889 advantage-gated secondary rider', () => {
         pendingSaves: {},
     };
 
-    beforeEach(() => {
-        getRuntimeValue.mockReset();
+    function resetRollState() {
         rollExpression.mockReset().mockReturnValue({ total: 2, rolls: [2], modifier: 0 });
-        applyDamageToTarget.mockReset().mockReturnValue({ finalDamage: 5, newHp: 7, damageReduced: false });
+        applyDamageToTarget.mockReset();
         clearReTriggeredSequence.mockClear();
         addEntry.mockClear().mockReturnValue(Promise.resolve());
+        deps.logEntry.mockClear();
+        deps.setPopupHtml.mockClear();
+    }
+
+    beforeEach(() => {
+        getRuntimeValue.mockReset();
+        resetRollState();
         loadCombatSummary.mockResolvedValue({
             creatures: [{ name: 'Bandit', type: 'npc', ac: 12, currentHp: 12, maxHp: 12 }],
         });
-        deps.logEntry.mockClear();
-        deps.setPopupHtml.mockClear();
     });
 
     function stampForcedMode(mode) {
@@ -130,205 +154,115 @@ describe('MA-0889 advantage-gated secondary rider', () => {
         });
     }
 
-    function scimitarContext(secondaryCondition) {
-        return {
-            targetName: 'Bandit',
-            damageType: 'Slashing',
-            attackerName: 'Goblin Boss',
-            autoDamageSecondaryFormula: '1d4',
-            autoDamageSecondaryName: 'Scimitar',
-            autoDamageSecondaryDamageType: 'Slashing',
-            secondaryCondition,
-        };
-    }
-
-    async function rollScimitar(secondaryCondition, mode) {
+    // secondaryCondition === 'absent' omits the key entirely (legacy rows).
+    function rollWeapon(weapon, mode, secondaryCondition = 'advantage') {
         stampForcedMode(mode);
         applyDamageToTarget
             .mockReturnValueOnce({ finalDamage: 2, newHp: 5, damageReduced: false })
             .mockReturnValueOnce({ finalDamage: 5, newHp: 7, damageReduced: false });
         const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Scimitar', formula: '1d6 + 2', total: 5, rolls: [3], modifier: 2, context: scimitarContext(secondaryCondition) });
+        return fn({
+            name: weapon.name,
+            formula: weapon.formula,
+            total: weapon.total,
+            rolls: [3],
+            modifier: weapon.modifier,
+            context: {
+                targetName: 'Bandit',
+                damageType: weapon.damageType,
+                attackerName: 'Goblin Boss',
+                autoDamageSecondaryFormula: weapon.secondaryFormula,
+                autoDamageSecondaryName: weapon.name,
+                autoDamageSecondaryDamageType: weapon.secondaryDamageType,
+                ...(secondaryCondition === 'absent' ? {} : { secondaryCondition }),
+            },
+        });
     }
 
-    describe('advantage hit (resolved forcedMode "advantage")', () => {
-        it('rider rolls and applies — primary + secondary both paid', async () => {
-            await rollScimitar('advantage', 'advantage');
-            expect(rollExpression).toHaveBeenCalledWith('1d4');
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
-            const secondaryCall = applyDamageToTarget.mock.calls[0];
-            expect(secondaryCall[2]).toBe(2);
-            expect(secondaryCall[3]).toEqual(['Slashing']);
-            const primaryCall = applyDamageToTarget.mock.calls[1];
-            expect(primaryCall[2]).toBe(5);
-            expect(clearReTriggeredSequence).toHaveBeenCalled();
-        });
+    const skipEntry = () => addEntry.mock.calls.map(c => c[1]).find(e => e?.automationType === 'secondary_damage_skipped');
+    const damageLog = () => deps.logEntry.mock.calls[0][0];
+    const popupData = () => deps.setPopupHtml.mock.calls[0][0];
 
-        it('combined_damage_roll log carries the secondary fields, no skip log', async () => {
-            await rollScimitar('advantage', 'advantage');
-            const logCall = deps.logEntry.mock.calls[0][0];
-            expect(logCall.note).toBe('combined_damage_roll');
-            expect(logCall.secondaryFormula).toBe('1d4');
-            expect(logCall.secondaryTotal).toBe(2);
-            expect(logCall.secondaryFinalDamage).toBe(2);
-            const skipped = addEntry.mock.calls.map(c => c[1]?.automationType);
-            expect(skipped).not.toContain('secondary_damage_skipped');
-        });
+    it('advantage hit — rider rolls, secondary applied first + primary, combined log, no skip log', async () => {
+        await rollWeapon(WEAPONS.scimitar, 'advantage');
+        expect(rollExpression).toHaveBeenCalledWith('1d4');
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(2);
+        expect(applyDamageToTarget.mock.calls[0][3]).toEqual(['Slashing']);
+        expect(applyDamageToTarget.mock.calls[1][2]).toBe(5);
+        expect(clearReTriggeredSequence).toHaveBeenCalled();
+        expect(damageLog().secondaryFormula).toBe('1d4');
+        expect(damageLog().secondaryTotal).toBe(2);
+        expect(damageLog().secondaryFinalDamage).toBe(2);
+        expect(popupData().secondaryFormula).toBe('1d4');
+        expect(addEntry.mock.calls.map(c => c[1]?.automationType)).not.toContain('secondary_damage_skipped');
     });
 
-    describe('normal hit (resolved forcedMode null) — rider gated OFF', () => {
-        it('rider never rolls; primary-only damage applied once', async () => {
-            await rollScimitar('advantage', null);
-            expect(rollExpression).not.toHaveBeenCalledWith('1d4');
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            const primaryCall = applyDamageToTarget.mock.calls[0];
-            expect(primaryCall[2]).toBe(5);
-            expect(primaryCall[3]).toEqual(['Slashing']);
-        });
-
-        it('logs secondary_damage_skipped with reason "no advantage"', async () => {
-            await rollScimitar('advantage', null);
-            const skipCall = addEntry.mock.calls.map(c => c[1]).find(e => e?.automationType === 'secondary_damage_skipped');
-            expect(skipCall).toBeTruthy();
-            expect(skipCall.reason).toBe('no advantage');
-            expect(skipCall.characterName).toBe('Goblin Boss');
-            expect(skipCall.abilityName).toBe('Scimitar');
-        });
-
-        it('damage log is primary-only — no secondary fields, no combined totals', async () => {
-            await rollScimitar('advantage', null);
-            const logCall = deps.logEntry.mock.calls[0][0];
-            expect(logCall.formula).toBe('1d6 + 2');
-            expect(logCall.secondaryFormula).toBeUndefined();
-            expect(logCall.secondaryTotal).toBeUndefined();
-            expect(logCall.secondaryFinalDamage).toBeUndefined();
-            const popupCall = deps.setPopupHtml.mock.calls[0][0];
-            expect(popupCall.secondaryFormula).toBeUndefined();
-        });
+    it('normal hit — rider gated: never rolls, primary-only applied, honest skip log, no secondary fields', async () => {
+        await rollWeapon(WEAPONS.scimitar, null);
+        expect(rollExpression).not.toHaveBeenCalledWith('1d4');
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(5);
+        expect(applyDamageToTarget.mock.calls[0][3]).toEqual(['Slashing']);
+        const skip = skipEntry();
+        expect(skip).toBeTruthy();
+        expect(skip.reason).toBe('no advantage');
+        expect(skip.characterName).toBe('Goblin Boss');
+        expect(skip.abilityName).toBe('Scimitar');
+        expect(damageLog().secondaryFormula).toBeUndefined();
+        expect(damageLog().secondaryTotal).toBeUndefined();
+        expect(damageLog().secondaryFinalDamage).toBeUndefined();
+        expect(popupData().secondaryFormula).toBeUndefined();
     });
 
-    describe('disadvantage hit — rider gated OFF too', () => {
-        it('forcedMode "disadvantage" skips the rider with the honest skip log', async () => {
-            await rollScimitar('advantage', 'disadvantage');
-            expect(rollExpression).not.toHaveBeenCalledWith('1d4');
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            const skipCall = addEntry.mock.calls.map(c => c[1]).find(e => e?.automationType === 'secondary_damage_skipped');
-            expect(skipCall?.reason).toBe('no advantage');
-        });
+    it('disadvantage hit — forcedMode "disadvantage" gates the rider off too', async () => {
+        await rollWeapon(WEAPONS.scimitar, 'disadvantage');
+        expect(rollExpression).not.toHaveBeenCalledWith('1d4');
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+        expect(skipEntry()?.reason).toBe('no advantage');
     });
 
-    describe('MA-1444 Scout Captain Shortsword — same gate on "3d6" rider', () => {
-        function shortswordContext() {
-            return {
-                targetName: 'Bandit',
-                damageType: 'Piercing',
-                attackerName: 'Goblin Boss',
-                autoDamageSecondaryFormula: '3d6',
-                autoDamageSecondaryName: 'Shortsword',
-                autoDamageSecondaryDamageType: 'Piercing',
-                secondaryCondition: 'advantage',
-            };
+    describe('MA-1444/1445 Scout Captain — same gate on the 3d6 riders', () => {
+        for (const key of ['shortsword', 'longbow']) {
+            const weapon = WEAPONS[key];
+            it(`${weapon.name} — advantage pays primary + secondary, normal hit gates with skip log`, async () => {
+                await rollWeapon(weapon, 'advantage');
+                expect(rollExpression).toHaveBeenCalledWith(weapon.secondaryFormula);
+                expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
+                expect(addEntry.mock.calls.map(c => c[1]?.automationType)).not.toContain('secondary_damage_skipped');
+
+                resetRollState();
+                await rollWeapon(weapon, null);
+                expect(rollExpression).not.toHaveBeenCalledWith(weapon.secondaryFormula);
+                expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+                expect(applyDamageToTarget.mock.calls[0][2]).toBe(weapon.total);
+                expect(applyDamageToTarget.mock.calls[0][3]).toEqual(['Piercing']);
+                const skip = skipEntry();
+                expect(skip?.reason).toBe('no advantage');
+                expect(skip?.abilityName).toBe(weapon.name);
+            });
         }
-
-        async function rollShortsword(mode) {
-            stampForcedMode(mode);
-            applyDamageToTarget
-                .mockReturnValueOnce({ finalDamage: 8, newHp: 991, damageReduced: false })
-                .mockReturnValueOnce({ finalDamage: 6, newHp: 985, damageReduced: false });
-            const fn = createLogDamageAndShow(deps);
-            await fn({ name: 'Shortsword', formula: '1d6 + 3', total: 6, rolls: [3], modifier: 3, context: shortswordContext() });
-        }
-
-        it('normal hit — rider gated: primary-only apply, secondary_damage_skipped "no advantage"', async () => {
-            await rollShortsword(null);
-            expect(rollExpression).not.toHaveBeenCalledWith('3d6');
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            expect(applyDamageToTarget.mock.calls[0][2]).toBe(6);
-            expect(applyDamageToTarget.mock.calls[0][3]).toEqual(['Piercing']);
-            const skipCall = addEntry.mock.calls.map(c => c[1]).find(e => e?.automationType === 'secondary_damage_skipped');
-            expect(skipCall?.reason).toBe('no advantage');
-            expect(skipCall?.abilityName).toBe('Shortsword');
-        });
-
-        it('advantage hit — rider rolls and pays primary + secondary', async () => {
-            await rollShortsword('advantage');
-            expect(rollExpression).toHaveBeenCalledWith('3d6');
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
-            const skipped = addEntry.mock.calls.map(c => c[1]?.automationType);
-            expect(skipped).not.toContain('secondary_damage_skipped');
-        });
     });
 
-    describe('MA-1445 Scout Captain Longbow — same gate on "3d6" rider, "1d8 + 3" primary', () => {
-        function longbowContext() {
-            return {
-                targetName: 'Bandit',
-                damageType: 'Piercing',
-                attackerName: 'Goblin Boss',
-                autoDamageSecondaryFormula: '3d6',
-                autoDamageSecondaryName: 'Longbow',
-                autoDamageSecondaryDamageType: 'Piercing',
-                secondaryCondition: 'advantage',
-            };
-        }
+    it('legacy always-roll rows unchanged (MA-0426/0531) — condition null or absent, rider always rolls', async () => {
+        await rollWeapon(WEAPONS.scimitar, null, null);
+        expect(rollExpression).toHaveBeenCalledWith('1d4');
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
+        expect(addEntry.mock.calls.map(c => c[1]?.automationType)).not.toContain('secondary_damage_skipped');
 
-        async function rollLongbow(mode) {
-            stampForcedMode(mode);
-            applyDamageToTarget
-                .mockReturnValueOnce({ finalDamage: 9, newHp: 990, damageReduced: false })
-                .mockReturnValueOnce({ finalDamage: 13, newHp: 977, damageReduced: false });
-            const fn = createLogDamageAndShow(deps);
-            await fn({ name: 'Longbow', formula: '1d8 + 3', total: 6, rolls: [3], modifier: 3, context: longbowContext() });
-        }
-
-        it('normal hit — rider gated: primary-only apply, secondary_damage_skipped "no advantage"', async () => {
-            await rollLongbow(null);
-            expect(rollExpression).not.toHaveBeenCalledWith('3d6');
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            expect(applyDamageToTarget.mock.calls[0][2]).toBe(6);
-            expect(applyDamageToTarget.mock.calls[0][3]).toEqual(['Piercing']);
-            const skipCall = addEntry.mock.calls.map(c => c[1]).find(e => e?.automationType === 'secondary_damage_skipped');
-            expect(skipCall?.reason).toBe('no advantage');
-            expect(skipCall?.abilityName).toBe('Longbow');
-        });
-
-        it('advantage hit — rider rolls and pays primary + secondary', async () => {
-            await rollLongbow('advantage');
-            expect(rollExpression).toHaveBeenCalledWith('3d6');
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
-            const skipped = addEntry.mock.calls.map(c => c[1]?.automationType);
-            expect(skipped).not.toContain('secondary_damage_skipped');
-        });
-
-        it('disadvantage hit — rider gated off with honest skip log', async () => {
-            await rollLongbow('disadvantage');
-            expect(rollExpression).not.toHaveBeenCalledWith('3d6');
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            const skipCall = addEntry.mock.calls.map(c => c[1]).find(e => e?.automationType === 'secondary_damage_skipped');
-            expect(skipCall?.reason).toBe('no advantage');
-        });
+        resetRollState();
+        await rollWeapon(WEAPONS.scimitar, null, 'absent');
+        expect(rollExpression).toHaveBeenCalledWith('1d4');
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
     });
 
-    describe('legacy always-roll rows unchanged (MA-0426/0531 byte-identical)', () => {
-        it('secondaryCondition null on a normal hit — rider still rolls and applies', async () => {
-            await rollScimitar(null, null);
-            expect(rollExpression).toHaveBeenCalledWith('1d4');
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
-            const skipped = addEntry.mock.calls.map(c => c[1]?.automationType);
-            expect(skipped).not.toContain('secondary_damage_skipped');
-        });
-
-        it('missing secondaryCondition key entirely — rider still rolls and applies', async () => {
-            stampForcedMode(null);
-            applyDamageToTarget
-                .mockReturnValueOnce({ finalDamage: 2, newHp: 5, damageReduced: false })
-                .mockReturnValueOnce({ finalDamage: 5, newHp: 7, damageReduced: false });
-            const context = scimitarContext(undefined);
-            delete context.secondaryCondition;
-            const fn = createLogDamageAndShow(deps);
-            await fn({ name: 'Claw', formula: '1d6 + 2', total: 5, rolls: [3], modifier: 2, context });
-            expect(rollExpression).toHaveBeenCalledWith('1d4');
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
-        });
+    it('monsters.json rows still carry the advantage gate this lane consumes', () => {
+        const rowsFor = (creature) => monstersData.find(m => m.name === creature).actions.reduce((acc, a) => ({ ...acc, [a.name]: a }), {});
+        const goblinBoss = rowsFor('Goblin Boss');
+        expect(goblinBoss.Scimitar).toMatchObject({ damage_dice_primary: '1d6 + 2', damage_dice_secondary: '1d4', damage_type_secondary: 'Slashing', secondary_condition: 'advantage' });
+        expect(goblinBoss.Shortbow).toMatchObject({ damage_dice_primary: '1d6 + 2', damage_dice_secondary: '1d4', damage_type_secondary: 'Piercing', secondary_condition: 'advantage' });
+        const scoutCaptain = rowsFor('Scout Captain');
+        expect(scoutCaptain.Shortsword).toMatchObject({ damage_dice_primary: '1d6 + 3', damage_dice_secondary: '3d6', damage_type_secondary: 'Piercing', secondary_condition: 'advantage' });
+        expect(scoutCaptain.Longbow).toMatchObject({ damage_dice_primary: '1d8 + 3', damage_dice_secondary: '3d6', damage_type_secondary: 'Piercing', secondary_condition: 'advantage' });
     });
 });

@@ -1,15 +1,17 @@
-// MA-1728: Wraith "Life Drain" HP-max-drain rider — FAIL(a)/DATA fixed at
-// the data layer: the row now authors hit_hp_max_reduce:{equal_to:"damage"},
-// the Specter actions[0] byte-twin (MA-1489), so the LIVE attack-hit-path
-// drain seam (parseHitHpMaxReduce → buildHitConditionClause.hpMaxReduce →
+// @maintained-by-ai: 2026-10-14
+// MA-1728: Wraith "Life Drain" HP-max-drain rider — wraith-row twin of the
+// MA-1489 Specter lane. The row authors hit_hp_max_reduce:{equal_to:"damage"}
+// (previously byte-inert, key ABSENT), so the LIVE attack-hit-path drain seam
+// (parseHitHpMaxReduce → buildHitConditionClause.hpMaxReduce →
 // handlePlainDamage.maybeApplyHitClause → applyHitHpMaxReduce →
-// hpMaxReduceService.applyHpMaxReduce) arms on this row: every resolved hit
+// hpMaxReduceService.applyHpMaxReduce) arms on THIS row: every resolved hit
 // reduces the victim's cs maxHp by exactly the necrotic damage applied,
-// accumulates the hp_max_reduce te ledger {baseMax, reduced, max}, and logs
-// each leg — previously byte-inert (key ABSENT on wraith.actions[0],
-// structured-key-only parser never armed). Consumer suite byte-identical to
-// the MA-1489 twin harness; only the row bytes (attack_bonus 6,
-// "4d8 + 3") differ.
+// accumulates the hp_max_reduce te ledger, logs the grant, NO clock.
+// This file owns ONLY the wraith-row contract — the shared drain core is
+// unit-covered by the MA-1547 save-path suite; parser byte-inert grammar,
+// registry spec, accumulation, PC routing, death clamp, zero state, and LR
+// clear keys are pinned by the MA-1489 twin; secondary-pool scoping +
+// attacker regain by MA-1645.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -91,7 +93,7 @@ import monsters from '../../../../public/data/monsters.json';
 
 const WRAITH = monsters.find(m => m.index === 'wraith');
 const LIFE_DRAIN = WRAITH.actions[0];
-const SPECTER_DRAIN = monsters.find(m => m.index === 'specter').actions[0];
+const CREATE_SPECTER = WRAITH.actions[1];
 
 describe('MA-1728 Wraith Life Drain hp_max_reduce producer', () => {
     const deps = {
@@ -102,41 +104,35 @@ describe('MA-1728 Wraith Life Drain hp_max_reduce producer', () => {
         logEntry: vi.fn(),
     };
 
-    function freshCs() {
-        return {
-            round: 1,
-            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium or Small', ac: 12, currentHp: 999, maxHp: 11 }],
-        };
-    }
-
     beforeEach(() => {
         vi.clearAllMocks();
         getRuntimeValue.mockReturnValue(null);
     });
 
-    async function resolveHit({ cs = freshCs(), targetName = 'Bandit 1', finalDamage = 7 } = {}) {
-        applyDamageToTarget.mockResolvedValue({ finalDamage, newHp: 999 - finalDamage, damageReduced: false });
+    async function resolveHit({ finalDamage = 7 } = {}) {
+        const cs = {
+            round: 1,
+            creatures: [{ name: 'Bandit 1', type: 'npc', size: 'Medium or Small', ac: 12, currentHp: 11, maxHp: 11 }],
+        };
+        applyDamageToTarget.mockResolvedValue({ finalDamage, newHp: 11 - finalDamage, damageReduced: false });
         await createPlainDamageHandler(deps)({
-            name: 'Life Drain', formula: '4d8 + 3', total: 7, rolls: [1, 1, 1, 1], modifier: 3,
+            name: 'Life Drain', formula: '4d8 + 3', total: 7, rolls: [2, 2, 2, 2], modifier: 3,
             adjustedTotal: 7, combatSummary: cs,
-            context: { targetName, damageType: 'Necrotic', attackerName: 'Wraith 1', hitClause: buildHitConditionClause(LIFE_DRAIN) },
+            context: { targetName: 'Bandit 1', damageType: 'Necrotic', attackerName: 'Wraith 1', hitClause: buildHitConditionClause(LIFE_DRAIN) },
         });
-        return cs.creatures.find(c => c.name === targetName);
+        return cs.creatures.find(c => c.name === 'Bandit 1');
     }
 
-    it('DATA: wraith.actions[0] authors the structured HP-max rider as the specter byte-twin; existing bytes byte-pinned', () => {
+    it('DATA & PARSER: wraith.actions[0] authors the structured HP-max rider — bytes byte-pinned, key position pinned, parser arms; Create Specter row byte-inert', () => {
         expect(LIFE_DRAIN.hit_hp_max_reduce).toEqual({ equal_to: 'damage' });
         expect(LIFE_DRAIN.attack_bonus).toBe(6);
         expect(LIFE_DRAIN.reach).toBe('5 ft.');
         expect(LIFE_DRAIN.damage_dice_primary).toBe('4d8 + 3');
         expect(LIFE_DRAIN.damage_type_primary).toBe('Necrotic');
         expect(LIFE_DRAIN.description).toBe('Melee Attack Roll: +6, reach 5 ft. Hit: 21 (4d8 + 3) Necrotic damage. If the target is a creature, its Hit Point maximum decreases by an amount equal to the damage taken.');
-        expect(SPECTER_DRAIN.hit_hp_max_reduce).toEqual({ equal_to: 'damage' });
         const keys = Object.keys(LIFE_DRAIN);
         expect(keys.indexOf('hit_hp_max_reduce')).toBe(keys.indexOf('damage_type_primary') + 1);
-    });
 
-    it('PARSER: parseHitHpMaxReduce arms the wraith row; buildHitConditionClause carries hpMaxReduce', () => {
         expect(parseHitHpMaxReduce(LIFE_DRAIN)).toEqual({ equalTo: 'damage' });
         expect(buildHitConditionClause(LIFE_DRAIN)).toEqual({
             conditions: [],
@@ -145,9 +141,12 @@ describe('MA-1728 Wraith Life Drain hp_max_reduce producer', () => {
             targetEffect: null,
             hpMaxReduce: { equalTo: 'damage' },
         });
+        expect(CREATE_SPECTER.hit_hp_max_reduce).toBeUndefined();
+        expect(parseHitHpMaxReduce(CREATE_SPECTER)).toBeNull();
+        expect(buildHitConditionClause(CREATE_SPECTER)).toBeNull();
     });
 
-    it('HIT: cs maxHp drops by exactly the necrotic damage applied, te ledger {baseMax,reduced,max} + drain log land, NO clock', async () => {
+    it('HIT: live wraith lane — cs maxHp drops by exactly the necrotic damage applied, currentHp clamps, te ledger {baseMax,reduced,max} + drain log land, NO clock', async () => {
         const bandit = await resolveHit();
 
         expect(bandit.maxHp).toBe(4);
@@ -163,38 +162,5 @@ describe('MA-1728 Wraith Life Drain hp_max_reduce producer', () => {
         const grant = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Max HP Reduced');
         expect(grant.reason).toBe('Life Drain — max HP 11 → 4 (−7, equal to damage taken)');
         expect(addExpiration).not.toHaveBeenCalled();
-    });
-
-    it('ACCUMULATE: standing ledger reduces within max and sums the drain', async () => {
-        const standing = { target: 'Bandit 1', effect: 'hp_max_reduce', baseMax: 999, reduced: 30, max: 969, source: 'Wraith 1', duration: 'until_long_rest' };
-        getRuntimeValue.mockImplementation((name, key) => (key === 'targetEffects' ? [standing] : null));
-
-        const bandit = await resolveHit({ finalDamage: 12 });
-
-        expect(bandit.maxHp).toBe(957);
-        expect(registerTargetEffect).toHaveBeenCalledWith(
-            'test-campaign',
-            'Bandit 1',
-            'hp_max_reduce',
-            'Wraith 1',
-            { baseMax: 999, reduced: 42, max: 957, duration: 'until_long_rest' },
-        );
-        const grant = deps.logEntry.mock.calls.map(c => c[0]).find(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Max HP Reduced');
-        expect(grant.reason).toBe('Life Drain — max HP 969 → 957 (−12, equal to damage taken)');
-    });
-
-    it('BYTE-INERT: wraith Create Specter row and clauseless rows arm nothing — zero writes, zero drain logs', async () => {
-        expect(parseHitHpMaxReduce(WRAITH.actions[1])).toBeNull();
-        expect(buildHitConditionClause(WRAITH.actions[1])).toBeNull();
-
-        await createPlainDamageHandler(deps)({
-            name: 'Scimitar', formula: '1d6 + 1', total: 6, rolls: [5], modifier: 1,
-            adjustedTotal: 6, combatSummary: freshCs(),
-            context: { targetName: 'Bandit 1', damageType: 'Slashing', attackerName: 'Wraith 1' },
-        });
-
-        expect(registerTargetEffect).not.toHaveBeenCalled();
-        expect(storage.set).not.toHaveBeenCalled();
-        expect(deps.logEntry.mock.calls.map(c => c[0]).some(e => (e.automationType || '').startsWith('hp_max_reduce') || e.condition === 'Max HP Reduced')).toBe(false);
     });
 });

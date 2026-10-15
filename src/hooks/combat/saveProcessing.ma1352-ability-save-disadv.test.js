@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 // MA-1352: ability-scoped ability_save_disadvantage te on the monster-card
 // save-chip seam. processNpcSave is the auto-roll path for GM-pressed DC
 // chips against NPC victims (live fingerprint: roll save stamps rolls:[d20],
@@ -5,7 +6,11 @@
 // mode pinned 'normal' even with an active rider). The seam must force
 // Disadvantage (min(r1, r2) + mode 'disadvantage') ONLY for saves of the
 // te's chosen ability; every other save type stays normal, and the te is
-// NOT consumed (duration-anchored clock, playbook §38).
+// NOT consumed nor re-anchored (duration-anchored clock is owned by the
+// hit-side producer, playbook §38). Matcher-branch coverage lives in
+// targetEffectDefinitions.test.js; the hit/hit-consume seams are covered by
+// handleNpcSaveDamage.ma1352 and handlePlainDamage.ma1352-pseudopod — this
+// file owns ONLY the saveProcessing-side fold.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -21,7 +26,6 @@ vi.mock('../../services/ui/utils.js', () => ({
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: () => ({ total: 5, rolls: [5], modifier: 0 }),
-    rollD20: () => 1,
 }));
 
 vi.mock('../../services/automation/common/savePrompt.js', () => ({
@@ -64,21 +68,23 @@ const campaignName = 'test-campaign';
 const ATTACKER = 'Psychic Gray Ooze 1';
 const TARGET = 'Bandit 1';
 
-const te = (ability) => ([{
-    target: TARGET,
+const te = (ability, target = TARGET) => ([{
+    target,
     effect: 'ability_save_disadvantage',
     source: ATTACKER,
     duration: 'until_start_of_next_turn',
     ability,
 }]);
 
-// Fixed disk row context (Psychic Crush DC chip: DC 10 Intelligence, 3d8).
+// Fixed disk row context (Psychic Crush DC chip: save_type 'Intelligence'
+// full word, DC 10, "Failure: 3d8 Psychic" → dc_success 'none' per
+// monsters.json; chip ctx carries effectiveD20 = r1 alongside r1/r2).
 const crushContext = (saveType) => ({
     saveDc: 10,
     saveType,
     attackerName: ATTACKER,
     actionName: 'Psychic Crush',
-    dcSuccess: 'half',
+    dcSuccess: 'none',
     autoDamageFormula: '3d8',
     autoDamageDamageType: 'Psychic',
     saveConditions: [],
@@ -108,48 +114,36 @@ beforeEach(() => {
 });
 
 describe('MA-1352 ability_save_disadvantage on the NPC save-chip seam', () => {
-    it('INT save with active INT te: min(r1, r2) + mode disadvantage on the log', async () => {
+    it('Intelligence save with active INT te: min(r1, r2) in both dice orders, mode disadvantage, te + expiry untouched', async () => {
         runtimeStore['campaign.targetEffects'] = te('int');
-        const { result, logEntry } = await resolveNpcSave('INT', 15, 6);
 
-        expect(result.effectiveD20ForSave).toBe(6);
-        expect(logEntry.mock.calls[0][0]).toMatchObject({ type: 'roll', rollType: 'save', mode: 'disadvantage' });
+        const higherFirst = await resolveNpcSave('Intelligence', 15, 6);
+        expect(higherFirst.result.effectiveD20ForSave).toBe(6);
+        expect(higherFirst.logEntry.mock.calls[0][0]).toMatchObject({ type: 'roll', rollType: 'save', mode: 'disadvantage' });
+
+        const lowerFirst = await resolveNpcSave('Intelligence', 4, 17);
+        expect(lowerFirst.result.effectiveD20ForSave).toBe(4);
+        expect(lowerFirst.logEntry.mock.calls[0][0]).toMatchObject({ mode: 'disadvantage' });
+
+        // Non-consuming: the te survives the resolve and this seam never
+        // re-registers its attacker-anchored expiration clock.
         expect(runtimeStore['campaign.targetEffects']).toEqual(te('int'));
+        expect(addExpiration).not.toHaveBeenCalled();
     });
 
-    it('INT save where the lower die is first (r1 < r2): effective unchanged, still disadvantage', async () => {
+    it('inert lanes stay normal mode, r1 wins: no te, mismatched ability, mismatched target', async () => {
+        const noTe = await resolveNpcSave('Intelligence', 15, 6);
+        expect(noTe.result.effectiveD20ForSave).toBe(15);
+        expect(noTe.logEntry.mock.calls[0][0].mode).toBe('normal');
+
         runtimeStore['campaign.targetEffects'] = te('int');
-        const { result } = await resolveNpcSave('INT', 4, 17);
+        const otherAbility = await resolveNpcSave('DEX', 15, 6);
+        expect(otherAbility.result.effectiveD20ForSave).toBe(15);
+        expect(otherAbility.logEntry.mock.calls[0][0].mode).toBe('normal');
 
-        expect(result.effectiveD20ForSave).toBe(4);
-    });
-
-    it('DEX save with active INT te: normal mode, r1 wins (other abilities unaffected)', async () => {
-        runtimeStore['campaign.targetEffects'] = te('int');
-        const { result, logEntry } = await resolveNpcSave('DEX', 15, 6);
-
-        expect(result.effectiveD20ForSave).toBe(15);
-        expect(logEntry.mock.calls[0][0].mode).toBe('normal');
-    });
-
-    it('WIS save with active INT te: normal mode', async () => {
-        runtimeStore['campaign.targetEffects'] = te('int');
-        const { result } = await resolveNpcSave('WIS', 15, 6);
-
-        expect(result.effectiveD20ForSave).toBe(15);
-    });
-
-    it('no te in store: byte-inert, normal mode', async () => {
-        const { result, logEntry } = await resolveNpcSave('INT', 15, 6);
-
-        expect(result.effectiveD20ForSave).toBe(15);
-        expect(logEntry.mock.calls[0][0].mode).toBe('normal');
-    });
-
-    it('te on a different creature: normal mode', async () => {
-        runtimeStore['campaign.targetEffects'] = [{ ...te('int')[0], target: 'AasimarTest' }];
-        const { result } = await resolveNpcSave('INT', 15, 6);
-
-        expect(result.effectiveD20ForSave).toBe(15);
+        runtimeStore['campaign.targetEffects'] = te('int', 'AasimarTest');
+        const otherTarget = await resolveNpcSave('Intelligence', 15, 6);
+        expect(otherTarget.result.effectiveD20ForSave).toBe(15);
+        expect(otherTarget.logEntry.mock.calls[0][0].mode).toBe('normal');
     });
 });

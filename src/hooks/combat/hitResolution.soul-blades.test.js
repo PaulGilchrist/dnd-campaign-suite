@@ -1,6 +1,12 @@
-// CLA-320 Homing Strikes (Soulknife Soul Blades lv9) resolution gates:
-// miss→hit conversion spends the die and flips hit; natural 1 never converts;
-// still-miss spends nothing and stamps the attempt.
+// @maintained-by-ai: 2026-10-14
+// CLA-320 hitResolution seam (hitResolution.js runHomingStrikes/attemptHomingStrike):
+// Soulknife lv9 Soul Blades "Homing Strikes" — on a Psychic Blade miss, roll the
+// psionic die and add it; hit vs EFFECTIVE AC spends 1 Psionic Energy; natural 1
+// never converts; still-miss and zero-energy spend nothing. Data gate: 2024
+// classes.json Rogue→Soul Blades level 9, lv17 energy_die_type 12 (d12 — validated
+// here through the REAL automationExpressions.getPsionicEnergyDieSize, unmocked).
+// Producer/UI seams covered elsewhere: autoRerollHandler.soul-blades.test.js,
+// DiceRollResult.homing.test.jsx, attackPostProcessing.js evidence stamps.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { resolveHit } from './hitResolution.js';
@@ -50,24 +56,21 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getTargetFromAttacker: vi.fn(() => null),
 }));
 
-vi.mock('../../services/combat/automation/automationExpressions.js', () => ({
-    evaluateAutoExpression: vi.fn(() => 12),
-}));
-
-function stubRandom(fraction) {
-    Object.defineProperty(Math, 'random', { value: () => fraction, configurable: true, writable: true });
-}
+// NOTE: automationExpressions is NOT mocked — the psionic die size must come from
+// the real level table (lv17 → d12, matching 2024 classes.json energy data).
 
 const characterName = 'AasimarTest';
 const campaignName = 'test-campaign';
+const AC = 18;
+const BONUS = 8;
 
-function makeContext() {
+function makeContext(overrides) {
     return {
         rollType: 'attack',
         attackerName: characterName,
         targetName: 'Knight 1',
-        effectiveBonus: 8,
-        bonus: 8,
+        effectiveBonus: BONUS,
+        bonus: BONUS,
         isPsychicBlade: true,
         isWeaponAttack: true,
         playerStats: {
@@ -76,18 +79,33 @@ function makeContext() {
             class: { name: 'Rogue', major: { name: 'Soulknife' } },
             _trackedResources: { psionicEnergy: { max: 12 } },
         },
+        ...overrides,
     };
 }
 
-const target = { name: 'Knight 1', ac: 18, type: 'monster' };
-
-function callResolveHit(effectiveD20Roll) {
-    return resolveHit({ characterName: characterName, campaignName: campaignName, context: makeContext(), bonus: 8, effectiveD20Roll: effectiveD20Roll, target: target, combatSummary: null, characters: [], logEntry: vi.fn() });
+function callResolveHit(effectiveD20Roll, contextOverrides) {
+    return resolveHit({
+        characterName,
+        campaignName,
+        context: makeContext(contextOverrides),
+        bonus: BONUS,
+        effectiveD20Roll,
+        target: { name: 'Knight 1', ac: AC, type: 'monster' },
+        combatSummary: null,
+        characters: [],
+        logEntry: vi.fn(),
+    });
 }
 
+const energyWrites = () => setRuntimeValue.mock.calls.filter(c => c[1] === 'psionicEnergy');
+const logText = () => addEntry.mock.calls.map(c => c[1].description).join('\n');
+
 describe('resolveHit — Homing Strikes (CLA-320 Soul Blades)', () => {
+    let randomSpy;
+
     beforeEach(() => {
         vi.clearAllMocks();
+        randomSpy = vi.spyOn(Math, 'random');
         getRuntimeValue.mockImplementation((name, key) => {
             if (name === characterName && key === 'psionicEnergy') return 12;
             return null;
@@ -95,65 +113,76 @@ describe('resolveHit — Homing Strikes (CLA-320 Soul Blades)', () => {
     });
 
     afterEach(() => {
-        Object.defineProperty(Math, 'random', { value: Math.random, configurable: true, writable: true });
+        vi.restoreAllMocks();
     });
 
     it('converts a miss into a hit, expends 1 Psionic Energy, and reports the homing bonus', async () => {
-        stubRandom(0.41); // d12 → 5; 8 + 8 + 5 = 21 ≥ AC 18
+        randomSpy.mockReturnValue(0.41); // d12 → 5; 8 + 8 + 5 = 21 ≥ AC 18
         const result = await callResolveHit(8);
 
         expect(result.hit).toBe(true);
-        expect(result.homingStrikesUsed).toBe(true);
         expect(result.homingStrikesAttempted).toBe(true);
+        expect(result.homingStrikesUsed).toBe(true);
         expect(result.homingStrikesBonus).toBe(5);
         expect(setRuntimeValue).toHaveBeenCalledWith(characterName, 'psionicEnergy', 11, campaignName);
-        const logs = addEntry.mock.calls.map(c => c[1].description).join('\n');
-        expect(logs).toContain('turn a miss into a hit');
-        expect(logs).toContain('Psionic Energy: 11/12');
+        expect(logText()).toContain('turn a miss into a hit');
+        expect(logText()).toContain('Psionic Energy: 11/12');
     });
 
-    it('compares the boosted total against effective AC (cover folded in)', async () => {
-        stubRandom(0.41); // d12 → 5; total 21 vs effective AC 20
-        const context = makeContext();
-        context.coverAcBonus = 2;
-        const result = await resolveHit({ characterName: characterName, campaignName: campaignName, context: context, bonus: 8, effectiveD20Roll: 8, target: { name: 'Knight 1', ac: 18 }, combatSummary: null, characters: [], logEntry: vi.fn() });
+    it('compares the boosted total against effective AC, not base AC (cover folded in)', async () => {
+        // Half-cover lifts AC 18 → effective 20. Total 19 would convert if the
+        // resolver wrongly compared against base AC 18 — it must still miss and
+        // spend nothing.
+        randomSpy.mockReturnValue(0.2); // d12 → 3; 8 + 8 + 3 = 19 < effective AC 20
+        const result = await callResolveHit(8, { coverAcBonus: 2 });
 
-        expect(result.hit).toBe(true);
-        expect(result.homingStrikesUsed).toBe(true);
-        expect(setRuntimeValue).toHaveBeenCalledWith(characterName, 'psionicEnergy', 11, campaignName);
+        expect(result.effectiveAc).toBe(20);
+        expect(result.hit).toBe(false);
+        expect(result.homingStrikesAttempted).toBe(true);
+        expect(result.homingStrikesUsed).toBe(false);
+        expect(energyWrites()).toHaveLength(0);
+        expect(logText()).toContain('still missed (total: 19 vs AC: 20)');
     });
 
     it('still-miss expends NO die but stamps the attempt', async () => {
-        stubRandom(0); // d12 → 1; 8 + 8 + 1 = 17 < AC 18
+        randomSpy.mockReturnValue(0); // d12 → 1; 8 + 8 + 1 = 17 < AC 18
         const result = await callResolveHit(8);
 
         expect(result.hit).toBe(false);
-        expect(result.homingStrikesUsed).toBe(false);
         expect(result.homingStrikesAttempted).toBe(true);
-        const energyWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'psionicEnergy');
-        expect(energyWrites).toHaveLength(0);
-        const logs = addEntry.mock.calls.map(c => c[1].description).join('\n');
-        expect(logs).toContain('the attack still missed (total: 17 vs AC: 18)');
+        expect(result.homingStrikesUsed).toBe(false);
+        expect(energyWrites()).toHaveLength(0);
+        expect(logText()).toContain('the attack still missed (total: 17 vs AC: 18)');
     });
 
     it('natural 1 never converts — no die rolled, no energy spent', async () => {
-        const randomSpy = vi.spyOn(Math, 'random');
         const result = await callResolveHit(1);
 
         expect(result.hit).toBe(false);
-        expect(result.homingStrikesUsed).toBe(false);
         expect(result.homingStrikesAttempted).toBe(false);
+        expect(result.homingStrikesUsed).toBe(false);
         expect(randomSpy).not.toHaveBeenCalled();
-        const energyWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'psionicEnergy');
-        expect(energyWrites).toHaveLength(0);
-        const logs = addEntry.mock.calls.map(c => c[1].description).join('\n');
-        expect(logs).toContain('natural 1');
-        expect(logs).toContain('Homing Strikes was not attempted');
+        expect(energyWrites()).toHaveLength(0);
+        expect(logText()).toContain('natural 1');
+        expect(logText()).toContain('Homing Strikes was not attempted');
     });
 
-    it('rolls the table die size (d12 at lv17), not a hardcoded fallback', async () => {
-        stubRandom(0.99); // d12 → 12
+    it('rolls the real lv17 psionic die size (d12), not a hardcoded fallback', async () => {
+        randomSpy.mockReturnValue(0.99); // d12 → 12
         const result = await callResolveHit(8);
         expect(result.homingStrikesBonus).toBe(12);
+    });
+
+    it('spends nothing and stays a miss when the psionic pool is empty (even if the die would convert)', async () => {
+        getRuntimeValue.mockImplementation((name, key) => {
+            if (name === characterName && key === 'psionicEnergy') return 0;
+            return null;
+        });
+        randomSpy.mockReturnValue(0.99); // d12 → 12; 8 + 8 + 12 = 28 ≥ AC 18
+        const result = await callResolveHit(8);
+
+        expect(result.hit).toBe(false);
+        expect(result.homingStrikesUsed).toBe(false);
+        expect(energyWrites()).toHaveLength(0);
     });
 });

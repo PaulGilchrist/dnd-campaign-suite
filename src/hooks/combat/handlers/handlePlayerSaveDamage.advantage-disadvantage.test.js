@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -116,6 +117,17 @@ function invokeHandler(handler, context = BASE_CONTEXT, combatSummary = BASE_COM
     return handler({ name: 'Fire Bolt', formula: '1d10', total: 5, rolls: [6], modifier: 0, context: context, adjustedTotal: 5, combatSummary: combatSummary, displayRolls: [6] });
 }
 
+function mockConditionEffects(overrides = {}) {
+    computeConditionEffects.mockReturnValue({
+        restoreBalance: false,
+        autoRerollForSaves: false,
+        autoRerollBonus: null,
+        saveAdvantageCount: 0,
+        saveAdvantageAbilities: null,
+        ...overrides,
+    });
+}
+
 describe('handlePlayerSaveDamage - advantage/disadvantage calculation', () => {
     const deps = {
         characterName: 'TestWizard',
@@ -130,20 +142,14 @@ describe('handlePlayerSaveDamage - advantage/disadvantage calculation', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         deps.pendingSaves = {};
-        computeConditionEffects.mockReturnValue({
-            restoreBalance: false,
-            autoRerollForSaves: false,
-            autoRerollBonus: null,
-            saveAdvantageCount: 0,
-            saveAdvantageAbilities: null,
-        });
+        mockConditionEffects();
         getHolyAuraTargets.mockReturnValue([]);
         getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: false });
         getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
         isCircleOfPowerActive.mockReturnValue(false);
     });
 
-    it('sets metamagicHeighten to true in pending data when corona aura grants disadvantage', async () => {
+    it('corona aura disadvantage rides the pending data and the save prompt', async () => {
         getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
 
         const handler = createPlayerSaveDamageHandler(deps);
@@ -159,11 +165,17 @@ describe('handlePlayerSaveDamage - advantage/disadvantage calculation', () => {
         expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('metamagicHeighten', true);
         expect(sendSavePrompt).toHaveBeenCalledWith(
             'test-campaign',
-            expect.objectContaining({ disadvantage: true })
+            expect.objectContaining({
+                targetName: 'TestWizard',
+                saveType: 'DEX',
+                saveDc: 13,
+                disadvantage: true,
+                advantage: false,
+            })
         );
     });
 
-    it('sets metamagicHeighten to true in pending data when elder champion aura grants disadvantage', async () => {
+    it('elder champion aura disadvantage rides the pending data and the save prompt', async () => {
         getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: true });
 
         const handler = createPlayerSaveDamageHandler(deps);
@@ -182,25 +194,20 @@ describe('handlePlayerSaveDamage - advantage/disadvantage calculation', () => {
         );
     });
 
-    it('passes disadvantage through sendSavePrompt to the UI', async () => {
-        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
+    it('uses handler characterName (not context attackerName) for the elder champion check', async () => {
+        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: true });
 
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
+        const handler = createPlayerSaveDamageHandler({ ...deps, characterName: 'CasterA' });
+        await invokeHandler(handler, { ...BASE_CONTEXT, attackerName: 'CasterB' });
 
-        expect(sendSavePrompt).toHaveBeenCalledWith(
-            'test-campaign',
-            expect.objectContaining({
-                targetName: 'TestWizard',
-                saveType: 'DEX',
-                saveDc: 13,
-                disadvantage: true,
-                advantage: false,
-            })
+        // The handler passes `characterName` (from deps) to getElderChampionSaveDisadvantage,
+        // not the effectiveAttackerName which would use context attackerName
+        expect(getElderChampionSaveDisadvantage).toHaveBeenCalledWith(
+            expect.objectContaining({ attackerName: 'CasterA' })
         );
     });
 
-    it('passes advantage through sendSavePrompt when circle of power grants advantage', async () => {
+    it('grants advantage when circle of power is active', async () => {
         isCircleOfPowerActive.mockReturnValue(true);
 
         const handler = createPlayerSaveDamageHandler(deps);
@@ -214,21 +221,34 @@ describe('handlePlayerSaveDamage - advantage/disadvantage calculation', () => {
         );
     });
 
+    it('grants advantage from condition-effect saveAdvantageCount without circle of power', async () => {
+        mockConditionEffects({ saveAdvantageCount: 1 });
+
+        const handler = createPlayerSaveDamageHandler(deps);
+        await invokeHandler(handler);
+
+        expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('saveAdvantage', true);
+        expect(sendSavePrompt).toHaveBeenCalledWith(
+            'test-campaign',
+            expect.objectContaining({ advantage: true })
+        );
+    });
+
     it('defaults to no advantage or disadvantage when no sources apply', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
         await invokeHandler(handler);
 
-        expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('metamagicHeighten', false);
-        expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('saveAdvantage', false);
+        expect(deps.pendingSaves['test-guid-1234']).toMatchObject({
+            metamagicHeighten: false,
+            saveAdvantage: false,
+        });
         expect(sendSavePrompt).toHaveBeenCalledWith(
             'test-campaign',
             expect.objectContaining({ disadvantage: false, advantage: false })
         );
     });
 
-    it('prioritizes metamagicHeighten context over corona aura disadvantage', async () => {
-        getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
-
+    it('context metamagicHeighten alone forces disadvantage and forcedMode in the log', async () => {
         const handler = createPlayerSaveDamageHandler(deps);
         await invokeHandler(handler, { ...BASE_CONTEXT, metamagicHeighten: true });
 
@@ -237,79 +257,39 @@ describe('handlePlayerSaveDamage - advantage/disadvantage calculation', () => {
             'test-campaign',
             expect.objectContaining({ disadvantage: true })
         );
+        expect(deps.logEntry).toHaveBeenCalledWith(
+            expect.objectContaining({ rollType: 'save-prompt', forcedMode: 'disadvantage' })
+        );
     });
 
-    it('combines corona and elder champion disadvantage sources with restoreBalance keeping disadvantage', async () => {
+    it('restoreBalance keeps disadvantage when two aura sources stack', async () => {
         getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
         getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: true });
-        computeConditionEffects.mockReturnValue({
-            restoreBalance: true,
-            autoRerollForSaves: false,
-            autoRerollBonus: null,
-            saveAdvantageCount: 0,
-            saveAdvantageAbilities: null,
-        });
+        mockConditionEffects({ restoreBalance: true });
 
         const handler = createPlayerSaveDamageHandler(deps);
         await invokeHandler(handler);
 
-        // restoreBalance reduces disadvantage: sources > 1 = true, so disadvantage stays true
+        // sources (2) > 1, so disadvantage survives restoreBalance
         expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('metamagicHeighten', true);
+        expect(sendSavePrompt).toHaveBeenCalledWith(
+            'test-campaign',
+            expect.objectContaining({ disadvantage: true })
+        );
     });
 
-    it('resolves disadvantage to false when restoreBalance cancels a single source', async () => {
+    it('restoreBalance cancels disadvantage from a single aura source', async () => {
         getCoronaSaveDisadvantage.mockReturnValue({ disadvantage: true });
-        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: false });
-        computeConditionEffects.mockReturnValue({
-            restoreBalance: true,
-            autoRerollForSaves: false,
-            autoRerollBonus: null,
-            saveAdvantageCount: 0,
-            saveAdvantageAbilities: null,
-        });
+        mockConditionEffects({ restoreBalance: true });
 
         const handler = createPlayerSaveDamageHandler(deps);
         await invokeHandler(handler);
 
-        // restoreBalance + 1 source: sources > 1 = false, so disadvantage becomes false
+        // sources (1) > 1 is false, so disadvantage becomes false
         expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('metamagicHeighten', false);
         expect(sendSavePrompt).toHaveBeenCalledWith(
             'test-campaign',
             expect.objectContaining({ disadvantage: false })
-        );
-    });
-
-    it('does not grant advantage when circle of power is inactive and saveAdvantageCount is zero', async () => {
-        isCircleOfPowerActive.mockReturnValue(false);
-        computeConditionEffects.mockReturnValue({
-            restoreBalance: false,
-            autoRerollForSaves: false,
-            autoRerollBonus: null,
-            saveAdvantageCount: 0,
-            saveAdvantageAbilities: null,
-        });
-
-        const handler = createPlayerSaveDamageHandler(deps);
-        await invokeHandler(handler);
-
-        expect(deps.pendingSaves['test-guid-1234']).toHaveProperty('saveAdvantage', false);
-    });
-
-    it('uses handler characterName (not context attackerName) for elder champion check', async () => {
-        getElderChampionSaveDisadvantage.mockResolvedValue({ disadvantage: true });
-
-        const handler = createPlayerSaveDamageHandler({ ...deps, characterName: 'CasterA' });
-        await invokeHandler(handler, {
-            ...BASE_CONTEXT,
-            attackerName: 'CasterB',
-        });
-
-        // The handler passes `characterName` (from deps) to getElderChampionSaveDisadvantage,
-        // not the effectiveAttackerName which would use context attackerName
-        expect(getElderChampionSaveDisadvantage).toHaveBeenCalledWith(
-            expect.objectContaining({
-                attackerName: 'CasterA',
-            })
         );
     });
 });

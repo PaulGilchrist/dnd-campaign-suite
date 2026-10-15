@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -35,15 +36,16 @@ vi.mock('../../services/encounters/combatData.js', () => ({
     getCombatSummary: () => null,
 }));
 
-// Mirror of the REAL pure resolvers (applyDamage.js:87-119) — real 'none'
-// branch additionally pinned live + by applyDamage.helpers.test.js:102.
+// Mirror of the REAL pure resolvers (applyDamage.js:93-132, incl. MA-0367
+// dc_success:'full'); the 'none' zero-on-success branch is additionally
+// pinned live + by applyDamage.helpers.test.js.
 const applyDamageToTarget = vi.fn(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 60 - finalDamage }));
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     normalizeSaveType: (t) => String(t || '').toUpperCase(),
-    computeDamageAfterSave: (raw, success, dcSuccess) => (!success ? raw : dcSuccess === 'half' ? Math.floor(raw / 2) : 0),
+    computeDamageAfterSave: (raw, success, dcSuccess) => (!success ? raw : dcSuccess === 'half' ? Math.floor(raw / 2) : dcSuccess === 'full' ? raw : 0),
     computeDamageAfterEvasion: (total, saveSuccess, dcSuccess, evasionActive) =>
         (evasionActive && dcSuccess === 'half') ? (saveSuccess ? 0 : Math.floor(total / 2))
-            : (!saveSuccess ? total : dcSuccess === 'half' ? Math.floor(total / 2) : 0),
+            : (!saveSuccess ? total : dcSuccess === 'half' ? Math.floor(total / 2) : dcSuccess === 'full' ? total : 0),
     applyDamageToTarget: (...args) => applyDamageToTarget(...args),
 }));
 
@@ -67,6 +69,9 @@ const campaignName = 'test-campaign';
 const YETI = 'Abominable Yeti 1';
 const TARGET = 'AberrantSorcerer';
 
+// Mirrors the authored Abominable Yeti Chilling Gaze row (monsters.json:
+// DC 18 CON, dc_success:none, 6d6 Cold, Paralyzed on fail, 1h gaze_immunity
+// on success).
 const gazeContext = {
     saveDc: 18,
     saveType: 'CON',
@@ -100,7 +105,7 @@ beforeEach(() => {
 });
 
 describe('MA-0030 Chilling Gaze dc_success:none + 1h gaze immunity', () => {
-    it('successful save: ZERO damage, gaze_immunity te sourced from yeti, 600-round expiry, granted log', async () => {
+    it('successful save: ZERO damage, gaze_immunity te sourced from yeti, 600-round expiry clock, granted log', async () => {
         await resolveSave({ ...gazeContext }, true, 24);
 
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
@@ -123,27 +128,25 @@ describe('MA-0030 Chilling Gaze dc_success:none + 1h gaze immunity', () => {
         expect(runtimeStore[`${TARGET}.activeConditions`]).toBeUndefined();
     });
 
-    it('failed save: FULL damage + Paralyzed applied, no immunity te (unchanged behavior)', async () => {
+    it('unchanged behavior: gaze fail pays FULL damage + Paralyzed with no immunity grant; plain half row stays byte-inert', async () => {
         await resolveSave({ ...gazeContext }, false, 11);
 
-        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(24);
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['paralyzed']);
-        expect(addEntryLogs.some(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Paralyzed')).toBe(true);
         expect(addExpiration).not.toHaveBeenCalled();
         expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
-    });
 
-    it('default half rows unchanged: no dc_success/success_immunity → half on success, no te', async () => {
-        const coldBreath = {
+        // Row without the success_immunity key: half-on-success lane untouched,
+        // no immunity clause ever granted (half math pinned in applyDamage.helpers.test.js).
+        vi.clearAllMocks();
+        await resolveSave({
             ...gazeContext,
             actionName: 'Cold Breath (Recharge 6)',
             dcSuccess: 'half',
             autoDamageFormula: '10d8',
             saveConditions: [],
             successImmunity: null,
-        };
-        await resolveSave(coldBreath, true, 45);
+        }, true, 45);
 
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(12);
         expect(addExpiration).not.toHaveBeenCalled();

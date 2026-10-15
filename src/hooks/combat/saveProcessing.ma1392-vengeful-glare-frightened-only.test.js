@@ -1,16 +1,15 @@
-// MA-1392: Revenant Vengeful Glare — conditional Paralyzed (+ Cursed) rider
-// over-granted on EVERY failed save. The prose tail ("If the Frightened target
+// @maintained-by-ai: 2026-10-14
+// MA-1392: Revenant Vengeful Glare — the prose tail ("If the Frightened target
 // is cursed by the revenant (see Vow of Revenge), the target also has the
 // Paralyzed condition for the duration.") is a gated conditional, but
 // extractConditionsFromSaveEffect word-scans the WHOLE save_effect string, so
 // the untruncated row sprayed ['cursed','frightened','paralyzed'] on any fail.
 // Fix = MA-1351 band-truncation twin, DATA-only: save_effect truncated to the
 // shallow Frightened band; description keeps the full RAW prose (§52: consumers
-// feed save_effect only — MonsterCardModal.jsx:581/:1024/:2231,
-// MonsterAction.jsx:122). The cursed-precondition→Paralyzed rider + the
+// feed save_effect only). The cursed-precondition→Paralyzed rider + the
 // revenant Vow-of-Revenge cursed producer are parked to a separate mechanism
-// ticket (§70-class; no consumer exists). Fail leg on an UNCURED victim:
-// Frightened ONLY. Success: zero grants. Pure save row: zero damage both legs.
+// ticket (§70-class; no consumer exists). Contract: Frightened ONLY on fail,
+// zero grants on success, zero damage both legs (pure save row).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import monstersData from '../../../public/data/monsters.json';
 import { extractConditionsFromSaveEffect } from '../../components/encounter/MonsterCardHelpers.js';
@@ -73,7 +72,7 @@ const campaignName = 'test-campaign';
 const ATTACKER = 'Revenant 1';
 const TARGET = 'Bandit 1';
 
-const glareRow = () => monstersData.find(m => m.name === 'Revenant').actions[2];
+const glareRow = () => monstersData.find(m => m.name === 'Revenant').actions.find(a => a.name === 'Vengeful Glare');
 
 // Fixed disk-row save context (§581 inline save lane shape: zero damage,
 // saveConditions re-extracted from the TRUNCATED save_effect).
@@ -104,8 +103,6 @@ async function resolveNpcSave(total) {
     });
 }
 
-const appliedLogs = () => conditionLogs.filter(e => e.type === 'condition' && e.action === 'applied');
-
 beforeEach(() => {
     vi.clearAllMocks();
     for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
@@ -113,43 +110,38 @@ beforeEach(() => {
 });
 
 describe('MA-1392 Revenant Vengeful Glare — truncated save_effect, Frightened-only fail grant', () => {
-    it('DATA lock: save_effect truncated at the conditional tail; description keeps full RAW prose', () => {
+    it('DATA lock: save_effect truncated at the conditional tail (word-scan yields Frightened ONLY); description keeps full RAW prose', () => {
         const row = glareRow();
-        expect(row.name).toBe('Vengeful Glare');
         expect(row.save_dc).toBe(15);
         expect(row.save_type).toBe('Wisdom');
         expect(row.save_effect).toBe('The target has the Frightened condition and repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically.');
         expect(row.save_effect).not.toMatch(/cursed|paralyzed/i);
+        expect(extractConditionsFromSaveEffect(row.save_effect)).toEqual(['frightened']);
+        // Pre-fix fingerprint: the gated rider survives ONLY in the description
+        // prose — a whole-string word-scan there re-sprays the three-condition
+        // over-grant MA-1392 truncated away (consumers feed save_effect only).
         expect(row.description).toContain('If the Frightened target is cursed by the revenant (see Vow of Revenge), the target also has the <strong>Paralyzed</strong> condition for the duration.');
+        expect(extractConditionsFromSaveEffect(row.description)).toEqual(['cursed', 'frightened', 'paralyzed']);
     });
 
-    it('extraction pin: word-scan of the fixed save_effect yields Frightened ONLY', () => {
-        expect(extractConditionsFromSaveEffect(glareRow().save_effect)).toEqual(['frightened']);
-    });
-
-    it('pre-fix fingerprint gone: whole-string scan of the old prose sprayed three conditions', () => {
-        const oldProse = glareRow().description.replace(/^.*Failure: /, '');
-        expect(extractConditionsFromSaveEffect(oldProse)).toEqual(['cursed', 'frightened', 'paralyzed']);
-    });
-
-    it('fail leg (total 3 vs DC 15) on uncursed victim: Frightened ONLY — zero cursed/paralyzed grants', async () => {
+    it('fail leg (total 3 vs DC 15) on uncursed victim: Frightened ONLY, zero damage', async () => {
         await resolveNpcSave(3);
 
+        // toEqual(['frightened']) IS the exclusivity contract: no cursed/paralyzed.
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['frightened']);
-        expect(appliedLogs().map(e => e.condition)).toEqual(['Frightened']);
         expect(runtimeStore[`${TARGET}.activeConditionMeta`].frightened).toMatchObject({ source: ATTACKER });
-        expect(runtimeStore[`${TARGET}.activeConditions`]).not.toContain('cursed');
-        expect(runtimeStore[`${TARGET}.activeConditions`]).not.toContain('paralyzed');
-        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(conditionLogs.filter(e => e.type === 'condition' && e.action === 'applied').map(e => e.condition)).toEqual(['Frightened']);
         expect(rollExpression).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
 
-    it('success leg (nat 1 + 19 vs DC 15): zero grants, zero damage, zero clock', async () => {
+    it('success leg (total 20 vs DC 15): zero grants, zero damage, zero clock', async () => {
         await resolveNpcSave(20);
 
         expect(runtimeStore[`${TARGET}.activeConditions`]).toBeUndefined();
-        expect(appliedLogs()).toHaveLength(0);
+        expect(conditionLogs.filter(e => e.type === 'condition' && e.action === 'applied')).toHaveLength(0);
         expect(addExpiration).not.toHaveBeenCalled();
+        expect(rollExpression).not.toHaveBeenCalled();
         expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
 });

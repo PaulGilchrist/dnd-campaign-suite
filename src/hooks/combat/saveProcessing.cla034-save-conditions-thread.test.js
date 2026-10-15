@@ -1,6 +1,10 @@
+// @maintained-by-ai: 2026-10-14
 // CLA-034: the monster-card save prompt for a PC must carry the save row's own
-// saveConditions (e.g. ['frightened'] from Fear Ray) on the createSaveListener
-// config/payload so conditional_advantage passives can key on the SAVE's condition.
+// saveConditions (e.g. ['frightened'] from Fear Ray, monsters.json Gazer '2. Fear
+// Ray' — DC 12 Wisdom, frightened) on the createSaveListener config, and the
+// campaign lastAttack stamp, so conditional_advantage passives can key on the
+// SAVE's condition. Condition-granting on failure is owned by
+// saveProcessing.failed-save-conditions.test.js — this file covers threading only.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -66,17 +70,17 @@ const fearRayContext = {
     isSpellDamage: true,
 };
 
-function resolveSave(success) {
+function resolveSave(contextOverrides = {}, saveSuccess = true) {
     const promise = processSaveRoll({
         rollType: 'save',
         target: { name: 'FeyRanger', type: 'player' },
         characterName: 'FeyRanger',
         campaignName,
-        context: { ...fearRayContext },
+        context: { ...fearRayContext, ...contextOverrides },
         logEntry: () => {},
         setPopupHtml: vi.fn(),
     });
-    pendingSaveResolve(success
+    pendingSaveResolve(saveSuccess
         ? { success: true, roll: 13, total: 16, saveBonus: 3, rawRolls: [], mode: 'normal' }
         : { success: false, roll: 3, total: 6, saveBonus: 3, rawRolls: [], mode: 'normal' });
     return promise;
@@ -89,25 +93,16 @@ beforeEach(() => {
 });
 
 describe('CLA-034 saveConditions threaded onto the PC save prompt', () => {
-    it('player prompt config carries saveConditions:["frightened"] from the save row', async () => {
-        await resolveSave(true);
+    it('player prompt config + lastAttack stamp carry saveConditions:["frightened"] from the save row', async () => {
+        await resolveSave();
         expect(listenerConfigs).toHaveLength(1);
         expect(listenerConfigs[0].saveConditions).toEqual(['frightened']);
+        expect(runtimeStore['campaign.lastAttack'].saveConditions).toEqual(['frightened']);
     });
 
     it('rows without saveConditions keep the byte-identical null passthrough', async () => {
-        const ctx = { ...fearRayContext, saveConditions: undefined };
-        const promise = processSaveRoll({
-            rollType: 'save',
-            target: { name: 'FeyRanger', type: 'player' },
-            characterName: 'FeyRanger',
-            campaignName,
-            context: ctx,
-            logEntry: () => {},
-            setPopupHtml: vi.fn(),
-        });
-        pendingSaveResolve({ success: true, roll: 13, total: 16, saveBonus: 3, rawRolls: [], mode: 'normal' });
-        await promise;
+        await resolveSave({ saveConditions: undefined });
         expect(listenerConfigs[0].saveConditions).toBeNull();
+        expect(runtimeStore['campaign.lastAttack'].saveConditions).toEqual([]);
     });
 });

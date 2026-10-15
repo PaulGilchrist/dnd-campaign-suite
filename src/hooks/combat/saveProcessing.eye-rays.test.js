@@ -1,7 +1,13 @@
-// MA-0374: saveProcessing dispatcher arms — failed-save Eye Ray grant hook
-// (delegated to beholderEyeRayService) and the Disintegration/Death Ray
-// 0-HP advisory record. Byte-inert for rows without context.eyeRay.
+// MA-0374 / MA-0383: saveProcessing Eye Rays dispatcher — failed-save grant
+// hook delegated to beholderEyeRayService (te grants + repeat-save ladders)
+// and the Disintegration/Death Ray 0-HP advisory record. Beholder (d10 row,
+// DC 16) and Beholder Zombie (d4 row, DC 14) ride the identical, ray-agnostic
+// dispatcher, so the zombie legs are folded into the shared tests below.
+// Rays/DCs/types are derived from monsters.json — never hardcoded.
+// Byte-inert for rows without context.eyeRay.
+// @maintained-by-ai: 2026-10-14
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import monsters from '../../../public/data/monsters.json';
 
 const runtimeStore = {};
 const addEntryLogs = [];
@@ -69,24 +75,39 @@ vi.mock('../../services/rules/features/beholderEyeRayService.js', () => ({
 import { processSaveRoll } from './saveProcessing.js';
 
 const campaignName = 'test-campaign';
-const BH = 'Beholder 1';
 const T = 'HexWarlock';
 
-const slowingRay = { key: 'slowing', name: 'Slowing Ray', save_ability: 'Constitution', damage_dice: '4d8', damage_type: 'Necrotic', dc_success: 'half', conditions: [], te_grants: ['speed_half', 'no_reactions', 'no_action_and_bonus_action'], clock_rounds: 2 };
-const deathRay = { key: 'death', name: 'Death Ray', save_ability: 'Dexterity', damage_dice: '10d10', damage_type: 'Necrotic', dc_success: 'half', conditions: [], zero_hp_clause: 'dies' };
+const list = Array.isArray(monsters) ? monsters : monsters.monsters;
+// The authored Eye Rays row for a monster (rays[] + row save_dc), exactly the
+// shape MonsterCardHelpers.buildEyeRayAction synthesizes the save context from.
+function rayRow(monsterName) {
+    const row = (list.find(m => m.name === monsterName)?.actions || []).find(a => Array.isArray(a.rays) && a.rays.length >= 2);
+    if (!row) throw new Error(`monsters.json: ${monsterName} has no authored rays[] row`);
+    return row;
+}
+function pickRay(row, key) {
+    const ray = row.rays.find(r => r.key === key);
+    if (!ray) throw new Error(`monsters.json: ${key} ray missing from ${row.name} row`);
+    return ray;
+}
 
-function rayContext(ray, over = {}) {
+const BH = 'Beholder 1';
+const BH_ROW = rayRow('Beholder');            // d10 table, DC 16
+const ZOMBIE_ROW = rayRow('Beholder Zombie'); // d4 table, DC 14
+
+// Save context as the monster-card seam builds it: row DC stamped onto the ray,
+// one save_type, one dice formula, one dc_success.
+function rayContext(row, ray) {
     return {
-        saveDc: 16,
+        saveDc: row.save_dc,
         saveType: ray.save_ability,
         attackerName: BH,
         actionName: `${ray.name} (Eye Rays)`,
         dcSuccess: ray.dc_success,
-        autoDamageFormula: ray.damage_dice || null,
-        autoDamageDamageType: ray.damage_type || null,
-        saveConditions: ray.conditions || [],
-        eyeRay: ray,
-        ...over,
+        autoDamageFormula: ray.damage_dice ?? null,
+        autoDamageDamageType: ray.damage_type ?? null,
+        saveConditions: ray.conditions ?? [],
+        eyeRay: { ...ray, save_dc: row.save_dc },
     };
 }
 
@@ -104,6 +125,10 @@ async function resolveSave(context, success, roll) {
     await promise;
 }
 
+function zeroHpAdvisories() {
+    return addEntryLogs.filter(e => e.automationType === 'eye_ray_zero_hp_advisory');
+}
+
 beforeEach(() => {
     vi.clearAllMocks();
     for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
@@ -111,90 +136,70 @@ beforeEach(() => {
     applyDamageToTarget.mockImplementation(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 60 - finalDamage }));
 });
 
-describe('MA-0374 saveProcessing Eye Rays dispatcher', () => {
-    it('failed save delegates the ray grant spec once, full damage on the fail leg', async () => {
-        await resolveSave(rayContext(slowingRay), false, 5);
+describe('saveProcessing Eye Rays dispatcher (MA-0374 Beholder / MA-0383 Zombie)', () => {
+    it('failed save delegates the picked ray grant once, full damage on the fail leg', async () => {
+        await resolveSave(rayContext(BH_ROW, pickRay(BH_ROW, 'slowing')), false, 5);
         expect(applyEyeRayFailedGrants).toHaveBeenCalledTimes(1);
-        expect(applyEyeRayFailedGrants.mock.calls[0][0]).toMatchObject({ campaignName, attackerName: BH, targetName: T, ray: slowingRay });
+        expect(applyEyeRayFailedGrants.mock.calls[0][0]).toMatchObject({
+            campaignName,
+            attackerName: BH,
+            targetName: T,
+            ray: { key: 'slowing', save_dc: BH_ROW.save_dc, te_grants: ['speed_half', 'no_reactions', 'no_action_and_bonus_action'] },
+        });
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(32);
     });
 
-    it('successful save: no grant leg, half damage (dc_success:half)', async () => {
-        await resolveSave(rayContext(slowingRay), true, 20);
-        expect(applyEyeRayFailedGrants).not.toHaveBeenCalled();
-        expect(applyDamageToTarget.mock.calls[0][2]).toBe(16);
-    });
-
-    it('fear ray: standard condition leg lands Frightened on the fail', async () => {
-        const fear = { key: 'fear', name: 'Fear Ray', save_ability: 'Wisdom', damage_dice: '4d6', damage_type: 'Psychic', dc_success: 'half', conditions: ['frightened'], clock_rounds: 2 };
-        await resolveSave(rayContext(fear), false, 6);
-        expect(runtimeStore[`${T}.activeConditions`]).toContain('frightened');
-        expect(addEntryLogs.some(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Frightened')).toBe(true);
-    });
-
-    it('damageless telekinetic ray: Restrained lands with no damage rolled', async () => {
-        const tk = { key: 'telekinetic', name: 'Telekinetic Ray', save_ability: 'Strength', damage_dice: null, damage_type: null, dc_success: 'none', conditions: ['restrained'], te_grants: ['telekinetic_movement'], clock_rounds: 2 };
-        await resolveSave(rayContext(tk), false, 4);
-        expect(applyDamageToTarget).not.toHaveBeenCalled();
-        expect(runtimeStore[`${T}.activeConditions`]).toContain('restrained');
+    it('Beholder Zombie d4 row rides the identical dispatcher: grant + Poisoned condition, DC 14', async () => {
+        await resolveSave(rayContext(ZOMBIE_ROW, pickRay(ZOMBIE_ROW, 'enervation')), false, 5);
         expect(applyEyeRayFailedGrants).toHaveBeenCalledTimes(1);
-    });
-
-    it('death ray at 0 HP: eye_ray_zero_hp_advisory named record on EITHER outcome', async () => {
-        applyDamageToTarget.mockImplementation(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 0 }));
-        await resolveSave(rayContext(deathRay), false, 2);
-        const adv = addEntryLogs.find(e => e.automationType === 'eye_ray_zero_hp_advisory');
-        expect(adv).toBeTruthy();
-        expect(adv.characterName).toBe(T);
-        expect(adv.description).toMatch(/dies \(GM-enforced/);
-
-        addEntryLogs.length = 0;
-        await resolveSave(rayContext(deathRay), true, 20);
-        expect(addEntryLogs.some(e => e.automationType === 'eye_ray_zero_hp_advisory')).toBe(true);
-    });
-
-    it('byte-inert without context.eyeRay: no grant call, no advisory even at 0 HP', async () => {
-        applyDamageToTarget.mockImplementation(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 0 }));
-        const claw = { saveDc: 16, saveType: 'Dexterity', attackerName: BH, actionName: 'Claw', dcSuccess: 'half', autoDamageFormula: '2d6', autoDamageDamageType: 'Slashing', saveConditions: [] };
-        await resolveSave(claw, false, 3);
-        expect(applyEyeRayFailedGrants).not.toHaveBeenCalled();
-        expect(addEntryLogs.some(e => e.automationType === 'eye_ray_zero_hp_advisory')).toBe(false);
-    });
-});
-
-// ── MA-0383: Beholder Zombie rays ride the identical dispatcher (d4 row) ──
-describe('MA-0383 saveProcessing Beholder Zombie legs', () => {
-    const zEnervation = { key: 'enervation', name: 'Enervation Ray', save_ability: 'Constitution', save_dc: 14, damage_dice: '3d6', damage_type: 'Necrotic', dc_success: 'half', conditions: ['poisoned'], te_grants: ['no_healing'], clock_rounds: 2 };
-    const zParalyzing = { key: 'paralyzing', name: 'Paralyzing Ray', save_ability: 'Constitution', save_dc: 14, damage_dice: null, damage_type: null, dc_success: 'none', conditions: [], ladder: 'paralyzed' };
-    const zDisintegration = { key: 'disintegration', name: 'Disintegration Ray', save_ability: 'Dexterity', save_dc: 14, damage_dice: '5d10', damage_type: 'Force', dc_success: 'half', conditions: [], zero_hp_clause: 'disintegrates into dust' };
-
-    it('enervation fail: full 3d6-equivalent damage, Poisoned condition + no_healing grant delegated', async () => {
-        await resolveSave(rayContext(zEnervation, { saveDc: 14 }), false, 5);
-        expect(applyEyeRayFailedGrants).toHaveBeenCalledTimes(1);
-        expect(applyEyeRayFailedGrants.mock.calls[0][0].ray).toMatchObject({ key: 'enervation', te_grants: ['no_healing'], save_dc: 14 });
+        expect(applyEyeRayFailedGrants.mock.calls[0][0].ray).toMatchObject({ key: 'enervation', te_grants: ['no_healing'], save_dc: ZOMBIE_ROW.save_dc });
         expect(runtimeStore[`${T}.activeConditions`]).toContain('poisoned');
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(32);
     });
 
-    it('paralyzing fail: ladder delegated once with DC 14, zero damage rolled', async () => {
-        await resolveSave(rayContext(zParalyzing, { saveDc: 14 }), false, 2);
-        expect(applyEyeRayFailedGrants).toHaveBeenCalledTimes(1);
-        expect(applyEyeRayFailedGrants.mock.calls[0][0].ray).toMatchObject({ ladder: 'paralyzed', save_dc: 14 });
-        expect(applyDamageToTarget).not.toHaveBeenCalled();
+    it('successful save: no grant leg, half damage (dc_success:half)', async () => {
+        await resolveSave(rayContext(BH_ROW, pickRay(BH_ROW, 'slowing')), true, 20);
+        expect(applyEyeRayFailedGrants).not.toHaveBeenCalled();
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(16);
     });
 
-    it('disintegration at 0 HP: dust advisory on EITHER outcome, half damage on success', async () => {
-        applyDamageToTarget.mockImplementation(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 0 }));
-        await resolveSave(rayContext(zDisintegration, { saveDc: 14 }), true, 20);
-        expect(applyDamageToTarget.mock.calls[0][2]).toBe(16);
-        const adv = addEntryLogs.find(e => e.automationType === 'eye_ray_zero_hp_advisory');
-        expect(adv).toBeTruthy();
-        expect(adv.description).toMatch(/disintegrates into dust \(GM-enforced/);
+    it('damageless rays roll no dice but still delegate the grant — Restrained and the Zombie Paralyzed ladder', async () => {
+        await resolveSave(rayContext(BH_ROW, pickRay(BH_ROW, 'telekinetic')), false, 4);
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(applyEyeRayFailedGrants).toHaveBeenCalledTimes(1);
+        expect(runtimeStore[`${T}.activeConditions`]).toContain('restrained');
 
-        addEntryLogs.length = 0;
-        applyDamageToTarget.mock.calls.length = 0;
-        await resolveSave(rayContext(zDisintegration, { saveDc: 14 }), false, 3);
-        expect(addEntryLogs.some(e => e.automationType === 'eye_ray_zero_hp_advisory')).toBe(true);
-        expect(applyDamageToTarget.mock.calls[0][2]).toBe(32);
+        applyEyeRayFailedGrants.mock.calls.length = 0;
+        await resolveSave(rayContext(ZOMBIE_ROW, pickRay(ZOMBIE_ROW, 'paralyzing')), false, 2);
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
+        expect(applyEyeRayFailedGrants).toHaveBeenCalledTimes(1);
+        expect(applyEyeRayFailedGrants.mock.calls[0][0].ray).toMatchObject({ ladder: 'paralyzed', save_dc: ZOMBIE_ROW.save_dc });
+    });
+
+    it('zero_hp_clause rays log the eye_ray_zero_hp_advisory on EITHER outcome', async () => {
+        applyDamageToTarget.mockImplementation(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 0 }));
+        const clauseRays = [
+            [BH_ROW, pickRay(BH_ROW, 'death')],
+            [ZOMBIE_ROW, pickRay(ZOMBIE_ROW, 'disintegration')],
+        ];
+        expect(clauseRays.map(([, r]) => r.zero_hp_clause)).toEqual(['dies', 'disintegrates into dust']);
+        for (const [row, ray] of clauseRays) {
+            for (const success of [false, true]) {
+                addEntryLogs.length = 0;
+                await resolveSave(rayContext(row, ray), success, success ? 20 : 3);
+                const adv = zeroHpAdvisories();
+                expect(adv.length).toBeGreaterThan(0);
+                expect(adv[0].characterName).toBe(T);
+                expect(adv[0].description).toContain(ray.zero_hp_clause);
+            }
+        }
+    });
+
+    it('byte-inert without context.eyeRay: no grant call, no advisory even at 0 HP', async () => {
+        applyDamageToTarget.mockImplementation(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 0 }));
+        const claw = { saveDc: BH_ROW.save_dc, saveType: 'Dexterity', attackerName: BH, actionName: 'Claw', dcSuccess: 'half', autoDamageFormula: '2d6', autoDamageDamageType: 'Slashing', saveConditions: [] };
+        await resolveSave(claw, false, 3);
+        expect(applyEyeRayFailedGrants).not.toHaveBeenCalled();
+        expect(zeroHpAdvisories()).toHaveLength(0);
     });
 });

@@ -1,5 +1,9 @@
+// @maintained-by-ai: 2026-10-14
 // CLA-019: Aura of Courage — saveProcessing failed-save leg suppresses aura-covered
-// conditions (suppression logged); control targets still get the condition.
+// conditions (suppression logged); control targets and uncovered conditions still land.
+// Seam-only: the aura membership/range channel itself is verified in
+// services/combat/auras/auraComboEffects.test.js and auraConditionImmunity.test.js;
+// the charmed sibling is saveProcessing.aura-of-devotion.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -49,7 +53,8 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
     playerIsImmuneToCondition: () => false,
 }));
 
-// Aura channel: ElderPaladin hosts the party aura; Thug 1 is the unprotected control.
+// Aura channel: ElderPaladin hosts the party Aura of Courage (frightened);
+// Thug 1 stands outside the aura as the unprotected control.
 vi.mock('../../services/combat/auras/auraConditionImmunity.js', async (importActual) => {
     const actual = await importActual();
     return {
@@ -66,20 +71,30 @@ import { processSaveRoll } from './saveProcessing.js';
 
 const campaignName = 'test-campaign';
 
-function fearContext(targetName) {
-    return {
-        saveDc: 16,
-        saveType: 'WIS',
-        attackerName: 'HexWarlock',
-        actionName: 'Fear',
-        dcSuccess: 'none',
-        autoDamageFormula: null,
-        saveConditions: ['frightened'],
-        _characters: [
-            { name: 'ElderPaladin', computedStats: { automation: { passives: [{ name: 'Aura of Protection' }] } } },
-            { name: targetName, computedStats: {} },
-        ],
-    };
+async function runFailedSave(targetName, saveConditions = ['frightened']) {
+    const promise = processSaveRoll({
+        rollType: 'save',
+        target: { name: targetName, type: 'player' },
+        characterName: targetName,
+        campaignName,
+        context: {
+            saveDc: 16,
+            saveType: 'WIS',
+            attackerName: 'HexWarlock',
+            actionName: 'Fear',
+            dcSuccess: 'none',
+            autoDamageFormula: null,
+            saveConditions,
+            _characters: [
+                { name: 'ElderPaladin', computedStats: {} },
+                { name: targetName, computedStats: {} },
+            ],
+        },
+        logEntry: vi.fn(),
+        setPopupHtml: vi.fn(),
+    });
+    pendingSaveResolve({ success: false, roll: 4, total: 4, saveBonus: 0, rawRolls: [], mode: 'normal' });
+    await promise;
 }
 
 beforeEach(() => {
@@ -88,21 +103,6 @@ beforeEach(() => {
     conditionLogs.length = 0;
 });
 
-async function runFailedSave(targetName, saveConditions = ['frightened']) {
-    const context = { ...fearContext(targetName), saveConditions };
-    const promise = processSaveRoll({
-        rollType: 'save',
-        target: { name: targetName, type: 'player' },
-        characterName: targetName,
-        campaignName,
-        context,
-        logEntry: vi.fn(),
-        setPopupHtml: vi.fn(),
-    });
-    pendingSaveResolve({ success: false, roll: 4, total: 4, saveBonus: 0, rawRolls: [], mode: 'normal' });
-    await promise;
-}
-
 describe('CLA-019 aura immunity on failed-save leg', () => {
     it('aura member: failed WIS save vs Fear does NOT apply frightened, immunity logged, no applied-log', async () => {
         await runFailedSave('EvasiveFighter');
@@ -110,14 +110,16 @@ describe('CLA-019 aura immunity on failed-save leg', () => {
         expect(runtimeStore['EvasiveFighter.activeConditions']).toBeUndefined();
         const immunity = conditionLogs.filter(e => e.automationType === 'condition_immunity_aura');
         expect(immunity).toHaveLength(1);
-        expect(immunity[0].type).toBe('automation');
-        expect(immunity[0].characterName).toBe('EvasiveFighter');
-        expect(immunity[0].sourceName).toBe('ElderPaladin');
+        expect(immunity[0]).toMatchObject({
+            type: 'automation',
+            characterName: 'EvasiveFighter',
+            sourceName: 'ElderPaladin',
+        });
         expect(immunity[0].description).toContain('EvasiveFighter is immune to Frightened (Aura of Courage from ElderPaladin)');
         expect(conditionLogs.some(e => e.type === 'condition' && e.action === 'applied')).toBe(false);
     });
 
-    it('control target: failed save still applies frightened, no immunity log', async () => {
+    it('control target outside the aura: failed save still applies frightened, no immunity log', async () => {
         await runFailedSave('Thug 1');
 
         expect(runtimeStore['Thug 1.activeConditions']).toEqual(['frightened']);
@@ -125,36 +127,11 @@ describe('CLA-019 aura immunity on failed-save leg', () => {
         expect(conditionLogs.some(e => e.type === 'condition' && e.action === 'applied')).toBe(true);
     });
 
-    it('aura member, non-covered condition (charmed via other source): unaffected path byte-identical', async () => {
-        await runFailedSave('EvasiveFighter', ['charmed']);
-
-        expect(runtimeStore['EvasiveFighter.activeConditions']).toEqual(['charmed']);
-        expect(conditionLogs.some(e => e.automationType === 'condition_immunity_aura')).toBe(false);
-    });
-
-    it('multi-condition row: covered suppressed, remainder applied (spread-new array)', async () => {
+    it('multi-condition row: covered frightened suppressed, remainder applied (spread-new array)', async () => {
         await runFailedSave('EvasiveFighter', ['frightened', 'stunned']);
 
         expect(runtimeStore['EvasiveFighter.activeConditions']).toEqual(['stunned']);
         expect(conditionLogs.filter(e => e.automationType === 'condition_immunity_aura')).toHaveLength(1);
         expect(conditionLogs.some(e => e.type === 'condition' && e.action === 'applied' && e.condition === 'Stunned')).toBe(true);
-    });
-
-    it('successful save: nothing lands, no immunity log (byte-identical legacy)', async () => {
-        const context = fearContext('EvasiveFighter');
-        const promise = processSaveRoll({
-            rollType: 'save',
-            target: { name: 'EvasiveFighter', type: 'player' },
-            characterName: 'EvasiveFighter',
-            campaignName,
-            context,
-            logEntry: vi.fn(),
-            setPopupHtml: vi.fn(),
-        });
-        pendingSaveResolve({ success: true, roll: 19, total: 19, saveBonus: 0, rawRolls: [], mode: 'normal' });
-        await promise;
-
-        expect(runtimeStore['EvasiveFighter.activeConditions']).toBeUndefined();
-        expect(conditionLogs.some(e => e.automationType === 'condition_immunity_aura')).toBe(false);
     });
 });

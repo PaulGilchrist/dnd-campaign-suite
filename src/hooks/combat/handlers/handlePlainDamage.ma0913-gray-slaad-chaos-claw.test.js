@@ -1,3 +1,7 @@
+// @maintained-by-ai: 2026-10-14
+// MA-0913 Gray Slaad Chaos Claw: disk data-lock + disk→runtime wiring of the
+// d4 rider. Runtime mechanics (face mapping, meta source, anchor clock, gates)
+// are lane-generic and covered by handlePlainDamage.hitConditionRoll.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -94,55 +98,31 @@ import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.
 import { loadCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
-import { buildHitConditionClause, parseHitConditionRoll } from '../../../components/encounter/MonsterCardHelpers.js';
+import { buildHitConditionClause } from '../../../components/encounter/MonsterCardHelpers.js';
 import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
 import monsters from '../../../../public/data/monsters.json';
 
-const CHAOS_CLAW_ACTION = {
-    name: 'Chaos Claw',
-    attack_bonus: 8,
-    reach: '10 ft.',
-    damage_dice_primary: '1d10 + 4',
-    damage_type_primary: 'Slashing',
-    damage_dice_secondary: '2d10',
-    damage_type_secondary: 'Necrotic',
-    hit_condition_roll: { die: 4, conditions: ['charmed', 'frightened', 'poisoned', 'incapacitated'] },
-};
+const ATTACKER = 'Gray Slaad 1';
+const TARGET = 'Bandit 1';
 
 const CANONICAL_RIDER_CONDITIONS = ['charmed', 'frightened', 'poisoned', 'incapacitated'];
 
+const diskRow = () => monsters.find(m => m.index === 'gray-slaad').actions.find(a => a.name === 'Chaos Claw');
+
 const deps = {
-    characterName: 'Gray Slaad 1',
+    characterName: ATTACKER,
     campaignName: 'test-campaign',
     characters: [
-        { name: 'Gray Slaad 1', computedStats: { armorClass: 18 } },
-        { name: 'Bandit 1', computedStats: { armorClass: 12 } },
+        { name: ATTACKER, computedStats: { armorClass: 18 } },
+        { name: TARGET, computedStats: { armorClass: 12 } },
     ],
     setPopupHtml: vi.fn(),
     logEntry: vi.fn(),
     pendingSaves: {},
 };
 
-function clawContext() {
-    return {
-        targetName: 'Bandit 1',
-        damageType: 'Slashing',
-        attackerName: 'Gray Slaad 1',
-        hitClause: buildHitConditionClause(CHAOS_CLAW_ACTION),
-    };
-}
-
-function clawDamageCall() {
-    return {
-        name: 'Chaos Claw', formula: '1d10 + 4', total: 9, rolls: [5], modifier: 4,
-        context: clawContext(),
-    };
-}
-
-async function hitWithRoll(n) {
-    rollExpression.mockImplementation((formula) => (formula === '1d4' ? { total: n, rolls: [n], modifier: 0, formula } : null));
-    const fn = createLogDamageAndShow(deps);
-    await fn(clawDamageCall());
+function runtimeWrite(key) {
+    return setRuntimeValue.mock.calls.find(c => c[1] === key);
 }
 
 beforeEach(() => {
@@ -151,99 +131,75 @@ beforeEach(() => {
     rollExpression.mockReturnValue(null);
     applyDamageToTarget.mockReturnValue({ finalDamage: 20, newHp: 2, damageReduced: false });
     loadCombatSummary.mockResolvedValue({
-        creatures: [{ name: 'Bandit 1', type: 'player', size: 'Medium', ac: 12, currentHp: 11, maxHp: 11 }],
+        creatures: [{ name: TARGET, type: 'player', size: 'Medium', ac: 12, currentHp: 11, maxHp: 11 }],
     });
 });
 
-describe('MA-0913 data-lock — Gray Slaad Chaos Claw hit_condition_roll', () => {
-    it('authors the structured d4 rider on disk with canonical condition tokens', () => {
-        const slaad = monsters.find(m => m.index === 'gray-slaad');
-        const row = slaad.actions.find(a => a.name === 'Chaos Claw');
-        expect(row.hit_condition_roll).toEqual({ die: 4, conditions: CANONICAL_RIDER_CONDITIONS });
-        expect(row.hit_condition_roll.conditions).toHaveLength(row.hit_condition_roll.die);
-    });
-
-    it('matches the death-slaad Chaos Blade authored twin byte-shape', () => {
-        const gray = monsters.find(m => m.index === 'gray-slaad').actions.find(a => a.name === 'Chaos Claw');
-        const death = monsters.find(m => m.index === 'death-slaad').actions.find(a => a.name === 'Chaos Blade');
-        expect(gray.hit_condition_roll).toEqual(death.hit_condition_roll);
-    });
-
-    it('leaves the damage rider byte-unchanged (+8 claw, 1d10+4 Slashing + 2d10 Necrotic)', () => {
-        const row = monsters.find(m => m.index === 'gray-slaad').actions.find(a => a.name === 'Chaos Claw');
+describe('MA-0913 data-lock — Gray Slaad Chaos Claw on disk', () => {
+    it('authors the canonical d4 rider twin plus the RAW damage bytes (+8, 1d10+4 Slashing + 2d10 Necrotic)', () => {
+        const row = diskRow();
         expect(row.attack_bonus).toBe(8);
         expect(row.reach).toBe('10 ft.');
         expect(row.damage_dice_primary).toBe('1d10 + 4');
         expect(row.damage_type_primary).toBe('Slashing');
         expect(row.damage_dice_secondary).toBe('2d10');
         expect(row.damage_type_secondary).toBe('Necrotic');
+        expect(row.hit_condition_roll).toEqual({ die: 4, conditions: CANONICAL_RIDER_CONDITIONS });
+        expect(row.hit_condition_roll.conditions).toHaveLength(row.hit_condition_roll.die);
+        // Identical d4 rider twin to the Death Slaad Chaos Blade (MA-0575).
+        const death = monsters.find(m => m.index === 'death-slaad').actions.find(a => a.name === 'Chaos Blade');
+        expect(row.hit_condition_roll).toEqual(death.hit_condition_roll);
     });
 });
 
-describe('MA-0913 buildHitConditionClause arms the gray-slaad d4 rider', () => {
-    it('parses the disk row into a conditionRoll-bearing clause', () => {
-        const row = monsters.find(m => m.index === 'gray-slaad').actions.find(a => a.name === 'Chaos Claw');
-        expect(parseHitConditionRoll(row)).toEqual({ die: 4, conditions: CANONICAL_RIDER_CONDITIONS });
-        expect(buildHitConditionClause(row)).toEqual({
+describe('MA-0913 disk row arms the d4 rider end-to-end', () => {
+    it('builds a conditionRoll clause from the disk row and grants the rolled condition on a resolved hit', async () => {
+        const hitClause = buildHitConditionClause(diskRow());
+        expect(hitClause).toMatchObject({
             conditions: [],
             escapeDc: null,
             attackName: 'Chaos Claw',
-            targetEffect: null,
             conditionRoll: { die: 4, conditions: CANONICAL_RIDER_CONDITIONS },
         });
-    });
-});
 
-describe('MA-0913 d4 rider grant on resolved hits', () => {
-    it.each([
-        [1, 'charmed'],
-        [2, 'frightened'],
-        [3, 'poisoned'],
-        [4, 'incapacitated'],
-    ])('maps 1d4 → %i to %s', async (n, expected) => {
-        await hitWithRoll(n);
-        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
-        expect(condCall).toBeTruthy();
-        expect(condCall[2]).toEqual([expected]);
-    });
+        rollExpression.mockImplementation((formula) => (formula === '1d4' ? { total: 3, rolls: [3], modifier: 0, formula } : null));
+        await createLogDamageAndShow(deps)({
+            name: 'Chaos Claw', formula: '1d10 + 4', total: 9, rolls: [5], modifier: 4,
+            context: { targetName: TARGET, damageType: 'Slashing', attackerName: ATTACKER, hitClause },
+        });
 
-    it('rolls the authored die via the rollExpression seam and logs it transparently', async () => {
-        await hitWithRoll(3);
         expect(rollExpression).toHaveBeenCalledWith('1d4');
-        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+        expect(runtimeWrite('activeConditions')?.[2]).toEqual(['poisoned']);
+        expect(runtimeWrite('activeConditionMeta')?.[2].poisoned).toMatchObject({ source: ATTACKER });
+
+        const logs = deps.logEntry.mock.calls.map(c => c[0]);
+        expect(logs).toContainEqual(expect.objectContaining({
             type: 'roll',
             rollType: 'chaos-condition',
-            characterName: 'Gray Slaad 1',
-            targetName: 'Bandit 1',
+            characterName: ATTACKER,
+            targetName: TARGET,
             formula: '1d4',
             rolls: [3],
             total: 3,
             description: '1d4 → 3 → Poisoned',
         }));
-    });
-
-    it('grants the chosen standard condition with meta source and a condition-applied log', async () => {
-        await hitWithRoll(2);
-        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
-        expect(metaCall[2].frightened).toMatchObject({ source: 'Gray Slaad 1' });
-        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+        expect(logs).toContainEqual(expect.objectContaining({
             type: 'condition',
             action: 'applied',
-            characterName: 'Bandit 1',
-            condition: 'Frightened',
+            characterName: TARGET,
+            condition: 'Poisoned',
+            reason: "Chaos Claw — 1d4 rolled 3 → Poisoned; until the start of Gray Slaad 1's next turn",
         }));
-    });
 
-    it('registers ONE anchor-expiry clock on the slaad (fires at its next turn start)', async () => {
-        await hitWithRoll(1);
+        // MA-0016 single-clock rule: exactly one expiry anchored on the slaad.
         expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration).toHaveBeenCalledWith({
-            attackerName: 'Gray Slaad 1',
-            targetName: 'Bandit 1',
-            effects: [{ type: 'condition', condition: 'charmed', source: 'Gray Slaad 1' }],
+            attackerName: ATTACKER,
+            targetName: TARGET,
+            effects: [{ type: 'condition', condition: 'poisoned', source: ATTACKER }],
             campaignName: 'test-campaign',
             rounds: undefined,
-            expireOnCreatureName: 'Gray Slaad 1',
+            expireOnCreatureName: ATTACKER,
         });
     });
 });

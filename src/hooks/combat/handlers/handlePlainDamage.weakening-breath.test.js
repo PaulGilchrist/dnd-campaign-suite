@@ -1,8 +1,15 @@
-// MA-0102: Weakening Breath damage-subtract consumer — while the afflicted
-// PC carries the weakening_breath te, its plain damage rolls subtract a
-// rolled 1d6 (te.damageSubtractDie), the log carries weakeningBreathReduction
-// / weakeningBreathRoll fields, and the popup shows the -1d6 notice. Without
-// the te the flow is byte-identical (zero reduction).
+// @maintained-by-ai: 2026-10-14
+// MA-0102: Weakening Breath damage-subtract consumer (handlePlainDamage lane).
+// While the afflicted attacker carries the weakening_breath te, each plain
+// damage roll rolls the te's damageSubtractDie once (monsters.json Adult Gold
+// Dragon: "subtracts 3 (1d6) from its damage rolls"; the die is consumed from
+// the te, never hardcoded) and subtracts it from the applied damage, clamped
+// at 0; the log row and the damage popup carry weakeningBreathReduction /
+// weakeningBreathRoll for the DiceRollResult -1d6 notice, and the ray channel
+// stays independent (0). Without the te there is no phantom 1d6 roll and the
+// popup defaults to 0/null (the zero-log-row baseline lives in the base
+// handlePlainDamage.test.js lane). Te grant/repeat-save lives in
+// weakeningBreathService; STR-test disadvantage in d20RollComputation.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -98,18 +105,10 @@ describe('MA-0102 Weakening Breath damage-subtract consumer', () => {
     const deps = {
         characterName: 'TestFighter',
         campaignName: 'test-campaign',
-        characters: [
-            { name: 'TestFighter', computedStats: { armorClass: 16, characterAdvancement: [] } },
-            { name: 'Goblin', computedStats: { armorClass: 12 } },
-        ],
+        characters: [{ name: 'TestFighter' }, { name: 'Goblin' }],
         setPopupHtml: vi.fn(),
         logEntry: vi.fn(),
-        pendingSaves: {},
     };
-
-    function createFn() {
-        return createLogDamageAndShow(deps);
-    }
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -120,60 +119,62 @@ describe('MA-0102 Weakening Breath damage-subtract consumer', () => {
         });
     });
 
-    it('subtracts rolled 1d6 from the afflicted attacker damage roll + logs it', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (name === 'campaign' && key === 'targetEffects') return [
-                { target: 'TestFighter', effect: 'weakening_breath', source: 'Adult Gold Dragon 1', damageSubtractDie: '1d6' },
-            ];
-            return null;
+    // Plain longsword hit (8 total); te on the attacker arms the subtract lane.
+    function attack() {
+        return createLogDamageAndShow(deps)({
+            name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3,
+            context: { targetName: 'Goblin', damageType: 'slashing' },
         });
-        rollExpression.mockImplementation((f) => (f === '1d6'
-            ? { total: 3, rolls: [3], modifier: 0 }
+    }
+
+    function weakenTe(die) {
+        return [{ target: 'TestFighter', effect: 'weakening_breath', source: 'Adult Gold Dragon 1', damageSubtractDie: die }];
+    }
+
+    function mockTe(weakeningRoll, die = '1d6') {
+        getRuntimeValue.mockImplementation((name, key) => (name === 'campaign' && key === 'targetEffects' ? weakenTe(die) : null));
+        rollExpression.mockImplementation((f) => (f === die
+            ? { total: weakeningRoll, rolls: [weakeningRoll], modifier: 0 }
             : { total: 8, rolls: [5, 3], modifier: 3 }));
+    }
 
-        const fn = createFn();
-        await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing' } });
+    const damagePopup = () => deps.setPopupHtml.mock.calls.find(
+        (call) => typeof call[0] === 'object' && call[0]?.type === 'damage'
+    )[0];
 
-        expect(rollExpression).toHaveBeenCalledWith('1d6');
-        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 5, ['slashing'], expect.any(Object));
-        const logCall = deps.logEntry.mock.calls[0][0];
-        expect(logCall.weakeningBreathReduction).toBe(3);
-        expect(logCall.weakeningBreathRoll).toBe(3);
-        expect(logCall.rayOfEnfeebleReduction).toBe(0);
+    // Adult Gold standard 1d6; the ancient-family te proves the die is read
+    // from the te (1d10, weakeningBreathService twin); reducedTotal clamps at 0.
+    it.each([
+        ['1d6', 3, 5],
+        ['1d10', 7, 1],
+        ['1d10', 12, 0],
+    ])('subtracting te %s roll %i applies %i, logged and surfaced on the popup', async (die, weakeningRoll, expectedApplied) => {
+        mockTe(weakeningRoll, die);
+        await attack();
+
+        expect(rollExpression).toHaveBeenCalledWith(die);
+        expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', expectedApplied, ['slashing'], expect.any(Object));
+
+        const logRow = deps.logEntry.mock.calls[0][0];
+        expect(logRow).toMatchObject({
+            weakeningBreathReduction: weakeningRoll,
+            weakeningBreathRoll: weakeningRoll,
+            rayOfEnfeebleReduction: 0,
+        });
+
+        const popup = damagePopup();
+        expect(popup.weakeningBreathReduction).toBe(weakeningRoll);
+        expect(popup.weakeningBreathRoll).toBe(weakeningRoll);
     });
 
-    it('popup carries weakeningBreathReduction for the -1d6 notice', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (name === 'campaign' && key === 'targetEffects') return [
-                { target: 'TestFighter', effect: 'weakening_breath', source: 'Adult Gold Dragon 1', damageSubtractDie: '1d6' },
-            ];
-            return null;
-        });
-        rollExpression.mockImplementation((f) => (f === '1d6'
-            ? { total: 3, rolls: [3], modifier: 0 }
-            : { total: 8, rolls: [5, 3], modifier: 3 }));
-
-        const fn = createFn();
-        await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing' } });
-
-        const popupCall = deps.setPopupHtml.mock.calls.find(
-            (call) => typeof call[0] === 'object' && call[0]?.type === 'damage'
-        );
-        expect(popupCall[0].weakeningBreathReduction).toBe(3);
-        expect(popupCall[0].weakeningBreathRoll).toBe(3);
-    });
-
-    it('no te → zero reduction, byte-identical flow', async () => {
+    it('no te → no phantom subtract roll, popup defaults 0/null', async () => {
         getRuntimeValue.mockReturnValue(null);
         rollExpression.mockReturnValue({ total: 8, rolls: [5, 3], modifier: 3 });
-        applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
 
-        const fn = createFn();
-        await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing' } });
+        await attack();
 
         expect(rollExpression).not.toHaveBeenCalledWith('1d6');
-        const logCall = deps.logEntry.mock.calls[0][0];
-        expect(logCall.weakeningBreathReduction).toBe(0);
-        expect(logCall.weakeningBreathRoll).toBeNull();
+        expect(rollExpression).not.toHaveBeenCalledWith('1d10');
+        expect(damagePopup()).toMatchObject({ weakeningBreathReduction: 0, weakeningBreathRoll: null });
     });
 });

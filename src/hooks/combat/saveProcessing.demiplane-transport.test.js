@@ -1,8 +1,9 @@
+// @maintained-by-ai: 2026-10-14
 // MA-0104: Adult Gold Dragon Banish authored failed-save demiplane-transport
 // grant — distinct te `banished_demiplane` on the target (not the PC spell
 // `banishment`, whose concentration/permanent semantics would misfire its
 // consumers), rounds:2 clock (MA-0073 shape) + granted log with honest
-// reappearance advisory.
+// reappearance advisory (GM-enforced placement, §7).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -43,7 +44,6 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 const applyDamageToTarget = vi.fn(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 100 - finalDamage }));
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     normalizeSaveType: (t) => String(t || '').toUpperCase(),
-    computeDamageAfterSave: (raw, success, dcSuccess) => (!success ? raw : dcSuccess === 'half' ? Math.floor(raw / 2) : 0),
     computeDamageAfterEvasion: (total, saveSuccess, dcSuccess, evasionActive) =>
         (evasionActive && dcSuccess === 'half') ? (saveSuccess ? 0 : Math.floor(total / 2))
             : (!saveSuccess ? total : dcSuccess === 'half' ? Math.floor(total / 2) : 0),
@@ -97,6 +97,9 @@ async function resolveSave(context, success, roll) {
     await promise;
 }
 
+const grantedLogs = () => addEntryLogs.filter(e => e.automationType === 'banished_demiplane_granted');
+const targetEffects = () => runtimeStore['campaign.targetEffects'] || [];
+
 beforeEach(() => {
     vi.clearAllMocks();
     for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
@@ -109,7 +112,7 @@ describe('MA-0104 Banish failed-save banished_demiplane te', () => {
 
         expect(applyDamageToTarget.mock.calls[0][2]).toBe(9);
 
-        const tes = runtimeStore['campaign.targetEffects'] || [];
+        const tes = targetEffects();
         expect(tes).toHaveLength(1);
         expect(tes[0]).toMatchObject({
             target: TARGET,
@@ -128,7 +131,7 @@ describe('MA-0104 Banish failed-save banished_demiplane te', () => {
             effects: [{ type: 'remove_target_effect', effectKey: 'banished_demiplane', source: DRAGON, target: TARGET }],
         });
 
-        const grant = addEntryLogs.find(e => e.automationType === 'banished_demiplane_granted');
+        const [grant] = grantedLogs();
         expect(grant).toBeTruthy();
         expect(grant.characterName).toBe(TARGET);
         expect(grant.sourceName).toBe(DRAGON);
@@ -137,27 +140,20 @@ describe('MA-0104 Banish failed-save banished_demiplane te', () => {
         expect(grant.description).toMatch(/GM-enforced/);
     });
 
-    it('successful save: no te, no expiry, no grant log, no damage (dc_success none) — honest success is inert', async () => {
+    it('successful save is inert: zero damage, no te, no expiry, no grant log (dc_success none)', async () => {
         await resolveSave({ ...banishContext }, true, 24);
 
-        expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(0);
+        expect(targetEffects()).toHaveLength(0);
         expect(addExpiration).not.toHaveBeenCalled();
-        expect(addEntryLogs.some(e => e.automationType === 'banished_demiplane_granted')).toBe(false);
-        if (applyDamageToTarget.mock.calls.length > 0) {
-            expect(applyDamageToTarget.mock.calls[0][2]).toBe(0);
-        }
+        expect(grantedLogs()).toHaveLength(0);
     });
 
-    it('rows without the clause are byte-inert: no te even on a failed save', async () => {
-        const claw = { ...banishContext, actionName: 'Claw', demiplaneTransport: null };
-        await resolveSave(claw, false, 3);
+    it('rows without the clause are byte-inert: no te, no expiry, no grant log even on a failed save', async () => {
+        await resolveSave({ ...banishContext, actionName: 'Claw', demiplaneTransport: null }, false, 3);
 
-        expect((runtimeStore['campaign.targetEffects'] || []).length).toBe(0);
+        expect(targetEffects()).toHaveLength(0);
         expect(addExpiration).not.toHaveBeenCalled();
-    });
-
-    it('does not reuse the PC spell te key: grant never writes banishment', async () => {
-        await resolveSave({ ...banishContext }, false, 4);
-        expect((runtimeStore['campaign.targetEffects'] || []).every(te => te.effect !== 'banishment')).toBe(true);
+        expect(grantedLogs()).toHaveLength(0);
     });
 });

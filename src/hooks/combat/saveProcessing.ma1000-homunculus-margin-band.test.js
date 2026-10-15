@@ -1,15 +1,17 @@
+// @maintained-by-ai: 2026-10-14
 // MA-1000: Homunculus Bite fail-margin bands — the rider-only composite save
 // chip (MA-0560 fork, MA-1000 guard fix) rides applyDamagelessSaveConditions
 // with saveConditions ['poisoned'] (shallow-band-only save_effect, MA-0639
-// twin layout) + structured context.saveMargin {failsBy:5, also:'unconscious'}.
+// twin layout) + structured context.saveMargin {failsBy:5, also:'unconscious'}
+// derived live from the monsters.json Homunculus row.
 // Shallow fail (margin < 5): POISONED ONLY — the extracted word list carries
 // no unconscious, so the shallow over-grant is suppressed at the source (§214).
 // Deep fail (margin >= 5): applySaveMarginRider adds UNCONSCIOUS with ONE
 // merged rounds:600 clock (§37/§170). Success: zero grants, zero clock.
-// Wake-on-damage early-end ("ends early if the target takes any damage") is a
-// §70 advisory residual — no consumer app-wide, GM-enforced, never a defect.
 // The save leg pays NO damage (§410/§416): autoDamageFormula null, so no
 // applyDamageToTarget call and no save-damage log on any band.
+// Generic rider mechanics + byte-inert fork: saveProcessing.save-margin-rider.test.js;
+// damage-bearing save leg: saveProcessing.ma1351-pseudodragon-sting-margin.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const runtimeStore = {};
@@ -64,23 +66,30 @@ vi.mock('../../services/rules/effects/expirationQueue.js', () => ({
     addExpiration: (...args) => addExpiration(...args),
 }));
 
+import { readFileSync } from 'node:fs';
 import { processSaveRoll } from './saveProcessing.js';
 
 const campaignName = 'test-campaign';
 const ATTACKER = 'Homunculus 1';
 const TARGET = 'Bandit 1';
 
-// Fixed disk row context (saveChipPlan riderOnly: saveDamageFormula null;
-// buildAbilitySaveRollContext arms saveMargin + saveConditions:['poisoned']).
+// Live monsters.json row — the disk row buildAbilitySaveRollContext arms into
+// the rider-only save-chip context (saveDamageFormula null: rider-only fork).
+const biteRow = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'))
+    .find(m => m.name === 'Homunculus').actions.find(a => a.name === 'Bite');
+const SAVE_DC = biteRow.save_dc;
+const SAVE_TYPE = biteRow.save_type.slice(0, 3).toUpperCase();
+const MARGIN = { failsBy: biteRow.save_margin.fails_by, also: biteRow.save_margin.also };
+
 const biteContext = (total) => ({
-    saveDc: 12,
-    saveType: 'CON',
+    saveDc: SAVE_DC,
+    saveType: SAVE_TYPE,
     attackerName: ATTACKER,
-    actionName: 'Bite',
+    actionName: biteRow.name,
     dcSuccess: null,
     autoDamageFormula: null,
     saveConditions: ['poisoned'],
-    saveMargin: { failsBy: 5, also: 'unconscious' },
+    saveMargin: MARGIN,
     effectiveD20: total,
     effectiveBonus: 0,
 });
@@ -109,44 +118,38 @@ beforeEach(() => {
 });
 
 describe('MA-1000 Homunculus Bite margin bands', () => {
-    it('shallow fail, margin 3 (total 9 vs DC 12): POISONED only — no Unconscious over-grant', async () => {
-        await resolveNpcSave(9);
+    it('monsters.json data lock: rider-only row arms DC/CON margin context', () => {
+        expect(SAVE_DC).toBe(12);
+        expect(SAVE_TYPE).toBe('CON');
+        expect(MARGIN).toEqual({ failsBy: 5, also: 'unconscious' });
+        expect(biteRow.save_effect).toMatch(/Poisoned/);
+        expect(biteRow).not.toHaveProperty('save_damage_formula');
+    });
+
+    it(`shallow fail by 3 (total ${SAVE_DC - 3}): POISONED only — no Unconscious over-grant, no clock`, async () => {
+        await resolveNpcSave(SAVE_DC - 3);
 
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned']);
         expect(appliedLogs().map(e => e.condition)).toEqual(['Poisoned']);
         expect(runtimeStore[`${TARGET}.activeConditionMeta`].poisoned).toMatchObject({ source: ATTACKER });
         expect(addExpiration).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
 
-    it('deep fail at the boundary, margin exactly 5 (total 7 vs DC 12): Poisoned + Unconscious', async () => {
-        await resolveNpcSave(7);
+    it(`deep fail at the boundary, margin exactly ${MARGIN.failsBy}: Poisoned + Unconscious, meta + log`, async () => {
+        await resolveNpcSave(SAVE_DC - MARGIN.failsBy);
 
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned', 'unconscious']);
-        const conds = appliedLogs().map(e => e.condition);
-        expect(conds).toContain('Poisoned');
-        expect(conds).toContain('Unconscious');
         const uncons = appliedLogs().find(e => e.condition === 'Unconscious');
-        expect(uncons.description).toMatch(/failed the save by 5/);
+        expect(uncons.sourceName).toBe(ATTACKER);
+        expect(uncons.sourceAbility).toBe('Bite');
+        expect(uncons.description).toMatch(new RegExp(`failed the save by ${MARGIN.failsBy}`));
     });
 
-    it('deep fail beyond the band, margin 10 (nat 2 vs DC 12): Poisoned + Unconscious', async () => {
+    it(`deep fail beyond the band, margin ${SAVE_DC - 2}: ONE merged rounds:600 clock, both legs — NO damage (§37/§170/§410)`, async () => {
         await resolveNpcSave(2);
 
         expect(runtimeStore[`${TARGET}.activeConditions`]).toEqual(['poisoned', 'unconscious']);
-        expect(appliedLogs().find(e => e.condition === 'Unconscious').description).toMatch(/failed the save by 10/);
-    });
-
-    it('success (total 12 vs DC 12): zero grants, zero clock, zero damage', async () => {
-        await resolveNpcSave(12);
-
-        expect(runtimeStore[`${TARGET}.activeConditions`]).toBeUndefined();
-        expect(appliedLogs()).toHaveLength(0);
-        expect(addExpiration).not.toHaveBeenCalled();
-    });
-
-    it('ONE merged addExpiration clock on the deep band: rounds:600, both legs (§37/§170)', async () => {
-        await resolveNpcSave(2);
-
         expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
             attackerName: ATTACKER,
@@ -155,16 +158,19 @@ describe('MA-1000 Homunculus Bite margin bands', () => {
             rounds: 600,
             effects: [
                 { type: 'condition', condition: 'poisoned' },
-                { type: 'condition', condition: 'unconscious' },
+                { type: 'condition', condition: MARGIN.also },
             ],
         }));
-    });
-
-    it('condition rider pays NO damage on any band (§410/§416: dc_success semantics N/A)', async () => {
-        await resolveNpcSave(2);
-        await resolveNpcSave(9);
-
         expect(applyDamageToTarget).not.toHaveBeenCalled();
         expect(conditionLogs.filter(e => e.type === 'roll' && e.rollType === 'save-damage')).toHaveLength(0);
+    });
+
+    it(`success (total ${SAVE_DC}): zero grants, zero clock, zero damage`, async () => {
+        await resolveNpcSave(SAVE_DC);
+
+        expect(runtimeStore[`${TARGET}.activeConditions`]).toBeUndefined();
+        expect(appliedLogs()).toHaveLength(0);
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(applyDamageToTarget).not.toHaveBeenCalled();
     });
 });
