@@ -1,3 +1,19 @@
+// @maintained-by-ai: 2026-10-16
+//
+// SP-110 spareTheDyingHandler EXECUTION lane — automation/index.js registry
+// `spare_the_dying` (handle → automation_info picker) and `spare_the_dying_apply`,
+// dispatched live via spellCastService triggerSpells.js and the
+// useSpellMetamagicFlow pending-confirm flow. Rules checked against spells.json
+// (5e + 2024): "You touch a living creature that has 0 hit points... has no
+// effect on undead or constructs." Stabilization model: target STAYS at 0 HP
+// and gains 3 successful death saves — it is never healed to 1 HP.
+// Canonical HP truth: PCs via the runtime store, monsters via combatSummary
+// currentHp only (pitfall 29); canonical-dead monsters need deathSaves to be
+// dying-modelled. The isSpareTheDyingTarget edge MATRIX is canonically pinned
+// in spellGates.spareTheDying.test.js (gate lane) — this lane keeps one row
+// per predicate input path as wiring evidence and OWNS the write semantics,
+// campaign-log entries, and popup-envelope/target-shape composition.
+
 import { handle, applySpareTheDying } from './spareTheDyingHandler.js'
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -37,8 +53,8 @@ describe('spareTheDyingHandler', () => {
         vi.clearAllMocks()
     })
 
-    describe('handle', () => {
-        it('offers dying PCs (runtime 0 HP, not dead) and reports them valid', async () => {
+    describe('handle — automation_info picker popup', () => {
+        it('offers dying PCs with the full popup envelope and target shape', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [
                     { name: 'Ally1', type: 'player' },
@@ -57,14 +73,24 @@ describe('spareTheDyingHandler', () => {
                 null
             )
 
-            expect(result.type).toBe('popup')
-            expect(result.payload.type).toBe('automation_info')
-            expect(result.payload.targets.length).toBe(2)
-            expect(result.payload.targets[0].isValidTarget).toBe(true)
-            expect(result.payload.targets[0].hp).toBe(0)
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Spare the Dying',
+                    description: 'Select a creature with 0 HP to make stable.',
+                    automation: { type: 'spare_the_dying' },
+                    range: '15 feet',
+                    rangeFt: 15,
+                    targets: [
+                        { name: 'Ally1', isValidTarget: true, hp: 0, isDead: false, type: undefined },
+                        { name: 'Ally2', isValidTarget: true, hp: 0, isDead: false, type: undefined },
+                    ],
+                },
+            })
         })
 
-        it('excludes the caster from targets', async () => {
+        it('excludes the caster even when dying', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [
                     { name: 'Cleric', type: 'player' },
@@ -83,31 +109,17 @@ describe('spareTheDyingHandler', () => {
                 null
             )
 
-            expect(result.payload.targets.length).toBe(1)
-            expect(result.payload.targets[0].name).toBe('Ally1')
+            expect(result.payload.targets.map(t => t.name)).toEqual(['Ally1'])
         })
 
-        it('excludes healthy PCs', async () => {
+        it('offers dying-modelled monsters from cs.currentHp with cs type shaping', async () => {
             getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'HealthyAlly', type: 'player' }],
+                creatures: [
+                    { name: 'Thug 1', type: 'npc', monsterType: 'humanoid', currentHp: 32 },
+                    { name: 'Thug 3', type: 'npc', monsterType: 'humanoid', currentHp: 0, deathSaves: [false, false, false] },
+                ],
             })
-            getRuntimeValue.mockImplementation(runtimeHp({ HealthyAlly: { currentHitPoints: 10 } }))
-
-            const result = await handle(
-                { name: 'Spare the Dying', spell: { range: '15 feet' } },
-                playerStats,
-                campaignName,
-                null
-            )
-
-            expect(result.payload.description).toContain('No valid targets found')
-        })
-
-        it('excludes dead PCs (runtime isDead)', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'DeadAlly', type: 'player' }],
-            })
-            getRuntimeValue.mockImplementation(runtimeHp({ DeadAlly: { currentHitPoints: 0, isDead: 1 } }))
+            getRuntimeValue.mockImplementation(() => undefined)
 
             const result = await handle(
                 { name: 'Spare the Dying', spell: {} },
@@ -116,14 +128,29 @@ describe('spareTheDyingHandler', () => {
                 null
             )
 
-            expect(result.payload.description).toContain('No valid targets found')
+            expect(result.payload.targets).toEqual([
+                { name: 'Thug 3', isValidTarget: true, hp: 0, isDead: false, type: 'humanoid' },
+            ])
         })
 
-        it('excludes already-Stable PCs (three death-save successes)', async () => {
+        it('reports no valid targets for a roster rejected on every predicate path', async () => {
+            // One creature per isSpareTheDyingTarget rejection path (matrix owner:
+            // spellGates.spareTheDying.test.js): healthy PC, dead PC, Stable PC,
+            // healthy monster, canonical-dead monster, undead, construct.
             getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'StableAlly', type: 'player' }],
+                creatures: [
+                    { name: 'HealthyAlly', type: 'player' },
+                    { name: 'DeadAlly', type: 'player' },
+                    { name: 'StableAlly', type: 'player' },
+                    { name: 'Thug 1', type: 'npc', monsterType: 'humanoid', currentHp: 32 },
+                    { name: 'Thug 2', type: 'npc', monsterType: 'humanoid', currentHp: 0 },
+                    { name: 'Zombie', type: 'npc', monsterType: 'Undead', currentHp: 0, deathSaves: [false, false, false] },
+                    { name: 'IronGolem', type: 'npc', monsterType: 'Construct', currentHp: 0, deathSaves: [false, false, false] },
+                ],
             })
             getRuntimeValue.mockImplementation(runtimeHp({
+                HealthyAlly: { currentHitPoints: 10 },
+                DeadAlly: { currentHitPoints: 0, isDead: 1 },
                 StableAlly: { currentHitPoints: 0, deathSaves: [true, true, true] },
             }))
 
@@ -134,88 +161,8 @@ describe('spareTheDyingHandler', () => {
                 null
             )
 
-            expect(result.payload.description).toContain('No valid targets found')
-        })
-
-        it('excludes healthy monsters via cs.currentHp (runtime monster HP keys never exist)', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Thug 1', type: 'npc', monsterType: 'humanoid', currentHp: 32 }],
-            })
-            getRuntimeValue.mockImplementation(() => undefined)
-
-            const result = await handle(
-                { name: 'Spare the Dying', spell: {} },
-                playerStats,
-                campaignName,
-                null
-            )
-
-            expect(result.payload.description).toContain('No valid targets found')
-        })
-
-        it('excludes dead monsters (cs 0 HP is canonical dead)', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Thug 2', type: 'npc', monsterType: 'humanoid', currentHp: 0 }],
-            })
-            getRuntimeValue.mockImplementation(() => undefined)
-
-            const result = await handle(
-                { name: 'Spare the Dying', spell: {} },
-                playerStats,
-                campaignName,
-                null
-            )
-
-            expect(result.payload.description).toContain('No valid targets found')
-        })
-
-        it('offers dying-modelled monsters (cs 0 HP + deathSaves)', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Thug 3', type: 'npc', monsterType: 'humanoid', currentHp: 0, deathSaves: [false, false, false] }],
-            })
-            getRuntimeValue.mockImplementation(() => undefined)
-
-            const result = await handle(
-                { name: 'Spare the Dying', spell: {} },
-                playerStats,
-                campaignName,
-                null
-            )
-
-            expect(result.payload.targets.length).toBe(1)
-            expect(result.payload.targets[0].name).toBe('Thug 3')
-        })
-
-        it('excludes undead creatures', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Zombie', type: 'npc', monsterType: 'Undead', currentHp: 0, deathSaves: [false, false, false] }],
-            })
-            getRuntimeValue.mockImplementation(() => undefined)
-
-            const result = await handle(
-                { name: 'Spare the Dying', spell: {} },
-                playerStats,
-                campaignName,
-                null
-            )
-
-            expect(result.payload.description).toContain('No valid targets found')
-        })
-
-        it('excludes construct creatures', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'IronGolem', type: 'npc', monsterType: 'Construct', currentHp: 0, deathSaves: [false, false, false] }],
-            })
-            getRuntimeValue.mockImplementation(() => undefined)
-
-            const result = await handle(
-                { name: 'Spare the Dying', spell: {} },
-                playerStats,
-                campaignName,
-                null
-            )
-
-            expect(result.payload.description).toContain('No valid targets found')
+            expect(result.type).toBe('popup')
+            expect(result.payload.description).toBe('No valid targets found. Target must have 0 HP, not be dead, and not be undead or a construct.')
         })
 
         it('returns error when no combat context', async () => {
@@ -233,7 +180,7 @@ describe('spareTheDyingHandler', () => {
         })
     })
 
-    describe('applySpareTheDying', () => {
+    describe('applySpareTheDying — stabilize writes and refusal guards', () => {
         const dyingCs = {
             creatures: [
                 { name: 'Cleric', type: 'player' },
@@ -241,7 +188,7 @@ describe('spareTheDyingHandler', () => {
             ],
         }
 
-        it('stabilizes WITHOUT healing: deathSaves stamped, currentHitPoints never written', async () => {
+        it('stabilizes WITHOUT healing: deathSaves + deathFailures stamped, currentHitPoints never written', async () => {
             getCombatContext.mockResolvedValue(dyingCs)
             getRuntimeValue.mockImplementation(runtimeHp({
                 Ally1: { currentHitPoints: 0, deathFailures: [false, false, false] },
@@ -255,12 +202,18 @@ describe('spareTheDyingHandler', () => {
                 { targetName: 'Ally1' }
             )
 
+            expect(setRuntimeValue).toHaveBeenCalledTimes(2)
             expect(setRuntimeValue).toHaveBeenCalledWith('Ally1', 'deathSaves', [true, true, true], campaignName)
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('Ally1', 'currentHitPoints', 1, campaignName)
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('Ally1', 'currentHitPoints', 0, campaignName)
-            expect(result.payload.type).toBe('automation_info')
-            expect(result.payload.description).toContain('Stable')
-            expect(result.payload.description).not.toContain('1 HP and gained')
+            expect(setRuntimeValue).toHaveBeenCalledWith('Ally1', 'deathFailures', [false, false, false], campaignName)
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Spare the Dying',
+                    automationType: 'spare_the_dying',
+                    description: 'Ally1 becomes Stable and remains at 0 Hit Points.',
+                },
+            })
         })
 
         it('logs ability_use and spell_effect entries naming Spare the Dying + Stable', async () => {
@@ -281,7 +234,7 @@ describe('spareTheDyingHandler', () => {
                 type: 'ability_use',
                 characterName: 'Cleric',
                 abilityName: 'Spare the Dying',
-                description: expect.stringContaining('stabilized'),
+                description: 'Cleric cast Spare the Dying on Ally1: Ally1 is stabilized and becomes Stable at 0 Hit Points.',
                 targetName: 'Ally1',
                 timestamp: expect.any(Number),
             })
@@ -295,107 +248,35 @@ describe('spareTheDyingHandler', () => {
             })
         })
 
-        it('refuses a healthy PC and writes nothing', async () => {
-            getCombatContext.mockResolvedValue(dyingCs)
-            getRuntimeValue.mockImplementation(runtimeHp({ Ally1: { currentHitPoints: 45 } }))
+        it.each([
+            { desc: 'healthy PC is rejected by the runtime HP path', cs: dyingCs, runtime: { Ally1: { currentHitPoints: 45 } }, target: 'Ally1' },
+            { desc: 'canonical-dead monster is rejected by the cs path', cs: { creatures: [{ name: 'Thug 2', type: 'npc', monsterType: 'humanoid', currentHp: 0 }] }, runtime: {}, target: 'Thug 2' },
+            { desc: 'undead and constructs are rejected even when dying-modelled', cs: { creatures: [
+                { name: 'Zombie', type: 'npc', monsterType: 'Undead', currentHp: 0, deathSaves: [false, false, false] },
+                { name: 'IronGolem', type: 'npc', monsterType: 'Construct', currentHp: 0, deathSaves: [false, false, false] },
+            ] }, runtime: {}, target: 'Zombie' },
+        ])('refuses with no writes and console.error when $desc', async ({ cs, runtime, target }) => {
+            getCombatContext.mockResolvedValue(cs)
+            getRuntimeValue.mockImplementation(runtimeHp(runtime))
+            const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
             const result = await applySpareTheDying(
                 { name: 'Spare the Dying' },
                 playerStats,
                 campaignName,
                 null,
-                { targetName: 'Ally1' }
+                { targetName: target }
             )
 
             expect(result.payload.type).toBe('automation_info')
-            expect(result.payload.description).toContain('no longer a valid target')
+            expect(result.payload.description).toBe(`${target} is no longer a valid target for Spare the Dying. Target must be a living creature at 0 Hit Points.`)
             expect(setRuntimeValue).not.toHaveBeenCalled()
+            expect(addEntry).not.toHaveBeenCalled()
+            expect(errSpy).toHaveBeenCalledWith(expect.stringContaining(target))
+            errSpy.mockRestore()
         })
 
-        it('refuses a dead PC (isDead) and writes nothing', async () => {
-            getCombatContext.mockResolvedValue(dyingCs)
-            getRuntimeValue.mockImplementation(runtimeHp({
-                Ally1: { currentHitPoints: 0, isDead: 1 },
-            }))
-
-            const result = await applySpareTheDying(
-                { name: 'Spare the Dying' },
-                playerStats,
-                campaignName,
-                null,
-                { targetName: 'Ally1' }
-            )
-
-            expect(result.payload.description).toContain('no longer a valid target')
-            expect(setRuntimeValue).not.toHaveBeenCalled()
-        })
-
-        it('refuses a healthy monster even though runtime monster HP keys are absent', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Thug 1', type: 'npc', monsterType: 'humanoid', currentHp: 32 }],
-            })
-            getRuntimeValue.mockImplementation(() => undefined)
-
-            const result = await applySpareTheDying(
-                { name: 'Spare the Dying' },
-                playerStats,
-                campaignName,
-                null,
-                { targetName: 'Thug 1' }
-            )
-
-            expect(result.payload.description).toContain('no longer a valid target')
-            expect(setRuntimeValue).not.toHaveBeenCalled()
-        })
-
-        it('refuses a canonical-dead monster (cs 0 HP, no deathSaves)', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Thug 2', type: 'npc', monsterType: 'humanoid', currentHp: 0 }],
-            })
-            getRuntimeValue.mockImplementation(() => undefined)
-
-            const result = await applySpareTheDying(
-                { name: 'Spare the Dying' },
-                playerStats,
-                campaignName,
-                null,
-                { targetName: 'Thug 2' }
-            )
-
-            expect(result.payload.description).toContain('no longer a valid target')
-            expect(setRuntimeValue).not.toHaveBeenCalled()
-        })
-
-        it('refuses undead and constructs at 0 HP', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Zombie', type: 'npc', monsterType: 'Undead', currentHp: 0, deathSaves: [false, false, false] },
-                    { name: 'IronGolem', type: 'npc', monsterType: 'Construct', currentHp: 0, deathSaves: [false, false, false] },
-                ],
-            })
-            getRuntimeValue.mockImplementation(() => undefined)
-
-            const zombieResult = await applySpareTheDying(
-                { name: 'Spare the Dying' },
-                playerStats,
-                campaignName,
-                null,
-                { targetName: 'Zombie' }
-            )
-            const golemResult = await applySpareTheDying(
-                { name: 'Spare the Dying' },
-                playerStats,
-                campaignName,
-                null,
-                { targetName: 'IronGolem' }
-            )
-
-            expect(zombieResult.payload.description).toContain('no longer a valid target')
-            expect(golemResult.payload.description).toContain('no longer a valid target')
-            expect(setRuntimeValue).not.toHaveBeenCalled()
-        })
-
-        it('stabilizes a dying-modelled monster via cs', async () => {
+        it('stabilizes a dying-modelled monster via cs, healing nothing', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Thug 3', type: 'npc', monsterType: 'humanoid', currentHp: 0, deathSaves: [false, false, false] }],
             })
@@ -409,11 +290,13 @@ describe('spareTheDyingHandler', () => {
                 { targetName: 'Thug 3' }
             )
 
-            expect(result.payload.description).toContain('Stable')
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('Thug 3', 'currentHitPoints', 1, campaignName)
+            expect(setRuntimeValue).toHaveBeenCalledTimes(2)
+            expect(setRuntimeValue).toHaveBeenCalledWith('Thug 3', 'deathSaves', [true, true, true], campaignName)
+            expect(setRuntimeValue).toHaveBeenCalledWith('Thug 3', 'deathFailures', [false, false, false], campaignName)
+            expect(result.payload.description).toBe('Thug 3 becomes Stable and remains at 0 Hit Points.')
         })
 
-        it('returns null when no target selected', async () => {
+        it('returns null when no target selected, writing nothing', async () => {
             const result = await applySpareTheDying(
                 { name: 'Spare the Dying' },
                 playerStats,
@@ -423,6 +306,8 @@ describe('spareTheDyingHandler', () => {
             )
 
             expect(result).toBeNull()
+            expect(setRuntimeValue).not.toHaveBeenCalled()
+            expect(addEntry).not.toHaveBeenCalled()
         })
     })
 })

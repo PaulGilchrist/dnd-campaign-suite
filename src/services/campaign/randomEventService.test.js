@@ -36,30 +36,38 @@ describe('randomEventService', () => {
     });
 
     it('should return false when total chance after modifiers is negative', () => {
+      // sparse 0.05 + plains 0 + weather -0.20 = -0.15
       randomSpy.mockReturnValue(0.5);
       expect(shouldTriggerEvent('plains', { encounterMod: -20 }, 'sparse')).toBe(false);
-      expect(randomSpy).toHaveBeenCalled();
+      expect(randomSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should return true when total chance reaches 100%', () => {
+      // frequent 0.25 + swamp 0.08 + weather 0.67 ≈ 1.0
       randomSpy.mockReturnValue(0.001);
       expect(shouldTriggerEvent('swamp', { encounterMod: 67 }, 'frequent')).toBe(true);
-      expect(randomSpy).toHaveBeenCalled();
+      expect(randomSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should apply terrain modifiers', () => {
       randomSpy.mockReturnValue(0.09);
+      // Only passes with forest's +0.05: sparse alone (0.05) would fail this roll
       expect(shouldTriggerEvent('forest', 'weather', 'sparse')).toBe(true);
+      expect(randomSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should apply weather encounter modifier', () => {
       randomSpy.mockReturnValue(0.14);
+      // Only passes with weather +0.10: sparse + plains (0.05) would fail this roll
       expect(shouldTriggerEvent('plains', { encounterMod: 10 }, 'sparse')).toBe(true);
+      expect(randomSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should apply combined terrain and weather modifiers', () => {
       randomSpy.mockReturnValue(0.19);
+      // Only passes with full sum 0.05 + 0.05 + 0.10 = 0.20
       expect(shouldTriggerEvent('forest', { encounterMod: 10 }, 'sparse')).toBe(true);
+      expect(randomSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should handle null or empty weather objects', () => {
@@ -68,18 +76,26 @@ describe('randomEventService', () => {
       expect(shouldTriggerEvent('plains', {}, 'sparse')).toBe(true);
     });
 
-    it('should treat non-numeric encounterMod as zero via NaN fallback', () => {
+    it('should fail closed when encounterMod is non-numeric (NaN poisons the comparison)', () => {
       randomSpy.mockReturnValue(0.04);
+      // 'abc' is truthy so it survives `|| 0`, then 'abc'/100 = NaN and
+      // `Math.random() < NaN` is false — a numeric 0 modifier must stay true
       expect(shouldTriggerEvent('plains', { encounterMod: 'abc' }, 'sparse')).toBe(false);
+      expect(shouldTriggerEvent('plains', { encounterMod: 0 }, 'sparse')).toBe(true);
     });
 
-    it('should support all defined terrain types with normal frequency', () => {
-      const terrainTypes = ['plains', 'forest', 'hills', 'mountains', 'swamp', 'desert', 'tundra', 'beach'];
-      randomSpy.mockReturnValue(0.001);
-
-      for (const terrain of terrainTypes) {
-        expect(shouldTriggerEvent(terrain, 'weather', 'normal')).toBe(true);
-      }
+    it('should apply each terrain modifier tier distinctly at normal frequency', () => {
+      // Roll 0.125 discriminates the modifier tiers: plains/beach (0.12) fail,
+      // hills (0.14), desert/tundra (0.15), forest/mountains (0.17), swamp (0.20) pass
+      randomSpy.mockReturnValue(0.125);
+      expect(shouldTriggerEvent('plains', 'weather', 'normal')).toBe(false);
+      expect(shouldTriggerEvent('beach', 'weather', 'normal')).toBe(false);
+      expect(shouldTriggerEvent('hills', 'weather', 'normal')).toBe(true);
+      expect(shouldTriggerEvent('desert', 'weather', 'normal')).toBe(true);
+      expect(shouldTriggerEvent('tundra', 'weather', 'normal')).toBe(true);
+      expect(shouldTriggerEvent('forest', 'weather', 'normal')).toBe(true);
+      expect(shouldTriggerEvent('mountains', 'weather', 'normal')).toBe(true);
+      expect(shouldTriggerEvent('swamp', 'weather', 'normal')).toBe(true);
     });
 
     it('should handle boundary random values correctly', () => {
@@ -92,64 +108,79 @@ describe('randomEventService', () => {
   });
 
   describe('generateRandomEvent', () => {
-    it('should return an event with all required fields', () => {
+    it('should return the plains table opener with full shape at roll 0', () => {
       randomSpy.mockReturnValue(0);
       const result = generateRandomEvent('plains');
 
-      expect(result).toHaveProperty('type');
-      expect(result).toHaveProperty('title');
-      expect(result).toHaveProperty('description');
-      expect(result).toHaveProperty('terrain');
-      expect(typeof result.type).toBe('string');
-      expect(typeof result.title).toBe('string');
-      expect(typeof result.description).toBe('string');
+      // Note: the { ...picked } spread leaks the internal table weight to consumers
+      expect(result).toEqual({
+        type: 'combat',
+        title: 'Wolves on the Hunt',
+        description: expect.any(String),
+        terrain: 'plains',
+        weight: 20,
+      });
+      expect(result.description.length).toBeGreaterThan(0);
+      // The weighted pick consumes exactly one roll per generation
+      expect(randomSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('should include the requested terrain in the result', () => {
-      randomSpy.mockReturnValue(0);
+    it('should return the plains table closer at high rolls', () => {
+      randomSpy.mockReturnValue(0.99);
       const result = generateRandomEvent('plains');
 
+      // Different rolls from roll 0 must land on a different entry
+      expect(result.type).toBe('navigation');
+      expect(result.title).toBe('Lost Bearings');
       expect(result.terrain).toBe('plains');
     });
 
-    it('should fall back to plains table for unknown or undefined terrain', () => {
+    it('should fall back to the plains table for unknown or undefined terrain', () => {
       randomSpy.mockReturnValue(0);
-
       const jungleResult = generateRandomEvent('jungle');
+      // Same opener as plains proves the fallback table
       expect(jungleResult.terrain).toBe('jungle');
-      expect(jungleResult.type).toBeDefined();
-      expect(typeof jungleResult.title).toBe('string');
+      expect(jungleResult.type).toBe('combat');
+      expect(jungleResult.title).toBe('Wolves on the Hunt');
 
+      randomSpy.mockReturnValue(1);
       const undefinedResult = generateRandomEvent(undefined);
-      expect(undefinedResult.terrain).toBe(undefined);
-      expect(undefinedResult.type).toBeDefined();
+      expect(undefinedResult.terrain).toBeUndefined();
+      expect(undefinedResult.title).toBe('Lost Bearings');
     });
 
-    it('should return different events based on different random rolls', () => {
-      randomSpy.mockReturnValue(0);
-      const result1 = generateRandomEvent('plains');
+    it('should resolve first and last table entries for every terrain deterministically', () => {
+      const terrainEndpins = {
+        plains: ['Wolves on the Hunt', 'Lost Bearings'],
+        forest: ['Ambush from the Brush', 'Twisted Trails'],
+        hills: ['Hill Giant', 'Ridge Confusion'],
+        mountains: ['Peryton Attack', 'False Pass'],
+        desert: ['Sand Wyrm', 'Dune Shifts'],
+        swamp: ['Lizardfolk Ambush', 'Twisted Waterways'],
+        tundra: ['Winter Wolf Pack', 'Whiteout'],
+        beach: ['Coastal Predators', 'Tide Cut-off'],
+      };
 
-      randomSpy.mockReturnValue(0.99);
-      const result2 = generateRandomEvent('plains');
+      for (const [terrain, [firstTitle, lastTitle]] of Object.entries(terrainEndpins)) {
+        randomSpy.mockReturnValue(0);
+        const first = generateRandomEvent(terrain);
+        expect(first.title).toBe(firstTitle);
+        expect(first.terrain).toBe(terrain);
+        expect(typeof first.description).toBe('string');
+        expect(first.description.length).toBeGreaterThan(0);
 
-      expect(result1.title).not.toBe(result2.title);
-    });
+        // roll = 1 lands exactly on the final entry (loop returns on roll <= 0)
+        randomSpy.mockReturnValue(1);
+        const last = generateRandomEvent(terrain);
+        expect(last.title).toBe(lastTitle);
+        expect(last.terrain).toBe(terrain);
 
-    it('should always return a valid event for every terrain type', () => {
-      const terrains = ['plains', 'forest', 'hills', 'mountains', 'desert', 'swamp', 'tundra', 'beach'];
-      const randomValues = [0, 0.5, 1];
-
-      for (const terrain of terrains) {
-        for (const roll of randomValues) {
-          const spy = vi.spyOn(Math, 'random');
-          spy.mockReturnValue(roll);
-          const event = generateRandomEvent(terrain);
-          expect(event).toHaveProperty('type');
-          expect(event).toHaveProperty('title');
-          expect(event).toHaveProperty('description');
-          expect(event).toHaveProperty('terrain', terrain);
-          spy.mockRestore();
-        }
+        // A mid roll must still produce a valid narrative entry
+        randomSpy.mockReturnValue(0.5);
+        const mid = generateRandomEvent(terrain);
+        expect(typeof mid.title).toBe('string');
+        expect(mid.title.length).toBeGreaterThan(0);
+        expect(typeof mid.type).toBe('string');
       }
     });
   });

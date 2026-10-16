@@ -1,954 +1,889 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import classRules from './classRules2024.js';
+import classes2024 from '../../../public/data/2024/classes.json';
 
-describe('classRules2024', () => {
-  beforeEach(() => {
-    vi.resetModules();
-  });
+// Lane: 2024 classRules (this file) — closes the dual-ruleset pair with
+// classRules.test.js (#2014, 5e lane). Owns public/data/2024/classes.json
+// (separate disk; dataLoader.getDataPath() routes rules==='2024' here, so
+// no cross-lane pin reuse — 5e names/values from #2014 are deliberately NOT
+// copied: Moon formula pins, Archdruid Infinity, Arcane Ward max are 5e-only).
+//
+// Pair closure (handoff from #2014):
+//  - 2024 capstone is FINITE: disk Druid L20 wild_shape:4 (no Archdruid
+//    Infinity) — pinned verbatim below.
+//  - Moon name-mismatch flag does NOT recur: disk majors here are named
+//    'Circle of the Moon' verbatim, matching the source formula's key.
+//  - No reciprocal rules!=='2024' guards exist in this module — routing is
+//    external (rulesFactory/rules-core `use2024 ? classRules2024 : classRules`,
+//    classFeatures FEATURE_GETTERS dispatch). Pinned honestly as absent.
+//
+// Production liveness (verified 2026-10-16):
+//  - getClass            → rulesFactory.getPlayerStats (rules-core injects the
+//                         2024 module; cr.getClass call site is ruleset-agnostic)
+//  - getFeatures         → rules-actions.js (via injected classRules)
+//  - getHighestMajorLevel→ rules/core/spellCalc2024.js:506 (subclass spellcasting)
+//  - getMartialArtsDie   → rules/core/attackCalc2024.js:578 (Flurry of Blows dice)
+//  - getUnarmoredMovementIncrease → charSummaryCalc.js (sheet)
+//  - get*Features (x10)  → classFeatures.getClassFeatures FEATURE_GETTERS dispatch
+//                         → CharClassFeatures.jsx, trackedResources, automation
+//  - getRogueSneakAttack / getDruid* delegators → rulesFactory wrappers (live)
+//  - getEnergy         → disk-backed accessor for Fighter(Psi Warrior)/Rogue
+//                         (Soulknife) energy rows; consumer is the 2024 sheet/rules
+//                         ruleset path (no direct non-test call site found — kept
+//                         as disk-verbatim pin, dead-export candidate flagged).
+//
+// Anti-pattern audit results (canned-vs-disk, #2014 block standard):
+//  - FIXED canned rows: every { level: N, <field>: X } synthetic progression row
+//    in the old file was fabricated and several contradicted disk (e.g. claimed
+//    martial_arts_die 6 at L5, disk is 8; sorcery/class channel_divinity 3 at
+//    Cleric L5, disk is 2; 'psi' energy type, disk shape is energy_die_type/num).
+//    All progression pins below are verbatim /data/2024/classes.json.
+//  - FLAG-A (skill path dead vs disk): source reads skill_proficiencies ||
+//    skill_proficiencies_choices, but disk uses skill_proficiency_choices for
+//    Barbarian/Druid (matches neither field) and every disk string starts with
+//    'Choose' (skipped). No disk class ever yields a 'Skill: ' proficiency.
+//  - FLAG-B: categories2024.featuresToIgnore is never consulted by
+//    categorizeFeatures — ignored names ('Fighting Style', 'Extra Attack',
+//    'Druid Subclass'…) still land in specialActions. Pinned as quirk.
+//  - FLAG-C: getMartialArtsDie default d4 is unreachable via disk — 2024 Monk
+//    rows all carry martial_arts_die and start at d6. Default kept as honest
+//    synthetic-row fallback pin only.
+//  - FLAG-D: hardcoded, no disk column: Sorcerer metamagic ladder and
+//    maxInnateSorcery:2, Paladin auraRange:null, Cleric destroyUndeadCR:null,
+//    Bard songOfRestDie:null / subclassMagicalSecrets:0, Warlock arcanum
+//    formula (cross-checked honest: disk 'Mystic Arcanum' feature rows appear
+//    at exactly L11/13/15/17, matching the >10 / >=11/13/15/17 formula).
+//  - Quirks pinned: getRogueSneakAttack/getEldritchInvocations use positional
+//    [level-1] indexing (not find-by-level); getEnergy required_major check
+//    reads only class.major.name (legacy subclass shape → null); getClass drops
+//    runtime major customProp (disk clone wins).
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
+const diskClass = (name) => classes2024.find((c) => c.name === name);
+const diskLevels = (name) => diskClass(name).class_levels;
+const namesIn = (categorized) => [
+  ...categorized.actions,
+  ...categorized.bonusActions,
+  ...categorized.reactions,
+  ...categorized.specialActions,
+  ...categorized.characterAdvancement,
+].map((f) => f.name);
 
+describe('classRules2024 (2024)', () => {
   describe('getClass', () => {
-    it('warns and returns default class_levels when class not found', () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const result = classRules.getClass([], { class: { name: 'Nonexistent' } });
-      expect(result).toEqual({ class_levels: [] });
-      expect(consoleWarnSpy).toHaveBeenCalledWith('Could not find class: Nonexistent');
-      consoleWarnSpy.mockRestore();
-    });
-
-    it('returns found class with merged data', () => {
-      const allClasses = [{
-        name: 'Cleric',
-        class_levels: [{ level: 1, features: [] }],
-        saving_throw_proficiencies: ['WIS', 'CHA'],
-        weapon_proficiencies: 'Simple weapons',
-        armor_training: 'Light armor',
-        tool_proficiencies: null,
-        skill_proficiencies: null,
-        skill_proficiencies_choices: null,
-        majors: [],
-      }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric', major: { name: 'Knowledge' } } });
-      expect(result.name).toBe('Cleric');
-      expect(result.class_levels).toEqual([{ level: 1, features: [] }]);
-      expect(result.major).toEqual({ name: 'Knowledge', features: [] });
-      expect(result.majors).toBeUndefined();
-    });
-
-    it('converts short ability names to long names', () => {
-      const allClasses = [{ name: 'Cleric', saving_throw_proficiencies: ['WIS', 'CHA'] }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
-      expect(result.saving_throw_proficiencies).toContain('Wisdom');
-      expect(result.saving_throw_proficiencies).toContain('Charisma');
-    });
-
-    it('handles weapon_proficiencies string mapping', () => {
-      const allClasses = [{ name: 'Cleric', weapon_proficiencies: 'Simple and Martial weapons' }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
-      expect(result.proficiencies).toContain('Simple Weapons');
-      expect(result.proficiencies).toContain('Martial Weapons');
-    });
-
-    it('handles armor_training string mapping', () => {
-      const allClasses = [{ name: 'Fighter', armor_training: 'Light, Medium, and Heavy armor and Shields' }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Fighter' } });
-      expect(result.proficiencies).toContain('Light Armor');
-      expect(result.proficiencies).toContain('Medium Armor');
-      expect(result.proficiencies).toContain('Heavy Armor');
-      expect(result.proficiencies).toContain('Shields');
-    });
-
-    it('handles tool_proficiencies that do not start with Choose', () => {
-      const allClasses = [{ name: 'Cleric', tool_proficiencies: "Healer's Kit" }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
-      expect(result.proficiencies).toContain("Healer's Kit");
-    });
-
-    it('skips tool_proficiencies that start with Choose', () => {
-      const allClasses = [{ name: 'Cleric', tool_proficiencies: "Choose one kind of Artisan's Tools" }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
-      expect(result.proficiencies).not.toContain("Choose one kind of Artisan's Tools");
-    });
-
-    it('handles skill_proficiencies string parsing', () => {
-      const allClasses = [{ name: 'Cleric', skill_proficiencies: 'History, Insight, Medicine' }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
-      expect(result.proficiencies).toContain('Skill: History');
-      expect(result.proficiencies).toContain('Skill: Insight');
-      expect(result.proficiencies).toContain('Skill: Medicine');
-    });
-
-    it('skips skill_proficiencies that start with Choose', () => {
-      const allClasses = [{ name: 'Cleric', skill_proficiencies: 'Choose two skills' }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
-      expect(result.proficiencies).not.toContain('Choose two skills');
-    });
-
-    it('adds Martial Weapons and Heavy Armor for Divine Order Protector Cleric', () => {
-      const result = classRules.getClass([{ name: 'Cleric' }], { class: { name: 'Cleric', divineOrder: 'Protector' } });
-      expect(result.proficiencies).toContain('Martial Weapons');
-      expect(result.proficiencies).toContain('Heavy Armor');
-    });
-
-    it('adds Martial Weapons and Medium Armor for Primal Order Warden Druid', () => {
-      const result = classRules.getClass([{ name: 'Druid' }], { class: { name: 'Druid', primalOrder: 'Warden' } });
-      expect(result.proficiencies).toContain('Martial Weapons');
-      expect(result.proficiencies).toContain('Medium Armor');
-    });
-
-    it('handles missing major by setting to null', () => {
-      const result = classRules.getClass([{ name: 'Cleric' }], { class: { name: 'Cleric' } });
+    it('merges disk Wizard verbatim: long saving names kept, major null, majors deleted', () => {
+      // disk Wizard saving_throw_proficiencies are already long names;
+      // utils.getAbilityLongName('Intelligence') → undefined → original kept.
+      const result = classRules.getClass(classes2024, { class: { name: 'Wizard' } });
+      expect(result.name).toBe('Wizard');
+      expect(result.saving_throw_proficiencies).toEqual(['Intelligence', 'Wisdom']);
       expect(result.major).toBeNull();
+      expect(result.majors).toBeUndefined();
+      expect(result.class_levels).toHaveLength(20);
     });
 
-    it('handles legacy subclass format via subclass.name fallback', () => {
-      const allClasses = [{ name: 'Cleric', majors: [{ name: 'Life' }] }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric', subclass: { name: 'Life' } } });
-      expect(result.major).toEqual({ name: 'Life' });
+    it('disk-wide scan: no short ability abbreviations exist on disk (conversion is character-JSON path only)', () => {
+      const shorts = classes2024.flatMap((c) => c.saving_throw_proficiencies).filter((s) => s.length <= 3);
+      expect(shorts).toEqual([]);
     });
 
-    it('creates major with empty features when subclass not found in majors', () => {
-      const allClasses = [{ name: 'Cleric', majors: [{ name: 'Life' }] }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric', subclass: { name: 'Unknown' } } });
-      expect(result.major).toEqual({ name: 'Unknown', features: [] });
+    it('converts short names merged in from playerSummary (synthetic wizard-path input)', () => {
+      const result = classRules.getClass(classes2024, { class: { name: 'Wizard', saving_throw_proficiencies: ['INT', 'WIS'] } });
+      expect(result.saving_throw_proficiencies).toEqual(['Intelligence', 'Wisdom']);
     });
 
-    it('throws when playerSummary.class is null', () => {
-      expect(() => classRules.getClass([{ name: 'Cleric' }], { class: null })).toThrow(TypeError);
+    it('maps disk Fighter weapon/armor strings verbatim (exact 6 entries)', () => {
+      const result = classRules.getClass(classes2024, { class: { name: 'Fighter' } });
+      expect(result.proficiencies).toEqual(['Simple Weapons', 'Martial Weapons', 'Light Armor', 'Medium Armor', 'Heavy Armor', 'Shields']);
     });
 
-    it('handles empty allClasses array', () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const result = classRules.getClass([], { class: { name: 'Wizard' } });
-      expect(result).toEqual({ class_levels: [] });
-      consoleWarnSpy.mockRestore();
+    it('maps disk Rogue Finesse-or-Light string + Thieves Tools verbatim (exact 5 entries)', () => {
+      const result = classRules.getClass(classes2024, { class: { name: 'Rogue' } });
+      expect(result.proficiencies).toEqual(['Simple Weapons', 'Finesse Martial Weapons', 'Light Martial Weapons', 'Light Armor', "Thieves' Tools"]);
     });
 
-    it('handles missing weapon_proficiencies gracefully', () => {
-      const allClasses = [{ name: 'Cleric' }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
-      expect(result.proficiencies).toEqual([]);
+    it('skips armor_training "None" and Choose-prefixed tools (disk Monk exact list)', () => {
+      const result = classRules.getClass(classes2024, { class: { name: 'Monk' } });
+      expect(result.proficiencies).toEqual(['Simple Weapons', 'Light Martial Weapons']);
     });
 
-    it('handles missing armor_training gracefully', () => {
-      const allClasses = [{ name: 'Cleric' }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
-      expect(result.proficiencies).toEqual([]);
+    it('includes disk Druid tool_proficiencies verbatim', () => {
+      const result = classRules.getClass(classes2024, { class: { name: 'Druid' } });
+      expect(result.proficiencies).toContain('Herbalism Kit');
     });
 
-    it('handles armor_training "None" by not adding any armor proficiencies', () => {
-      const allClasses = [{ name: 'Cleric', armor_training: 'None' }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
-      expect(result.proficiencies).toEqual([]);
+    it('FLAG-A: no disk class ever emits a Skill: proficiency (all strings Choose-prefixed or field-name mismatch)', () => {
+      // Barbarian/Druid store skill_proficiency_choices (matches neither field
+      // the module reads); all other disk skill strings start with 'Choose'.
+      for (const c of classes2024) {
+        const result = classRules.getClass(classes2024, { class: { name: c.name } });
+        expect(result.proficiencies.filter((p) => p.startsWith('Skill: '))).toEqual([]);
+      }
     });
 
-    it('falls back to skill_proficiencies_choices when skill_proficiencies is null', () => {
-      const allClasses = [{ name: 'Cleric', skill_proficiencies_choices: 'History, Religion' }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
+    it('parses non-Choose skill string and strips " or " inside the last token (synthetic path, quirk)', () => {
+      // Synthetic input: no disk string reaches this parser (see FLAG-A).
+      // Quirk kept honest: ' or ' is removed, not split — 'PersuasionReligion'.
+      const result = classRules.getClass(classes2024, { class: { name: 'Cleric', skill_proficiencies: 'History, Insight, Medicine, Persuasion or Religion' } });
       expect(result.proficiencies).toContain('Skill: History');
-      expect(result.proficiencies).toContain('Skill: Religion');
-    });
-
-    it('skips skill_proficiencies_choices that start with Choose', () => {
-      const allClasses = [{ name: 'Cleric', skill_proficiencies_choices: 'Choose two skills' }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
-      expect(result.proficiencies).not.toContain('Choose two skills');
-    });
-
-    it('removes " or " from within a skill token (not a delimiter)', () => {
-      const allClasses = [{ name: 'Cleric', skill_proficiencies: 'History, Insight, Medicine, Persuasion or Religion' }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
-      expect(result.proficiencies).toContain('Skill: History');
-      expect(result.proficiencies).toContain('Skill: Insight');
       expect(result.proficiencies).toContain('Skill: Medicine');
       expect(result.proficiencies).toContain('Skill: PersuasionReligion');
     });
 
-    it('preserves class_levels after merging playerSummary data', () => {
-      const allClasses = [{
-        name: 'Cleric',
-        class_levels: [{ level: 1, features: [{ name: 'Channel Divinity' }] }],
-      }];
-      const result = classRules.getClass(allClasses, { class: { name: 'Cleric', customProp: 'value' } });
-      expect(result.class_levels).toEqual([{ level: 1, features: [{ name: 'Channel Divinity' }] }]);
-      expect(result.customProp).toBe('value');
+    it('adds Martial Weapons + Heavy Armor for Divine Order Protector Cleric (runtime character field)', () => {
+      const result = classRules.getClass(classes2024, { class: { name: 'Cleric', divineOrder: 'Protector' } });
+      expect(result.proficiencies).toContain('Martial Weapons');
+      expect(result.proficiencies).toContain('Heavy Armor');
+    });
+
+    it('adds Martial Weapons + Medium Armor for Primal Order Warden Druid (runtime character field)', () => {
+      const result = classRules.getClass(classes2024, { class: { name: 'Druid', primalOrder: 'Warden' } });
+      expect(result.proficiencies).toContain('Martial Weapons');
+      expect(result.proficiencies).toContain('Medium Armor');
+    });
+
+    it('resolves disk major by name as a disk clone (runtime major customProp is dropped — quirk)', () => {
+      const lifeDomain = diskClass('Cleric').majors.find((m) => m.name === 'Life Domain');
+      const result = classRules.getClass(classes2024, { class: { name: 'Cleric', major: { name: 'Life Domain', customProp: 'x' } } });
+      expect(result.major).toEqual(lifeDomain); // verbatim disk clone: Disciple of Life, Preserve Life, Blessed Healer, Supreme Healing
+      expect(result.major.customProp).toBeUndefined();
+      expect(result.majors).toBeUndefined();
+    });
+
+    it('resolves legacy subclass.name against disk majors (2024 disk name, not 5e short name)', () => {
+      const land = diskClass('Druid').majors.find((m) => m.name === 'Circle of the Land');
+      const result = classRules.getClass(classes2024, { class: { name: 'Druid', subclass: { name: 'Circle of the Land' } } });
+      expect(result.major).toEqual(land);
+    });
+
+    it('creates empty-features major when not found in disk majors', () => {
+      const result = classRules.getClass(classes2024, { class: { name: 'Cleric', subclass: { name: 'Nonexistent Domain' } } });
+      expect(result.major).toEqual({ name: 'Nonexistent Domain', features: [] });
+    });
+
+    it('warns and returns default class_levels when class not found (incl. empty allClasses)', () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(classRules.getClass(classes2024, { class: { name: 'Artificer' } })).toEqual({ class_levels: [] });
+      expect(classRules.getClass([], { class: { name: 'Wizard' } })).toEqual({ class_levels: [] });
+      expect(consoleWarnSpy).toHaveBeenCalledWith('Could not find class: Artificer');
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('preserves disk class_levels when playerSummary.class carries its own (source restore-on-merge)', () => {
+      const result = classRules.getClass(classes2024, { class: { name: 'Fighter', class_levels: [{ level: 99 }] } });
+      expect(result.class_levels).toHaveLength(20);
+      expect(result.class_levels[0].level).toBe(1);
+    });
+
+    it('throws TypeError when playerSummary.class is null', () => {
+      expect(() => classRules.getClass(classes2024, { class: null })).toThrow(TypeError);
     });
   });
 
   describe('getDruidMaxWildShapeChallengeRating', () => {
-    it('returns beast_max_cr from class_levels', () => {
-      const playerStats = { class: { class_levels: [{ level: 3, beast_max_cr: 0.5 }] }, level: 3 };
-      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(0.5);
+    // disk Druid beast_max_cr verbatim (non-Moon path)
+    it.each([
+      [1, 0],
+      [2, 0.25],
+      [4, 0.5],
+      [8, 1],
+      [20, 1],
+    ])('reads disk beast_max_cr verbatim at level %i', (level, expected) => {
+      const playerStats = { class: { name: 'Druid', class_levels: diskLevels('Druid') }, level };
+      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(expected);
     });
 
-    it('returns 1 for Moon subclass level > 1', () => {
-      const playerStats = { class: { class_levels: [{ level: 3, beast_max_cr: 0.5 }], major: { name: 'Circle of the Moon' } }, level: 3 };
-      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(1);
+    // Moon formula (source: >1 → 1; >5 → floor(level/3)), disk name verbatim.
+    // Level 8 is discriminating: formula 2 vs disk 1.
+    it.each([
+      [1, 0],   // no override at L1 (disk value 0)
+      [2, 1],   // disk 0.25 overridden
+      [5, 1],   // disk 0.5 overridden
+      [6, 2],
+      [8, 2],
+      [17, 5],
+      [20, 6],
+    ])('applies Moon formula over disk at level %i', (level, expected) => {
+      const playerStats = {
+        class: { name: 'Druid', major: { name: 'Circle of the Moon' }, class_levels: diskLevels('Druid') },
+        level,
+      };
+      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(expected);
     });
 
-    it('returns 1 for Moon subclass at level 2', () => {
-      const playerStats = { class: { class_levels: [{ level: 2, beast_max_cr: 0.5 }], major: { name: 'Circle of the Moon' } }, level: 2 };
-      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(1);
-    });
-
-    it('returns 0 for Moon subclass at level 1 (no override)', () => {
-      const playerStats = { class: { class_levels: [{ level: 1, beast_max_cr: 0.5 }], major: { name: 'Circle of the Moon' } }, level: 1 };
-      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(0.5);
-    });
-
-    it('returns Math.floor(level/3) for Moon subclass level > 5', () => {
-      const playerStats = { class: { class_levels: [{ level: 8, beast_max_cr: 0.5 }], major: { name: 'Circle of the Moon' } }, level: 8 };
+    it('applies the Moon formula via legacy subclass.name shape at level 8', () => {
+      const playerStats = { class: { name: 'Druid', subclass: { name: 'Circle of the Moon' }, class_levels: diskLevels('Druid') }, level: 8 };
       expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(2);
     });
 
-    it('does not override for non-Moon subclass', () => {
-      const playerStats = { class: { class_levels: [{ level: 8, beast_max_cr: 0.5 }], major: { name: 'Spores' } }, level: 8 };
-      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(0.5);
-    });
-
-    it('supports legacy subclass field name for Moon detection', () => {
-      const playerStats = { class: { class_levels: [{ level: 8, beast_max_cr: 0.5 }], subclass: { name: 'Circle of the Moon' } }, level: 8 };
-      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(2);
+    it('does not override for other disk majors (Circle of the Stars at level 8 → disk 1)', () => {
+      const playerStats = { class: { name: 'Druid', major: { name: 'Circle of the Stars' }, class_levels: diskLevels('Druid') }, level: 8 };
+      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(1);
     });
 
     it('returns 0 when class_levels is missing', () => {
-      const playerStats = { class: {}, level: 3 };
-      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(0);
+      expect(classRules.getDruidMaxWildShapeChallengeRating({ class: { name: 'Druid' }, level: 3 })).toBe(0);
     });
   });
 
   describe('getDruidWildShapeUses', () => {
-    it('returns wild_shape from class_levels', () => {
-      const playerStats = { class: { class_levels: [{ level: 3, wild_shape: 2 }] }, level: 3 };
-      expect(classRules.getDruidWildShapeUses(playerStats)).toBe(2);
-    });
-
-    it('returns 0 when wild_shape is undefined', () => {
-      const playerStats = { class: { class_levels: [{ level: 3 }] }, level: 3 };
-      expect(classRules.getDruidWildShapeUses(playerStats)).toBe(0);
+    // disk wild_shape verbatim — pair-closure pin: L20 is FINITE (4),
+    // unlike the 5e Archdruid Infinity #2014.
+    it.each([
+      [1, 0],
+      [2, 2],
+      [6, 3],
+      [17, 4],
+      [20, 4],
+    ])('reads disk wild_shape verbatim at level %i', (level, expected) => {
+      const playerStats = { class: { name: 'Druid', class_levels: diskLevels('Druid') }, level };
+      expect(classRules.getDruidWildShapeUses(playerStats)).toBe(expected);
     });
 
     it('returns 0 when class_levels is missing', () => {
-      const playerStats = { class: {}, level: 3 };
-      expect(classRules.getDruidWildShapeUses(playerStats)).toBe(0);
-    });
-
-    it('returns 0 when class is missing', () => {
+      expect(classRules.getDruidWildShapeUses({ class: { name: 'Druid' }, level: 3 })).toBe(0);
       expect(classRules.getDruidWildShapeUses({})).toBe(0);
     });
   });
 
   describe('getDruidBeastKnownForms', () => {
-    it('returns beast_known_forms from class_levels', () => {
-      const playerStats = { class: { class_levels: [{ level: 3, beast_known_forms: 2 }] }, level: 3 };
-      expect(classRules.getDruidBeastKnownForms(playerStats)).toBe(2);
-    });
-
-    it('returns 0 when beast_known_forms is undefined', () => {
-      const playerStats = { class: { class_levels: [{ level: 3 }] }, level: 3 };
-      expect(classRules.getDruidBeastKnownForms(playerStats)).toBe(0);
+    it.each([
+      [1, 0],
+      [2, 4],
+      [4, 6],
+      [8, 8],
+    ])('reads disk beast_known_forms verbatim at level %i', (level, expected) => {
+      const playerStats = { class: { name: 'Druid', class_levels: diskLevels('Druid') }, level };
+      expect(classRules.getDruidBeastKnownForms(playerStats)).toBe(expected);
     });
 
     it('returns 0 when class_levels is missing', () => {
-      const playerStats = { class: {}, level: 3 };
-      expect(classRules.getDruidBeastKnownForms(playerStats)).toBe(0);
+      expect(classRules.getDruidBeastKnownForms({ class: { name: 'Druid' }, level: 3 })).toBe(0);
     });
   });
 
   describe('getDruidBeastFlySpeed', () => {
-    it('returns true when beast_fly_speed is Yes', () => {
-      const playerStats = { class: { class_levels: [{ level: 3, beast_fly_speed: 'Yes' }] }, level: 3 };
-      expect(classRules.getDruidBeastFlySpeed(playerStats)).toBe(true);
-    });
-
-    it('returns false when beast_fly_speed is No', () => {
-      const playerStats = { class: { class_levels: [{ level: 3, beast_fly_speed: 'No' }] }, level: 3 };
-      expect(classRules.getDruidBeastFlySpeed(playerStats)).toBe(false);
-    });
-
-    it('returns false when beast_fly_speed is undefined', () => {
-      const playerStats = { class: { class_levels: [{ level: 3 }] }, level: 3 };
-      expect(classRules.getDruidBeastFlySpeed(playerStats)).toBe(false);
+    // disk beast_fly_speed Yes/No verbatim; L7/L8 is the boundary.
+    it.each([
+      [1, false],
+      [7, false],
+      [8, true],
+      [20, true],
+    ])('reads disk beast_fly_speed verbatim at level %i', (level, expected) => {
+      const playerStats = { class: { name: 'Druid', class_levels: diskLevels('Druid') }, level };
+      expect(classRules.getDruidBeastFlySpeed(playerStats)).toBe(expected);
     });
 
     it('returns false when class_levels is missing', () => {
-      const playerStats = { class: {}, level: 3 };
-      expect(classRules.getDruidBeastFlySpeed(playerStats)).toBe(false);
+      expect(classRules.getDruidBeastFlySpeed({ class: { name: 'Druid' }, level: 8 })).toBe(false);
     });
   });
 
   describe('getFeatures', () => {
-    it('returns categorized features object with all category keys', () => {
-      const playerStats = {
-        class: { class_levels: [{ level: 1, features: [{ name: 'Channel Divinity', level: 2 }] }, { level: 2, features: [] }] },
-        level: 2,
-      };
+    it('categorizes disk Fighter L1-L2 by casting time (FLAG-B: featuresToIgnore names still surface in specialActions)', () => {
+      const playerStats = { class: { name: 'Fighter', class_levels: diskLevels('Fighter') }, level: 2 };
       const result = classRules.getFeatures(playerStats);
-      expect(result).toHaveProperty('actions');
-      expect(result).toHaveProperty('bonusActions');
-      expect(result).toHaveProperty('reactions');
-      expect(result).toHaveProperty('specialActions');
-      expect(result).toHaveProperty('characterAdvancement');
-    });
-
-    it('filters out features above player level', () => {
-      const playerStats = {
-        class: {
-          class_levels: [
-            { level: 1, features: [{ name: 'Level 1 Feature', level: 1 }] },
-            { level: 2, features: [{ name: 'Level 2 Feature', level: 2 }] },
-            { level: 3, features: [{ name: 'Level 3 Feature', level: 3 }] },
-          ],
-        },
-        level: 2,
-      };
-      const result = classRules.getFeatures(playerStats);
-      const allFeatureNames = [
-        ...result.actions, ...result.bonusActions, ...result.reactions,
-        ...result.specialActions, ...result.characterAdvancement,
-      ].map(f => f.name);
-      expect(allFeatureNames).not.toContain('Level 3 Feature');
-      expect(allFeatureNames).toContain('Level 1 Feature');
-    });
-
-    it('replaces base monk features with Heightened versions at level >= 10', () => {
-      const playerStats = {
-        class: {
-          class_levels: [
-            { level: 1, features: [{ name: 'Flurry of Blows', level: 2 }, { name: 'Patient Defense', level: 2 }, { name: 'Step of the Wind', level: 2 }] },
-            { level: 2, features: [{ name: 'Heightened Flurry of Blows', level: 10 }] },
-          ],
-        },
-        level: 10,
-      };
-      const result = classRules.getFeatures(playerStats);
-      const allFeatureNames = [
-        ...result.actions, ...result.bonusActions, ...result.reactions,
-        ...result.specialActions, ...result.characterAdvancement,
-      ].map(f => f.name);
-      expect(allFeatureNames).not.toContain('Flurry of Blows');
-      expect(allFeatureNames).toContain('Heightened Flurry of Blows');
-    });
-
-    it('replaces Deflect Attacks with Deflect Energy at level >= 13', () => {
-      const playerStats = {
-        class: {
-          class_levels: [
-            { level: 1, features: [{ name: 'Deflect Attacks', level: 1 }] },
-            { level: 2, features: [{ name: 'Deflect Energy', level: 13 }] },
-          ],
-        },
-        level: 13,
-      };
-      const result = classRules.getFeatures(playerStats);
-      const allFeatureNames = [
-        ...result.actions, ...result.bonusActions, ...result.reactions,
-        ...result.specialActions, ...result.characterAdvancement,
-      ].map(f => f.name);
-      expect(allFeatureNames).not.toContain('Deflect Attacks');
-      expect(allFeatureNames).toContain('Deflect Energy');
-    });
-
-    it('includes major features when major exists', () => {
-      const playerStats = {
-        class: {
-          class_levels: [{ level: 1, features: [] }],
-          major: { features: [{ name: 'Major Feature', level: 1 }] },
-        },
-        level: 1,
-      };
-      const result = classRules.getFeatures(playerStats);
-      const allFeatureNames = [
-        ...result.actions, ...result.bonusActions, ...result.reactions,
-        ...result.specialActions, ...result.characterAdvancement,
-      ].map(f => f.name);
-      expect(allFeatureNames).toContain('Major Feature');
-    });
-
-    it('handles major with empty features array', () => {
-      const playerStats = {
-        class: {
-          class_levels: [{ level: 1, features: [{ name: 'Base Feature', level: 1 }] }],
-          major: { features: [] },
-        },
-        level: 1,
-      };
-      const result = classRules.getFeatures(playerStats);
-      const allFeatureNames = [
-        ...result.actions, ...result.bonusActions, ...result.reactions,
-        ...result.specialActions, ...result.characterAdvancement,
-      ].map(f => f.name);
-      expect(allFeatureNames).toContain('Base Feature');
-    });
-
-    it('handles missing major by not including major features', () => {
-      const playerStats = {
-        class: {
-          class_levels: [{ level: 1, features: [{ name: 'Base Feature', level: 1 }] }],
-        },
-        level: 1,
-      };
-      const result = classRules.getFeatures(playerStats);
-      const allFeatureNames = [
-        ...result.actions, ...result.bonusActions, ...result.reactions,
-        ...result.specialActions, ...result.characterAdvancement,
-      ].map(f => f.name);
-      expect(allFeatureNames).toContain('Base Feature');
-    });
-
-    it('returns empty categories when class_levels is empty', () => {
-      const playerStats = { class: { class_levels: [] }, level: 1 };
-      const result = classRules.getFeatures(playerStats);
-      expect(result.actions).toEqual([]);
-      expect(result.bonusActions).toEqual([]);
+      expect(result.actions.map((f) => f.name)).toEqual(['Action Surge']);
+      expect(result.bonusActions.map((f) => f.name)).toEqual(['Second Wind']);
       expect(result.reactions).toEqual([]);
-      expect(result.specialActions).toEqual([]);
+      // 'Fighting Style'/'Weapon Mastery' are in categories2024.featuresToIgnore,
+      // which categorizeFeatures never consults.
+      expect(result.specialActions.map((f) => f.name)).toEqual(['Tactical Mind', 'Fighting Style', 'Weapon Mastery']);
       expect(result.characterAdvancement).toEqual([]);
     });
 
-    it('throws when playerStats has no class property', () => {
-      expect(() => classRules.getFeatures({})).toThrow(TypeError);
+    it('filters out level rows beyond the player level (Fighter L1 excludes Action Surge)', () => {
+      const playerStats = { class: { name: 'Fighter', class_levels: diskLevels('Fighter') }, level: 1 };
+      const names = namesIn(classRules.getFeatures(playerStats));
+      expect(names).toContain('Second Wind');
+      expect(names).not.toContain('Action Surge');
     });
 
-    it('includes subclass features when only subclass exists (not major)', () => {
+    it('replaces base bonus-action monk features with Heightened versions at level 10, not at 9', () => {
+      const statsAt = (level) => ({ class: { name: 'Monk', class_levels: diskLevels('Monk') }, level });
+      const l10 = classRules.getFeatures(statsAt(10));
+      expect(l10.bonusActions.map((f) => f.name)).toEqual([
+        'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind',
+      ]);
+      expect(namesIn(l10)).not.toContain('Flurry of Blows');
+      // disk L5 Extra Attack has no casting_time and featuresToIgnore is inert (FLAG-B)
+      expect(l10.specialActions.map((f) => f.name)).toContain('Extra Attack');
+
+      const l9 = classRules.getFeatures(statsAt(9));
+      expect(l9.bonusActions.map((f) => f.name)).toEqual(['Flurry of Blows', 'Patient Defense', 'Step of the Wind']);
+      expect(namesIn(l9)).not.toContain('Heightened Flurry of Blows');
+    });
+
+    it('replaces Deflect Attacks with Deflect Energy at level 13, not at 12 (reactions from disk)', () => {
+      const statsAt = (level) => ({ class: { name: 'Monk', class_levels: diskLevels('Monk') }, level });
+      // disk also carries L3 Slow Fall (1 reaction) in both windows — verbatim.
+      const l13 = classRules.getFeatures(statsAt(13));
+      expect(l13.reactions.map((f) => f.name)).toEqual(['Deflect Energy', 'Slow Fall']);
+      expect(namesIn(l13)).not.toContain('Deflect Attacks');
+
+      const l12 = classRules.getFeatures(statsAt(12));
+      // addFeatures walks levels high→low: L3 Slow Fall precedes L2 Deflect Attacks.
+      expect(l12.reactions.map((f) => f.name)).toEqual(['Slow Fall', 'Deflect Attacks']);
+    });
+
+    it('merges disk Circle of the Moon major features filtered by feature.level (level 3)', () => {
       const playerStats = {
-        class: {
-          class_levels: [{ level: 1, features: [] }],
-          subclass: { features: [{ name: 'Beguiling Defenses', level: 10 }] },
-        },
-        level: 10,
+        class: { name: 'Druid', class_levels: diskLevels('Druid'), major: diskClass('Druid').majors.find((m) => m.name === 'Circle of the Moon') },
+        level: 3,
       };
       const result = classRules.getFeatures(playerStats);
-      const allFeatureNames = [
-        ...result.actions, ...result.bonusActions, ...result.reactions,
-        ...result.specialActions, ...result.characterAdvancement,
-      ].map(f => f.name);
-      expect(allFeatureNames).toContain('Beguiling Defenses');
+      expect(result.bonusActions.map((f) => f.name)).toContain('Wild Shape'); // disk Druid L2
+      expect(result.specialActions.map((f) => f.name)).toContain('Circle Forms'); // major @3
+      expect(result.specialActions.map((f) => f.name)).toContain('Circle of the Moon Spells'); // major @3
+      expect(namesIn(result)).not.toContain('Improved Circle Forms'); // major @6
+      expect(namesIn(result)).not.toContain('Lunar Form'); // major @14
+    });
+
+    it('excludes major features when major is null', () => {
+      const playerStats = { class: { name: 'Druid', class_levels: diskLevels('Druid'), major: null }, level: 3 };
+      const names = namesIn(classRules.getFeatures(playerStats));
+      expect(names).toContain('Wild Shape');
+      expect(names).not.toContain('Circle Forms');
+    });
+
+    it('returns empty categories when class_levels is empty', () => {
+      const result = classRules.getFeatures({ class: { class_levels: [] }, level: 1 });
+      expect(result).toEqual({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] });
+    });
+
+    it('throws TypeError when playerStats has no class property', () => {
+      expect(() => classRules.getFeatures({ level: 1 })).toThrow(TypeError);
     });
   });
 
   describe('getHighestMajorLevel', () => {
-    it('returns highest level from major features capped at player level', () => {
-      const playerStats = {
-        class: {
-          major: {
-            features: [{ name: 'Feature 1', level: 1 }, { name: 'Feature 2', level: 3 }, { name: 'Feature 3', level: 5 }],
-          },
-        },
-        level: 10,
-      };
-      expect(classRules.getHighestMajorLevel(playerStats)).toBe(5);
+    // disk Circle of the Moon feature levels: [3, 3, 6, 10, 14]
+    const moonStats = (level, key = 'major') => ({
+      class: { name: 'Druid', [key]: diskClass('Druid').majors.find((m) => m.name === 'Circle of the Moon') },
+      level,
     });
 
-    it('only counts features at or below player level', () => {
-      const playerStats = {
-        class: {
-          major: { features: [{ name: 'Feature 1', level: 1 }, { name: 'Feature 2', level: 15 }] },
-        },
-        level: 10,
-      };
-      expect(classRules.getHighestMajorLevel(playerStats)).toBe(1);
+    it.each([
+      [2, 0],    // below first major feature
+      [5, 3],
+      [10, 10],
+      [13, 10], // 14-row not yet reached
+      [14, 14],
+    ])('returns highest disk major feature level <= %i (%i)', (level, expected) => {
+      expect(classRules.getHighestMajorLevel(moonStats(level))).toBe(expected);
     });
 
-    it('returns 0 when major is missing', () => {
-      const playerStats = { class: {}, level: 10 };
-      expect(classRules.getHighestMajorLevel(playerStats)).toBe(0);
+    it('falls back to legacy subclass shape at level 6', () => {
+      expect(classRules.getHighestMajorLevel(moonStats(6, 'subclass'))).toBe(6);
     });
 
-    it('returns 0 when major has no features', () => {
-      const playerStats = { class: { major: { features: [] } }, level: 10 };
-      expect(classRules.getHighestMajorLevel(playerStats)).toBe(0);
+    it('returns 0 when major is missing or empty', () => {
+      expect(classRules.getHighestMajorLevel({ class: { name: 'Druid' }, level: 10 })).toBe(0);
+      expect(classRules.getHighestMajorLevel({ class: { major: null }, level: 10 })).toBe(0);
+      expect(classRules.getHighestMajorLevel({ class: { major: { features: [] } }, level: 10 })).toBe(0);
     });
 
-    it('returns 0 when major is null', () => {
-      const playerStats = { class: { major: null }, level: 10 };
-      expect(classRules.getHighestMajorLevel(playerStats)).toBe(0);
-    });
-
-    it('returns highest level from subclass when only subclass exists (not major)', () => {
-      const playerStats = {
-        class: {
-          subclass: { features: [{ name: 'Beguiling Defenses', level: 10 }] },
-        },
-        level: 10,
-      };
-      expect(classRules.getHighestMajorLevel(playerStats)).toBe(10);
+    it('throws TypeError when class is missing', () => {
+      expect(() => classRules.getHighestMajorLevel({ level: 10 })).toThrow(TypeError);
     });
   });
 
   describe('getEnergy', () => {
-    it('returns energy when found and required_major matches', () => {
-      const playerStats = {
-        class: {
-          class_levels: [{ level: 5, energy: { type: 'psi', required_major: 'Storm Sorcery' } }],
-          major: { name: 'Storm Sorcery' },
-        },
-        level: 5,
-      };
-      expect(classRules.getEnergy(playerStats)).toEqual({ type: 'psi', required_major: 'Storm Sorcery' });
+    // disk Fighter energy rows verbatim (required_major Psi Warrior):
+    // die bumps at L9 (6→8), type-only bump at L11 (num stays 8), L20 d12s.
+    const psiStats = (level) => ({
+      class: { name: 'Fighter', class_levels: diskLevels('Fighter'), major: { name: 'Psi Warrior' } },
+      level,
     });
 
-    it('returns null when required_major does not match', () => {
-      const playerStats = {
-        class: {
-          class_levels: [{ level: 5, energy: { type: 'psi', required_major: 'Storm Sorcery' } }],
-          major: { name: 'Shadow' },
-        },
-        level: 5,
-      };
+    it.each([
+      [3, { required_major: 'Psi Warrior', energy_die_type: 6, energy_die_num: 6 }],
+      [8, { required_major: 'Psi Warrior', energy_die_type: 6, energy_die_num: 6 }],
+      [9, { required_major: 'Psi Warrior', energy_die_type: 8, energy_die_num: 8 }],
+      [11, { required_major: 'Psi Warrior', energy_die_type: 10, energy_die_num: 8 }],
+      [20, { required_major: 'Psi Warrior', energy_die_type: 12, energy_die_num: 12 }],
+    ])('reads disk Fighter energy verbatim at level %i', (level, expected) => {
+      expect(classRules.getEnergy(psiStats(level))).toEqual(expected);
+    });
+
+    it('returns disk Rogue Soulknife energy verbatim at level 5', () => {
+      const playerStats = { class: { name: 'Rogue', class_levels: diskLevels('Rogue'), major: { name: 'Soulknife' } }, level: 5 };
+      expect(classRules.getEnergy(playerStats)).toEqual({ required_major: 'Soulknife', energy_die_type: 8, energy_die_num: 6 });
+    });
+
+    it('returns null when required_major does not match the player major', () => {
+      const playerStats = { ...psiStats(3), class: { name: 'Fighter', class_levels: diskLevels('Fighter'), major: { name: 'Champion' } } };
       expect(classRules.getEnergy(playerStats)).toBeNull();
     });
 
-    it('returns energy when no required_major field', () => {
-      const playerStats = {
-        class: { class_levels: [{ level: 5, energy: { type: 'psi' } }] },
-        level: 5,
-      };
-      expect(classRules.getEnergy(playerStats)).toEqual({ type: 'psi' });
+    it('returns null when required_major is set but major is absent (quirk: legacy subclass shape is not consulted)', () => {
+      const noMajor = { class: { name: 'Fighter', class_levels: diskLevels('Fighter') }, level: 3 };
+      expect(classRules.getEnergy(noMajor)).toBeNull();
+      const subclassShape = { class: { name: 'Fighter', class_levels: diskLevels('Fighter'), subclass: { name: 'Psi Warrior' } }, level: 3 };
+      expect(classRules.getEnergy(subclassShape)).toBeNull();
     });
 
-    it('returns null when classLevel is not found for player level', () => {
-      const playerStats = {
-        class: { class_levels: [{ level: 5, energy: { type: 'psi' } }] },
-        level: 3,
-      };
+    it('returns null for disk rows with no energy field (Fighter L1) and missing class_levels', () => {
+      const playerStats = { class: { name: 'Fighter', class_levels: diskLevels('Fighter'), major: { name: 'Psi Warrior' } }, level: 1 };
       expect(classRules.getEnergy(playerStats)).toBeNull();
-    });
-
-    it('returns null when class_levels is missing', () => {
-      const playerStats = { class: {}, level: 5 };
-      expect(classRules.getEnergy(playerStats)).toBeNull();
+      expect(classRules.getEnergy({ class: { major: { name: 'Psi Warrior' } }, level: 5 })).toBeNull();
     });
   });
 
   describe('class-specific getters', () => {
     describe('getSecondWind', () => {
-      it('returns second_wind from class_levels', () => {
-        const playerStats = { class: { class_levels: [{ level: 5, second_wind: 2 }] }, level: 5 };
-        expect(classRules.getSecondWind(playerStats)).toBe(2);
-      });
-
-      it('returns 0 when second_wind is undefined', () => {
-        const playerStats = { class: { class_levels: [{ level: 5 }] }, level: 5 };
-        expect(classRules.getSecondWind(playerStats)).toBe(0);
+      // disk Fighter second_wind verbatim; L3/L4 boundary (2→3), L10 bump to 4.
+      it.each([
+        [1, 2],
+        [3, 2],
+        [4, 3],
+        [10, 4],
+      ])('reads disk second_wind verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Fighter', class_levels: diskLevels('Fighter') }, level };
+        expect(classRules.getSecondWind(playerStats)).toBe(expected);
       });
 
       it('returns 0 when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        expect(classRules.getSecondWind(playerStats)).toBe(0);
+        expect(classRules.getSecondWind({ class: { name: 'Fighter' }, level: 5 })).toBe(0);
       });
     });
 
     describe('getWeaponMastery', () => {
-      it('returns weapon_mastery from class_levels', () => {
-        const playerStats = { class: { class_levels: [{ level: 5, weapon_mastery: 2 }] }, level: 5 };
-        expect(classRules.getWeaponMastery(playerStats)).toBe(2);
-      });
-
-      it('returns 0 when weapon_mastery is undefined', () => {
-        const playerStats = { class: { class_levels: [{ level: 5 }] }, level: 5 };
-        expect(classRules.getWeaponMastery(playerStats)).toBe(0);
+      // disk Fighter weapon_mastery verbatim (bumps at L4, L10, L16)
+      it.each([
+        [1, 3],
+        [4, 4],
+        [10, 5],
+        [16, 6],
+      ])('reads disk weapon_mastery verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Fighter', class_levels: diskLevels('Fighter') }, level };
+        expect(classRules.getWeaponMastery(playerStats)).toBe(expected);
       });
 
       it('returns 0 when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        expect(classRules.getWeaponMastery(playerStats)).toBe(0);
+        expect(classRules.getWeaponMastery({ class: { name: 'Fighter' }, level: 5 })).toBe(0);
       });
     });
 
     describe('getMartialArtsDie', () => {
-      it('returns martial_arts_die from class_levels', () => {
-        const playerStats = { class: { class_levels: [{ level: 5, martial_arts_die: 6 }] }, level: 5 };
-        expect(classRules.getMartialArtsDie(playerStats)).toBe(6);
+      // disk Monk martial_arts_die verbatim. FLAG-C: disk starts at d6, so the
+      // source's d4 default never fires for any disk row (it did not in the old
+      // canned test either — corrected there: old file claimed d6 at L5, disk is 8).
+      it.each([
+        [1, 6],
+        [5, 8],
+        [11, 10],
+        [17, 12],
+      ])('reads disk martial_arts_die verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Monk', class_levels: diskLevels('Monk') }, level };
+        expect(classRules.getMartialArtsDie(playerStats)).toBe(expected);
       });
 
-      it('defaults to 4 when martial_arts_die is undefined', () => {
-        const playerStats = { class: { class_levels: [{ level: 5 }] }, level: 5 };
-        expect(classRules.getMartialArtsDie(playerStats)).toBe(4);
-      });
-
-      it('defaults to 4 when class_levels is empty', () => {
-        const playerStats = { class: { class_levels: [] }, level: 5 };
-        expect(classRules.getMartialArtsDie(playerStats)).toBe(4);
-      });
-
-      it('defaults to 4 when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        expect(classRules.getMartialArtsDie(playerStats)).toBe(4);
+      it('defaults to d4 only on synthetic rows missing the field (unreachable via disk — FLAG-C)', () => {
+        expect(classRules.getMartialArtsDie({ class: { class_levels: [{ level: 5 }] }, level: 5 })).toBe(4);
+        expect(classRules.getMartialArtsDie({ class: {}, level: 5 })).toBe(4);
       });
     });
 
     describe('getFocusPoints', () => {
-      it('returns focus_points from class_levels', () => {
-        const playerStats = { class: { class_levels: [{ level: 5, focus_points: 8 }] }, level: 5 };
-        expect(classRules.getFocusPoints(playerStats)).toBe(8);
-      });
-
-      it('returns 0 when focus_points is undefined', () => {
-        const playerStats = { class: { class_levels: [{ level: 5 }] }, level: 5 };
-        expect(classRules.getFocusPoints(playerStats)).toBe(0);
+      // disk Monk focus_points verbatim (== level from L2)
+      it.each([
+        [2, 2],
+        [8, 8],
+        [20, 20],
+      ])('reads disk focus_points verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Monk', class_levels: diskLevels('Monk') }, level };
+        expect(classRules.getFocusPoints(playerStats)).toBe(expected);
       });
 
       it('returns 0 when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        expect(classRules.getFocusPoints(playerStats)).toBe(0);
+        expect(classRules.getFocusPoints({ class: { name: 'Monk' }, level: 5 })).toBe(0);
       });
     });
 
     describe('getUnarmoredMovementIncrease', () => {
-      it('returns unarmored_movement_increase from class_levels', () => {
-        const playerStats = { class: { class_levels: [{ level: 5, unarmored_movement_increase: 10 }] }, level: 5 };
-        expect(classRules.getUnarmoredMovementIncrease(playerStats)).toBe(10);
-      });
-
-      it('returns 0 when unarmored_movement_increase is undefined', () => {
-        const playerStats = { class: { class_levels: [{ level: 5 }] }, level: 5 };
-        expect(classRules.getUnarmoredMovementIncrease(playerStats)).toBe(0);
+      // disk verbatim; live consumer charSummaryCalc.js
+      it.each([
+        [2, 10],
+        [6, 15],
+        [10, 20],
+        [14, 25],
+        [18, 30],
+      ])('reads disk unarmored_movement_increase verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Monk', class_levels: diskLevels('Monk') }, level };
+        expect(classRules.getUnarmoredMovementIncrease(playerStats)).toBe(expected);
       });
 
       it('returns 0 when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        expect(classRules.getUnarmoredMovementIncrease(playerStats)).toBe(0);
+        expect(classRules.getUnarmoredMovementIncrease({ class: { name: 'Monk' }, level: 5 })).toBe(0);
       });
     });
 
     describe('getFavoredEnemy', () => {
-      it('returns favored_enemy from class_levels', () => {
-        const playerStats = { class: { class_levels: [{ level: 5, favored_enemy: 2 }] }, level: 5 };
-        expect(classRules.getFavoredEnemy(playerStats)).toBe(2);
-      });
-
-      it('returns 0 when favored_enemy is undefined', () => {
-        const playerStats = { class: { class_levels: [{ level: 5 }] }, level: 5 };
-        expect(classRules.getFavoredEnemy(playerStats)).toBe(0);
+      // disk Ranger favored_enemy verbatim (bumps at L5, L9, L13, L17)
+      it.each([
+        [1, 2],
+        [8, 3],
+        [9, 4],
+        [13, 5],
+        [17, 6],
+      ])('reads disk favored_enemy verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Ranger', class_levels: diskLevels('Ranger') }, level };
+        expect(classRules.getFavoredEnemy(playerStats)).toBe(expected);
       });
 
       it('returns 0 when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        expect(classRules.getFavoredEnemy(playerStats)).toBe(0);
+        expect(classRules.getFavoredEnemy({ class: { name: 'Ranger' }, level: 5 })).toBe(0);
       });
     });
 
     describe('getRogueSneakAttack', () => {
-      it('returns sneak attack with dice_count and dice_value', () => {
-        const playerStats = { class: { class_levels: [{}, {}, {}, {}, { sneak_attack_num_d6: 3 }] }, level: 5 };
-        expect(classRules.getRogueSneakAttack(playerStats)).toEqual({ dice_count: 3, dice_value: 6 });
+      // disk Rogue sneak_attack_num_d6 verbatim (same ladder as 5e sibling)
+      it.each([
+        [1, { dice_count: 1, dice_value: 6 }],
+        [3, { dice_count: 2, dice_value: 6 }],
+        [5, { dice_count: 3, dice_value: 6 }],
+        [11, { dice_count: 6, dice_value: 6 }],
+        [17, { dice_count: 9, dice_value: 6 }],
+        [20, { dice_count: 10, dice_value: 6 }],
+      ])('reads disk sneak_attack verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Rogue', class_levels: diskLevels('Rogue') }, level };
+        expect(classRules.getRogueSneakAttack(playerStats)).toEqual(expected);
       });
 
-      it('returns default dice_count 0 when sneak_attack_num_d6 is undefined', () => {
-        const playerStats = { class: { class_levels: [{}, {}, {}, {}, {}] }, level: 5 };
+      it('indexes class_levels positionally at level-1 (quirk: does not find-by-level)', () => {
+        // Row says level 9 (5d6) but sits at index 0; a find-by-level impl
+        // would return {1,6} from… nowhere — positional read finds nothing.
+        const playerStats = { class: { class_levels: [{ level: 9, sneak_attack_num_d6: 5 }] }, level: 5 };
         expect(classRules.getRogueSneakAttack(playerStats)).toEqual({ dice_count: 0, dice_value: 6 });
       });
 
-      it('returns default when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        expect(classRules.getRogueSneakAttack(playerStats)).toEqual({ dice_count: 0, dice_value: 6 });
+      it('returns default {0,6} when class is missing', () => {
+        expect(classRules.getRogueSneakAttack({})).toEqual({ dice_count: 0, dice_value: 6 });
       });
     });
 
     describe('getEldritchInvocations', () => {
-      it('returns eldritch_invocations from class_levels', () => {
-        const playerStats = { class: { class_levels: [{}, {}, {}, {}, { eldritch_invocations: 4 }] }, level: 5 };
-        expect(classRules.getEldritchInvocations(playerStats)).toBe(4);
-      });
-
-      it('returns 0 when eldritch_invocations is undefined', () => {
-        const playerStats = { class: { class_levels: [{}, {}, {}, {}, {}] }, level: 5 };
-        expect(classRules.getEldritchInvocations(playerStats)).toBe(0);
+      // disk Warlock eldritch_invocations verbatim (same index-based access)
+      it.each([
+        [1, 1],
+        [2, 3],
+        [7, 6],
+        [12, 8],
+        [20, 10],
+      ])('reads disk eldritch_invocations verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Warlock', class_levels: diskLevels('Warlock') }, level };
+        expect(classRules.getEldritchInvocations(playerStats)).toBe(expected);
       });
 
       it('returns 0 when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        expect(classRules.getEldritchInvocations(playerStats)).toBe(0);
+        expect(classRules.getEldritchInvocations({ class: { name: 'Warlock' }, level: 5 })).toBe(0);
       });
     });
 
     describe('getClericFeatures', () => {
-      it('returns maxChannelDivinity', () => {
-        const playerStats = { class: { class_levels: [{}, {}, {}, {}, { channel_divinity: 3 }] }, level: 5 };
-        expect(classRules.getClericFeatures(playerStats)).toEqual({ maxChannelDivinity: 3, destroyUndeadCR: null });
+      // disk Cleric channel_divinity verbatim; destroyUndeadCR is hardcoded null
+      // (FLAG-D: disk Cleric table has no destroy_undead column at all in 2024).
+      it.each([
+        [1, { maxChannelDivinity: 0, destroyUndeadCR: null }],
+        [2, { maxChannelDivinity: 2, destroyUndeadCR: null }],
+        [5, { maxChannelDivinity: 2, destroyUndeadCR: null }], // old canned file claimed 3 here
+        [6, { maxChannelDivinity: 3, destroyUndeadCR: null }],
+        [18, { maxChannelDivinity: 4, destroyUndeadCR: null }],
+      ])('reads disk channel_divinity verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Cleric', class_levels: diskLevels('Cleric') }, level };
+        expect(classRules.getClericFeatures(playerStats)).toEqual(expected);
       });
 
-      it('returns 0 maxChannelDivinity when channel_divinity is undefined', () => {
-        const playerStats = { class: { class_levels: [{}, {}, {}, {}, {}] }, level: 5 };
-        expect(classRules.getClericFeatures(playerStats)).toEqual({ maxChannelDivinity: 0, destroyUndeadCR: null });
-      });
-
-      it('returns defaults when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        expect(classRules.getClericFeatures(playerStats)).toEqual({ maxChannelDivinity: 0, destroyUndeadCR: null });
+      it('returns defaults when class is missing', () => {
+        expect(classRules.getClericFeatures({})).toEqual({ maxChannelDivinity: 0, destroyUndeadCR: null });
       });
     });
 
     describe('getDruidFeatures', () => {
-      it('returns all druid feature properties', () => {
-        const playerStats = {
-          class: { class_levels: [{ level: 3, wild_shape: 2, beast_max_cr: 0.5, beast_known_forms: 2, beast_fly_speed: 'Yes' }] },
-          level: 3,
-        };
-        const result = classRules.getDruidFeatures(playerStats);
-        expect(result.maxWildShapeUses).toBe(2);
-        expect(result.maxWildShapeChallengeRating).toBe(0.5);
-        expect(result.beastKnownForms).toBe(2);
-        expect(result.wildShapeLimitations).toBe('walk, swim, or fly');
+      it('aggregates disk L2 row exactly (no-fly)', () => {
+        const playerStats = { class: { name: 'Druid', class_levels: diskLevels('Druid') }, level: 2 };
+        expect(classRules.getDruidFeatures(playerStats)).toEqual({
+          maxWildShapeUses: 2,
+          maxWildShapeChallengeRating: 0.25,
+          beastKnownForms: 4,
+          wildShapeLimitations: 'walk or swim only (no fly)',
+        });
       });
 
-      it('sets wildShapeLimitations to no-fly message when fly is false', () => {
+      it('aggregates disk L8 row exactly (fly boundary)', () => {
+        const playerStats = { class: { name: 'Druid', class_levels: diskLevels('Druid') }, level: 8 };
+        expect(classRules.getDruidFeatures(playerStats)).toEqual({
+          maxWildShapeUses: 3,
+          maxWildShapeChallengeRating: 1,
+          beastKnownForms: 8,
+          wildShapeLimitations: 'walk, swim, or fly',
+        });
+      });
+
+      it('routes Moon formula through the aggregate at L20 (finite CR 6, uses 4)', () => {
         const playerStats = {
-          class: { class_levels: [{ level: 3, beast_fly_speed: 'No' }] },
-          level: 3,
+          class: { name: 'Druid', major: { name: 'Circle of the Moon' }, class_levels: diskLevels('Druid') },
+          level: 20,
         };
-        const result = classRules.getDruidFeatures(playerStats);
-        expect(result.wildShapeLimitations).toBe('walk or swim only (no fly)');
+        expect(classRules.getDruidFeatures(playerStats)).toEqual({
+          maxWildShapeUses: 4,
+          maxWildShapeChallengeRating: 6, // floor(20/3), disk was 1
+          beastKnownForms: 8,
+          wildShapeLimitations: 'walk, swim, or fly',
+        });
       });
 
       it('returns defaults when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 3 };
-        const result = classRules.getDruidFeatures(playerStats);
-        expect(result.maxWildShapeUses).toBe(0);
-        expect(result.maxWildShapeChallengeRating).toBe(0);
-        expect(result.beastKnownForms).toBe(0);
-        expect(result.wildShapeLimitations).toBe('walk or swim only (no fly)');
+        const result = classRules.getDruidFeatures({ class: { name: 'Druid' }, level: 3 });
+        expect(result).toEqual({
+          maxWildShapeUses: 0,
+          maxWildShapeChallengeRating: 0,
+          beastKnownForms: 0,
+          wildShapeLimitations: 'walk or swim only (no fly)',
+        });
       });
     });
 
     describe('getPaladinFeatures', () => {
-      it('returns extraAttacks for level > 4', () => {
-        const playerStats = { class: { class_levels: [{}, {}, {}, {}, { channel_divinity: 2 }] }, level: 5 };
+      // disk Paladin channel_divinity verbatim (2024 Paladin gets Channel Oath
+      // at L3 — unlike the 5e sibling where the class table has none).
+      // FLAG-D: auraRange hardcoded null — disk has no aura column (auras live
+      // in oath major features, e.g. Oath of the Ancients L7).
+      it.each([
+        [3, 2],
+        [10, 2],
+        [11, 3],
+      ])('reads disk channel_divinity verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Paladin', class_levels: diskLevels('Paladin') }, level };
         const result = classRules.getPaladinFeatures(playerStats);
-        expect(result.maxChannelDivinity).toBe(2);
-        expect(result.extraAttacks).toBe(1);
+        expect(result.maxChannelDivinity).toBe(expected);
+        expect(result.auraRange).toBeNull();
       });
 
-      it('returns 0 extraAttacks for level <= 4', () => {
-        const playerStats = { class: { class_levels: [{ channel_divinity: 1 }] }, level: 3 };
-        const result = classRules.getPaladinFeatures(playerStats);
-        expect(result.extraAttacks).toBe(0);
+      it('extraAttacks boundary: 0 at level 4, 1 at level 5 (Extra Attack disk row is L5)', () => {
+        const statsAt = (level) => ({ class: { name: 'Paladin', class_levels: diskLevels('Paladin') }, level });
+        expect(classRules.getPaladinFeatures(statsAt(4)).extraAttacks).toBe(0);
+        expect(classRules.getPaladinFeatures(statsAt(5)).extraAttacks).toBe(1);
+        expect(namesIn(classRules.getFeatures(statsAt(5)))).toContain('Extra Attack');
       });
 
       it('returns defaults when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        const result = classRules.getPaladinFeatures(playerStats);
-        expect(result.maxChannelDivinity).toBe(0);
-        expect(result.auraRange).toBeNull();
-        expect(result.extraAttacks).toBe(1);
+        expect(classRules.getPaladinFeatures({ class: {}, level: 5 })).toEqual({ maxChannelDivinity: 0, auraRange: null, extraAttacks: 1 });
       });
     });
 
     describe('getSorcererFeatures', () => {
-      it('returns metamagicKnown based on level thresholds', () => {
-        const makeStats = (level) => ({
-          class: { class_levels: Array.from({ length: level }, (_, i) => ({ level: i + 1 })) },
-          level,
-        });
-        expect(classRules.getSorcererFeatures(makeStats(1)).metamagicKnown).toBe(0);
-        expect(classRules.getSorcererFeatures(makeStats(2)).metamagicKnown).toBe(0);
-        expect(classRules.getSorcererFeatures(makeStats(3)).metamagicKnown).toBe(2);
-        expect(classRules.getSorcererFeatures(makeStats(9)).metamagicKnown).toBe(2);
-        expect(classRules.getSorcererFeatures(makeStats(10)).metamagicKnown).toBe(4);
-        expect(classRules.getSorcererFeatures(makeStats(16)).metamagicKnown).toBe(4);
-        expect(classRules.getSorcererFeatures(makeStats(17)).metamagicKnown).toBe(6);
-        expect(classRules.getSorcererFeatures(makeStats(20)).metamagicKnown).toBe(6);
+      // disk Sorcerer sorcery_points verbatim (0 at L1, == level after)
+      it.each([
+        [1, 0],
+        [5, 5],
+        [20, 20],
+      ])('reads disk sorcery_points verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Sorcerer', class_levels: diskLevels('Sorcerer') }, level };
+        expect(classRules.getSorcererFeatures(playerStats).maxSorceryPoints).toBe(expected);
       });
 
-      it('returns defaults when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        const result = classRules.getSorcererFeatures(playerStats);
-        expect(result.maxSorceryPoints).toBe(0);
-        expect(result.metamagicKnown).toBe(2);
-        expect(result.maxInnateSorcery).toBe(2);
-        expect(result.creatingSpellSlotCosts).toEqual([]);
+      // FLAG-D: metamagicKnown is a hardcoded source formula — disk has no
+      // metamagic column. Pinned as-is at every threshold boundary.
+      it.each([
+        [1, 0],
+        [2, 0],
+        [3, 2],
+        [9, 2],
+        [10, 4],
+        [16, 4],
+        [17, 6],
+        [20, 6],
+      ])('applies hardcoded metamagicKnown formula at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Sorcerer', class_levels: diskLevels('Sorcerer') }, level };
+        expect(classRules.getSorcererFeatures(playerStats).metamagicKnown).toBe(expected);
+      });
+
+      it('returns defaults when class_levels is missing (maxInnateSorcery: 2 is hardcoded — FLAG-D)', () => {
+        expect(classRules.getSorcererFeatures({ class: {}, level: 5 })).toEqual({
+          maxSorceryPoints: 0,
+          metamagicKnown: 2,
+          maxInnateSorcery: 2,
+          creatingSpellSlotCosts: [],
+        });
       });
     });
 
     describe('getWarlockFeatures', () => {
-      it('returns arcanum levels at each threshold', () => {
-        const makeStats = (level) => ({
-          class: { class_levels: Array.from({ length: level }, (_, i) => ({ level: i + 1 })), arcanums: [], pactBoon: null, invocations: [] },
-          level,
-        });
-        // level > 10 required for arcanumLevels (not >= 10)
-        expect(classRules.getWarlockFeatures(makeStats(10)).arcanumLevels).toBeNull();
-        expect(classRules.getWarlockFeatures(makeStats(10)).hasArcanum).toBe(false);
-        expect(classRules.getWarlockFeatures(makeStats(11)).arcanumLevels).toEqual({ level6: 1, level7: 0, level8: 0, level9: 0 });
-        expect(classRules.getWarlockFeatures(makeStats(13)).arcanumLevels).toEqual({ level6: 1, level7: 1, level8: 0, level9: 0 });
-        expect(classRules.getWarlockFeatures(makeStats(15)).arcanumLevels).toEqual({ level6: 1, level7: 1, level8: 1, level9: 0 });
-        expect(classRules.getWarlockFeatures(makeStats(17)).arcanumLevels).toEqual({ level6: 1, level7: 1, level8: 1, level9: 1 });
+      // disk Warlock eldritch_invocations verbatim
+      it.each([
+        [1, 1],
+        [5, 5],
+        [7, 6],
+        [20, 10],
+      ])('reads disk eldritch_invocations verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Warlock', class_levels: diskLevels('Warlock') }, level };
+        expect(classRules.getWarlockFeatures(playerStats).invocationsKnown).toBe(expected);
       });
 
-      it('returns invocationsKnown from class_levels', () => {
-        const playerStats = { class: { class_levels: [{}, {}, {}, {}, { eldritch_invocations: 4 }] }, level: 5 };
-        expect(classRules.getWarlockFeatures(playerStats).invocationsKnown).toBe(4);
+      it('hasArcanum boundary at level 11 matches disk Mystic Arcanum feature rows', () => {
+        const statsAt = (level) => ({ class: { name: 'Warlock', class_levels: diskLevels('Warlock') }, level });
+        // formula: >10; disk cross-check: 'Mystic Arcanum' appears at L11, not L10
+        const diskHasArcanumRow = (level) => diskLevels('Warlock')[level - 1].features.some((f) => f.name.startsWith('Mystic Arcanum'));
+        expect(classRules.getWarlockFeatures(statsAt(10))).toMatchObject({ hasArcanum: false, arcanumLevels: null });
+        expect(diskHasArcanumRow(10)).toBe(false);
+        expect(classRules.getWarlockFeatures(statsAt(11)).hasArcanum).toBe(true);
+        expect(diskHasArcanumRow(11)).toBe(true);
       });
 
-      it('passes through arcanums and invocations from class', () => {
+      // FLAG-D: arcanumLevels ladder is source formula (disk exposes only the
+      // 'Mystic Arcanum (level N spell)' feature rows, at the same 11/13/15/17 seams).
+      it.each([
+        [11, { level6: 1, level7: 0, level8: 0, level9: 0 }],
+        [13, { level6: 1, level7: 1, level8: 0, level9: 0 }],
+        [15, { level6: 1, level7: 1, level8: 1, level9: 0 }],
+        [17, { level6: 1, level7: 1, level8: 1, level9: 1 }],
+      ])('arcanumLevels ladder at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Warlock', class_levels: diskLevels('Warlock') }, level };
+        expect(classRules.getWarlockFeatures(playerStats).arcanumLevels).toEqual(expected);
+      });
+
+      it('passes through runtime arcanums/invocations from playerSummary-derived class (no pactBoon key — differs from 5e sibling)', () => {
         const playerStats = {
           class: {
-            class_levels: [{ level: 1 }],
+            name: 'Warlock',
+            class_levels: diskLevels('Warlock'),
             arcanums: [{ name: 'Foresight', level: 9 }],
             invocations: [{ name: 'Eldritch Sight' }],
           },
-          level: 1,
+          level: 13,
         };
         const result = classRules.getWarlockFeatures(playerStats);
         expect(result.arcanums).toEqual([{ name: 'Foresight', level: 9 }]);
         expect(result.invocations).toEqual([{ name: 'Eldritch Sight' }]);
+        expect(result.pactBoon).toBeUndefined();
+      });
+
+      it('returns defaults when class is missing', () => {
+        expect(classRules.getWarlockFeatures({})).toEqual({
+          invocationsKnown: 0,
+          hasArcanum: false,
+          arcanumLevels: null,
+          arcanums: [],
+          invocations: [],
+        });
       });
     });
 
     describe('getWizardFeatures', () => {
-      it('returns arcaneRecoveryLevels from class_specific', () => {
-        const playerStats = {
-          class: { class_levels: [{ level: 5, class_specific: { arcane_recovery_levels: 1 } }] },
-          level: 5,
-        };
-        const result = classRules.getWizardFeatures(playerStats);
-        expect(result.showWizardFeatures).toBe(true);
-        expect(result.arcaneRecoveryLevels).toBe(1);
+      // disk Wizard arcane_recovery_levels verbatim (ceil(level/2))
+      it.each([
+        [1, 1],
+        [4, 2],
+        [7, 4],
+        [20, 10],
+      ])('reads disk arcane_recovery_levels verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Wizard', class_levels: diskLevels('Wizard') }, level };
+        expect(classRules.getWizardFeatures(playerStats)).toMatchObject({
+          showWizardFeatures: true,
+          arcaneRecoveryLevels: expected,
+          arcaneWard: false,
+        });
       });
 
-      it('returns arcaneWard: true when arcane_ward passive exists', () => {
-        const playerStats = {
-          class: { class_levels: [{ level: 5 }] },
-          level: 5,
-          automation: { passives: [{ type: 'arcane_ward' }] },
-        };
-        const result = classRules.getWizardFeatures(playerStats);
-        expect(result.arcaneWard).toBe(true);
+      it('detects arcane_ward passives in both type and passive_rule/effect shapes (runtime automation)', () => {
+        const base = { class: { name: 'Wizard', class_levels: diskLevels('Wizard') }, level: 7 };
+        expect(classRules.getWizardFeatures({ ...base, automation: { passives: [{ type: 'arcane_ward' }] } }).arcaneWard).toBe(true);
+        expect(classRules.getWizardFeatures({ ...base, automation: { passives: [{ type: 'passive_rule', effect: 'arcane_ward' }] } }).arcaneWard).toBe(true);
       });
 
-      it('returns arcaneWard: false when no arcane_ward passive', () => {
-        const playerStats = {
-          class: { class_levels: [{ level: 5 }] },
-          level: 5,
-          automation: { passives: [] },
-        };
-        const result = classRules.getWizardFeatures(playerStats);
-        expect(result.arcaneWard).toBe(false);
-      });
-
-      it('handles missing automation.passives gracefully', () => {
-        const playerStats = { class: { class_levels: [{ level: 5 }] }, level: 5 };
-        const result = classRules.getWizardFeatures(playerStats);
-        expect(result.arcaneWard).toBe(false);
-      });
-
-      it('returns defaults when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        const result = classRules.getWizardFeatures(playerStats);
-        expect(result.arcaneRecoveryLevels).toBe(0);
-        expect(result.showWizardFeatures).toBe(true);
+      it('returns arcaneWard false when passives are empty or automation is absent', () => {
+        const base = { class: { name: 'Wizard', class_levels: diskLevels('Wizard') }, level: 7 };
+        expect(classRules.getWizardFeatures({ ...base, automation: { passives: [] } }).arcaneWard).toBe(false);
+        expect(classRules.getWizardFeatures(base).arcaneWard).toBe(false);
       });
     });
 
     describe('getMonkFeatures', () => {
-      it('returns all monk feature properties', () => {
-        const playerStats = {
-          class: { class_levels: [{ level: 5, martial_arts_die: 6, unarmored_movement_increase: 10, focus_points: 8 }] },
-          level: 5,
-        };
-        const result = classRules.getMonkFeatures(playerStats);
-        expect(result.martialArtsDie).toBe(6);
-        expect(result.unarmoredMovementIncrease).toBe(10);
-        expect(result.maxFocusPoints).toBe(8);
-        expect(result.wisdomBonus).toBe(0);
+      // disk aggregation via this.* delegators (unlike the 5e sibling's constants)
+      it.each([
+        [1, { martialArtsDie: 6, unarmoredMovementIncrease: 0, maxFocusPoints: 0 }],
+        [5, { martialArtsDie: 8, unarmoredMovementIncrease: 10, maxFocusPoints: 5 }],
+        [18, { martialArtsDie: 12, unarmoredMovementIncrease: 30, maxFocusPoints: 18 }],
+      ])('aggregates disk Monk row verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Monk', class_levels: diskLevels('Monk') }, level };
+        expect(classRules.getMonkFeatures(playerStats)).toEqual({ ...expected, wisdomBonus: 0 });
       });
 
-      it('returns defaults for all properties when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        const result = classRules.getMonkFeatures(playerStats);
-        expect(result.martialArtsDie).toBe(4);
-        expect(result.unarmoredMovementIncrease).toBe(0);
-        expect(result.maxFocusPoints).toBe(0);
-        expect(result.wisdomBonus).toBe(0);
+      it('returns defaults when class_levels is missing', () => {
+        expect(classRules.getMonkFeatures({ class: {}, level: 5 })).toEqual({
+          martialArtsDie: 4,
+          unarmoredMovementIncrease: 0,
+          maxFocusPoints: 0,
+          wisdomBonus: 0,
+        });
       });
     });
 
     describe('getRangerFeatures', () => {
-      it('returns favoredEnemies and extraAttacks', () => {
-        const playerStats = {
-          class: { class_levels: [{ level: 5, favored_enemy: 2 }] },
-          level: 5,
-        };
-        const result = classRules.getRangerFeatures(playerStats);
-        expect(result.favoredEnemies).toBe(2);
-        expect(result.extraAttacks).toBe(1);
-      });
-
-      it('returns 0 extraAttacks for level <= 4', () => {
-        const playerStats = { class: { class_levels: [{ level: 3 }] }, level: 3 };
-        const result = classRules.getRangerFeatures(playerStats);
-        expect(result.extraAttacks).toBe(0);
+      // disk Ranger verbatim: favored_enemy 2@L1→3@L5→4@L9; Extra Attack L5
+      it.each([
+        [4, { favoredEnemies: 2, extraAttacks: 0 }],
+        [5, { favoredEnemies: 3, extraAttacks: 1 }],
+        [9, { favoredEnemies: 4, extraAttacks: 1 }],
+      ])('reads disk Ranger values verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Ranger', class_levels: diskLevels('Ranger') }, level };
+        expect(classRules.getRangerFeatures(playerStats)).toEqual(expected);
       });
 
       it('returns defaults when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 5 };
-        const result = classRules.getRangerFeatures(playerStats);
-        expect(result.favoredEnemies).toBe(0);
-        expect(result.extraAttacks).toBe(1);
+        expect(classRules.getRangerFeatures({ class: {}, level: 5 })).toEqual({ favoredEnemies: 0, extraAttacks: 1 });
       });
     });
 
     describe('getRogueFeatures', () => {
-      it('returns sneakAttack and expertise', () => {
-        const playerStats = {
-          class: { class_levels: [{}, {}, {}, {}, { sneak_attack_num_d6: 3 }], expertise: ['Stealth', 'Persuasion'] },
-          level: 5,
-          expertise: ['Stealth', 'Persuasion'],
-        };
+      it('delegates sneak attack to disk L7 row and passes through runtime expertise', () => {
+        const playerStats = { class: { name: 'Rogue', class_levels: diskLevels('Rogue') }, level: 7, expertise: ['Stealth', 'Persuasion'] };
         const result = classRules.getRogueFeatures(playerStats);
-        expect(result.sneakAttack).toEqual({ dice_count: 3, dice_value: 6 });
+        expect(result.sneakAttack).toEqual({ dice_count: 4, dice_value: 6 }); // disk L7
         expect(result.expertise).toEqual(['Stealth', 'Persuasion']);
       });
 
-      it('returns empty expertise array when not set', () => {
-        const playerStats = { class: { class_levels: [{}, {}, {}, {}, { sneak_attack_num_d6: 2 }] }, level: 5 };
-        const result = classRules.getRogueFeatures(playerStats);
-        expect(result.expertise).toEqual([]);
-      });
-
-      it('returns defaults when class is missing', () => {
-        const result = classRules.getRogueFeatures({});
-        expect(result.sneakAttack).toEqual({ dice_count: 0, dice_value: 6 });
-        expect(result.expertise).toEqual([]);
+      it('returns empty expertise by default and defaults when class is missing', () => {
+        const playerStats = { class: { name: 'Rogue', class_levels: diskLevels('Rogue') }, level: 5 };
+        expect(classRules.getRogueFeatures(playerStats)).toEqual({ sneakAttack: { dice_count: 3, dice_value: 6 }, expertise: [] });
+        expect(classRules.getRogueFeatures({})).toEqual({ sneakAttack: { dice_count: 0, dice_value: 6 }, expertise: [] });
       });
     });
 
     describe('getBardFeatures', () => {
-      it('returns bardicDie and magicalSecrets', () => {
-        const classLevels = Array.from({ length: 10 }, (_, i) => ({ level: i + 1 }));
-        const playerStats = { class: { class_levels: classLevels }, level: 10 };
+      // disk Bard bardic_die verbatim
+      it.each([
+        [1, 6],
+        [5, 8],
+        [10, 10],
+        [15, 12],
+      ])('reads disk bardic_die verbatim at level %i', (level, expected) => {
+        const playerStats = { class: { name: 'Bard', class_levels: diskLevels('Bard') }, level };
+        expect(classRules.getBardFeatures(playerStats).bardicDie).toBe(expected);
+      });
+
+      it('reads disk magical_secrets verbatim: 2 at L10 (only cs row), ?? null at L9', () => {
+        // disk Bard class_specific exists ONLY at L10 {magical_secrets: 2}
+        const statsAt = (level) => ({ class: { name: 'Bard', class_levels: diskLevels('Bard') }, level });
+        expect(classRules.getBardFeatures(statsAt(10)).magicalSecrets).toBe(2);
+        expect(classRules.getBardFeatures(statsAt(9)).magicalSecrets).toBeNull();
+      });
+
+      it('returns hardcoded 2024 constants (FLAG-D: disk has no song_of_rest column, no subclass secrets)', () => {
+        const playerStats = { class: { name: 'Bard', class_levels: diskLevels('Bard') }, level: 10 };
         const result = classRules.getBardFeatures(playerStats);
-        expect(result.bardicDie).toBe(0);
-        expect(result.magicalSecrets).toBeNull();
         expect(result.songOfRestDie).toBeNull();
-        expect(result.subclassMagicalSecrets).toBe(0);
-      });
-
-      it('returns bardicDie when set in class_levels', () => {
-        const classLevels = Array.from({ length: 10 }, (_, i) => ({ level: i + 1 }));
-        classLevels[9] = { level: 10, bardic_die: 6 };
-        const playerStats = { class: { class_levels: classLevels }, level: 10 };
-        expect(classRules.getBardFeatures(playerStats).bardicDie).toBe(6);
-      });
-
-      it('returns magicalSecrets from class_specific', () => {
-        const classLevels = Array.from({ length: 10 }, (_, i) => ({ level: i + 1 }));
-        classLevels[9] = { level: 10, class_specific: { magical_secrets: 2 } };
-        const playerStats = { class: { class_levels: classLevels }, level: 10 };
-        expect(classRules.getBardFeatures(playerStats).magicalSecrets).toBe(2);
+        expect(result.subclassMagicalSecrets).toBe(0); // source: 2024 has no subclass Additional Magical Secrets
       });
 
       it('returns defaults when class_levels is missing', () => {
-        const playerStats = { class: {}, level: 10 };
-        const result = classRules.getBardFeatures(playerStats);
-        expect(result.bardicDie).toBe(0);
-        expect(result.magicalSecrets).toBeNull();
-        expect(result.songOfRestDie).toBeNull();
-        expect(result.subclassMagicalSecrets).toBe(0);
+        expect(classRules.getBardFeatures({ class: {}, level: 10 })).toEqual({
+          bardicDie: 0,
+          songOfRestDie: null,
+          magicalSecrets: null,
+          subclassMagicalSecrets: 0,
+        });
       });
     });
   });

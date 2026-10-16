@@ -1,3 +1,38 @@
+// @maintained-by-ai
+/**
+ * campaignService — client-side fetch contract for campaign/character CRUD.
+ *
+ * OPENER of the services/campaign/ block (test_maintain_queue lines 2002-2012).
+ * This file owns the HTTP semantics at the fetch() boundary: URL encoding,
+ * request methods/bodies, response-shape passthrough, error extraction, and
+ * the silent-swallow vs rethrow split. Consumers (CampaignSelection.jsx,
+ * useCharacterWizard.js, useCharacterManagement.js) wire these results into
+ * React state — their behavior is NOT re-tested here.
+ *
+ * Canonical seam (this lane owns): raw `/api/campaigns`, `/api/campaigns/:campaign`,
+ * and `/api/campaigns/:campaign/:file` (character JSON) — fetch-spied per-test,
+ * never live. Mock shapes pinned against server/routes/campaigns-basic.js
+ * ({ folders } / { files }) and campaigns-character.js ({ error } on 4xx,
+ * { message, character, fileName } on create); consumer use of
+ * `result.character` (useCharacterWizard) preserved in the create mock.
+ *
+ * BLOCK seam map (services/campaign/ siblings, queue order):
+ *  - campaignService (THIS file): campaign listing + character-file CRUD.
+ *  - factionsService, notesService, questsService, settlementsService,
+ *    sessionsService: sub-collection CRUD under `/api/campaigns/:campaign/<coll>`
+ *    — same fetch-spy idiom, own endpoints; do not re-pin /api/campaigns roots here.
+ *  - inventoryService: transfer seam under .../transfer.
+ *  - settlementGenerator: static `/data/*.json` name-bank generator — no
+ *    /api surface; own mock family.
+ *  - travelService, weatherService, randomEventService, sessionPlannerUtils:
+ *    no direct fetch — runtime-store / pure-utility lanes (server-first via
+ *    the runtime store per AGENTS.md), not fetch-contract lanes.
+ *  - Server-side ownership lives in server/routes/campaigns-*.test.js
+ *    (out of this queue's scope — noted, not duplicated here).
+ *
+ * Campaign lockdown: fixtures never hit a live server (fetch fails loud by
+ * default in beforeEach); only 'test-campaign' as a name is sanctioned.
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   getCharacterFolders,
@@ -10,9 +45,16 @@ import {
 
 describe('campaignService', () => {
   let fetchSpy;
+  let consoleErrorSpy;
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(globalThis, 'fetch');
+    // Fail-loud default: any fetch a test forgets to mock rejects instead of
+    // reaching a live server (campaign lockdown — never real /api here).
+    fetchSpy.mockImplementation((url) => {
+      throw new Error(`unmocked fetch in campaignService test: ${url}`);
+    });
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -52,6 +94,11 @@ describe('campaignService', () => {
       const result = await getCharacterFolders();
 
       expect(result).toEqual([]);
+      // Swallow must stay non-silent (AGENTS.md: console.error, not silence).
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error fetching character folders:',
+        expect.any(Error)
+      );
     });
 
     it('should return empty array on network error', async () => {
@@ -107,6 +154,11 @@ describe('campaignService', () => {
       const result = await getCharacterFiles('campaign1');
 
       expect(result).toEqual([]);
+      // Swallow must stay non-silent (AGENTS.md: console.error, not silence).
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error fetching character files:',
+        expect.any(Error)
+      );
     });
 
     it('should return empty array on network error', async () => {
@@ -175,6 +227,11 @@ describe('campaignService', () => {
       const result = await loadCharacters('campaign1', ['char1.json', 'char2.json']);
 
       expect(result).toEqual([]);
+      // All-or-nothing swallow must stay non-silent.
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error loading characters:',
+        expect.any(Error)
+      );
     });
 
     it('should return empty array on network error', async () => {
@@ -281,6 +338,22 @@ describe('campaignService', () => {
       await expect(
         createCharacter('campaign1', { name: 'Test' })
       ).rejects.toThrow('Failed to create character: Bad Request');
+    });
+
+    it('should prefer the server JSON error message over statusText', async () => {
+      // campaigns-character.js answers 4xx with { error } bodies (e.g. the
+      // duplicate-name 400) — the body extraction branch must win over the
+      // statusText fallback.
+      fetchSpy.mockResolvedValue({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        json: () => Promise.resolve({ error: 'A character with that name already exists' })
+      });
+
+      await expect(
+        createCharacter('test-campaign', { name: 'Test' })
+      ).rejects.toThrow('A character with that name already exists');
     });
 
     it('should throw and rethrow network errors', async () => {

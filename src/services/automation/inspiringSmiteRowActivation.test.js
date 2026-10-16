@@ -6,6 +6,28 @@
 // lastAttack gate (Divine Smite by the caster) is live — and show a friendly
 // popup otherwise. Previously the row was inert (type missing from
 // INTERACTIVE_HANDLER_TYPES) and the auto post-cast trigger was unreachable.
+//
+// ── RowActivation PAIR seam map (with sacredWeaponRowActivation.test.js #2001) ──
+// Shared spine (both files): verbatim-disk feature row → REAL executeHandler
+// (index.js:702) → REAL handler → modal-event-or-popup assertions; mocked
+// useRuntimeState/rangeCheck/mapsService; campaign test-campaign; CD spent only
+// at modal confirm (never at row click).
+// This file (inspiring smite): UNIQUE-TYPE routing lane — auto.type
+// 'post_cast_inspiring_smite' resolves straight through HANDLER_MAP
+// (index.js:408), no fingerprint needed (the save_attack+ sorcery_points
+// fingerprint at index.js:692 is sacredWeapon-family adjacent, not this row).
+// Row from public/data/2024/classes.json (Oath of Glory lv3), builder shape
+// canon core-handlers.js:185, gate INTERACTIVE_HANDLER_TYPES
+// (automationService.js:58). Modal opens via window CustomEvent.
+// #2001 (sacred weapon): FINGERPRINT-delegation lane — generic type
+// 'temp_buff' + effect 'sacred_weapon' must beat the generic temp_buff path
+// via buffHandler's effect-delegation branch; modal is a damage-type picker
+// ('sacredWeaponDamageType'), and it pins downstream confirm legs
+// (applyDamageTypeChoice/cancelSacredWeapon, expirations, ability_use log).
+// Non-overlap honored: bucket-table mechanics stay canonical in
+// automationService.interactive.test.js + automationCollector.types.test.js +
+// automationRouter.js lane; handler internals in inspiringSmiteHandler.test.js
+// and once-per-cast token latch in inspiringSmiteLatch.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────

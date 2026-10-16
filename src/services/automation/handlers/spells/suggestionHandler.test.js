@@ -1,3 +1,44 @@
+// # suggestionHandler — Suggestion (SP-113): single-target WIS save, dcSuccess 'none', Charmed
+// on fail, damage-break ender. NOT a delegation shell — unlike the charmMonster/charmPerson pair
+// (#1883, 11-line shells over charmSpellUtils; #1884/#1885 own those utils' internals), this
+// module imports NO charmSpellUtils (grep-verified 2026-10-16): it is its own canonical home, so
+// full inline pins stay. massSuggestion (pair closed earlier, 14/18) is a DISTINCT module — its
+// multi-target orchestration and rejections lanes are not mirrored here by assumption.
+//
+// Caller liveness (grep-verified 2026-10-16): automation/index.js:242 imports handle as
+// handleSuggestion → HANDLER_MAP suggestion: handleSuggestion (index.js:576) → executeHandler
+// (index.js:702) dynamic dispatch. Spell rows ship in BOTH rulesets (public/data/spells.json +
+// public/data/2024/spells.json, index 'suggestion') — one shared handler, dual-ruleset by design.
+// Manifest SP-113 verified 2026-10-09 (host run: 'no save' data-wrong, WIS dc_success:none;
+// charmed write + expiry stamp + damage-break consumers live).
+//
+// Rollback ledger (previously mocked-but-unasserted — folded in, house pattern per animalFriendship
+// /banishment lanes): storeSpellLastAttack fires BEFORE the target guard, so the ledger is stamped
+// even on a targetless attempt; addTargetResult pins exact success/failure ledger payloads with
+// conditions [] vs ['charmed'] — the ledger/condition coherence seam.
+//
+// DC provenance decoy: automation.saveDc is 15 in every fixture but the handler takes its dc ONLY
+// from buildSaveDc (mocked 17) — every downstream saveDc pin reads 17, proving provenance.
+//
+// Duration honesty: retired test names claimed 'default 24 hour' / '8 hour when auto.duration' —
+// the handler passes NO duration anywhere and never reads auto.duration (no-timers policy: >=1 min
+// is combat-scoped; the clock lives in expirations.js downstream, cleared at initiative/rest seams).
+// The strict addExpiration table below pins that absence; the auto.duration decoy is deleted.
+//
+// Trim map (29 → 18, folded or provably subsumed):
+// - no-target null vs missing-name legs → one test, same !targetName guard, + prompt-not-raised guard
+// - mapName-ignored deleted: assertion byte-identical to the resolveTarget args pin; _mapName is
+//   an underscore-unused param
+// - preserve-conditions leg folded into dedupe: ['CHARMED','frightened'] → ['frightened','charmed']
+//   already pins filter + preserve + append-order
+// - auto.duration '8 hour' twin deleted (identical assertion, dead input)
+// - getRuntimeValue undefined / non-array legs → one test (single Array.isArray guard; the L87
+//   `|| []` is subsumed by L88)
+// - metamagic falsy + missing-metaCtx legs already strictly pinned by the default createSaveListener
+//   table (disadvantage:false) → only the heightened-true leg stays
+// - custom-name ability_use + custom-name popup → one test (abilityName/spellName dynamic, prose literal)
+// - 4 blanket addEntry-rejection tests with >=1 asserts → one per path with EXACT console.error counts
+//   (success: ability_use + save_result = 2; failure: + condition = 3) and flow-continues guards
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/savePrompt.js', () => ({
@@ -30,12 +71,15 @@ vi.mock('../../common/targetResolver.js', () => ({
 import { handle } from './suggestionHandler.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { resolveTarget } from '../../common/targetResolver.js';
+import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
 const campaignName = 'test-campaign';
 
+// buildSaveDc returns 17 while fixtures carry automation.saveDc 15 — the decoy that proves every
+// downstream dc is buildSaveDc-derived.
 function makePlayerStats(overrides = {}) {
   return {
     name: 'TestCaster',
@@ -46,16 +90,18 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeAction(automation = {}) {
+// Lane convention: merges top-level AND automation overrides.
+function makeAction(overrides = {}) {
   return {
     name: 'Suggestion',
-    automation: { type: 'suggestion', saveType: 'WIS', saveDc: 15, ...automation },
+    ...overrides,
+    automation: { type: 'suggestion', saveType: 'WIS', saveDc: 15, ...overrides.automation },
   };
 }
 
 function setupBaseMocks(saveResult = { success: true }) {
   resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-  buildSaveDc.mockReturnValue(15);
+  buildSaveDc.mockReturnValue(17);
   createSaveListener.mockReturnValue({
     promptId: 'test-prompt-id',
     promise: Promise.resolve(saveResult),
@@ -66,41 +112,54 @@ function setupRejectingAddEntry() {
   addEntry.mockImplementation(() => Promise.reject(new Error('log error')));
 }
 
+function spyConsoleError() {
+  return vi.spyOn(console, 'error').mockImplementation(() => {});
+}
+
 describe('suggestionHandler.handle', () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
 
-  describe('target resolution', () => {
-    it('returns popup when no target is selected', async () => {
-      resolveTarget.mockResolvedValue(null);
+  describe('target resolution and pre-save side effects', () => {
+    it('returns honest popup without raising a save prompt when no target name resolves', async () => {
+      // Both legs of the !targetName guard: null targetInfo and target-without-name.
+      resolveTarget.mockResolvedValueOnce(null);
+      const first = await handle(makeAction(), makePlayerStats(), campaignName, null);
+      resolveTarget.mockResolvedValueOnce({ target: {} });
+      const second = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No target selected');
-      expect(result.payload.description).toContain('Suggestion has no effect');
+      for (const result of [first, second]) {
+        expect(result).toEqual({
+          type: 'popup',
+          payload: {
+            type: 'automation_info',
+            name: 'Suggestion',
+            description: 'No target selected. Suggestion has no effect.',
+          },
+        });
+      }
+      expect(createSaveListener).not.toHaveBeenCalled();
+      // Ledger honesty: the attempt is still stamped before the guard (rollback lane).
+      expect(storeSpellLastAttack).toHaveBeenCalledTimes(2);
     });
 
-    it('returns popup when target name is missing', async () => {
-      resolveTarget.mockResolvedValue({ target: {} });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No target selected');
-    });
-
-    it('calls resolveTarget with campaignName and caster name', async () => {
+    it('reads the target via resolveTarget and stamps the rollback ledger with the WIS single-target payload', async () => {
       setupBaseMocks();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(resolveTarget).toHaveBeenCalledWith(campaignName, 'TestCaster');
+      expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, {
+        casterName: 'TestCaster',
+        spellName: 'Suggestion',
+        saveType: 'WIS',
+        saveDc: 17,
+        attackScope: 'single',
+      });
     });
 
-    it('calls createSaveListener with correct arguments', async () => {
+    it('raises the save prompt with the exact contract (dc from buildSaveDc, dcSuccess none, condition charmed)', async () => {
       setupBaseMocks();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -108,7 +167,7 @@ describe('suggestionHandler.handle', () => {
       expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
         targetName: 'Goblin',
         saveType: 'WIS',
-        saveDc: 15,
+        saveDc: 17,
         dcSuccess: 'none',
         disadvantage: false,
         condition: 'charmed',
@@ -116,8 +175,8 @@ describe('suggestionHandler.handle', () => {
     });
   });
 
-  describe('ability_use log entry', () => {
-    it('logs ability_use with correct details when a target is resolved', async () => {
+  describe('logging and naming', () => {
+    it('logs ability_use with exact shape and verbatim description', async () => {
       setupBaseMocks();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -126,229 +185,212 @@ describe('suggestionHandler.handle', () => {
         type: 'ability_use',
         characterName: 'TestCaster',
         abilityName: 'Suggestion',
-        description: expect.stringContaining('TestCaster casts Suggestion on Goblin'),
+        description: 'TestCaster casts Suggestion on Goblin! Goblin must make a WIS save (DC 17) or become Charmed.',
         promptId: 'test-prompt-id',
       });
     });
 
-    it('uses action.name as abilityName in ability_use entry', async () => {
-      setupBaseMocks();
+    it('tracks action.name in abilityName/spellName/popup name while prose and ledger spell-name-free text stay literal', async () => {
+      setupBaseMocks({ success: false });
+      getRuntimeValue.mockReturnValue([]);
 
-      await handle({ name: 'My Suggestion', automation: { saveType: 'WIS', saveDc: 15 } }, makePlayerStats(), campaignName, null);
+      const ps = makePlayerStats({ name: 'WizardX' });
+      const result = await handle(makeAction({ name: 'My Suggestion' }), ps, campaignName, null);
 
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        abilityName: 'My Suggestion',
+      expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        spellName: 'My Suggestion',
       }));
-    });
-
-    it('catches and logs errors from addEntry rejection on ability_use', async () => {
-      setupRejectingAddEntry();
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      setupBaseMocks();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(consoleSpy).toHaveBeenCalledWith('[suggestion] Error:', expect.any(Error));
-      consoleSpy.mockRestore();
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'WizardX',
+        abilityName: 'My Suggestion',
+        description: 'WizardX casts Suggestion on Goblin! Goblin must make a WIS save (DC 17) or become Charmed.',
+      }));
+      expect(result.payload.name).toBe('My Suggestion');
+      expect(result.payload.description).toBe(
+        'Goblin failed WIS save and is Charmed by Suggestion. The Charmed target pursues the suggested course of activity. The spell ends if WizardX or allies deal damage to the target.'
+      );
     });
   });
 
   describe('successful save', () => {
-    it('returns popup with success description', async () => {
+    it('returns the verbatim success popup', async () => {
       setupBaseMocks({ success: true });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('succeeded on WIS save');
-      expect(result.payload.description).toContain('Goblin');
-      expect(result.payload.name).toBe('Suggestion');
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Suggestion',
+          description: 'Goblin succeeded on WIS save against Suggestion.',
+        },
+      });
     });
 
-    it('logs save_result with success=true', async () => {
+    it('writes the success rollback ledger and save_result entry exactly (missing roll/total default to 0)', async () => {
       setupBaseMocks({ success: true });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
+      expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
         targetName: 'Goblin',
-        success: true,
+        saveResult: 'success',
+        roll: 0,
+        total: 0,
+        conditions: [],
+        appliedDamage: 0,
+      });
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'save_result',
+        characterName: 'TestCaster',
         rollType: 'save-suggestion',
-        saveDc: 15,
+        targetName: 'Goblin',
+        saveDc: 17,
         saveType: 'WIS',
-      }));
+        success: true,
+        description: 'Goblin succeeded on WIS save against Suggestion.',
+      });
     });
 
-    it('does not apply charmed condition or add expiration on success', async () => {
+    it('does not write conditions or expiration on success', async () => {
       setupBaseMocks({ success: true });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(addExpiration).not.toHaveBeenCalled();
-      expect(addEntry).toHaveBeenCalledTimes(2);
-      const abilityEntries = addEntry.mock.calls.filter(call => call[1].type === 'ability_use');
-      expect(abilityEntries.length).toBe(1);
-      const saveEntries = addEntry.mock.calls.filter(call => call[1].type === 'save_result');
-      expect(saveEntries.length).toBe(1);
-    });
-
-    it('catches and logs errors from addEntry rejection on save_result success', async () => {
-      setupRejectingAddEntry();
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      setupBaseMocks({ success: true });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const errorCalls = consoleSpy.mock.calls.filter(call => call[0] === '[suggestion] Error:');
-      expect(errorCalls.length).toBeGreaterThanOrEqual(1);
-      consoleSpy.mockRestore();
+      const types = addEntry.mock.calls.map(call => call[1].type);
+      expect(types).toEqual(['ability_use', 'save_result']);
     });
   });
 
   describe('failed save', () => {
-    it('applies charmed condition to target', async () => {
+    it('writes charmed onto the target through the runtime store (fresh and dedupe/preserve legs)', async () => {
       setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        expect.arrayContaining(['charmed']),
-        campaignName,
-      );
-    });
+      expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['charmed'], campaignName);
 
-    it('deduplicates charmed condition regardless of case', async () => {
-      setupBaseMocks({ success: false });
+      // Uppercase 'CHARMED' filtered case-insensitively; 'frightened' preserved; append order held.
       getRuntimeValue.mockReturnValue(['CHARMED', 'frightened']);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(setRuntimeValue).toHaveBeenLastCalledWith('Goblin', 'activeConditions', ['frightened', 'charmed'], campaignName);
+    });
+
+    it('registers expiration with the strict effect table and NO duration (combat-scoped clock lives downstream)', async () => {
+      setupBaseMocks({ success: false });
+      getRuntimeValue.mockReturnValue([]);
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['frightened', 'charmed'],
+      expect(addExpiration).toHaveBeenCalledWith({
+        attackerName: 'TestCaster',
+        targetName: 'Goblin',
+        effects: [{ type: 'charmed', condition: 'charmed' }],
         campaignName,
-      );
+      });
     });
 
-    it('preserves other conditions when adding charmed', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue(['frightened', 'unconscious']);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['frightened', 'unconscious', 'charmed'],
-        campaignName,
-      );
-    });
-
-    it('registers expiration with default 24 hour duration', async () => {
+    it('posts the condition log with verbatim damage-break note', async () => {
       setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.arrayContaining([{ type: 'charmed', condition: 'charmed' }]), campaignName });
-    });
-
-    it('registers expiration with 8 hour duration when auto.duration is true', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-
-      await handle(makeAction({ duration: true }), makePlayerStats(), campaignName, null);
-
-      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.arrayContaining([{ type: 'charmed', condition: 'charmed' }]), campaignName });
-    });
-
-    it('posts condition log entry with full note', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'condition',
         action: 'applied',
         characterName: 'Goblin',
         condition: 'Charmed',
         reason: 'Suggestion spell',
-        note: expect.stringContaining('pursues the suggested course of activity'),
+        note: 'Goblin is Charmed by Suggestion and pursues the suggested course of activity. The spell ends if TestCaster or allies deal damage to the target.',
         timestamp: expect.any(Number),
-      }));
+      });
     });
 
-    it('logs save_result with success=false', async () => {
+    it('writes the failure rollback ledger and save_result entry exactly', async () => {
       setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
+      expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
         targetName: 'Goblin',
-        success: false,
+        saveResult: 'failure',
+        roll: 0,
+        total: 0,
+        conditions: ['charmed'],
+        appliedDamage: 0,
+      });
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'save_result',
+        characterName: 'TestCaster',
         rollType: 'save-suggestion',
-        saveDc: 15,
+        targetName: 'Goblin',
+        saveDc: 17,
         saveType: 'WIS',
-      }));
+        success: false,
+        description: 'Goblin failed WIS save against Suggestion and is Charmed.',
+      });
     });
 
-    it('returns popup with failure description including caster, target, and spell end condition', async () => {
+    it('returns the verbatim failure popup', async () => {
       setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Suggestion');
-      expect(result.payload.description).toContain('TestCaster');
-      expect(result.payload.description).toContain('Goblin');
-      expect(result.payload.description).toContain('damage');
-      expect(result.payload.description).toContain('Charmed');
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Suggestion',
+          description: 'Goblin failed WIS save and is Charmed by Suggestion. The Charmed target pursues the suggested course of activity. The spell ends if TestCaster or allies deal damage to the target.',
+        },
+      });
     });
+  });
 
-    it('catches and logs errors from addEntry rejection on condition log entry', async () => {
+  describe('log rejections never break the flow', () => {
+    it('on success path, every addEntry rejection is caught and logged (2 legs) and the popup still returns', async () => {
+      const consoleSpy = spyConsoleError();
       setupRejectingAddEntry();
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      setupBaseMocks({ success: true });
 
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const errorCalls = consoleSpy.mock.calls.filter(call => call[0] === '[suggestion] Error:');
-      expect(errorCalls.length).toBeGreaterThanOrEqual(1);
+      // ability_use + save_result both reject → exactly 2 caught errors.
+      expect(consoleSpy).toHaveBeenCalledTimes(2);
+      expect(consoleSpy).toHaveBeenCalledWith('[suggestion] Error:', expect.any(Error));
+      expect(result.payload.description).toBe('Goblin succeeded on WIS save against Suggestion.');
       consoleSpy.mockRestore();
     });
 
-    it('catches and logs errors from addEntry rejection on save_result failure', async () => {
+    it('on failure path, every addEntry rejection is caught and logged (3 legs) and the charmed write still lands', async () => {
+      const consoleSpy = spyConsoleError();
       setupRejectingAddEntry();
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const errorCalls = consoleSpy.mock.calls.filter(call => call[0] === '[suggestion] Error:');
-      expect(errorCalls.length).toBeGreaterThanOrEqual(1);
+      // ability_use + condition + save_result all reject → exactly 3 caught errors.
+      expect(consoleSpy).toHaveBeenCalledTimes(3);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['charmed'], campaignName);
+      expect(addExpiration).toHaveBeenCalledTimes(1);
+      expect(result.payload.description).toContain('Charmed by Suggestion');
       consoleSpy.mockRestore();
     });
   });
 
   describe('edge cases', () => {
-    it('handles missing automation property by defaulting to empty object', async () => {
+    it('defaults missing automation to {} into buildSaveDc', async () => {
       resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       buildSaveDc.mockReturnValue(10);
       createSaveListener.mockReturnValue({
@@ -357,92 +399,33 @@ describe('suggestionHandler.handle', () => {
       });
       getRuntimeValue.mockReturnValue([]);
 
-      const result = await handle({ name: 'Suggestion' }, makePlayerStats(), campaignName, null);
+      const ps = makePlayerStats();
+      const result = await handle({ name: 'Suggestion' }, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(buildSaveDc).toHaveBeenCalledWith({}, makePlayerStats());
+      expect(buildSaveDc).toHaveBeenCalledWith({}, ps);
     });
 
-    it('ignores the mapName parameter', async () => {
+    it('defaults non-array stored conditions to empty (undefined and junk legs)', async () => {
       setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
 
-      await handle(makeAction(), makePlayerStats(), campaignName, 'some-map');
-
-      expect(resolveTarget).toHaveBeenCalledWith(campaignName, 'TestCaster');
-    });
-
-    it('handles undefined or non-array getRuntimeValue by defaulting to empty array', async () => {
-      setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue(undefined);
-
       await handle(makeAction(), makePlayerStats(), campaignName, null);
+      expect(setRuntimeValue).toHaveBeenLastCalledWith('Goblin', 'activeConditions', ['charmed'], campaignName);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['charmed'],
-        campaignName,
-      );
-    });
-
-    it('uses custom names in popup and ability_use descriptions', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-
-      const ps = makePlayerStats({ name: 'WizardX' });
-      const result = await handle(makeAction(), ps, campaignName, null);
-
-      expect(result.payload.description).toContain('WizardX');
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        description: expect.stringContaining('WizardX casts Suggestion'),
-      }));
-    });
-
-    it('handles non-array getRuntimeValue by defaulting to empty array', async () => {
-      setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue('not-an-array');
-
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['charmed'],
-        campaignName,
-      );
+      expect(setRuntimeValue).toHaveBeenLastCalledWith('Goblin', 'activeConditions', ['charmed'], campaignName);
     });
 
-    it('sets disadvantage when metaCtx.metamagicHeighten is truthy', async () => {
+    it('heightened spell forces disadvantage on the save prompt', async () => {
       setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
 
-      await handle({ name: 'Suggestion', metaCtx: { metamagicHeighten: true }, automation: { type: 'suggestion', saveType: 'WIS', saveDc: 15 } }, makePlayerStats(), campaignName, null);
+      await handle(makeAction({ metaCtx: { metamagicHeighten: true } }), makePlayerStats(), campaignName, null);
 
       expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         disadvantage: true,
-      }));
-    });
-
-    it('does not set disadvantage when metaCtx.metamagicHeighten is falsy', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-
-      await handle({ name: 'Suggestion', metaCtx: { metamagicHeighten: false }, automation: { type: 'suggestion', saveType: 'WIS', saveDc: 15 } }, makePlayerStats(), campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        disadvantage: false,
-      }));
-    });
-
-    it('does not set disadvantage when metaCtx is missing', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        disadvantage: false,
       }));
     });
   });

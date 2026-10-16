@@ -11,6 +11,13 @@
 // spellcast-summon path this monster is designed for) resolves BOTH legs
 // from the caster — the residual gap is caster context at EB direct-join
 // only (new subsystem: EB join inheriting summoner caster context).
+// Trio split (mirrors cla138 header, siblings read read-only):
+//   cla138 #1976 = _noConcentrationChoice stamp lane ONLY (zero overlap here).
+//   mao-huge-slam (this file) = MA-0284/MA-0285 byte-clean data locks +
+//     resolveMonsterActions fold consumers — zero concentration content.
+//   main #1978 = orchestration: handle/modal, SP-015/114 AC-HP ladder,
+//     CLA-066 Create Thrall rider, CLA-252 phantasmal, SP-005 refusal,
+//     Fey chooser concentration default.
 import { describe, it, expect, vi } from 'vitest';
 import monstersData from '../../../../../public/data/monsters.json' with { type: 'json' };
 import spells2024 from '../../../../../public/data/2024/spells.json' with { type: 'json' };

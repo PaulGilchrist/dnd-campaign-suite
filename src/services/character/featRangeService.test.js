@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { computeFeatRangeEffects, matchesExtraReachCondition, resolveMeleeReachBonus } from './featRangeService.js'
 import { computeRangeEffect } from '../rules/combat/rangeValidation.js'
 import * as dataLoader from '../ui/dataLoader.js'
@@ -6,6 +7,12 @@ import * as dataLoader from '../ui/dataLoader.js'
 vi.mock('../ui/dataLoader.js', () => ({
   loadFeatData: vi.fn(),
 }))
+
+// Disk anchors: fixtures flow the real bestiary rows through the service
+// instead of hand-typed copies (verified against disk 2026-10-16).
+const feats5e = JSON.parse(readFileSync('public/data/feats.json', 'utf8'))
+const feats2024 = JSON.parse(readFileSync('public/data/2024/feats.json', 'utf8'))
+const classes2024 = JSON.parse(readFileSync('public/data/2024/classes.json', 'utf8'))
 
 describe('computeFeatRangeEffects', () => {
   const defaultResult = {
@@ -18,26 +25,6 @@ describe('computeFeatRangeEffects', () => {
     cantripRangeBonus: 0,
   }
 
-  const crossbowExpert = {
-    name: 'Crossbow Expert',
-    index: 'crossbow-expert',
-    rangeEffects: { ignoresMeleeDisadvantage: true, appliesToWeaponType: 'crossbow' },
-  }
-
-  const sharpshooter = {
-    name: 'Sharpshooter',
-    index: 'sharpshooter',
-    rangeEffects: { ignoresLongRangeDisadvantage: true },
-  }
-
-  const spellSniper = {
-    name: 'Spell Sniper',
-    index: 'spell-sniper',
-    rangeEffects: { ignoresMeleeDisadvantage: true, appliesToAttackType: 'spell' },
-  }
-
-  const allFeats = [crossbowExpert, sharpshooter, spellSniper]
-
   afterEach(() => {
     vi.resetAllMocks()
   })
@@ -49,52 +36,69 @@ describe('computeFeatRangeEffects', () => {
       const result = await computeFeatRangeEffects(invalid, '5e')
       expect(result).toEqual(defaultResult)
     }
+    // short-circuits before touching the data loader
+    expect(dataLoader.loadFeatData).not.toHaveBeenCalled()
   })
 
-  // --- Feat range effect detection ---
+  // --- Feat range effect detection (disk feats.json rows) ---
 
   it('detects Crossbow Expert melee disadvantage immunity', async () => {
-    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(allFeats)
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
     const result = await computeFeatRangeEffects(['Crossbow Expert'], '5e')
+    expect(result.ignoresMeleeDisadvantage).toBe(true)
+    expect(result.ignoresLongRangeDisadvantage).toBe(false)
+    expect(dataLoader.loadFeatData).toHaveBeenCalledWith('5e')
+  })
+
+  it('detects Sharpshooter long range disadvantage immunity', async () => {
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
+    const result = await computeFeatRangeEffects(['Sharpshooter'], '5e')
+    expect(result.ignoresLongRangeDisadvantage).toBe(true)
+    expect(result.ignoresMeleeDisadvantage).toBe(false)
+    // rangeMultiplier is a fixed passthrough — no feat on disk mutates it
+    expect(result.rangeMultiplier).toBe(1)
+  })
+
+  it('detects Spell Sniper melee disadvantage immunity for spells', async () => {
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
+    const result = await computeFeatRangeEffects(['Spell Sniper'], '5e')
     expect(result.ignoresMeleeDisadvantage).toBe(true)
     expect(result.ignoresLongRangeDisadvantage).toBe(false)
   })
 
-  it('detects Sharpshooter long range disadvantage immunity', async () => {
-    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(allFeats)
-    const result = await computeFeatRangeEffects(['Sharpshooter'], '5e')
-    expect(result.ignoresLongRangeDisadvantage).toBe(true)
-    expect(result.ignoresMeleeDisadvantage).toBe(false)
-  })
-
-  it('detects Spell Sniper melee disadvantage immunity for spells', async () => {
-    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(allFeats)
-    const result = await computeFeatRangeEffects(['Spell Sniper'], '5e')
-    expect(result.ignoresMeleeDisadvantage).toBe(true)
-  })
-
   it('combines effects from multiple feats', async () => {
-    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(allFeats)
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
     const result = await computeFeatRangeEffects(['Crossbow Expert', 'Sharpshooter'], '5e')
     expect(result.ignoresMeleeDisadvantage).toBe(true)
     expect(result.ignoresLongRangeDisadvantage).toBe(true)
   })
 
   it('ignores unknown feat names mixed with valid ones', async () => {
-    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(allFeats)
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
     const result = await computeFeatRangeEffects(['Crossbow Expert', 'Fake Feat'], '5e')
     expect(result.ignoresMeleeDisadvantage).toBe(true)
+    expect(result.ignoresLongRangeDisadvantage).toBe(false)
   })
 
-  it('supports 2024 ruleset feats', async () => {
-    const crossbowExpert2024 = {
-      name: 'Crossbow Expert',
-      index: 'crossbow-expert',
-      rangeEffects: { ignoresMeleeDisadvantage: true, appliesToWeaponType: 'crossbow' },
-    }
-    vi.mocked(dataLoader.loadFeatData).mockResolvedValue([crossbowExpert2024])
-    const result = await computeFeatRangeEffects(['Crossbow Expert'], '2024')
+  it('Sharpshooter discriminates rulesets: 5e long-range only, 2024 also melee', async () => {
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
+    const result5e = await computeFeatRangeEffects(['Sharpshooter'], '5e')
+    expect(result5e.ignoresLongRangeDisadvantage).toBe(true)
+    expect(result5e.ignoresMeleeDisadvantage).toBe(false)
+    expect(dataLoader.loadFeatData).toHaveBeenLastCalledWith('5e')
+
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats2024)
+    const result2024 = await computeFeatRangeEffects(['Sharpshooter'], '2024')
+    expect(result2024.ignoresLongRangeDisadvantage).toBe(true)
+    expect(result2024.ignoresMeleeDisadvantage).toBe(true) // 2024 disk row adds melee immunity
+    expect(dataLoader.loadFeatData).toHaveBeenLastCalledWith('2024')
+  })
+
+  it('2024 Spell Sniper contributes spellRangeBonus 60 from the disk row', async () => {
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats2024)
+    const result = await computeFeatRangeEffects(['Spell Sniper'], '2024')
     expect(result.ignoresMeleeDisadvantage).toBe(true)
+    expect(result.spellRangeBonus).toBe(60)
   })
 
   it('handles feats without or with null/undefined rangeEffects gracefully', async () => {
@@ -108,7 +112,7 @@ describe('computeFeatRangeEffects', () => {
   })
 
   it('strips parenthetical suffixes when matching feat names', async () => {
-    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(allFeats)
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
     const result = await computeFeatRangeEffects(['Crossbow Expert (Level 4)'], '5e')
     expect(result.ignoresMeleeDisadvantage).toBe(true)
   })
@@ -132,9 +136,14 @@ describe('computeFeatRangeEffects', () => {
   })
 
   it('ignores spellRangeBonus values that are falsy (0, negative, null, undefined)', async () => {
-    const feat = { name: 'Feat', index: 'feat', rangeEffects: { spellRangeBonus: 0 } }
-    vi.mocked(dataLoader.loadFeatData).mockResolvedValue([feat])
-    const result = await computeFeatRangeEffects(['Feat'], '5e')
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue([
+      { name: 'Zero Feat', index: 'zero-feat', rangeEffects: { spellRangeBonus: 0 } },
+      { name: 'Negative Feat', index: 'negative-feat', rangeEffects: { spellRangeBonus: -50 } },
+      { name: 'Null Feat', index: 'null-feat', rangeEffects: { spellRangeBonus: null } },
+      { name: 'Missing Feat', index: 'missing-feat', rangeEffects: {} },
+    ])
+    const result = await computeFeatRangeEffects(
+      ['Zero Feat', 'Negative Feat', 'Null Feat', 'Missing Feat'], '5e')
     expect(result.spellRangeBonus).toBe(0)
   })
 
@@ -143,8 +152,8 @@ describe('computeFeatRangeEffects', () => {
   it('extracts meleeReachBonus and cantripRangeBonus from passives', async () => {
     const result = await computeFeatRangeEffects([], '5e', {
       automation: { passives: [
-        { effect: 'extra_reach', bonusExpression: '5' },
-        { effect: 'cantrip_range_bonus', bonusExpression: '30' },
+        { type: 'passive_buff', effect: 'extra_reach', bonusExpression: '5' },
+        { type: 'cantrip_range_bonus', effect: 'cantrip_range_bonus', bonusExpression: '30' },
       ]},
     })
     expect(result.meleeReachBonus).toBe(5)
@@ -154,10 +163,10 @@ describe('computeFeatRangeEffects', () => {
   it('uses the highest bonus when multiple passives of the same type exist', async () => {
     const result = await computeFeatRangeEffects([], '5e', {
       automation: { passives: [
-        { effect: 'extra_reach', bonusExpression: '5' },
-        { effect: 'extra_reach', bonusExpression: '10' },
-        { effect: 'cantrip_range_bonus', bonusExpression: '20' },
-        { effect: 'cantrip_range_bonus', bonusExpression: '40' },
+        { type: 'passive_buff', effect: 'extra_reach', bonusExpression: '5' },
+        { type: 'passive_buff', effect: 'extra_reach', bonusExpression: '10' },
+        { type: 'cantrip_range_bonus', effect: 'cantrip_range_bonus', bonusExpression: '20' },
+        { type: 'cantrip_range_bonus', effect: 'cantrip_range_bonus', bonusExpression: '40' },
       ]},
     })
     expect(result.meleeReachBonus).toBe(10)
@@ -167,11 +176,13 @@ describe('computeFeatRangeEffects', () => {
   it('ignores non-matching, non-numeric, missing, negative, or zero bonusExpressions', async () => {
     const result = await computeFeatRangeEffects([], '5e', {
       automation: { passives: [
-        { effect: 'some_other_effect', bonusExpression: '99' },
-        { effect: 'extra_reach', bonusExpression: 'not-a-number' },
-        { effect: 'extra_reach' },
-        { effect: 'extra_reach', bonusExpression: '0' },
-        { effect: 'extra_reach', bonusExpression: '-3' },
+        { type: 'passive_buff', effect: 'some_other_effect', bonusExpression: '99' },
+        { type: 'passive_buff', effect: 'extra_reach', bonusExpression: 'not-a-number' },
+        { type: 'passive_buff', effect: 'extra_reach' },
+        { type: 'passive_buff', effect: 'extra_reach', bonusExpression: '0' },
+        { type: 'passive_buff', effect: 'extra_reach', bonusExpression: '-3' },
+        { type: 'cantrip_range_bonus', effect: 'cantrip_range_bonus', bonusExpression: '0' },
+        { type: 'cantrip_range_bonus', effect: 'cantrip_range_bonus', bonusExpression: '-20' },
       ]},
     })
     expect(result.meleeReachBonus).toBe(0)
@@ -179,9 +190,9 @@ describe('computeFeatRangeEffects', () => {
   })
 
   it('combines feat effects with passive automation bonuses', async () => {
-    vi.mocked(dataLoader.loadFeatData).mockResolvedValue([crossbowExpert])
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
     const result = await computeFeatRangeEffects(['Crossbow Expert'], '5e', {
-      automation: { passives: [{ effect: 'extra_reach', bonusExpression: '5' }] },
+      automation: { passives: [{ type: 'passive_buff', effect: 'extra_reach', bonusExpression: '5' }] },
     })
     expect(result.ignoresMeleeDisadvantage).toBe(true)
     expect(result.meleeReachBonus).toBe(5)
@@ -189,21 +200,47 @@ describe('computeFeatRangeEffects', () => {
 
   // --- CLA-029: condition-gated extra reach (Battering Roots) ---
 
+  it('disk anchor: Battering Roots row declares extra_reach with bonus "10 ft"', () => {
+    const roots = classes2024
+      .flatMap(c => (c.majors || []).flatMap(m => m.features || []))
+      .find(f => f.name === 'Battering Roots')
+    expect(roots.automation).toMatchObject({
+      type: 'passive_buff',
+      effect: 'extra_reach',
+      bonus: '10 ft',
+      condition: 'heavy_or_versatile_melee_weapon',
+    })
+    // automationInfoBuilder/passive.js maps auto.bonus → bonusExpression,
+    // so the shape that reaches this service is bonusExpression: '10 ft'.
+  })
+
   it('routes conditional extra_reach into meleeReachGrants, not the ungated bonus', async () => {
     const result = await computeFeatRangeEffects([], '2024', {
       automation: { passives: [
-        { name: 'Battering Roots', effect: 'extra_reach', bonusExpression: '10', condition: 'heavy_or_versatile_melee_weapon' },
+        { name: 'Battering Roots', type: 'passive_buff', effect: 'extra_reach', bonusExpression: '10 ft', condition: 'heavy_or_versatile_melee_weapon' },
       ]},
     })
     expect(result.meleeReachBonus).toBe(0)
     expect(result.meleeReachGrants).toEqual([{ bonus: 10, condition: 'heavy_or_versatile_melee_weapon', source: 'Battering Roots' }])
   })
 
+  it('records a zero-valued conditional grant but never extends reach', async () => {
+    const result = await computeFeatRangeEffects([], '2024', {
+      automation: { passives: [
+        { name: 'Broken Roots', type: 'passive_buff', effect: 'extra_reach', bonusExpression: '0', condition: 'heavy_or_versatile_melee_weapon' },
+      ]},
+    })
+    // honest source behavior: conditional branch records the grant regardless of size
+    expect(result.meleeReachGrants).toEqual([{ bonus: 0, condition: 'heavy_or_versatile_melee_weapon', source: 'Broken Roots' }])
+    expect(result.meleeReachBonus).toBe(0)
+    expect(resolveMeleeReachBonus(result, { properties: ['Heavy'] }).meleeReachBonus).toBe(0)
+  })
+
   it('keeps unconditional extra_reach in meleeReachBonus alongside conditional grants', async () => {
     const result = await computeFeatRangeEffects([], '2024', {
       automation: { passives: [
         { effect: 'extra_reach', bonusExpression: '5' },
-        { name: 'Battering Roots', effect: 'extra_reach', bonusExpression: '10', condition: 'heavy_or_versatile_melee_weapon' },
+        { name: 'Battering Roots', type: 'passive_buff', effect: 'extra_reach', bonusExpression: '10 ft', condition: 'heavy_or_versatile_melee_weapon' },
       ]},
     })
     expect(result.meleeReachBonus).toBe(5)
@@ -256,6 +293,13 @@ describe('computeFeatRangeEffects', () => {
       }
       expect(resolveMeleeReachBonus(mixed, { properties: ['Heavy'] }).meleeReachBonus).toBe(10)
     })
+    it('base bonus higher than a matching grant is kept', () => {
+      const mixed = {
+        meleeReachBonus: 15,
+        meleeReachGrants: [{ bonus: 10, condition: 'heavy_or_versatile_melee_weapon', source: 'Battering Roots' }],
+      }
+      expect(resolveMeleeReachBonus(mixed, { properties: ['Heavy'] }).meleeReachBonus).toBe(15)
+    })
     it('Battering Roots caps a Versatile Longsword at 18 ft but leaves a Shortsword at 8 ft', () => {
       const longsword = resolveMeleeReachBonus(feats, { properties: ['Versatile'] })
       const shortsword = resolveMeleeReachBonus(feats, { properties: ['Finesse', 'Light', 'Monk'] })
@@ -265,6 +309,19 @@ describe('computeFeatRangeEffects', () => {
       expect(computeRangeEffect(5, 8, shortsword).mode).toBe('normal')
       expect(computeRangeEffect(5, 9, shortsword).mode).toBe('miss')
     })
+  })
+
+  // --- computeRangeEffect integration with computed feat effects ---
+
+  it('Sharpshooter output turns a 150 ft long-range shot from disadvantage into a clean hit', async () => {
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
+    const sharp = await computeFeatRangeEffects(['Sharpshooter'], '5e')
+    // 100 ft weapon: long band is 101-200 ft, miss beyond
+    expect(computeRangeEffect(100, 101, {})).toMatchObject({ mode: 'disadvantage' })
+    expect(computeRangeEffect(100, 150, {}).mode).toBe('disadvantage')
+    expect(computeRangeEffect(100, 150, sharp).mode).toBe('normal')
+    expect(computeRangeEffect(100, 200, sharp).mode).toBe('normal')
+    expect(computeRangeEffect(100, 201, sharp).mode).toBe('miss')
   })
 
   // --- playerStats edge cases ---
@@ -278,8 +335,7 @@ describe('computeFeatRangeEffects', () => {
       await computeFeatRangeEffects([], '5e', { automation: { passives: [] } }),
     ]
     for (const result of results) {
-      expect(result.meleeReachBonus).toBe(0)
-      expect(result.cantripRangeBonus).toBe(0)
+      expect(result).toEqual(defaultResult)
     }
   })
 })

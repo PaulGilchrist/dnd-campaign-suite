@@ -1,49 +1,111 @@
+// ── #1997 index.test.js — MAIN canonical MECHANICS lane for automation/index.js ──
+// Seam map: index.mistyWanderer.test.js header (#1995, closed 2 KEEP law) plus
+// #1996 index.psychicTeleportation.test.js (closed 3 shed). Subject: resolveHandler
+// (L675-700), executeHandler (L702-749), inline dispatchers spell_modifier L334 and
+// damage_reduction L341-347, and the PASSIVE_RULE_EFFECTS table L290-297.
+// THIS lane is the law for mechanics — feature lanes never re-pin it:
+//   • null-shape early-outs L703-705 → strict null-shape table, no-side-effect guard.
+//   • no-handler null seams: single-object table miss L699→L738-740 and array
+//     no-actionable L729-730.
+//   • error-catch composition L745-748 — exact console.error `[automation] Handler
+//     ${type}/${effect} failed:` and full-string popup { type:'popup', payload:{
+//     type:'automation_info', name, description:'Failed to execute <name>' } }.
+//     Composed inline, NOT via automationInfoPopup (asserted bypassed).
+//   • generic auto-array scan L716-734 — actionable filter L717-721 (registered type
+//     + casting_time/action/trigger; passive_rule via PASSIVE_RULE_EFFECTS) and the
+//     generic first-actionable ordering. The CLA-229 misty_wanderer prefer L723-727
+//     is #1995's — no misty pin here.
+//   • CLA-192 replacesWarMagic prefer L722 (prefer queries actionable, not raw auto).
+//   • passive_rule route mechanics L676-677 — full PASSIVE_RULE_EFFECTS table,
+//     including the savant school 5th-arg mapping from SAVANT_SCHOOLS L278-283.
+//   • auto_effect table mechanics generically — unrecognized effect falls through every
+//     effect route to the table miss → null (psychic route #1996, implosion
+//     fingerprint #1998, web row #1999, misty #1995).
+//   • table-lookup fallthrough L699 — dispatch, exact 5-arg forwarding through L743,
+//     result pass-through L744. Prod-caller liveness verified 2026-10-16:
+//     useCharActionsAutomation.js L448 (5-arg with characters), CharReactions.jsx
+//     L255/L520, useAreaEffectHandlers.js, triggerSpells.js, useCombatSuperiorityModal
+//     .js L219 (live stamps combat_superiority_attack_rider/_prompt_skill_check).
+//   • SP-042 Eyebite row KEPT: sole home for this dispatch row + saveDc data fix
+//     (handlers/spells/eyebiteHandler.test.js covers handler internals only).
+// Shed here (feature subject files exist, exact names): SP-056 Grease spells.json
+//   data pins (9 tests) → the grease pair home handlers/spells/
+//   greaseAreaSaveHandler.handle.test.js (#1922) + greaseAreaSaveHandler.areaSave
+//   .test.js (#1921) — registration live at index.js L556, cited there. The pure
+//   data-shape assertions (range/duration/classes/area_of_effect) are flagged for
+//   absorption by that pair — see FINAL REPORT.
+// Old-file fix: it mocked '../../../shared/popupResponse.js' (root shared/ module)
+// which NEVER intercepted the automationInfoPopup index.js imports from
+// '../shared/popupResponse.js' (src/services/shared) — spell_modifier ran the real
+// popup. Correct-path mock + exact-args pins below.
+// Registration-symmetry audit (2026-10-16, cluster flagged in FINAL REPORT, NOT
+// deleted): 29 HANDLER_MAP keys have zero prod producers across public/data,
+// public/campaigns runtime data, and programmatic type stamps in src/server.
+// No timers; turn-based row-click dispatch only; test-campaign only.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { executeHandler } from './index.js';
 
-// ── Module-level mocks ─
+// ── Module-level mocks (paths exactly as index.js imports them) ──────────────
 
 vi.mock('./handlers/combat/saveOnlyHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'save_only' }),
+  handle: vi.fn(async () => ({ result: 'save_only' })),
 }));
 vi.mock('./handlers/healing/healingHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'shared_healing' }),
+  handle: vi.fn(async () => ({ result: 'shared_healing' })),
 }));
 vi.mock('./handlers/combat/autoRerollHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'auto_reroll' }),
+  handle: vi.fn(async () => ({ result: 'auto_reroll' })),
 }));
 vi.mock('./handlers/class-wizard/SavantHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'savant' }),
+  handle: vi.fn(async () => ({ result: 'savant' })),
 }));
 vi.mock('./handlers/combat/damageReductionHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'damage_reduction' }),
+  handle: vi.fn(async () => ({ result: 'damage_reduction' })),
 }));
 vi.mock('./handlers/class-sorcerer/protectiveFieldHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'protective_field' }),
+  handle: vi.fn(async () => ({ result: 'protective_field' })),
 }));
-vi.mock('./handlers/spells/eyebiteHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({
-    type: 'modal',
-    modalName: 'eyebiteEffect',
-    payload: { saveDc: 17 },
-  }),
+vi.mock('./handlers/class-barbarian/persistentRageHandler.js', () => ({
+  handle: vi.fn(async () => ({ result: 'persistent_rage' })),
+}));
+vi.mock('./handlers/superiorDefenseHandler.js', () => ({
+  handle: vi.fn(async () => ({ result: 'superior_defense' })),
 }));
 vi.mock('./handlers/class-fighter-rogue/warMagicCantripHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'war_magic_cantrip' }),
+  handle: vi.fn(async () => ({ result: 'war_magic_cantrip' })),
 }));
 vi.mock('./handlers/class-fighter-rogue/warMagicSpellHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'war_magic_spell' }),
+  handle: vi.fn(async () => ({ result: 'war_magic_spell' })),
 }));
-vi.mock('../../../shared/popupResponse.js', () => ({
-  automationInfoPopup: vi.fn().mockReturnValue({ type: 'popup', payload: { type: 'automation_info', description: 'test' } }),
+vi.mock('./handlers/spells/eyebiteHandler.js', () => ({
+  handle: vi.fn(async () => ({ type: 'modal', modalName: 'eyebiteEffect', payload: { saveDc: 17 } })),
+}));
+vi.mock('../shared/popupResponse.js', () => ({
+  automationInfoPopup: vi.fn(() => ({
+    type: 'popup',
+    payload: { type: 'automation_info', name: 'SENTINEL', automationType: 'spell_modifier', description: 'popup pass-through' },
+  })),
 }));
 
-// ── Helpers ─────────────────────────────────────────────────────
+import { handle as saveOnlyHandle } from './handlers/combat/saveOnlyHandler.js';
+import { handle as healingHandle } from './handlers/healing/healingHandler.js';
+import { handle as autoRerollHandle } from './handlers/combat/autoRerollHandler.js';
+import { handle as savantHandle } from './handlers/class-wizard/SavantHandler.js';
+import { handle as damageReductionHandle } from './handlers/combat/damageReductionHandler.js';
+import { handle as protectiveFieldHandle } from './handlers/class-sorcerer/protectiveFieldHandler.js';
+import { handle as persistentRageHandle } from './handlers/class-barbarian/persistentRageHandler.js';
+import { handle as superiorDefenseHandle } from './handlers/superiorDefenseHandler.js';
+import { handle as cantripHandle } from './handlers/class-fighter-rogue/warMagicCantripHandler.js';
+import { handle as spellHandle } from './handlers/class-fighter-rogue/warMagicSpellHandler.js';
+import { handle as eyebiteHandle } from './handlers/spells/eyebiteHandler.js';
+import { automationInfoPopup } from '../shared/popupResponse.js';
 
-const campaignName = 'TestCampaign';
+// ── Helpers ─────────────────────────────────────────────────────────────────────
+
+const campaignName = 'test-campaign';
 const mapName = 'TestMap';
 
 function makePlayerStats(overrides = {}) {
@@ -60,396 +122,358 @@ function makeAction(automation = {}) {
   return { name: 'Test Action', automation: { ...automation } };
 }
 
-// ── Tests ───────────────────────────────────────────────────────
+const characters = [{ name: 'Companion', level: 3 }];
 
-describe('executeHandler', () => {
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+// ── null-shape early-outs (L703-705) ──────────────────────────────────────────
+
+describe('executeHandler — null-shape table (L703-705)', () => {
+  it.each([
+    ['null action', null],
+    ['undefined action', undefined],
+    ['empty object', {}],
+    ['automation: null', { automation: null }],
+    ['automation: undefined', { automation: undefined }],
+    ['name-only action (automation missing)', { name: 'No Automation' }],
+  ])('returns null without touching any handler for %s', async (_label, action) => {
+    expect(await executeHandler(action, makePlayerStats(), campaignName, mapName, characters)).toBeNull();
+    expect(saveOnlyHandle).not.toHaveBeenCalled();
+    expect(healingHandle).not.toHaveBeenCalled();
+    expect(autoRerollHandle).not.toHaveBeenCalled();
+    expect(savantHandle).not.toHaveBeenCalled();
+    expect(eyebiteHandle).not.toHaveBeenCalled();
+    expect(automationInfoPopup).not.toHaveBeenCalled();
+  });
+});
+
+// ── no-handler null seams: table miss (L699→L738-740) and array miss (L729-730) ──
+
+describe('executeHandler — no-handler null seams', () => {
+  it('returns null for a bare automation:{} — matches no route, misses the table', async () => {
+    expect(await executeHandler({ name: 'Bare', automation: {} }, makePlayerStats(), campaignName, mapName)).toBeNull();
+  });
+
+  it('returns null for an automation.type absent from HANDLER_MAP (L699 miss → L738)', async () => {
+    expect(await executeHandler(makeAction({ type: 'nonexistent_type' }), makePlayerStats(), campaignName, mapName)).toBeNull();
+    expect(saveOnlyHandle).not.toHaveBeenCalled();
+  });
+
+  it('auto_effect with an unrecognized effect falls through every effect route to the table miss → null', async () => {
+    // Generic auto_effect table-miss law; effect routes themselves: psychic #1996,
+    // implosion fingerprint #1998, misty #1995. A wrong-route mutation returns non-null.
+    const action = makeAction({ type: 'auto_effect', effect: 'nonexistent_effect', trigger: 'turn_start' });
+    expect(await executeHandler(action, makePlayerStats(), campaignName, mapName)).toBeNull();
+  });
+
+  it('returns null for an array with no actionable entries (L729-730)', async () => {
+    const action = { name: 'Dead Rows', automation: [{ type: 'unknown_type' }, { type: 'passive_rule', effect: 'unknown_savant' }, null] };
+    expect(await executeHandler(action, makePlayerStats(), campaignName, mapName)).toBeNull();
+    expect(autoRerollHandle).not.toHaveBeenCalled();
+    expect(savantHandle).not.toHaveBeenCalled();
+  });
+
+  it('returns null for an empty array and for an all-null array', async () => {
+    expect(await executeHandler({ name: 'Empty', automation: [] }, makePlayerStats(), campaignName, mapName)).toBeNull();
+    expect(await executeHandler({ name: 'Nulls', automation: [null, null] }, makePlayerStats(), campaignName, mapName)).toBeNull();
+  });
+});
+
+// ── table-lookup fallthrough: dispatch, 5-arg forwarding, pass-through ─────────
+
+describe('executeHandler — table fallthrough dispatch (L699 → L743-744)', () => {
+  it('forwards all five args to the resolved handler and passes its result through', async () => {
+    const stats = makePlayerStats();
+    const action = makeAction({ type: 'save_only', saveType: 'DEX' });
+    const sentinel = { type: 'modal', modalName: 'savePrompt', payload: { saveType: 'DEX' } };
+    saveOnlyHandle.mockResolvedValueOnce(sentinel);
+
+    const result = await executeHandler(action, stats, campaignName, mapName, characters);
+
+    expect(saveOnlyHandle).toHaveBeenCalledTimes(1);
+    expect(saveOnlyHandle).toHaveBeenCalledWith(action, stats, campaignName, mapName, characters);
+    expect(saveOnlyHandle.mock.calls[0][0]).toBe(action); // single-object path forwards the ORIGINAL action, not a copy
+    expect(result).toBe(sentinel); // L744 identity pass-through
+  });
+
+  it('healing and self_healing share the same registered handler function', async () => {
+    const stats = makePlayerStats();
+    expect(await executeHandler(makeAction({ type: 'healing' }), stats, campaignName, mapName)).toEqual({ result: 'shared_healing' });
+    expect(await executeHandler(makeAction({ type: 'self_healing' }), stats, campaignName, mapName)).toEqual({ result: 'shared_healing' });
+    expect(healingHandle).toHaveBeenCalledTimes(2);
+    expect(healingHandle.mock.calls[1][0].automation.type).toBe('self_healing');
+  });
+});
+
+// ── error-catch composition (L745-748) ─────────────────────────────────────────
+
+describe('executeHandler — error catch (L745-748)', () => {
+  let originalConsoleError;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    originalConsoleError = console.error;
+    console.error = vi.fn();
   });
 
-  describe('null/early returns', () => {
-    it.each([
-      [null, 'null action'],
-      [undefined, 'undefined action'],
-      [{}, 'empty object'],
-      [{ automation: null }, 'null automation'],
-    ])('returns null for %s (%s)', async (action, _label) => {
-      expect(await executeHandler(action, makePlayerStats(), campaignName, mapName)).toBeNull();
-    });
-
-    it('returns null when action.automation.type is not in HANDLER_MAP', async () => {
-      const result = await executeHandler(
-        makeAction({ type: 'nonexistent_type' }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-      expect(result).toBeNull();
-    });
+  afterEach(() => {
+    console.error = originalConsoleError;
   });
 
-  describe('handler routing', () => {
-    it('routes a known handler type and returns its result', async () => {
-      const { handle: saveOnlyHandle } = await import('./handlers/combat/saveOnlyHandler.js');
-      saveOnlyHandle.mockResolvedValue({ result: 'save_only' });
+  it('catches an async rejection: exact console message, exact popup, popup helper bypassed', async () => {
+    const action = makeAction({ type: 'healing' });
+    action.name = 'Cure Wounds';
+    const err = new Error('boom');
+    healingHandle.mockRejectedValueOnce(err);
 
-      const action = makeAction({ type: 'save_only' });
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+    const result = await executeHandler(action, makePlayerStats(), campaignName, mapName, characters);
 
-      expect(saveOnlyHandle).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ result: 'save_only' });
+    expect(console.error).toHaveBeenCalledTimes(1);
+    expect(console.error).toHaveBeenCalledWith('[automation] Handler healing/undefined failed:', err);
+    expect(result).toEqual({
+      type: 'popup',
+      payload: { type: 'automation_info', name: 'Cure Wounds', description: 'Failed to execute Cure Wounds' },
     });
-
-    it('routes a shared handler (healing) used by multiple automation types', async () => {
-      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
-      healingHandle.mockResolvedValue({ result: 'shared_healing' });
-
-      const action = makeAction({ type: 'healing' });
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(healingHandle).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ result: 'shared_healing' });
-    });
-
-    it('routes a second type sharing the same handler (self_healing)', async () => {
-      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
-      healingHandle.mockResolvedValue({ result: 'shared_healing' });
-
-      const action = makeAction({ type: 'self_healing' });
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(healingHandle).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ result: 'shared_healing' });
-    });
+    expect(automationInfoPopup).not.toHaveBeenCalled(); // L747 composes inline, not via the helper
   });
 
-
-  describe('error handling', () => {
-    let originalConsoleError;
-
-    beforeEach(() => {
-      originalConsoleError = console.error;
-      console.error = vi.fn();
+  it('catches a sync throw via a passive_rule row and interpolates effect into the console message', async () => {
+    const action = makeAction({ type: 'passive_rule', effect: 'abjuration_savant' });
+    action.name = 'Savant Guard';
+    const err = new Error('sync boom');
+    savantHandle.mockImplementationOnce(() => {
+      throw err;
     });
 
-    afterEach(() => {
-      console.error = originalConsoleError;
-    });
+    const result = await executeHandler(action, makePlayerStats(), campaignName, mapName, characters);
 
-    it('returns a popup with action.name when handler throws', async () => {
-      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
-      const action = makeAction({ type: 'healing' });
-      action.name = 'Cure Wounds';
-      healingHandle.mockRejectedValue(new Error('boom'));
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe('Failed to execute Cure Wounds');
-    });
-  });
-
-  describe('spell_modifier handler', () => {
-    it('returns automation_info popup for non-Metamagic types', async () => {
-      const action = makeAction({ type: 'spell_modifier' });
-      action.name = 'Quickened Spell';
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Quickened Spell');
-    });
-
-    it('returns null for Metamagic type', async () => {
-      const action = makeAction({ type: 'spell_modifier' });
-      action.name = 'Metamagic';
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('damage_reduction handler', () => {
-    it('routes to protectiveField when automation.cost.resource is psionicEnergy', async () => {
-      const action = makeAction({
-        type: 'damage_reduction',
-        cost: { resource: 'psionicEnergy' },
-      });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.result).toBe('protective_field');
-    });
-
-    it.each([
-      [{ resource: 'something_else' }, 'other resource type'],
-      [undefined, 'missing cost'],
-      [{}],
-    ])('routes to damageReduction when cost is %s', async (cost, _label) => {
-      const action = makeAction({
-        type: 'damage_reduction',
-        cost,
-      });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.result).toBe('damage_reduction');
-    });
-  });
-
-  describe('auto array handling', () => {
-    it('selects passive_rule entry when it has a registered handler', async () => {
-      const action = {
-        name: 'Guarded Mind',
-        automation: [
-          { type: 'passive_rule', effect: 'abjuration_savant' },
-          { type: 'auto_reroll' },
-        ],
-      };
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toEqual({ result: 'savant' });
-    });
-
-    it('selects first entry with a registered handler when no passive_rule present', async () => {
-      const action = {
-        name: 'Test',
-        automation: [
-          { type: 'auto_reroll', action: 'Bonus Action' },
-          { type: 'auto_reroll' },
-        ],
-      };
-
-      const { handle: autoRerollHandle } = await import('./handlers/combat/autoRerollHandler.js');
-      autoRerollHandle.mockResolvedValue({ result: 'auto_reroll' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toEqual({ result: 'auto_reroll' });
-    });
-
-    it('returns null when auto array has no actionable entries', async () => {
-      const action = {
-        name: 'Test',
-        automation: [
-          { type: 'passive_rule', effect: 'unknown_savant' },
-          { type: 'unknown_type' },
-        ],
-      };
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when auto array is empty or contains only null entries', async () => {
-      const emptyAction = { name: 'Test', automation: [] };
-      expect(await executeHandler(emptyAction, makePlayerStats(), campaignName, mapName)).toBeNull();
-
-      const nullAction = { name: 'Test', automation: [null, null] };
-      expect(await executeHandler(nullAction, makePlayerStats(), campaignName, mapName)).toBeNull();
-    });
-
-    // CLA-192 regression: Eldritch Knight lv18 Improved War Magic declares
-    // automation [war_magic_cantrip, war_magic_spell(replacesWarMagic)].
-    // The spell half must dispatch so the row offers level 1-2 spells;
-    // previously automation[0] (the lv7 cantrip picker) always won.
-    it('dispatches the replacesWarMagic spell half over the cantrip half (CLA-192)', async () => {
-      const { handle: cantripHandle } = await import('./handlers/class-fighter-rogue/warMagicCantripHandler.js');
-      const { handle: spellHandle } = await import('./handlers/class-fighter-rogue/warMagicSpellHandler.js');
-
-      const action = {
-        name: 'Improved War Magic',
-        automation: [
-          { type: 'war_magic_cantrip', spellList: 'wizard_cantrips', action: 'action', casting_time: '1 action' },
-          { type: 'war_magic_spell', spellList: 'wizard_spells', maxSpellLevel: 2, action: 'action', casting_time: '1 action', replacesWarMagic: true },
-        ],
-      };
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toEqual({ result: 'war_magic_spell' });
-      expect(spellHandle).toHaveBeenCalledTimes(1);
-      expect(cantripHandle).not.toHaveBeenCalled();
-    });
-
-    it('still dispatches the cantrip half for base War Magic without replacesWarMagic', async () => {
-      const { handle: cantripHandle } = await import('./handlers/class-fighter-rogue/warMagicCantripHandler.js');
-
-      const action = {
-        name: 'War Magic',
-        automation: { type: 'war_magic_cantrip', spellList: 'wizard_cantrips', action: 'action', casting_time: '1 action' },
-      };
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toEqual({ result: 'war_magic_cantrip' });
-      expect(cantripHandle).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('passive_rule handler', () => {
-    it.each([
-      'abjuration_savant',
-      'divination_savant',
-      'evocation_savant',
-      'illusion_savant',
-    ])('routes %s passive_rule to savant handler', async (effect) => {
-      const action = makeAction({ type: 'passive_rule', effect });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toEqual({ result: 'savant' });
-    });
-
-    it.each([
-      ['unknown_savant', 'unknown effect'],
-      [undefined, 'no effect field'],
-    ])('returns null for passive_rule with %s', async (effect, _label) => {
-      const action = makeAction({ type: 'passive_rule', effect });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBeNull();
+    expect(console.error).toHaveBeenCalledWith('[automation] Handler passive_rule/abjuration_savant failed:', err);
+    expect(result).toEqual({
+      type: 'popup',
+      payload: { type: 'automation_info', name: 'Savant Guard', description: 'Failed to execute Savant Guard' },
     });
   });
 });
 
-// ── SP-042 Eyebite regression ─────────────────────────────────────
-// Reported: casting Eyebite produced no effect (handler never invoked,
-// an info popup shown instead of the effect modal). Separately, the spell
-// data was missing saveDc, so the WIS save DC fell back to the default 10.
+// ── generic auto-array scan (L716-734) — NOT the CLA-229 prefer (#1995) ──────
 
-describe('SP-042 Eyebite regression', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe('executeHandler — generic auto-array scan (L716-734)', () => {
+  it('skips unregistered types and null entries, dispatches the first actionable entry', async () => {
+    const action = { name: 'Scan', automation: [{ type: 'unknown_type' }, null, { type: 'auto_reroll', action: 'action' }] };
+
+    expect(await executeHandler(action, makePlayerStats(), campaignName, mapName)).toEqual({ result: 'auto_reroll' });
+    expect(autoRerollHandle).toHaveBeenCalledTimes(1);
   });
 
-  it('routes type:eyebite to the eyebite handler and returns the eyebiteEffect modal', async () => {
-    const { handle: handleEyebite } = await import('./handlers/spells/eyebiteHandler.js');
+  it('inside an array, a registered entry WITHOUT casting_time/action/trigger is not actionable', async () => {
+    const action = { name: 'Scan', automation: [{ type: 'healing' }, { type: 'auto_reroll', casting_time: '1 action' }] };
 
-    const action = makeAction({
-      type: 'eyebite',
-      saveType: 'WIS',
-      saveDc: 'spell_save_dc',
-      range: '60 ft',
-      duration: '1_minute',
-    });
+    expect(await executeHandler(action, makePlayerStats(), campaignName, mapName)).toEqual({ result: 'auto_reroll' });
+    expect(healingHandle).not.toHaveBeenCalled();
+  });
+
+  it('a bare single-object automation still dispatches — the actionable filter is array-only', async () => {
+    const action = makeAction({ type: 'healing' });
+
+    expect(await executeHandler(action, makePlayerStats(), campaignName, mapName)).toEqual({ result: 'shared_healing' });
+    expect(healingHandle).toHaveBeenCalledTimes(1);
+  });
+
+  it('generic ordering: the first actionable entry wins', async () => {
+    const action = { name: 'Order', automation: [{ type: 'auto_reroll', action: 'action' }, { type: 'healing', action: 'action' }] };
+
+    expect(await executeHandler(action, makePlayerStats(), campaignName, mapName)).toEqual({ result: 'auto_reroll' });
+    expect(healingHandle).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['unregistered passive_rule is skipped, next actionable dispatches', [{ type: 'passive_rule', effect: 'unknown_savant' }, { type: 'auto_reroll', action: 'action' }], { result: 'auto_reroll' }],
+    ['registered passive_rule is actionable without casting_time', [{ type: 'passive_rule', effect: 'divination_savant' }], { result: 'savant' }],
+  ])('array filter %s (L719-720)', async (_label, automation, expected) => {
+    expect(await executeHandler({ name: 'Passive Scan', automation }, makePlayerStats(), campaignName, mapName)).toEqual(expected);
+  });
+
+  // CLA-192 regression: Eldritch Knight lv18 Improved War Magic declares
+  // automation [war_magic_cantrip, war_magic_spell(replacesWarMagic)]. The spell
+  // half must dispatch so the row offers level 1-2 spells; previously automation[0]
+  // (the lv7 cantrip picker) always won.
+  it('CLA-192: the replacesWarMagic half is preferred over the leading cantrip half', async () => {
+    const cantrip = { type: 'war_magic_cantrip', spellList: 'wizard_cantrips', action: 'action', casting_time: '1 action' };
+    const spell = { type: 'war_magic_spell', spellList: 'wizard_spells', maxSpellLevel: 2, action: 'action', casting_time: '1 action', replacesWarMagic: true };
+    const action = { name: 'Improved War Magic', automation: [cantrip, spell] };
+
+    const result = await executeHandler(action, makePlayerStats(), campaignName, mapName, characters);
+
+    expect(result).toEqual({ result: 'war_magic_spell' });
+    expect(spellHandle).toHaveBeenCalledTimes(1);
+    expect(cantripHandle).not.toHaveBeenCalled();
+    // L732: forwarded action spreads the ORIGINAL but swaps automation to the selected row
+    expect(spellHandle.mock.calls[0][0].automation).toBe(spell);
+    expect(spellHandle.mock.calls[0][4]).toBe(characters);
+  });
+
+  it('CLA-192: replacesWarMagic on a NON-actionable entry cannot win — cantrip half still dispatches', async () => {
+    // The prefer at L722 queries `actionable`, never the raw array.
+    const action = {
+      name: 'Improved War Magic',
+      automation: [
+        { type: 'war_magic_cantrip', spellList: 'wizard_cantrips', action: 'action', casting_time: '1 action' },
+        { type: 'war_magic_spell', replacesWarMagic: true }, // no action/casting_time/trigger → filtered out
+      ],
+    };
+
+    expect(await executeHandler(action, makePlayerStats(), campaignName, mapName)).toEqual({ result: 'war_magic_cantrip' });
+    expect(spellHandle).not.toHaveBeenCalled();
+  });
+
+  it('CLA-192 control: base War Magic single-object automation dispatches the cantrip half', async () => {
+    const action = makeAction({ type: 'war_magic_cantrip', spellList: 'wizard_cantrips', action: 'action', casting_time: '1 action' });
+
+    expect(await executeHandler(action, makePlayerStats(), campaignName, mapName)).toEqual({ result: 'war_magic_cantrip' });
+    expect(cantripHandle).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── passive_rule route mechanics (L676-677, PASSIVE_RULE_EFFECTS L290-297) ────
+
+describe('executeHandler — passive_rule route (full PASSIVE_RULE_EFFECTS table)', () => {
+  it.each([
+    ['abjuration_savant', 'Abjuration'],
+    ['divination_savant', 'Divination'],
+    ['evocation_savant', 'Evocation'],
+    ['illusion_savant', 'Illusion'],
+  ])('routes %s to SavantHandler with school %s as the 5th arg (wrapper drops characters)', async (effect, school) => {
+    const action = makeAction({ type: 'passive_rule', effect });
+    const stats = makePlayerStats();
+
+    const result = await executeHandler(action, stats, campaignName, mapName, characters);
+
+    expect(savantHandle).toHaveBeenCalledTimes(1);
+    expect(savantHandle).toHaveBeenCalledWith(action, stats, campaignName, mapName, school);
+    expect(result).toEqual({ result: 'savant' });
+  });
+
+  it('routes persistent_rage straight to persistentRageHandler with all five args', async () => {
+    const action = makeAction({ type: 'passive_rule', effect: 'persistent_rage' });
+    const stats = makePlayerStats();
+
+    const result = await executeHandler(action, stats, campaignName, mapName, characters);
+
+    expect(persistentRageHandle).toHaveBeenCalledWith(action, stats, campaignName, mapName, characters);
+    expect(result).toEqual({ result: 'persistent_rage' });
+  });
+
+  it('routes superior_defense straight to superiorDefenseHandler with all five args', async () => {
+    const action = makeAction({ type: 'passive_rule', effect: 'superior_defense' });
+    const stats = makePlayerStats();
+
+    const result = await executeHandler(action, stats, campaignName, mapName, characters);
+
+    expect(superiorDefenseHandle).toHaveBeenCalledWith(action, stats, campaignName, mapName, characters);
+    expect(result).toEqual({ result: 'superior_defense' });
+  });
+
+  it('table miss (unknown or missing effect) falls through HANDLER_MAP.passive_rule (absent) → null', async () => {
+    expect(await executeHandler(makeAction({ type: 'passive_rule', effect: 'unknown_savant' }), makePlayerStats(), campaignName, mapName)).toBeNull();
+    expect(await executeHandler(makeAction({ type: 'passive_rule' }), makePlayerStats(), campaignName, mapName)).toBeNull();
+    expect(savantHandle).not.toHaveBeenCalled();
+    expect(persistentRageHandle).not.toHaveBeenCalled();
+    expect(superiorDefenseHandle).not.toHaveBeenCalled();
+  });
+});
+
+// ── spell_modifier inline dispatcher (L334) ────────────────────────────────────
+
+describe('executeHandler — spell_modifier dispatcher (L334)', () => {
+  it('returns null for name === "Metamagic" WITHOUT invoking automationInfoPopup', async () => {
+    const action = makeAction({ type: 'spell_modifier' });
+    action.name = 'Metamagic';
+
+    expect(await executeHandler(action, makePlayerStats(), campaignName, mapName)).toBeNull();
+    expect(automationInfoPopup).not.toHaveBeenCalled();
+  });
+
+  it('any other name delegates to automationInfoPopup(action) and passes its return through', async () => {
+    const action = makeAction({ type: 'spell_modifier' });
+    action.name = 'Quickened Spell';
 
     const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
-    expect(handleEyebite).toHaveBeenCalledTimes(1);
-    expect(result.type).toBe('modal');
-    expect(result.modalName).toBe('eyebiteEffect');
+    expect(automationInfoPopup).toHaveBeenCalledTimes(1);
+    expect(automationInfoPopup).toHaveBeenCalledWith(action);
+    expect(result).toEqual({
+      type: 'popup',
+      payload: { type: 'automation_info', name: 'SENTINEL', automationType: 'spell_modifier', description: 'popup pass-through' },
+    });
   });
 
-  function readEyebiteAutomation(dataFile) {
-    const spells = JSON.parse(readFileSync(resolve(process.cwd(), dataFile), 'utf8'));
-    return spells.find((s) => s.index === 'eyebite')?.automation;
-  }
+  it('comparison is strict equality: lowercase "metamagic" gets the popup, not null', async () => {
+    const action = makeAction({ type: 'spell_modifier' });
+    action.name = 'metamagic';
+
+    const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+    expect(result.type).toBe('popup');
+    expect(automationInfoPopup).toHaveBeenCalledWith(action);
+  });
+});
+
+// ── damage_reduction inline dispatcher (L341-347) ──────────────────────────────
+
+describe('executeHandler — damage_reduction dispatcher (L341-347)', () => {
+  it('cost.resource psionicEnergy steers to protectiveFieldHandler (dispatcher arrow forwards 4 — drops characters, arity benign)', async () => {
+    const action = makeAction({ type: 'damage_reduction', cost: { resource: 'psionicEnergy' } });
+    const stats = makePlayerStats();
+
+    const result = await executeHandler(action, stats, campaignName, mapName, characters);
+
+    expect(protectiveFieldHandle).toHaveBeenCalledWith(action, stats, campaignName, mapName); // L341 arrow has 4 params; characters dropped before invoke
+    expect(damageReductionHandle).not.toHaveBeenCalled();
+    expect(result).toEqual({ result: 'protective_field' });
+  });
+
+  it.each([
+    ['another resource', { resource: 'ki' }],
+    ['empty cost object', {}],
+    ['undefined cost', undefined],
+  ])('cost %s falls through to damageReductionHandler', async (_label, cost) => {
+    const action = makeAction({ type: 'damage_reduction', cost });
+
+    const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+    expect(damageReductionHandle).toHaveBeenCalledTimes(1);
+    expect(protectiveFieldHandle).not.toHaveBeenCalled();
+    expect(result).toEqual({ result: 'damage_reduction' });
+  });
+});
+
+// ── SP-042 Eyebite regression (kept: sole home for dispatch row + saveDc fix) ──
+// Reported: casting Eyebite produced no effect (handler never invoked, an info
+// popup shown instead of the effect modal). Separately, the spell data was missing
+// saveDc, so the WIS save DC fell back to the default 10.
+
+describe('SP-042 Eyebite row (L527)', () => {
+  it('routes type:eyebite via the table fallthrough to its handler and returns the modal', async () => {
+    const action = makeAction({ type: 'eyebite', saveType: 'WIS', saveDc: 'spell_save_dc', range: '60 ft', duration: '1_minute' });
+    const stats = makePlayerStats();
+
+    const result = await executeHandler(action, stats, campaignName, mapName);
+
+    expect(eyebiteHandle).toHaveBeenCalledTimes(1);
+    expect(eyebiteHandle).toHaveBeenCalledWith(action, stats, campaignName, mapName, undefined); // 4-arg caller: characters forwarded as undefined (arity benign)
+    expect(result).toEqual({ type: 'modal', modalName: 'eyebiteEffect', payload: { saveDc: 17 } });
+  });
 
   it.each([
     'public/data/spells.json',
     'public/data/2024/spells.json',
   ])('declares saveDc: spell_save_dc for Eyebite in %s', (dataFile) => {
-    const automation = readEyebiteAutomation(dataFile);
+    const spells = JSON.parse(readFileSync(resolve(process.cwd(), dataFile), 'utf8'));
+    const automation = spells.find((s) => s.index === 'eyebite')?.automation;
 
     expect(automation).toBeDefined();
     expect(automation.saveType).toBe('WIS');
     expect(automation.saveDc).toBe('spell_save_dc');
-  });
-});
-
-// ── SP-056 Grease regression ─────────────────────────────────────
-// Bug: Grease could not be verified because no character had the spell
-// in their spell list. The automation implementation was correct but
-// the test campaign lacked a valid caster (Sorcerer/Wizard with Grease).
-// Fix: Added Grease to DivinationWizard's spell list in test-campaign.
-// Verified live via playwright-mcp: spell cast modal appeared with
-// DEX save DC 17 and prone condition description, and the action was
-// logged in the campaign log.
-
-describe('SP-056 Grease regression', () => {
-  function readGreaseAutomation(dataFile) {
-    const spells = JSON.parse(readFileSync(resolve(process.cwd(), dataFile), 'utf8'));
-    return spells.find((s) => s.index === 'grease');
-  }
-
-  it('has grease spell data in 2024 ruleset with save_only automation', () => {
-    const spell = readGreaseAutomation('public/data/2024/spells.json');
-
-    expect(spell).toBeDefined();
-    expect(spell.name).toBe('Grease');
-    expect(spell.level).toBe(1);
-    expect(spell.automation).toBeDefined();
-    expect(spell.automation.type).toBe('save_only');
-    expect(spell.automation.saveType).toBe('DEX');
-  });
-
-  it('has grease spell data in 5e ruleset with save_attack automation array', () => {
-    const spell = readGreaseAutomation('public/data/spells.json');
-
-    expect(spell).toBeDefined();
-    expect(spell.name).toBe('Grease');
-    expect(spell.level).toBe(1);
-    expect(Array.isArray(spell.automation)).toBe(true);
-    expect(spell.automation.length).toBe(2);
-    expect(spell.automation[0].type).toBe('save_attack');
-    expect(spell.automation[1].type).toBe('grease_area_save');
-  });
-
-  it('has grease automation with prone fail effect in 2024 ruleset', () => {
-    const spell = readGreaseAutomation('public/data/2024/spells.json');
-
-    expect(spell.automation.effects).toBeDefined();
-    expect(spell.automation.effects.fail).toBeDefined();
-    expect(spell.automation.effects.fail[0].condition).toBe('prone');
-  });
-
-  it('has grease area_of_effect in 2024 ruleset', () => {
-    const spell = readGreaseAutomation('public/data/2024/spells.json');
-
-    expect(spell.area_of_effect).toBeDefined();
-    expect(spell.area_of_effect.shape).toBe('square');
-    expect(spell.area_of_effect.size).toBe('10-foot');
-  });
-
-  it('has grease area_of_effect in 5e ruleset (cube, numeric size)', () => {
-    const spell = readGreaseAutomation('public/data/spells.json');
-
-    expect(spell.area_of_effect).toBeDefined();
-    expect(spell.area_of_effect.type).toBe('cube');
-    expect(spell.area_of_effect.size).toBe(10);
-  });
-
-  it('grease is available to Wizard and Sorcerer classes in 2024 ruleset', () => {
-    const spell = readGreaseAutomation('public/data/2024/spells.json');
-
-    expect(spell.classes).toContain('Wizard');
-    expect(spell.classes).toContain('Sorcerer');
-  });
-
-  it('grease is available to Wizard class in 5e ruleset', () => {
-    const spell = readGreaseAutomation('public/data/spells.json');
-
-    expect(spell.classes).toContain('Wizard');
-  });
-
-  it('grease has correct range and duration in 2024 ruleset', () => {
-    const spell = readGreaseAutomation('public/data/2024/spells.json');
-
-    expect(spell.range).toBe('60 feet');
-    expect(spell.duration).toBe('1 minute');
-  });
-
-  it('grease has correct range and duration in 5e ruleset', () => {
-    const spell = readGreaseAutomation('public/data/spells.json');
-
-    expect(spell.range).toBe('60 feet');
-    expect(spell.duration).toBe('1 minute');
   });
 });

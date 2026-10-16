@@ -242,8 +242,8 @@ describe('stinkingCloudHandler', () => {
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('1 creature(s) saved');
-      expect(result.payload.description).toContain('No creatures affected');
+      // Full-string own-composition pin — empty immune slot leaves a trailing space.
+      expect(result.payload.description).toBe('No creatures affected by Stinking Cloud. 1 creature(s) saved. ');
     });
   });
 
@@ -367,9 +367,11 @@ describe('stinkingCloudHandler', () => {
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('Poisoned');
-      expect(result.payload.description).toContain('1 creature(s)');
-      expect(result.payload.description).toContain('end of their current turn');
+      // Full-string own-composition pin (buildStinkingCloudSummary, cast lane):
+      // the empty immune slot renders as the double space before "Affected".
+      expect(result.payload.description).toBe(
+        'Stinking Cloud affects 1 creature(s). EnemyGoblin is Poisoned. 0 creature(s) saved.  Affected creatures are Poisoned (can\'t take Actions or Bonus Actions) until the end of their current turn.'
+      );
     });
   });
 
@@ -506,8 +508,8 @@ describe('stinkingCloudHandler', () => {
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('2 creature(s) saved');
-      expect(result.payload.description).toContain('No creatures affected');
+      // Full-string own-composition pin — empty immune slot leaves a trailing space.
+      expect(result.payload.description).toBe('No creatures affected by Stinking Cloud. 2 creature(s) saved. ');
     });
   });
 
@@ -736,6 +738,109 @@ describe('stinkingCloudHandler', () => {
           }),
         }),
         campaignName,
+      );
+    });
+  });
+
+  // ── SP-111 cast-time wires (inherited from areaSave lane #1973 seam map,
+  // trimmed out of it 2026-10-16 — never re-add there) ──────────────────
+  describe('SP-111 cast-time zone wires', () => {
+    it('writes the _stinkingCloud_<caster> tracking store on cast (saveDc/saveType CON/radius 20/mapName)', async () => {
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      createSaveListener.mockReturnValue({
+        promptId: 'goblin-prompt',
+        promise: Promise.resolve({ success: true }),
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, 'test-map');
+
+      // Exact-key pin: consumer processStinkingCloudAreaSave reads this store
+      // at every turn start (expireStaleEffects Phase 4). timestamp is
+      // write-metadata, not a game clock — excluded.
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestWizard',
+        '_stinkingCloud_TestWizard',
+        expect.objectContaining({
+          caster: 'TestWizard',
+          mapName: 'test-map',
+          campaignName,
+          saveDc: 13,
+          saveType: 'CON',
+          radius: 20,
+          duration: 'Concentration, up to 1 minute',
+        }),
+        campaignName,
+      );
+    });
+
+    it('registers the zone expiration with rounds:10 (CLA-334 minutes→rounds×10, matured at initiative seams)', async () => {
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      createSaveListener.mockReturnValue({
+        promptId: 'goblin-prompt',
+        promise: Promise.resolve({ success: true }),
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      // 'Concentration, up to 1 minute' → 10 rounds (round counter, never a
+      // wall-clock timer): clears zone tracking + both zone-sourced tes.
+      expect(addExpiration).toHaveBeenCalledWith({
+        attackerName: 'TestWizard',
+        targetName: 'TestWizard',
+        effects: [
+          { type: 'clear_runtime_value', creatureName: 'TestWizard', key: '_stinkingCloud_TestWizard' },
+          { type: 'remove_target_effect', effectKey: 'stinking_cloud', source: 'TestWizard' },
+          { type: 'remove_target_effect', effectKey: 'no_action_and_bonus_action', source: 'TestWizard' },
+        ],
+        campaignName,
+        rounds: 10,
+      });
+    });
+
+    it('encodes explicit duration strings: minutes ×10, rounds verbatim', async () => {
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      createSaveListener.mockReturnValue({
+        promptId: 'goblin-prompt',
+        promise: Promise.resolve({ success: true }),
+      });
+
+      await handle(makeAction({ duration: '2_minutes' }), makePlayerStats(), campaignName, null);
+      await handle(makeAction({ duration: '3_rounds' }), makePlayerStats(), campaignName, null);
+
+      const zoneCalls = addExpiration.mock.calls.map(([arg]) => arg).filter(arg => arg.rounds !== undefined);
+      expect(zoneCalls.map(arg => arg.rounds)).toEqual([20, 3]);
+    });
+
+    it('writes the cast-time block te through registerTargetEffect with skipSync=true on a failed save', async () => {
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      getRuntimeValue.mockImplementation((key, field) => {
+        if (key === 'campaign' && field === 'targetEffects') return [];
+        return [];
+      });
+      createSaveListener.mockReturnValue({
+        promptId: 'goblin-prompt',
+        promise: Promise.resolve({ success: false }),
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      // 5-arg pin distinguishes the REAL registerTargetEffect write
+      // (targetEffectDefinitions.js:1505, skipSync=true — server already
+      // persists; SSE-echo safe) from this lane's own 4-arg stinking_cloud
+      // marker write above. Shed by applyStinkingCloudTurnEnd at turn end.
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'campaign',
+        'targetEffects',
+        expect.arrayContaining([
+          expect.objectContaining({
+            target: 'EnemyGoblin',
+            effect: 'no_action_and_bonus_action',
+            source: 'TestWizard',
+            duration: 'until_end_of_current_turn',
+          }),
+        ]),
+        campaignName,
+        true,
       );
     });
   });

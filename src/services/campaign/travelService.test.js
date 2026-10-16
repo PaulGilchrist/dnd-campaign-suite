@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   TERRAIN_MOVE_COST,
   TRAVEL_PACES,
+  MAX_TRAVEL_HOURS_PER_DAY,
+  HORSEBACK_SPEED_MULTIPLIER,
+  EXHAUSTION_SPEED_MULTIPLIER,
+  EXHAUSTION_LEVELS,
   applyExhaustionSpeedPenalty,
   applyExhaustionSpeedPenaltyToBudget,
   getExhaustionMultiplierPercent,
@@ -17,7 +21,7 @@ import {
 
 describe('travelService', () => {
   describe('constants', () => {
-    it('should export TERRAIN_MOVE_COST, TRAVEL_PACES, and movement constants', () => {
+    it('should export TERRAIN_MOVE_COST with RAW-ish per-terrain move costs', () => {
       expect(TERRAIN_MOVE_COST).toEqual({
         plains: 0.75,
         hills: 1,
@@ -29,13 +33,31 @@ describe('travelService', () => {
         beach: 1,
         water: 4,
       });
+    });
+
+    it('should pin the movement scalars used across the travel domain', () => {
+      expect(MAX_TRAVEL_HOURS_PER_DAY).toBe(8);
+      expect(HORSEBACK_SPEED_MULTIPLIER).toBe(2);
+      expect(EXHAUSTION_LEVELS).toBe(6);
+      // 5/6 speed per exhaustion stack (homebrew: forced-march hours stack as levels
+      // in useTravelManagement, each costing 1/6 of remaining budget/speed)
+      expect(EXHAUSTION_SPEED_MULTIPLIER).toBeCloseTo(5 / 6, 10);
+    });
+
+    it('should define slow/normal/fast paces with full perception and encounter modifiers', () => {
       expect(TRAVEL_PACES).toHaveLength(3);
       const byId = Object.fromEntries(TRAVEL_PACES.map(p => [p.id, p]));
       expect(byId).toMatchObject({
-        slow: { hexesPerHour: 1 / 3, hoursPerHex: 3 },
-        normal: { hexesPerHour: 1 / 2, hoursPerHex: 2 },
-        fast: { hexesPerHour: 2 / 3, hoursPerHex: 1.5 },
+        slow: { hexesPerHour: 1 / 3, hoursPerHex: 3, perception: 5, stealthAdvantage: true, encounterMod: -2 },
+        normal: { hexesPerHour: 1 / 2, hoursPerHex: 2, perception: 0, stealthAdvantage: false, encounterMod: 0 },
+        fast: { hexesPerHour: 2 / 3, hoursPerHex: 1.5, perception: -5, stealthAdvantage: false, encounterMod: 2 },
       });
+    });
+
+    it('should keep each pace internally consistent (hexesPerHour is the inverse of hoursPerHex)', () => {
+      for (const pace of TRAVEL_PACES) {
+        expect(1 / pace.hexesPerHour).toBeCloseTo(pace.hoursPerHex, 10);
+      }
     });
   });
 
@@ -46,9 +68,10 @@ describe('travelService', () => {
       expect(applyExhaustionSpeedPenalty(0, 5)).toBe(0);
     });
 
-    it('should increase cost as exhaustion stacks grow', () => {
-      expect(applyExhaustionSpeedPenalty(10, 1)).toBe(10 / (5 / 6));
-      expect(applyExhaustionSpeedPenalty(10, 3)).toBe(10 / Math.pow(5 / 6, 3));
+    it('should inflate cost by (6/5)^stacks as exhaustion grows', () => {
+      // 10 / (5/6) = 12 exactly; 10 / (5/6)^3 = 10 * 1.728 = 17.28
+      expect(applyExhaustionSpeedPenalty(10, 1)).toBe(12);
+      expect(applyExhaustionSpeedPenalty(10, 3)).toBeCloseTo(17.28, 6);
     });
   });
 
@@ -59,30 +82,34 @@ describe('travelService', () => {
       expect(applyExhaustionSpeedPenaltyToBudget(0, 5)).toBe(0);
     });
 
-    it('should decrease budget with exhaustion stacks (floored)', () => {
-      expect(applyExhaustionSpeedPenaltyToBudget(12, 1)).toBe(Math.floor(Math.pow(5 / 6, 1) * 12));
-      expect(applyExhaustionSpeedPenaltyToBudget(12, 2)).toBe(Math.floor(Math.pow(5 / 6, 2) * 12));
+    it('should shrink budget per stack with floor (12 hexes: 10, 8, 6 at 1-3 stacks)', () => {
+      expect(applyExhaustionSpeedPenaltyToBudget(12, 1)).toBe(10); // floor(10.0)
+      expect(applyExhaustionSpeedPenaltyToBudget(12, 2)).toBe(8);  // floor(8.33)
+      expect(applyExhaustionSpeedPenaltyToBudget(12, 3)).toBe(6);  // floor(6.94)
     });
   });
 
   describe('getExhaustionMultiplierPercent', () => {
-    it('should return 100 for zero stacks and decreasing percentage for higher stacks', () => {
+    it('should return 100 at 0 stacks and rounded-down-ish percentages for higher stacks', () => {
       expect(getExhaustionMultiplierPercent(0)).toBe(100);
-      expect(getExhaustionMultiplierPercent(1)).toBe(Math.round(5 / 6 * 100));
-      expect(getExhaustionMultiplierPercent(6)).toBe(33);
+      expect(getExhaustionMultiplierPercent(1)).toBe(83); // round(83.33)
+      expect(getExhaustionMultiplierPercent(2)).toBe(69); // round(69.44)
+      expect(getExhaustionMultiplierPercent(6)).toBe(33); // round(33.49)
     });
   });
 
   describe('getHexTravelTime', () => {
-    it('should return null for invalid pace and NaN for unknown terrain', () => {
+    it('should return null for invalid pace and NaN for unknown terrain (source quirk: guards on === null, lookup yields undefined)', () => {
       expect(getHexTravelTime('plains', 'invalid')).toBeNull();
       expect(Number.isNaN(getHexTravelTime('unknown', 'normal'))).toBe(true);
     });
 
-    it('should return correct time for pace x terrain and halve for horseback', () => {
-      expect(getHexTravelTime('plains', 'normal')).toBe(2 * 0.75);
-      expect(getHexTravelTime('mountains', 'slow')).toBe(3 * 2);
-      expect(getHexTravelTime('plains', 'normal', true)).toBe((2 * 0.75) / 2);
+    it('should compute pace hoursPerHex x terrain cost and halve for horseback', () => {
+      expect(getHexTravelTime('plains', 'normal')).toBe(1.5);   // 2 x 0.75
+      expect(getHexTravelTime('mountains', 'slow')).toBe(6);     // 3 x 2
+      expect(getHexTravelTime('forest', 'fast')).toBe(1.5);      // 1.5 x 1
+      expect(getHexTravelTime('plains', 'normal', true)).toBe(0.75); // 1.5 / 2
+      expect(getHexTravelTime('mountains', 'fast', true)).toBe(1.5); // 1.5 x 2 / 2
     });
   });
 
@@ -90,6 +117,12 @@ describe('travelService', () => {
     it('should return null for unknown or undefined terrain', () => {
       expect(getHexMoveCost('unknown')).toBeNull();
       expect(getHexMoveCost(undefined)).toBeNull();
+    });
+
+    it('should return the registry cost for known terrains', () => {
+      expect(getHexMoveCost('plains')).toBe(0.75);
+      expect(getHexMoveCost('mountains')).toBe(2);
+      expect(getHexMoveCost('water')).toBe(4);
     });
   });
 
@@ -111,6 +144,11 @@ describe('travelService', () => {
       expect(isHexOnRoad(5, 6, roads)).toBe(true);
       expect(isHexOnRoad(9, 10, roads)).toBe(false);
     });
+
+    it('should tolerate road entries without a hexes array', () => {
+      expect(isHexOnRoad(1, 2, [{}, { hexes: ['1,2'] }])).toBe(true);
+      expect(isHexOnRoad(1, 2, [{}])).toBe(false);
+    });
   });
 
   describe('getHexMoveCostWithRoad', () => {
@@ -119,13 +157,16 @@ describe('travelService', () => {
       expect(getHexMoveCostWithRoad('plains', 1, 2, null)).toBe(0.75);
     });
 
-    it('should reduce cost by 0.5 when on road with minimum of 1', () => {
+    it('should cut road cost by 0.5 but never below the floor of 1', () => {
       const roads = [{ hexes: ['1,2'] }];
-      expect(getHexMoveCostWithRoad('plains', 1, 2, roads)).toBe(1);
-      expect(getHexMoveCostWithRoad('mountains', 1, 2, roads)).toBe(1.5);
+      // quirk: floor of 1 makes roads on cheap terrain (plains 0.75) SLOWER off-road
+      expect(getHexMoveCostWithRoad('plains', 1, 2, roads)).toBe(1);   // floor lift from 0.25
+      expect(getHexMoveCostWithRoad('hills', 1, 2, roads)).toBe(1);    // floor lift from 0.5
+      expect(getHexMoveCostWithRoad('swamp', 1, 2, roads)).toBe(1);    // 1.5 - 0.5
+      expect(getHexMoveCostWithRoad('mountains', 1, 2, roads)).toBe(1.5); // 2 - 0.5
     });
 
-    it('should return NaN for unknown terrain even on road', () => {
+    it('should return NaN for unknown terrain even on road (guards on === null)', () => {
       const roads = [{ hexes: ['1,2'] }];
       expect(Number.isNaN(getHexMoveCostWithRoad('unknown', 1, 2, roads))).toBe(true);
     });
@@ -133,6 +174,7 @@ describe('travelService', () => {
 
   describe('getDailyHexBudget', () => {
     it('should return the correct hex budget for each pace and null for invalid', () => {
+      // floor(hexesPerHour x 8h): slow floor(2.67)=2, normal floor(4)=4, fast floor(5.33)=5
       expect(getDailyHexBudget('slow')).toBe(2);
       expect(getDailyHexBudget('normal')).toBe(4);
       expect(getDailyHexBudget('fast')).toBe(5);
@@ -147,12 +189,28 @@ describe('travelService', () => {
       expect(getTotalTravelTime(undefined)).toEqual({ hours: 0, days: 0 });
     });
 
-    it('should sum travel time across multiple hexes and calculate days', () => {
+    it('should sum cost/3 hours per hex and derive days at 8 travel-hours', () => {
       const path = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 1, r: 1 }];
       const terrain = { '0,0': 'plains', '1,0': 'hills', '1,1': 'forest' };
       const result = getTotalTravelTime(path, terrain);
-      expect(result.hours).toBeCloseTo((0.75 + 1 + 1) / 3);
-      expect(result.days).toBeCloseTo(result.hours / 8);
+      // NOTE: this is the service's own rate (cost units / 3 hours), which does NOT
+      // agree with getHexTravelTime at 'normal' pace (hoursPerHex 2 x cost) — flagged upstream.
+      expect(result.hours).toBeCloseTo(2.75 / 3, 6); // 0.75 + 1 + 1 cost units
+      expect(result.days).toBeCloseTo(2.75 / 3 / 8, 6);
+    });
+
+    it('should halve hours for horseback', () => {
+      const path = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 1, r: 1 }];
+      const terrain = { '0,0': 'plains', '1,0': 'hills', '1,1': 'forest' };
+      const result = getTotalTravelTime(path, terrain, true);
+      expect(result.hours).toBeCloseTo(2.75 / 3 / 2, 6);
+      expect(result.days).toBeCloseTo(2.75 / 3 / 2 / 8, 6);
+    });
+
+    it('should fall back to DEFAULT_TERRAIN (plains, cost 0.75) for hexes missing from the terrain map', () => {
+      const result = getTotalTravelTime([{ q: 9, r: 9 }], {});
+      expect(result.hours).toBe(0.25); // 0.75 / 3
+      expect(result.days).toBe(0.03125);
     });
   });
 
@@ -184,9 +242,11 @@ describe('travelService', () => {
       const result = calculatePath({ q: 0, r: 0 }, { q: 4, r: 0 }, { hexCols: 5, hexRows: 5, terrain, roads: [] });
       const mountainHexes = result.filter(h => terrain[`${h.q},${h.r}`] === 'mountains');
       expect(mountainHexes.length).toBe(0);
+      expect(result[0]).toEqual({ q: 0, r: 0 });
+      expect(result[result.length - 1]).toEqual({ q: 4, r: 0 });
     });
 
-    it('should respect grid boundaries and use roads when provided', () => {
+    it('should respect grid boundaries', () => {
       const result = calculatePath({ q: 0, r: 0 }, { q: 3, r: 3 }, { hexCols: 5, hexRows: 5, terrain: {}, roads: [] });
       for (const hex of result) {
         expect(hex.q).toBeGreaterThanOrEqual(0);
@@ -194,10 +254,21 @@ describe('travelService', () => {
         expect(hex.r).toBeGreaterThanOrEqual(0);
         expect(hex.r).toBeLessThan(5);
       }
+    });
+
+    it('should route straight along cheap plains road when it is the shortest lane', () => {
+      // Road cost on plains floors to 1 (vs 0.75 off-road), but any detour costs
+      // more in total steps + cost, so the straight road lane wins deterministically.
       const roads = [{ hexes: ['1,0', '2,0', '3,0'] }];
       const terrain = { '1,0': 'plains', '2,0': 'plains', '3,0': 'plains' };
-      const roadResult = calculatePath({ q: 0, r: 0 }, { q: 4, r: 0 }, { hexCols: 10, hexRows: 10, terrain, roads });
-      expect(roadResult.length).toBeGreaterThan(0);
+      const result = calculatePath({ q: 0, r: 0 }, { q: 4, r: 0 }, { hexCols: 10, hexRows: 10, terrain, roads });
+      expect(result).toEqual([
+        { q: 0, r: 0 },
+        { q: 1, r: 0 },
+        { q: 2, r: 0 },
+        { q: 3, r: 0 },
+        { q: 4, r: 0 },
+      ]);
     });
 
     it('should return empty array when destination is unreachable', () => {

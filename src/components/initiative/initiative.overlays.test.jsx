@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockFetchSpellOverlays = vi.fn();
@@ -121,20 +121,28 @@ describe('Initiative overlay loading', () => {
 
         render(<Initiative {...props} />);
 
-        await waitFor(() => {
-            expect(mockFetchSpellOverlays).toHaveBeenCalledWith('test-campaign');
-        });
-        await waitFor(() => {
-            expect(screen.getByTestId('overlay-count-Alice')).toHaveTextContent('1');
-        });
+        // Deterministic flush instead of polling waitFor: the mount effect
+        // invokes the fetch synchronously and its pre-resolved fake settles
+        // in microtasks, so act() drains the whole chain (fetch .then →
+        // setOverlays, loadCombatSummary → setCombatSummary → card render)
+        // without jsdom timer ticks — which starve past waitFor's 1000ms
+        // window under full-suite parallel load (batch-run flake, 2026-10).
+        await act(async () => {});
+
+        expect(mockFetchSpellOverlays).toHaveBeenCalledWith('test-campaign');
+        expect(screen.getByTestId('overlay-count-Alice')).toHaveTextContent('1');
     });
 
     it('shows no overlay options when the server has none', async () => {
         render(<Initiative {...props} />);
 
-        await waitFor(() => {
-            expect(mockFetchSpellOverlays).toHaveBeenCalled();
-        });
+        // See note above — fetch fires synchronously in the mount effect and
+        // the beforeEach fake (mockResolvedValue([])) resolves in microtasks.
+        // Flushing deterministically still fails loudly if any option leaks
+        // into state (count ≠ 0) or the card never renders (getBy throws).
+        await act(async () => {});
+
+        expect(mockFetchSpellOverlays).toHaveBeenCalled();
         expect(screen.getByTestId('overlay-count-Alice')).toHaveTextContent('0');
     });
 });

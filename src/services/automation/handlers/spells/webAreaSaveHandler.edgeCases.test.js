@@ -1,3 +1,25 @@
+// ── webAreaSave QUINTET lane #1990 .edgeCases ──
+// (full seam map: webAreaSaveHandler.areaSave.test.js header — that lane owns
+// recurring STR-save content incl exact addTargetResult shapes; this file is
+// the LAW-honored edge split)
+// THIS lane: handle() guards / odd shapes — existing-Restrained refresh
+//   (cast lane filters+re-apps at webAreaSaveHandler.js:92-93, never skips),
+//   empty selected-name matches (:157-159 guard popup), null combatSummary
+//   (concentration no-op), missing spellAbilities/proficiency → fallback
+//   concentrationDc (areaSpellUtils.js:28, `saveDc || 8 + (proficiency || 2)`
+//   → 12 with prof 4, 10 with prof absent), missing action.automation
+//   (:145 `|| {}` guard), roll-less saveResult (`roll ?? 0` :109-110).
+// OWNED ELSEWHERE (not pinned here): cast orchestration, target-selection
+//   default, full cast-ledger shapes, activeConditionMeta (#1992 .main);
+//   [web] console.error catch legs (#1991 .errors — zero console pins in
+//   this file); `_web_<caster>` zone store + 600-round merged expiration
+//   (#1993 .zone); recurring STR-save internals + webTargetIsImmune :249
+//   un-awaited prod-defect flag (#1989 / .areaSave map flag — cross-ref).
+// Note: no-metaCtx defaults to ALL creatures incl caster (areaSpellUtils.js:20)
+//   — the missing-automation leg constrains metaCtx to one target so only the
+//   :145 guard is exercised; selection mechanics stay in #1992.
+// No dice (saves faked via createSaveListener promises) → no riggedRandom, no
+// Math.random reads; no timers; setRuntimeValue writes 4-arg, campaignName last.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -18,10 +40,6 @@ vi.mock('../../../ui/logService.js', () => ({
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
-}));
-
-vi.mock('../../../rules/combat/rangeCheck.js', () => ({
-  getDistanceFeet: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
@@ -58,7 +76,8 @@ vi.mock('../../common/damageRollback.js', () => ({
 import { handle } from './webAreaSaveHandler.js';
 import * as savePrompt from '../../common/savePrompt.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
-// logService is mocked but not directly asserted in edge cases
+// logService is mocked (handler addEntry calls need a resolved stub) but not
+// asserted here — log pins live in #1991 .errors.
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as concentrationService from '../../../combat/concentration/concentrationService.js';
 import * as combatData from '../../../encounters/combatData.js';
@@ -108,7 +127,6 @@ describe('webAreaSaveHandler.handle - edge cases', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       combatData.getCombatSummary.mockReturnValue({});
-      storage.default.set.mockReturnValue(undefined);
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'activeConditions') return ['restrained', 'blinded'];
         if (key === 'activeConditionMeta') return { restrained: { dc: 10 } };
@@ -149,7 +167,9 @@ describe('webAreaSaveHandler.handle - edge cases', () => {
       );
 
       expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No creatures selected');
+      // Own-composition full-string pin of the :158 guard popup.
+      expect(result.payload.name).toBe('Web');
+      expect(result.payload.description).toBe('No creatures selected for Web.');
     });
 
     it('returns popup when combatSummary is null (no concentration tracking)', async () => {
@@ -177,7 +197,6 @@ describe('webAreaSaveHandler.handle - edge cases', () => {
     it('uses fallback DC when spellAbilities is missing', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       combatData.getCombatSummary.mockReturnValue({});
-      storage.default.set.mockReturnValue(undefined);
 
       const casterStats = {
         name: 'TestCaster',
@@ -210,7 +229,6 @@ describe('webAreaSaveHandler.handle - edge cases', () => {
     it('uses fallback proficiency when both spellAbilities and proficiency are missing', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       combatData.getCombatSummary.mockReturnValue({});
-      storage.default.set.mockReturnValue(undefined);
 
       const casterStats = {
         name: 'TestCaster',
@@ -243,15 +261,17 @@ describe('webAreaSaveHandler.handle - edge cases', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       combatData.getCombatSummary.mockReturnValue({});
-      storage.default.set.mockReturnValue(undefined);
 
       savePrompt.createSaveListener.mockReturnValue({
         promptId: 'web-save-no-automation',
         promise: Promise.resolve({ success: true, roll: 14, total: 14 }),
       });
 
+      // metaCtx pinned to one target: no-metaCtx defaults to ALL creatures
+      // incl the caster (areaSpellUtils.js:20) — selection mechanics belong
+      // to #1992; this leg only exercises the :145 automation `|| {}` guard.
       await handle(
-        { name: 'Web' },
+        { name: 'Web', metaCtx: { targets: ['Goblin'] } },
         makePlayerStats(),
         campaignName,
         null,
@@ -264,7 +284,6 @@ describe('webAreaSaveHandler.handle - edge cases', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       combatData.getCombatSummary.mockReturnValue({});
-      storage.default.set.mockReturnValue(undefined);
       useRuntimeState.getRuntimeValue.mockReturnValue({});
 
       savePrompt.createSaveListener.mockReturnValue({

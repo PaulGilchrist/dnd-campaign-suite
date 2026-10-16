@@ -1,3 +1,22 @@
+// MAIN LANE #1978 (trio close) — summonSpiritHandler orchestration canonical:
+// handle()/confirmSummonSpirit modal dispatch, SP-015/SP-114 AC-HP ladder,
+// CLA-066 Create Thrall rider, CLA-252 phantasmal free cast, SP-005 refusal +
+// unique-name/markers, SP-120 Fey chooser concentration default.
+// Trio split (siblings read-only, homes honored):
+//   cla138 #1976 = _noConcentrationChoice stamp lane ONLY — no stamp pins here.
+//   mao #1977  = MA-0284/0285 Huge/Large Slam disk locks + resolveMonsterActions
+//     sign-fold consumers — zero concentration content, none restated here.
+// Fold coverage per mao's claim lives HERE: Celestial Spirit (MA-0465/0466/0467),
+// Construct Spirit (Clay) (MA-0516), synthetic rows via confirm — never re-joined
+// to the Huge/Large sign matrix.
+// findSteedSummon consumer lane (CLA-130, 8/8) closed — only direct handler
+// content pinned here; no delegation-lane restatement.
+// Exports live (#1916 verified): handle + confirmSummonSpirit registered in
+// services/automation/index.js:619-620 (summon_spirit / summon_spirit_confirm)
+// and confirmSummonSpirit consumed by CharActionModals.SecondaryModals.jsx;
+// resolveCreateThrallRiderHit consumed by MonsterCardModal.jsx.
+// Turn-based only: no timers in this file; duration clocks are round-counted
+// game state resolved at seams (CLA-334 recipe stays pinned as written).
 import { handle, confirmSummonSpirit, resolveMonsterActions, resolveMonsterReactions, resolveCreateThrallRiderHit } from './summonSpiritHandler.js';
 import summonFeySpells from '../../../../../public/data/2024/spells.json' with { type: 'json' };
 import summonFeyMonsters from '../../../../../public/data/monsters.json' with { type: 'json' };
@@ -44,6 +63,8 @@ vi.mock('../buffs/tempHpService.js', () => ({
     setTempHpOnKey: vi.fn(),
 }));
 
+// getNextUniqueMonsterName stays REAL (SP-005 numbered displayName is exactly
+// what the spawn-seam pins consume); only save-bonus extraction is stubbed.
 vi.mock('../../../encounters/encounterToInitiative.js', async (importOriginal) => {
     const actual = await importOriginal();
     return {
@@ -99,6 +120,9 @@ describe('summonSpiritHandler', () => {
         { name: 'Bestial Spirit (Water)', monsterIndex: 'bestial-spirit-water' },
     ];
 
+    // Merge contract: automation overrides shallow-merge OVER the defaults
+    // (callers may omit type/baseLevel/hpPerLevelAbove); top-level overrides
+    // (name, spell, metaCtx) replace wholesale.
     function makeAction(overrides = {}) {
         return {
             name: 'Summon Beast',
@@ -186,18 +210,6 @@ describe('summonSpiritHandler', () => {
                 reach: '5 ft.',
                 damage_dice_primary: '3d6+spellcasting modifier',
                 damage_type_primary: 'psychic',
-            }],
-        },
-        {
-            index: 'animate-objects-medium', name: 'Animated Object (Medium)', type: 'construct',
-            armor_class: 15, hit_points: 10, damage_resistances: [], damage_immunities: [], immunities: [],
-            saving_throws: {}, actions: [{
-                name: 'Slam',
-                description: 'Melee Spell Attack: +spell attack modifier, reach 5 ft. Hit: 1d4+3 Force damage.',
-                attack_bonus: null,
-                reach: '5 ft.',
-                damage_dice_primary: '1d4+3',
-                damage_type_primary: 'force',
             }],
         },
     ];
@@ -291,7 +303,7 @@ describe('summonSpiritHandler', () => {
             expect(logged[1].description).toContain('35/35 HP');
         });
 
-        it('SP-015: unflagged summon blocks stay byte-identical — AC never gains the slot level (SP-114)', async () => {
+        it('SP-114: unflagged blocks stay byte-identical — AC never gains the slot level (scale stays fixed too)', async () => {
             loadMonsters.mockResolvedValue(mockMonsters);
             const combatSummary = getCombatSummary(mockCampaignName);
             const action = makeAction({
@@ -299,10 +311,18 @@ describe('summonSpiritHandler', () => {
                 automation: { typeLabel: 'Animated Object', scale: false, variants: [{ name: 'Animated Object (Medium)', monsterIndex: 'animated-object-medium' }] },
             });
 
-            await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Animated Object (Medium)');
+            const result = await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Animated Object (Medium)');
             const ao = combatSummary.creatures.find(c => c.name?.startsWith('Animated Object (Medium)'));
             expect(ao.ac).toBe(15);
+            expect(ao.maxHp).toBe(10);
+            expect(ao.summonedBy).toBe('TestCaster');
+            expect(ao.summonSource).toBe('spell');
+            expect(ao.speed.walk).toBe('30 ft.');
+            const aoEffect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target?.startsWith('Animated Object (Medium)'));
+            expect(aoEffect).toMatchObject({ effect: 'summoned', source: 'TestCaster', summonSource: 'spell', duration: 'concentration' });
+            expect(result.type).toBe('popup');
 
+            // Fixed-block AC spell, upcast: HP scales, AC stays armor_class base.
             const aberrant = makeAction({
                 name: 'Summon Aberration',
                 automation: { typeLabel: 'Aberrant Spirit', baseLevel: 4, hpPerLevelAbove: 5, variants: [{ name: 'Aberrant Spirit (Mind Flayer)', monsterIndex: 'aberrant-spirit-mind-flayer' }] },
@@ -312,51 +332,6 @@ describe('summonSpiritHandler', () => {
             const mf = combatSummary.creatures.find(c => c.name?.startsWith('Aberrant Spirit (Mind Flayer)'));
             expect(mf.ac).toBe(11);
             expect(mf.maxHp).toBe(40 + 5 * (5 - 4));
-        });
-
-        it('does not scale AC/HP when automation.scale is false', async () => {
-            loadMonsters.mockResolvedValue(mockMonsters);
-            const combatSummary = getCombatSummary(mockCampaignName);
-            const action = makeAction({
-                name: 'Animate Objects',
-                automation: { typeLabel: 'Animated Object', scale: false, variants: [{ name: 'Animated Object (Medium)', monsterIndex: 'animated-object-medium' }] },
-            });
-
-            await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Animated Object (Medium)');
-
-            const added = combatSummary.creatures.find(c => c.name?.startsWith('Animated Object (Medium)'));
-            expect(added.ac).toBe(15);
-            expect(added.maxHp).toBe(10);
-        });
-
-        it('summons animated object with correct monster index from 2024 spells.json', async () => {
-            loadMonsters.mockResolvedValue(mockMonsters);
-            const combatSummary = getCombatSummary(mockCampaignName);
-            const action = makeAction({
-                name: 'Animate Objects',
-                automation: { typeLabel: 'Animated Object', scale: false, variants: [{ name: 'Animated Object (Medium)', monsterIndex: 'animated-object-medium' }] },
-            });
-
-            const result = await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Animated Object (Medium)');
-
-            const added = combatSummary.creatures.find(c => c.name?.startsWith('Animated Object (Medium)'));
-            expect(added).toBeDefined();
-            expect(added.summonedBy).toBe('TestCaster');
-            expect(added.summonSource).toBe('spell');
-            expect(added.ac).toBe(15);
-            expect(added.maxHp).toBe(10);
-            expect(added.speed.walk).toBe('30 ft.');
-
-            const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target?.startsWith('Animated Object (Medium)'));
-            expect(effect).toMatchObject({
-                effect: 'summoned',
-                source: 'TestCaster',
-                summonSource: 'spell',
-                duration: 'concentration',
-            });
-
-            expect(addConcentration).toHaveBeenCalled();
-            expect(result.type).toBe('popup');
         });
 
         it('resolves spell attack, WIS modifier, spell level and save DC placeholders', async () => {
@@ -412,7 +387,7 @@ describe('summonSpiritHandler', () => {
                 },
             };
 
-            it('keeps canonical concentration for a caster WITHOUT the Create Thrall feature', async () => {
+            it('canonical caster WITHOUT Create Thrall: concentrates, fixed AC/HP, no thrall content, 600-round spell-end clock', async () => {
                 loadMonsters.mockResolvedValue(mockMonsters);
                 const combatSummary = getCombatSummary(mockCampaignName);
 
@@ -422,26 +397,22 @@ describe('summonSpiritHandler', () => {
                 expect(added).toBeDefined();
                 expect(added.ac).toBe(11);
                 expect(added.maxHp).toBe(40);
+                // Non-thrall: canonical rows only — no Psychic Strike, no rider transport.
                 expect(added.actions.map(a => a.name)).toEqual(['Psychic Slam']);
+                expect(added.createThrall).toBe(false);
+                expect(added.actions[0].thrall_hex_rider).toBeUndefined();
                 expect(setTempHpOnKey).not.toHaveBeenCalled();
 
                 const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target?.startsWith('Aberrant Spirit (Mind Flayer)'));
                 expect(effect).toMatchObject({ effect: 'summoned', duration: 'concentration' });
                 expect(addConcentration).toHaveBeenCalledWith(combatSummary, 'TestCaster', 'Summon Aberration', 13);
-            });
-
-            it('registers a 1-hour (600-round) concentration expiry clock on summon', async () => {
-                loadMonsters.mockResolvedValue(mockMonsters);
-                getCombatSummary(mockCampaignName);
-
-                await confirmSummonSpirit(makeAberrantAction(), mockPlayerStats, mockCampaignName, 'Aberrant Spirit (Mind Flayer)');
-
+                // "Concentration, up to 1 hour" → 600 rounds (CLA-334 hour×600).
                 expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'TestCaster', effects: [
                     { type: 'remove_summoned_creatures', spell: 'Summon Aberration' },
                 ], campaignName: mockCampaignName, rounds: 600 });
             });
 
-            it('keeps Create Thrall verified behavior for a feature holder: no concentration, temp HP, Psychic Strike', async () => {
+            it('keeps Create Thrall verified behavior for a legacy class_levels holder: no concentration, temp HP, Psychic Strike, rounds:10 clock', async () => {
                 loadMonsters.mockResolvedValue(mockMonsters);
                 const combatSummary = getCombatSummary(mockCampaignName);
 
@@ -492,23 +463,11 @@ describe('summonSpiritHandler', () => {
                 expect(added.actions[0].thrall_hex_bonus).toEqual({ expression: '1d6', damageType: 'Psychic' });
                 // createThrall flag conditional on the gate (not unconditional stamp)
                 expect(added.createThrall).toBe(true);
-                // no caster concentration, 1-minute clock
+                // no caster concentration (10-round clock pinned fully in the
+                // legacy-shape test above — same seam, one pin suffices)
                 expect(addConcentration).not.toHaveBeenCalled();
-                expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({ rounds: 10 }));
                 // THP = warlock level + CHA modifier = 14 + 3 = 17
                 expect(setTempHpOnKey).toHaveBeenCalledWith('Aberrant Spirit (Mind Flayer) 1', 'tempHp', 17, mockCampaignName);
-            });
-
-            it('CLA-066 non-thrall caster: createThrall flag stays false, no rider transport', async () => {
-                loadMonsters.mockResolvedValue(mockMonsters);
-                const combatSummary = getCombatSummary(mockCampaignName);
-
-                await confirmSummonSpirit(makeAberrantAction(), mockPlayerStats, mockCampaignName, 'Aberrant Spirit (Mind Flayer)');
-
-                const added = combatSummary.creatures.find(c => c.name?.startsWith('Aberrant Spirit (Mind Flayer)'));
-                expect(added.createThrall).toBe(false);
-                expect(added.actions.map(a => a.name)).toEqual(['Psychic Slam']);
-                expect(added.actions[0].thrall_hex_rider).toBeUndefined();
             });
 
             it('CLA-066 resolveCreateThrallRiderHit: rider fires once per turn on hexed target, second hit same round refused', async () => {
@@ -595,7 +554,7 @@ describe('summonSpiritHandler', () => {
                 return action;
             };
 
-            it('halves the summoned spirit HP on the free-cast spectral version', async () => {
+            it('halves HP, stamps spectral flags, and logs the trait citation instead of a slot-level mislabel', async () => {
                 loadMonsters.mockResolvedValue(mockMonsters);
                 const combatSummary = getCombatSummary(mockCampaignName);
 
@@ -606,6 +565,13 @@ describe('summonSpiritHandler', () => {
                 expect(added.currentHp).toBe(15);
                 expect(added.phantasmal).toBe(true);
                 expect(added.spectral).toBe(true);
+
+                // Full-string own-composition pin (payment truth, no slot level).
+                const logged = addEntry.mock.calls.find(c => c[1]?.type === 'summons');
+                expect(logged[1].description).toBe(
+                    'TestCaster casts Summon Beast — Phantasmal Creatures free cast (spectral, half HP), summoning Bestial Spirit (Land) (15/15 HP).'
+                );
+                expect(logged[1].description).not.toContain('slot level');
             });
 
             it('keeps full HP on a normal slotted cast even with the passive present', async () => {
@@ -618,25 +584,17 @@ describe('summonSpiritHandler', () => {
                 expect(added.maxHp).toBe(30);
                 expect(added.phantasmal).toBeUndefined();
             });
-
-            it('logs the free cast with the trait citation and HP instead of a slot-level mislabel', async () => {
-                loadMonsters.mockResolvedValue(mockMonsters);
-
-                await confirmSummonSpirit(freeCastAction(), phantasmalPlayerStats, mockCampaignName, 'Bestial Spirit (Land)');
-
-                expect(addEntry).toHaveBeenCalledWith(mockCampaignName, expect.objectContaining({
-                    type: 'summons',
-                    description: expect.stringContaining('Phantasmal Creatures free cast (spectral, half HP)'),
-                }));
-                const logged = addEntry.mock.calls.find(c => c[1]?.type === 'summons');
-                expect(logged[1].description).not.toContain('slot level');
-                expect(logged[1].description).toContain('15/15 HP');
-            });
         });
 
         describe('SP-120 Summon Fey form chooser (locked to disk data)', () => {
             const summonFeySpell = summonFeySpells.find(s => s.index === 'summon-fey');
             const summonFeyVariants = summonFeySpell.automation.variants;
+
+            const summonFeyAction = (spellLevel = 4) => ({
+                name: 'Summon Fey',
+                automation: summonFeySpell.automation,
+                spell: { level: spellLevel, duration: summonFeySpell.duration, concentration: true },
+            });
 
             it('encodes three Trickster/Warrior/Guide variants with distinct monsterIndex entries', () => {
                 expect(summonFeyVariants.map(v => v.name)).toEqual([
@@ -650,29 +608,18 @@ describe('summonSpiritHandler', () => {
             });
 
             it('offers the summonSpirit chooser modal instead of auto-summoning', async () => {
-                const action = {
-                    name: 'Summon Fey',
-                    automation: summonFeySpell.automation,
-                    spell: { level: 4, duration: summonFeySpell.duration, concentration: true },
-                };
-
-                const result = await handle(action, mockPlayerStats, mockCampaignName);
+                const result = await handle(summonFeyAction(), mockPlayerStats, mockCampaignName);
 
                 expect(result.type).toBe('modal');
                 expect(result.modalName).toBe('summonSpirit');
             });
 
             summonFeyVariants.forEach(variant => {
-                it(`summons ${variant.name} with base AC 12, scaled HP, concentration and a slot-level log`, async () => {
+                it(`summons ${variant.name} through its own monsterIndex at base AC 12 / HP 30`, async () => {
                     loadMonsters.mockResolvedValue(summonFeyMonsters);
                     const combatSummary = getCombatSummary(mockCampaignName);
-                    const action = {
-                        name: 'Summon Fey',
-                        automation: summonFeySpell.automation,
-                        spell: { level: 4, duration: summonFeySpell.duration, concentration: true },
-                    };
 
-                    await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, variant.name);
+                    await confirmSummonSpirit(summonFeyAction(), mockPlayerStats, mockCampaignName, variant.name);
 
                     const added = combatSummary.creatures.find(c => c.name?.startsWith(variant.name));
                     expect(added).toBeDefined();
@@ -680,29 +627,31 @@ describe('summonSpiritHandler', () => {
                     expect(added.maxHp).toBe(30);
                     expect(added.summonedBy).toBe('TestCaster');
                     expect(added.monsterIndex).toBe(variant.monsterIndex);
-
-                    const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target?.startsWith(variant.name));
-                    expect(effect).toMatchObject({ effect: 'summoned', source: 'TestCaster', duration: 'concentration' });
-                    expect(addConcentration).toHaveBeenCalledWith(combatSummary, 'TestCaster', 'Summon Fey', 13);
-
-                    const logged = addEntry.mock.calls.filter(c => c[1]?.type === 'summons');
-                    expect(logged).toHaveLength(1);
-                    expect(logged[0][1].description).toContain('slot level 4');
-                    expect(logged[0][1].description).toContain(variant.name);
-                    expect(logged[0][1].description).toContain('30/30 HP');
                 });
+            });
+
+            it('chooser spawn carries the concentration default: te marker, addConcentration, one slot-level 4 log', async () => {
+                loadMonsters.mockResolvedValue(summonFeyMonsters);
+                const combatSummary = getCombatSummary(mockCampaignName);
+
+                await confirmSummonSpirit(summonFeyAction(), mockPlayerStats, mockCampaignName, 'Fey Spirit (Trickster)');
+
+                const effect = getRuntimeValue('campaign', 'targetEffects').find(te => te.target?.startsWith('Fey Spirit (Trickster)'));
+                expect(effect).toMatchObject({ effect: 'summoned', source: 'TestCaster', duration: 'concentration' });
+                expect(addConcentration).toHaveBeenCalledWith(combatSummary, 'TestCaster', 'Summon Fey', 13);
+
+                const logged = addEntry.mock.calls.filter(c => c[1]?.type === 'summons');
+                expect(logged).toHaveLength(1);
+                expect(logged[0][1].description).toContain('slot level 4');
+                expect(logged[0][1].description).toContain('Fey Spirit (Trickster)');
+                expect(logged[0][1].description).toContain('30/30 HP');
             });
 
             it('scales HP above base level while keeping base AC', async () => {
                 loadMonsters.mockResolvedValue(summonFeyMonsters);
                 const combatSummary = getCombatSummary(mockCampaignName);
-                const action = {
-                    name: 'Summon Fey',
-                    automation: summonFeySpell.automation,
-                    spell: { level: 5, duration: summonFeySpell.duration, concentration: true },
-                };
 
-                await confirmSummonSpirit(action, mockPlayerStats, mockCampaignName, 'Fey Spirit (Trickster)');
+                await confirmSummonSpirit(summonFeyAction(5), mockPlayerStats, mockCampaignName, 'Fey Spirit (Trickster)');
 
                 const added = combatSummary.creatures.find(c => c.name?.startsWith('Fey Spirit (Trickster)'));
                 expect(added.ac).toBe(12);
@@ -781,16 +730,17 @@ describe('summonSpiritHandler', () => {
         const avenger = summonFeyMonsters.find(m => m.index === 'celestial-spirit-avenger');
         const lv17Mods = { slotLevel: 5, spellAttackMod: 9, spellSaveDc: 17, wisModifier: 3, spellcastingModifier: 3 };
 
-        it('folds "spell level" in damage_dice_primary to the slot level (disk row)', () => {
+        it('folds "spell level" in damage_dice_primary to the slot level (disk row) and null attack_bonus to +9', () => {
             expect(avenger.actions[0].damage_dice_primary).toBe('2d6+2+spell level');
+            expect(avenger.actions[0].attack_bonus).toBeNull();
             const [action] = resolveMonsterActions(avenger, lv17Mods);
             expect(action.damage_dice_primary).toBe('2d6+2+5');
             expect(action.description).toContain('2d6+2+5');
-        });
+            expect(action.attack_bonus).toBe(9);
 
-        it('folds "spell level" at an upcast slot level', () => {
-            const [action] = resolveMonsterActions(avenger, { ...lv17Mods, slotLevel: 6 });
-            expect(action.damage_dice_primary).toBe('2d6+2+6');
+            // Upcast slot re-folds the same disk row.
+            const [upcast] = resolveMonsterActions(avenger, { ...lv17Mods, slotLevel: 6 });
+            expect(upcast.damage_dice_primary).toBe('2d6+2+6');
         });
 
         it('MA-0466: folds "spell level" on Defender Radiant Mace disk row to the slot level', () => {
@@ -828,12 +778,6 @@ describe('summonSpiritHandler', () => {
             expect(action.description).toBe('Melee Weapon Attack: reach 5 ft. Hit: 1d8+2 bludgeoning damage.');
         });
 
-        it('still folds null attack_bonus to the caster spell attack modifier (+9 lv17 WIS+3 PB+6)', () => {
-            const [action] = resolveMonsterActions(avenger, lv17Mods);
-            expect(avenger.actions[0].attack_bonus).toBeNull();
-            expect(action.attack_bonus).toBe(9);
-        });
-
         it('end-to-end: summoned Avenger combatant carries rolled damage formula', async () => {
             loadMonsters.mockResolvedValue(summonFeyMonsters);
             const combatSummary = getCombatSummary(mockCampaignName);
@@ -867,17 +811,15 @@ describe('summonSpiritHandler', () => {
         const defender = summonFeyMonsters.find(m => m.index === 'celestial-spirit-defender');
         const lv17Mods = { slotLevel: 5, spellAttackMod: 9, spellSaveDc: 17, wisModifier: 3, spellcastingModifier: 3 };
 
-        it('folds Defender reactions[0] slot5 disk row "2d8+spell level" → "2d8+5"', () => {
+        it('folds Defender reactions[0] slot5 disk row "2d8+spell level" → "2d8+5" (and slot 7 → "2d8+7")', () => {
             expect(defender.reactions[0].name).toBe('Healing Touch');
             expect(defender.reactions[0].damage_dice_primary).toBe('2d8+spell level');
             const [reaction] = resolveMonsterReactions(defender, lv17Mods);
             expect(reaction.damage_dice_primary).toBe('2d8+5');
             expect(reaction.description).toContain('2d8+5');
-        });
 
-        it('folds at upcast slot levels too', () => {
-            const [reaction] = resolveMonsterReactions(defender, { ...lv17Mods, slotLevel: 7 });
-            expect(reaction.damage_dice_primary).toBe('2d8+7');
+            const [upcast] = resolveMonsterReactions(defender, { ...lv17Mods, slotLevel: 7 });
+            expect(upcast.damage_dice_primary).toBe('2d8+7');
         });
 
         it('never backfills attack_bonus/save_dc on reaction rows (no false auto-hit affordance); automation + At Will sentinel ride byte-shape', () => {

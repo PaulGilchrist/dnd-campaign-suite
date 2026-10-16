@@ -331,7 +331,12 @@ describe('sleetStormHandler.handle — cast time (#1961)', () => {
     it('breaks target concentration and posts full-string concentration_lost', async () => {
       const summaryRef = { active: true };
       setupFailedSave();
-      combatData.getCombatSummary.mockReturnValue(summaryRef);
+      // Once-queue by call site: #1 registerSpellConcentration (L79),
+      // #2 applySleetStormProneTarget's read (L201). Distinct refs let the
+      // storage/set + log pins below prove they came from the break branch.
+      combatData.getCombatSummary
+        .mockReturnValueOnce({ registered: true })
+        .mockReturnValueOnce(summaryRef);
       concentrationService.breakConcentration.mockReturnValue('Fireball');
 
       await castOnGoblin();
@@ -349,19 +354,20 @@ describe('sleetStormHandler.handle — cast time (#1961)', () => {
     });
 
     it('does not persist summary or log concentration_lost when target held none', async () => {
+      const summaryRef = { active: true };
       setupFailedSave();
+      combatData.getCombatSummary
+        .mockReturnValueOnce({ registered: true }) // register lane (L79)
+        .mockReturnValueOnce(summaryRef); // apply lane (L201)
       concentrationService.breakConcentration.mockReturnValue(null);
 
       await castOnGoblin();
 
+      expect(concentrationService.breakConcentration).toHaveBeenCalledWith(summaryRef, 'Goblin');
+      // Break branch taken (summary read) but nothing held → no persist, no log.
+      expect(storage.default.set).not.toHaveBeenCalledWith('combatSummary', summaryRef, campaignName);
       const logTypes = logService.addEntry.mock.calls.map((c) => c[1].type);
       expect(logTypes).not.toContain('concentration_lost');
-      // storage.set IS also reached by LIVE registerSpellConcentration —
-      // guard the summary-persist by call content, not count:
-      const summaryWrites = storage.default.set.mock.calls.filter(
-        (c) => c[1] !== campaignName ? true : true,
-      );
-      expect(summaryWrites.length).toBeGreaterThanOrEqual(0);
     });
 
     it('appends concentration-loss tracking exactly (PENDING-WIRING: consumed nowhere)', async () => {

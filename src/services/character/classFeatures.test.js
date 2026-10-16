@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('./classRules.js', () => ({ default: {} }));
 vi.mock('./classRules2024.js', () => ({ default: {} }));
@@ -10,9 +10,12 @@ const clearObj = (obj) => {
   }
 };
 
+const KNOWN_CLASSES = ['Bard', 'Cleric', 'Druid', 'Paladin', 'Sorcerer', 'Warlock', 'Wizard', 'Monk', 'Rogue', 'Ranger'];
+
 describe('classFeatures.getClassFeatures', () => {
   let mockedClassRules;
   let mockedClassRules2024;
+  let getClassFeatures;
 
   beforeEach(async () => {
     const classRulesModule = await import('./classRules.js');
@@ -22,10 +25,8 @@ describe('classFeatures.getClassFeatures', () => {
 
     clearObj(mockedClassRules);
     clearObj(mockedClassRules2024);
-  });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+    ({ getClassFeatures } = await import('./classFeatures.js'));
   });
 
   const makePlayerStats = (overrides = {}) => ({
@@ -35,125 +36,73 @@ describe('classFeatures.getClassFeatures', () => {
     ...overrides,
   });
 
-  it('delegates to the 2024 ruleset module when rules is 2024', async () => {
-    mockedClassRules2024.getBardFeatures = vi.fn(() => ({ ruleset: '2024' }));
-    mockedClassRules.getBardFeatures = vi.fn(() => ({ ruleset: '5e' }));
-    const { getClassFeatures } = await import('./classFeatures.js');
+  // rules field selects module: only '2024' routes to classRules2024; '5e' and
+  // undefined (legacy characters) fall back to classRules.
+  it.each([
+    ['2024', '2024'],
+    ['5e', '5e'],
+    [undefined, '5e'],
+  ])('routes rules=%s to the %s module', async (rules, expectedModule) => {
+    const target = expectedModule === '2024' ? mockedClassRules2024 : mockedClassRules;
+    const other = expectedModule === '2024' ? mockedClassRules : mockedClassRules2024;
+    target.getBardFeatures = vi.fn(() => ({ ruleset: expectedModule }));
+    other.getBardFeatures = vi.fn(() => ({ ruleset: expectedModule === '2024' ? '5e' : '2024' }));
 
-    getClassFeatures(makePlayerStats({ rules: '2024' }));
+    const result = getClassFeatures(makePlayerStats({ rules }));
 
-    expect(mockedClassRules2024.getBardFeatures).toHaveBeenCalledTimes(1);
-    expect(mockedClassRules.getBardFeatures).not.toHaveBeenCalled();
+    expect(target.getBardFeatures).toHaveBeenCalledTimes(1);
+    expect(other.getBardFeatures).not.toHaveBeenCalled();
+    expect(result).toEqual({ ruleset: expectedModule });
   });
 
-  it('delegates to the 5e ruleset module when rules is 5e', async () => {
-    mockedClassRules.getBardFeatures = vi.fn(() => ({ ruleset: '5e' }));
-    mockedClassRules2024.getBardFeatures = vi.fn(() => ({ ruleset: '2024' }));
-    const { getClassFeatures } = await import('./classFeatures.js');
+  // FEATURE_GETTERS maps exactly the ten classes both ruleset modules implement
+  // (Barbarian/Fighter render via class_levels elsewhere and are absent by design).
+  it.each([
+    ['5e', 'classRules'],
+    ['2024', 'classRules2024'],
+  ])('delegates each known class to get%sFeatures (%s)', async (rules, moduleName) => {
+    const target = moduleName === 'classRules2024' ? mockedClassRules2024 : mockedClassRules;
 
-    getClassFeatures(makePlayerStats({ rules: '5e' }));
-
-    expect(mockedClassRules.getBardFeatures).toHaveBeenCalledTimes(1);
-    expect(mockedClassRules2024.getBardFeatures).not.toHaveBeenCalled();
-  });
-
-  it('delegates to the 5e ruleset when rules is undefined', async () => {
-    mockedClassRules.getBardFeatures = vi.fn(() => ({ ruleset: '5e' }));
-    mockedClassRules2024.getBardFeatures = vi.fn(() => ({ ruleset: '2024' }));
-    const { getClassFeatures } = await import('./classFeatures.js');
-
-    getClassFeatures(makePlayerStats({ rules: undefined }));
-
-    expect(mockedClassRules.getBardFeatures).toHaveBeenCalledTimes(1);
-    expect(mockedClassRules2024.getBardFeatures).not.toHaveBeenCalled();
-  });
-
-  it('delegates to the correct class method for each known class (5e)', async () => {
-    const { getClassFeatures } = await import('./classFeatures.js');
-    const knownClasses = ['Bard', 'Cleric', 'Druid', 'Paladin', 'Sorcerer', 'Warlock', 'Wizard', 'Monk', 'Rogue', 'Ranger'];
-
-    for (const className of knownClasses) {
+    for (const className of KNOWN_CLASSES) {
       const method = `get${className}Features`;
-      mockedClassRules[method] = vi.fn(() => ({ [className]: true }));
+      target[method] = vi.fn(() => ({ [className]: true }));
 
-      const result = getClassFeatures(makePlayerStats({ class: { name: className } }));
+      const result = getClassFeatures(makePlayerStats({ rules, class: { name: className } }));
 
       expect(result).toEqual({ [className]: true });
-      expect(mockedClassRules[method]).toHaveBeenCalledTimes(1);
+      expect(target[method]).toHaveBeenCalledTimes(1);
     }
   });
 
-  it('delegates to the correct class method for each known class (2024)', async () => {
-    const { getClassFeatures } = await import('./classFeatures.js');
-    const knownClasses = ['Bard', 'Cleric', 'Druid', 'Paladin', 'Sorcerer', 'Warlock', 'Wizard', 'Monk', 'Rogue', 'Ranger'];
-
-    for (const className of knownClasses) {
-      const method = `get${className}Features`;
-      mockedClassRules2024[method] = vi.fn(() => ({ [className]: true }));
-
-      const result = getClassFeatures(makePlayerStats({ rules: '2024', class: { name: className } }));
-
-      expect(result).toEqual({ [className]: true });
-      expect(mockedClassRules2024[method]).toHaveBeenCalledTimes(1);
-    }
-  });
-
-  it('passes the full playerStats object to the class method', async () => {
-    const capturedArgs = [];
-    mockedClassRules.getBardFeatures = vi.fn((arg) => {
-      capturedArgs.push(arg);
-      return { received: true };
-    });
-    const { getClassFeatures } = await import('./classFeatures.js');
+  it('passes the full playerStats object through to the class method', async () => {
     const inputStats = makePlayerStats({ level: 5, class: { name: 'Bard', subclass: { name: 'Lore' } } });
+    mockedClassRules.getBardFeatures = vi.fn(() => ({ received: true }));
+
     getClassFeatures(inputStats);
-    expect(capturedArgs[0]).toEqual(inputStats);
+
+    expect(mockedClassRules.getBardFeatures).toHaveBeenCalledWith(inputStats);
   });
 
-  it('returns null for unknown class name', async () => {
-    const { getClassFeatures } = await import('./classFeatures.js');
-    const result = getClassFeatures(makePlayerStats({ class: { name: 'UnknownClass' } }));
-    expect(result).toBeNull();
+  // Missing class name (or unknown/case-mismatched one) has no getter: null.
+  it.each([
+    ['unknown class name', makePlayerStats({ class: { name: 'UnknownClass' } })],
+    ['lowercase class name (case-sensitive)', makePlayerStats({ class: { name: 'bard' } })],
+    ['missing class property', { rules: '5e' }],
+    ['null class property', { rules: '5e', class: null }],
+    ['empty playerStats object', {}],
+  ])('returns null for %s', async (_label, stats) => {
+    expect(getClassFeatures(stats)).toBeNull();
   });
 
-  it('returns null when class property is missing', async () => {
-    const { getClassFeatures } = await import('./classFeatures.js');
-    const result = getClassFeatures({ rules: '5e' });
-    expect(result).toBeNull();
-  });
-
-  it('returns null when class property is null', async () => {
-    const { getClassFeatures } = await import('./classFeatures.js');
-    const result = getClassFeatures({ rules: '5e', class: null });
-    expect(result).toBeNull();
-  });
-
-  it('returns null when playerStats is an empty object', async () => {
-    const { getClassFeatures } = await import('./classFeatures.js');
-    const result = getClassFeatures({});
-    expect(result).toBeNull();
-  });
-
-  it('throws when playerStats is null', async () => {
-    const { getClassFeatures } = await import('./classFeatures.js');
+  it('throws when playerStats is null or undefined (no optional chain on rules)', async () => {
     expect(() => getClassFeatures(null)).toThrow();
-  });
-
-  it('throws when playerStats is undefined', async () => {
-    const { getClassFeatures } = await import('./classFeatures.js');
     expect(() => getClassFeatures(undefined)).toThrow();
   });
 
-  it('returns null for lowercase class name (case-sensitive match)', async () => {
-    const { getClassFeatures } = await import('./classFeatures.js');
-    const result = getClassFeatures(makePlayerStats({ class: { name: 'bard' } }));
-    expect(result).toBeNull();
-  });
-
-  it('returns undefined when the rules method does not exist for a known class', async () => {
-    clearObj(mockedClassRules);
-    const { getClassFeatures } = await import('./classFeatures.js');
-    const result = getClassFeatures(makePlayerStats());
-    expect(result).toBeUndefined();
+  // Defensive branch: getter name exists in FEATURE_GETTERS but the module
+  // does not implement it.
+  it('returns undefined when the rules module lacks the class method', async () => {
+    // beforeEach already cleared both mocks; no getter attached.
+    expect(getClassFeatures(makePlayerStats())).toBeUndefined();
   });
 });
