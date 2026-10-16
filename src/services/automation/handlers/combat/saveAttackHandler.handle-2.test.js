@@ -1,3 +1,12 @@
+// @maintained-by-ai — deterministic unit contract for handle()'s routing lanes:
+// tracked-uses cost (incl. long_rest_or_expend_rage fallback), heal/condition/AoE
+// modal routing, effect-only and condition popups, pushEffect normalization, and
+// buildSaveAttackRollResult payload + notes composition (darkness-dispelled note
+// only reachable when condition+damage bypasses the AoE modal guard). Pure logic
+// through module-boundary mocks; stable unless runtime keys, popup copy, modal
+// names, or payload shape change. Channel-divinity / wild-shape consumption and
+// shape-resolution lanes live in saveAttackHandler.handle.test.js; isExhausted()
+// booleans in saveAttackHandler.exhausted.test.js — do not cross-remove.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -136,7 +145,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
     });
 
     it('should proceed to damage roll when maxUses is 0', async () => {
-      runtimeState.getRuntimeValue.mockReturnValueOnce(0);
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
 
       const action = makeAction({ usesMax: 0, damage: '1d6' });
@@ -152,7 +160,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
   describe('handle - area + healing', () => {
     it('should return saveAttackHeal modal when healExpression and area shape present', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValue(null);
       mapsService.loadMapData.mockResolvedValue(null);
 
       const action = makeAction({
@@ -176,8 +183,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
     // CLA-208: scaled damage + heal expressions and auto.range must reach the modal payload
     it('resolves level scaling and auto.range into the saveAttackHeal payload', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-      mapsService.loadMapData.mockResolvedValue(null);
       automationExpressions.resolveScaling.mockImplementation((stats, scaling) => {
         if (!scaling) return null;
         const entries = Object.entries(scaling).map(([level, damage]) => ({ level: parseInt(level, 10), damage }));
@@ -205,7 +210,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
 
     it('should use custom saveType when provided', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       const action = makeAction({
         shape: 'cone',
@@ -220,7 +224,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
 
     it('should not return modal for healing without area shape', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       const action = makeAction({
         healExpression: '2d4',
@@ -235,7 +238,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
 
     it('should include attacker position when map data is available', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
@@ -251,11 +253,10 @@ describe('saveAttackHandler - handle (part 2)', () => {
       expect(result.payload.attackerPos).toEqual({ gridX: 5, gridY: 10 });
     });
 
-    it('should return null attackerPos when map data is missing or load fails', async () => {
+    it('should return null attackerPos when map load fails', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
-      mapsService.loadMapData.mockRejectedValue(new Error('not found'));
+      mapsService.loadMapData.mockRejectedValueOnce(new Error('not found'));
 
       const action = makeAction({
         shape: 'cone',
@@ -269,7 +270,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
 
     it('should return null attackerPos when attacker not found in map data', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: 'OtherPlayer', gridX: 1, gridY: 2 }],
@@ -289,7 +289,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
   describe('handle - condition inflicted', () => {
     it('should return setCondition modal for condition + area shape', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       const action = makeAction({
         shape: 'cone',
@@ -308,7 +307,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
 
     it('should use custom saveType for condition modal', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       const action = makeAction({
         shape: 'cone',
@@ -345,7 +343,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
 
     it('should not return modal when conditionInflicted is present with damage', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       const action = makeAction({
         shape: 'cone',
@@ -417,7 +414,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
   describe('handle - damage roll', () => {
     it('should return roll payload with correct damage values', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 12, rolls: [7, 5], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       const action = makeAction({ damage: '2d6' });
 
@@ -434,7 +430,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
 
     it('should include rider description in notes for push effect', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       const action = makeAction({ damage: '1d8', effect: 'push', effectValue: '10_ft' });
 
@@ -445,35 +440,41 @@ describe('saveAttackHandler - handle (part 2)', () => {
       );
     });
 
-    it('should include darkness dispelled note for area shapes', async () => {
+    // An area shape with damage only reaches the roll path (buildSaveAttackRollResult,
+    // where the darkness-dispelled note lives) when conditionInflicted bypasses the
+    // saveAttackAoe modal guard — the AoE modal itself is pinned in handle.test.js.
+    it('should include darkness dispelled note on roll for area shape with condition and damage', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
-      const action = makeAction({ damage: '1d8', shape: 'cone' });
+      const action = makeAction({ damage: '1d8', shape: 'cone', conditionInflicted: 'Poisoned' });
 
       const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('modal');
-      expect(result.modalName).toBe('saveAttackAoe');
-      expect(result.payload.shape).toBe('cone');
+      expect(result.type).toBe('roll');
+      expect(result.payload.notes).toBe('Magical Darkness in the area is dispelled.');
     });
 
-    it('should combine darkness dispelled and rider notes for area with effect', async () => {
+    it('should combine darkness dispelled and rider notes on roll for area with effect', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
-      const action = makeAction({ damage: '1d8', shape: 'cone', effect: 'push', effectValue: '5_ft' });
+      const action = makeAction({
+        damage: '1d8',
+        shape: 'cone',
+        conditionInflicted: 'Poisoned',
+        effect: 'push',
+        effectValue: '5_ft',
+      });
 
       const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('modal');
-      expect(result.modalName).toBe('saveAttackAoe');
-      expect(result.payload.shape).toBe('cone');
+      expect(result.type).toBe('roll');
+      expect(result.payload.notes).toBe(
+        'Magical Darkness in the area is dispelled. the target is pushed 5 ft',
+      );
     });
 
     it('should return null when rollExpression returns null', async () => {
       diceRoller.rollExpression.mockReturnValue(null);
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       const action = makeAction({ damage: '2d6' });
 
@@ -484,7 +485,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
 
     it('should set contextConfig with correct defaults', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       const action = makeAction({ damage: '1d8' });
 
@@ -503,11 +503,11 @@ describe('saveAttackHandler - handle (part 2)', () => {
 
     it('should set dcSuccess based on shape and explicit value', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       const action1 = makeAction({ damage: '1d8', shape: 'cone' });
       const result1 = await handle(action1, makePlayerStats(), campaignName, null);
       expect(result1.type).toBe('modal');
+      expect(result1.modalName).toBe('saveAttackAoe');
       expect(result1.payload.dcSuccess).toBe('half');
 
       const action2 = makeAction({ damage: '1d8', shape: 'line' });
@@ -522,7 +522,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
 
     it('should include custom saveType in contextConfig', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       const action = makeAction({ damage: '1d8', saveType: 'CON' });
 
@@ -535,7 +534,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
   describe('handle - pushEffect normalization', () => {
     it('should set effect from pushEffect when effect is missing', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       const action = makeAction({ damage: '1d8', pushEffect: 'push', effectValue: '10_ft' });
 
@@ -546,7 +544,6 @@ describe('saveAttackHandler - handle (part 2)', () => {
 
     it('should not override existing effect with pushEffect', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
-      runtimeState.getRuntimeValue.mockReturnValueOnce(null);
 
       const action = makeAction({ damage: '1d8', pushEffect: 'push', effect: 'speed_reduction', effectValue: '20_ft' });
 

@@ -1,3 +1,14 @@
+// @maintained-by-ai
+// interceptionHandler sextet — lane: DAMAGE MATH (computeInterceptionReduction +
+// resolveInterceptionDamageBonus: roll + bonus, clamp to 0, null roll, zero damage;
+// applyHealingToTarget amounts and skip paths). Owns the repo-wide
+// 'Interception damage reduction' numeric pins and applyHealing amount pins
+// (shed by the consumption lane). Does NOT pin addExpiration (consumption owns
+// the rounds:1 latch) nor upsertProtectionEffect store writes (targetEffects
+// companion owns push/update/append).
+//
+// Deterministic: runtime/logService/dice/healing/range/expirations mocked, pure
+// handler, exact numeric pins — no churn expected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/targetResolver.js', () => ({
@@ -46,6 +57,11 @@ vi.mock('../../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
 }));
 
+// addExpiration pins live in the consumption lane; keep the barrel graph inert here.
+vi.mock('../../../rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
+}));
+
 // ── Imports ─────────────────────────────────────────────────────
 
 import { handle } from './interceptionHandler.js';
@@ -78,8 +94,10 @@ function makePlayerStats(overrides = {}) {
 }
 
 function makeAction(overrides = {}) {
+    const { automation, ...rest } = overrides;
     return {
         name: 'Interception',
+        ...rest,
         automation: {
             type: 'interception',
             trigger: 'ally_within_5ft_attacked',
@@ -90,9 +108,8 @@ function makeAction(overrides = {}) {
             requiresShield: true,
             casting_time: '1 reaction',
             hasAutomation: true,
-            ...overrides.automation,
+            ...automation,
         },
-        ...overrides,
     };
 }
 
@@ -155,8 +172,14 @@ describe('interceptionHandler damage & healing', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Original damage: 12');
-            expect(result.payload.description).toContain('Interception damage reduction: 1d10(7) + 3');
-            expect(result.payload.description).toContain('Reduced damage:');
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(7) + 3 = <b>10</b>');
+            expect(result.payload.description).toContain('Reduced damage: <b>2</b>');
+            expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
+                expect.anything(),
+                defenderName,
+                10,
+                campaignName
+            );
         });
 
         it('uses proficiency bonus from playerStats when damageBonusExpression is proficiency_bonus', async () => {
@@ -170,16 +193,11 @@ describe('interceptionHandler damage & healing', () => {
 
             const result = await handle(action, ps, campaignName, mapName);
 
-            expect(result.payload.description).toContain('Interception damage reduction: 1d10(3) + 6');
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(3) + 6 = <b>9</b>');
         });
 
         it('uses numeric damageBonusExpression value', async () => {
-            const action = makeAction({
-                automation: {
-                    ...makeAction().automation,
-                    damageBonusExpression: '5',
-                },
-            });
+            const action = makeAction({ automation: { damageBonusExpression: '5' } });
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
                 equipment: [{ name: 'Shield', armor_category: 'Shield' }],
@@ -188,16 +206,11 @@ describe('interceptionHandler damage & healing', () => {
 
             const result = await handle(action, ps, campaignName, mapName);
 
-            expect(result.payload.description).toContain('Interception damage reduction: 1d10(4) + 5');
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(4) + 5 = <b>9</b>');
         });
 
         it('ignores invalid damageBonusExpression', async () => {
-            const action = makeAction({
-                automation: {
-                    ...makeAction().automation,
-                    damageBonusExpression: 'not_a_number',
-                },
-            });
+            const action = makeAction({ automation: { damageBonusExpression: 'not_a_number' } });
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
                 equipment: [{ name: 'Shield', armor_category: 'Shield' }],
@@ -206,16 +219,12 @@ describe('interceptionHandler damage & healing', () => {
 
             const result = await handle(action, ps, campaignName, mapName);
 
-            expect(result.payload.description).toContain('Interception damage reduction: 1d10(6) + 0');
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(6) + 0 = <b>6</b>');
         });
 
         it('uses pre-computed damageBonus from automation when present', async () => {
             const action = makeAction({
-                automation: {
-                    ...makeAction().automation,
-                    damageBonus: 10,
-                    damageBonusExpression: 'proficiency_bonus',
-                },
+                automation: { damageBonus: 10, damageBonusExpression: 'proficiency_bonus' },
             });
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
@@ -225,16 +234,11 @@ describe('interceptionHandler damage & healing', () => {
 
             const result = await handle(action, ps, campaignName, mapName);
 
-            expect(result.payload.description).toContain('Interception damage reduction: 1d10(4) + 10');
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(4) + 10 = <b>14</b>');
         });
 
         it('defaults to 1d10 when no damageExpression', async () => {
-            const action = makeAction({
-                automation: {
-                    ...makeAction().automation,
-                    damageExpression: null,
-                },
-            });
+            const action = makeAction({ automation: { damageExpression: null } });
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
                 equipment: [{ name: 'Shield', armor_category: 'Shield' }],
@@ -243,10 +247,11 @@ describe('interceptionHandler damage & healing', () => {
 
             const result = await handle(action, ps, campaignName, mapName);
 
-            expect(result.payload.description).toContain('Interception damage reduction: 1d10(3)');
+            expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d10');
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(3) + 3 = <b>6</b>');
         });
 
-        it('clamps reduced damage to minimum 0', async () => {
+        it('clamps reduced damage to minimum 0 and heals at most original damage', async () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
@@ -256,10 +261,18 @@ describe('interceptionHandler damage & healing', () => {
 
             const result = await handle(action, ps, campaignName, mapName);
 
+            // reduction 12+3=15 > original 12 → reduced 0, heal capped at 12
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(12) + 3 = <b>15</b>');
             expect(result.payload.description).toContain('Reduced damage: <b>0</b>');
+            expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
+                expect.anything(),
+                defenderName,
+                12,
+                campaignName
+            );
         });
 
-        it('handles zero original damage', async () => {
+        it('handles zero original damage (reduction rolls but nothing to heal)', async () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
@@ -274,7 +287,6 @@ describe('interceptionHandler damage & healing', () => {
                 totalDamage: 0,
                 damageTypes: [],
             });
-            diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
 
             const result = await handle(action, ps, campaignName, mapName);
 
@@ -293,7 +305,7 @@ describe('interceptionHandler damage & healing', () => {
 
             const result = await handle(action, ps, campaignName, mapName);
 
-            expect(result.payload.description).toContain('1d10(0)');
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(0) + 3 = <b>3</b>');
             expect(result.payload.description).toContain('Reduced damage: <b>9</b>');
             expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
                 expect.anything(),
@@ -305,20 +317,21 @@ describe('interceptionHandler damage & healing', () => {
     });
 
     describe('healing application', () => {
-        it('applies healing to target equal to reduction amount (capped at original damage)', async () => {
+        it('applies healing to target equal to reduction amount (5+3=8)', async () => {
             const action = makeAction();
             const ps = makePlayerStats({
                 inventory: { equipped: ['Shield'] },
                 equipment: [{ name: 'Shield', armor_category: 'Shield' }],
             });
-            diceRoller.rollExpression.mockReturnValue({ total: 8, rolls: [8], modifier: 0 });
+            // beforeEach default roll total 5 → reduction 5+3=8, original 12, heal 8
+            const result = await handle(action, ps, campaignName, mapName);
 
-            await handle(action, ps, campaignName, mapName);
-
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(5) + 3 = <b>8</b>');
+            expect(result.payload.description).toContain('Reduced damage: <b>4</b>');
             expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
                 expect.anything(),
                 defenderName,
-                11,
+                8,
                 campaignName
             );
         });
@@ -331,8 +344,9 @@ describe('interceptionHandler damage & healing', () => {
             });
             diceRoller.rollExpression.mockReturnValue({ total: 0, rolls: [0], modifier: 0 });
 
-            await handle(action, ps, campaignName, mapName);
-
+            // roll 0 → reduction 0+3=3, heal still 3
+            const result = await handle(action, ps, campaignName, mapName);
+            expect(result.payload.description).toContain('Interception damage reduction: 1d10(0) + 3 = <b>3</b>');
             expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
                 expect.anything(),
                 defenderName,
@@ -356,33 +370,9 @@ describe('interceptionHandler damage & healing', () => {
                 totalDamage: 12,
                 damageTypes: ['slashing'],
             });
-            diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
 
             await handle(action, ps, campaignName, mapName);
 
-            expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
-        });
-
-        it('does not apply healing when attack missed (totalDamage is 0)', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: { ...makeCombatSummary().lastAttack, hit: false },
-                attackerName,
-                targetName: defenderName,
-                primaryDamage: 0,
-                secondaryDamage: 0,
-                totalDamage: 0,
-                damageTypes: [],
-            });
-            diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-
-            const result = await handle(action, ps, campaignName, mapName);
-
-            expect(result.payload.description).toContain('Original damage: 0');
             expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
         });
     });

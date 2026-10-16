@@ -1,4 +1,33 @@
 // CLA-071: Cutting Words re-fires unlimited on one resolved attack (no Reaction latch).
+//
+// reactionDebuffHandler octet — lane: CUTTING WORDS LATCH (default route →
+// handleBardicRoll → gateBardicReaction / bardicAttackIdentity /
+// buildBardicStampPatch; automation/index.js `reaction_debuff` → handle →
+// DEFAULT_EFFECT_ROUTE). This file owns the once-per-round Reaction latch
+// (_Cutting_Words_usedRound), the per-attack-instance marker
+// (_Cutting_Words_appliedAttack, timestamp + no-timestamp fallback identity),
+// and the §39 bake-before-dispatch / flush-after-dispatch single-channel
+// writes. Refusals: cutting_words_refused + reason token, zero spend, zero
+// stamp, zero heal.
+//
+// Seam map vs sibling reactionDebuffHandler.cuttingWords.test.js (non-latch
+// content of the same feature): that file owns the debuff CONTENT/wording
+// (d20 reduction, hit→miss prose, d20 floor at 1), early exits (no combat
+// context / no target / no uses / no recent roll), and the loose uses
+// decrement ('decrements bardicInspirationUses after successful use',
+// expect.anything() skip flag) plus its loose hit→miss heal
+// ('heals target when attack roll hit turns to miss with primary damage
+// available' — description-only, no arg pin). Overlap mapped here honestly:
+// our 'allows a fresh attack in a later round...' test is a strict superset
+// of that sibling decrement test (exact stamp keys + skipSync=true + flush),
+// and our 'threads campaignName through the hit-to-miss rollback heal' is
+// the exact-arg complement (defender, amount, campaignName) of that sibling
+// description-only test. Neither sibling of the octet pins the identity
+// fallback shape — owned here. Attacks-vs-ally lane flagged SOURCE BUG #11
+// (handleAttacksVsAlly :463 calls resolveMapPositions with 2 args); our
+// 3-arg arity pin below (bardicRangeRefusal :582 — campaignName, mapName,
+// playerName) is the CORRECT reference shape — keep it strong.
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './reactionDebuffHandler.js';
 
@@ -175,6 +204,26 @@ describe('CLA-071: Cutting Words — reaction latch', () => {
     expect(useRuntimeState.setRuntimeObject).not.toHaveBeenCalled();
     expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
       type: 'automation',
+      automationType: 'cutting_words_refused',
+      reason: 'attack_already_debuffed',
+    }));
+  });
+
+  it('matches the marker against the no-timestamp fallback identity d20:17+3:Bandit 1', async () => {
+    // bardicAttackIdentity fallback: no attackEvent.timestamp → `d20:{d20}+{bonus}:{attacker}`
+    // (null, not undefined — the helper's default param would resurrect ATTACK_TS)
+    mockRuntimeStore({
+      'CuttingWordsBard._Cutting_Words_appliedAttack': 'd20:17+3:Bandit 1',
+    });
+    applyHealing.applyHealingToTarget.mockReturnValue({ newHp: 163, actualHeal: 6 });
+    const action = setupDamageLane({ round: 2, timestamp: null });
+
+    const result = await handle(action, makeBardStats(), campaignName, mapName);
+
+    expect(result.payload.description).toContain('already been applied to this roll');
+    expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
+    expect(useRuntimeState.setRuntimeObject).not.toHaveBeenCalled();
+    expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
       automationType: 'cutting_words_refused',
       reason: 'attack_already_debuffed',
     }));

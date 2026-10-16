@@ -1,5 +1,49 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+/**
+ * shapechangeHandler.test.js — lane map (trimmed; sibling shapechangeService.test.js #1954)
+ *
+ * HANDLER = pure gate / payload-builder (polymorph-pair precedent confirmed at source):
+ * reads getCombatContext + runtime targetEffects/currentHitPoints + monsterUtils,
+ * RETURNS popup payloads, performs ZERO writes (no-write guard pinned below).
+ * Application lives in shapechangeService (#1954): confirmShapechangeTransform
+ * (cs stat swap, first-form THP anchor, concentration stamp, expiryRounds:600,
+ * targetEffects push), revertShapechange, revertShapechangeTempHp. SHED for #1954:
+ * every cs-write, THP, concentration, pendingExpirations, revert, applyShapechange,
+ * getActiveShapechanges/getShapechangeCaster lane.
+ *
+ * DELEGATION direction is the INVERSE of the polymorph pair: shapechangeService
+ * imports handle (applyShapechange wrapper) — but applyShapechange has ZERO
+ * production callers (dead-API tally #1916, flag for #1954). The handler's live
+ * lanes are DIRECT calls:
+ *  1. spellCastService/execution/modalSpells.js handleShapechange ← executeSpellCast
+ *     (both rulesets: shapechange lv9 concentration present in spells.json AND
+ *     2024/spells.json; spell data carries NO automation field — modalSpells matches
+ *     by name and synthesizes automation:{type:'shapechange'}, so live cast popups
+ *     have NO spellSlotLevel — level rides on payload.spell).
+ *  2. CharSpecialActions.jsx handleShapeShiftClick — the runtime-derived unpaid
+ *     "Shape-Shift:" row (automation.type 'shapechange_form_change' ∈
+ *     automationService INTERACTIVE_AUTOMATIONS unpaid set) with
+ *     metaCtx._shapechangeFormChange:true and spellSlotLevel:null.
+ *  3. useSpellMetamagicGates tryUnpaidShapechangeRecast stamps
+ *     _shapechangeFormChange on spell+metaCtx → folds back into lane 1.
+ * Registered≠dispatched (#1949 lesson): HANDLER_MAP['shapechange'] (index.js) is
+ * never dispatched live — no features/spells data declares automation.type
+ * 'shapechange'; modalSpells invokes handle directly.
+ *
+ * resolveShapechangeMaxCR is exported but has NO external production caller
+ * (dead-API #1916) — kept as the CR-gate rules table (RAW: creature form CR ≤
+ * target's level if PC, else CR; default 1). Fractional CR pins stay (real
+ * monsters), vacuous duplicates shed.
+ *
+ * FIXED vacuous lanes at this pass: target is ALWAYS the caster
+ * (targetName = casterName), yet three legacy HP tests parked 0/negative/
+ * hit_points-shape HP on a decoy 'Goblin' creature — all three passed vacuously
+ * through the `?? 0` default. HP now pinned on the caster creature, with the
+ * `?? 0` default surfaced as its own explicit lane. Negative-HP dropped (same
+ * `<= 0` guard as zero).
+ */
+
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -26,7 +70,7 @@ vi.mock('../../../ui/utils.js', () => ({
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle, resolveShapechangeMaxCR } from './shapechangeHandler.js';
-import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getMonsterData } from '../../../npcs/monsterUtils.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -35,7 +79,6 @@ import { addEntry } from '../../../ui/logService.js';
 
 const campaignName = 'TestCampaign';
 const casterName = 'TestCaster';
-const targetName = 'Goblin';
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -45,25 +88,38 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeAction(metaCtx = {}) {
+// Cast-lane action (modalSpells builds name/spell/metaCtx; spellSlotLevel:9
+// mirrors the paid lane — the unpaid form-change row sends null). MERGES overrides.
+function makeAction(metaCtx = {}, overrides = {}) {
   return {
     name: 'Shapechange',
     spell: { name: 'Shapechange', level: 9 },
     spellSlotLevel: 9,
-    spellSlotUsed: 9,
     metaCtx,
+    ...overrides,
   };
+}
+
+function abilityLogCalls() {
+  return vi.mocked(addEntry).mock.calls.filter((call) => call[1]?.type === 'ability_use');
+}
+
+// Target is always the caster (targetName = casterName): HP-shape variants attach
+// to the caster creature, never to a decoy.
+function casterCreature(hp = { currentHp: 10 }) {
+  return { name: casterName, type: 'player', ...hp };
 }
 
 const baseCombatContext = {
   creatures: [
-    { name: targetName, type: 'monster', currentHp: 5, maxHp: 7, traits: [] },
-    { name: casterName, type: 'player', currentHp: 10, maxHp: 10, traits: [] },
+    { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7, traits: [] },
+    casterCreature(),
   ],
 };
 
-function setupBaseMocks({ existingEffects = [] } = {}) {
-  getCombatContext.mockResolvedValue(baseCombatContext);
+function setupBaseMocks({ existingEffects = [], cs = baseCombatContext } = {}) {
+  getCombatContext.mockResolvedValue(cs);
+  getMonsterData.mockResolvedValue(null);
   getRuntimeValue.mockImplementation((key, subKey) => {
     if (key === 'campaign' && subKey === 'targetEffects') return existingEffects;
     return undefined;
@@ -75,66 +131,57 @@ function setupBaseMocks({ existingEffects = [] } = {}) {
 describe('shapechangeHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setupBaseMocks();
   });
 
-  describe('combat context validation', () => {
-    it('returns popup when combat context has no creatures', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No creatures in combat');
-    });
-
-    it('returns popup when combat context is null', async () => {
+  describe('combat context gate', () => {
+    it('null combat context → no-creatures popup, nothing logged', async () => {
       getCombatContext.mockResolvedValue(null);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No creatures in combat');
+      expect(result.payload).toEqual({
+        type: 'automation_info',
+        name: 'Shapechange',
+        description: 'No creatures in combat. Shapechange has no effect.',
+      });
+      expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('returns popup when combat context creatures is undefined', async () => {
+    it('missing or empty creatures list → same refusal', async () => {
       getCombatContext.mockResolvedValue({});
+      expect((await handle(makeAction(), makePlayerStats(), campaignName, null)).payload
+        .description).toBe('No creatures in combat. Shapechange has no effect.');
 
+      getCombatContext.mockResolvedValue({ creatures: [] });
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No creatures in combat');
+      expect(addEntry).not.toHaveBeenCalled();
     });
   });
 
   describe('target validation', () => {
-    it('returns popup when target not found in combat', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'OtherCreature', type: 'monster', currentHp: 5, maxHp: 7, traits: [] }],
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('not found in combat');
-    });
-
-    it('includes target name in not-found message', async () => {
+    it('caster not found in combat → not-found popup, nothing logged', async () => {
       getCombatContext.mockResolvedValue({
         creatures: [{ name: 'OtherCreature', type: 'monster', currentHp: 5 }],
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain(casterName);
+      expect(result.payload).toEqual({
+        type: 'automation_info',
+        name: 'Shapechange',
+        description: `${casterName} not found in combat. Shapechange has no effect.`,
+      });
+      expect(addEntry).not.toHaveBeenCalled();
     });
+  });
 
-    it('SP-103: active shapechange effect reopens the chooser as a free form change', async () => {
+  describe('SP-103 form-change routing', () => {
+    it('active shapechange effect reopens the chooser UNPAID (formChange:true), logs nothing', async () => {
       setupBaseMocks({
-        existingEffects: [{ target: casterName, effect: 'shapechange', source: 'OldCaster' }],
+        existingEffects: [{ target: casterName, effect: 'shapechange', source: casterName }],
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -142,15 +189,18 @@ describe('shapechangeHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('shapechange_select');
       expect(result.payload.formChange).toBe(true);
+      // confirmShapechangeTransform logs the shift — the opener stays silent.
+      expect(abilityLogCalls().length).toBe(0);
     });
 
-    it('SP-103: shapechangeOriginal without a targetEffect still routes form change', async () => {
-      setupBaseMocks();
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', currentHp: 5, maxHp: 7, traits: [] },
-          { name: casterName, type: 'player', currentHp: 10, maxHp: 10, traits: [], shapechangeOriginal: { maxHp: 10, ac: 12, speed: 30 } },
-        ],
+    it('shapechangeOriginal on the creature (no targetEffect) still routes form change', async () => {
+      setupBaseMocks({
+        cs: {
+          creatures: [
+            { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7, traits: [] },
+            casterCreature({ currentHp: 10, shapechangeOriginal: { maxHp: 10, ac: 12, speed: 30 } }),
+          ],
+        },
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -159,48 +209,56 @@ describe('shapechangeHandler.handle', () => {
       expect(result.payload.formChange).toBe(true);
     });
 
-    it('SP-103: stale form-change request without transform state refuses unpaid', async () => {
-      setupBaseMocks();
+    it('stale form-change request without transform state refuses unpaid and logs', async () => {
+      const result = await handle(
+        makeAction({ _shapechangeFormChange: true }),
+        makePlayerStats(),
+        campaignName,
+        null
+      );
 
-      const result = await handle(makeAction({ _shapechangeFormChange: true }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('not transformed');
-      const abilityCalls = vi.mocked(addEntry).mock.calls.filter(call => call[1]?.type === 'ability_use');
-      expect(abilityCalls.length).toBe(1);
-      expect(abilityCalls[0][1].description).toContain('not transformed');
+      expect(result.payload).toEqual({
+        type: 'automation_info',
+        name: 'Shapechange',
+        description: `${casterName} is not transformed. Shapechange the caster first.`,
+      });
+      const logs = abilityLogCalls();
+      expect(logs.length).toBe(1);
+      expect(logs[0][1].description).toContain('not transformed');
     });
 
-    it('SP-103: fresh cast (no transform state) opens chooser without formChange', async () => {
-      setupBaseMocks();
-
+    it('fresh cast (no transform state) opens chooser without formChange', async () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.payload.type).toBe('shapechange_select');
       expect(result.payload.formChange).toBeUndefined();
     });
 
-    it('returns popup when target is already transformed (polymorph effect)', async () => {
+    it('polymorph-family effects refuse (the other spell keeps control) and log once', async () => {
       setupBaseMocks({
-        existingEffects: [{ target: casterName, effect: 'polymorph', source: 'OldCaster' }],
+        existingEffects: [
+          { target: casterName, effect: 'polymorph', source: 'OldCaster' },
+          { target: casterName, effect: 'true_polymorph', source: 'OldCaster' },
+        ],
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('already transformed');
-    });
-
-    it('returns popup when target is already transformed (true_polymorph effect)', async () => {
-      setupBaseMocks({
-        existingEffects: [{ target: casterName, effect: 'true_polymorph', source: 'OldCaster' }],
+      expect(result.payload).toEqual({
+        type: 'automation_info',
+        name: 'Shapechange',
+        description: `${casterName} is already transformed.`,
       });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('already transformed');
+      const logs = abilityLogCalls();
+      expect(logs.length).toBe(1);
+      expect(logs[0][1].characterName).toBe(casterName);
+      expect(logs[0][1].abilityName).toBe('Shapechange');
+      expect(logs[0][1].description).toBe(
+        `${casterName} casts Shapechange, but ${casterName} is already transformed.`
+      );
     });
 
-    it('SP-103: handles array target in existing effects check (form change)', async () => {
+    it('array target on self-effect still matches (formChange)', async () => {
       setupBaseMocks({
         existingEffects: [{ target: [casterName, 'extra'], effect: 'shapechange', source: 'OldCaster' }],
       });
@@ -211,54 +269,39 @@ describe('shapechangeHandler.handle', () => {
       expect(result.payload.formChange).toBe(true);
     });
 
-    it('does not flag different target as already transformed', async () => {
+    it('shapechange effect on a DIFFERENT creature neither blocks nor formChange-flips', async () => {
       setupBaseMocks({
-        existingEffects: [{ target: 'OtherCreature', effect: 'shapechange', source: 'OldCaster' }],
-      });
-
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', currentHp: 5, maxHp: 7, traits: [] },
-          { name: casterName, type: 'player', currentHp: 10, maxHp: 10, traits: [] },
-        ],
+        existingEffects: [{ target: 'Goblin', effect: 'shapechange', source: 'OldCaster' }],
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.payload.type).toBe('shapechange_select');
+      expect(result.payload.formChange).toBeUndefined();
     });
   });
 
-  describe('HP validation', () => {
-    it('returns popup when target has 0 hit points (currentHp)', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', currentHp: 0, maxHp: 7, traits: [] },
-          { name: casterName, type: 'player' },
-        ],
-      });
-      getRuntimeValue.mockImplementation((key, subKey) => {
-        if (key === 'campaign' && subKey === 'targetEffects') return [];
-        return undefined;
-      });
+  describe('HP gate (target is always the caster)', () => {
+    it('currentHp 0 → refusal + ability_use log', async () => {
+      setupBaseMocks({ cs: { creatures: [casterCreature({ currentHp: 0 })] } });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('0 hit points');
+      expect(result.payload).toEqual({
+        type: 'automation_info',
+        name: 'Shapechange',
+        description: 'Shapechange has no effect on a creature with 0 hit points.',
+      });
+      const logs = abilityLogCalls();
+      expect(logs.length).toBe(1);
+      expect(logs[0][1].description).toBe(
+        `${casterName} casts Shapechange, but a creature with 0 hit points can't use Shapechange.`
+      );
     });
 
-    it('returns popup when target has hit_points.current = 0', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', hit_points: { current: 0, max: 7 }, traits: [] },
-          { name: casterName, type: 'player' },
-        ],
-      });
-      getRuntimeValue.mockImplementation((key, subKey) => {
-        if (key === 'campaign' && subKey === 'targetEffects') return [];
-        return undefined;
+    it('hit_points.current = 0 → same refusal (legacy HP shape)', async () => {
+      setupBaseMocks({
+        cs: { creatures: [casterCreature({ hit_points: { current: 0, max: 7 } })] },
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -266,14 +309,10 @@ describe('shapechangeHandler.handle', () => {
       expect(result.payload.description).toContain('0 hit points');
     });
 
-    it('returns popup when target has negative hit points', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', currentHp: -2, maxHp: 7, traits: [] },
-          { name: casterName, type: 'player' },
-        ],
-      });
+    it('player HP reads currentHitPoints from the runtime store (server-first)', async () => {
+      setupBaseMocks();
       getRuntimeValue.mockImplementation((key, subKey) => {
+        if (key === casterName && subKey === 'currentHitPoints') return 0;
         if (key === 'campaign' && subKey === 'targetEffects') return [];
         return undefined;
       });
@@ -283,49 +322,10 @@ describe('shapechangeHandler.handle', () => {
       expect(result.payload.description).toContain('0 hit points');
     });
 
-    it('reads currentHitPoints from runtime store for player-type targets', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: casterName, type: 'player', currentHp: 10 },
-        ],
-      });
-      getRuntimeValue.mockImplementation((key, subKey, cn) => {
-        if (key === casterName && subKey === 'currentHitPoints' && cn === campaignName) return 0;
-        if (key === 'campaign' && subKey === 'targetEffects') return [];
-        return undefined;
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('0 hit points');
-    });
-
-    it('uses creature currentHp when runtime store returns non-number for player', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: casterName, type: 'player', currentHp: 5 },
-        ],
-      });
-      getRuntimeValue.mockImplementation((key, subKey, cn) => {
-        if (key === casterName && subKey === 'currentHitPoints' && cn === campaignName) return 'invalid';
-        if (key === 'campaign' && subKey === 'targetEffects') return [];
-        return undefined;
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      // Should pass HP check via creature.currentHp = 5
-      expect(result.payload.type).toBe('shapechange_select');
-    });
-
-    it('allows target with positive HP to proceed', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', currentHp: 3, maxHp: 7, traits: [] },
-          { name: casterName, type: 'player', currentHp: 10, maxHp: 10, traits: [] },
-        ],
-      });
+    it('non-number runtime HP falls back to creature.currentHp → chooser opens', async () => {
+      setupBaseMocks({ cs: { creatures: [casterCreature({ currentHp: 5 })] } });
       getRuntimeValue.mockImplementation((key, subKey) => {
+        if (key === casterName && subKey === 'currentHitPoints') return 'invalid';
         if (key === 'campaign' && subKey === 'targetEffects') return [];
         return undefined;
       });
@@ -333,270 +333,97 @@ describe('shapechangeHandler.handle', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.payload.type).toBe('shapechange_select');
+    });
+
+    it('creature with no HP fields at all defaults to 0 → refusal (?? 0 floor)', async () => {
+      setupBaseMocks({ cs: { creatures: [{ name: casterName, type: 'player' }] } });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.payload.description).toContain('0 hit points');
     });
   });
 
-  describe('successful shapechange_select popup', () => {
-    it('returns shapechange_select popup with correct payload', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', currentHp: 5, maxHp: 7, traits: [] },
-          { name: casterName, type: 'player', currentHp: 10, maxHp: 10, traits: [] },
-        ],
-      });
-      getRuntimeValue.mockImplementation((key, subKey) => {
-        if (key === 'campaign' && subKey === 'targetEffects') return [];
-        return undefined;
-      });
-      getMonsterData.mockResolvedValue(null);
-
+  describe('shapechange_select payload (own composition)', () => {
+    it('chooser payload carries caster/self targeting, spell, slot level, default maxCR — zero writes', async () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('shapechange_select');
-      expect(result.payload.targetName).toBe(casterName);
-      expect(result.payload.casterName).toBe(casterName);
-      expect(result.payload.campaignName).toBe(campaignName);
-      expect(result.payload.spell).toEqual({ name: 'Shapechange', level: 9 });
-      expect(result.payload.spellLevel).toBe(9);
+      expect(result.payload).toEqual({
+        type: 'shapechange_select',
+        targetName: casterName,
+        maxCR: 1,
+        casterName,
+        campaignName,
+        spell: { name: 'Shapechange', level: 9 },
+        spellLevel: 9,
+      });
+      // Pure gate: the handler must never write runtime state.
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('passes characters array from action.metaCtx to maxCR resolution', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', currentHp: 5, traits: [] },
-          { name: casterName, type: 'player', currentHp: 10, traits: [] },
-        ],
-      });
-      getRuntimeValue.mockImplementation((key, subKey) => {
-        if (key === 'campaign' && subKey === 'targetEffects') return [];
-        return undefined;
-      });
-      getMonsterData.mockResolvedValue({ challenge_rating: 5 });
-
+    it('characters from action.metaCtx drive maxCR via PC level', async () => {
       const characters = [{ name: casterName, computedStats: { level: 12 } }];
+
       const result = await handle(makeAction({ characters }), makePlayerStats(), campaignName, null);
 
       expect(result.payload.type).toBe('shapechange_select');
       expect(result.payload.maxCR).toBe(12);
     });
   });
-
-  describe('logging', () => {
-    it('SP-103: logs ability_use refusal only for polymorph-family effects', async () => {
-      setupBaseMocks({
-        existingEffects: [{ target: casterName, effect: 'polymorph', source: 'OldCaster' }],
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const abilityCalls = vi.mocked(addEntry).mock.calls.filter(
-        (call) => call[1]?.type === 'ability_use',
-      );
-      expect(abilityCalls.length).toBe(1);
-      expect(abilityCalls[0][1].characterName).toBe(casterName);
-      expect(abilityCalls[0][1].abilityName).toBe('Shapechange');
-      expect(abilityCalls[0][1].description).toContain('already transformed');
-    });
-
-    it('SP-103: opening the form-change chooser logs nothing (confirm logs the shift)', async () => {
-      setupBaseMocks({
-        existingEffects: [{ target: casterName, effect: 'shapechange', source: casterName }],
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(vi.mocked(addEntry).mock.calls.filter(call => call[1]?.type === 'ability_use').length).toBe(0);
-    });
-
-    it('logs ability_use when target has 0 hit points', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', currentHp: 0, traits: [] },
-          { name: casterName, type: 'player' },
-        ],
-      });
-      getRuntimeValue.mockImplementation((key, subKey) => {
-        if (key === 'campaign' && subKey === 'targetEffects') return [];
-        return undefined;
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const abilityCalls = vi.mocked(addEntry).mock.calls.filter(
-        (call) => call[1]?.type === 'ability_use',
-      );
-      expect(abilityCalls.length).toBe(1);
-      expect(abilityCalls[0][1].description).toContain('0 hit points');
-    });
-
-    it('logs ability_use when no creatures in combat', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const abilityCalls = vi.mocked(addEntry).mock.calls.filter(
-        (call) => call[1]?.type === 'ability_use',
-      );
-      expect(abilityCalls.length).toBe(0);
-    });
-
-    it('logs ability_use when target not found in combat', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'OtherCreature', type: 'monster', currentHp: 5 }],
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const abilityCalls = vi.mocked(addEntry).mock.calls.filter(
-        (call) => call[1]?.type === 'ability_use',
-      );
-      expect(abilityCalls.length).toBe(0);
-    });
-  });
 });
 
-describe('shapechangeHandler.resolveShapechangeMaxCR', () => {
+describe('shapechangeHandler.resolveShapechangeMaxCR (CR-gate rules table)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it('returns player level for a matching PC via computedStats.level', async () => {
-    const characters = [{ name: targetName, computedStats: { level: 7 } }];
-
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, characters);
-
-    expect(maxCR).toBe(7);
-  });
-
-  it('falls back to creature level field for a PC', async () => {
-    const characters = [{ name: targetName, level: 5 }];
-
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, characters);
-
-    expect(maxCR).toBe(5);
-  });
-
-  it('returns monster challenge rating for NPCs', async () => {
-    getMonsterData.mockResolvedValue({ name: targetName, challenge_rating: 3 });
-
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, []);
-
-    expect(maxCR).toBe(3);
-  });
-
-  it('parses fractional challenge ratings', async () => {
-    getMonsterData.mockResolvedValue({ name: targetName, challenge_rating: '1/2' });
-
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, []);
-
-    expect(maxCR).toBe(0.5);
-  });
-
-  it('defaults to CR 1 for custom NPCs without a challenge rating', async () => {
     getMonsterData.mockResolvedValue(null);
-
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, []);
-
-    expect(maxCR).toBe(1);
   });
 
-  it('matches a PC by exact name', async () => {
-    const characters = [{ name: 'Goblin the Brave', computedStats: { level: 9 } }];
-
-    const maxCR = await resolveShapechangeMaxCR('Goblin the Brave', campaignName, characters);
-
-    expect(maxCR).toBe(9);
+  it('PC match: computedStats.level preferred over raw level, both fallbacks', async () => {
+    expect(await resolveShapechangeMaxCR(casterName, campaignName, [
+      { name: casterName, level: 3, computedStats: { level: 8 } },
+    ])).toBe(8);
+    expect(await resolveShapechangeMaxCR(casterName, campaignName, [
+      { name: casterName, level: 5 },
+    ])).toBe(5);
   });
 
-  it('prefers computedStats.level over level field', async () => {
-    const characters = [{ name: targetName, level: 3, computedStats: { level: 8 } }];
-
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, characters);
-
-    expect(maxCR).toBe(8);
+  it('PC with missing/zero/non-number level never yields a level-derived CR', async () => {
+    // non-number falls through to the monster lane…
+    getMonsterData.mockResolvedValue({ challenge_rating: 2 });
+    expect(await resolveShapechangeMaxCR(casterName, campaignName, [
+      { name: casterName, computedStats: { level: 'unknown' } },
+    ])).toBe(2);
+    // …and with no monster data the floor is DEFAULT_MAX_CR (level 0 and absent).
+    getMonsterData.mockResolvedValue(null);
+    expect(await resolveShapechangeMaxCR(casterName, campaignName, [
+      { name: casterName, computedStats: { level: 0 } },
+    ])).toBe(1);
+    expect(await resolveShapechangeMaxCR(casterName, campaignName, [
+      { name: casterName },
+    ])).toBe(1);
   });
 
-  it('returns DEFAULT_MAX_CR (1) when character has no level', async () => {
-    const characters = [{ name: targetName }];
-
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, characters);
-
-    expect(maxCR).toBe(1);
+  it('monster challenge_rating: integer and fractional parse', async () => {
+    getMonsterData.mockResolvedValue({ challenge_rating: 3 });
+    expect(await resolveShapechangeMaxCR('Goblin', campaignName, [])).toBe(3);
+    getMonsterData.mockResolvedValue({ challenge_rating: '1/2' });
+    expect(await resolveShapechangeMaxCR('Goblin', campaignName, [])).toBe(0.5);
   });
 
-  it('returns DEFAULT_MAX_CR when level is 0', async () => {
-    const characters = [{ name: targetName, computedStats: { level: 0 } }];
-
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, characters);
-
-    expect(maxCR).toBe(1);
+  it('unparseable CR string yields 0', async () => {
+    getMonsterData.mockResolvedValue({ challenge_rating: 'invalid' });
+    expect(await resolveShapechangeMaxCR('Goblin', campaignName, [])).toBe(0);
   });
 
-  it('skips characters with non-number level', async () => {
-    const characters = [{ name: targetName, computedStats: { level: 'unknown' } }];
-    getMonsterData.mockResolvedValue({ name: targetName, challenge_rating: '2' });
+  it('missing monster/CR data defaults to 1; missing characters argument is tolerated', async () => {
+    getMonsterData.mockResolvedValue(null);
+    expect(await resolveShapechangeMaxCR('Goblin', campaignName, null)).toBe(1);
+    expect(await resolveShapechangeMaxCR('Goblin', campaignName, undefined)).toBe(1);
 
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, characters);
-
-    expect(maxCR).toBe(2);
-  });
-
-  it('returns 0 for empty fractional CR like "0/1"', async () => {
-    getMonsterData.mockResolvedValue({ name: targetName, challenge_rating: '0/1' });
-
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, []);
-
-    expect(maxCR).toBe(0);
-  });
-
-  it('returns 0 for invalid CR string', async () => {
-    getMonsterData.mockResolvedValue({ name: targetName, challenge_rating: 'invalid' });
-
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, []);
-
-    expect(maxCR).toBe(0);
-  });
-
-  it('handles null challenge_rating', async () => {
-    getMonsterData.mockResolvedValue({ name: targetName, challenge_rating: null });
-
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, []);
-
-    expect(maxCR).toBe(1);
-  });
-
-  it('handles empty string challenge_rating', async () => {
-    getMonsterData.mockResolvedValue({ name: targetName, challenge_rating: '' });
-
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, []);
-
-    expect(maxCR).toBe(1);
-  });
-
-  it('returns DEFAULT_MAX_CR when characters array is null', async () => {
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, null);
-
-    expect(maxCR).toBe(1);
-  });
-
-  it('returns DEFAULT_MAX_CR when characters array is undefined', async () => {
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, undefined);
-
-    expect(maxCR).toBe(1);
-  });
-
-  it('returns DEFAULT_MAX_CR when characters array is empty', async () => {
-    const maxCR = await resolveShapechangeMaxCR(targetName, campaignName, []);
-
-    expect(maxCR).toBe(1);
-  });
-
-  it('uses utils.getName for character matching', async () => {
-    const characters = [{ name: 'TestCaster', computedStats: { level: 11 } }];
-
-    const maxCR = await resolveShapechangeMaxCR('TestCaster', campaignName, characters);
-
-    expect(maxCR).toBe(11);
+    getMonsterData.mockResolvedValue({ name: 'Goblin', challenge_rating: null });
+    expect(await resolveShapechangeMaxCR('Goblin', campaignName, [])).toBe(1);
+    getMonsterData.mockResolvedValue({ name: 'Goblin', challenge_rating: '' });
+    expect(await resolveShapechangeMaxCR('Goblin', campaignName, [])).toBe(1);
   });
 });

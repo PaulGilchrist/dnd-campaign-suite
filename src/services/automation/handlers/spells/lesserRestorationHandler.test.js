@@ -59,7 +59,7 @@ describe('lesserRestorationHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('Lesser Restoration');
-      expect(result.payload.description).toContain('No combat context found');
+      expect(result.payload.description).toBe('No combat context found. Cannot apply Lesser Restoration.');
     });
   });
 
@@ -71,8 +71,12 @@ describe('lesserRestorationHandler.handle', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       const selfTarget = result.payload.targets.find(t => t.isSelf === true);
-      expect(selfTarget).toBeDefined();
-      expect(selfTarget.name).toBe('TestCleric');
+      expect(selfTarget).toEqual({
+        name: 'TestCleric',
+        hasApplicableConditions: false,
+        conditions: [],
+        isSelf: true,
+      });
     });
 
     it('should exclude the caster from non-self creature targets', async () => {
@@ -103,8 +107,8 @@ describe('lesserRestorationHandler.handle', () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       getRuntimeValue.mockImplementation((target, key) => {
         if (key === 'activeConditions') {
-          if (target === 'Ally1') return ['Blinded', 'Frightened', 'Restrained'];
-          if (target === 'Goblin') return ['Poisoned', 'Prone'];
+          if (target === 'Ally1') return ['Blinded', 'Deafened', 'Paralyzed', 'Frightened', 'Restrained'];
+          if (target === 'Goblin') return ['POISONED', 'Prone'];
           return [];
         }
         return [];
@@ -113,11 +117,11 @@ describe('lesserRestorationHandler.handle', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       const allyTarget = result.payload.targets.find(t => t.name === 'Ally1');
-      expect(allyTarget.conditions).toEqual(['Blinded']);
+      expect(allyTarget.conditions).toEqual(['Blinded', 'Deafened', 'Paralyzed']);
       expect(allyTarget.hasApplicableConditions).toBe(true);
 
       const goblinTarget = result.payload.targets.find(t => t.name === 'Goblin');
-      expect(goblinTarget.conditions).toEqual(['Poisoned']);
+      expect(goblinTarget.conditions).toEqual(['POISONED']);
       expect(goblinTarget.hasApplicableConditions).toBe(true);
     });
 
@@ -171,7 +175,6 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
     });
 
     it('should return info popup when no condition selected', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
       const result = await applyLesserRestoration(
         makeAction(),
         makePlayerStats(),
@@ -182,13 +185,12 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No condition selected');
+      expect(result.payload.description).toBe('Ally1: No condition selected.');
     });
   });
 
   describe('condition removal', () => {
     it('should remove the condition from activeConditions', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
       getRuntimeValue.mockReturnValue(['Blinded', 'Poisoned', 'Frightened']);
 
       const result = await applyLesserRestoration(
@@ -200,7 +202,7 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
       );
 
       expect(result).not.toBeNull();
-      expect(result.payload.description).toContain('Removed Blinded condition');
+      expect(result.payload.description).toBe('Ally1: Removed Blinded condition.');
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Ally1',
         'activeConditions',
@@ -209,16 +211,15 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
       );
     });
 
-    it('should handle case-insensitive condition matching', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
-      getRuntimeValue.mockReturnValue(['blinded', 'POISONED']);
+    it('should match conditions case-insensitively and ignore whitespace', async () => {
+      getRuntimeValue.mockReturnValue(['  BLINDED  ', 'POISONED']);
 
       await applyLesserRestoration(
         makeAction(),
         makePlayerStats(),
         campaignName,
         null,
-        { targetName: 'Ally1', condition: 'BLINDED' },
+        { targetName: 'Ally1', condition: 'Blinded' },
       );
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -230,7 +231,6 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
     });
 
     it('should not modify when condition is not present', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
       getRuntimeValue.mockReturnValue(['Poisoned', 'Frightened']);
 
       const result = await applyLesserRestoration(
@@ -242,33 +242,12 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
       );
 
       expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(result.payload.description).toContain('No applicable condition found');
-    });
-
-    it('should handle whitespace in condition names', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
-      getRuntimeValue.mockReturnValue(['  blinded  ', 'POISONED']);
-
-      await applyLesserRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Ally1', condition: 'blinded' },
-      );
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Ally1',
-        'activeConditions',
-        ['POISONED'],
-        campaignName,
-      );
+      expect(result.payload.description).toBe('Ally1: No applicable condition found to remove.');
     });
   });
 
   describe('logging and storage', () => {
-    it('should call addEntry with ability_use on successful removal', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
+    it('should log ability_use and spell_effect on successful removal', async () => {
       getRuntimeValue.mockReturnValue(['Blinded']);
 
       await applyLesserRestoration(
@@ -285,20 +264,6 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
         abilityName: 'Lesser Restoration',
         targetName: 'Ally1',
       }));
-    });
-
-    it('should call addEntry with spell_effect on successful removal', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
-      getRuntimeValue.mockReturnValue(['Blinded']);
-
-      await applyLesserRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Ally1', condition: 'Blinded' },
-      );
-
       expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'spell_effect',
         characterName: 'TestCleric',
@@ -309,7 +274,6 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
     });
 
     it('should not log when condition removal fails', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
       getRuntimeValue.mockReturnValue(['Poisoned']);
 
       await applyLesserRestoration(
@@ -322,6 +286,5 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
 
       expect(addEntry).not.toHaveBeenCalled();
     });
-
   });
 });

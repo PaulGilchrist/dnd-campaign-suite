@@ -1,3 +1,40 @@
+// @maintained-by-ai
+/**
+ * faerieFire TRIO lane #1908 — save-handling OUTCOMES (faerieFireHandler.js).
+ * Canonical TRIO SEAM MAP lives in faerieFireHandler.handle.test.js header (#1907).
+ *  - #1908 THIS FILE — outlineTarget internals L28-111 (campaign targetEffects SHAPE
+ *        incl. re-cast replace-in-place, activeBuffs shape + replace-not-duplicate,
+ *        addExpiration enqueue, Invisible-condition removal + removed-log envelope,
+ *        addTargetResult payloads, applied-condition and save_result log envelopes with
+ *        full own-composition strings), recordFaerieFireSaveSuccess internals L121-140
+ *        (payload + success save_result envelope + no-write/no-condition-log guards),
+ *        registerSpellConcentration content (areaSpellUtils.js L25-31 via its
+ *        combatData/concentrationService/storage mocks + window event dispatch), and the
+ *        per-target ability_use log envelopes L188-193/L207-213 (content pins only —
+ *        prompt OPTIONS and immunity-gate COUNTS belong to #1907, never re-absorbed).
+ *  - #1907 faerieFireHandler.handle.test.js — handle orchestration (selection, prompt
+ *        options, gate counts, mixed-dispatch smoke). Closes there: 'should return early
+ *        when all creatures are the caster' — no duplicate here (verified 2026-10-16).
+ *  - #1909 faerieFireHandler.summary.test.js — owns faerieFireSummary L142-148 template
+ *        (smoke only here: the immunity/advantage wording below is pinned on the
+ *        outlineTarget LOG note, not the popup summary) plus runtime-store fallbacks,
+ *        addEntry .catch() exercises, and the concentration-DC proficiency fallback.
+ *
+ * Trimmed 2026-10-16 (23→18): summary-notes pin → #1909; duplicate concentration-DC
+ * saveDc-value pin dropped (same branch as the 16-pin); applied-condition log pair,
+ * ability_use pair, and success no-condition-log merged into their envelope owners;
+ * dead addEventListenerSpy removed; own-lane pins tightened to exact objects.
+ *
+ * Caller liveness (verified at source 2026-10-16): automation/index.js L274/L586
+ * `faerie_fire: handleFaerieFire` (dynamic dispatch map); automationRouter.js L255;
+ * meta from rules/features/faerieFireService.js; te consumers conditionEffects.js L510,
+ * clearExpirationEffects.js L163/L435 ('remove_faerie_fire'), concentrationService.js L334.
+ *
+ * Captured-listener pattern: makeSaveListener returns a pre-resolved promise — handle
+ * awaits its own chain, so no setTimeout / vi.waitFor graces anywhere in this file.
+ * Turn-based: 'concentration' / 'Concentration, up to 1 minute' are latch strings
+ * cleared at concentration/initiative/rest seams via addExpiration — never a wall-clock.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './faerieFireHandler.js';
@@ -82,6 +119,15 @@ function mockGetRuntimeValue(dispatch) {
   runtimeState.getRuntimeValue.mockImplementation((playerName, key, _cName) => dispatch(playerName, key, _cName));
 }
 
+function mockEmptyStores() {
+  mockGetRuntimeValue((playerName, key) => {
+    if (key === 'targetEffects') return [];
+    if (key === 'activeBuffs') return [];
+    if (key === 'activeConditions') return [];
+    return null;
+  });
+}
+
 function makeSaveListener(promiseResult, promptId) {
   return { promptId: promptId || 'faerie-prompt', promise: Promise.resolve(promiseResult) };
 }
@@ -89,12 +135,7 @@ function makeSaveListener(promiseResult, promptId) {
 function setupFailedSaveMock() {
   damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
   savePrompt.buildSaveDc.mockReturnValue(15);
-  mockGetRuntimeValue((playerName, key) => {
-    if (key === 'targetEffects') return [];
-    if (key === 'activeBuffs') return [];
-    if (key === 'activeConditions') return [];
-    return null;
-  });
+  mockEmptyStores();
   savePrompt.createSaveListener.mockReturnValue(makeSaveListener({ success: false }));
 }
 
@@ -109,8 +150,8 @@ describe('faerieFireHandler.save-handling', () => {
     vi.resetAllMocks();
   });
 
-  describe('failed save handling', () => {
-    it('should register faerie_fire targetEffect on failed save', async () => {
+  describe('failed save — outlineTarget writes', () => {
+    it('should write exact faerie_fire targetEffect on failed save', async () => {
       setupFailedSaveMock();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -118,19 +159,12 @@ describe('faerieFireHandler.save-handling', () => {
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'campaign',
         'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({
-            target: 'Goblin',
-            effect: 'faerie_fire',
-            source: 'TestCaster',
-            duration: 'concentration',
-          }),
-        ]),
+        [{ target: 'Goblin', effect: 'faerie_fire', source: 'TestCaster', duration: 'concentration' }],
         campaignName,
       );
     });
 
-    it('should add activeBuffs entry with invisible immunity on failed save', async () => {
+    it('should write exact activeBuffs entry with invisible immunity on failed save', async () => {
       setupFailedSaveMock();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -138,15 +172,13 @@ describe('faerieFireHandler.save-handling', () => {
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Goblin',
         'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: 'Faerie Fire',
-            effect: 'faerie_fire',
-            duration: 'Concentration, up to 1 minute',
-            source: 'TestCaster',
-            conditionImmunity: ['invisible'],
-          }),
-        ]),
+        [{
+          name: 'Faerie Fire',
+          effect: 'faerie_fire',
+          duration: 'Concentration, up to 1 minute',
+          source: 'TestCaster',
+          conditionImmunity: ['invisible'],
+        }],
         campaignName,
       );
     });
@@ -156,10 +188,78 @@ describe('faerieFireHandler.save-handling', () => {
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: [{ type: 'remove_faerie_fire' }], campaignName });
+      expect(expirations.addExpiration).toHaveBeenCalledWith({
+        attackerName: 'TestCaster',
+        targetName: 'Goblin',
+        effects: [{ type: 'remove_faerie_fire' }],
+        campaignName,
+      });
     });
 
-    it('should remove invisible condition when present', async () => {
+    it('should replace existing faerie_fire targetEffect in place when re-casting on same target', async () => {
+      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
+      savePrompt.buildSaveDc.mockReturnValue(15);
+      const existingEffect = {
+        target: 'Goblin',
+        effect: 'faerie_fire',
+        source: 'OldCaster',
+        duration: 'concentration',
+      };
+      mockGetRuntimeValue((playerName, key) => {
+        if (key === 'targetEffects') return [existingEffect];
+        if (key === 'activeBuffs') return [];
+        if (key === 'activeConditions') return [];
+        return null;
+      });
+      savePrompt.createSaveListener.mockReturnValue(makeSaveListener({ success: false }));
+
+      await handle(makeAction(), makePlayerStats({ name: 'OldCaster' }), campaignName, null);
+
+      const targetEffectsCall = runtimeState.setRuntimeValue.mock.calls.find(
+        call => call[0] === 'campaign' && call[1] === 'targetEffects'
+      );
+      // Replace-in-place: single entry, source retargeted to the new caster.
+      expect(targetEffectsCall).toBeDefined();
+      expect(targetEffectsCall[2]).toEqual([
+        { target: 'Goblin', effect: 'faerie_fire', source: 'OldCaster', duration: 'concentration' },
+      ]);
+    });
+
+    it('should replace existing faerie_fire buff in activeBuffs instead of duplicating', async () => {
+      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
+      savePrompt.buildSaveDc.mockReturnValue(15);
+      const staleBuff = {
+        name: 'Faerie Fire',
+        effect: 'faerie_fire',
+        duration: 'Concentration, up to 1 minute',
+        source: 'AncientFaerie',
+        conditionImmunity: ['invisible'],
+      };
+      mockGetRuntimeValue((playerName, key) => {
+        if (key === 'targetEffects') return [];
+        if (key === 'activeBuffs') return [staleBuff];
+        if (key === 'activeConditions') return [];
+        return null;
+      });
+      savePrompt.createSaveListener.mockReturnValue(makeSaveListener({ success: false }));
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      const buffsCall = runtimeState.setRuntimeValue.mock.calls.find(
+        call => call[0] === 'Goblin' && call[1] === 'activeBuffs'
+      );
+      expect(buffsCall).toBeDefined();
+      // Length 1 AND source switched to the current caster — proves replace, not keep.
+      expect(buffsCall[2]).toEqual([{
+        name: 'Faerie Fire',
+        effect: 'faerie_fire',
+        duration: 'Concentration, up to 1 minute',
+        source: 'TestCaster',
+        conditionImmunity: ['invisible'],
+      }]);
+    });
+
+    it('should remove invisible condition and log the removal envelope', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       mockGetRuntimeValue((playerName, key) => {
@@ -178,6 +278,17 @@ describe('faerieFireHandler.save-handling', () => {
         [],
         campaignName,
       );
+
+      const { addEntry } = await import('../../../ui/logService.js');
+      const removedEntry = addEntry.mock.calls.find(
+        ([, entry]) => entry.type === 'condition' && entry.action === 'removed'
+      );
+      expect(removedEntry).toBeDefined();
+      expect(removedEntry[1]).toEqual(expect.objectContaining({
+        characterName: 'Goblin',
+        condition: 'Invisible',
+        reason: 'Faerie Fire spell — affected creatures can\'t benefit from invisibility',
+      }));
     });
 
     it('should not touch activeConditions when invisible is absent', async () => {
@@ -192,122 +303,28 @@ describe('faerieFireHandler.save-handling', () => {
         campaignName,
       );
     });
+  });
 
-    it('should log the applied condition entry', async () => {
+  describe('failed save — log and rollback envelopes', () => {
+    it('should log condition applied entry with full outline note', async () => {
       setupFailedSaveMock();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       const { addEntry } = await import('../../../ui/logService.js');
-      const appliedEntry = addEntry.mock.calls.find(([, entry]) => entry.type === 'condition' && entry.action === 'applied');
-      expect(appliedEntry).toBeTruthy();
-      expect(appliedEntry[1].condition).toBe('Faerie Fire');
-      expect(appliedEntry[1].note).toContain('immune to the Invisible condition');
-      expect(appliedEntry[1].note).toContain('Advantage');
-    });
-
-    it('should include immunity and advantage notes in summary', async () => {
-      setupFailedSaveMock();
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('immune to the Invisible condition');
-      expect(result.payload.description).toContain('Advantage');
-    });
-
-    it('should update existing faerie_fire effect when re-casting on same target', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      const existingEffect = {
-        target: 'Goblin',
-        effect: 'faerie_fire',
-        source: 'OldCaster',
-        duration: 'concentration',
-      };
-      mockGetRuntimeValue((playerName, key) => {
-        if (key === 'targetEffects') return [existingEffect];
-        if (key === 'activeBuffs') return [];
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-      savePrompt.createSaveListener.mockReturnValue(makeSaveListener({ success: false }));
-
-      const oldCasterStats = makePlayerStats({ name: 'OldCaster' });
-      await handle(makeAction(), oldCasterStats, campaignName, null);
-
-      const targetEffectsCall = runtimeState.setRuntimeValue.mock.calls.find(
-        call => call[0] === 'campaign' && call[1] === 'targetEffects'
-      );
-      expect(targetEffectsCall).toBeDefined();
-      expect(targetEffectsCall[2]).toEqual([
-        expect.objectContaining({
-          target: 'Goblin',
-          effect: 'faerie_fire',
-          source: 'OldCaster',
-          duration: 'concentration',
-        }),
-      ]);
-    });
-
-    it('should not duplicate faerie_fire in activeBuffs when already present', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      const existingBuff = {
-        name: 'Faerie Fire',
-        effect: 'faerie_fire',
-        duration: 'Concentration, up to 1 minute',
-        source: 'OldCaster',
-        conditionImmunity: ['invisible'],
-      };
-      mockGetRuntimeValue((playerName, key) => {
-        if (key === 'targetEffects') return [];
-        if (key === 'activeBuffs') return [existingBuff];
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-      savePrompt.createSaveListener.mockReturnValue(makeSaveListener({ success: false }));
-
-      const oldCasterStats = makePlayerStats({ name: 'OldCaster' });
-      await handle(makeAction(), oldCasterStats, campaignName, null);
-
-      const buffsCall = runtimeState.setRuntimeValue.mock.calls.find(
-        call => call[0] === 'Goblin' && call[1] === 'activeBuffs'
-      );
-      expect(buffsCall).toBeDefined();
-      expect(buffsCall[2]).toHaveLength(1);
-    });
-
-    it('should call addTargetResult with failure details', async () => {
-      setupFailedSaveMock();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(damageRollback.addTargetResult).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Goblin',
-        saveResult: 'failure',
-        roll: 0,
-        total: 0,
-        conditions: ['faerie_fire'],
-        appliedDamage: 0,
-      });
-    });
-
-    it('should log condition applied entry for failed save', async () => {
-      setupFailedSaveMock();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const { addEntry } = await import('../../../ui/logService.js');
-      const conditionEntry = addEntry.mock.calls.find(
+      const appliedEntry = addEntry.mock.calls.find(
         ([, entry]) => entry.type === 'condition' && entry.action === 'applied'
       );
-      expect(conditionEntry).toBeDefined();
-      expect(conditionEntry[1].characterName).toBe('Goblin');
-      expect(conditionEntry[1].condition).toBe('Faerie Fire');
-      expect(conditionEntry[1].note).toContain('outlined by Faerie Fire');
+      expect(appliedEntry).toBeDefined();
+      expect(appliedEntry[1]).toEqual(expect.objectContaining({
+        characterName: 'Goblin',
+        condition: 'Faerie Fire',
+        reason: 'Faerie Fire spell',
+        note: 'Goblin is outlined by Faerie Fire: sheds Dim Light in 10-foot radius, is immune to the Invisible condition, and attack rolls against it have Advantage.',
+      }));
     });
 
-    it('should log save_result entry for failed save', async () => {
+    it('should log save_result failure envelope with full description', async () => {
       setupFailedSaveMock();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -317,27 +334,40 @@ describe('faerieFireHandler.save-handling', () => {
         ([, entry]) => entry.type === 'save_result' && entry.success === false
       );
       expect(saveResultEntry).toBeDefined();
-      expect(saveResultEntry[1].targetName).toBe('Goblin');
-      expect(saveResultEntry[1].saveType).toBe('DEX');
-      expect(saveResultEntry[1].saveDc).toBe(15);
-      expect(saveResultEntry[1].rollType).toBe('save-faerie-fire');
+      expect(saveResultEntry[1]).toEqual({
+        type: 'save_result',
+        characterName: 'TestCaster',
+        rollType: 'save-faerie-fire',
+        targetName: 'Goblin',
+        saveDc: 15,
+        saveType: 'DEX',
+        success: false,
+        description: 'Goblin failed DEX save against Faerie Fire. Outlined in light.',
+      });
     });
 
-    it('should log ability_use entry when casting', async () => {
+    it('should log ability_use prompt entry with action.name, DC, and promptId', async () => {
       setupFailedSaveMock();
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+      const customAction = { name: 'My Faerie Fire', automation: { type: 'faerie_fire', saveType: 'DEX', saveDc: 15 } };
+      await handle(customAction, makePlayerStats(), campaignName, null);
 
       const { addEntry } = await import('../../../ui/logService.js');
       const abilityEntry = addEntry.mock.calls.find(
-        ([, entry]) => entry.type === 'ability_use' && entry.abilityName === 'Faerie Fire' && entry.promptId
+        ([, entry]) => entry.type === 'ability_use' && entry.promptId
       );
       expect(abilityEntry).toBeDefined();
-      expect(abilityEntry[1].characterName).toBe('TestCaster');
-      expect(abilityEntry[1].description).toContain('must make a DEX save');
+      // abilityName follows action.name (custom here); description is handle's own template.
+      expect(abilityEntry[1]).toEqual({
+        type: 'ability_use',
+        characterName: 'TestCaster',
+        abilityName: 'My Faerie Fire',
+        description: 'TestCaster casts Faerie Fire! Goblin must make a DEX save (DC 15) or be outlined in light.',
+        promptId: 'faerie-prompt',
+      });
     });
 
-    it('should log ability_use entry for immune creature', async () => {
+    it('should log ability_use entry for immune creature without a promptId', async () => {
       const combatWithImmune = {
         ...baseCombatContext,
         creatures: [
@@ -356,49 +386,44 @@ describe('faerieFireHandler.save-handling', () => {
         ([, entry]) => entry.type === 'ability_use' && entry.description?.includes('immune')
       );
       expect(immuneEntry).toBeDefined();
-      expect(immuneEntry[1].description).toContain('IronGolem');
-      expect(immuneEntry[1].description).toContain('DEX immunity');
+      expect(immuneEntry[1]).toEqual({
+        type: 'ability_use',
+        characterName: 'TestCaster',
+        abilityName: 'Faerie Fire',
+        description: 'IronGolem is immune to Faerie Fire (DEX immunity).',
+      });
     });
 
-    it('should use action.name in ability_use log entries', async () => {
+    it('should call addTargetResult with failure details', async () => {
       setupFailedSaveMock();
-      vi.clearAllMocks();
-      mockGetRuntimeValue((playerName, key) => {
-        if (key === 'targetEffects') return [];
-        if (key === 'activeBuffs') return [];
-        if (key === 'activeConditions') return [];
-        return null;
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(damageRollback.addTargetResult).toHaveBeenCalledWith(campaignName, {
+        targetName: 'Goblin',
+        saveResult: 'failure',
+        roll: 0,
+        total: 0,
+        conditions: ['faerie_fire'],
+        appliedDamage: 0,
       });
-
-      const customAction = { name: 'My Faerie Fire', automation: { type: 'faerie_fire', saveType: 'DEX', saveDc: 15 } };
-      savePrompt.createSaveListener.mockReturnValue(makeSaveListener({ success: false }));
-
-      await handle(customAction, makePlayerStats(), campaignName, null);
-
-      const { addEntry } = await import('../../../ui/logService.js');
-      const abilityEntry = addEntry.mock.calls.find(
-        ([, entry]) => entry.type === 'ability_use' && entry.abilityName === 'My Faerie Fire'
-      );
-      expect(abilityEntry).toBeDefined();
     });
   });
 
-  describe('successful save handling', () => {
-    it('should not apply targetEffect or activeBuff when save succeeds', async () => {
+  describe('successful save — recordFaerieFireSaveSuccess', () => {
+    it('should write no state and log no condition when save succeeds', async () => {
       setupSuccessfulSaveMock();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
-        expect.any(Array),
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(expirations.addExpiration).not.toHaveBeenCalled();
+
+      const { addEntry } = await import('../../../ui/logService.js');
+      const faerieConditionEntry = addEntry.mock.calls.find(
+        ([, entry]) => entry.type === 'condition' && entry.action === 'applied' && entry.condition === 'Faerie Fire'
       );
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        expect.any(String),
-        'activeBuffs',
-        expect.any(Array),
-      );
+      expect(faerieConditionEntry).toBeUndefined();
     });
 
     it('should call addTargetResult with success details', async () => {
@@ -416,7 +441,7 @@ describe('faerieFireHandler.save-handling', () => {
       });
     });
 
-    it('should log save_result entry for successful save', async () => {
+    it('should log save_result success envelope with full description', async () => {
       setupSuccessfulSaveMock();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -426,32 +451,24 @@ describe('faerieFireHandler.save-handling', () => {
         ([, entry]) => entry.type === 'save_result' && entry.success === true
       );
       expect(saveResultEntry).toBeDefined();
-      expect(saveResultEntry[1].targetName).toBe('Goblin');
-      expect(saveResultEntry[1].saveType).toBe('DEX');
-      expect(saveResultEntry[1].saveDc).toBe(20);
-      expect(saveResultEntry[1].rollType).toBe('save-faerie-fire');
-    });
-
-    it('should not apply faerie_fire conditions on success', async () => {
-      setupSuccessfulSaveMock();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const { addEntry } = await import('../../../ui/logService.js');
-      const faerieConditionEntry = addEntry.mock.calls.find(
-        ([, entry]) => entry.type === 'condition' && entry.action === 'applied' && entry.condition === 'Faerie Fire'
-      );
-      expect(faerieConditionEntry).toBeUndefined();
+      expect(saveResultEntry[1]).toEqual({
+        type: 'save_result',
+        characterName: 'TestCaster',
+        rollType: 'save-faerie-fire',
+        targetName: 'Goblin',
+        saveDc: 20,
+        saveType: 'DEX',
+        success: true,
+        description: 'Goblin succeeded on DEX save against Faerie Fire.',
+      });
     });
   });
 
   describe('concentration', () => {
-    it('should register concentration when combat summary is available', async () => {
+    it('should register concentration from spellAbilities.saveDc and persist summary', async () => {
       const summary = { creatures: [{ name: 'TestCaster' }, { name: 'Goblin' }] };
       combatData.getCombatSummary.mockReturnValue(summary);
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      savePrompt.createSaveListener.mockReturnValue(makeSaveListener({ success: true }));
+      setupSuccessfulSaveMock();
 
       const playerStats = makePlayerStats({ spellAbilities: { saveDc: 16 } });
       await handle(makeAction(), playerStats, campaignName, null);
@@ -465,29 +482,9 @@ describe('faerieFireHandler.save-handling', () => {
       expect(storage.set).toHaveBeenCalledWith('combatSummary', summary, campaignName);
     });
 
-    it('should compute concentration DC from spellAbilities.saveDc when available', async () => {
-      const summary = { creatures: [{ name: 'TestCaster' }, { name: 'Goblin' }] };
-      combatData.getCombatSummary.mockReturnValue(summary);
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      savePrompt.createSaveListener.mockReturnValue(makeSaveListener({ success: true }));
-
-      const playerStats = makePlayerStats({ spellAbilities: { saveDc: 18 } });
-      await handle(makeAction(), playerStats, campaignName, null);
-
-      expect(concentrationService.addConcentration).toHaveBeenCalledWith(
-        summary,
-        'TestCaster',
-        'Faerie Fire',
-        18,
-      );
-    });
-
     it('should not register concentration when combat summary is null', async () => {
       combatData.getCombatSummary.mockReturnValue(null);
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      savePrompt.createSaveListener.mockReturnValue(makeSaveListener({ success: true }));
+      setupSuccessfulSaveMock();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -498,17 +495,13 @@ describe('faerieFireHandler.save-handling', () => {
     it('should dispatch window event for combat-summary-updated', async () => {
       const summary = { creatures: [{ name: 'TestCaster' }, { name: 'Goblin' }] };
       combatData.getCombatSummary.mockReturnValue(summary);
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      savePrompt.createSaveListener.mockReturnValue(makeSaveListener({ success: true }));
+      setupSuccessfulSaveMock();
 
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
       const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(dispatchEventSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
-      addEventListenerSpy.mockRestore();
       dispatchEventSpy.mockRestore();
     });
   });

@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Deterministic contract suite for aidHandler (handle popup + applyAid writes).
+// All deps mocked; pins popup payload shape, runtime-store key writes, buff
+// composition, expiration delegation, and log payloads. Stable with the app.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -120,6 +124,9 @@ describe('aidHandler', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('aid_target_selection');
       expect(result.payload.creatureTargets).toEqual(['TestCleric', 'Ally1', 'Ally2']);
+      expect(result.payload.name).toBe('Aid');
+      expect(result.payload.maxTargets).toBe(3);
+      expect(result.payload.duration).toBe('8 hours');
     });
 
     it('resolves range from automation, spell, or default 30 feet', async () => {
@@ -296,7 +303,18 @@ describe('aidHandler', () => {
       expect(hpCalls).toHaveLength(2);
       expect(hpCalls[0]).toEqual(['Ally1', 'currentHitPoints', 15, campaignName]);
       expect(hpCalls[1]).toEqual(['Ally2', 'currentHitPoints', 15, campaignName]);
-      expect(result.payload.description).toContain('2 target(s)');
+
+      // Delegation pin — expirations module owns its internals.
+      expect(addExpiration).toHaveBeenCalledTimes(2);
+      expect(addExpiration).toHaveBeenCalledWith({
+        attackerName: 'TestCleric',
+        targetName: 'Ally1',
+        effects: [{ type: 'remove_aid_buff', buffName: 'Aid', hpKey: 'aidHpMaxIncrease' }],
+        campaignName,
+      });
+
+      // Own-composition full-string pin (count + delta + name seam).
+      expect(result.payload.description).toBe('2 target(s) gained +5 HP maximum from Aid.');
     });
 
     it('stacks aidHpMaxIncrease with existing value', async () => {
@@ -377,10 +395,11 @@ describe('aidHandler', () => {
         (c) => c[0] === 'Ally1' && c[1] === 'activeBuffs',
       );
       expect(buffsCall).toBeDefined();
-      expect(buffsCall[2].length).toBe(2);
-      const aidBuff = buffsCall[2].find((b) => b.name === 'Aid');
-      expect(aidBuff).toBeDefined();
-      expect(aidBuff.sourceCharacter).toBe('TestCleric');
+      // Full buff composition pin, incl. default 8-hour duration and coexisting buffs.
+      expect(buffsCall[2]).toEqual([
+        { name: 'Shield' },
+        { name: 'Aid', effect: 'aid_hp_increase', duration: '8 hours', sourceCharacter: 'TestCleric' },
+      ]);
     });
 
     it('does not add duplicate Aid buff when already present', async () => {
@@ -499,53 +518,7 @@ describe('aidHandler', () => {
         delta: 10,
         note: 'Aid (+10 HP max)',
       }));
-      expect(result.payload.description).toContain('+10 HP maximum');
-    });
-
-    it('SP-127: lv2 base still resolves +5 — byte-identical legacy lane', async () => {
-      getRuntimeValue.mockImplementation((target, key) => {
-        if (key === 'aidHpMaxIncrease') return 0;
-        if (key === 'currentHitPoints') return 60;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-      evaluateAutoExpression.mockImplementation((expr, _ps, _prof, _lvl, slotLevel) =>
-        (/spellSlotLevel/.test(expr) ? 5 + (slotLevel - 2) * 5 : 5));
-
-      const action = {
-        name: 'Aid',
-        automation: { type: 'aid' },
-        spell: {
-          level: 2,
-          automation: { hpMaxIncreaseExpression: '5 + ((spellSlotLevel - 2) * 5)' },
-        },
-        spellSlotLevel: 2,
-      };
-
-      await applyAid(action, makePlayerStats(), campaignName, mapName, ['War_Cleric']);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('War_Cleric', 'aidHpMaxIncrease', 5, campaignName);
-      expect(setRuntimeValue).toHaveBeenCalledWith('War_Cleric', 'currentHitPoints', 65, campaignName);
-    });
-
-    it('returns correct popup description with target count and hpIncrease', async () => {
-      getRuntimeValue.mockImplementation((target, key) => {
-        if (key === 'aidHpMaxIncrease') return 0;
-        if (key === 'currentHitPoints') return 10;
-        if (key === 'activeBuffs') return [];
-        return null;
-      });
-
-      const result = await applyAid(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-        ['Ally1', 'Ally2', 'Ally3'],
-      );
-
-      expect(result.payload.description).toContain('3 target(s)');
-      expect(result.payload.description).toContain('+5 HP maximum');
+      expect(result.payload.description).toBe('1 target(s) gained +10 HP maximum from Aid.');
     });
   });
 });

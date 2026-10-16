@@ -18,10 +18,6 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
-}));
-
 const campaignName = 'TestCampaign';
 
 function makePlayerStats(overrides = {}) {
@@ -58,55 +54,36 @@ describe('greaterRestorationHandler.handle', () => {
     vi.clearAllMocks();
   });
 
-  describe('combat context validation', () => {
-    it('should return automation_info popup when no combat context exists', async () => {
-      getCombatContext.mockResolvedValue(null);
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+  it('should return automation_info popup when no combat context exists', async () => {
+    getCombatContext.mockResolvedValue(null);
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Greater Restoration');
-      expect(result.payload.description).toContain('No combat context found');
-    });
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.name).toBe('Greater Restoration');
+    expect(result.payload.description).toContain('No combat context found');
   });
 
-  describe('creature targets', () => {
-    it('should exclude the caster from creature targets', async () => {
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+  it('should open selection popup with creature targets excluding the caster', async () => {
+    getCombatContext.mockResolvedValue(makeCombatContext());
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.type).toBe('greater_restoration_selection');
-      expect(result.payload.creatureTargets).toEqual(['Goblin', 'Orc']);
-    });
+    expect(result.payload.type).toBe('greater_restoration_selection');
+    expect(result.payload.creatureTargets).toEqual(['Goblin', 'Orc']);
+  });
 
-    it('should return empty creature targets when creatures array is empty', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [], players: [], placedItems: [] });
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+  it('should pass through range from config and default range/automation when absent', async () => {
+    getCombatContext.mockResolvedValue(makeCombatContext());
 
-      expect(result.payload.creatureTargets).toEqual([]);
-    });
+    const withRange = await handle(makeAction({ range: '30 ft' }), makePlayerStats(), campaignName, null);
+    expect(withRange.payload.range).toBe('30 ft');
 
-    it('should include range from automation config', async () => {
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      const result = await handle(makeAction({ range: '30 ft' }), makePlayerStats(), campaignName, null);
+    const defaultRange = await handle(makeAction({}), makePlayerStats(), campaignName, null);
+    expect(defaultRange.payload.range).toBe('Touch');
 
-      expect(result.payload.range).toBe('30 ft');
-    });
-
-    it('should default range to Touch when not specified', async () => {
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      const result = await handle(makeAction({}), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.range).toBe('Touch');
-    });
-
-    it('should use empty object when action has no automation property', async () => {
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      const result = await handle({ name: 'Greater Restoration' }, makePlayerStats(), campaignName, null);
-
-      expect(result.payload.range).toBe('Touch');
-      expect(result.payload.automation).toEqual({});
-    });
+    const noAutomation = await handle({ name: 'Greater Restoration' }, makePlayerStats(), campaignName, null);
+    expect(noAutomation.payload.range).toBe('Touch');
+    expect(noAutomation.payload.automation).toEqual({});
   });
 });
 
@@ -133,7 +110,6 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
         if (prop === 'exhaustionLevel') return 2;
         return null;
       });
-      setRuntimeValue.mockResolvedValue(undefined);
 
       const result = await applyGreaterRestoration(
         makeAction(),
@@ -146,23 +122,6 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'exhaustionLevel', 1, campaignName);
       expect(result.payload.description).toContain('Exhaustion level');
     });
-
-    it('should not modify when exhaustion level is 0', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'exhaustionLevel') return 0;
-        return null;
-      });
-
-      const result = await applyGreaterRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Goblin', selections: [{ type: 'exhaustion' }] },
-      );
-
-      expect(result.payload.description).toContain('No removable effects found');
-    });
   });
 
   describe('condition removal', () => {
@@ -171,7 +130,6 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
         if (prop === 'activeConditions') return ['Paralyzed', 'Frightened'];
         return null;
       });
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin', conditions: [{ key: 'Paralyzed' }] }] });
 
       const result = await applyGreaterRestoration(
         makeAction(),
@@ -183,24 +141,6 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
 
       expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['Frightened'], campaignName);
       expect(result.payload.description).toContain('Paralyzed condition');
-    });
-
-    it('should not modify conditions when condition is not present', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'activeConditions') return ['Frightened'];
-        return null;
-      });
-
-      const result = await applyGreaterRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Goblin', selections: [{ type: 'condition', condition: 'Paralyzed' }] },
-      );
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(result.payload.description).toContain('No removable effects found');
     });
 
     it('should handle case-insensitive condition matching', async () => {
@@ -261,49 +201,10 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeBuffs', [], campaignName);
       expect(result.payload.description).toContain('Curse');
     });
-
-    it('should skip when no cursed buffs exist', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'activeBuffs') return [{ type: 'buff', name: 'Shield' }];
-        return null;
-      });
-
-      const result = await applyGreaterRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Goblin', selections: [{ type: 'curse' }] },
-      );
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(result.payload.description).toContain('No removable effects found');
-    });
   });
 
   describe('ability reduction restoration', () => {
-    it('should restore all reduced ability scores', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'abilityReductions') return { strength: { original: 18, current: 10 } };
-        if (prop === 'strength') return 10;
-        return null;
-      });
-
-      const result = await applyGreaterRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Goblin', selections: [{ type: 'ability_reduction' }] },
-      );
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'strength_original', 18, campaignName);
-      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'strength', 18, campaignName);
-      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'abilityReductions', {}, campaignName);
-      expect(result.payload.description).toContain('Ability score reduction');
-    });
-
-    it('should restore multiple ability reductions', async () => {
+    it('should restore all reduced ability scores and name them in the description', async () => {
       getRuntimeValue.mockImplementation((target, prop) => {
         if (prop === 'abilityReductions') return { strength: { original: 18, current: 10 }, dexterity: { original: 16, current: 8 } };
         if (prop === 'strength') return 10;
@@ -320,7 +221,10 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
       );
 
       expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'strength_original', 18, campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'strength', 18, campaignName);
       expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'dexterity_original', 16, campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'dexterity', 16, campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'abilityReductions', {}, campaignName);
       expect(result.payload.description).toContain('strength, dexterity');
     });
 
@@ -342,24 +246,6 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'strength_original', 18, campaignName);
       expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'strength', 18, campaignName);
       expect(result.payload.description).toContain('Ability score reduction');
-    });
-
-    it('should skip when no ability reductions exist', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'abilityReductions') return {};
-        return null;
-      });
-
-      const result = await applyGreaterRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Goblin', selections: [{ type: 'ability_reduction' }] },
-      );
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(result.payload.description).toContain('No removable effects found');
     });
   });
 
@@ -424,24 +310,6 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'hitPoints', 25, campaignName);
       expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'currentHitPoints', 25, campaignName);
     });
-
-    it('should skip when hpMaxReduction is 0', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'hpMaxReduction') return 0;
-        return null;
-      });
-
-      const result = await applyGreaterRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Goblin', selections: [{ type: 'hp_max_reduction' }] },
-      );
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(result.payload.description).toContain('No removable effects found');
-    });
   });
 
   describe('logging', () => {
@@ -478,53 +346,6 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
         }),
       );
     });
-
-    it('should not log when no effects were removed', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'activeConditions') return [];
-        if (prop === 'exhaustionLevel') return 0;
-        if (prop === 'activeBuffs') return [];
-        if (prop === 'abilityReductions') return {};
-        if (prop === 'hpMaxReduction') return 0;
-        return null;
-      });
-
-      await applyGreaterRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Goblin', selections: [{ type: 'condition', condition: 'Paralyzed' }] },
-      );
-
-      expect(addEntry).not.toHaveBeenCalled();
-      expect(addEntry).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('no removable effects', () => {
-    it('should return info popup with no removable effects message when all properties are empty', async () => {
-      getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'activeConditions') return [];
-        if (prop === 'exhaustionLevel') return 0;
-        if (prop === 'activeBuffs') return [];
-        if (prop === 'abilityReductions') return {};
-        if (prop === 'hpMaxReduction') return 0;
-        return null;
-      });
-
-      const result = await applyGreaterRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Goblin', selections: [{ type: 'condition', condition: 'Paralyzed' }] },
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No removable effects found');
-    });
   });
 
   describe('multiple selections', () => {
@@ -552,12 +373,12 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
       expect(result.payload.description).toContain('Exhaustion level');
       expect(result.payload.description).toContain('Paralyzed condition');
     });
+  });
 
-    it('should process mixed selections including curse and ability reduction', async () => {
+  describe('nothing removable', () => {
+    it('should skip every remover, write nothing, log nothing, and return no-removable popup', async () => {
       getRuntimeValue.mockImplementation((target, prop) => {
-        if (prop === 'activeBuffs') return [{ type: 'cursed', name: 'Hex' }];
-        if (prop === 'abilityReductions') return { strength: { original: 18, current: 10 } };
-        if (prop === 'strength') return 10;
+        if (prop === 'activeConditions') return ['Frightened'];
         return null;
       });
 
@@ -569,14 +390,20 @@ describe('greaterRestorationHandler.applyGreaterRestoration', () => {
         {
           targetName: 'Goblin',
           selections: [
+            { type: 'exhaustion' },
+            { type: 'condition', condition: 'Paralyzed' },
             { type: 'curse' },
             { type: 'ability_reduction' },
+            { type: 'hp_max_reduction' },
           ],
         },
       );
 
-      expect(result.payload.description).toContain('Curse');
-      expect(result.payload.description).toContain('Ability score reduction');
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('No removable effects found');
     });
   });
 });

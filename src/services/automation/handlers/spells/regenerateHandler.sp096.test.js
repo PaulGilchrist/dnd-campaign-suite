@@ -1,7 +1,21 @@
 // SP-096: PC initial heal computed negative (-82) from combatSummary placeholder maxHp=1.
-// Pins: PC max-HP truth = runtime/change-data hitPoints, heal clamped to missing HP
-// floored at 0, no negative hp_change log, rolled dice total surfaced in popup + logs,
-// and the monster lane max-HP resolution byte-identical.
+// FIX-SPECIFIC lock lane (#1948) — pins ONLY what commit d6e630823 changed or guarded:
+// PC max-HP truth = runtime/change-data hitPoints, heal floored at 0, hp_change log
+// skipped when nothing restored, rolled-dice-total surfaced (rollInitialHeal), honest
+// zero-heal message, monster-lane max-HP resolution byte-identical (no-side-effect guard).
+//
+// Overlap verdict vs closed #1947 .apply (per test-suite-trim handoff):
+//   • regenerateActive one-write pin — NOT touched by the fix; #1947's exact one-write
+//     table is the load-bearing forward contract → shed from here (was a loose dupe).
+//   • targetEffects stamp — NOT touched by the fix; #1947 owns exact badge tables → shed.
+//   • monster-lane tests here are fix guards with runtime decoys #1947 lacks → kept.
+// Mutation kills (mutant = fix reverted / element removed):
+//   T1 exact-call+popup kills pre-fix (apply skipped, '-82' in popup);
+//   T2 identity-mock + exact-call(20) kills un-clamped pass-through and pre-fix maxHp 1;
+//   T3 no-entries + '-82' guard + full-string popup kills pre-fix always-log branch;
+//   T4 full-string zero-heal popup + hp_change-skip kills pre-fix popup & log-always;
+//   T5 deterministic rollExpression + rollTotal/rolls pins kill no-roll pre-fix;
+//   T6 Goblin runtime hitPoints decoy kills any runtime-first leak into the monster lane.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -29,10 +43,20 @@ vi.mock('../../../encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(),
 }));
 
+// Deterministic roller: the FIX (d6e630823) added rollInitialHeal → rollExpression
+// for un-rolled notation. A live roller made the delta pin flaky (4d8 total 19 once
+// per ~4096 rolls). Mock pins the exact call site and keeps every total fixed.
+vi.mock('../../../dice/diceRoller.js', () => ({
+    rollExpression: vi.fn(),
+}));
+
 import { applyRegenerateEffect } from './regenerateHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+// setRuntimeValue stays mocked (handler writes through it) but is no longer asserted
+// here — its exact-write contract lives in #1947 (see header overlap verdict).
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { addEntry } from '../../../ui/logService.js';
 
@@ -69,10 +93,16 @@ function stampRuntime({ hitPoints = null, currentHitPoints = null } = {}) {
     });
 }
 
+function hpChangeEntries() {
+    return addEntry.mock.calls.map(([, e]) => e).filter(e => e && e.type === 'hp_change');
+}
+
 describe('regenerateHandler SP-096 PC initial heal', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getCombatSummary.mockReturnValue(csWithPlaceholder);
+        // Identity mock: reports back exactly what the handler asked to heal, so any
+        // un-clamped or placeholder-driven amount flows straight into the assertions.
         applyHealingToTarget.mockImplementation((cs, name, amount) => ({ actualHeal: amount, oldHp: 83, newHp: 83 + amount, maxHp: 103 }));
     });
 
@@ -81,6 +111,7 @@ describe('regenerateHandler SP-096 PC initial heal', () => {
         stampRuntime({ hitPoints: 103, currentHitPoints: 83 });
         const result = await applyRegenerateEffect(makeAction(), casterStats(), campaignName, null, victimName);
 
+        // Pre-fix mutant: maxHp 1 - current 83 -> actualHeal -82 -> this call never happens.
         expect(applyHealingToTarget).toHaveBeenCalledWith(csWithPlaceholder, victimName, 12, campaignName);
         expect(result.payload.description).toContain('Regained 12 HP');
         expect(result.payload.description).not.toContain('-');
@@ -89,14 +120,15 @@ describe('regenerateHandler SP-096 PC initial heal', () => {
     it('clamps PC initial heal to missing HP (roll 21 vs 20 missing -> 20)', async () => {
         evaluateAutoExpression.mockReturnValue(21);
         stampRuntime({ hitPoints: 103, currentHitPoints: 83 });
-        // Missing HP = 20 in this scenario variant: current 83, roll reaches 21.
-        applyHealingToTarget.mockImplementation((cs, name, amount) => ({ actualHeal: Math.min(amount, 20), oldHp: 83, newHp: 103, maxHp: 103 }));
         const result = await applyRegenerateEffect(makeAction(), casterStats(), campaignName, null, victimName);
 
-        const hpEntry = addEntry.mock.calls.map(([, e]) => e).find(e => e && e.type === 'hp_change');
+        // Exact-call pin on the identity mock: a mutant handing the raw 21 to the
+        // heal path now shows up as a wrong amount instead of being self-clamped.
+        expect(applyHealingToTarget).toHaveBeenCalledWith(csWithPlaceholder, victimName, 20, campaignName);
+        const hpEntry = hpChangeEntries()[0];
         expect(hpEntry.delta).toBe(20);
         expect(hpEntry.currentHp).toBe(103);
-        expect(hpEntry.maxHp).toBe(103);
+        expect(hpEntry.maxHp).toBe(103); // pre-fix mutant logged maxHp 1 here
         expect(hpEntry.isHealing).toBe(true);
         expect(result.payload.description).toContain('Regained 20 HP');
     });
@@ -108,57 +140,59 @@ describe('regenerateHandler SP-096 PC initial heal', () => {
         const result = await applyRegenerateEffect(makeAction(), casterStats(), campaignName, null, victimName);
 
         expect(applyHealingToTarget).not.toHaveBeenCalled();
-        const hpEntries = addEntry.mock.calls.map(([, e]) => e).filter(e => e && e.type === 'hp_change');
-        expect(hpEntries.length).toBe(0);
+        expect(hpChangeEntries().length).toBe(0);
         expect(JSON.stringify(addEntry.mock.calls)).not.toContain('-82');
-        expect(result.payload.description).toContain('Already at full HP');
+        // Full-string own-composition pin of the post-fix honest zero-heal popup.
+        expect(result.payload.description).toBe(
+            'Regenerate on HexWarlock: Already at full HP (rolled 4d8 + 15 = 21, no HP restored). ' +
+            'Target gains 1 HP per turn and is restored to full HP when the effect ends.'
+        );
     });
 
-    it('at-max PC gets an honest zero-heal message while the regenerate stamp still lands', async () => {
+    it('at-max PC gets an honest zero-heal message and no hp_change log', async () => {
         evaluateAutoExpression.mockReturnValue(21);
         stampRuntime({ hitPoints: 103, currentHitPoints: 103 });
         const result = await applyRegenerateEffect(makeAction(), casterStats(), campaignName, null, victimName);
 
         expect(applyHealingToTarget).not.toHaveBeenCalled();
-        expect(result.payload.description).toContain('Already at full HP');
-        expect(result.payload.description).toContain('rolled 4d8 + 15 = 21');
-        expect(setRuntimeValue).toHaveBeenCalledWith(victimName, 'regenerateActive', true, campaignName);
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign', 'targetEffects',
-            expect.arrayContaining([expect.objectContaining({ target: victimName, effect: 'regenerate' })]),
-            campaignName,
+        expect(result.payload.description).toBe(
+            'Regenerate on HexWarlock: Already at full HP (rolled 4d8 + 15 = 21, no HP restored). ' +
+            'Target gains 1 HP per turn and is restored to full HP when the effect ends.'
         );
+        // Fix added the appliedHeal>0 log skip: pre-fix logged a delta-0 hp_change here.
+        // (regenerateActive + targetEffects stamp pins live in #1947's exact tables — shed here.)
+        expect(hpChangeEntries().length).toBe(0);
     });
 
     it('rolls un-rolled dice notation and surfaces the rolled total in popup and logs', async () => {
         // Live fingerprint: evaluateAutoExpression returns dice notation un-rolled.
         evaluateAutoExpression.mockImplementation(expr => expr);
+        rollExpression.mockReturnValue({ total: 29, rolls: [7, 8, 6, 8] });
         stampRuntime({ hitPoints: 103, currentHitPoints: 83 });
         const result = await applyRegenerateEffect(makeAction(), casterStats(), campaignName, null, victimName);
 
-        const rollArg = applyHealingToTarget.mock.calls[0][2];
-        expect(rollArg).toBeGreaterThanOrEqual(19); // 4d8+15 min
-        expect(rollArg).toBeLessThanOrEqual(20);     // clamped to missing HP (20)
+        // Pre-fix never rolled: it resolved the notation to the 33 fallback.
+        expect(rollExpression).toHaveBeenCalledWith('4d8 + 15');
+        expect(applyHealingToTarget).toHaveBeenCalledWith(csWithPlaceholder, victimName, 20, campaignName);
 
-        const healMatch = result.payload.description.match(/rolled 4d8 \+ 15 = (\d+)/);
-        expect(healMatch).not.toBeNull();
-        const rolledTotal = Number(healMatch[1]);
-        expect(rolledTotal).toBeGreaterThanOrEqual(19);
-        expect(rolledTotal).toBeLessThanOrEqual(47);
+        expect(result.payload.description).toContain('rolled 4d8 + 15 = 29');
 
-        const hpEntry = addEntry.mock.calls.map(([, e]) => e).find(e => e && e.type === 'hp_change');
-        expect(hpEntry.rollTotal).toBe(rolledTotal);
-        expect(hpEntry.rolls).toHaveLength(4);
+        const hpEntry = hpChangeEntries()[0];
+        expect(hpEntry.rollTotal).toBe(29);
+        expect(hpEntry.rolls).toEqual([7, 8, 6, 8]);
         expect(hpEntry.delta).toBe(20);
 
         const spellEntry = addEntry.mock.calls.map(([, e]) => e).find(e => e && e.type === 'spell_effect');
-        expect(spellEntry.effects[0]).toContain(`rolled 4d8 + 15 = ${rolledTotal}`);
+        expect(spellEntry.effects[0]).toBe('Initial heal: 20 HP (rolled 4d8 + 15 = 29), Ongoing: 1 HP/turn');
     });
 
     it('monster victim lane keeps combatSummary maxHp precedence byte-identical', async () => {
         evaluateAutoExpression.mockReturnValue(25);
         getRuntimeValue.mockImplementation((name, key) => {
             if (name === 'campaign' && key === 'targetEffects') return [];
+            // Decoy: monsters must NEVER resolve maxHp from runtime hitPoints —
+            // a runtime-first leak into the monster lane heals 25, not 4.
+            if (name === 'Goblin' && key === 'hitPoints') return 999;
             return null;
         });
         applyHealingToTarget.mockImplementation((cs, name, amount) => ({ actualHeal: amount, oldHp: 3, newHp: 3 + amount, maxHp: 7 }));

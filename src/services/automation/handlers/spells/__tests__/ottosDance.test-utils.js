@@ -12,16 +12,11 @@ export function makePlayerStats(overrides = {}) {
   };
 }
 
-export function makeAction(automation = {}) {
+export function makeAction(automationOverrides = {}, overrides = {}) {
   return {
     name: "Otto's Irresistible Dance",
-    automation: { type: 'ottos_dance', saveType: 'WIS', saveDc: 15, ...automation },
-  };
-}
-
-export function makeActionNoAutomation() {
-  return {
-    name: "Otto's Irresistible Dance",
+    automation: { type: 'ottos_dance', saveType: 'WIS', saveDc: 15, ...automationOverrides },
+    ...overrides,
   };
 }
 
@@ -35,33 +30,33 @@ export const baseCombatContext = {
   placedItems: [],
 };
 
-export function createFailedSaveSetup({ getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener, existingConditions = [], existingEffects = [], existingMeta = {} }) {
-  return function failedSaveSetup() {
-    getCombatContext.mockResolvedValue(baseCombatContext);
-    buildSaveDc.mockReturnValue(15);
-    resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-    getRuntimeValue.mockImplementation((_caster, key, _camp) => {
-      if (key === 'activeConditions') return existingConditions;
-      if (key === 'targetEffects') return existingEffects;
-      if (key === 'activeConditionMeta') return existingMeta;
-      return [];
-    });
-    createSaveListener.mockReturnValue({
-      promptId: 'otto-fail',
-      promise: Promise.resolve({ success: false }),
-    });
-  };
-}
-
-export function createSuccessfulSaveSetup(getCombatContext, buildSaveDc, resolveTarget, getRuntimeValue, createSaveListener) {
-  return function successfulSaveSetup() {
-    getCombatContext.mockResolvedValue(baseCombatContext);
-    buildSaveDc.mockReturnValue(20);
-    resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-    getRuntimeValue.mockReturnValue([]);
-    createSaveListener.mockReturnValue({
-      promptId: 'otto-success-save',
-      promise: Promise.resolve({ success: true }),
-    });
-  };
+/**
+ * Wire the mocked collaborators for one full cast of Otto's Irresistible
+ * Dance: combat context, save DC, resolved Goblin target, runtime store
+ * reads, and a save listener resolving with `saveResult`.
+ */
+export function setupCast({
+  getCombatContext,
+  buildSaveDc,
+  resolveTarget,
+  getRuntimeValue,
+  createSaveListener,
+  dc = 15,
+  saveResult = { success: false },
+  promptId = 'otto-prompt',
+  combatContext = baseCombatContext,
+  activeConditions = [],
+  targetEffects = [],
+  activeConditionMeta = {},
+}) {
+  getCombatContext.mockResolvedValue(combatContext);
+  buildSaveDc.mockReturnValue(dc);
+  resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+  getRuntimeValue.mockImplementation((_caster, key) => {
+    if (key === 'activeConditions') return activeConditions;
+    if (key === 'targetEffects') return targetEffects;
+    if (key === 'activeConditionMeta') return activeConditionMeta;
+    return [];
+  });
+  createSaveListener.mockReturnValue({ promptId, promise: Promise.resolve(saveResult) });
 }

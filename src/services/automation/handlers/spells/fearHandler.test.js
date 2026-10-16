@@ -1,4 +1,24 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// fearHandler.handle lane (#1911) — closes the fear pair with
+// fearHandler.saveDc.test.js (#1910); PAIR seam map lives in that file's
+// header. #1910 runs the REAL buildSaveDc and owns DC derivation, sourcing
+// discrimination, and DC propagation-to-sinks. buildSaveDc is STUBBED here —
+// this lane owns the rest of handle():
+//   • target resolution (caster excluded, survivors prompted in order)
+//   • WIS prompt shape (exact-key createSaveListener payload; stub DC is a
+//     passthrough, not a derivation pin)
+//   • frightened condition write (lowercase dedupe + append, exact array)
+//   • te producer 'fear_end_on_los' full shape incl. duration:'concentration'
+//     (handler:69 — te CONTENT seam here; te.dc VALUE derivation is #1910)
+//   • storeSpellLastAttack record, caster concentration registration,
+//     combatSummary persistence, combat-summary-updated dispatch
+//   • save-outcome sinks (addTargetResult, save_result/condition/ability_use
+//     log entries) — full own-composition strings
+//   • popup summaries (both branches, full-string pins), heightenTarget
+//     disadvantage, no-combat early return, addEntry-reject catch sites
+// Turn-based only: no timers here or in the handler (conditions expire via
+// addExpiration round seams). Liveness: registered at automation/index.js:530
+// (`fear: handleFear`), dispatched from type:'fear' in both spells.json.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
@@ -43,6 +63,7 @@ vi.mock('../../../ui/storage.js', () => ({
 import { handle } from './fearHandler.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
+import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
@@ -51,8 +72,10 @@ import storage from '../../../ui/storage.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
-const campaignName = 'TestCampaign';
+const campaignName = 'test-campaign';
 const casterName = 'TestCaster';
+// Stub DC — pure passthrough here; real derivation is #1910's lane.
+const STUB_DC = 13;
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -69,589 +92,436 @@ function makeAction(automation = {}) {
     name: 'Fear',
     automation: {
       type: 'fear',
-      saveType: 'WIS',
-      saveDc: 13,
       ...automation,
     },
   };
 }
 
-function makeCombatContext(creatures) {
+function makeCombatContext(...names) {
   return {
-    creatures,
-    players: [{ name: casterName, gridX: 5, gridY: 10 }],
+    creatures: names.map(name => ({ name })),
+    players: [{ name: casterName }],
     placedItems: [],
   };
 }
 
-function failSaveListener() {
-  return {
+// Stub the pre-flight: combat context + stubbed buildSaveDc + per-target
+// save outcome decided by prompt config (order-independent).
+function stubCast(ctx, saveOutcome = () => false) {
+  getCombatContext.mockResolvedValue(ctx);
+  buildSaveDc.mockReturnValue(STUB_DC);
+  createSaveListener.mockImplementation((_campaign, cfg) => ({
     promptId: 'fear-prompt',
-    promise: Promise.resolve({ success: false }),
-  };
+    promise: Promise.resolve({
+      success: saveOutcome(cfg.targetName),
+      roll: 8,
+      total: saveOutcome(cfg.targetName) ? 18 : 5,
+    }),
+  }));
 }
 
-function successSaveListener() {
-  return {
-    promptId: 'fear-prompt',
-    promise: Promise.resolve({ success: true }),
-  };
-}
+const savedAll = () => true;
+const failedAll = () => false;
 
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('fearHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default runtime reads are empty; keyed by the runtime key (2nd arg).
+    getRuntimeValue.mockImplementation(() => []);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('when no combat context exists', () => {
-    it('returns a popup indicating no creatures in combat', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      getCombatContext.mockResolvedValue(null);
+    it.each([
+      ['null context', null],
+      ['empty creatures', { creatures: [] }],
+    ])('returns no-effect popup and touches no state: %s', async (_label, ctx) => {
+      getCombatContext.mockResolvedValue(ctx);
 
-      const result = await handle(action, ps, campaignName, null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No creatures in combat');
-      expect(result.payload.description).toContain('Fear has no effect');
-    });
-
-    it('returns a popup when combat context has no creatures', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      getCombatContext.mockResolvedValue({ creatures: [] });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No creatures in combat');
-      expect(result.payload.description).toContain('Fear has no effect');
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Fear',
+          description: 'No creatures in combat. Fear has no effect.',
+        },
+      });
+      // Early return happens before concentration/rollback/prompt setup.
+      expect(addConcentration).not.toHaveBeenCalled();
+      expect(storage.set).not.toHaveBeenCalled();
+      expect(storeSpellLastAttack).not.toHaveBeenCalled();
+      expect(createSaveListener).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
   });
 
-  describe('target selection', () => {
-    it('excludes the caster from targets', async () => {
-      const ps = makePlayerStats();
+  describe('target resolution', () => {
+    it('prompts every non-caster creature once, in context order, excluding the caster', async () => {
+      const ctx = makeCombatContext('Goblin', 'Orc', casterName);
+      stubCast(ctx, failedAll);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      const targetNames = createSaveListener.mock.calls.map(c => c[1].targetName);
+      expect(targetNames).toEqual(['Goblin', 'Orc']);
+    });
+  });
+
+  describe('save prompt shape', () => {
+    it('builds the DC from automation+stats and prompts with the exact WIS/frightened shape', async () => {
       const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-        { name: 'TestCaster', gridX: 5, gridY: 10 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
-      createSaveListener.mockReturnValue(failSaveListener());
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, failedAll);
 
-      await handle(action, ps, campaignName, null);
+      await handle(action, makePlayerStats(), campaignName, null);
 
-      expect(createSaveListener).toHaveBeenCalledTimes(1);
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      expect(buildSaveDc).toHaveBeenCalledWith(action.automation, expect.objectContaining({ name: casterName }));
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
         targetName: 'Goblin',
-      }));
+        saveType: 'WIS',
+        saveDc: STUB_DC,
+        dcSuccess: 'none',
+        disadvantage: false,
+        condition: 'frightened',
+      });
     });
 
-    it('targets all non-caster creatures in combat', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-        { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
-        { name: 'TestCaster', gridX: 5, gridY: 10 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
-      createSaveListener.mockReturnValue(failSaveListener());
+    it('applies disadvantage only to the heightened target', async () => {
+      const action = {
+        ...makeAction(),
+        metaCtx: { heightenTarget: 'Orc' },
+      };
+      const ctx = makeCombatContext('Goblin', 'Orc');
+      stubCast(ctx, failedAll);
 
-      await handle(action, ps, campaignName, null);
+      await handle(action, makePlayerStats(), campaignName, null);
 
       expect(createSaveListener).toHaveBeenCalledTimes(2);
-      const targetNames = createSaveListener.mock.calls.map(c => c[1].targetName);
-      expect(targetNames).toContain('Goblin');
-      expect(targetNames).toContain('Orc');
+      const promptFor = name => createSaveListener.mock.calls.find(c => c[1].targetName === name)[1];
+      expect(promptFor('Orc')).toEqual({
+        targetName: 'Orc',
+        saveType: 'WIS',
+        saveDc: STUB_DC,
+        dcSuccess: 'none',
+        disadvantage: true,
+        condition: 'frightened',
+      });
+      expect(promptFor('Goblin')).toEqual({
+        targetName: 'Goblin',
+        saveType: 'WIS',
+        saveDc: STUB_DC,
+        dcSuccess: 'none',
+        disadvantage: false,
+        condition: 'frightened',
+      });
     });
-  });
 
-  describe('save prompt creation', () => {
-    it('uses WIS save type and computed DC from buildSaveDc', async () => {
+    it('falls back to an empty automation object when the action has none', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({ saveDc: 15 });
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue(failSaveListener());
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, failedAll);
 
-      await handle(action, ps, campaignName, null);
+      await handle({ name: 'Fear' }, ps, campaignName, null);
 
-      expect(buildSaveDc).toHaveBeenCalledWith(action.automation, ps);
+      expect(buildSaveDc).toHaveBeenCalledWith({}, ps);
       expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         saveType: 'WIS',
-        saveDc: 15,
+        saveDc: STUB_DC,
       }));
     });
   });
 
-  describe('caster concentration registration', () => {
-    it('registers caster concentration at the resolved spell save DC and persists combatSummary', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ saveDc: 17 });
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-        { name: casterName },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(17);
-      createSaveListener.mockReturnValue(successSaveListener());
+  describe('caster concentration and rollback registration', () => {
+    it('registers caster concentration, persists combatSummary, and dispatches combat-summary-updated once', async () => {
+      const ctx = makeCombatContext('Goblin', casterName);
+      stubCast(ctx, failedAll);
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
-      await handle(action, ps, campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(addConcentration).toHaveBeenCalledWith(ctx, casterName, 'Fear', 17);
+      expect(addConcentration).toHaveBeenCalledWith(ctx, casterName, 'Fear', STUB_DC);
       expect(storage.set).toHaveBeenCalledWith('combatSummary', ctx, campaignName);
+      expect(dispatchSpy).toHaveBeenCalledTimes(1);
+      expect(dispatchSpy).toHaveBeenCalledWith(new CustomEvent('combat-summary-updated'));
+    });
+
+    it('records the AoE spell last-attack for rollback', async () => {
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, failedAll);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, {
+        casterName,
+        spellName: 'Fear',
+        saveType: 'WIS',
+        saveDc: STUB_DC,
+        attackScope: 'aoe',
+      });
     });
   });
 
   describe('log entries on cast', () => {
-    it('posts an ability_use entry for each target', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-        { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
-      createSaveListener.mockReturnValue(failSaveListener());
+    it('posts one exact ability_use entry per target with the promptId link', async () => {
+      const ctx = makeCombatContext('Goblin', 'Orc');
+      stubCast(ctx, failedAll);
 
-      await handle(action, ps, campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(addEntry).toHaveBeenCalledTimes(4);
-      const abilityEntries = addEntry.mock.calls.filter(
-        call => call[1].type === 'ability_use',
-      );
+      const abilityEntries = addEntry.mock.calls.filter(c => c[1].type === 'ability_use');
       expect(abilityEntries.length).toBe(2);
-    });
-
-    it('includes the caster name, ability name, and target in the description', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
+      expect(abilityEntries.map(c => c[1])).toEqual([
+        {
+          type: 'ability_use',
+          characterName: casterName,
+          abilityName: 'Fear',
+          description: `${casterName} casts Fear! Goblin must make a WIS save (DC ${STUB_DC}) or drop what it's holding and become Frightened.`,
+          promptId: 'fear-prompt',
+        },
+        {
+          type: 'ability_use',
+          characterName: casterName,
+          abilityName: 'Fear',
+          description: `${casterName} casts Fear! Orc must make a WIS save (DC ${STUB_DC}) or drop what it's holding and become Frightened.`,
+          promptId: 'fear-prompt',
+        },
       ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      await handle(action, ps, campaignName, null);
-
-      const abilityEntry = addEntry.mock.calls[0][1];
-      expect(abilityEntry.type).toBe('ability_use');
-      expect(abilityEntry.characterName).toBe(casterName);
-      expect(abilityEntry.abilityName).toBe('Fear');
-      expect(abilityEntry.description).toContain('Goblin');
-      expect(abilityEntry.description).toContain('WIS save');
-      expect(abilityEntry.description).toContain('DC 13');
     });
   });
 
   describe('on successful save', () => {
-    it('posts a save_result entry', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(20);
-      createSaveListener.mockReturnValue(successSaveListener());
+    it('records a clean rollback result and posts an exact save_result entry', async () => {
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, savedAll);
 
-      await handle(action, ps, campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const saveResultEntries = addEntry.mock.calls.filter(
-        call => call[1].type === 'save_result',
-      );
-      expect(saveResultEntries.length).toBe(1);
-      const entry = saveResultEntries[0][1];
-      expect(entry.targetName).toBe('Goblin');
-      expect(entry.success).toBe(true);
-      expect(entry.saveType).toBe('WIS');
+      expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
+        targetName: 'Goblin',
+        saveResult: 'success',
+        roll: 8,
+        total: 18,
+        conditions: [],
+        appliedDamage: 0,
+      });
+      const saveEntries = addEntry.mock.calls.filter(c => c[1].type === 'save_result');
+      expect(saveEntries.map(c => c[1])).toEqual([{
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-fear',
+        targetName: 'Goblin',
+        saveDc: STUB_DC,
+        saveType: 'WIS',
+        success: true,
+        description: 'Goblin succeeded on WIS save against Fear.',
+      }]);
     });
 
-    it('does not apply any conditions or log entries for the condition', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(20);
-      createSaveListener.mockReturnValue(successSaveListener());
+    it('applies no conditions, targetEffects, or expirations', async () => {
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, savedAll);
 
-      await handle(action, ps, campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(addEntry).toHaveBeenCalledTimes(2);
-      const abilityEntries = addEntry.mock.calls.filter(call => call[1].type === 'ability_use');
-      expect(abilityEntries.length).toBe(1);
-      const saveEntries = addEntry.mock.calls.filter(call => call[1].type === 'save_result');
-      expect(saveEntries.length).toBe(1);
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'Goblin', 'activeConditions', expect.any(Array), campaignName,
-      );
+      expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(addExpiration).not.toHaveBeenCalled();
     });
   });
 
   describe('on failed save', () => {
-    it('applies the Frightened condition to the target', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue(failSaveListener());
+    it('appends frightened with lowercase dedupe and records the condition in rollback', async () => {
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, failedAll);
+      getRuntimeValue.mockImplementation((_characterKey, runtimeKey) =>
+        (runtimeKey === 'activeConditions' ? ['frightened', 'Stunned'] : []));
 
-      await handle(action, ps, campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin', 'activeConditions', expect.arrayContaining(['frightened']), campaignName,
+        'Goblin', 'activeConditions', ['Stunned', 'frightened'], campaignName,
       );
+      expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
+        targetName: 'Goblin',
+        saveResult: 'failure',
+        roll: 8,
+        total: 5,
+        conditions: ['frightened'],
+        appliedDamage: 0,
+      });
     });
 
-    it('deduplicates the Frightened condition if already present', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      getRuntimeValue.mockReturnValue(['frightened', 'Stunned']);
-      createSaveListener.mockReturnValue(failSaveListener());
+    it('posts an exact condition log entry with the dash-and-drop note', async () => {
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, failedAll);
 
-      await handle(action, ps, campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const conditionsArg = setRuntimeValue.mock.calls[0][2];
-      expect(conditionsArg.filter(c => String(c).toLowerCase() === 'frightened').length).toBe(1);
-    });
-
-    it('posts a condition log entry with the correct details', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      await handle(action, ps, campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      const conditionEntries = addEntry.mock.calls.filter(c => c[1].type === 'condition');
+      expect(conditionEntries.map(c => c[1])).toEqual([{
         type: 'condition',
         action: 'applied',
         characterName: 'Goblin',
         condition: 'Frightened',
         reason: 'Fear spell',
-      }));
+        note: 'Goblin drops what it was holding, becomes Frightened, and must take the Dash action to move away from TestCaster on each of its turns.',
+        timestamp: expect.any(Number),
+      }]);
     });
 
-    it('registers an expiration for the condition', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue(failSaveListener());
+    it('registers a frightened condition expiration at the round seam', async () => {
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, failedAll);
 
-      await handle(action, ps, campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: 'Goblin', effects: expect.arrayContaining([expect.objectContaining({ condition: 'frightened' })]), campaignName });
+      expect(addExpiration).toHaveBeenCalledWith({
+        attackerName: casterName,
+        targetName: 'Goblin',
+        effects: [{ type: 'condition', condition: 'frightened' }],
+        campaignName,
+      });
     });
 
-    it('tracks a fear_end_on_los effect in targetEffects', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue(failSaveListener());
+    it('pushes the exact fear_end_on_los te (duration: concentration, handler:69)', async () => {
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, failedAll);
 
-      await handle(action, ps, campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const effectCalls = setRuntimeValue.mock.calls.filter(
-        call => call[1] === 'targetEffects',
-      );
-      expect(effectCalls.length).toBeGreaterThan(0);
-      const effects = effectCalls[effectCalls.length - 1][2];
-      const fearEffect = effects.find(e => e.effect === 'fear_end_on_los');
-      expect(fearEffect).toBeDefined();
-      expect(fearEffect.target).toBe('Goblin');
-      expect(fearEffect.source).toBe(casterName);
-      expect(fearEffect.duration).toBe('concentration');
+      expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [{
+        target: 'Goblin',
+        effect: 'fear_end_on_los',
+        source: casterName,
+        condition: 'frightened',
+        dc: STUB_DC,
+        duration: 'concentration',
+      }], campaignName);
+    });
+
+    it('replaces the same-target fear te in place, leaving other targets untouched', async () => {
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, failedAll);
+      const staleGoblinTe = { target: 'Goblin', effect: 'fear_end_on_los', source: 'OldCaster', condition: 'frightened', dc: 12, duration: '1 minute' };
+      const orcTe = { target: 'Orc', effect: 'fear_end_on_los', source: 'OldCaster', condition: 'frightened', dc: 12, duration: '1 minute' };
+      getRuntimeValue.mockImplementation((_characterKey, runtimeKey) =>
+        (runtimeKey === 'targetEffects' ? [staleGoblinTe, orcTe] : []));
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [
+        {
+          target: 'Goblin',
+          effect: 'fear_end_on_los',
+          source: casterName,
+          condition: 'frightened',
+          dc: STUB_DC,
+          duration: 'concentration',
+        },
+        orcTe,
+      ], campaignName);
     });
   });
 
   describe('summary popup', () => {
-    it('reports affected creature count when some fail', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-        { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      createSaveListener.mockReturnValue(failSaveListener());
+    it('full-string pin: affected branch (mixed fail/save) with per-target results, saved count, and LOS repeat-save rule', async () => {
+      const ctx = makeCombatContext('Goblin', 'Orc');
+      stubCast(ctx, (targetName) => targetName === 'Orc');
 
-      const result = await handle(action, ps, campaignName, null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('Fear affects 2 creature(s)');
-    });
-
-    it('reports saved creature count in the summary', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-        { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-
-      let callCount = 0;
-      createSaveListener.mockImplementation(() => {
-        callCount++;
-        return {
-          promptId: 'fear-prompt',
-          promise: Promise.resolve({ success: callCount === 1 }),
-        };
+      expect(result.payload).toEqual({
+        type: 'automation_info',
+        name: 'Fear',
+        description: `Fear affects 1 creature(s). Goblin drops what it's holding and is Frightened. 1 creature(s) saved. Affected creatures drop what they're holding, are Frightened, and must use the Dash action to move away on each of their turns. An affected creature can repeat the save if it ends its turn without line of sight to you.`,
       });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('creature(s) saved');
     });
 
-    it('reports no creatures affected when all save', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(20);
-      createSaveListener.mockReturnValue(successSaveListener());
+    it('full-string pin: none-affected branch counts saves only', async () => {
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, savedAll);
 
-      const result = await handle(action, ps, campaignName, null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('No creatures affected by Fear');
+      expect(result.payload).toEqual({
+        type: 'automation_info',
+        name: 'Fear',
+        description: 'No creatures affected by Fear. 1 creature(s) saved.',
+      });
     });
 
-    it('mentions repeat save on line of sight loss', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      createSaveListener.mockReturnValue(failSaveListener());
+    it('uses the action name (not the spell text) in the popup payload', async () => {
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, failedAll);
 
-      const result = await handle(action, ps, campaignName, null);
+      const result = await handle(
+        { name: 'Terror', automation: { type: 'fear' } },
+        makePlayerStats(),
+        campaignName,
+        null,
+      );
 
-      expect(result.payload.description).toContain('repeat the save');
-      expect(result.payload.description).toContain('line of sight');
-    });
-
-    it('uses the action name in the popup payload', async () => {
-      const ps = makePlayerStats();
-      const action = { name: 'Terror', automation: { type: 'fear', saveType: 'WIS', saveDc: 13 } };
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      const result = await handle(action, ps, campaignName, null);
-
+      expect(result.type).toBe('popup');
       expect(result.payload.name).toBe('Terror');
     });
   });
 
-  describe('edge cases', () => {
-    it('handles single non-caster target', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-        { name: 'TestCaster', gridX: 5, gridY: 10 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      createSaveListener.mockReturnValue(failSaveListener());
+  describe('when every creature in combat is the caster', () => {
+    it('skips prompts and logging entirely but still registers concentration', async () => {
+      const ctx = makeCombatContext(casterName);
+      stubCast(ctx);
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledTimes(1);
-      expect(result.payload.description).toContain('Fear affects 1 creature(s)');
-    });
-
-    it('handles all creatures being the caster (no enemies)', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'TestCaster', gridX: 5, gridY: 10 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-
-      const result = await handle(action, ps, campaignName, null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(createSaveListener).not.toHaveBeenCalled();
       expect(addEntry).not.toHaveBeenCalled();
-      expect(result.payload.description).toContain('No creatures affected by Fear');
-    });
-  });
-
-  describe('when action has no automation', () => {
-    it('uses empty object fallback for auto', async () => {
-      const ps = makePlayerStats();
-      const action = { name: 'Fear' };
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
-      getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      await handle(action, ps, campaignName, null);
-
-      expect(buildSaveDc).toHaveBeenCalledWith({}, ps);
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        saveType: 'WIS',
-        saveDc: 13,
-      }));
-    });
-  });
-
-  describe('when heightenTarget is set', () => {
-    it('applies disadvantage to the heightened target', async () => {
-      const ps = makePlayerStats();
-      const action = {
-        name: 'Fear',
-        automation: { type: 'fear', saveType: 'WIS', saveDc: 13 },
-        metaCtx: { heightenTarget: 'Orc' },
-      };
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-        { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
-      getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      await handle(action, ps, campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledTimes(2);
-      const orcCall = createSaveListener.mock.calls.find(
-        call => call[1].targetName === 'Orc',
-      );
-      expect(orcCall[1].disadvantage).toBe(true);
-      const goblinCall = createSaveListener.mock.calls.find(
-        call => call[1].targetName === 'Goblin',
-      );
-      expect(goblinCall[1].disadvantage).toBe(false);
-    });
-  });
-
-  describe('when updating existing fear effect', () => {
-    it('replaces the existing fear_end_on_los effect instead of pushing a new one', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      const existingEffects = [
-        { target: 'Goblin', effect: 'fear_end_on_los', source: 'OldCaster', condition: 'frightened', dc: 12, duration: '1 minute' },
-        { target: 'Orc', effect: 'fear_end_on_los', source: 'OldCaster', condition: 'frightened', dc: 12, duration: '1 minute' },
-      ];
-      getRuntimeValue
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(existingEffects);
-
-      await handle(action, ps, campaignName, null);
-
-      const effectCalls = setRuntimeValue.mock.calls.filter(
-        call => call[1] === 'targetEffects',
-      );
-      expect(effectCalls.length).toBeGreaterThan(0);
-      const effects = effectCalls[effectCalls.length - 1][2];
-      const goblinEffect = effects.find(e => e.target === 'Goblin' && e.effect === 'fear_end_on_los');
-      expect(goblinEffect).toBeDefined();
-      expect(goblinEffect.source).toBe(casterName);
-      expect(goblinEffect.dc).toBe(10);
-      expect(goblinEffect.duration).toBe('concentration');
-      expect(effects.length).toBe(2);
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(addExpiration).not.toHaveBeenCalled();
+      expect(addConcentration).toHaveBeenCalledTimes(1);
+      expect(result.payload.description).toBe('No creatures affected by Fear. 0 creature(s) saved.');
     });
   });
 
   describe('when addEntry rejects', () => {
-    it('catches errors from ability_use addEntry without crashing', async () => {
-      vi.spyOn(console, 'error').mockImplementation(() => { });
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      getRuntimeValue.mockReturnValue([]);
-      addEntry.mockImplementation(() => Promise.reject(new Error('log error')));
-      createSaveListener.mockReturnValue(failSaveListener());
+    it('catches ability_use log failures without crashing the cast', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, failedAll);
+      addEntry.mockRejectedValueOnce(new Error('log error'));
 
-      const result = await handle(action, ps, campaignName, null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(console.error).toHaveBeenCalledWith('[fear] Error:', expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith('[fear] Error:', expect.any(Error));
+      // Cast flow continued despite the lost cast log.
+      expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        saveResult: 'failure',
+      }));
     });
 
-    it('catches errors from save_result addEntry without crashing', async () => {
-      vi.spyOn(console, 'error').mockImplementation(() => { });
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(20);
+    it('catches save_result log failures without crashing the cast', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+      const ctx = makeCombatContext('Goblin');
+      stubCast(ctx, savedAll);
       addEntry
         .mockReturnValueOnce(Promise.resolve({}))
         .mockRejectedValueOnce(new Error('save result log error'));
-      createSaveListener.mockReturnValue(successSaveListener());
 
-      const result = await handle(action, ps, campaignName, null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(console.error).toHaveBeenCalledWith('[fear] Error:', expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith('[fear] Error:', expect.any(Error));
+      expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        saveResult: 'success',
+      }));
     });
   });
 });

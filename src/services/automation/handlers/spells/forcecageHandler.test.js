@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { handle, handleEscape, isForcecageBlocked, isCreatureTrappedInForcecage, removeForcecageEffect } from './forcecageHandler.js';
+import { handle, handleEscape, isForcecageBlocked, removeForcecageEffect } from './forcecageHandler.js';
 import * as savePrompt from '../../common/savePrompt.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -11,7 +11,6 @@ import * as logService from '../../../ui/logService.js';
 
 vi.mock('../../common/savePrompt.js', () => ({
   buildSaveDc: vi.fn(),
-  createSaveListener: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
@@ -169,15 +168,15 @@ describe('forcecageHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('Goblin');
-      expect(result.payload.description).toContain('Orc');
-
-      expect(currentTargetEffects).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ target: 'Goblin', effect: 'forcecage', source: 'TestCaster', dc: 17, saveAbility: 'CHA', duration: 'concentration', concentration: true }),
-          expect.objectContaining({ target: 'Orc', effect: 'forcecage', source: 'TestCaster', dc: 17 }),
-        ]),
+      expect(result.payload.description).toBe(
+        'Forcecage traps 2 creature(s): Goblin, Orc. Trapped creatures can\'t leave by nonmagical means. No attack, spell, or effect can pass between inside and outside the prison. Click a creature\'s Forcecaged badge to attempt a CHA save (DC 17); on success the creature can use teleportation or interplanar travel to exit.',
       );
+
+      // exact te shapes — handler writes these fields verbatim per trapped creature
+      expect(currentTargetEffects).toEqual([
+        { target: 'Goblin', effect: 'forcecage', source: 'TestCaster', dc: 17, saveAbility: 'CHA', duration: 'concentration', concentration: true },
+        { target: 'Orc', effect: 'forcecage', source: 'TestCaster', dc: 17, saveAbility: 'CHA', duration: 'concentration', concentration: true },
+      ]);
 
       expect(concentrationService.addConcentration).toHaveBeenCalledWith(
         expect.anything(),
@@ -197,9 +196,7 @@ describe('forcecageHandler.handle', () => {
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'campaign',
         'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({ target: 'TestCaster', effect: 'forcecage', source: 'TestCaster' }),
-        ]),
+        [{ target: 'TestCaster', effect: 'forcecage', source: 'TestCaster', dc: 17, saveAbility: 'CHA', duration: 'concentration', concentration: true }],
         campaignName,
       );
     });
@@ -280,22 +277,10 @@ describe('forcecageHandler.isForcecageBlocked', () => {
   });
 });
 
-describe('forcecageHandler.isCreatureTrappedInForcecage', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-  });
-
-  it('returns true when creature has a forcecage effect', () => {
-    mockGetRuntimeValue([{ target: 'Goblin', effect: 'forcecage', source: 'Wizard' }]);
-    expect(isCreatureTrappedInForcecage('Goblin')).toBe(true);
-    expect(isCreatureTrappedInForcecage('Orc')).toBe(false);
-  });
-
-  it('returns false when no effects exist', () => {
-    mockGetRuntimeValue([]);
-    expect(isCreatureTrappedInForcecage('Goblin')).toBe(false);
-  });
-});
+// isCreatureTrappedInForcecage: DEAD export — zero call sites repo-wide
+// (not used inside its own module either; handleEscape does its own find()).
+// Symmetric with banishment's isCreatureTrappedInBanishment: tests removed,
+// export deletion flagged for owner sign-off.
 
 describe('forcecageHandler.removeForcecageEffect', () => {
   beforeEach(() => {
@@ -311,17 +296,16 @@ describe('forcecageHandler.removeForcecageEffect', () => {
 
     const removed = removeForcecageEffect('Goblin', 'Wizard', campaignName);
 
-    expect(removed).toEqual(expect.objectContaining({ target: 'Goblin', effect: 'forcecage', source: 'Wizard' }));
+    expect(removed).toEqual({ target: 'Goblin', effect: 'forcecage', source: 'Wizard' });
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
       'campaign',
       'targetEffects',
-      expect.arrayContaining([
-        expect.objectContaining({ target: 'Orc', effect: 'forcecage' }),
-        expect.objectContaining({ target: 'Goblin', effect: 'silenced' }),
-      ]),
+      [
+        { target: 'Orc', effect: 'forcecage', source: 'Wizard' },
+        { target: 'Goblin', effect: 'silenced', source: 'Enemy' },
+      ],
       campaignName,
     );
-    expect(runtimeState.setRuntimeValue.mock.calls[0][2].some(te => te.effect === 'forcecage' && te.target === 'Goblin')).toBe(false);
   });
 
   it('returns null when no matching effect exists', () => {
@@ -348,6 +332,18 @@ describe('forcecageHandler.handleEscape', () => {
     mockGetRuntimeValue([{ target: 'Goblin', effect: 'forcecage', source: 'Wizard' }]);
     const result = await handleEscape({ metaCtx: { target: 'Orc' } }, makePlayerStats(), campaignName, null);
     expect(result.payload.description).toContain('is not trapped');
+  });
+
+  it('resolves the target from the metaCtx.forcecageTargetName alias key', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    mockGetRuntimeValue([{ target: 'Goblin', effect: 'forcecage', source: 'Wizard', dc: 15 }]);
+    const action = { metaCtx: { forcecageTargetName: 'Goblin', creatures: [{ name: 'Goblin', abilities: { CHA: { bonus: 0 } }, proficiency: 0 }] } };
+
+    const result = await handleEscape(action, makePlayerStats(), campaignName, null);
+
+    expect(result.payload.description).toContain('escaped');
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [], campaignName);
+    vi.restoreAllMocks();
   });
 
   it('removes the forcecage effect and logs success on a successful save', async () => {

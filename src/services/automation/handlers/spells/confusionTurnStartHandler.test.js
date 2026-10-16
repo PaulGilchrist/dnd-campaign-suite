@@ -1,4 +1,55 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+/**
+ * confusion TRIO lane #1891 — confusionTurnStartHandler.js (distinct module; trio
+ * seam map lives in confusionHandler.saveResults.test.js header).
+ *
+ * CONSUMED INPUT (from #1889 confusionHandler.saveResults failure path): the te
+ * {target, effect:'confusion', source, dc, conditions, duration:'concentration'} —
+ * this lane pins CONSUMPTION of that te (identity match target+effect, dc read),
+ * not its production. Producer verified 2026-10-16: confusionHandler.js L79 also
+ * registers the 'confusion_turn_start' expiration consumed by the dispatcher below.
+ *
+ * LIVE lane (full pins maintained): handleConfusionTurnStart — production chain
+ * verified at source 2026-10-16:
+ *   confusionHandler.js L79 addExpiration 'confusion_turn_start'
+ *   → rules/effects/turnStartEffects.js L181 dispatcher entry
+ *   → applyConfusionTurnStart L618 → handleConfusionTurnStart call L619.
+ * Every other consumer suite (turnStartEffects.*.test.js, expirations_*.test.js)
+ * vi.mocks this module with a handleConfusionTurnStart stub only, so THIS file is
+ * the only mutation-killing coverage of the d10 behavior table — a () => {}
+ * mutant survives all other suites. Full-file deletion: NOT permitted.
+ *
+ * DEAD-API audit (assigned from #1889/#1890 flags) — verdict: DEAD, deletion
+ * recommended (evidence, verified 2026-10-16):
+ *  - applyEndOfTurnConfusionSave: zero production callers (grep src/ + server/ +
+ *    docs/automations-manifest.json hits only this module + its test). No export *
+ *    barrel re-exports it; no dynamic import of the module exists. Its promptId
+ *    prefix 'confusion-end-turn-' is consumed NOWHERE — and it cannot work even if
+ *    wired: the real save-listener lane (services/automation/common/savePrompt.js
+ *    createSaveListener L105+) registers pendingSavePrompts[promptId] + payload
+ *    and sends the prompt; this function only pushes a raw id onto
+ *    pendingSaveListenerPrompts, which useLoggedDiceRollEventHandlers.js L33-40
+ *    merely filters — an unregistered id never resolves a save.
+ *  - removeConfusionEffect: zero production callers. The initiative-reroll WIS
+ *    save lane createRollConditionSaveHandler.handleConfusionSuccess
+ *    (components/initiative/createRollConditionSaveHandler.js L97-122) performs
+ *    its OWN removal via removeCondition(charmed)+removeCondition(speed_zero)+
+ *    removeTargetEffect — it never calls this export.
+ *  - Deletion safety: no other test file imports these two exports (all module
+ *    mocks elsewhere stub handleConfusionTurnStart only), so deleting both exports
+ *    + their two DEAD describes is independently zero-coverage-loss. Kept as
+ *    minimal API-surface pins until owner confirms deletion.
+ *
+ * Prod dupes flagged (owned by turnStartEffects lane, NOT re-pinned here):
+ *  - applyConfusionTurnStart re-logs type 'condition'/action 'turn_start_behavior'
+ *    with the same fields handleConfusionTurnStart already logged (double log).
+ *
+ * Rules note: this is the module's own 4-band d10 table (1=move_random,
+ * 2-6=do_nothing, 7-8=attack_random, 9-10=choose) + d4 direction sub-table
+ * (1=N,2=E,3=S,4=W) — pinned strict over all rows. Turn-based only: the
+ * "end-of-turn save" is an event seam; nothing here is a clock.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -9,8 +60,6 @@ vi.mock('../../../../services/ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-// ── Imports ────────────────────────────────────────────────────
-
 import { handleConfusionTurnStart, applyEndOfTurnConfusionSave, removeConfusionEffect } from './confusionTurnStartHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../../services/ui/logService.js';
@@ -18,10 +67,12 @@ import { addEntry } from '../../../../services/ui/logService.js';
 // ── Helpers ────────────────────────────────────────────────────
 
 const campaignName = 'TestCampaign';
+const TARGET = 'Goblin';
 
+// The te shape #1889's failure path writes — consumed here (identity + dc).
 function makeConfusionEffect(overrides = {}) {
     return {
-        target: 'Goblin',
+        target: TARGET,
         effect: 'confusion',
         source: 'TestCaster',
         dc: 13,
@@ -31,466 +82,251 @@ function makeConfusionEffect(overrides = {}) {
     };
 }
 
-// ── Tests ──────────────────────────────────────────────────────
+// Deterministic dice queue: floor(f*10)+1 === n with ≥0.001 margin from the
+// next integer, so float noise cannot flip a band boundary.
+const d10Fraction = (n) => (n - 1) / 10 + 1e-4;
+const d4Fraction = (d) => (d - 1) / 4 + 1e-4;
 
-describe('handleConfusionTurnStart', () => {
+let rollSpy = null;
+function mockRolls(values) {
+    let i = 0;
+    rollSpy = vi.spyOn(Math, 'random').mockImplementation(() => values[i++] ?? 0.999);
+}
+afterEach(() => {
+    rollSpy?.mockRestore();
+    rollSpy = null;
+});
+
+// Key-router for getRuntimeValue so each test targets exactly one read.
+function mockRuntime(map) {
+    getRuntimeValue.mockImplementation((scope, key) => (key in map ? map[key] : undefined));
+}
+
+// ── LIVE lane: handleConfusionTurnStart ────────────────────────
+
+describe('handleConfusionTurnStart (live: turnStartEffects L181→L619)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    describe('when no confusion effect exists', () => {
-        it('returns null when targetEffects is empty', async () => {
-            getRuntimeValue.mockReturnValue([]);
+    it('reads the te store with the exact store key and nothing else', async () => {
+        mockRuntime({ targetEffects: [makeConfusionEffect()] });
 
-            const result = await handleConfusionTurnStart('Goblin', campaignName);
+        await handleConfusionTurnStart(TARGET, campaignName);
 
-            expect(result).toBeNull();
+        expect(getRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects');
+        // Pure reader: this function writes no runtime state.
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['empty targetEffects', []],
+        ['missing targetEffects', undefined],
+    ])('returns null with no side effects when %s', async (_label, stored) => {
+        mockRuntime({ targetEffects: stored });
+
+        const result = await handleConfusionTurnStart(TARGET, campaignName);
+
+        expect(result).toBeNull();
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('ignores effects with a mismatched target or effect key', async () => {
+        mockRuntime({
+            targetEffects: [
+                makeConfusionEffect({ target: 'Orc' }),
+                makeConfusionEffect({ effect: 'fear' }),
+            ],
         });
 
-        it('returns null when targetEffects is missing', async () => {
-            getRuntimeValue.mockReturnValue(undefined);
+        const result = await handleConfusionTurnStart(TARGET, campaignName);
 
-            const result = await handleConfusionTurnStart('Goblin', campaignName);
+        expect(result).toBeNull();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
 
-            expect(result).toBeNull();
-        });
+    it('rolls a real d10 (1-10), reports the consumed te dc, logs once', async () => {
+        mockRuntime({ targetEffects: [makeConfusionEffect()] });
 
-        it('returns null when target has no confusion effect', async () => {
-            getRuntimeValue.mockReturnValue([
-                makeConfusionEffect({ target: 'Orc', effect: 'fear' }),
-            ]);
+        const result = await handleConfusionTurnStart(TARGET, campaignName);
 
-            const result = await handleConfusionTurnStart('Goblin', campaignName);
+        expect(Number.isInteger(result.d10Roll)).toBe(true);
+        expect(result.d10Roll).toBeGreaterThanOrEqual(1);
+        expect(result.d10Roll).toBeLessThanOrEqual(10);
+        expect(result.dc).toBe(13);
+        expect(['move_random', 'do_nothing', 'attack_random', 'choose']).toContain(result.behavior);
+        expect(addEntry).toHaveBeenCalledTimes(1);
+    });
 
-            expect(result).toBeNull();
+    // Module's own d10 band table, strict over all 10 rows: full own-composition
+    // behaviorText + behavior key + echoed roll value.
+    it.each([
+        [1, 'move_random', 'Rolled 1: Goblin moves randomly to the north. No action taken.'],
+        [2, 'do_nothing', 'Rolled 2: Goblin does nothing (no movement or actions).'],
+        [3, 'do_nothing', 'Rolled 3: Goblin does nothing (no movement or actions).'],
+        [4, 'do_nothing', 'Rolled 4: Goblin does nothing (no movement or actions).'],
+        [5, 'do_nothing', 'Rolled 5: Goblin does nothing (no movement or actions).'],
+        [6, 'do_nothing', 'Rolled 6: Goblin does nothing (no movement or actions).'],
+        [7, 'attack_random', 'Rolled 7: Goblin takes the Attack action against a random creature within reach.'],
+        [8, 'attack_random', 'Rolled 8: Goblin takes the Attack action against a random creature within reach.'],
+        [9, 'choose', 'Rolled 9: Goblin chooses its own behavior.'],
+        [10, 'choose', 'Rolled 10: Goblin chooses its own behavior.'],
+    ])('d10=%i → behavior %s, exact text', async (roll, behavior, text) => {
+        mockRuntime({ targetEffects: [makeConfusionEffect()] });
+        mockRolls([d10Fraction(roll), d4Fraction(1)]);
+
+        const result = await handleConfusionTurnStart(TARGET, campaignName);
+
+        expect(result).toEqual({
+            behavior,
+            d10Roll: roll,
+            dc: 13,
+            behaviorText: text,
         });
     });
 
-    describe('when confusion effect exists', () => {
-        it('returns behavior object with d10Roll, dc, and behaviorText', async () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
+    // d4 direction sub-table, only reachable on d10=1.
+    it.each([
+        [1, 'north'],
+        [2, 'east'],
+        [3, 'south'],
+        [4, 'west'],
+    ])('d10=1, d4=%i moves %s', async (d4, dir) => {
+        mockRuntime({ targetEffects: [makeConfusionEffect()] });
+        mockRolls([d10Fraction(1), d4Fraction(d4)]);
 
-            const result = await handleConfusionTurnStart('Goblin', campaignName);
+        const result = await handleConfusionTurnStart(TARGET, campaignName);
 
-            expect(result).toBeDefined();
-            expect(result).toHaveProperty('behavior');
-            expect(result).toHaveProperty('d10Roll');
-            expect(result).toHaveProperty('dc', 13);
-            expect(result).toHaveProperty('behaviorText');
-        });
+        expect(result.behaviorText).toBe(
+            `Rolled 1: ${TARGET} moves randomly to the ${dir}. No action taken.`
+        );
+    });
 
-        it('rolls a d10 between 1 and 10', async () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
+    it('reports the consumed te dc unchanged (no recomputation)', async () => {
+        mockRuntime({ targetEffects: [makeConfusionEffect({ dc: 17 })] });
+        mockRolls([d10Fraction(8)]);
 
-            const result = await handleConfusionTurnStart('Goblin', campaignName);
+        const result = await handleConfusionTurnStart(TARGET, campaignName);
 
-            expect(result.d10Roll).toBeGreaterThanOrEqual(1);
-            expect(result.d10Roll).toBeLessThanOrEqual(10);
-        });
+        expect(result.dc).toBe(17);
+    });
 
-        it('returns behavior "move_random" for d10 roll of 1', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0); // floor(0*10)+1 = 1
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
+    it('logs the behavior with the exact own-composition entry', async () => {
+        mockRuntime({ targetEffects: [makeConfusionEffect()] });
+        mockRolls([d10Fraction(8)]);
 
-            const result = await handleConfusionTurnStart('Goblin', campaignName);
+        await handleConfusionTurnStart(TARGET, campaignName);
 
-            expect(result.behavior).toBe('move_random');
-            expect(result.behaviorText).toContain('moves randomly');
-            expect(result.behaviorText).toContain('north');
-            Math.random.mockRestore();
-        });
-
-        it('includes direction in behavior text for move_random', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0); // d10=1, d4=1 (north)
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-
-            const result = await handleConfusionTurnStart('Goblin', campaignName);
-
-            expect(result.behaviorText).toContain('north');
-            Math.random.mockRestore();
-        });
-
-        it('returns behavior "do_nothing" for d10 roll between 2 and 6', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.15); // floor(1.5)+1 = 2
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-
-            const result = await handleConfusionTurnStart('Goblin', campaignName);
-
-            expect(result.behavior).toBe('do_nothing');
-            expect(result.behaviorText).toContain('does nothing');
-            expect(result.behaviorText).toContain('no movement or actions');
-            Math.random.mockRestore();
-        });
-
-        it('returns behavior "attack_random" for d10 roll between 7 and 8', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.75); // floor(7.5)+1 = 8
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-
-            const result = await handleConfusionTurnStart('Goblin', campaignName);
-
-            expect(result.behavior).toBe('attack_random');
-            expect(result.behaviorText).toContain('Attack action');
-            expect(result.behaviorText).toContain('random creature');
-            Math.random.mockRestore();
-        });
-
-        it('returns behavior "choose" for d10 roll between 9 and 10', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.9); // floor(9)+1 = 10
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-
-            const result = await handleConfusionTurnStart('Goblin', campaignName);
-
-            expect(result.behavior).toBe('choose');
-            expect(result.behaviorText).toContain('chooses its own behavior');
-            Math.random.mockRestore();
-        });
-
-        it('logs a condition entry with type "condition"', async () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-
-            await handleConfusionTurnStart('Goblin', campaignName);
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'condition',
-                action: 'turn_start_behavior',
-                characterName: 'Goblin',
-                condition: 'Confused',
-                reason: 'Confusion spell turn-start effect',
-                note: expect.any(String),
-                timestamp: expect.any(Number),
-            }));
-        });
-
-        it('includes target name in the behavior log note', async () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-
-            await handleConfusionTurnStart('Goblin', campaignName);
-
-            const logEntry = addEntry.mock.calls[0][1];
-            expect(logEntry.note).toContain('Goblin');
-        });
-
-        it('uses the confusion effect dc in the result', async () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect({ dc: 17 })]);
-
-            const result = await handleConfusionTurnStart('Goblin', campaignName);
-
-            expect(result.dc).toBe(17);
+        expect(addEntry).toHaveBeenCalledWith(campaignName, {
+            type: 'condition',
+            action: 'turn_start_behavior',
+            characterName: TARGET,
+            condition: 'Confused',
+            reason: 'Confusion spell turn-start effect',
+            note: 'Rolled 8: Goblin takes the Attack action against a random creature within reach.',
+            timestamp: expect.any(Number),
         });
     });
 
-    describe('error handling', () => {
-        it('does not throw when addEntry fails', async () => {
-            vi.spyOn(console, 'error').mockReturnValue();
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-            addEntry.mockRejectedValue(new Error('Log error'));
+    it('still returns the behavior object when addEntry rejects', async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
+        mockRuntime({ targetEffects: [makeConfusionEffect()] });
+        mockRolls([d10Fraction(3)]);
+        addEntry.mockRejectedValueOnce(new Error('Log error'));
 
-            await expect(handleConfusionTurnStart('Goblin', campaignName)).resolves.toBeDefined();
+        const result = await handleConfusionTurnStart(TARGET, campaignName);
 
-            console.error.mockRestore();
-        });
+        expect(result.behavior).toBe('do_nothing');
+        expect(result.d10Roll).toBe(3);
+        expect(consoleSpy).toHaveBeenCalled();
+        consoleSpy.mockRestore();
     });
 });
 
-describe('applyEndOfTurnConfusionSave', () => {
+// ── DEAD API surface (see header audit — deletion recommended) ─
+
+describe('applyEndOfTurnConfusionSave [DEAD API — zero prod callers]', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    describe('when no confusion effect exists', () => {
-        it('returns null when targetEffects is empty', () => {
-            getRuntimeValue.mockReturnValue([]);
+    it('returns null and writes nothing when no confusion te exists', () => {
+        mockRuntime({ targetEffects: [makeConfusionEffect({ target: 'Orc', effect: 'fear' })] });
 
-            const result = applyEndOfTurnConfusionSave('Goblin', campaignName, 13, 'WIS');
+        expect(applyEndOfTurnConfusionSave(TARGET, campaignName, 13, 'WIS')).toBeNull();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
 
-            expect(result).toBeNull();
-        });
+    it('returns the prompt stub: te dc wins, passed saveDc/saveType fill gaps', () => {
+        mockRuntime({ targetEffects: [makeConfusionEffect({ dc: 17 })] });
 
-        it('returns null when target has no confusion effect', () => {
-            getRuntimeValue.mockReturnValue([
-                makeConfusionEffect({ target: 'Orc', effect: 'fear' }),
-            ]);
+        const result = applyEndOfTurnConfusionSave(TARGET, campaignName, 13);
 
-            const result = applyEndOfTurnConfusionSave('Goblin', campaignName, 13, 'WIS');
-
-            expect(result).toBeNull();
+        expect(result).toEqual({
+            promptId: expect.stringMatching(/^confusion-end-turn-/),
+            dc: 17,
+            saveType: 'WIS',
+            targetName: TARGET,
         });
     });
 
-    describe('when confusion effect exists', () => {
-        it('returns an object with promptId, dc, saveType, and targetName', () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-
-            const result = applyEndOfTurnConfusionSave('Goblin', campaignName, 13, 'WIS');
-
-            expect(result).toBeDefined();
-            expect(result).toHaveProperty('promptId');
-            expect(result).toHaveProperty('dc', 13);
-            expect(result).toHaveProperty('saveType', 'WIS');
-            expect(result).toHaveProperty('targetName', 'Goblin');
+    it.each([
+        { seed: ['existing-prompt'], expectedLen: 2 },
+        { seed: undefined, expectedLen: 1 },
+    ])('stamps the promptId onto campaign pendingSaveListenerPrompts (seed $seed)', ({ seed, expectedLen }) => {        mockRuntime({
+            targetEffects: [makeConfusionEffect()],
+            pendingSaveListenerPrompts: seed,
         });
 
-        it('generates a promptId with the correct prefix', () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
+        applyEndOfTurnConfusionSave(TARGET, campaignName, 13, 'INT');
 
-            const result = applyEndOfTurnConfusionSave('Goblin', campaignName, 13, 'WIS');
-
-            expect(result.promptId).toMatch(/^confusion-end-turn-/);
-        });
-
-        it('uses confusion effect dc when provided', () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect({ dc: 17 })]);
-
-            const result = applyEndOfTurnConfusionSave('Goblin', campaignName, 13, 'WIS');
-
-            expect(result.dc).toBe(17);
-        });
-
-        it('falls back to passed saveDc when confusion effect dc is missing', () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect({ dc: undefined })]);
-
-            const result = applyEndOfTurnConfusionSave('Goblin', campaignName, 15, 'WIS');
-
-            expect(result.dc).toBe(15);
-        });
-
-        it('defaults to WIS saveType when not provided', () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-
-            const result = applyEndOfTurnConfusionSave('Goblin', campaignName, 13);
-
-            expect(result.saveType).toBe('WIS');
-        });
-
-        it('uses passed saveType when provided', () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-
-            const result = applyEndOfTurnConfusionSave('Goblin', campaignName, 13, 'INT');
-
-            expect(result.saveType).toBe('INT');
-        });
-
-        it('adds the promptId to pendingSaveListenerPrompts', () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-
-            applyEndOfTurnConfusionSave('Goblin', campaignName, 13, 'WIS');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'pendingSaveListenerPrompts',
-                expect.arrayContaining([expect.stringMatching(/^confusion-end-turn-/)]),
-                campaignName,
-            );
-        });
-
-        it('appends to existing pendingSaveListenerPrompts', () => {
-            getRuntimeValue.mockReturnValue([
-                makeConfusionEffect(),
-            ]);
-            // First call returns existing prompts with one already there
-            let existingPrompts = ['existing-prompt'];
-            getRuntimeValue.mockImplementation((scope, key) => {
-                if (key === 'pendingSaveListenerPrompts') {
-                    return existingPrompts;
-                }
-                return [makeConfusionEffect()];
-            });
-
-            applyEndOfTurnConfusionSave('Goblin', campaignName, 13, 'WIS');
-
-            const updatedPrompts = setRuntimeValue.mock.calls[0][2];
-            expect(updatedPrompts.length).toBe(2);
-            expect(updatedPrompts).toContain('existing-prompt');
-        });
-
-        it('handles missing pendingSaveListenerPrompts by starting a new array', () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-            getRuntimeValue.mockImplementation((scope, key) => {
-                if (key === 'pendingSaveListenerPrompts') {
-                    return undefined;
-                }
-                return [makeConfusionEffect()];
-            });
-
-            applyEndOfTurnConfusionSave('Goblin', campaignName, 13, 'WIS');
-
-            const updatedPrompts = setRuntimeValue.mock.calls[0][2];
-            expect(updatedPrompts.length).toBe(1);
-        });
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'campaign',
+            'pendingSaveListenerPrompts',
+            expectedLen === 2
+                ? ['existing-prompt', expect.stringMatching(/^confusion-end-turn-/)]
+                : [expect.stringMatching(/^confusion-end-turn-/)],
+            campaignName,
+        );
     });
 });
 
-describe('removeConfusionEffect', () => {
+describe('removeConfusionEffect [DEAD API — removal is createRollConditionSaveHandler\'s own lane]', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    describe('condition removal', () => {
-        it('removes charmed and speed_zero from activeConditions', () => {
-            getRuntimeValue.mockReturnValue(['charmed', 'speed_zero', 'frightened']);
-
-            removeConfusionEffect('Goblin', campaignName);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'activeConditions',
-                expect.arrayContaining(['frightened']),
-                campaignName,
-            );
-            // Should only have frightened left
-            const newConditions = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions')[2];
-            expect(newConditions).toEqual(['frightened']);
+    it('filters charmed/speed_zero (case-insensitive) and the confusion te, logging removal', () => {
+        const fearTe = { target: 'Orc', effect: 'fear', source: 'Caster' };
+        mockRuntime({
+            activeConditions: ['CHARMED', 'speed_zero', 'blinded'],
+            targetEffects: [makeConfusionEffect(), fearTe],
         });
 
-        it('removes charmed and speed_zero even if they appear in different cases', () => {
-            getRuntimeValue.mockReturnValue(['CHARMED', 'Speed_Zero', 'blinded']);
+        removeConfusionEffect(TARGET, campaignName);
 
-            removeConfusionEffect('Goblin', campaignName);
-
-            const newConditions = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions')[2];
-            expect(newConditions).toEqual(['blinded']);
-        });
-
-        it('handles when charmed and speed_zero are not present', () => {
-            getRuntimeValue.mockReturnValue(['frightened', 'blinded']);
-
-            removeConfusionEffect('Goblin', campaignName);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'activeConditions',
-                ['frightened', 'blinded'],
-                campaignName,
-            );
-        });
-
-        it('handles empty activeConditions array', () => {
-            getRuntimeValue.mockReturnValue([]);
-
-            removeConfusionEffect('Goblin', campaignName);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'activeConditions',
-                [],
-                campaignName,
-            );
-        });
-
-        it('handles undefined activeConditions', () => {
-            getRuntimeValue.mockReturnValue(undefined);
-
-            removeConfusionEffect('Goblin', campaignName);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'activeConditions',
-                [],
-                campaignName,
-            );
-        });
-
-        it('handles non-array activeConditions as empty', () => {
-            getRuntimeValue.mockReturnValue('not-an-array');
-
-            removeConfusionEffect('Goblin', campaignName);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'activeConditions',
-                [],
-                campaignName,
-            );
+        expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded'], campaignName);
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [fearTe], campaignName);
+        expect(addEntry).toHaveBeenCalledWith(campaignName, {
+            type: 'condition',
+            action: 'removed',
+            characterName: TARGET,
+            condition: 'Confused',
+            reason: 'Successful WIS save at end of turn',
+            timestamp: expect.any(Number),
         });
     });
 
-    describe('targetEffects removal', () => {
-        it('removes confusion targetEffect for the target', () => {
-            getRuntimeValue.mockReturnValue([
-                makeConfusionEffect(),
-                { target: 'Orc', effect: 'fear', source: 'Caster' },
-            ]);
+    it.each([
+        ['undefined', undefined],
+        ['non-array junk', 'not-an-array'],
+    ])('writes empty arrays when stored state is %s', (_label, stored) => {
+        mockRuntime({ activeConditions: stored, targetEffects: stored });
 
-            removeConfusionEffect('Goblin', campaignName);
+        removeConfusionEffect(TARGET, campaignName);
 
-            const effectCalls = setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects');
-            expect(effectCalls.length).toBeGreaterThan(0);
-            const newEffects = effectCalls[effectCalls.length - 1][2];
-            expect(newEffects.length).toBe(1);
-            expect(newEffects[0].target).toBe('Orc');
-            expect(newEffects[0].effect).toBe('fear');
-        });
-
-        it('handles when confusion effect is not present for target', () => {
-            getRuntimeValue.mockReturnValue([
-                { target: 'Orc', effect: 'fear', source: 'Caster' },
-            ]);
-
-            removeConfusionEffect('Goblin', campaignName);
-
-            const effectCalls = setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects');
-            expect(effectCalls.length).toBeGreaterThan(0);
-            const newEffects = effectCalls[effectCalls.length - 1][2];
-            expect(newEffects.length).toBe(1);
-            expect(newEffects[0].target).toBe('Orc');
-        });
-
-        it('handles non-array targetEffects', () => {
-            getRuntimeValue.mockReturnValue('not-an-array');
-
-            removeConfusionEffect('Goblin', campaignName);
-
-            const effectCalls = setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects');
-            expect(effectCalls.length).toBeGreaterThan(0);
-            expect(effectCalls[0][2]).toEqual([]);
-        });
-
-        it('handles undefined targetEffects', () => {
-            getRuntimeValue.mockReturnValue(undefined);
-
-            removeConfusionEffect('Goblin', campaignName);
-
-            const effectCalls = setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects');
-            expect(effectCalls.length).toBeGreaterThan(0);
-            expect(effectCalls[0][2]).toEqual([]);
-        });
-    });
-
-    describe('logging', () => {
-        it('logs a condition entry with action "removed"', async () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-
-            removeConfusionEffect('Goblin', campaignName);
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'condition',
-                action: 'removed',
-                characterName: 'Goblin',
-                condition: 'Confused',
-                reason: 'Successful WIS save at end of turn',
-                timestamp: expect.any(Number),
-            }));
-        });
-
-        it('includes target name in the condition entry', async () => {
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-
-            removeConfusionEffect('Goblin', campaignName);
-
-            const logEntry = addEntry.mock.calls[0][1];
-            expect(logEntry.characterName).toBe('Goblin');
-        });
-    });
-
-    describe('error handling', () => {
-        it('does not throw when addEntry fails', () => {
-            vi.spyOn(console, 'error').mockReturnValue();
-            getRuntimeValue.mockReturnValue([makeConfusionEffect()]);
-            addEntry.mockRejectedValue(new Error('Log error'));
-
-            removeConfusionEffect('Goblin', campaignName);
-
-            console.error.mockRestore();
-        });
+        expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', [], campaignName);
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [], campaignName);
     });
 });

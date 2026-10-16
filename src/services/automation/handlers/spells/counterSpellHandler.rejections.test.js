@@ -1,6 +1,26 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// ── Mocks BEFORE imports ───────────────────────────────────────
+// ── QUAD seam map — counterSpellHandler.js ─────────────────────────────
+// Subject is LIVE: automation/index.js imports `handle` (l.201) and registers
+// it as `reaction_counterspell` in the dispatch table (l.525); the dispatcher
+// catches handler rejections (index.js l.745).
+//
+// THIS FILE (#1894) — REJECTION / ERROR lane:
+//   • every addEntry rejection is swallowed via .catch(console.error) and
+//     the flow continues (trigger log, failed-save success:false branch,
+//     successful-save branch)
+//   • service failures (getCombatContext / findLastAttack rejects,
+//     createSaveListener throw) REJECT handle by contract — only addEntry
+//     is swallowed — and never arm the save-result listener
+//   • rollbackSpellEffects rejection propagates out of handleSaveResult and
+//     leaves the listener armed (pinned current contract; logged to #1896)
+//   • getRuntimeValue null/undefined/negative slot-refund guards
+//   Save-result exact shapes, rollback args, broadcast payload and promptId
+//   guard stay canonical in #1893 (handleResults). Spell Breaker refund
+//   content lives in #1895. No game timers — captured-listener awaits only.
+// ─────────────────────────────────────────────────────────────────────────
+
+// ── Mocks BEFORE imports ───────────────────────────────────────────────
 
 vi.mock('../../common/savePrompt.js', () => ({
   buildSaveDc: vi.fn(),
@@ -25,7 +45,7 @@ vi.mock('../../common/damageRollback.js', () => ({
   rollbackSpellEffects: vi.fn(),
 }));
 
-// ── Imports ────────────────────────────────────────────────────
+// ── Imports ──────────────────────────────────────────────────────────────
 
 import { handle } from './counterSpellHandler.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
@@ -34,9 +54,11 @@ import { addEntry } from '../../../ui/logService.js';
 import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { findLastAttack, rollbackSpellEffects } from '../../common/damageRollback.js';
 
-// ── Helpers ────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────
 
 const campaignName = 'test-campaign';
+const PROMPT_ID = 'rejections-prompt';
+const SLOT_KEY = 'spell_slots_level_3';
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -46,6 +68,16 @@ function makePlayerStats(overrides = {}) {
     abilities: [{ name: 'Charisma', bonus: 3 }],
     ...overrides,
   };
+}
+
+function makeSpellBreakerStats() {
+  return makePlayerStats({
+    automation: {
+      passives: [
+        { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
+      ],
+    },
+  });
 }
 
 function makeAction(automation = {}) {
@@ -61,6 +93,7 @@ function makeAction(automation = {}) {
 
 function makeCombatContext(overrides = {}) {
   return {
+    round: 1,
     creatures: [
       { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
       { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
@@ -75,6 +108,7 @@ function makeCombatContext(overrides = {}) {
 }
 
 function makeLastAttack(overrides = {}) {
+  const { attackEvent: attackEventOverrides = {}, ...rest } = overrides;
   return {
     attackEvent: {
       attackerName: 'Goblin',
@@ -83,7 +117,12 @@ function makeLastAttack(overrides = {}) {
       damageName: 'Fire Bolt',
       attackName: 'Fire Bolt',
       saveType: null,
-      ...overrides.attackEvent,
+      primaryDamage: 9,
+      secondaryDamage: 0,
+      affectedTargets: ['TestCaster'],
+      statusEffects: null,
+      // attackEvent overrides MERGE (caller keeps untouched identity fields)
+      ...attackEventOverrides,
     },
     attackerName: 'Goblin',
     targetName: 'TestCaster',
@@ -91,207 +130,228 @@ function makeLastAttack(overrides = {}) {
     secondaryDamage: 0,
     totalDamage: 9,
     damageTypes: ['Fire'],
-    statusEffects: null,
-    affectedTargets: ['TestCaster'],
-    ...overrides,
+    ...rest,
   };
 }
 
-// ── Tests ──────────────────────────────────────────────────────
+// Run handle() and return spies + the captured window 'save-result'
+// listener. Awaiting savedCallback awaits handleSaveResult end-to-end —
+// no setTimeout flushes, no timer races.
+async function armListener(action, playerStats) {
+  const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+  const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+  await handle(action, playerStats, campaignName, null);
+  const savedCallback = addEventListenerSpy.mock.calls.find(
+    call => call[0] === 'save-result'
+  )[1];
+  return { savedCallback, addEventListenerSpy, removeEventListenerSpy };
+}
 
-describe('counterSpellHandler.errors', () => {
+function saveSlotCalls() {
+  return setRuntimeValue.mock.calls.filter(
+    call => String(call[1]).startsWith('spell_slots_level_')
+  );
+}
+
+// ── Tests ────────────────────────────────────────────────────────────────
+
+describe('counterSpellHandler.rejections', () => {
+  let consoleErrorSpy;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    // mockReset (not clearAllMocks) also drains queued once-implementations
+    // so a rejection queued by one test can never leak into the next.
+    getCombatContext.mockReset().mockResolvedValue(makeCombatContext());
+    findLastAttack.mockReset().mockResolvedValue(makeLastAttack());
+    buildSaveDc.mockReset().mockReturnValue(15);
+    createSaveListener.mockReset().mockReturnValue({ promptId: PROMPT_ID });
+    rollbackSpellEffects.mockReset().mockResolvedValue({
+      targetsHealed: 0,
+      conditionsRemoved: [],
+      effectsRemoved: 0,
+      damageHealed: 0,
+      logDescription: '',
+    });
+    addEntry.mockReset().mockResolvedValue(undefined);
+    setRuntimeValue.mockReset();
+    getRuntimeValue.mockReset();
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  describe('addEntry rejection handling', () => {
-    it('should not throw when initial addEntry rejects', async () => {
-      const addEntryReject = vi.fn(() => Promise.reject(new Error('db error')));
-      vi.mocked(addEntry).mockImplementation(addEntryReject);
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+  });
 
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'reject-prompt-1' });
+  describe('addEntry rejection paths (swallowed + logged)', () => {
+    it('swallows the initial ability_use rejection, logs it, and still arms the save listener', async () => {
+      const err = new Error('db error');
+      addEntry.mockRejectedValueOnce(err); // first call = trigger log
 
-      const ps = makePlayerStats();
-      const action = makeAction();
+      const { savedCallback, addEventListenerSpy, removeEventListenerSpy } =
+        await armListener(makeAction(), makePlayerStats());
 
-      await expect(handle(action, ps, campaignName, null)).resolves.not.toThrow();
+      // Log attempted once, rejection caught at its own call site
+      expect(addEntry).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[counterSpell] Error:', err);
+
+      // Flow continued past the failed log — CON save prompt is armed
+      const saveResultCalls = addEventListenerSpy.mock.calls.filter(
+        call => call[0] === 'save-result'
+      );
+      expect(saveResultCalls).toHaveLength(1);
+
+      // Unresolved by contract — de-arm so it can't fire into the next test
+      expect(removeEventListenerSpy).not.toHaveBeenCalledWith('save-result', savedCallback);
+      window.removeEventListener('save-result', savedCallback);
+      addEventListenerSpy.mockRestore();
+      removeEventListenerSpy.mockRestore();
     });
 
-    it('should not throw when failed-save addEntry rejects', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-      const addEntryReject = vi.fn(() => Promise.reject(new Error('db error')));
-      vi.mocked(addEntry).mockImplementation(addEntryReject);
+    it.each([
+      ['failed save (counterspell succeeds)', false],
+      ['successful save (counterspell fails)', true],
+    ])('swallows every addEntry rejection on %s and still finishes the branch', async (_label, success) => {
+      const err = new Error('db error');
+      addEntry.mockImplementation(() => Promise.reject(err));
 
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue({
-        attackEvent: {
-          attackerName: 'Goblin',
-          targetName: 'TestCaster',
-          damageFormula: '3d6',
-          damageName: 'Fire Bolt',
-          attackName: 'Fire Bolt',
-          primaryDamage: 9,
-          secondaryDamage: 0,
-          affectedTargets: ['TestCaster'],
-          statusEffects: null,
-        },
-        attackerName: 'Goblin',
-        targetName: 'TestCaster',
-        primaryDamage: 9,
-        secondaryDamage: 0,
-        totalDamage: 9,
-        damageTypes: ['Fire'],
-      });
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'reject-fail-prompt' });
-      rollbackSpellEffects.mockResolvedValue({
-        targetsHealed: 1,
-        conditionsRemoved: [],
-        effectsRemoved: 0,
-        damageHealed: 9,
-        logDescription: "Goblin's spell 'Fire Bolt' was countered — 9 HP healed, no conditions to remove, no target effects to clear on TestCaster.",
-      });
+      const { savedCallback, addEventListenerSpy, removeEventListenerSpy } =
+        await armListener(makeAction(), makePlayerStats());
 
-      const ps = makePlayerStats();
-      const action = makeAction();
+      // handleSaveResult resolves despite every log rejecting
+      await expect(savedCallback({
+        detail: { promptId: PROMPT_ID, success },
+      })).resolves.toBeUndefined();
 
-      await expect(handle(action, ps, campaignName, null)).resolves.not.toThrow();
+      // Trigger log + save_result log both attempted, both console.error'd
+      expect(addEntry).toHaveBeenCalledTimes(2);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[counterSpell] Error:', err);
 
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'reject-fail-prompt',
-          success: false,
-        },
-      });
+      // Log failures must not corrupt the combat side effects
+      expect(rollbackSpellEffects).toHaveBeenCalledTimes(success ? 0 : 1);
 
-      await new Promise(r => setTimeout(r, 10));
+      // One-shot listener cleanup runs even through the rejected logs
+      expect(removeEventListenerSpy).toHaveBeenCalledWith('save-result', savedCallback);
+
       addEventListenerSpy.mockRestore();
-    });
-
-    it('should not throw when success save addEntry rejects', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-      const addEntryReject = vi.fn(() => Promise.reject(new Error('db error')));
-      vi.mocked(addEntry).mockImplementation(addEntryReject);
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'reject-success-prompt' });
-
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      await expect(handle(action, ps, campaignName, null)).resolves.not.toThrow();
-
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'reject-success-prompt',
-          success: true,
-        },
-      });
-
-      await new Promise(r => setTimeout(r, 10));
-      addEventListenerSpy.mockRestore();
+      removeEventListenerSpy.mockRestore();
     });
   });
 
-  describe('spell slot restoration edge cases', () => {
-    it('should not restore slot when getRuntimeValue returns null', async () => {
+  describe('service failures (rejections propagate by contract)', () => {
+    it('rejects when getCombatContext rejects — nothing logged, no listener armed', async () => {
+      getCombatContext.mockRejectedValueOnce(new Error('context unavailable'));
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
 
-      getRuntimeValue.mockReturnValue(null);
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'nullslots-prompt' });
+      // Dispatcher (index.js l.745) is the catcher — handler must not swallow
+      await expect(handle(makeAction(), makePlayerStats(), campaignName, null))
+        .rejects.toThrow('context unavailable');
 
-      const ps = makePlayerStats({
-        automation: {
-          passives: [
-            { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
-          ],
-        },
-      });
-
-      await handle(makeAction(), ps, campaignName, null);
-
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'nullslots-prompt',
-          success: true,
-        },
-      });
-
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(expect.any(String), expect.stringContaining('spell_slots_level_'), expect.any(Number), campaignName);
+      expect(findLastAttack).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(addEventListenerSpy.mock.calls.filter(call => call[0] === 'save-result')).toHaveLength(0);
       addEventListenerSpy.mockRestore();
     });
 
-    it('should not restore slot when getRuntimeValue returns undefined', async () => {
+    it('rejects when findLastAttack rejects — nothing logged, no listener armed', async () => {
+      findLastAttack.mockRejectedValueOnce(new Error('log read failed'));
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
 
-      getRuntimeValue.mockReturnValue(undefined);
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'undefslots-prompt' });
+      await expect(handle(makeAction(), makePlayerStats(), campaignName, null))
+        .rejects.toThrow('log read failed');
 
-      const ps = makePlayerStats({
-        automation: {
-          passives: [
-            { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
-          ],
-        },
-      });
-
-      await handle(makeAction(), ps, campaignName, null);
-
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'undefslots-prompt',
-          success: true,
-        },
-      });
-
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(expect.any(String), expect.stringContaining('spell_slots_level_'), expect.any(Number), campaignName);
+      expect(findLastAttack).toHaveBeenCalledWith(campaignName);
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(addEventListenerSpy.mock.calls.filter(call => call[0] === 'save-result')).toHaveLength(0);
       addEventListenerSpy.mockRestore();
     });
 
-    it('should not restore slot when currentSlots is negative', async () => {
+    it('rejects when createSaveListener throws — save prompt precedes every log', async () => {
+      createSaveListener.mockImplementationOnce(() => {
+        throw new Error('prompt failed');
+      });
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
 
-      getRuntimeValue.mockReturnValue(-1);
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'negslots-prompt' });
+      await expect(handle(makeAction(), makePlayerStats(), campaignName, null))
+        .rejects.toThrow('prompt failed');
 
-      const ps = makePlayerStats({
-        automation: {
-          passives: [
-            { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
-          ],
-        },
-      });
-
-      await handle(makeAction(), ps, campaignName, null);
-
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'negslots-prompt',
-          success: true,
-        },
-      });
-
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(expect.any(String), expect.stringContaining('spell_slots_level_'), expect.any(Number), campaignName);
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(addEventListenerSpy.mock.calls.filter(call => call[0] === 'save-result')).toHaveLength(0);
       addEventListenerSpy.mockRestore();
+    });
+
+    it('propagates a rollbackSpellEffects rejection and leaves the listener armed (current contract)', async () => {
+      rollbackSpellEffects.mockRejectedValueOnce(new Error('rollback failed'));
+
+      const { savedCallback, addEventListenerSpy, removeEventListenerSpy } =
+        await armListener(makeAction(), makePlayerStats());
+
+      // Rollback runs BEFORE the failed-save logs — its rejection aborts
+      // the branch (pinned current behavior; flagged for #1896 review)
+      await expect(savedCallback({
+        detail: { promptId: PROMPT_ID, success: false },
+      })).rejects.toThrow('rollback failed');
+
+      // Aborted before the save_result log; only the trigger log exists
+      expect(addEntry).toHaveBeenCalledTimes(1);
+      expect(addEntry.mock.calls.filter(call => call[1]?.type === 'save_result')).toHaveLength(0);
+
+      // Abort skips the one-shot cleanup — listener stays armed
+      expect(removeEventListenerSpy).not.toHaveBeenCalledWith('save-result', savedCallback);
+
+      window.removeEventListener('save-result', savedCallback); // de-arm for hygiene
+      addEventListenerSpy.mockRestore();
+      removeEventListenerSpy.mockRestore();
+    });
+  });
+
+  describe('spell slot refund guards (getRuntimeValue)', () => {
+    // Keyed implementation: the slot read gets the hostile value, the
+    // reaction-latch read stays clean so the guard under test is isolated.
+    function stubSlotRead(value) {
+      getRuntimeValue.mockImplementation((_name, key) =>
+        key === SLOT_KEY ? value : undefined
+      );
+    }
+
+    it.each([
+      ['null', null],
+      ['undefined', undefined],
+      ['a negative number', -1],
+    ])('does not write %s + 1 to the slot ledger when the stored count is %s', async (_label, badValue) => {
+      stubSlotRead(badValue);
+
+      const { savedCallback, addEventListenerSpy, removeEventListenerSpy } =
+        await armListener(makeAction(), makeSpellBreakerStats());
+
+      await savedCallback({ detail: { promptId: PROMPT_ID, success: true } });
+
+      // Guard actually consulted the exact slot key
+      expect(getRuntimeValue).toHaveBeenCalledWith('TestCaster', SLOT_KEY);
+      // Bad reading must never reach the ledger
+      expect(saveSlotCalls()).toHaveLength(0);
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestCaster', SLOT_KEY, expect.any(Number), campaignName);
+
+      // Success branch completed — one-shot listener disarmed itself
+      expect(removeEventListenerSpy).toHaveBeenCalledWith('save-result', savedCallback);
+
+      addEventListenerSpy.mockRestore();
+      removeEventListenerSpy.mockRestore();
+    });
+
+    it('writes the refund when the stored count sits on the guard boundary (0) — guard pin is not vacuous', async () => {
+      stubSlotRead(0); // 0 is legal: `currentSlots != null && currentSlots >= 0`
+
+      const { savedCallback, addEventListenerSpy, removeEventListenerSpy } =
+        await armListener(makeAction(), makeSpellBreakerStats());
+
+      await savedCallback({ detail: { promptId: PROMPT_ID, success: true } });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestCaster', SLOT_KEY, 1, campaignName);
+
+      addEventListenerSpy.mockRestore();
+      removeEventListenerSpy.mockRestore();
     });
   });
 });

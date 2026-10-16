@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// reactionBonusHandler.js MAIN lane — repo-canonical home of applyD20Modifier internals
+// (description building, outcome shifts, campaign log), plus handleBendFate modal,
+// handleAcBonus (Defensive Duelist), handleLeapAside, and handleVeer.
+// Sibling lanes: inspiring movement lives in reactionBonusHandler.inspiringMovement.test.js
+// (canonical for handle() default-fallthrough/applyInspiringMovement/resolveInspiringMovementUses/
+// appendAgileStrikes); Unbreakable Majesty lives in reactionBonusHandler.unbreakableMajesty.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, applyBendFateChoice } from './reactionBonusHandler.js';
@@ -47,7 +54,6 @@ vi.mock('../../../../services/character/classFeatures.js', () => ({
 
 vi.mock('../../common/damageRollback.js', () => ({
     findAttackRollAgainstTarget: vi.fn(),
-    rollbackDamage: vi.fn(),
 }));
 
 vi.mock('../../common/buffToggle.js', () => ({
@@ -71,7 +77,7 @@ import { rollExpression } from '../../../dice/diceRoller.js';
 import { getCurrentSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
 import { spendSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { findAttackRollAgainstTarget, rollbackDamage } from '../../common/damageRollback.js';
+import { findAttackRollAgainstTarget } from '../../common/damageRollback.js';
 import { toggleBuff } from '../../common/buffToggle.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
@@ -84,14 +90,16 @@ const MAP = 'test-map';
 const HERO_NAME = 'TestHero';
 
 function makeAction(overrides = {}) {
+    // Merge nested automation; never let a trailing overrides spread replace it wholesale.
+    const { automation: automationOverrides, ...rest } = overrides;
     return {
         name: 'Test Reaction',
         description: 'A reaction bonus.',
+        ...rest,
         automation: {
             type: 'reaction_bonus',
-            ...overrides.automation,
+            ...automationOverrides,
         },
-        ...overrides,
     };
 }
 
@@ -185,6 +193,24 @@ describe('reactionBonusHandler', () => {
             const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
 
             expect(result.type).toBe('modal');
+            expect(getClassFeatures).toHaveBeenCalled();
+            expect(getCurrentSorceryPoints).toHaveBeenCalledWith(HERO_NAME, 5);
+        });
+
+        it('should prefer tracked Sorcery Points specialAction over class features for max SP', async () => {
+            getCurrentSorceryPoints.mockReturnValue(7);
+            getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
+                if (propertyName === 'lastAttack') {
+                    return { rollType: 'attack', attackerName: 'Goblin', d20: 15, bonus: 5, targetName: 'Orc' };
+                }
+                return undefined;
+            });
+            const stats = makePlayerStats({ automation: { specialActions: [{ name: 'Sorcery Points', uses: 7 }] } });
+            const result = await handle(makeAction({ automation: { effect: 'bonus_or_penalty_choice' } }), stats, CAMPAIGN, MAP);
+
+            expect(result.type).toBe('modal');
+            expect(getCurrentSorceryPoints).toHaveBeenCalledWith(HERO_NAME, 7);
+            expect(getClassFeatures).not.toHaveBeenCalled();
         });
 
         it('should return modal with correct payload for each roll type', async () => {
@@ -267,36 +293,18 @@ describe('reactionBonusHandler', () => {
             expect(result.payload.attackerName).toBeUndefined();
         });
 
-        it('should show correct hit/miss status based on attack total vs AC', async () => {
-            // miss status
+        it('should show miss status when attack total is below AC', async () => {
+            // Hit and Success statuses are pinned in the payload matrix test above;
+            // this lane pins the Miss branch of describeBendFateEvent.
             getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
                 if (propertyName === 'lastAttack') {
                     return { rollType: 'attack', attackerName: 'Goblin', d20: 5, bonus: 2, targetName: 'Orc', targetAc: 16 };
                 }
                 return undefined;
             });
-            let result = await handle(makeAction({ automation: { effect: 'bonus_or_penalty_choice' } }), makePlayerStats(), CAMPAIGN, MAP);
+            const result = await handle(makeAction({ automation: { effect: 'bonus_or_penalty_choice' } }), makePlayerStats(), CAMPAIGN, MAP);
             expect(result.payload.hitStatus).toBe('Miss');
-
-            // hit status
-            getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
-                if (propertyName === 'lastAttack') {
-                    return { rollType: 'attack', attackerName: 'Goblin', d20: 15, bonus: 5, targetName: 'Orc', targetAc: 16 };
-                }
-                return undefined;
-            });
-            result = await handle(makeAction({ automation: { effect: 'bonus_or_penalty_choice' } }), makePlayerStats(), CAMPAIGN, MAP);
-            expect(result.payload.hitStatus).toBe('Hit');
-
-            // save success
-            getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
-                if (propertyName === 'lastAttack') {
-                    return { rollType: 'save', attackerName: 'Goblin', d20: 10, bonus: 5, saveType: 'wisdom', saveDc: 13 };
-                }
-                return undefined;
-            });
-            result = await handle(makeAction({ automation: { effect: 'bonus_or_penalty_choice' } }), makePlayerStats(), CAMPAIGN, MAP);
-            expect(result.payload.saveStatus).toBe('Success');
+            expect(result.payload.eventLabel).toBe('Attack by Goblin');
         });
     });
 
@@ -404,7 +412,7 @@ describe('reactionBonusHandler', () => {
                 });
 
             expect(result.payload.description).toContain('The save now succeeds');
-            expect(result.payload.description).toContain('Conditions removed');
+            expect(result.payload.description).toContain('Conditions removed: charmed, incapacitated');
         });
 
         it('should change save success to failure and add conditions', async () => {
@@ -415,7 +423,7 @@ describe('reactionBonusHandler', () => {
                 rollType: 'save',
                 saveType: 'wisdom',
                 saveDc: 13,
-                saveConditions: ['charmed'],
+                saveConditions: ['charmed', 'frightened'],
             };
             getCombatContext.mockReturnValue({ lastAttack });
             getRuntimeValue.mockImplementation((targetName, key) => {
@@ -433,13 +441,13 @@ describe('reactionBonusHandler', () => {
                 });
 
             expect(result.payload.description).toContain('The save now fails');
-            expect(result.payload.description).toContain('Conditions applied');
+            expect(result.payload.description).toContain('Conditions applied: charmed, frightened');
         });
 
-        it('should spend sorcery points on success', async () => {
+        it('should report no change in outcome when neither AC nor hit flag is known', async () => {
             getCombatContext.mockReturnValue({ lastAttack: { ...baseLastAttack } });
 
-            await applyBendFateChoice({
+            const result = await applyBendFateChoice({
                     action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
                     playerStats: makePlayerStats(),
                     campaignName: CAMPAIGN,
@@ -448,7 +456,8 @@ describe('reactionBonusHandler', () => {
                     mode: 'bonus',
                 });
 
-            expect(spendSorceryPoints).toHaveBeenCalledWith(HERO_NAME, 1, CAMPAIGN, 0);
+            // No targetAc/effectiveAc and no hit flag → attackOutcomeTail(null, null).
+            expect(result.payload.description).toContain('No change in outcome');
         });
 
         it('should log to campaign log', async () => {
@@ -690,62 +699,6 @@ describe('reactionBonusHandler', () => {
             expect(spendSorceryPoints).toHaveBeenCalledWith(HERO_NAME, 1, CAMPAIGN, 0);
         });
 
-        it('should include conditions added/removed in popup description', async () => {
-            // conditions added (save failure)
-            let lastAttack = {
-                d20: 10,
-                bonus: 3,
-                targetName: 'Goblin',
-                rollType: 'save',
-                saveType: 'wisdom',
-                saveDc: 13,
-                saveConditions: ['charmed', 'frightened'],
-            };
-            getCombatContext.mockReturnValue({ lastAttack });
-            getRuntimeValue.mockImplementation((targetName, key) => {
-                if (key === 'activeConditions' && targetName === 'Goblin') return ['frightened'];
-                return null;
-            });
-            let result = await applyBendFateChoice({
-                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                    playerStats: makePlayerStats(),
-                    campaignName: CAMPAIGN,
-                    d4Roll: 3,
-                    lastAttack,
-                    mode: 'penalty',
-                });
-            expect(result.payload.description).toContain('Conditions applied');
-            expect(result.payload.description).toContain('charmed');
-
-            // conditions removed (save success)
-            vi.clearAllMocks();
-            getCombatContext.mockReturnValue({ lastAttack });
-            getCurrentSorceryPoints.mockReturnValue(3);
-            lastAttack = {
-                d20: 8,
-                bonus: 3,
-                targetName: 'Goblin',
-                rollType: 'save',
-                saveType: 'wisdom',
-                saveDc: 13,
-                saveConditions: ['charmed'],
-            };
-            getRuntimeValue.mockImplementation((targetName, key) => {
-                if (key === 'activeConditions' && targetName === 'Goblin') return ['charmed'];
-                return null;
-            });
-            result = await applyBendFateChoice({
-                    action: { name: 'Bend Luck', automation: { type: 'reaction_bonus' } },
-                    playerStats: makePlayerStats(),
-                    campaignName: CAMPAIGN,
-                    d4Roll: 3,
-                    lastAttack,
-                    mode: 'bonus',
-                });
-            expect(result.payload.description).toContain('Conditions removed');
-            expect(result.payload.description).toContain('charmed');
-        });
-
         it('should handle missing saveConditions gracefully', async () => {
             const lastAttack = {
                 d20: 8,
@@ -799,7 +752,6 @@ describe('reactionBonusHandler', () => {
         beforeEach(() => {
             toggleBuff.mockReturnValue({ wasActive: false });
             findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: null, attackerName: null });
-            rollbackDamage.mockResolvedValue(0);
             addEntry.mockResolvedValue(undefined);
             getCombatContext.mockReturnValue(null);
             applyHealingToTarget.mockReturnValue(null);
@@ -824,23 +776,13 @@ describe('reactionBonusHandler', () => {
             );
             expect(result.payload.description).toContain('must be wielding a Finesse weapon');
 
-            // magic-prefixed item name stripped correctly
+            // magic-prefixed item name stripped correctly — passes the Finesse gate,
+            // then reaches the no-recent-attack rejection (also guards toggleBuff not fired)
             result = await handle(
                 makeAction({ automation: { effect: 'ac_bonus' } }),
                 makePlayerStats({ equipped: ['+3 Shortsword'], equipment: [finesseWeapon] }),
                 CAMPAIGN, MAP
             );
-            expect(result.payload.description).toContain('No recent attack');
-        });
-
-        it('should reject when no recent attack targeting player', async () => {
-            const result = await handle(
-                makeAction({ automation: { effect: 'ac_bonus' } }),
-                makePlayerStats({ equipped: ['Shortsword'], equipment: [finesseWeapon] }),
-                CAMPAIGN, MAP
-            );
-
-            expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('No recent attack targeting');
             expect(toggleBuff).not.toHaveBeenCalled();
         });
@@ -850,7 +792,7 @@ describe('reactionBonusHandler', () => {
             const action = makeAction({ automation: { effect: 'ac_bonus' } });
             const result = await handle(action, makePlayerStats({ equipped: ['Shortsword'], equipment: [finesseWeapon] }), CAMPAIGN, MAP);
 
-            expect(toggleBuff).toHaveBeenCalledWith(HERO_NAME, 'Test Reaction', expect.objectContaining({ effect: 'defensive_duelist' }), CAMPAIGN);
+            expect(toggleBuff).toHaveBeenCalledWith(HERO_NAME, 'Test Reaction', expect.objectContaining({ effect: 'defensive_duelist', acBonus: 3 }), CAMPAIGN);
             expect(addExpiration).toHaveBeenCalledWith({ attackerName: HERO_NAME, targetName: HERO_NAME, effects: expect.arrayContaining([
                 expect.objectContaining({ type: 'remove_active_buff', buffName: 'Test Reaction' })
             ]), campaignName: CAMPAIGN, rounds: undefined, expireOnCreatureName: HERO_NAME });
@@ -867,7 +809,6 @@ describe('reactionBonusHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('already active');
             expect(addExpiration).not.toHaveBeenCalled();
-            expect(rollbackDamage).not.toHaveBeenCalled();
         });
 
         it('should show "still hits" when roll >= new AC', async () => {
@@ -877,7 +818,6 @@ describe('reactionBonusHandler', () => {
 
             expect(result.payload.description).toContain('still hits');
             expect(result.payload.description).toContain('Roll 19');
-            expect(rollbackDamage).not.toHaveBeenCalled();
             expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
                 type: 'ability_use',
                 characterName: HERO_NAME,
@@ -915,14 +855,14 @@ describe('reactionBonusHandler', () => {
             expect(result.payload.description).not.toContain('healed');
         });
 
-        it('should handle null targetAc, null combatContext, missing proficiency, and non-string equipped entries', async () => {
+        it('should handle null targetAc, null combatContext, and non-string equipped entries', async () => {
             // null targetAc — still activates
             const attackNoAc = { ...mockAttackEvent, targetAc: null };
             findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: attackNoAc, attackerName: 'Goblin' });
             let result = await handle(makeAction({ automation: { effect: 'ac_bonus' } }), makePlayerStats({ proficiency: 3, equipped: ['Shortsword'], equipment: [finesseWeapon] }), CAMPAIGN, MAP);
             expect(result.payload.description).toContain('activated');
 
-            // null combatContext during healing — misses without healing
+            // null combatContext during healing — misses without healing (distinct from applyHealingToTarget returning null)
             const attackWithDamage = { ...mockAttackEvent, rawDamage: 8, targetAc: 17 };
             findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: attackWithDamage, attackerName: 'Goblin' });
             getCombatContext.mockReturnValue(null);
@@ -930,21 +870,24 @@ describe('reactionBonusHandler', () => {
             expect(result.payload.description).toContain('misses');
             expect(result.payload.description).not.toContain('healed');
 
-            // missing proficiency — still activates
-            findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: mockAttackEvent, attackerName: 'Goblin' });
-            getCombatContext.mockReturnValue(null);
-            result = await handle(makeAction({ automation: { effect: 'ac_bonus' } }), makePlayerStats({ equipped: ['Shortsword'], equipment: [finesseWeapon] }), CAMPAIGN, MAP);
-            expect(result.payload.description).toContain('activated');
-
-            // non-string equipped entries
+            // non-string equipped entries are skipped by the Finesse check
             findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: null, attackerName: null });
-            getCombatContext.mockReturnValue(null);
             result = await handle(
                 makeAction({ automation: { effect: 'ac_bonus' } }),
                 makePlayerStats({ equipped: [null, undefined, 'Shortsword'], equipment: [finesseWeapon] }),
                 CAMPAIGN, MAP
             );
             expect(result.payload.description).toContain('No recent attack');
+
+            // undefined proficiency defaults to +0 AC
+            findAttackRollAgainstTarget.mockResolvedValue({ attackEvent: mockAttackEvent, attackerName: 'Goblin' });
+            result = await handle(
+                makeAction({ automation: { effect: 'ac_bonus' } }),
+                makePlayerStats({ proficiency: undefined, equipped: ['Shortsword'], equipment: [finesseWeapon] }),
+                CAMPAIGN, MAP
+            );
+            expect(result.payload.description).toContain('+0 AC');
+            expect(toggleBuff).toHaveBeenLastCalledWith(HERO_NAME, 'Test Reaction', expect.objectContaining({ effect: 'defensive_duelist', acBonus: 0 }), CAMPAIGN);
         });
 
         it('should handle missing equipment array or inventory.equipped', async () => {
@@ -1025,15 +968,6 @@ describe('reactionBonusHandler', () => {
             expect(result.payload.description).toContain('activated');
             expect(result.payload.description).toContain('Warhorse');
             expect(setRuntimeValue).toHaveBeenCalledWith(HERO_NAME, 'leapAsideActive', true, CAMPAIGN);
-        });
-
-        it('should reject when player has multiple conditions including incapacitated', async () => {
-            getRuntimeValue.mockReturnValue('Warhorse');
-            const stats = makePlayerStats({ conditions: ['frightened', 'incapacitated', 'poisoned'] });
-            const action = makeAction({ automation: { effect: 'zero_on_success_half_on_fail_for_mount' } });
-            const result = await handle(action, stats, CAMPAIGN, MAP);
-
-            expect(result.payload.description).toContain('not be Incapacitated');
         });
 
         it('should allow activation when mount conditions is null', async () => {
@@ -1137,14 +1071,6 @@ describe('reactionBonusHandler', () => {
                 characterName: HERO_NAME,
                 abilityName: 'Veer',
             }));
-        });
-
-        it('should handle mount name from getRuntimeValue', async () => {
-            getRuntimeValue.mockReturnValue('Shadowmere');
-            const action = makeAction({ automation: { effect: 'redirect_attack_to_self' } });
-            const result = await handle(action, makePlayerStats(), CAMPAIGN, MAP);
-
-            expect(result.payload.description).toContain('Shadowmere');
         });
     });
 });

@@ -1,4 +1,24 @@
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai
+//
+// LANE: animalShapesHandler.js ONLY — the automation dispatch entry for automation.type
+// 'animal_shapes' (registered in services/automation/index.js as handleAnimalShapes).
+// This lane owns the handler's three branches: no-combat-context guard, already-transformed
+// guard (campaign targetEffects scan + log), and the animal_shapes_target_selection popup
+// composition. All deps mocked; deterministic popup-payload contracts.
+//
+// TRIO MAP (verified against imports — no overlap):
+// - animalShapesService.test.js (#1860): animalShapesService.js mutation lane —
+//   applyAnimalShapes/confirmAnimalShapesTransform/revertAnimalShapes THP & polymorphOriginal
+//   writes, targetEffects/pendingExpirations storage. Near-name sibling test
+//   "should handle existing animal_shapes effects during confirm transform" is the SERVICE's
+//   te-merge behaviour, NOT this handler's read-only already-transformed guard — distinct.
+// - animalShapesSpellData.test.js (#1861): spells.json/2024 spells.json automation.type data
+//   pin. This lane builds its action inline, never reads JSON — distinct.
+// Consumers (different seams, not dupes): useSpellMetamagicFlow*.test.js fabricate the
+// animal_shapes_target_selection payload in the hook; targetEffectDefinitions.test.js owns
+// targetEffects registry internals (this handler writes no te — read-only scan only).
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
@@ -32,13 +52,14 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeAction(metaCtx = {}) {
+function makeAction(overrides = {}) {
   return {
     name: 'Animal Shapes',
     automation: { type: 'animal_shapes', saveType: 'WIS', saveDc: 15 },
     spell: { name: 'Animal Shapes', level: 8 },
     spellSlotLevel: 8,
-    metaCtx,
+    metaCtx: {},
+    ...overrides,
   };
 }
 
@@ -58,13 +79,21 @@ function setupBaseMocks({ existingEffects = [] } = {}) {
 }
 
 describe('animalShapesHandler', () => {
+  beforeEach(() => {
+    addEntry.mockClear();
+    getRuntimeValue.mockClear();
+    getCombatContext.mockClear();
+  });
+
   describe('handle', () => {
     it('should return automation_info when no combat context', async () => {
       getCombatContext.mockResolvedValue(null);
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No creatures in combat');
+      expect(result.payload.name).toBe('Animal Shapes');
+      expect(result.payload.description).toBe('No creatures in combat. Animal Shapes has no effect.');
+      expect(addEntry).not.toHaveBeenCalled();
     });
 
     it('should return automation_info when no creatures', async () => {
@@ -72,7 +101,9 @@ describe('animalShapesHandler', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No creatures in combat');
+      expect(result.payload.name).toBe('Animal Shapes');
+      expect(result.payload.description).toBe('No creatures in combat. Animal Shapes has no effect.');
+      expect(addEntry).not.toHaveBeenCalled();
     });
 
     it('should return animal_shapes_target_selection popup', async () => {
@@ -86,6 +117,16 @@ describe('animalShapesHandler', () => {
       expect(result.payload.allowedSizes).toEqual(['Tiny', 'Small', 'Medium', 'Large']);
       expect(result.payload.spell).toEqual({ name: 'Animal Shapes', level: 8 });
       expect(result.payload.spellLevel).toBe(8);
+      expect(result.payload.automation).toEqual({ type: 'animal_shapes', saveType: 'WIS', saveDc: 15 });
+    });
+
+    it('should default automation to empty object when action has none', async () => {
+      setupBaseMocks();
+      const action = makeAction();
+      delete action.automation;
+      const result = await handle(action, makePlayerStats(), campaignName, null);
+      expect(result.payload.type).toBe('animal_shapes_target_selection');
+      expect(result.payload.automation).toEqual({});
     });
 
     it('should return automation_info when creatures already have animal_shapes effect', async () => {
@@ -93,8 +134,13 @@ describe('animalShapesHandler', () => {
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('already transformed');
-      expect(addEntry).toHaveBeenCalled();
+      expect(result.payload.name).toBe('Animal Shapes');
+      expect(result.payload.description).toBe('Animal Shapes has no effect on creatures already transformed by Animal Shapes.');
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: 'Animal Shapes',
+      }));
     });
   });
 });

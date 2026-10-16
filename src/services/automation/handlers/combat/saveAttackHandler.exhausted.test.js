@@ -1,3 +1,7 @@
+// @maintained-by-ai — deterministic unit contract for the exported isExhausted()
+// predicate (channel divinity / wild shape / tracked-uses refusal gating).
+// Pure logic over action.automation + playerStats with module-boundary mocks;
+// stable unless the predicate's signature or runtime keys change.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -86,20 +90,26 @@ describe('saveAttackHandler - isExhausted', () => {
   });
 
   describe('channel divinity resource cost', () => {
+    // NOTE: the handler looks up class data POSITIONALLY at class_levels[level - 1],
+    // so these fixtures use level 1 with the entry at index 0.
+
     it('should return true when charges are depleted', () => {
       runtimeState.getRuntimeValue.mockReturnValue(0);
       const ps = makePlayerStats({
-        class: { class_levels: [{ level: 5, channel_divinity: 2 }] },
+        level: 1,
+        class: { class_levels: [{ level: 1, channel_divinity: 2 }] },
       });
       const action = makeAction({ resourceCost: 'channel_divinity' });
 
       expect(isExhausted(action, ps, campaignName)).toBe(true);
+      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('TestCaster', 'channelDivinityCharges');
     });
 
     it('should return false when charges are available', () => {
       runtimeState.getRuntimeValue.mockReturnValue(1);
       const ps = makePlayerStats({
-        class: { class_levels: [{ level: 5, channel_divinity: 2 }] },
+        level: 1,
+        class: { class_levels: [{ level: 1, channel_divinity: 2 }] },
       });
       const action = makeAction({ resourceCost: 'channel_divinity' });
 
@@ -109,7 +119,8 @@ describe('saveAttackHandler - isExhausted', () => {
     it('should default to max charges when no runtime value is set', () => {
       runtimeState.getRuntimeValue.mockReturnValue(null);
       const ps = makePlayerStats({
-        class: { class_levels: [{ level: 5, channel_divinity: 2 }] },
+        level: 1,
+        class: { class_levels: [{ level: 1, channel_divinity: 2 }] },
       });
       const action = makeAction({ resourceCost: 'channel_divinity' });
 
@@ -118,8 +129,11 @@ describe('saveAttackHandler - isExhausted', () => {
 
     it('should use class_specific channel_divinity_charges fallback', () => {
       runtimeState.getRuntimeValue.mockReturnValue(null);
+      // channel_divinity falsy (0) forces the || fallback to class_specific:
+      // reading channel_divinity directly (e.g. via ??) would report exhausted.
       const ps = makePlayerStats({
-        class: { class_levels: [{ level: 5, class_specific: { channel_divinity_charges: 3 } }] },
+        level: 1,
+        class: { class_levels: [{ level: 1, channel_divinity: 0, class_specific: { channel_divinity_charges: 3 } }] },
       });
       const action = makeAction({ resourceCost: 'channel_divinity' });
 
@@ -144,6 +158,7 @@ describe('saveAttackHandler - isExhausted', () => {
       const action = makeAction({ resourceCost: 'wild_shape' });
 
       expect(isExhausted(action, ps, campaignName)).toBe(true);
+      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('TestCaster', 'wildShapeUses', campaignName);
     });
 
     it('should return false when uses are available', () => {
@@ -183,6 +198,8 @@ describe('saveAttackHandler - isExhausted', () => {
       const action = makeAction({ usesMax: 1 });
 
       expect(isExhausted(action, makePlayerStats(), campaignName)).toBe(true);
+      // default uses key derived from the action name
+      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('TestCaster', 'breathweaponUses', campaignName);
     });
 
     it('should return false when uses are available', () => {
@@ -192,18 +209,23 @@ describe('saveAttackHandler - isExhausted', () => {
       expect(isExhausted(action, makePlayerStats(), campaignName)).toBe(false);
     });
 
-    it('should use resolveUses fallback when usesMax is undefined', () => {
-      automationExpressions.resolveUses.mockReturnValue(3);
-      runtimeState.getRuntimeValue.mockReturnValue(2);
-      const action = makeAction({ uses: '1_per_long_rest' });
+    it('should read the custom resourceKey when provided', () => {
+      // only the custom key is depleted; other keys would report available
+      runtimeState.getRuntimeValue.mockImplementation((_name, key) => (key === 'customUses' ? 0 : 5));
+      const action = makeAction({ usesMax: 1, resourceKey: 'customUses' });
 
-      expect(isExhausted(action, makePlayerStats(), campaignName)).toBe(false);
+      expect(isExhausted(action, makePlayerStats(), campaignName)).toBe(true);
+      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith('TestCaster', 'customUses', campaignName);
     });
 
-    it('should return false when both uses and usesMax are undefined', () => {
-      const action = makeAction({});
+    it('should delegate max-uses resolution to resolveUses when usesMax is undefined', () => {
+      automationExpressions.resolveUses.mockReturnValue(3);
+      runtimeState.getRuntimeValue.mockReturnValue(2);
+      const ps = makePlayerStats();
+      const action = makeAction({ uses: '1_per_long_rest' });
 
-      expect(isExhausted(action, makePlayerStats(), campaignName)).toBe(false);
+      expect(isExhausted(action, ps, campaignName)).toBe(false);
+      expect(automationExpressions.resolveUses).toHaveBeenCalledWith(ps, '1_per_long_rest');
     });
   });
 });

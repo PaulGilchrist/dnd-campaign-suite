@@ -1,5 +1,37 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// reactionDebuffHandler octet — lane: WARDING-FLARE ROUTE GATE + IMPROVED
+// WARDING FLARE tempHp TAIL (effect 'disadvantage_on_attack_roll' →
+// EFFECT_ROUTES → handleWardingFlare + logWardingFlareTail →
+// applyImprovedWardingFlare; automation/index.js `reaction_debuff`; live from
+// public/data/2024/classes.json Light Domain 'Warding Flare' /
+// 'Improved Warding Flare' — CLA-193).
+//
+// Seam map lives in reactionDebuffHandler.attacksVsAlly.test.js header.
+// This file owns:
+//  - wardingFlareRangeGate exact refusal copy + zero-side-effect refusal
+//    (zero spend, zero te, zero latch, warding_flare_refused log row) and
+//    the '30_ft' default the gate uses when the production automation omits
+//    a range field (2024 classes.json Warding Flare has none).
+//  - applyImprovedWardingFlare tempHp math + write + tail copy: 2d6 + WIS
+//    onto the DEFENDER (never the attacker), pinned deterministically via
+//    Math.random stubs; feature found in characterAdvancement OR
+//    specialActions (both search branches); skip when feature absent, and
+//    skip when 2d6 + negative WIS lands ≤ 0 (flare still fires); tempHp tail
+//    never runs on the default (bardic) route.
+// NOT owned here (do not re-add): te disadvantage_next_attack write, latch,
+// spend, and no-attack/self-attack refusals (.wardingFlare.test.js);
+// attacksVsAlly range gate (its own same-named test); bardic lane content
+// (.cuttingWords/.defaultPath/.latch/.uses); generic handle() guards
+// (.earlyExits). Its 'refuses out-of-range attackers...' test duplicates this
+// lane's gate coverage (weaker copy — reported for removal).
+//
+// Deterministic: runtime/logService/range/rollback/-popup/automationService
+// fully mocked; the two random WF rolls are stubbed wherever numerals are
+// pinned; unstubbed lanes vary only unpinned numerals. No churn expected.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handle } from './reactionDebuffHandler.js';
+
+// ── Mocks BEFORE imports ────────────────────────────────────────
 
 vi.mock('../../common/targetResolver.js', () => ({
   resolveTarget: vi.fn(),
@@ -17,7 +49,7 @@ vi.mock('../../../ui/logService.js', () => ({
 }));
 
 vi.mock('../../../rules/combat/rangeValidation.js', () => ({
-  rangeToFeet: vi.fn(),
+  rangeToFeet: vi.fn().mockReturnValue(30),
 }));
 
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
@@ -33,15 +65,11 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
 }));
 
 vi.mock('../../common/damageRollback.js', () => ({
-  findLastAttack: vi.fn().mockResolvedValue({
-    attackEvent: null,
-    attackerName: null,
-    targetName: null,
-    primaryDamage: 0,
-    secondaryDamage: 0,
-    totalDamage: 0,
-    damageTypes: [],
-  }),
+  findLastAttack: vi.fn(),
+}));
+
+vi.mock('../../../combat/automation/automationService.js', () => ({
+  evaluateAutoExpression: vi.fn().mockReturnValue(3),
 }));
 
 vi.mock('../../common/infoPopup.js', () => ({
@@ -63,147 +91,188 @@ vi.mock('../../common/infoPopup.js', () => ({
 }));
 
 import * as targetResolver from '../../common/targetResolver.js';
+import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import * as logService from '../../../ui/logService.js';
+import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as damageRollback from '../../common/damageRollback.js';
 
-function makePlayerStats(overrides = {}) {
+const campaignName = 'TestCampaign';
+const mapName = 'TestMap';
+
+// Production shape from 2024 classes.json Light Domain — deliberately NO
+// range field: the gate's '30_ft' default is pinned below.
+function makeWardingFlareAction() {
   return {
-    name: 'Bard',
-    proficiency: 2,
-    level: 3,
-    class: {
-      name: 'Bard',
-      class_levels: [
-        { level: 1, bardic_die: 6 },
-        { level: 2, bardic_die: 6 },
-        { level: 3, bardic_die: 8 },
-      ],
+    name: 'Warding Flare',
+    automation: {
+      type: 'reaction_debuff',
+      trigger: 'attack_roll_within_30ft',
+      effect: 'disadvantage_on_attack_roll',
+      uses_expression: 'WIS modifier_min_1',
+      recharge: 'long_rest',
+      casting_time: '1 reaction',
     },
-    abilities: [
-      { name: 'Wisdom', bonus: 2 },
-      { name: 'Charisma', bonus: 4 },
-    ],
+  };
+}
+
+function makeCleric(overrides = {}) {
+  return {
+    name: 'Light_Cleric',
+    level: 8,
+    proficiency: 3,
+    abilities: [{ name: 'Wisdom', bonus: 4 }],
     characterAdvancement: [],
-    _trackedResources: {
-      bardicInspirationUses: { current: 4, max: 4 },
-    },
+    specialActions: [],
     ...overrides,
   };
 }
 
-function makeAction(automation = {}) {
-  return {
-    name: 'Cutting Words',
-    automation: {
-      type: 'reaction_debuff',
-      range: '60_ft',
-      effect: '',
-      uses_expression: null,
-      recharge: 'long_rest',
-      ...automation,
+const improvedWardingFlare = {
+  name: 'Improved Warding Flare',
+  automation: { tempHpExpression: '2d6 + WIS modifier' },
+};
+
+// Thug 1 hits Ally_Paladin — attacker ≠ player ≠ defender so every pin
+// names its exact role.
+function setupFlareTrigger() {
+  damageUtils.getCombatContext.mockResolvedValue({ round: 1, creatures: [] });
+  damageRollback.findLastAttack.mockResolvedValue({
+    attackEvent: {
+      d20: 15,
+      bonus: 5,
+      targetName: 'Ally_Paladin',
+      targetAc: 14,
+      effectiveAc: null,
+      hit: true,
+      timestamp: 1700000000000,
     },
-  };
+    attackerName: 'Thug 1',
+    targetName: 'Ally_Paladin',
+    primaryDamage: 10,
+    secondaryDamage: 0,
+    totalDamage: 10,
+    damageTypes: ['Slashing'],
+  });
 }
 
-function makeCombatSummary(creatures = []) {
-  return { round: 1, creatures };
+function stubRolls(first, second) {
+  // 2d6: roll = floor(r * 6) + 1 — distinct values catch roll-order swaps.
+  return vi.spyOn(Math, 'random').mockReturnValueOnce(first).mockReturnValueOnce(second);
 }
 
-function freshAttackEvent(options = {}) {
-  return {
-    d20: 15,
-    bonus: 5,
-    targetName: 'Goblin',
-    targetAc: 14,
-    effectiveAc: null,
-    hit: true,
-    timestamp: Date.now(),
-    ...options,
-  };
+function tempHpWrites() {
+  return useRuntimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'tempHp');
 }
 
-const campaignName = 'TestCampaign';
-const mapName = 'DungeonMap';
+function refusalLogRow() {
+  return logService.addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'warding_flare_refused');
+}
 
-describe('reactionDebuffHandler — disadvantage effect & warding flare', () => {
+describe('reactionDebuffHandler — warding-flare lane (range gate + Improved WF tempHp tail)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     rangeCheck.isWithinRange.mockReset().mockResolvedValue(true);
   });
 
-  describe('effect: disadvantage_on_attack_roll', () => {
-    it('returns popup when out of range', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ effect: 'disadvantage_on_attack_roll', range: '30_ft' });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent({ d20: 18, bonus: 5, hit: true }),
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 10,
-        secondaryDamage: 0,
-        totalDamage: 10,
-        damageTypes: ['Piercing'],
-      });
-      targetResolver.resolveMapPositions.mockResolvedValue({
-        attackerPos: { gridX: 0, gridY: 0 },
-        targetPos: { gridX: 20, gridY: 0 },
-      });
-      rangeCheck.isWithinRange.mockResolvedValue(false);
+  it('refuses an out-of-range attacker with the exact gate copy and ZERO writes (spend, te, latch all untouched), logging the refusal', async () => {
+    setupFlareTrigger();
+    targetResolver.resolveMapPositions.mockResolvedValue({
+      attackerPos: { gridX: 0, gridY: 0 },
+      targetPos: { gridX: 20, gridY: 0 },
+    });
+    rangeCheck.isWithinRange.mockResolvedValue(false);
 
-      const result = await handle(action, ps, campaignName, mapName);
+    const result = await handle(makeWardingFlareAction(), makeCleric(), campaignName, mapName);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('out of range');
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toBe(
+      'Thug 1 is out of range of Light_Cleric — Warding Flare requires the attacker to be within 30 feet.'
+    );
+    // Production automation omits range → gate defaults to '30_ft'.
+    expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('30_ft');
+    expect(rangeCheck.isWithinRange).toHaveBeenCalledWith('Light_Cleric', 'Thug 1', 30);
+    // Refusal economy: nothing is spent, no te, no round latch.
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+
+    const refusal = refusalLogRow();
+    expect(refusal).toMatchObject({
+      type: 'automation',
+      characterName: 'Light_Cleric',
+      name: 'Warding Flare',
+      description: 'Thug 1 is out of range of Light_Cleric — Warding Flare requires the attacker to be within 30 feet.',
     });
   });
 
-  describe('Improved Warding Flare', () => {
-    function makeWardingFlarePlayer() {
-      return makePlayerStats({
-        abilities: [{ name: 'Wisdom', bonus: 2 }],
-        characterAdvancement: [
-          { name: 'Improved Warding Flare', automation: { tempHpExpression: '2d6' } },
-        ],
-      });
+  it.each(['characterAdvancement', 'specialActions'])(
+    'Improved Warding Flare in %s grants 2d6 + WIS tempHp to the DEFENDER with exact write and tail copy',
+    async (storageKey) => {
+      const ps = makeCleric({ [storageKey]: [improvedWardingFlare] });
+      setupFlareTrigger();
+      stubRolls(0.99, 0.0); // rolls 6 + 1 + WIS 4 = 11
+
+      const result = await handle(makeWardingFlareAction(), ps, campaignName, mapName);
+
+      expect(result.type).toBe('popup');
+      expect(tempHpWrites()).toEqual([['Ally_Paladin', 'tempHp', 11, campaignName]]);
+      // Never the attacker.
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith('Thug 1', 'tempHp', expect.anything(), campaignName);
+      expect(result.payload.description).toContain(
+        '<br/><br/>Ally_Paladin gains 11 Temporary Hit Points from Improved Warding Flare.'
+      );
     }
+  );
 
-    function setupWardingFlareTest(hasFeature, effect) {
-      const ps = hasFeature ? makeWardingFlarePlayer() : makePlayerStats({});
-      const action = makeAction({ effect });
+  it('reacts without tempHp when Improved Warding Flare is not on the character', async () => {
+    setupFlareTrigger();
 
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: freshAttackEvent({ d20: 18, bonus: 3, hit: true }),
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 10,
-        secondaryDamage: 0,
-        totalDamage: 10,
-        damageTypes: ['Piercing'],
-      });
+    const result = await handle(makeWardingFlareAction(), makeCleric(), campaignName, mapName);
 
-      return { action, ps };
-    }
+    expect(result.type).toBe('popup');
+    expect(tempHpWrites()).toEqual([]);
+    expect(result.payload.description).not.toContain('Temporary Hit Points');
+  });
 
-    it.each([
-      { effect: 'disadvantage_on_attack_roll', hasFeature: true, expectTempHp: true, desc: 'includes tempHp when effect is disadvantage and feature present' },
-      { effect: '', hasFeature: true, expectTempHp: false, desc: 'does not include tempHp when effect is not disadvantage' },
-      { effect: 'disadvantage_on_attack_roll', hasFeature: false, expectTempHp: false, desc: 'does not include tempHp when feature not on player' },
-    ])('$desc', async ({ effect, hasFeature, expectTempHp }) => {
-      const { action, ps } = setupWardingFlareTest(hasFeature, effect);
-
-      const result = await handle(action, ps, campaignName, mapName);
-
-      if (expectTempHp) {
-        expect(result.payload.description).toContain('Temporary Hit Points');
-      } else {
-        expect(result.payload.description).not.toContain('Temporary Hit Points');
-      }
+  it('skips the tempHp grant when 2d6 + negative WIS lands at or below zero — the flare still fires', async () => {
+    const ps = makeCleric({
+      abilities: [{ name: 'Wisdom', bonus: -2 }],
+      characterAdvancement: [improvedWardingFlare],
     });
+    setupFlareTrigger();
+    stubRolls(0.0, 0.0); // rolls 1 + 1 - 2 = 0
+
+    const result = await handle(makeWardingFlareAction(), ps, campaignName, mapName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(tempHpWrites()).toEqual([]);
+    expect(result.payload.description).not.toContain('Temporary Hit Points');
+  });
+
+  it('never runs the WF tempHp tail on the default (bardic) route even when the feature is present', async () => {
+    const action = {
+      name: 'Cutting Words',
+      automation: {
+        type: 'reaction_debuff',
+        range: '60_ft',
+        effect: '',
+        uses_expression: null,
+        recharge: 'long_rest',
+      },
+    };
+    const ps = makeCleric({ specialActions: [improvedWardingFlare] });
+    setupFlareTrigger();
+    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Thug 1' } });
+
+    const result = await handle(action, ps, campaignName, mapName);
+
+    expect(result.type).toBe('popup');
+    expect(tempHpWrites()).toEqual([]);
+    expect(result.payload.description).not.toContain('Temporary Hit Points');
   });
 });

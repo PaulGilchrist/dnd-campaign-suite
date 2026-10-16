@@ -1,3 +1,25 @@
+// @maintained-by-ai
+/**
+ * animateDead SEXTET lane #1865 confirm (main) — per the seam map in
+ * animateDeadHandler.confirm.details.test.js, this lane owns:
+ *  - confirmAnimateDead happy path: popup envelope + spawn-name presence
+ *  - zero-total guard (counts 0 / undefined / partial) — short-circuits
+ *    before combat summary or monster data are even touched
+ *  - combat-summary missing and skeleton/zombie monster-load failure popups
+ *  - spawn field spot-checks (ac/maxHp/type/targetName + missing-field defaults)
+ *
+ * Handoffs honored (removed as superseded):
+ *  - popup prose ('Skeleton'/'Zombies'/'right after you') → details lane full-string pin
+ *  - te write content → #1864 confirm.storage exact-array + 4-arg pins
+ *  - unique numbering / marker accumulation per cast → #1866 multicast pins
+ *  - initiative formula / sort order → #1863 initiative lane
+ *  - enforcement.turnLock branch → #1864 storage lane (real resolveEnforcement
+ *    defaults turnLock:false on undefined, so this lane stays off that branch)
+ *
+ * Deterministic: every external seam mocked, no timers, stated caster
+ * initiative '15' keeps resolveCasterInitiative roll-free.
+ * makeAction MERGES overrides (automation included) — never replaces wholesale.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -51,68 +73,69 @@ vi.mock('../../../encounters/encounterToInitiative.js', () => ({
 }));
 
 import { confirmAnimateDead } from './animateDeadHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
 
-describe('confirmAnimateDead - basic flow', () => {
+const mockPlayerStats = {
+    name: 'TestCaster',
+    level: 5,
+    proficiency: 3,
+    abilities: [{ name: 'Charisma', bonus: 3 }],
+};
+const mockCampaignName = 'test-campaign';
+
+const mockSkeleton = {
+    index: 'skeleton',
+    name: 'Skeleton',
+    type: 'Undead',
+    armor_class: 13,
+    hit_points: 13,
+    damage_resistances: [],
+    damage_immunities: [],
+    immunities: [],
+    saving_throws: {},
+    initiative_details: '+2',
+};
+
+const mockZombie = {
+    index: 'zombie',
+    name: 'Zombie',
+    type: 'Undead',
+    armor_class: 8,
+    hit_points: 22,
+    damage_resistances: [],
+    damage_immunities: [],
+    immunities: [],
+    saving_throws: {},
+    initiative_details: '-1',
+};
+
+function makeAction(overrides = {}) {
+    const { automation: automationOverrides, ...rest } = overrides;
+    return {
+        name: 'Animate Dead',
+        ...rest,
+        automation: { type: 'animate_dead', ...automationOverrides },
+    };
+}
+
+// Fresh mutable combat summary; the handler mutates it in place, so re-arm
+// via summary() between tests that must not see each other's spawns.
+function summary(creatures = [{ name: 'TestCaster', initiative: '15', initiativeBonus: 3 }]) {
+    const cs = { creatures };
+    getCombatSummary.mockReturnValue(cs);
+    return cs;
+}
+
+describe('confirmAnimateDead - happy path and spawn spot-checks', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-    });
-
-    const mockPlayerStats = {
-        name: 'TestCaster',
-        level: 5,
-        proficiency: 3,
-        abilities: [{ name: 'Charisma', bonus: 3 }],
-    };
-    const mockCampaignName = 'test-campaign';
-
-    const mockSkeleton = {
-        index: 'skeleton',
-        name: 'Skeleton',
-        type: 'Undead',
-        armor_class: 13,
-        hit_points: 13,
-        damage_resistances: [],
-        damage_immunities: [],
-        immunities: [],
-        saving_throws: {},
-        initiative_details: '+2',
-    };
-
-    const mockZombie = {
-        index: 'zombie',
-        name: 'Zombie',
-        type: 'Undead',
-        armor_class: 8,
-        hit_points: 22,
-        damage_resistances: [],
-        damage_immunities: [],
-        immunities: [],
-        saving_throws: {},
-        initiative_details: '-1',
-    };
-
-    function makeAction(overrides = {}) {
-        return {
-            name: 'Animate Dead',
-            automation: { type: 'animate_dead', ...overrides.automation },
-            ...overrides,
-        };
-    }
-
-    beforeEach(() => {
-        getCombatSummary.mockReturnValue({
-            creatures: [
-                { name: 'TestCaster', initiative: '15', initiativeBonus: 3 },
-            ],
-        });
+        summary();
         loadMonsters.mockResolvedValue([mockSkeleton, mockZombie]);
     });
 
     it('creates skeletons and zombies when counts are provided', async () => {
-        const combatSummary = getCombatSummary(mockCampaignName);
+        const cs = summary();
 
         const result = await confirmAnimateDead(
             makeAction(),
@@ -121,156 +144,145 @@ describe('confirmAnimateDead - basic flow', () => {
             { skeletonCount: 1, zombieCount: 2 },
         );
 
+        // Prose is owned by the details lane's full-string pin — envelope + names only.
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('Skeleton');
-        expect(result.payload.description).toContain('Zombies');
-        expect(result.payload.description).toContain('right after you');
 
-        const creatures = combatSummary.creatures;
-        expect(creatures.find(c => c.name === 'Skeleton 1')).toBeDefined();
-        expect(creatures.find(c => c.name === 'Zombie 1')).toBeDefined();
-        expect(creatures.find(c => c.name === 'Zombie 2')).toBeDefined();
+        const names = cs.creatures.map(c => c.name);
+        expect(names).toContain('Skeleton 1');
+        expect(names).toContain('Zombie 1');
+        expect(names).toContain('Zombie 2');
     });
 
-    it('defaults counts to 0 when both are zero/null', async () => {
-        const result = await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { zombieCount: 0, skeletonCount: 0 },
-        );
+    it('creates a skeleton with correct properties', async () => {
+        const cs = summary();
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toBe('No undead created.');
-    });
-
-    it('defaults counts to 0 when undefined', async () => {
-        const result = await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            {},
-        );
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toBe('No undead created.');
-    });
-
-    it('defaults counts to 0 when only one is provided', async () => {
-        const result = await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { zombieCount: 0 },
-        );
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toBe('No undead created.');
-    });
-});
-
-describe('confirmAnimateDead - combat summary failures', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    const mockPlayerStats = {
-        name: 'TestCaster',
-        level: 5,
-        proficiency: 3,
-        abilities: [{ name: 'Charisma', bonus: 3 }],
-    };
-    const mockCampaignName = 'test-campaign';
-
-    function makeAction(overrides = {}) {
-        return {
-            name: 'Animate Dead',
-            automation: { type: 'animate_dead', ...overrides.automation },
-            ...overrides,
-        };
-    }
-
-    it('returns error popup when combat summary is null', async () => {
-        getCombatSummary.mockReturnValue(null);
-
-        const result = await confirmAnimateDead(
+        await confirmAnimateDead(
             makeAction(),
             mockPlayerStats,
             mockCampaignName,
             { skeletonCount: 1 },
         );
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toBe('Failed to load combat summary.');
+        const skeleton = cs.creatures.find(c => c.name === 'Skeleton 1');
+        expect(skeleton).toBeDefined();
+        expect(skeleton.name).toBe('Skeleton 1');
+        expect(skeleton.type).toBe('npc');
+        expect(skeleton.monsterType).toBe('Undead');
+        expect(skeleton.ac).toBe(13);
+        expect(skeleton.maxHp).toBe(13);
+        expect(skeleton.currentHp).toBe(13);
+        expect(skeleton.monsterIndex).toBe('skeleton');
     });
 
-    it('returns error popup when combat summary is undefined', async () => {
-        getCombatSummary.mockReturnValue(undefined);
+    it('creates a zombie with correct properties', async () => {
+        const cs = summary();
 
-        const result = await confirmAnimateDead(
+        await confirmAnimateDead(
+            makeAction(),
+            mockPlayerStats,
+            mockCampaignName,
+            { zombieCount: 1 },
+        );
+
+        const zombie = cs.creatures.find(c => c.name === 'Zombie 1');
+        expect(zombie).toBeDefined();
+        expect(zombie.name).toBe('Zombie 1');
+        expect(zombie.type).toBe('npc');
+        expect(zombie.monsterType).toBe('Undead');
+        expect(zombie.ac).toBe(8);
+        expect(zombie.maxHp).toBe(22);
+        expect(zombie.currentHp).toBe(22);
+        expect(zombie.monsterIndex).toBe('zombie');
+    });
+
+    it('numbers multiple skeletons of the same cast 1..n', async () => {
+        const cs = summary();
+
+        await confirmAnimateDead(
+            makeAction(),
+            mockPlayerStats,
+            mockCampaignName,
+            { skeletonCount: 3 },
+        );
+
+        expect(cs.creatures.map(c => c.name).filter(n => n.startsWith('Skeleton')))
+            .toEqual(['Skeleton 1', 'Skeleton 2', 'Skeleton 3']);
+    });
+
+    it('sets targetName to null on created creatures', async () => {
+        const cs = summary();
+
+        await confirmAnimateDead(
             makeAction(),
             mockPlayerStats,
             mockCampaignName,
             { skeletonCount: 1 },
         );
 
-        expect(result.payload.description).toBe('Failed to load combat summary.');
+        const skeleton = cs.creatures.find(c => c.name === 'Skeleton 1');
+        expect(skeleton.targetName).toBeNull();
+        expect(skeleton.concentration).toBeNull();
+    });
+
+    it('uses monster defaults when properties are missing', async () => {
+        loadMonsters.mockResolvedValue([{ index: 'skeleton', name: 'Skeleton' }, mockZombie]);
+        const cs = summary();
+
+        await confirmAnimateDead(
+            makeAction(),
+            mockPlayerStats,
+            mockCampaignName,
+            { skeletonCount: 1 },
+        );
+
+        const creature = cs.creatures.find(c => c.monsterIndex === 'skeleton');
+        expect(creature.type).toBe('npc');
+        expect(creature.monsterType).toBe('Undead');
+        expect(creature.ac).toBe(10);
+        expect(creature.maxHp).toBe(10);
     });
 });
 
-describe('confirmAnimateDead - monster loading failures', () => {
+describe('confirmAnimateDead - guard refusals and load failures', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        summary();
+        loadMonsters.mockResolvedValue([mockSkeleton, mockZombie]);
     });
 
-    const mockPlayerStats = {
-        name: 'TestCaster',
-        level: 5,
-        proficiency: 3,
-        abilities: [{ name: 'Charisma', bonus: 3 }],
-    };
-    const mockCampaignName = 'test-campaign';
+    it('returns no-undead popup when counts are zero, missing, or partial — without touching summary', async () => {
+        for (const counts of [{ skeletonCount: 0, zombieCount: 0 }, {}, { zombieCount: 0 }]) {
+            const result = await confirmAnimateDead(
+                makeAction(),
+                mockPlayerStats,
+                mockCampaignName,
+                counts,
+            );
 
-    const mockSkeleton = {
-        index: 'skeleton',
-        name: 'Skeleton',
-        type: 'Undead',
-        armor_class: 13,
-        hit_points: 13,
-        damage_resistances: [],
-        damage_immunities: [],
-        immunities: [],
-        saving_throws: {},
-        initiative_details: '+2',
-    };
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toBe('No undead created.');
+        }
+        // Guard short-circuits before any data access.
+        expect(getCombatSummary).not.toHaveBeenCalled();
+    });
 
-    const mockZombie = {
-        index: 'zombie',
-        name: 'Zombie',
-        type: 'Undead',
-        armor_class: 8,
-        hit_points: 22,
-        damage_resistances: [],
-        damage_immunities: [],
-        immunities: [],
-        saving_throws: {},
-        initiative_details: '-1',
-    };
+    it('returns error popup when combat summary is null or undefined — before monster load', async () => {
+        for (const missing of [null, undefined]) {
+            getCombatSummary.mockReturnValue(missing);
 
-    function makeAction(overrides = {}) {
-        return {
-            name: 'Animate Dead',
-            automation: { type: 'animate_dead', ...overrides.automation },
-            ...overrides,
-        };
-    }
+            const result = await confirmAnimateDead(
+                makeAction(),
+                mockPlayerStats,
+                mockCampaignName,
+                { skeletonCount: 1 },
+            );
 
-    beforeEach(() => {
-        getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'TestCaster', initiative: '15', initiativeBonus: 3 }],
-        });
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toBe('Failed to load combat summary.');
+        }
+        expect(loadMonsters).not.toHaveBeenCalled();
     });
 
     it('returns error popup when skeleton monster is not found', async () => {
@@ -299,217 +311,5 @@ describe('confirmAnimateDead - monster loading failures', () => {
 
         expect(result.type).toBe('popup');
         expect(result.payload.description).toBe('Failed to load zombie monster data.');
-    });
-});
-
-describe('confirmAnimateDead - creature creation', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    const mockPlayerStats = {
-        name: 'TestCaster',
-        level: 5,
-        proficiency: 3,
-        abilities: [{ name: 'Charisma', bonus: 3 }],
-    };
-    const mockCampaignName = 'test-campaign';
-
-    const mockSkeleton = {
-        index: 'skeleton',
-        name: 'Skeleton',
-        type: 'Undead',
-        armor_class: 13,
-        hit_points: 13,
-        damage_resistances: [],
-        damage_immunities: [],
-        immunities: [],
-        saving_throws: {},
-        initiative_details: '+2',
-    };
-
-    const mockZombie = {
-        index: 'zombie',
-        name: 'Zombie',
-        type: 'Undead',
-        armor_class: 8,
-        hit_points: 22,
-        damage_resistances: [],
-        damage_immunities: [],
-        immunities: [],
-        saving_throws: {},
-        initiative_details: '-1',
-    };
-
-    function makeAction(overrides = {}) {
-        return {
-            name: 'Animate Dead',
-            automation: { type: 'animate_dead', ...overrides.automation },
-            ...overrides,
-        };
-    }
-
-    beforeEach(() => {
-        getCombatSummary.mockReturnValue({
-            creatures: [
-                { name: 'TestCaster', initiative: '15', initiativeBonus: 3 },
-            ],
-        });
-        loadMonsters.mockResolvedValue([mockSkeleton, mockZombie]);
-    });
-
-    it('creates a skeleton with correct properties', async () => {
-        const combatSummary = getCombatSummary(mockCampaignName);
-
-        await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { skeletonCount: 1 },
-        );
-
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
-        expect(skeleton).toBeDefined();
-        expect(skeleton.name).toBe('Skeleton 1');
-        expect(skeleton.type).toBe('npc');
-        expect(skeleton.monsterType).toBe('Undead');
-        expect(skeleton.ac).toBe(13);
-        expect(skeleton.maxHp).toBe(13);
-        expect(skeleton.currentHp).toBe(13);
-        expect(skeleton.monsterIndex).toBe('skeleton');
-    });
-
-    it('creates a zombie with correct properties', async () => {
-        const combatSummary = getCombatSummary(mockCampaignName);
-
-        await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { zombieCount: 1 },
-        );
-
-        const zombie = combatSummary.creatures.find(c => c.name === 'Zombie 1');
-        expect(zombie).toBeDefined();
-        expect(zombie.name).toBe('Zombie 1');
-        expect(zombie.type).toBe('npc');
-        expect(zombie.monsterType).toBe('Undead');
-        expect(zombie.ac).toBe(8);
-        expect(zombie.maxHp).toBe(22);
-        expect(zombie.currentHp).toBe(22);
-        expect(zombie.monsterIndex).toBe('zombie');
-    });
-
-    it('numbers multiple creatures of the same type', async () => {
-        const combatSummary = getCombatSummary(mockCampaignName);
-
-        await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { skeletonCount: 3 },
-        );
-
-        expect(combatSummary.creatures.find(c => c.name === 'Skeleton 1')).toBeDefined();
-        expect(combatSummary.creatures.find(c => c.name === 'Skeleton 2')).toBeDefined();
-        expect(combatSummary.creatures.find(c => c.name === 'Skeleton 3')).toBeDefined();
-    });
-
-    it('numbers multiple zombies correctly', async () => {
-        const combatSummary = getCombatSummary(mockCampaignName);
-
-        await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { zombieCount: 2 },
-        );
-
-        expect(combatSummary.creatures.find(c => c.name === 'Zombie 1')).toBeDefined();
-        expect(combatSummary.creatures.find(c => c.name === 'Zombie 2')).toBeDefined();
-    });
-
-    it('sets targetName to null on created creatures', async () => {
-        const combatSummary = getCombatSummary(mockCampaignName);
-
-        await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { skeletonCount: 1 },
-        );
-
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
-        expect(skeleton.targetName).toBeNull();
-        expect(skeleton.concentration).toBeNull();
-    });
-
-    it('uses monster defaults when properties are missing', async () => {
-        const minimalMonster = {
-            index: 'skeleton',
-            name: 'Skeleton',
-        };
-        loadMonsters.mockResolvedValue([minimalMonster, mockZombie]);
-        getCombatSummary.mockReturnValue({
-            creatures: [{ name: 'TestCaster', initiative: '10', initiativeBonus: 0 }],
-        });
-
-        const combatSummary = getCombatSummary(mockCampaignName);
-
-        await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { skeletonCount: 1 },
-        );
-
-        const creature = combatSummary.creatures.find(c => c.monsterIndex === 'skeleton');
-        expect(creature.type).toBe('npc');
-        expect(creature.monsterType).toBe('Undead');
-        expect(creature.ac).toBe(10);
-        expect(creature.maxHp).toBe(10);
-    });
-
-    it('creates summoned target effects for each creature', async () => {
-        getRuntimeValue.mockImplementation((_entity, key) => {
-            if (key === 'targetEffects') return [];
-            return null;
-        });
-
-        await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { skeletonCount: 1, zombieCount: 1 },
-        );
-
-        const writtenTe = setRuntimeValue.mock.calls.find(call => call[1] === 'targetEffects')[2];
-        expect(writtenTe).toHaveLength(2);
-        expect(writtenTe.find(te => te.target === 'Skeleton 1')).toMatchObject({
-            source: 'TestCaster',
-            effect: 'summoned',
-        });
-        expect(writtenTe.find(te => te.target === 'Zombie 1')).toMatchObject({
-            source: 'TestCaster',
-            effect: 'summoned',
-        });
-    });
-
-    it('spawns uniquely-numbered creatures per cast', async () => {
-        getRuntimeValue.mockImplementation((_entity, key) => {
-            if (key === 'targetEffects') return [];
-            return null;
-        });
-
-        await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { skeletonCount: 2 },
-        );
-
-        const writtenTe = setRuntimeValue.mock.calls.find(call => call[1] === 'targetEffects')[2];
-        expect(writtenTe.filter(te => te.target === 'Skeleton 1')).toHaveLength(1);
-        expect(writtenTe.filter(te => te.target === 'Skeleton 2')).toHaveLength(1);
     });
 });

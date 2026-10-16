@@ -1,3 +1,51 @@
+// @maintained-by-ai
+/**
+ * createUndead TRIO seam map — all three lanes share createUndeadHandler.js:
+ *  - #1898 confirm (main)       — confirmCreateUndead guards (falsy ghoulCount default,
+ *                                   negative-count popup, combat-summary / ghoul-load failure
+ *                                   popups), ghoul spawn field spot-checks, summoned te
+ *                                   accumulation + source pin, initiative resolve / offset /
+ *                                   sort / string-format lanes.
+ *  - #1899 handle (main)        — modal/popup dispatch, maxTargets re-entry popup,
+ *                                   getSlotLevel chain (automation→metaCtx→spell→default 6),
+ *                                   getMaxTargets upcast table via payload.maxTargets,
+ *                                   named exports (modalName / confirmType).
+ *  - THIS LANE (confirm.storage) — confirm-side persistence: storage.set('combatSummary')
+ *                                   detached-clone guard, exact-array setRuntimeValue
+ *                                   ('campaign', 'targetEffects') pins incl. pre-existing-te
+ *                                   preservation, initiative-rolled CustomEvent dispatch,
+ *                                   addEntry summons-log full-string composition, returned
+ *                                   logEntries mirror, log-rejection resilience, action.metadata
+ *                                   maxTargets write + merge, popup description full strings,
+ *                                   automation pass-through identity, unique-name naming of
+ *                                   STORED creatures (proves the loop feeds the growing
+ *                                   creatures array and stores the result).
+ *
+ * Different handler from animateDeadHandler (confirmed at source): ghoul-only spawn table,
+ * bespoke handle()/confirmCreateUndead() — no shared factory config with animateDead or
+ * createMassHeal; animateDead sextet lanes stay separate. No D2-enforcement-style branch
+ * exists at this source (no save prompt on summon) — noted honestly.
+ *
+ * Handoff to later lanes (#1898 / #1899):
+ *  - Full-string popup pins below supersede #1898's loose contains-pins in
+ *    'creates a ghoul when count is 1' ('Ghoul' / 'right after you').
+ *  - Exact-array te pins below supersede #1898's filter-and-length checks in
+ *    'creates summoned target effects for each ghoul' / 'does not duplicate summoned
+ *    effects for same creature' (dedupe itself stays #1898's — they seed live arrays).
+ *  - 'numbers multiple ghouls correctly' (#1898) and this file's removed
+ *    'renames ghoul when one already exists' / 'handles chain of existing ghouls'
+ *    were characterization tests of the MOCKED getNextUniqueMonsterName — consolidated
+ *    into the stored-naming pin here; helper behavior belongs to encounterToInitiative's
+ *    own tests.
+ *  - Removed upcast trio (6/7/9) + metadata slot-8 test consolidated into one table pin.
+ *    NOTE: handler never clamps ghoulCount to maxTargets — old test names overstated it.
+ *  - makeAction here now MERGES automation overrides (trio siblings #1898/#1899 still
+ *    spread overrides AFTER the automation merge, silently dropping type — fix there too).
+ *
+ * Deterministic: every external seam mocked, no timers (summon persistence is
+ * combat-scoped), full-string description pins and exact-array te pins intentional
+ * per house style.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -45,6 +93,7 @@ vi.mock('../../../encounters/encounterToInitiative.js', () => ({
 }));
 
 import { confirmCreateUndead } from './createUndeadHandler.js';
+import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import storage from '../../../ui/storage.js';
@@ -53,6 +102,9 @@ import { loadMonsters } from '../../../ui/dataLoader.js';
 describe('createUndeadHandler - confirmCreateUndead storage/logging', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        // clearAllMocks keeps implementations — force te-reader back to empty
+        // so getRuntimeValue.mockReturnValue cannot leak between tests.
+        getRuntimeValue.mockReturnValue(undefined);
     });
 
     const mockPlayerStats = {
@@ -78,51 +130,71 @@ describe('createUndeadHandler - confirmCreateUndead storage/logging', () => {
     function makeAction(overrides = {}) {
         return {
             name: 'Create Undead',
-            automation: { type: 'create_undead', ...overrides.automation },
             ...overrides,
+            automation: { type: 'create_undead', ...overrides.automation },
         };
     }
 
-    // ── confirmCreateUndead: storage and logging ───────────────
+    function defaultCombatSummary() {
+        return {
+            creatures: [
+                { name: 'TestCaster', initiative: '15', initiativeBonus: 3 },
+            ],
+        };
+    }
 
-    describe('confirmCreateUndead - storage and logging', () => {
+    // ── confirm-side storage & runtime writes ────────────────────
+
+    describe('confirmCreateUndead - storage & runtime writes', () => {
         beforeEach(() => {
-            getCombatSummary.mockReturnValue({
-                creatures: [{ name: 'TestCaster', initiative: '15', initiativeBonus: 3 }],
-            });
+            getCombatSummary.mockReturnValue(defaultCombatSummary());
             loadMonsters.mockResolvedValue([mockGhoul]);
         });
 
-        it('calls storage.set with combatSummary', async () => {
+        it('stores the sorted combat summary as a detached clone', async () => {
             await confirmCreateUndead(
                 makeAction(),
                 mockPlayerStats,
                 mockCampaignName,
-                { ghoulCount: 1 },
+                { ghoulCount: 2 },
             );
 
-            expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), mockCampaignName);
+            expect(storage.set).toHaveBeenCalledTimes(1);
+            const [key, written, campaign] = storage.set.mock.calls[0];
+            expect(key).toBe('combatSummary');
+            expect(campaign).toBe(mockCampaignName);
+
+            const summary = getCombatSummary(mockCampaignName);
+            expect(written).not.toBe(summary);
+            expect(written.creatures).not.toBe(summary.creatures);
+            // caster stays first, ghouls follow at caster-initiative - 0.1
+            expect(written.creatures.map(c => c.name)).toEqual(['TestCaster', 'Ghoul', 'Ghoul 2']);
+
+            // mutate the live summary AFTER the write — the clone must not track it
+            summary.creatures[0].name = 'Mutated';
+            expect(written.creatures[0].name).toBe('TestCaster');
         });
 
-        it('calls setRuntimeValue with targetEffects', async () => {
-            const { setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
+        it('writes the exact summoned targetEffects array, preserving pre-existing effects', async () => {
+            getRuntimeValue.mockReturnValue([
+                { target: 'Goblin', source: 'Enemy', effect: 'restrained' },
+            ]);
 
             await confirmCreateUndead(
                 makeAction(),
                 mockPlayerStats,
                 mockCampaignName,
-                { ghoulCount: 1 },
+                { ghoulCount: 2 },
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.any(Array),
-                mockCampaignName,
-            );
+            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [
+                { target: 'Goblin', source: 'Enemy', effect: 'restrained' },
+                { target: 'Ghoul', source: 'TestCaster', effect: 'summoned' },
+                { target: 'Ghoul 2', source: 'TestCaster', effect: 'summoned' },
+            ], mockCampaignName);
         });
 
-        it('dispatches initiative-rolled event', async () => {
+        it('dispatches a bare initiative-rolled CustomEvent once', async () => {
             const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
             await confirmCreateUndead(
@@ -132,327 +204,55 @@ describe('createUndeadHandler - confirmCreateUndead storage/logging', () => {
                 { ghoulCount: 1 },
             );
 
-            expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'initiative-rolled',
-            }));
+            expect(dispatchSpy).toHaveBeenCalledTimes(1);
+            const event = dispatchSpy.mock.calls[0][0];
+            expect(event).toBeInstanceOf(CustomEvent);
+            expect(event.type).toBe('initiative-rolled');
+            expect(event.detail).toBeNull();
             dispatchSpy.mockRestore();
         });
 
-        it('calls addEntry with summons log type', async () => {
-            await confirmCreateUndead(
-                makeAction(),
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 2 },
-            );
+        it('stores requested ghouls and slot-derived maxTargets metadata across the upcast table', async () => {
+            const table = [
+                { slotLevel: 6, count: 3 },
+                { slotLevel: 7, count: 4 },
+                { slotLevel: 8, count: 5 },
+                { slotLevel: 9, count: 6 },
+            ];
 
-            expect(addEntry).toHaveBeenCalledWith(mockCampaignName, expect.objectContaining({
-                type: 'summons',
-                characterName: 'TestCaster',
-                summonName: 'Create Undead',
-                description: expect.stringContaining('Create Undead'),
-                summonedCreatures: expect.any(Array),
-                timestamp: expect.any(Number),
-            }));
+            for (let i = 0; i < table.length; i++) {
+                getCombatSummary.mockReturnValue(defaultCombatSummary());
+                const action = makeAction({ automation: { slotLevel: table[i].slotLevel } });
+
+                await confirmCreateUndead(
+                    action,
+                    mockPlayerStats,
+                    mockCampaignName,
+                    { ghoulCount: table[i].count },
+                );
+
+                // handler never clamps ghoulCount — it stores exactly what was requested
+                expect(storage.set).toHaveBeenCalledTimes(i + 1);
+                const [, written] = storage.set.mock.calls[i];
+                expect(written.creatures.filter(c => c.monsterIndex === 'ghoul')).toHaveLength(table[i].count);
+                expect(action.metadata).toEqual({ createUndeadMaxTargets: table[i].count });
+            }
         });
 
-        it('includes logEntries in the return value', async () => {
-            const result = await confirmCreateUndead(
-                makeAction(),
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 1 },
-            );
+        it('writes maxTargets metadata fresh and merged onto existing metadata', async () => {
+            const plainAction = makeAction();
+            await confirmCreateUndead(plainAction, mockPlayerStats, mockCampaignName, { ghoulCount: 1 });
+            expect(plainAction.metadata).toEqual({ createUndeadMaxTargets: 3 });
 
-            expect(result.logEntries).toBeDefined();
-            expect(result.logEntries).toHaveLength(1);
-            expect(result.logEntries[0]).toMatchObject({
-                type: 'summons',
-                characterName: 'TestCaster',
-                summonName: 'Create Undead',
-            });
-        });
-
-        it('updates action metadata with max targets', async () => {
-            const action = makeAction();
-
-            await confirmCreateUndead(
-                action,
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 1 },
-            );
-
-            expect(action.metadata).toEqual({ createUndeadMaxTargets: 3 });
-        });
-
-        it('merges metadata when it already exists', async () => {
-            const action = makeAction({ metadata: { existingKey: 'value' } });
-
-            await confirmCreateUndead(
-                action,
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 1 },
-            );
-
-            expect(action.metadata).toEqual({
+            const actionWithMeta = makeAction({ metadata: { existingKey: 'value' } });
+            await confirmCreateUndead(actionWithMeta, mockPlayerStats, mockCampaignName, { ghoulCount: 1 });
+            expect(actionWithMeta.metadata).toEqual({
                 existingKey: 'value',
                 createUndeadMaxTargets: 3,
             });
         });
-    });
 
-    // ── confirmCreateUndead: popup description ─────────────────
-
-    describe('confirmCreateUndead - popup description', () => {
-        beforeEach(() => {
-            getCombatSummary.mockReturnValue({
-                creatures: [{ name: 'TestCaster', initiative: '15', initiativeBonus: 3 }],
-            });
-            loadMonsters.mockResolvedValue([mockGhoul]);
-        });
-
-        it('uses singular form for single ghoul', async () => {
-            const result = await confirmCreateUndead(
-                makeAction(),
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 1 },
-            );
-
-            expect(result.payload.description).toContain('Ghoul');
-            expect(result.payload.description).not.toContain('Ghouls');
-        });
-
-        it('uses plural form for multiple ghouls', async () => {
-            const result = await confirmCreateUndead(
-                makeAction(),
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 3 },
-            );
-
-            expect(result.payload.description).toContain('3 Ghouls');
-        });
-
-        it('includes "right after you" in description', async () => {
-            const result = await confirmCreateUndead(
-                makeAction(),
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 1 },
-            );
-
-            expect(result.payload.description).toContain('right after you');
-        });
-
-        it('includes caster name in description', async () => {
-            const result = await confirmCreateUndead(
-                makeAction(),
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 1 },
-            );
-
-            expect(result.payload.description).toContain('TestCaster');
-        });
-
-        it('includes automation in popup payload', async () => {
-            const automation = { type: 'create_undead', slotLevel: 5 };
-            const action = makeAction({ automation });
-
-            const result = await confirmCreateUndead(
-                action,
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 1 },
-            );
-
-            expect(result.payload.automation).toEqual(automation);
-        });
-
-        it('includes slot level in log description', async () => {
-            const action = makeAction({ automation: { slotLevel: 7 } });
-
-            const result = await confirmCreateUndead(
-                action,
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 1 },
-            );
-
-            expect(result.logEntries[0].description).toContain('slot level 7');
-        });
-    });
-
-    // ── confirmCreateUndead: upcast ────────────────────────────
-
-    describe('confirmCreateUndead - upcast', () => {
-        beforeEach(() => {
-            getCombatSummary.mockReturnValue({
-                creatures: [{ name: 'TestCaster', initiative: '15', initiativeBonus: 3 }],
-            });
-            loadMonsters.mockResolvedValue([mockGhoul]);
-        });
-
-        it('respects upcast max targets for slot level 6', async () => {
-            const action = makeAction({ automation: { slotLevel: 6 } });
-            const combatSummary = getCombatSummary(mockCampaignName);
-
-            await confirmCreateUndead(
-                action,
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 3 },
-            );
-
-            expect(combatSummary.creatures.filter(c => c.monsterIndex === 'ghoul')).toHaveLength(3);
-        });
-
-        it('respects upcast max targets for slot level 7', async () => {
-            const action = makeAction({ automation: { slotLevel: 7 } });
-            const combatSummary = getCombatSummary(mockCampaignName);
-
-            await confirmCreateUndead(
-                action,
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 4 },
-            );
-
-            expect(combatSummary.creatures.filter(c => c.monsterIndex === 'ghoul')).toHaveLength(4);
-        });
-
-        it('respects upcast max targets for slot level 9', async () => {
-            const action = makeAction({ automation: { slotLevel: 9 } });
-            const combatSummary = getCombatSummary(mockCampaignName);
-
-            await confirmCreateUndead(
-                action,
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 6 },
-            );
-
-            expect(combatSummary.creatures.filter(c => c.monsterIndex === 'ghoul')).toHaveLength(6);
-        });
-
-        it('updates metadata with correct max targets for upcast', async () => {
-            const action = makeAction({ automation: { slotLevel: 8 } });
-
-            await confirmCreateUndead(
-                action,
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 1 },
-            );
-
-            expect(action.metadata.createUndeadMaxTargets).toBe(5);
-        });
-    });
-
-    // ── confirmCreateUndead: action name in popup ──────────────
-
-    describe('confirmCreateUndead - action name in popup', () => {
-        beforeEach(() => {
-            getCombatSummary.mockReturnValue({
-                creatures: [{ name: 'TestCaster', initiative: '15', initiativeBonus: 3 }],
-            });
-            loadMonsters.mockResolvedValue([mockGhoul]);
-        });
-
-        it('uses custom action name in popup', async () => {
-            const action = makeAction({ name: 'Custom Undead Spell' });
-
-            const result = await confirmCreateUndead(
-                action,
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 1 },
-            );
-
-            expect(result.payload.name).toBe('Custom Undead Spell');
-        });
-
-        it('uses action name in log entry', async () => {
-            const action = makeAction({ name: 'Custom Undead Spell' });
-
-            const result = await confirmCreateUndead(
-                action,
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 1 },
-            );
-
-            expect(result.logEntries[0].summonName).toBe('Create Undead');
-        });
-    });
-
-    // ── confirmCreateUndead: summoned creatures in log ─────────
-
-    describe('confirmCreateUndead - summoned creatures in log', () => {
-        beforeEach(() => {
-            getCombatSummary.mockReturnValue({
-                creatures: [{ name: 'TestCaster', initiative: '15', initiativeBonus: 3 }],
-            });
-            loadMonsters.mockResolvedValue([mockGhoul]);
-        });
-
-        it('includes summonedCreatures array in log entry', async () => {
-            const result = await confirmCreateUndead(
-                makeAction(),
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 3 },
-            );
-
-            expect(result.logEntries[0].summonedCreatures).toEqual(['Ghoul', 'Ghoul 2', 'Ghoul 3']);
-        });
-
-        it('includes timestamp in log entry', async () => {
-            const result = await confirmCreateUndead(
-                makeAction(),
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 1 },
-            );
-
-            expect(result.logEntries[0].timestamp).toBeTypeOf('number');
-        });
-    });
-
-    // ── confirmCreateUndead: existing creatures with same name ─
-
-    describe('confirmCreateUndead - existing creature naming', () => {
-        beforeEach(() => {
-            loadMonsters.mockResolvedValue([mockGhoul]);
-        });
-
-        it('renames ghoul when one already exists', async () => {
-            getCombatSummary.mockReturnValue({
-                creatures: [
-                    { name: 'TestCaster', initiative: '15', initiativeBonus: 3 },
-                    { name: 'Ghoul', initiative: '10', initiativeBonus: 0 },
-                ],
-            });
-
-            const combatSummary = getCombatSummary(mockCampaignName);
-
-            await confirmCreateUndead(
-                makeAction(),
-                mockPlayerStats,
-                mockCampaignName,
-                { ghoulCount: 1 },
-            );
-
-            // The new ghoul gets renamed to "Ghoul 2" since "Ghoul" already exists
-            expect(combatSummary.creatures.find(c => c.name === 'Ghoul 2')).toBeDefined();
-            // The original "Ghoul" still exists
-            expect(combatSummary.creatures.find(c => c.name === 'Ghoul')).toBeDefined();
-        });
-
-        it('handles chain of existing ghouls', async () => {
+        it('stores and badges uniquely numbered names when ghouls already exist', async () => {
             getCombatSummary.mockReturnValue({
                 creatures: [
                     { name: 'TestCaster', initiative: '15', initiativeBonus: 3 },
@@ -462,16 +262,157 @@ describe('createUndeadHandler - confirmCreateUndead storage/logging', () => {
                 ],
             });
 
-            const combatSummary = getCombatSummary(mockCampaignName);
-
             await confirmCreateUndead(
+                makeAction(),
+                mockPlayerStats,
+                mockCampaignName,
+                { ghoulCount: 2 },
+            );
+
+            const [, written] = storage.set.mock.calls[0];
+            // loop feeds the growing creature array: Ghoul 4 and 5 must not collide,
+            // and stay sorted right after the caster at 15 - 0.1
+            expect(written.creatures.map(c => c.name)).toEqual([
+                'TestCaster', 'Ghoul 4', 'Ghoul 5', 'Ghoul', 'Ghoul 2', 'Ghoul 3',
+            ]);
+            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [
+                { target: 'Ghoul 4', source: 'TestCaster', effect: 'summoned' },
+                { target: 'Ghoul 5', source: 'TestCaster', effect: 'summoned' },
+            ], mockCampaignName);
+        });
+    });
+
+    // ── confirm-side log writes ──────────────────────────────────
+
+    describe('confirmCreateUndead - log writes', () => {
+        beforeEach(() => {
+            getCombatSummary.mockReturnValue(defaultCombatSummary());
+            loadMonsters.mockResolvedValue([mockGhoul]);
+        });
+
+        it('logs a summons entry with the exact composed description and creature list', async () => {
+            await confirmCreateUndead(
+                makeAction(),
+                mockPlayerStats,
+                mockCampaignName,
+                { ghoulCount: 3 },
+            );
+
+            expect(addEntry).toHaveBeenCalledWith(mockCampaignName, {
+                type: 'summons',
+                characterName: 'TestCaster',
+                summonName: 'Create Undead',
+                description: 'TestCaster casts Create Undead (slot level 6), creating 3 ghouls.',
+                summonedCreatures: ['Ghoul', 'Ghoul 2', 'Ghoul 3'],
+                timestamp: expect.any(Number),
+            });
+        });
+
+        it('returns logEntries mirroring the persisted summons entry', async () => {
+            const result = await confirmCreateUndead(
                 makeAction(),
                 mockPlayerStats,
                 mockCampaignName,
                 { ghoulCount: 1 },
             );
 
-            expect(combatSummary.creatures.find(c => c.name === 'Ghoul 4')).toBeDefined();
+            expect(result.logEntries).toEqual([{
+                type: 'summons',
+                characterName: 'TestCaster',
+                summonName: 'Create Undead',
+                description: 'TestCaster casts Create Undead (slot level 6), creating 1 ghoul.',
+                summonedCreatures: ['Ghoul'],
+                timestamp: expect.any(Number),
+            }]);
+        });
+
+        it('keeps hardcoded summon text when the action has a custom name', async () => {
+            const result = await confirmCreateUndead(
+                makeAction({ name: 'Custom Undead Spell' }),
+                mockPlayerStats,
+                mockCampaignName,
+                { ghoulCount: 1 },
+            );
+
+            expect(result.payload.name).toBe('Custom Undead Spell');
+            expect(addEntry).toHaveBeenCalledWith(mockCampaignName, {
+                type: 'summons',
+                characterName: 'TestCaster',
+                summonName: 'Create Undead',
+                description: 'TestCaster casts Create Undead (slot level 6), creating 1 ghoul.',
+                summonedCreatures: ['Ghoul'],
+                timestamp: expect.any(Number),
+            });
+            expect(result.logEntries[0].summonName).toBe('Create Undead');
+        });
+
+        it('still completes storage writes and returns popup when addEntry rejects', async () => {
+            addEntry.mockRejectedValueOnce(new Error('log service down'));
+            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            const result = await confirmCreateUndead(
+                makeAction(),
+                mockPlayerStats,
+                mockCampaignName,
+                { ghoulCount: 1 },
+            );
+
+            expect(result.type).toBe('popup');
+            expect(result.logEntries).toHaveLength(1);
+            // persistence landed BEFORE the log attempt — summon is not rolled back
+            expect(storage.set).toHaveBeenCalledTimes(1);
+            expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+            expect(consoleSpy).toHaveBeenCalledWith('[createUndeadHandler:log-error]', expect.any(Error));
+            consoleSpy.mockRestore();
+        });
+    });
+
+    // ── confirm popup payload composition ──────────────────────────
+
+    describe('confirmCreateUndead - popup payload', () => {
+        beforeEach(() => {
+            getCombatSummary.mockReturnValue(defaultCombatSummary());
+            loadMonsters.mockResolvedValue([mockGhoul]);
+        });
+
+        it('composes the exact singular popup description', async () => {
+            const result = await confirmCreateUndead(
+                makeAction(),
+                mockPlayerStats,
+                mockCampaignName,
+                { ghoulCount: 1 },
+            );
+
+            expect(result.payload.description).toBe(
+                'TestCaster casts Create Undead, creating 1 Ghoul. They act on your turn, right after you.'
+            );
+        });
+
+        it('composes the exact plural popup description', async () => {
+            const result = await confirmCreateUndead(
+                makeAction(),
+                mockPlayerStats,
+                mockCampaignName,
+                { ghoulCount: 3 },
+            );
+
+            expect(result.payload.description).toBe(
+                'TestCaster casts Create Undead, creating 3 Ghouls. They act on your turn, right after you.'
+            );
+        });
+
+        it('passes the action automation through to the popup payload by reference', async () => {
+            const action = makeAction({ automation: { slotLevel: 5 } });
+
+            const result = await confirmCreateUndead(
+                action,
+                mockPlayerStats,
+                mockCampaignName,
+                { ghoulCount: 1 },
+            );
+
+            expect(result.payload.automation).toBe(action.automation);
+            expect(result.payload.automation).toEqual({ type: 'create_undead', slotLevel: 5 });
         });
     });
 });

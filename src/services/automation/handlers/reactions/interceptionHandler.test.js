@@ -1,3 +1,28 @@
+// @maintained-by-ai
+// interceptionHandler sextet — lane: MAIN / EARLY-RETURN GATES (gate behavior only;
+// envelope shape, description text, damage math, logging, consumption latch owned elsewhere).
+//
+// Six-lane seam map (each lane owns what it pins; do not duplicate across lanes):
+//  - .consumption.test.js:           isReactionSpent gate, stampInterceptionRound mark,
+//                                      latch release, no-side-effect guards, rounds:1 addExpiration.
+//  - .damage.test.js:                computeInterceptionReduction + resolveInterceptionDamageBonus,
+//                                      applyHealingToTarget amounts and skip paths.
+//  - .description.test.js:           baseDescription + attackDetails popup text templates,
+//                                      combatSummary-null basic-description text.
+//  - .logging.test.js:             addEntry ability_use entries (shape, names, amounts).
+//  - .returnValue.test.js:         envelope key set on EVERY return path, automation
+//                                      pass-through by reference; probes the gate call seams
+//                                      (order only). Shape only — gate messages owned here.
+//  - .test.js (main, THIS file):   early-return gate behavior — no recent attack
+//                                      (featureName in message), shield/weapon requirement
+//                                      (incl. magic-name parsing + equipment lookup miss),
+//                                      range gate parsed rangeFt passed to isWithinRange
+//                                      (default 5, custom, non-numeric fallback) and the
+//                                      skip paths (no map, unavailable positions).
+//
+// Range seam is isWithinRange (rangeValidation.js is NOT imported by the handler).
+// Deterministic: every handler import mocked (incl. expirations barrel), exact-string
+// gate-message pins, call-seam range pins — no churn expected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/targetResolver.js', () => ({
@@ -11,11 +36,6 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn().mockResolvedValue({}),
-}));
-
-vi.mock('../../../rules/combat/rangeValidation.js', () => ({
-    getDistanceFeet: vi.fn(),
-    rangeToFeet: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
@@ -46,13 +66,15 @@ vi.mock('../../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
 }));
 
+vi.mock('../../../rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
+}));
+
 // ── Imports ─────────────────────────────────────────────────────
 
 import { handle } from './interceptionHandler.js';
 
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as logService from '../../../ui/logService.js';
-import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as damageRollback from '../../common/damageRollback.js';
@@ -76,9 +98,16 @@ function makePlayerStats(overrides = {}) {
     };
 }
 
+const shieldStats = {
+    inventory: { equipped: ['Shield'] },
+    equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+};
+
 function makeAction(overrides = {}) {
+    const { automation: automationOverrides, ...rest } = overrides;
     return {
         name: 'Interception',
+        ...rest,
         automation: {
             type: 'interception',
             trigger: 'ally_within_5ft_attacked',
@@ -89,9 +118,8 @@ function makeAction(overrides = {}) {
             requiresShield: true,
             casting_time: '1 reaction',
             hasAutomation: true,
-            ...overrides.automation,
+            ...automationOverrides,
         },
-        ...overrides,
     };
 }
 
@@ -120,13 +148,10 @@ describe('interceptionHandler', () => {
         vi.clearAllMocks();
         useRuntimeState.getRuntimeValue.mockReturnValue(null);
         useRuntimeState.setRuntimeValue.mockResolvedValue(undefined);
-        logService.addEntry.mockResolvedValue({});
         targetResolver.resolveMapPositions.mockResolvedValue({
             attackerPos: { x: 0, y: 0 },
             targetPos: { x: 1, y: 0 },
         });
-        rangeValidation.getDistanceFeet.mockReturnValue(5);
-        rangeValidation.rangeToFeet.mockReturnValue(5);
         rangeCheck.isWithinRange.mockResolvedValue(true);
         damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
         damageRollback.findLastAttack.mockResolvedValue({
@@ -138,14 +163,14 @@ describe('interceptionHandler', () => {
             totalDamage: 12,
             damageTypes: ['slashing'],
         });
-        // Default dice roll for validation tests
-        // Individual tests override as needed
     });
 
-    describe('no recent attack', () => {
-        it('returns error popup when no attack found', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats();
+    describe('no recent attack gate', () => {
+        it.each([
+            { label: 'action.name', overrides: {}, expected: 'Interception: No recent attack found. Can only be used after an attack roll.' },
+            { label: 'custom name', overrides: { name: 'CustomFeature' }, expected: 'CustomFeature: No recent attack found. Can only be used after an attack roll.' },
+            { label: 'Feature fallback', overrides: { name: undefined }, expected: 'Feature: No recent attack found. Can only be used after an attack roll.' },
+        ])('returns automation_info popup naming $label when no attack found', async ({ overrides, expected }) => {
             damageRollback.findLastAttack.mockResolvedValue({
                 attackEvent: null,
                 attackerName: null,
@@ -153,58 +178,38 @@ describe('interceptionHandler', () => {
                 totalDamage: 0,
             });
 
-            const result = await handle(action, ps, campaignName, mapName);
+            const result = await handle(makeAction(overrides), makePlayerStats(), campaignName, mapName);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('No recent attack found');
-            expect(result.payload.description).toContain('Can only be used after an attack roll');
-        });
-
-        it('uses action.name as feature name in error message', async () => {
-            const action = makeAction({ name: 'CustomFeature' });
-            const ps = makePlayerStats();
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: null,
-                attackerName: null,
-                targetName: null,
-                totalDamage: 0,
-            });
-
-            const result = await handle(action, ps, campaignName, mapName);
-
-            expect(result.payload.description).toContain('CustomFeature: No recent attack found');
-        });
-
-        it('uses "Feature" as fallback when action has no name', async () => {
-            const action = { automation: { type: 'interception' } };
-            const ps = makePlayerStats();
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: null,
-                attackerName: null,
-                targetName: null,
-                totalDamage: 0,
-            });
-
-            const result = await handle(action, ps, campaignName, mapName);
-
-            expect(result.payload.description).toContain('Feature: No recent attack found');
+            expect(result.payload.description).toBe(expected);
+            expect(rangeCheck.isWithinRange).not.toHaveBeenCalled();
         });
     });
 
-    describe('shield or weapon requirement', () => {
+    describe('shield or weapon gate', () => {
         it('returns error popup when no shield or weapon equipped', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats();
-
-            const result = await handle(action, ps, campaignName, mapName);
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('You must be holding a Shield');
-            expect(result.payload.description).toContain('Simple or Martial weapon');
+            expect(result.payload.description).toBe(
+                'Interception: You must be holding a Shield or a Simple or Martial weapon to use this Reaction.'
+            );
+            expect(rangeCheck.isWithinRange).not.toHaveBeenCalled();
         });
 
-        it('proceeds when shield, weapon, or both are equipped', async () => {
+        it('returns error popup when equipped slot misses the equipment lookup', async () => {
+            const ps = makePlayerStats({
+                inventory: { equipped: ['Longsword', null] },
+                equipment: [{ name: 'Something Else', equipment_category: 'Weapon' }],
+            });
+
+            const result = await handle(makeAction(), ps, campaignName, mapName);
+
+            expect(result.payload.description).toContain('You must be holding a Shield');
+        });
+
+        it('proceeds when shield, weapon, or both are equipped (incl. magic-name parsing)', async () => {
             const testCases = [
                 { inventory: { equipped: ['Shield'] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }] },
                 { inventory: { equipped: ['Longsword'] }, equipment: [{ name: 'Longsword', equipment_category: 'Weapon' }] },
@@ -215,125 +220,53 @@ describe('interceptionHandler', () => {
             ];
 
             for (const tc of testCases) {
-                const action = makeAction();
-                const ps = makePlayerStats(tc);
-                const result = await handle(action, ps, campaignName, mapName);
-                expect(result.type).toBe('popup');
+                const result = await handle(makeAction(), makePlayerStats(tc), campaignName, mapName);
                 expect(result.payload.description).not.toContain('You must be holding a Shield');
                 expect(result.payload.description).toContain('interpose yourself');
             }
         });
     });
 
-    describe('range check', () => {
-        it('returns error popup when attacker is out of range', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
-            rangeValidation.getDistanceFeet.mockReturnValue(10);
+    describe('range gate', () => {
+        it.each([
+            { label: 'default 5_ft', range: '5_ft', expectedFt: 5 },
+            { label: 'custom 10_ft', range: '10_ft', expectedFt: 10 },
+            { label: 'non-numeric falls back to 5', range: 'Self', expectedFt: 5 },
+            { label: 'missing range falls back to 5', range: undefined, expectedFt: 5 },
+        ])('blocks with parsed $expectedFt ft ($label) and reports out of range', async ({ range, expectedFt }) => {
             rangeCheck.isWithinRange.mockResolvedValue(false);
 
-            const result = await handle(action, ps, campaignName, mapName);
+            const result = await handle(makeAction({ automation: { range } }), makePlayerStats(shieldStats), campaignName, mapName);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('out of range');
+            expect(result.payload.description).toBe(`${attackerName} is out of range.`);
+            expect(rangeCheck.isWithinRange).toHaveBeenCalledWith(playerName, attackerName, expectedFt);
         });
 
-        it('uses custom range from automation config', async () => {
-            const action = makeAction({
-                automation: {
-                    ...makeAction().automation,
-                    range: '10_ft',
-                },
-            });
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
-            rangeValidation.rangeToFeet.mockReturnValue(10);
-            rangeValidation.getDistanceFeet.mockReturnValue(15);
+        it('skips range check when no map (no position lookup, no range call)', async () => {
             rangeCheck.isWithinRange.mockResolvedValue(false);
 
-            const result = await handle(action, ps, campaignName, mapName);
+            const result = await handle(makeAction(), makePlayerStats(shieldStats), campaignName, null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('out of range');
-        });
-
-        it('rounds distance in range error message', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
-            rangeValidation.getDistanceFeet.mockReturnValue(7.8);
-            rangeCheck.isWithinRange.mockResolvedValue(false);
-
-            const result = await handle(action, ps, campaignName, mapName);
-
-            expect(result.payload.description).toContain('out of range');
-        });
-
-        it('passes range check when attacker is within range', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
-            rangeValidation.getDistanceFeet.mockReturnValue(5);
-
-            const result = await handle(action, ps, campaignName, mapName);
-
-            expect(result.type).toBe('popup');
+            expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
+            expect(rangeCheck.isWithinRange).not.toHaveBeenCalled();
             expect(result.payload.description).not.toContain('out of range');
             expect(result.payload.description).toContain('interpose yourself');
         });
 
-        it('skips range check when no map', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
+        it.each([
+            ['positions unavailable', null],
+            ['only attacker position', { attackerPos: { x: 0, y: 0 }, targetPos: null }],
+            ['only target position', { attackerPos: null, targetPos: { x: 1, y: 0 } }],
+        ])('skips range check with %s', async (_label, positions) => {
+            rangeCheck.isWithinRange.mockResolvedValue(false);
+            targetResolver.resolveMapPositions.mockResolvedValue(positions);
 
-            const result = await handle(action, ps, campaignName, null);
+            const result = await handle(makeAction(), makePlayerStats(shieldStats), campaignName, mapName);
 
+            expect(rangeCheck.isWithinRange).not.toHaveBeenCalled();
             expect(result.payload.description).not.toContain('out of range');
-            expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
-        });
-
-        it('skips range check when rangeToFeet returns null, positions unavailable, or only one position', async () => {
-            const basePs = {
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            };
-
-            // rangeToFeet returns null
-            rangeValidation.rangeToFeet.mockReturnValue(null);
-            let result = await handle(makeAction(), makePlayerStats(basePs), campaignName, mapName);
-            expect(result.payload.description).not.toContain('out of range');
-            expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
-            rangeValidation.rangeToFeet.mockReturnValue(5);
-
-            // Map positions unavailable
-            targetResolver.resolveMapPositions.mockResolvedValue(null);
-            result = await handle(makeAction(), makePlayerStats(basePs), campaignName, mapName);
-            expect(result.payload.description).not.toContain('out of range');
-            expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
-
-            // Only attacker position
-            targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: { x: 0, y: 0 }, targetPos: null });
-            result = await handle(makeAction(), makePlayerStats(basePs), campaignName, mapName);
-            expect(result.payload.description).not.toContain('out of range');
-            expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
-
-            // Only target position
-            targetResolver.resolveMapPositions.mockResolvedValue({ attackerPos: null, targetPos: { x: 1, y: 0 } });
-            result = await handle(makeAction(), makePlayerStats(basePs), campaignName, mapName);
-            expect(result.payload.description).not.toContain('out of range');
-            expect(rangeValidation.getDistanceFeet).not.toHaveBeenCalled();
+            expect(result.payload.description).toContain('interpose yourself');
         });
     });
 });

@@ -128,10 +128,10 @@ describe('enhanceAbilityHandler', () => {
       expect(result2).toBeNull();
     });
 
-    it('adds enhance_ability targetEffect with concentration duration', async () => {
+    it('adds enhance_ability targetEffect with concentration duration and returns outcome popup', async () => {
       getRuntimeValue.mockReturnValue([]);
 
-      await applyEnhanceAbility({
+      const result = await applyEnhanceAbility({
     action: makeAction(),
     playerStats: makePlayerStats(),
     campaignName,
@@ -151,6 +151,13 @@ describe('enhanceAbilityHandler', () => {
           duration: 'concentration',
         })],
         campaignName,
+      );
+
+      // Full-string own-composition pin (outcome description)
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toBe(
+        'TestCaster cast Enhance Ability on Wolf: Advantage on Strength ability checks for up to 1 hour (concentration).'
       );
     });
 
@@ -192,11 +199,14 @@ describe('enhanceAbilityHandler', () => {
 });
 
       const effects = setRuntimeValue.mock.calls[0][2];
+      // Literal pins — effects[] aliases the mutated `existing` array, so
+      // comparing against existing[i] would be trivially true.
       expect(effects).toHaveLength(2);
-      expect(effects[0]).toEqual(existing[0]);
+      expect(effects[0]).toEqual({ target: 'Goblin', effect: 'bane_penalty', source: 'TestCaster' });
+      expect(effects[1]).toEqual(expect.objectContaining({ target: 'Wolf', effect: 'enhance_ability', ability: 'INT' }));
     });
 
-    it('logs ability_use entry with ability label', async () => {
+    it('logs exactly one ability_use entry with ability label', async () => {
       getRuntimeValue.mockReturnValue([]);
 
       await applyEnhanceAbility({
@@ -218,23 +228,8 @@ describe('enhanceAbilityHandler', () => {
           description: expect.stringContaining('Charisma'),
         }),
       );
-    });
-
-    it('returns automation_info popup with outcome', async () => {
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await applyEnhanceAbility({
-        action: makeAction(),
-        playerStats: makePlayerStats(),
-        campaignName,
-        mapName: null,
-        targetNames: ['Wolf'],
-        ability: 'STR',
-      });
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('Wolf');
+      const abilityUseCalls = addEntry.mock.calls.filter(([, e]) => e.type === 'ability_use');
+      expect(abilityUseCalls).toHaveLength(1);
     });
 
     // SP-039: concentration must be registered on the caster and the summary persisted
@@ -264,23 +259,6 @@ describe('enhanceAbilityHandler', () => {
       expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
       dispatchSpy.mockRestore();
     });
-
-    it('logs exactly one ability_use entry on apply', async () => {
-      getRuntimeValue.mockReturnValue([]);
-
-      await applyEnhanceAbility({
-        action: makeAction(),
-        playerStats: makePlayerStats(),
-        campaignName,
-        mapName: null,
-        targetNames: ['Wolf'],
-        ability: 'DEX',
-      });
-
-      const abilityUseCalls = addEntry.mock.calls.filter(([, e]) => e.type === 'ability_use');
-      expect(abilityUseCalls).toHaveLength(1);
-      expect(abilityUseCalls[0][1].description).toContain('Dexterity');
-    });
   });
 
   // CLA-113 lesson: positional-vs-object call-shape pin for the object-destructure
@@ -295,21 +273,9 @@ describe('enhanceAbilityHandler', () => {
       expect(setRuntimeValue).not.toHaveBeenCalled();
       expect(addConcentration).not.toHaveBeenCalled();
     });
-
-    it('the object call shape with targetNames+ability stamps and logs', async () => {
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await applyEnhanceAbility({
-        action: makeAction(),
-        playerStats: makePlayerStats(),
-        campaignName,
-        targetNames: ['Wolf'],
-        ability: 'CHA',
-      });
-
-      expect(result).not.toBeNull();
-      expect(setRuntimeValue).toHaveBeenCalled();
-      expect(addConcentration).toHaveBeenCalled();
-    });
+    // Positive control for the object shape lives in 'applyEnhanceAbility'
+    // above ('adds enhance_ability targetEffect...', 'registers caster
+    // concentration...') — both drive the object call shape with exact pins,
+    // so a weak not.toBeNull()/toHaveBeenCalled() twin here was redundant.
   });
 });

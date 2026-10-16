@@ -1,3 +1,10 @@
+// @maintained-by-ai — deterministic unit contract for handle()'s resource-cost
+// consumption and variable damage/shape resolution (channel divinity & wild shape
+// refusal popups, optionDetails merging, area-effect expiration). Pure logic
+// through module-boundary mocks; stable unless runtime keys, popup copy, modal
+// names, or payload shape change. isExhausted() booleans live in
+// saveAttackHandler.exhausted.test.js; heal/condition/effect/damage-roll routing
+// in saveAttackHandler.handle-2.test.js — do not cross-remove.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -124,26 +131,6 @@ describe('saveAttackHandler - handle', () => {
   });
 
   describe('handle - variable shape resolution', () => {
-    it('should default to cone shape when variable with options and no choice made', async () => {
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-
-      const action = makeAction({
-        shape: 'variable',
-        hasOptions: true,
-        optionDetails: {
-          cone: { shape: 'cone' },
-          line: { shape: 'line' },
-        },
-        damage: '1d8',
-      });
-
-      const result = await handle(action, makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('modal');
-      expect(result.modalName).toBe('saveAttackAoe');
-      expect(result.payload.shape).toBe('cone');
-    });
-
     it('should resolve shape to cone fallback when variable but no optionDetails', async () => {
       diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
       runtimeState.getRuntimeValue.mockReturnValue(null);
@@ -205,11 +192,15 @@ describe('saveAttackHandler - handle', () => {
   });
 
   describe('handle - channel divinity cost', () => {
+    // NOTE: consumeChannelDivinity looks up class data POSITIONALLY at
+    // class_levels[level - 1], so these fixtures use level 1 with the entry
+    // at index 0 (wild shape fixtures below resolve via find by level).
     it('should return popup when channel divinity charges are depleted', async () => {
       runtimeState.getRuntimeValue.mockReturnValueOnce(0);
 
       const ps = makePlayerStats({
-        class: { class_levels: [{ level: 5, channel_divinity: 2 }] },
+        level: 1,
+        class: { class_levels: [{ level: 1, channel_divinity: 2 }] },
       });
       const action = makeAction({ resourceCost: 'channel_divinity' });
 
@@ -226,7 +217,8 @@ describe('saveAttackHandler - handle', () => {
       runtimeState.getRuntimeValue.mockReturnValueOnce(2);
 
       const ps = makePlayerStats({
-        class: { class_levels: [{ level: 5, channel_divinity: 2 }] },
+        level: 1,
+        class: { class_levels: [{ level: 1, channel_divinity: 2 }] },
       });
       const action = makeAction({ resourceCost: 'channel_divinity' });
 

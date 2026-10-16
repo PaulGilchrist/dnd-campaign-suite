@@ -1,6 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// ── Mocks BEFORE imports ───────────────────────────────────────
+// prismaticSpray SEXTET lane #1944 — SUMMARY composition (subject prismaticSprayHandler.js).
+// Owns the popup/result-summary prose templates built at the bottom of handle():
+//   `Prismatic Spray affects N creature(s). ${results.join(' ')} N creature(s) saved. N ray(s) immune.`
+//   and the all-saved branch `No creatures affected by Prismatic Spray. ...`.
+// These are FULL-STRING own-composition pins — siblings hold toContain fragments only.
+// Seam map in prismaticSprayHandler.damage-regression.test.js header.
+// Trimmed here (owned elsewhere per seam map):
+//   • 'falls back to 12d6 when damage is not in automation' — TRUE DUPE of #1939's
+//     fix-site ② pin (hardened there with a rollExpression assertion); deleted.
+//   • custom-damage createSaveListener payload pin — formula (#1939) / payload row (#1942).
+//   • storeSpellLastAttack / buildSaveDc call pins, createSaveListener dispatch counts —
+//     orchestration (#1940).
+// Math.random is forced in every test so the joined results and ray names are exact.
+// ──────────────────────────────────────────────────────────────────────────────
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../common/savePrompt.js', () => ({
   buildSaveDc: vi.fn(),
@@ -35,7 +47,7 @@ vi.mock('../../../dice/diceRoller.js', () => ({
 
 vi.mock('../../../rules/combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn(() => Promise.resolve()),
-  computeDamageAfterSave: vi.fn(),
+  computeDamageAfterSave: vi.fn((raw, success) => (success ? Math.floor(raw / 2) : raw)),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
@@ -44,14 +56,32 @@ import { handle } from './prismaticSprayHandler.js';
 import * as savePrompt from '../../common/savePrompt.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as damageRollback from '../../common/damageRollback.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
-import * as applyDamage from '../../../rules/combat/applyDamage.js';
 
 // ── Constants & Helpers ────────────────────────────────────────
 
 const campaignName = 'TestCampaign';
 const casterName = 'TestWizard';
+
+const originalRandom = Math.random;
+
+// Force pickRays' firstRoll (1d8) so every target gets the same ray, deterministically.
+function forceRoll(dieValue) {
+  Math.random = () => (dieValue - 0.5) / 8;
+}
+
+function makeAction(overrides = {}) {
+  return {
+    name: 'Prismatic Spray',
+    automation: {
+      type: 'prismatic_spray',
+      saveType: 'DEX',
+      saveDc: 15,
+      damage: '12d6',
+      ...overrides,
+    },
+  };
+}
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -60,19 +90,6 @@ function makePlayerStats(overrides = {}) {
     proficiency: 4,
     abilities: [{ name: 'Charisma', bonus: 3 }],
     ...overrides,
-  };
-}
-
-function makeAction(automation = {}) {
-  return {
-    name: 'Prismatic Spray',
-    automation: {
-      type: 'prismatic_spray',
-      saveType: 'DEX',
-      saveDc: 15,
-      damage: '12d6',
-      ...automation,
-    },
   };
 }
 
@@ -101,263 +118,167 @@ function successSaveListener() {
   };
 }
 
+function mockFailingFlow(dc = 15) {
+  damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
+  savePrompt.buildSaveDc.mockReturnValue(dc);
+  diceRoller.rollExpression.mockReturnValue({ total: 30 });
+  savePrompt.createSaveListener.mockReturnValue(failSaveListener());
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
-describe('prismaticSprayHandler.handle - summaries and edge cases', () => {
+describe('prismaticSprayHandler.handle - summary composition', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useRuntimeState.getRuntimeValue.mockReturnValue(null);
   });
 
-  describe('summary popup', () => {
-    it('reports affected creature count when some fail', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
-      savePrompt.createSaveListener.mockReturnValue(failSaveListener());
-
-      // Control random so Dragon doesn't get the fire (Red) ray it's immune to
-      const originalRandom = Math.random;
-      Math.random = () => 5 / 8; // firstRoll = 6 (Indigo) for all targets
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
-
-      expect(result.payload.description).toContain('Prismatic Spray affects 3 creature(s)');
-    });
-
-    it('reports saved creature count in the summary', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(15);
-
-      let callCount = 0;
-      savePrompt.createSaveListener.mockImplementation(() => {
-        callCount++;
-        return {
-          promptId: 'prismatic-prompt',
-          promise: Promise.resolve({ success: callCount === 1 }),
-        };
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('creature(s) saved');
-    });
-
-    it('reports no creatures affected when all save', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(15);
-      savePrompt.createSaveListener.mockReturnValue(successSaveListener());
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('No creatures affected by Prismatic Spray');
-    });
-
-    it('uses the action name in the popup payload', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(15);
-      savePrompt.createSaveListener.mockReturnValue(successSaveListener());
-
-      const result = await handle(
-        { name: 'Custom Prismatic Spray', automation: makeAction().automation },
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.payload.name).toBe('Custom Prismatic Spray');
-    });
-
-    it('includes immune count in summary when applicable', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
-      savePrompt.createSaveListener.mockReturnValue(successSaveListener());
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      Math.random = originalRandom;
-
-      expect(result.payload.description).toContain('1 ray(s) immune');
-    });
-
-    it('includes individual ray results in summary', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-      savePrompt.createSaveListener.mockReturnValue(failSaveListener());
-
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red)
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
-
-      expect(result.payload.description).toContain('Red ray');
-    });
+  afterEach(() => {
+    Math.random = originalRandom;
   });
 
-  describe('mixed results across targets', () => {
-    it('processes all targets with mixed save results', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
+  it('pins the full affected-summary string for three failed Indigo rays', async () => {
+    mockFailingFlow();
+    forceRoll(6); // Indigo for all targets
 
-      savePrompt.createSaveListener
-        .mockReturnValueOnce(failSaveListener())
-        .mockReturnValueOnce(successSaveListener())
-        .mockReturnValueOnce(failSaveListener());
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const result = await handle(
-        { ...makeAction(), metaCtx: { selectedTargets: ['Goblin', 'Orc', 'Dragon'] } },
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.payload.description).toContain('creature(s)');
-      expect(result.payload.description).toContain('creature(s) saved');
-    });
-
-    it('handles mixed immunity and non-immunity with save results', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      // Force Red ray (fire) which Dragon is immune to
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
-
-      savePrompt.createSaveListener
-        .mockReturnValueOnce(failSaveListener())
-        .mockReturnValueOnce(failSaveListener());
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      Math.random = originalRandom;
-
-      expect(result.payload.description).toContain('1 ray(s) immune');
-      expect(result.payload.description).toContain('creature(s)');
-      expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(2);
-    });
+    // Status-ray fail phrasing + affected/saved counts + empty-immunity trailing space.
+    expect(result.payload.description.trim()).toBe(
+      'Prismatic Spray affects 3 creature(s). ' +
+      'Goblin: Indigo ray (failed DEX save, Restrained). ' +
+      'Orc: Indigo ray (failed DEX save, Restrained). ' +
+      'Dragon: Indigo ray (failed DEX save, Restrained). ' +
+      '0 creature(s) saved.'
+    );
   });
 
-  describe('edge cases', () => {
-    it('handles single non-caster target', async () => {
-      const singleTargetContext = {
-        creatures: [
-          { name: 'Goblin', type: 'monster', weaknessesAndResistivities: { immunities: [] } },
-          { name: casterName, gridX: 5, gridY: 10 },
-        ],
-        players: [{ name: casterName, gridX: 5, gridY: 10 }],
-        placedItems: [],
+  it('pins the full mixed saved/failed summary string across targets', async () => {
+    damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
+    savePrompt.buildSaveDc.mockReturnValue(15);
+    diceRoller.rollExpression.mockReturnValue({ total: 30 });
+
+    let callCount = 0;
+    savePrompt.createSaveListener.mockImplementation(() => {
+      callCount++;
+      return {
+        promptId: 'prismatic-prompt',
+        promise: Promise.resolve({ success: callCount === 1, roll: callCount === 1 ? 14 : 5, total: callCount === 1 ? 14 : 5 }),
       };
-      damageUtils.getCombatContext.mockResolvedValue(singleTargetContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
-      savePrompt.createSaveListener.mockReturnValue(failSaveListener());
-
-      // Control random so a single ray is rolled (firstRoll = 6, Indigo — not 8)
-      const originalRandom = Math.random;
-      Math.random = () => 5 / 8;
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
-
-      expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(1);
-      expect(result.payload.description).toContain('Prismatic Spray affects 1 creature(s)');
     });
+    forceRoll(5); // Blue/cold for all targets — avoids Dragon's fire immunity skewing the mix
 
-    it('handles empty automation object', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
-      savePrompt.createSaveListener.mockReturnValue(failSaveListener());
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const result = await handle(
-        { name: 'Prismatic Spray', automation: {} },
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
+    // Saved-vs-failed phrasing in one string: Goblin saved, Orc/Dragon took full damage.
+    expect(result.payload.description.trim()).toBe(
+      'Prismatic Spray affects 2 creature(s). ' +
+      'Goblin: Blue ray (saved DEX save). ' +
+      'Orc: Blue ray (failed DEX save, full damage). ' +
+      'Dragon: Blue ray (failed DEX save, full damage). ' +
+      '1 creature(s) saved.'
+    );
+  });
 
-      expect(result.type).toBe('popup');
-      expect(damageRollback.storeSpellLastAttack).toHaveBeenCalled();
+  it('pins the full all-saved branch string', async () => {
+    damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
+    savePrompt.buildSaveDc.mockReturnValue(15);
+    diceRoller.rollExpression.mockReturnValue({ total: 30 });
+    savePrompt.createSaveListener.mockReturnValue(successSaveListener());
+    forceRoll(6); // Indigo — no immunity interaction on this branch
+
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+    expect(result.payload.description.trim()).toBe(
+      'No creatures affected by Prismatic Spray. 3 creature(s) saved.'
+    );
+  });
+
+  it('pins the full summary string with immunity skip mixed into failed saves', async () => {
+    mockFailingFlow();
+    forceRoll(1); // Red/fire — Dragon is fire-immune and is skipped (no save queued)
+
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+    // Immunity line is pushed during queueing, before the processed save outcomes.
+    expect(result.payload.description.trim()).toBe(
+      'Prismatic Spray affects 2 creature(s). ' +
+      'Dragon is immune to Red ray (Fire immunity). ' +
+      'Goblin: Red ray (failed DEX save, full damage). ' +
+      'Orc: Red ray (failed DEX save, full damage). ' +
+      '0 creature(s) saved. 1 ray(s) immune.'
+    );
+  });
+
+  it('pins the full single-target summary string', async () => {
+    damageUtils.getCombatContext.mockResolvedValue({
+      creatures: [
+        { name: 'Goblin', type: 'monster', weaknessesAndResistivities: { immunities: [] } },
+        { name: casterName, gridX: 5, gridY: 10 },
+      ],
+      players: [{ name: casterName, gridX: 5, gridY: 10 }],
+      placedItems: [],
     });
+    savePrompt.buildSaveDc.mockReturnValue(15);
+    diceRoller.rollExpression.mockReturnValue({ total: 30 });
+    savePrompt.createSaveListener.mockReturnValue(failSaveListener());
+    forceRoll(6); // Indigo, not 8 (no two-ray reroll)
 
-    it('handles playerStats with no proficiency', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
-      savePrompt.createSaveListener.mockReturnValue(failSaveListener());
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const ps = makePlayerStats({ proficiency: 0, abilities: [] });
-      const result = await handle(makeAction(), ps, campaignName, null);
+    expect(result.payload.description.trim()).toBe(
+      'Prismatic Spray affects 1 creature(s). ' +
+      'Goblin: Indigo ray (failed DEX save, Restrained). ' +
+      '0 creature(s) saved.'
+    );
+  });
 
-      expect(result.type).toBe('popup');
-      expect(savePrompt.buildSaveDc).toHaveBeenCalledWith(makeAction().automation, ps);
+  it('pins the full Violet summary string with saved and blinded phrasing', async () => {
+    damageUtils.getCombatContext.mockResolvedValue({
+      creatures: [
+        { name: 'Goblin', type: 'monster', weaknessesAndResistivities: { immunities: [] } },
+        { name: 'Orc', type: 'monster', weaknessesAndResistivities: { immunities: [] } },
+        { name: casterName, gridX: 5, gridY: 10 },
+      ],
+      players: [{ name: casterName, gridX: 5, gridY: 10 }],
+      placedItems: [],
     });
+    savePrompt.buildSaveDc.mockReturnValue(15);
 
-    it('uses custom damage formula from automation', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 40 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(40);
-      savePrompt.createSaveListener.mockReturnValue(failSaveListener());
-
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
-      await handle(
-        { ...makeAction(), automation: { damage: '12d6' } },
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-      Math.random = originalRandom;
-
-      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          damageFormula: '12d6',
-        }),
-      );
+    let callCount = 0;
+    savePrompt.createSaveListener.mockImplementation(() => {
+      callCount++;
+      return {
+        promptId: 'prismatic-prompt',
+        promise: Promise.resolve({ success: callCount === 1, roll: 5, total: 5 }),
+      };
     });
+    forceRoll(7); // Violet for both targets
 
-    it('falls back to 12d6 when damage is not in automation', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
-      savePrompt.createSaveListener.mockReturnValue(failSaveListener());
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
-      const action = { name: 'Prismatic Spray', automation: { type: 'prismatic_spray', saveType: 'DEX', saveDc: 15 } };
-      await handle(action, makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
+    // Violet has its own failed-outcome wording ('Blinded'), distinct from Indigo/full-damage rays.
+    expect(result.payload.description.trim()).toBe(
+      'Prismatic Spray affects 1 creature(s). ' +
+      'Goblin: Violet ray (saved DEX save). ' +
+      'Orc: Violet ray (failed DEX save, Blinded). ' +
+      '1 creature(s) saved.'
+    );
+  });
 
-      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          damageFormula: '12d6',
-        }),
-      );
-    });
+  it('uses the action name and automation_info type in the popup payload', async () => {
+    mockFailingFlow();
+    forceRoll(6);
+
+    const result = await handle(
+      { name: 'Custom Prismatic Spray', automation: makeAction().automation },
+      makePlayerStats(),
+      campaignName,
+      null,
+    );
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.name).toBe('Custom Prismatic Spray');
   });
 });

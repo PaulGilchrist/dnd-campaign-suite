@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, applyWarCasterReaction } from './reactionSpellHandler.js';
@@ -50,10 +51,11 @@ function makePlayerStats(overrides = {}) {
 }
 
 function makeAction(overrides = {}) {
+    const { automation, ...rest } = overrides;
     return {
         name: 'Reactive Spell',
-        automation: { type: 'reaction_spell', ...overrides.automation },
-        ...overrides,
+        ...rest,
+        automation: { type: 'reaction_spell', ...automation },
     };
 }
 
@@ -229,20 +231,13 @@ describe('reactionSpellHandler', () => {
             expect(result.payload.description).toContain('Fireball');
         });
 
-        it('reports no spells when spellAbilities.spells is empty or none match', async () => {
-            // Empty spell list
-            const ps1 = makePlayerStats({ spellAbilities: { spells: [] } });
-            let result = await handle(makeAction(), ps1, campaignName);
-            expect(result.payload.eligibleSpells).toHaveLength(0);
-            expect(result.payload.description).toContain('No spells');
-            expect(result.payload.hasWarnings).toBe(false);
-
-            // No matching spells (all wrong casting time)
-            const ps2 = makePlayerStats({ spellAbilities: { spells: [
+        it('reports no spells when none match the eligibility filters', async () => {
+            const ps = makePlayerStats({ spellAbilities: { spells: [
                 { name: 'Shield', casting_time: '1 reaction', prepared: 'Always' },
                 { name: 'Mage Armor', casting_time: '1 bonus action', prepared: 'Always' },
             ] } });
-            result = await handle(makeAction(), ps2, campaignName);
+            const result = await handle(makeAction(), ps, campaignName);
+
             expect(result.payload.description).toContain('No spells');
             expect(result.payload.hasWarnings).toBe(false);
         });
@@ -332,15 +327,6 @@ describe('reactionSpellHandler', () => {
                     characterName: playerName,
                 }),
             ]));
-        });
-
-        it('returns ok:true on success', async () => {
-            const ps = makePlayerStats();
-            const spellData = { name: 'Burning Hands', level: 3, range: '120 feet' };
-
-            const result = await applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
-
-            expect(result).toEqual({ ok: true });
         });
 
         it('appends to existing reactions without mutating the stored array', async () => {

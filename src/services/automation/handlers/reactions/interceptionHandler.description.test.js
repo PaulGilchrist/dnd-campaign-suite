@@ -1,3 +1,14 @@
+// @maintained-by-ai
+// interceptionHandler sextet — lane: DESCRIPTION COMPOSITION (baseDescription heading +
+// interposition template, attackDetails line templates incl. placeholder fallbacks
+// 'vs AC —', '+ 0', 'd20(undefined)', '→ <b>MISS</b>', and the actualHeal note
+// render/skip) + the combatSummary-null basic-description early path (L41-44).
+// Bare-prefix pins only for reduction lines — full-string numeric reduction pins live
+// in .damage.test.js; popup envelope shape lives in .returnValue.test.js; consumption
+// gate text lives in .consumption.test.js; addEntry text lives in .logging.test.js.
+//
+// Deterministic: runtime/logService/dice/healing/range/expirations mocked, pure
+// handler, own-composition string pins — no churn expected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/targetResolver.js', () => ({
@@ -46,6 +57,11 @@ vi.mock('../../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
 }));
 
+// addExpiration pins live in the consumption lane; keep the barrel graph inert here.
+vi.mock('../../../rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
+}));
+
 // ── Imports ─────────────────────────────────────────────────────
 
 import { handle } from './interceptionHandler.js';
@@ -77,9 +93,18 @@ function makePlayerStats(overrides = {}) {
     };
 }
 
+function makeShieldUser() {
+    return makePlayerStats({
+        inventory: { equipped: ['Shield'] },
+        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+    });
+}
+
 function makeAction(overrides = {}) {
+    const { automation, ...rest } = overrides;
     return {
         name: 'Interception',
+        ...rest,
         automation: {
             type: 'interception',
             trigger: 'ally_within_5ft_attacked',
@@ -90,9 +115,8 @@ function makeAction(overrides = {}) {
             requiresShield: true,
             casting_time: '1 reaction',
             hasAutomation: true,
-            ...overrides.automation,
+            ...automation,
         },
-        ...overrides,
     };
 }
 
@@ -112,6 +136,20 @@ function makeCombatSummary() {
             damageTypes: ['slashing'],
         },
     };
+}
+
+// Stub findLastAttack with the canonical lastAttack overridden per scenario
+// (attackDetails placeholder/MISS rendering under test).
+function stubAttackEvent(eventOverrides) {
+    damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { ...makeCombatSummary().lastAttack, ...eventOverrides },
+        attackerName,
+        targetName: defenderName,
+        primaryDamage: 12,
+        secondaryDamage: 0,
+        totalDamage: 12,
+        damageTypes: ['slashing'],
+    });
 }
 
 // ── Tests ───────────────────────────────────────────────────────
@@ -142,163 +180,92 @@ describe('interceptionHandler description', () => {
         applyHealing.applyHealingToTarget.mockReturnValue({ actualHeal: 5, oldHp: 50, newHp: 55 });
     });
 
-    describe('description generation', () => {
-        it('includes base description with attacker and defender names', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
+    it('composes the exact baseDescription heading and interposition template', async () => {
+        const result = await handle(makeAction(), makeShieldUser(), campaignName, mapName);
 
-            const result = await handle(action, ps, campaignName, mapName);
+        expect(result.payload.description).toContain(
+            '<b>Interception</b><br/>You interpose yourself between Goblin and Rogue. ' +
+            'Goblin and all other creatures have Disadvantage on attack rolls against Rogue ' +
+            'until the start of your next turn.'
+        );
+    });
 
-            expect(result.payload.description).toContain('interpose yourself between');
-            expect(result.payload.description).toContain(attackerName);
-            expect(result.payload.description).toContain(defenderName);
-            expect(result.payload.description).toContain('Disadvantage');
-            expect(result.payload.description).toContain('until the start of your next turn');
-        });
+    it('renders the attack roll line and damage-section skeleton after the base description', async () => {
+        const result = await handle(makeAction(), makeShieldUser(), campaignName, mapName);
 
-        it('includes attack roll details when attack event exists', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
+        const description = result.payload.description;
+        expect(description).toContain('Attack roll: d20(15) + 5 = 20 vs AC 16 → <b>HIT</b>');
+        // Bare prefixes only — numeric reduction content is pinned in the damage lane.
+        expect(description).toContain('Original damage:');
+        expect(description).toContain('Interception damage reduction:');
+        expect(description).toContain('Reduced damage:');
+    });
 
-            const result = await handle(action, ps, campaignName, mapName);
+    it('renders the heal note when actualHeal > 0 and omits it when reduction is zero', async () => {
+        const hit = await handle(makeAction(), makeShieldUser(), campaignName, mapName);
+        // Template pin — the exact amount is damage-lane content.
+        expect(hit.payload.description).toMatch(/The target healed for \d+ HP\./);
 
-            expect(result.payload.description).toContain('Attack roll:');
-            expect(result.payload.description).toContain('d20(15)');
-            expect(result.payload.description).toContain('+ 5');
-            expect(result.payload.description).toContain('vs AC 16');
-            expect(result.payload.description).toContain('HIT');
-        });
+        diceRoller.rollExpression.mockReturnValue({ total: 0, rolls: [], modifier: 0 });
+        const zeroReduction = await handle(
+            makeAction({ automation: { damageBonusExpression: '' } }),
+            makeShieldUser(),
+            campaignName,
+            mapName
+        );
+        expect(zeroReduction.payload.description).toContain('Interception damage reduction:');
+        expect(zeroReduction.payload.description).not.toContain('healed for');
+    });
 
-        it('includes damage reduction breakdown in description', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
+    it('propagates action.name into the popup name and the description heading', async () => {
+        const result = await handle(makeAction({ name: 'MyInterception' }), makeShieldUser(), campaignName, mapName);
 
-            const result = await handle(action, ps, campaignName, mapName);
+        expect(result.payload.name).toBe('MyInterception');
+        expect(result.payload.description).toContain('<b>MyInterception</b>');
+    });
 
-            expect(result.payload.description).toContain('Interception damage reduction:');
-            expect(result.payload.description).toContain('Reduced damage:');
-        });
+    it('returns popup with basic description only when combatSummary is null', async () => {
+        damageUtils.getCombatContext.mockResolvedValue(null);
 
-        it('includes heal note when actual heal > 0', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
+        const result = await handle(makeAction(), makeShieldUser(), campaignName, mapName);
 
-            const result = await handle(action, ps, campaignName, mapName);
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.description).toContain('interpose yourself between');
+        expect(result.payload.description).not.toContain('Attack roll:');
+        expect(result.payload.description).not.toContain('Original damage:');
+        expect(result.payload.description).not.toContain('Interception damage reduction:');
+    });
 
-            expect(result.payload.description).toContain('healed for');
-            expect(result.payload.description).toContain('HP');
-        });
+    it('renders AC placeholder as em dash when targetAc is null', async () => {
+        stubAttackEvent({ targetAc: null });
 
-        it('uses action.name in popup name and description heading', async () => {
-            const action = makeAction({ name: 'MyInterception' });
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
+        const result = await handle(makeAction(), makeShieldUser(), campaignName, mapName);
 
-            const result = await handle(action, ps, campaignName, mapName);
+        expect(result.payload.description).toContain('Attack roll: d20(15) + 5 = 20 vs AC — → <b>HIT</b>');
+    });
 
-            expect(result.payload.name).toBe('MyInterception');
-            expect(result.payload.description).toContain('<b>MyInterception</b>');
-        });
+    it('renders bonus as + 0 when attack bonus is null', async () => {
+        stubAttackEvent({ bonus: null });
 
-        it('returns popup with basic description when combatSummary is null', async () => {
-            const action = makeAction();
-            const ps = makePlayerStats({
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            });
-            damageUtils.getCombatContext.mockResolvedValue(null);
+        const result = await handle(makeAction(), makeShieldUser(), campaignName, mapName);
 
-            const result = await handle(action, ps, campaignName, mapName);
+        expect(result.payload.description).toContain('+ 0 = 15');
+    });
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('interpose yourself between');
-            expect(result.payload.description).not.toContain('Attack roll:');
-            expect(result.payload.description).not.toContain('Original damage:');
-            expect(result.payload.description).not.toContain('Interception damage reduction:');
-        });
+    it('renders d20(undefined) = NaN when d20 is missing from the attack event', async () => {
+        stubAttackEvent({ d20: undefined });
 
-        it('handles attack event with missing optional fields (targetAc, bonus, d20, hit)', async () => {
-            const basePs = {
-                inventory: { equipped: ['Shield'] },
-                equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            };
+        const result = await handle(makeAction(), makeShieldUser(), campaignName, mapName);
 
-            // Missing targetAc
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: { ...makeCombatSummary().lastAttack, targetAc: null },
-                attackerName,
-                targetName: defenderName,
-                primaryDamage: 12,
-                secondaryDamage: 0,
-                totalDamage: 12,
-                damageTypes: ['slashing'],
-            });
-            let result = await handle(makeAction(), makePlayerStats(basePs), campaignName, mapName);
-            expect(result.payload.description).toContain('vs AC —');
+        expect(result.payload.description).toContain('Attack roll: d20(undefined) + 5 = NaN vs AC 16');
+    });
 
-            // Missing bonus
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: { ...makeCombatSummary().lastAttack, bonus: null },
-                attackerName,
-                targetName: defenderName,
-                primaryDamage: 12,
-                secondaryDamage: 0,
-                totalDamage: 12,
-                damageTypes: ['slashing'],
-            });
-            result = await handle(makeAction(), makePlayerStats(basePs), campaignName, mapName);
-            expect(result.payload.description).toContain('+ 0');
+    it('renders MISS when hit is undefined', async () => {
+        stubAttackEvent({ hit: undefined });
 
-            // Missing d20
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: {
-                    attackerName,
-                    targetName: defenderName,
-                    bonus: 5,
-                    hit: true,
-                    targetAc: 16,
-                    primaryDamage: 12,
-                    rawDamage: 12,
-                    actualDamage: 12,
-                    damageTypes: ['slashing'],
-                },
-                attackerName,
-                targetName: defenderName,
-                primaryDamage: 12,
-                secondaryDamage: 0,
-                totalDamage: 12,
-                damageTypes: ['slashing'],
-            });
-            result = await handle(makeAction(), makePlayerStats(basePs), campaignName, mapName);
-            expect(result.payload.description).toContain('d20(undefined)');
+        const result = await handle(makeAction(), makeShieldUser(), campaignName, mapName);
 
-            // hit undefined as MISS
-            damageRollback.findLastAttack.mockResolvedValue({
-                attackEvent: { ...makeCombatSummary().lastAttack, hit: undefined },
-                attackerName,
-                targetName: defenderName,
-                primaryDamage: 12,
-                secondaryDamage: 0,
-                totalDamage: 12,
-                damageTypes: ['slashing'],
-            });
-            result = await handle(makeAction(), makePlayerStats(basePs), campaignName, mapName);
-            expect(result.payload.description).toContain('MISS');
-        });
+        expect(result.payload.description).toContain('Attack roll: d20(15) + 5 = 20 vs AC 16 → <b>MISS</b>');
     });
 });

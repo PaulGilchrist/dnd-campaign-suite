@@ -1,6 +1,35 @@
 // SP-045 regression: Fear cone saves must resolve the caster's spell save DC
 // (data automation saveDc 'spell_save_dc' -> buildSaveDc -> DC 17), never the
 // DC-10 fallback (CLA-277 / SP-082 / SP-042 Eyebite sentinel precedent).
+//
+// ── PAIR seam map (fear pair, #1910 this file / #1911 sibling) ─────────
+// THIS file (#1910, saveDc lane) owns the LIVE buildSaveDc sourcing chain:
+// fearHandler.js:81 calls the REAL buildSaveDc (savePrompt.js partially
+// mocked via importActual) — this is the only fear test where the actual
+// derivation executes. Lanes pinned here:
+//   • data declaration: saveDc 'spell_save_dc' in BOTH dual-ruleset JSONs
+//   • DC propagation to all four sinks: createSaveListener, storeSpellLastAttack,
+//     addConcentration, fear_end_on_los te.dc (+ DC 17 in ability_use log)
+//   • source-discrimination: direct spellAbilities.saveDc beats 8+mod+prof
+//     recomputation; recomputation chain (8+spellMod+prof) flows when absent
+//     (makePlayerStats' 17 == 8+3+6 by coincidence — discriminating configs below)
+//   • fallback control: automation without saveDc -> DC 10 + exactly one
+//     [buildSaveDc] console.error (why the SP-045 data fix matters)
+// Sibling fearHandler.test.js (#1911) owns the rest of handle() with
+// buildSaveDc STUBBED (mockReturnValue) — target selection, WIS prompt shape,
+// concentration/summary persistence, condition branches, popups, heighten,
+// addEntry-reject. Do not stub buildSaveDc here.
+// Generic buildSaveDc arithmetic (ability branch, numeric passthrough, edge
+// defaults) belongs to common/savePrompt.test.js — kept out of this lane.
+//
+// Duration flags: fearHandler has NO durationRounds/minutes×10 legacy
+// (Eyebite's retired-recipe pattern NOT present): te carries
+// duration:'concentration' (handler:69) and condition expiry goes through
+// addExpiration round seams — turn-based compliant, no action needed.
+// Liveness: registered live at automation/index.js:530 (`fear: handleFear`),
+// dispatched from type:'fear' in both spells.json; manifest SP-045 verified
+// 2026-10-04. Distinct from closed massFear trio (handlers/combat/massFear*
+// — massFear dispatch registration removed there; single-target fear is live).
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -67,6 +96,8 @@ function makePlayerStats() {
   return {
     name: casterName,
     level: 20,
+    // NB: 8 + modifier(3) + proficiency(6) == spellAbilities.saveDc(17) by
+    // coincidence — see sourcing discrimination test below for split values.
     proficiency: 6,
     abilities: [{ name: 'Intelligence', bonus: 3 }],
     spellAbilities: { saveDc: 17, modifier: 3 },
@@ -137,6 +168,26 @@ describe('SP-045 Fear save DC', () => {
 
     const fallbackErrors = console.error.mock.calls.filter(c => String(c[0]).includes('[buildSaveDc]'));
     expect(fallbackErrors.length).toBe(0);
+  });
+
+  it('sourcing discrimination: uses spellAbilities.saveDc directly, recomputes 8+mod+prof only when it is absent', async () => {
+    getCombatContext.mockResolvedValue(makeCombatContext());
+    const automation = readFearAutomation('public/data/2024/spells.json');
+
+    // Direct source beats recomputation: saveDc 19 present, 8+3+6 would be 17.
+    const direct = { level: 20, proficiency: 6, abilities: [{ name: 'Intelligence', bonus: 3 }], spellAbilities: { saveDc: 19, modifier: 3 } };
+    await handle({ name: 'Fear', automation }, { ...makePlayerStats(), ...direct }, campaignName, null);
+    expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({ saveDc: 19 }));
+    expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, expect.objectContaining({ saveDc: 19 }));
+    expect(console.error.mock.calls.filter(c => String(c[0]).includes('[buildSaveDc]')).length).toBe(0);
+
+    // Recompute chain when saveDc absent: 8 + spellAbilities.modifier(4) + prof(6) = 18, not DC-10.
+    vi.clearAllMocks();
+    const recomputed = { ...makePlayerStats(), spellAbilities: { modifier: 4 } };
+    await handle({ name: 'Fear', automation }, recomputed, campaignName, null);
+    expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({ saveDc: 18 }));
+    expect(addConcentration).toHaveBeenCalledWith(expect.any(Object), casterName, 'Fear', 18);
+    expect(console.error.mock.calls.filter(c => String(c[0]).includes('[buildSaveDc]')).length).toBe(0);
   });
 
   it('control: automation without saveDc still falls back to DC 10 with console error (why the data fix matters)', async () => {

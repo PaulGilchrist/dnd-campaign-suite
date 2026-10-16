@@ -1,4 +1,26 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+/**
+ * animateDead SEXTET lane #1863 confirm.initiative — per the seam map in
+ * animateDeadHandler.confirm.details.test.js, this lane owns:
+ *  - resolveCasterInitiative share/fallback (initiateDeadHandler.js)
+ *  - byInitiativeDesc sort applied to combatSummary.creatures after summoning
+ *  - the initiative value assigned onto each spawn entry (String-cast share)
+ *
+ * Canonical pins received via handoff from the shed lane:
+ *  - 'initiative fallback uses d20 + initiativeBonus' — Math.random spied at
+ *    both d20 bounds (1 and 20) so the formula is pinned, not just "a number".
+ *  - 'initiative values sorted descending' — full-order table pins, relying
+ *    on stable sort for ties (V8 sort is stable).
+ *  - initiative assigned from encounterToInitiative: spawn entries carry the
+ *    caster's resolved initiative as a string; the prod import path
+ *    (encounters/encounterToInitiative.js → getMonsterSaveBonuses +
+ *    getNextUniqueMonsterName) is verified against animateDeadHandler.js.
+ *
+ * Deterministic: every external seam mocked, Math.random spied where the
+ * fallback is exercised, spies restored in afterEach. No timers (undead
+ * persistence is flag-based, combat-scoped).
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -54,65 +76,99 @@ import { confirmAnimateDead } from './animateDeadHandler.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
 
-describe('confirmAnimateDead - initiative', () => {
+const mockPlayerStats = {
+    name: 'TestCaster',
+    level: 5,
+    proficiency: 3,
+    abilities: [{ name: 'Charisma', bonus: 3 }],
+};
+const mockCampaignName = 'test-campaign';
+
+const mockSkeleton = {
+    index: 'skeleton',
+    name: 'Skeleton',
+    type: 'Undead',
+    armor_class: 13,
+    hit_points: 13,
+    damage_resistances: [],
+    damage_immunities: [],
+    immunities: [],
+    saving_throws: {},
+    initiative_details: '+2',
+};
+
+const mockZombie = {
+    index: 'zombie',
+    name: 'Zombie',
+    type: 'Undead',
+    armor_class: 8,
+    hit_points: 22,
+    damage_resistances: [],
+    damage_immunities: [],
+    immunities: [],
+    saving_throws: {},
+    initiative_details: '-1',
+};
+
+// makeAction MERGES overrides (automation included) — never replaces wholesale.
+function makeAction(overrides = {}) {
+    const { automation: automationOverrides, ...rest } = overrides;
+    return {
+        name: 'Animate Dead',
+        ...rest,
+        automation: { type: 'animate_dead', ...automationOverrides },
+    };
+}
+
+// Fresh mutable combat summary; the handler mutates it in place, so re-arm
+// via summary() between casts that must not see each other's spawns.
+function summary(creatures) {
+    const cs = { creatures };
+    getCombatSummary.mockReturnValue(cs);
+    return cs;
+}
+
+function spawnOf(cs, name) {
+    return cs.creatures.find(c => c.name === name);
+}
+
+describe('confirmAnimateDead - initiative share, fallback, and sort', () => {
+    let randomSpy = null;
+
     beforeEach(() => {
         vi.clearAllMocks();
-    });
-
-    const mockPlayerStats = {
-        name: 'TestCaster',
-        level: 5,
-        proficiency: 3,
-        abilities: [{ name: 'Charisma', bonus: 3 }],
-    };
-    const mockCampaignName = 'test-campaign';
-
-    const mockSkeleton = {
-        index: 'skeleton',
-        name: 'Skeleton',
-        type: 'Undead',
-        armor_class: 13,
-        hit_points: 13,
-        damage_resistances: [],
-        damage_immunities: [],
-        immunities: [],
-        saving_throws: {},
-        initiative_details: '+2',
-    };
-
-    const mockZombie = {
-        index: 'zombie',
-        name: 'Zombie',
-        type: 'Undead',
-        armor_class: 8,
-        hit_points: 22,
-        damage_resistances: [],
-        damage_immunities: [],
-        immunities: [],
-        saving_throws: {},
-        initiative_details: '-1',
-    };
-
-    function makeAction(overrides = {}) {
-        return {
-            name: 'Animate Dead',
-            automation: { type: 'animate_dead', ...overrides.automation },
-            ...overrides,
-        };
-    }
-
-    beforeEach(() => {
         loadMonsters.mockResolvedValue([mockSkeleton, mockZombie]);
     });
 
-    it('uses caster initiative from combat summary when available', async () => {
-        getCombatSummary.mockReturnValue({
-            creatures: [
-                { name: 'TestCaster', initiative: '12', initiativeBonus: 2 },
-            ],
-        });
+    afterEach(() => {
+        if (randomSpy) {
+            randomSpy.mockRestore();
+            randomSpy = null;
+        }
+    });
 
-        const combatSummary = getCombatSummary(mockCampaignName);
+    it('summons share the caster stated initiative, stringified onto every spawn', async () => {
+        // No-roll guard: a stated initiative must never trigger a fresh roll.
+        randomSpy = vi.spyOn(Math, 'random');
+
+        const cs = summary([
+            { name: 'TestCaster', initiative: '12', initiativeBonus: 2 },
+        ]);
+
+        await confirmAnimateDead(
+            makeAction(),
+            mockPlayerStats,
+            mockCampaignName,
+            { skeletonCount: 1, zombieCount: 1 },
+        );
+
+        expect(spawnOf(cs, 'Skeleton 1').initiative).toBe('12');
+        expect(spawnOf(cs, 'Zombie 1').initiative).toBe('12');
+
+        // Stated initiative stored as a number still lands as a string.
+        const cs2 = summary([
+            { name: 'TestCaster', initiative: 9, initiativeBonus: 2 },
+        ]);
 
         await confirmAnimateDead(
             makeAction(),
@@ -121,18 +177,44 @@ describe('confirmAnimateDead - initiative', () => {
             { skeletonCount: 1 },
         );
 
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
-        expect(skeleton.initiative).toBe('12');
+        expect(spawnOf(cs2, 'Skeleton 1').initiative).toBe('9');
+        expect(randomSpy).not.toHaveBeenCalled();
     });
 
-    it('uses initiativeBonus when initiative is set', async () => {
-        getCombatSummary.mockReturnValue({
-            creatures: [
-                { name: 'TestCaster', initiative: '10', initiativeBonus: 5 },
-            ],
-        });
+    it('initiative fallback uses d20 + initiativeBonus when stated initiative is empty', async () => {
+        randomSpy = vi.spyOn(Math, 'random');
 
-        const combatSummary = getCombatSummary(mockCampaignName);
+        // Roll floor: Math.floor(0 * 20) + 1 + 3 = 4
+        randomSpy.mockReturnValue(0);
+        const csLow = summary([
+            { name: 'TestCaster', initiative: '', initiativeBonus: 3 },
+        ]);
+        await confirmAnimateDead(
+            makeAction(),
+            mockPlayerStats,
+            mockCampaignName,
+            { skeletonCount: 1 },
+        );
+        expect(spawnOf(csLow, 'Skeleton 1').initiative).toBe('4');
+
+        // Roll ceiling: Math.floor(0.9999... * 20) + 1 + 3 = 23
+        randomSpy.mockReturnValue(0.9999999999);
+        const csHigh = summary([
+            { name: 'TestCaster', initiative: '', initiativeBonus: 3 },
+        ]);
+        await confirmAnimateDead(
+            makeAction(),
+            mockPlayerStats,
+            mockCampaignName,
+            { zombieCount: 1 },
+        );
+        expect(spawnOf(csHigh, 'Zombie 1').initiative).toBe('23');
+    });
+
+    it('falls back to a raw d20 roll when initiative and bonus are both missing', async () => {
+        randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+
+        const cs = summary([{ name: 'TestCaster' }]);
 
         await confirmAnimateDead(
             makeAction(),
@@ -141,20 +223,16 @@ describe('confirmAnimateDead - initiative', () => {
             { skeletonCount: 1 },
         );
 
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
-        // initiativeValue = parseInt('10', 10) = 10
-        // Then initiativeValue = 10 || (random) = 10
-        expect(skeleton.initiative).toBe('10');
+        // Math.floor(0 * 20) + 1 + (undefined || 0) = 1
+        expect(spawnOf(cs, 'Skeleton 1').initiative).toBe('1');
     });
 
-    it('falls back to random roll when caster has no initiative', async () => {
-        getCombatSummary.mockReturnValue({
-            creatures: [
-                { name: 'TestCaster', initiative: '', initiativeBonus: 3 },
-            ],
-        });
+    it('treats a stated initiative of 0 as missing and rolls fresh', async () => {
+        randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
 
-        const combatSummary = getCombatSummary(mockCampaignName);
+        const cs = summary([
+            { name: 'TestCaster', initiative: '0', initiativeBonus: 2 },
+        ]);
 
         await confirmAnimateDead(
             makeAction(),
@@ -163,20 +241,16 @@ describe('confirmAnimateDead - initiative', () => {
             { skeletonCount: 1 },
         );
 
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
-        // With no initiative, falls back to Math.floor(random * 20) + 1 + bonus
-        // The value should be a string of a positive number
-        expect(skeleton.initiative).toMatch(/^\d+$/);
+        // parseInt('0') is falsy, so the share branch is skipped:
+        // Math.floor(0 * 20) + 1 + 2 = 3
+        expect(spawnOf(cs, 'Skeleton 1').initiative).toBe('3');
     });
 
-    it('falls back to random roll when initiative is undefined', async () => {
-        getCombatSummary.mockReturnValue({
-            creatures: [
-                { name: 'TestCaster' },
-            ],
-        });
-
-        const combatSummary = getCombatSummary(mockCampaignName);
+    it('initiative values sorted descending after summoning', async () => {
+        const cs = summary([
+            { name: 'TestCaster', initiative: '15', initiativeBonus: 0 },
+            { name: 'Goblin', initiative: '5', initiativeBonus: 0 },
+        ]);
 
         await confirmAnimateDead(
             makeAction(),
@@ -185,19 +259,20 @@ describe('confirmAnimateDead - initiative', () => {
             { skeletonCount: 1 },
         );
 
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
-        expect(skeleton.initiative).toMatch(/^\d+$/);
+        // Spawn shares caster's 15; stable sort keeps caster ahead of spawn.
+        expect(cs.creatures.map(c => c.name)).toEqual([
+            'TestCaster',
+            'Skeleton 1',
+            'Goblin',
+        ]);
     });
 
-    it('sorts creatures by initiative descending', async () => {
-        getCombatSummary.mockReturnValue({
-            creatures: [
-                { name: 'TestCaster', initiative: '15', initiativeBonus: 0 },
-                { name: 'Goblin', initiative: '5', initiativeBonus: 0 },
-            ],
-        });
-
-        const combatSummary = getCombatSummary(mockCampaignName);
+    it('sorts creatures with empty or undefined initiative to the bottom as zero', async () => {
+        const cs = summary([
+            { name: 'Goblin', initiative: '' },
+            { name: 'Orc' },
+            { name: 'TestCaster', initiative: '15', initiativeBonus: 0 },
+        ]);
 
         await confirmAnimateDead(
             makeAction(),
@@ -206,127 +281,11 @@ describe('confirmAnimateDead - initiative', () => {
             { skeletonCount: 1 },
         );
 
-        const indices = combatSummary.creatures.map(c => c.name);
-        const skeletonIdx = indices.indexOf('Skeleton 1');
-        const goblinIdx = indices.indexOf('Goblin');
-        expect(skeletonIdx).toBeLessThan(goblinIdx);
-    });
-});
-
-describe('confirmAnimateDead - initiative sorting edge cases', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    const mockPlayerStats = {
-        name: 'TestCaster',
-        level: 5,
-        proficiency: 3,
-        abilities: [{ name: 'Charisma', bonus: 3 }],
-    };
-    const mockCampaignName = 'test-campaign';
-
-    const mockSkeleton = {
-        index: 'skeleton',
-        name: 'Skeleton',
-        type: 'Undead',
-        armor_class: 13,
-        hit_points: 13,
-        damage_resistances: [],
-        damage_immunities: [],
-        immunities: [],
-        saving_throws: {},
-        initiative_details: '+2',
-    };
-
-    const mockZombie = {
-        index: 'zombie',
-        name: 'Zombie',
-        type: 'Undead',
-        armor_class: 8,
-        hit_points: 22,
-        damage_resistances: [],
-        damage_immunities: [],
-        immunities: [],
-        saving_throws: {},
-        initiative_details: '-1',
-    };
-
-    function makeAction(overrides = {}) {
-        return {
-            name: 'Animate Dead',
-            automation: { type: 'animate_dead', ...overrides.automation },
-            ...overrides,
-        };
-    }
-
-    beforeEach(() => {
-        loadMonsters.mockResolvedValue([mockSkeleton, mockZombie]);
-    });
-
-    it('handles creatures with empty initiative string', async () => {
-        getCombatSummary.mockReturnValue({
-            creatures: [
-                { name: 'TestCaster', initiative: '15', initiativeBonus: 0 },
-                { name: 'Goblin', initiative: '', initiativeBonus: 0 },
-            ],
-        });
-
-        const combatSummary = getCombatSummary(mockCampaignName);
-
-        await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { skeletonCount: 1 },
-        );
-
-        const indices = combatSummary.creatures.map(c => c.name);
-        const skeletonIdx = indices.indexOf('Skeleton 1');
-        const goblinIdx = indices.indexOf('Goblin');
-        expect(skeletonIdx).toBeLessThan(goblinIdx);
-    });
-
-    it('handles creatures with undefined initiative', async () => {
-        getCombatSummary.mockReturnValue({
-            creatures: [
-                { name: 'TestCaster', initiative: '15', initiativeBonus: 0 },
-                { name: 'Goblin' },
-            ],
-        });
-
-        const combatSummary = getCombatSummary(mockCampaignName);
-
-        await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { skeletonCount: 1 },
-        );
-
-        const indices = combatSummary.creatures.map(c => c.name);
-        const skeletonIdx = indices.indexOf('Skeleton 1');
-        const goblinIdx = indices.indexOf('Goblin');
-        expect(skeletonIdx).toBeLessThan(goblinIdx);
-    });
-
-    it('handles initiativeBonus being 0', async () => {
-        getCombatSummary.mockReturnValue({
-            creatures: [
-                { name: 'TestCaster', initiative: '10', initiativeBonus: 0 },
-            ],
-        });
-
-        const combatSummary = getCombatSummary(mockCampaignName);
-
-        await confirmAnimateDead(
-            makeAction(),
-            mockPlayerStats,
-            mockCampaignName,
-            { skeletonCount: 1 },
-        );
-
-        const skeleton = combatSummary.creatures.find(c => c.name === 'Skeleton 1');
-        expect(skeleton.initiative).toBe('10');
+        expect(cs.creatures.map(c => c.name)).toEqual([
+            'TestCaster',
+            'Skeleton 1',
+            'Goblin',
+            'Orc',
+        ]);
     });
 });

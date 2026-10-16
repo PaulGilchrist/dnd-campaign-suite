@@ -1,3 +1,36 @@
+// @maintained-by-ai: 2026-10-15 — deterministic full-mock lane over
+// reactionSaveHealHandler.handle() (Relentless Rage save-then-heal reaction).
+// LIVE: automation/index.js `reaction_save_heal` → handleReactionSaveHeal;
+// fed by public/data/classes.json + 2024/classes.json; whitelisted in
+// combat/automation/automationRouter.js. Pins this handler's own execution
+// composition: early-exit guards (Rage stance gate via activeBuffs 'stance'
+// name-match, combat-context gate, not-at-0-HP gate, uses-exhausted gate),
+// save-prompt creation, ability_use log shape, automation_info popup return,
+// getPlayersLastKnownHp name/branch matching, uses-key derivation,
+// save-result success/failure wiring, the 5e death-save slot machine
+// (nat20 clear / success slot / nat1 double-fail), heal-expression
+// evaluation, and addEntry-rejection .catch resilience on all three logs.
+//
+// SEAM MAP: relentlessRageService.js (rules/features/) is a DISTINCT parallel
+// module intercepted by applyDamage.js (checkRelentlessRage) — its five
+// *.test.js lanes own that surface; do not duplicate across. No same-name
+// dupe exists: this is the sole suite for reactionSaveHealHandler.
+//
+// Removed in trim audit 2026-10-15 (4 vacuous/duplicate pins):
+//  - 'applies dcScaling' — inert: maxUses=1 hardcodes currentUses=0 at DC
+//    calc time, so baseDc + 0*scaling ≡ baseDc (identical pin to the
+//    CON/10 defaults test). dcScaling is a dead knob in the source.
+//  - 'includes saveType in popup description when custom' — same description
+//    template as the CON/DC-15 twin; custom saveType pinned by save-prompt
+//    + log lanes.
+//  - '2 * barbarian_level using direct field' — barbarianLevelOf() never
+//    reads playerStats.barbarianLevel for string expressions; byte-identical
+//    to the no-class_levels level-fallback test.
+//  - 'finds creature by exact name match' — the beforeEach context IS the
+//    exact-match fixture; every other test traverses that branch.
+// NOTE: handlers self-remove their save-result listeners after firing; the
+// pre-fire registrations that tests leave behind are inert because each test
+// asserts pollution-tolerant (filter + containsEqual / objectContaining).
 // Suppress fire-and-forget logService.addEntry rejection warnings from source code
 process.on('unhandledRejection', () => {});
 
@@ -93,9 +126,6 @@ function triggerDeathSaveResult(extra = {}) {
 describe('reactionSaveHealHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Clean up any event listeners from previous tests to prevent cross-test pollution
-    window.removeEventListener('save-result', () => {});
-    window.removeEventListener('death-save-result', () => {});
     runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
       if (key === 'activeBuffs') return [{ name: 'Rage', effect: 'stance' }];
       if (key === 'currentHitPoints') return 0;
@@ -209,24 +239,6 @@ describe('reactionSaveHealHandler', () => {
         saveDc: 10,
       });
     });
-
-    it('applies dcScaling to the base DC', async () => {
-      runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Rage', effect: 'stance' }];
-        if (key === 'currentHitPoints') return 0;
-        if (key === 'relentlessrageUses') return 0;
-        return 0;
-      });
-      const action = makeAction({ saveType: 'CON', saveDc: 10, dcScaling: 2 });
-      await handle(action, makePlayerStats(), campaignName, null);
-
-      // DC = 10 + (0 * 2) = 10 (uses start at 0)
-      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'TestBarbarian',
-        saveType: 'CON',
-        saveDc: 10,
-      });
-    });
   });
 
   // ── Log entry ───────────────────────────────────────────────
@@ -279,26 +291,12 @@ describe('reactionSaveHealHandler', () => {
       expect(result.payload.description).toContain('CON saving throw');
       expect(result.payload.description).toContain('DC 15');
     });
-
-    it('includes saveType in popup description when custom', async () => {
-      const result = await handle(makeAction({ saveType: 'WIS', saveDc: 13 }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('WIS saving throw');
-      expect(result.payload.description).toContain('DC 13');
-    });
   });
 
   // ── Creature name matching ──────────────────────────────────
+  // Exact-match branch is the beforeEach fixture (traversed by every test).
 
   describe('creature name matching', () => {
-    it('finds creature by exact name match', async () => {
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
-      });
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(result.payload.targetName).toBe('TestBarbarian');
-    });
-
     it('finds creature by name prefix match (name + space)', async () => {
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'TestBarbarian (Player)', type: 'player', currentHp: 0 }],
@@ -603,19 +601,6 @@ describe('reactionSaveHealHandler', () => {
   describe('heal expression evaluation', () => {
     it('uses numeric expression directly', async () => {
       await handle(makeAction({ healExpression: 10 }), makePlayerStats(), campaignName, null);
-      triggerSaveResult(true);
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestBarbarian',
-        'currentHitPoints',
-        10,
-        campaignName,
-      );
-    });
-
-    it('evaluates "2 * barbarian_level" using direct field', async () => {
-      const ps = makePlayerStats({ barbarianLevel: 5 });
-      await handle(makeAction({ healExpression: '2 * barbarian_level' }), ps, campaignName, null);
       triggerSaveResult(true);
 
       expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(

@@ -31,6 +31,7 @@ vi.mock('../../common/damageRollback.js', () => ({
 }));
 
 const campaignName = 'test-campaign';
+const activeKey = '_activeFriends_Bard1';
 const defaultPlayerStats = {
     name: 'Bard1',
     level: 5,
@@ -38,22 +39,17 @@ const defaultPlayerStats = {
     abilities: [{ name: 'Charisma', bonus: 3 }],
 };
 
+// Production builds automation via friendsService with type 'friends'.
 function makeAction(automation = {}) {
-    return { name: 'Friends', automation: { type: 'friends_cantrip', ...automation } };
+    return { name: 'Friends', automation: { type: 'friends', ...automation } };
 }
 
-function makeActionNoAutomation() {
-    return { name: 'Friends' };
-}
-
-function defaultSaveListener(success = true) {
+function resolveSave({ success = true, roll, total } = {}) {
     createSaveListener.mockReturnValue({
         promptId: 'friends-prompt-1',
-        promise: Promise.resolve({ success }),
+        promise: Promise.resolve({ success, roll, total }),
     });
 }
-
-// ─── Success path ───
 
 describe('friendsHandler.handle', () => {
     beforeEach(() => {
@@ -61,8 +57,8 @@ describe('friendsHandler.handle', () => {
     });
 
     describe('save succeeds', () => {
-        it('returns a popup indicating the save succeeded', async () => {
-            defaultSaveListener(true);
+        it('returns exact success popup pinning full description (Unknown target)', async () => {
+            resolveSave({ success: true });
 
             const result = await handle(makeAction(), defaultPlayerStats, campaignName, null);
 
@@ -71,13 +67,13 @@ describe('friendsHandler.handle', () => {
                 payload: {
                     type: 'automation_info',
                     name: 'Friends',
-                    description: expect.stringContaining('succeeded on the Wisdom save'),
+                    description: 'Unknown succeeded on the Wisdom save. Friends has no effect.',
                 },
             });
         });
 
-        it('logs the ability use and save result entries', async () => {
-            defaultSaveListener(true);
+        it('logs ability_use then save_result with full composed strings', async () => {
+            resolveSave({ success: true });
 
             await handle(makeAction(), defaultPlayerStats, campaignName, null);
 
@@ -89,7 +85,7 @@ describe('friendsHandler.handle', () => {
                     type: 'ability_use',
                     characterName: 'Bard1',
                     abilityName: 'Friends',
-                    description: expect.stringContaining('Bard1 casts Friends on Unknown'),
+                    description: 'Bard1 casts Friends on Unknown. Unknown must make a WIS save (DC 10) or be Charmed.',
                     promptId: expect.any(String),
                 }),
             );
@@ -98,29 +94,21 @@ describe('friendsHandler.handle', () => {
                 campaignName,
                 expect.objectContaining({
                     type: 'save_result',
+                    rollType: 'save-friends',
+                    targetName: 'Unknown',
+                    saveDc: 10,
+                    saveType: 'WIS',
                     success: true,
                 }),
             );
         });
 
-        it('clears active Friends tracking after a successful save', async () => {
-            defaultSaveListener(true);
-
-            await handle(makeAction(), defaultPlayerStats, campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                '_activeFriends_Bard1',
-                null,
-                campaignName,
-            );
-        });
-
-        it('calls storeSpellLastAttack with correct parameters', async () => {
-            defaultSaveListener(true);
+        it('stores spell attack and records zero-damage success target result', async () => {
+            resolveSave({ success: true });
 
             await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
 
+            expect(storeSpellLastAttack).toHaveBeenCalledTimes(1);
             expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, {
                 casterName: 'Bard1',
                 spellName: 'Friends',
@@ -128,13 +116,7 @@ describe('friendsHandler.handle', () => {
                 saveDc: 10,
                 attackScope: 'single',
             });
-        });
-
-        it('calls addTargetResult with correct parameters on save success', async () => {
-            defaultSaveListener(true);
-
-            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
+            expect(addTargetResult).toHaveBeenCalledTimes(1);
             expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
                 targetName: 'Goblin',
                 saveResult: 'success',
@@ -144,58 +126,69 @@ describe('friendsHandler.handle', () => {
                 appliedDamage: 0,
             });
         });
+
+        it('clears active Friends tracking after a successful save', async () => {
+            resolveSave({ success: true });
+
+            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', activeKey, null, campaignName);
+        });
+
+        it('survives rejected log entries on the success path', async () => {
+            resolveSave({ success: true });
+            addEntry.mockRejectedValueOnce(new Error('log error'));
+            addEntry.mockRejectedValueOnce(new Error('save result log error'));
+
+            const result = await handle(makeAction(), defaultPlayerStats, campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(addEntry).toHaveBeenCalledTimes(2);
+        });
     });
 
-    // ─── Save fails ───
-
     describe('save fails', () => {
-        it('applies charmed condition to the target', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-
-            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'activeConditions',
-                expect.arrayContaining(['charmed']),
-                campaignName,
-            );
-        });
-
-        it('removes existing charmed condition before re-adding', async () => {
-            defaultSaveListener(false);
+        it('writes charmed once preserving other conditions and tracks active target without clearing', async () => {
+            resolveSave({ success: false, roll: 3, total: 6 });
             getRuntimeValue.mockReturnValue(['charmed', 'frightened']);
 
-            await handle(makeAction({ targetName: 'Ally1' }), defaultPlayerStats, campaignName, null);
+            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
 
-            const calls = setRuntimeValue.mock.calls.filter(
-                (c) => c[1] === 'activeConditions',
-            );
-            expect(calls).toHaveLength(1);
-            const newConditions = calls[0][2];
-            expect(newConditions).toEqual(['frightened', 'charmed']);
+            const conditionWrites = setRuntimeValue.mock.calls.filter((c) => c[1] === 'activeConditions');
+            expect(conditionWrites).toEqual([['Goblin', 'activeConditions', ['frightened', 'charmed'], campaignName]]);
+            const activeWrites = setRuntimeValue.mock.calls.filter((c) => c[1] === activeKey);
+            expect(activeWrites).toEqual([['campaign', activeKey, 'Goblin', campaignName]]);
+            expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
+                targetName: 'Goblin',
+                saveResult: 'failure',
+                roll: 3,
+                total: 6,
+                conditions: ['charmed'],
+                appliedDamage: 0,
+            });
         });
 
-        it('calls addExpiration and addEntry for the target', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-
-            await handle(makeAction({ targetName: 'Ally1' }), defaultPlayerStats, campaignName, null);
-
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard1', targetName: 'Ally1', effects: expect.any(Array), campaignName, rounds: 2 });
-            expect(addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({ characterName: 'Ally1' }),
-            );
-        });
-
-        it('posts a condition log entry with correct details', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
+        it('defaults to empty conditions when getRuntimeValue is undefined', async () => {
+            resolveSave({ success: false });
+            getRuntimeValue.mockReturnValue(undefined);
 
             await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
 
+            expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['charmed'], campaignName);
+        });
+
+        it('applies exact-shape expiration and posts full condition log entry', async () => {
+            resolveSave({ success: false });
+
+            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
+
+            expect(addExpiration).toHaveBeenCalledWith({
+                attackerName: 'Bard1',
+                targetName: 'Goblin',
+                effects: [{ type: 'condition', condition: 'charmed' }],
+                campaignName,
+                rounds: 2,
+            });
             expect(addEntry).toHaveBeenCalledWith(
                 campaignName,
                 expect.objectContaining({
@@ -204,33 +197,17 @@ describe('friendsHandler.handle', () => {
                     characterName: 'Goblin',
                     condition: 'Charmed',
                     reason: 'Friends cantrip',
-                    note: expect.stringContaining('initiative roll'),
+                    note: 'Goblin is Charmed by Bard1 (Concentration, up to 1 minute). The spell ends if concentration is lost, on initiative roll, short rest, or long rest.',
                 }),
             );
         });
 
-        it('returns a popup with the failure description', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-
-            const result = await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.name).toBe('Friends');
-            expect(result.payload.description).toContain('Charmed');
-            expect(result.payload.description).toContain('Concentration');
-            expect(result.payload.description).toContain('initiative roll');
-            expect(result.payload.description).toContain('short rest');
-            expect(result.payload.description).toContain('long rest');
-            expect(result.payload.targetName).toBe('Goblin');
-        });
-
-        it('calls addTargetResult with failure details', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
+        it('records zero-roll failure target result', async () => {
+            resolveSave({ success: false });
 
             await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
 
+            expect(addTargetResult).toHaveBeenCalledTimes(1);
             expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
                 targetName: 'Goblin',
                 saveResult: 'failure',
@@ -240,106 +217,40 @@ describe('friendsHandler.handle', () => {
                 appliedDamage: 0,
             });
         });
-    });
 
-    // ─── Target not in combat ───
+        it('returns exact failure popup with full description and echoed automation', async () => {
+            const auto = { type: 'friends', targetName: 'Goblin', saveDc: 13 };
+            resolveSave({ success: false });
 
-    describe('target not in combat', () => {
-        it('still applies expiration and log entry when targetCreature is undefined', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
+            const result = await handle(makeAction({ targetName: 'Goblin', saveDc: 13 }), defaultPlayerStats, campaignName, null);
 
-            await handle(makeAction({ targetName: 'MissingTarget' }), defaultPlayerStats, campaignName, null);
-
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard1', targetName: 'MissingTarget', effects: expect.any(Array), campaignName, rounds: 2 });
-            expect(addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({ characterName: 'MissingTarget' }),
-            );
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Friends',
+                    targetName: 'Goblin',
+                    description: 'Goblin failed the WIS save and is Charmed (Concentration, up to 1 min). The spell ends if concentration is lost, on initiative roll, short rest, or long rest. When the spell ends, Goblin will know it was Charmed by you.',
+                    automation: auto,
+                },
+            });
         });
 
-        it('applies charmed condition via setRuntimeValue even when targetCreature is undefined', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
+        it('survives a rejected condition log entry on the failure path', async () => {
+            resolveSave({ success: false });
+            addEntry.mockResolvedValueOnce(undefined);
+            addEntry.mockRejectedValueOnce(new Error('condition log error'));
 
-            await handle(makeAction({ targetName: 'MissingTarget' }), defaultPlayerStats, campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'MissingTarget',
-                'activeConditions',
-                expect.arrayContaining(['charmed']),
-                campaignName,
-            );
-        });
-    });
-
-    // ─── No combat context ───
-
-    describe('no combat context', () => {
-        it('handles null combat context gracefully on success', async () => {
-            defaultSaveListener(true);
-
-            const result = await handle(makeAction(), defaultPlayerStats, campaignName, null);
+            const result = await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Unknown');
-        });
-
-        it('handles null combat context on failure', async () => {
-            defaultSaveListener(false);
-
-            const result = await handle(makeAction(), defaultPlayerStats, campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.targetName).toBe('Unknown');
+            expect(result.payload.description).toContain('Charmed');
         });
     });
 
-    // ─── Custom targetName ───
-
-    describe('custom targetName', () => {
-        it('uses the automation targetName in all outputs', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-
-            await handle(makeAction({ targetName: 'CustomTarget' }), defaultPlayerStats, campaignName, null);
-
-            expect(addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({ characterName: 'CustomTarget' }),
-            );
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard1', targetName: 'CustomTarget', effects: expect.any(Array), campaignName, rounds: 2 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                '_activeFriends_Bard1',
-                'CustomTarget',
-                campaignName,
-            );
-        });
-    });
-
-    // ─── buildSaveDc integration ───
-
-    describe('buildSaveDc usage', () => {
-        it('passes saveDc to the save listener when save fails', async () => {
-            const customDc = 13;
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-
-            await handle(makeAction({ targetName: 'Goblin', saveDc: customDc }), defaultPlayerStats, campaignName, null);
-
-            expect(buildSaveDc).toHaveBeenCalledWith(
-                expect.objectContaining({ saveDc: customDc }),
-                defaultPlayerStats,
-            );
-        });
-    });
-
-    // ─── createSaveListener invocation ───
-
-    describe('createSaveListener invocation', () => {
-        it('calls createSaveListener with correct parameters', async () => {
-            defaultSaveListener(true);
+    describe('save listener wiring', () => {
+        it('creates the save listener with the exact prompt options', async () => {
+            resolveSave({ success: true });
 
             await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
 
@@ -353,282 +264,78 @@ describe('friendsHandler.handle', () => {
                 condition: 'charmed',
             });
         });
-    });
 
-    // ─── Metamagic Heighten (disadvantage) ───
+        it('passes saveDc through buildSaveDc into the listener and rollback store', async () => {
+            resolveSave({ success: true });
 
-    describe('metamagic Heighten', () => {
-        it('passes disadvantage to createSaveListener when metamagicHeighten is set', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
+            await handle(makeAction({ targetName: 'Goblin', saveDc: 13 }), defaultPlayerStats, campaignName, null);
 
-            await handle({ name: 'Friends', automation: { type: 'friends_cantrip', targetName: 'Goblin' }, metaCtx: { metamagicHeighten: true } }, defaultPlayerStats, campaignName, null);
+            expect(buildSaveDc).toHaveBeenCalledWith(
+                { type: 'friends', targetName: 'Goblin', saveDc: 13 },
+                defaultPlayerStats,
+            );
+            expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({ saveDc: 13 }));
+            expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, expect.objectContaining({ saveDc: 13 }));
+        });
+
+        it('applies disadvantage only when metamagicHeighten is set', async () => {
+            resolveSave({ success: false });
+
+            await handle(
+                { name: 'Friends', automation: { type: 'friends', targetName: 'Goblin' }, metaCtx: { metamagicHeighten: true } },
+                defaultPlayerStats,
+                campaignName,
+                null,
+            );
 
             expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 disadvantage: true,
             }));
         });
-
-        it('passes disadvantage: false when metamagicHeighten is not set', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-
-            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                disadvantage: false,
-            }));
-        });
     });
 
-    // ─── Save result with roll values ───
-
-    describe('save result with roll values', () => {
-        it('includes roll and total in addTargetResult when save result has them (success)', async () => {
-            createSaveListener.mockReturnValue({
-                promptId: 'friends-prompt-1',
-                promise: Promise.resolve({ success: true, roll: 15, total: 18 }),
-            });
-
-            await handle(makeAction({ targetName: 'Goblin', saveDc: 13 }), defaultPlayerStats, campaignName, null);
-
-            expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
-                targetName: 'Goblin',
-                saveResult: 'success',
-                roll: 15,
-                total: 18,
-                conditions: [],
-                appliedDamage: 0,
-            });
-        });
-
-        it('includes roll and total in addTargetResult when save result has them (failure)', async () => {
-            createSaveListener.mockReturnValue({
-                promptId: 'friends-prompt-1',
-                promise: Promise.resolve({ success: false, roll: 3, total: 6 }),
-            });
+    describe('target and automation defaults', () => {
+        it('routes every failure-path write to the automation targetName', async () => {
+            resolveSave({ success: false });
             getRuntimeValue.mockReturnValue([]);
 
-            await handle(makeAction({ targetName: 'Goblin', saveDc: 13 }), defaultPlayerStats, campaignName, null);
+            const result = await handle(makeAction({ targetName: 'CustomTarget' }), defaultPlayerStats, campaignName, null);
 
-            expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
-                targetName: 'Goblin',
-                saveResult: 'failure',
-                roll: 3,
-                total: 6,
-                conditions: ['charmed'],
-                appliedDamage: 0,
-            });
-        });
-    });
-
-    // ─── getRuntimeValue fallback (undefined conditions) ───
-
-    describe('getRuntimeValue returning undefined', () => {
-        it('handles undefined getRuntimeValue result by defaulting to empty array', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue(undefined);
-
-            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'activeConditions',
-                ['charmed'],
+            expect(result.payload.targetName).toBe('CustomTarget');
+            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', activeKey, 'CustomTarget', campaignName);
+            expect(setRuntimeValue).toHaveBeenCalledWith('CustomTarget', 'activeConditions', ['charmed'], campaignName);
+            expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({ targetName: 'CustomTarget' }));
+            expect(addEntry).toHaveBeenNthCalledWith(
+                1,
                 campaignName,
+                expect.objectContaining({
+                    type: 'ability_use',
+                    characterName: 'Bard1',
+                    description: 'Bard1 casts Friends on CustomTarget. CustomTarget must make a WIS save (DC 10) or be Charmed.',
+                }),
+            );
+            expect(addEntry).toHaveBeenNthCalledWith(
+                2,
+                campaignName,
+                expect.objectContaining({
+                    type: 'condition',
+                    characterName: 'CustomTarget',
+                }),
             );
         });
-    });
 
-    // ─── action.automation undefined ───
+        it('defaults missing automation to empty object, DC 10, Unknown target, still applying charmed', async () => {
+            resolveSave({ success: false });
 
-    describe('action.automation undefined', () => {
-        it('defaults auto to empty object and uses default DC of 10', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-
-            await handle(makeActionNoAutomation(), defaultPlayerStats, campaignName, null);
+            const result = await handle({ name: 'Friends' }, defaultPlayerStats, campaignName, null);
 
             expect(buildSaveDc).toHaveBeenCalledWith({}, defaultPlayerStats);
-            expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                saveDc: 10,
-            }));
-        });
-
-        it('still applies charmed and logs entries when automation is missing', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-
-            const result = await handle(makeActionNoAutomation(), defaultPlayerStats, campaignName, null);
-
+            expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({ saveDc: 10 }));
             expect(result.type).toBe('popup');
             expect(result.payload.targetName).toBe('Unknown');
+            expect(setRuntimeValue).toHaveBeenCalledWith('Unknown', 'activeConditions', ['charmed'], campaignName);
+            expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({ targetName: 'Unknown', rounds: 2 }));
             expect(addEntry).toHaveBeenCalledTimes(2);
-            expect(addExpiration).toHaveBeenCalled();
-        });
-    });
-
-    // ─── addEntry error handling ───
-
-    describe('addEntry error handling', () => {
-        it('catches and logs errors from the first addEntry (ability_use) without failing', async () => {
-            defaultSaveListener(true);
-            addEntry.mockImplementation(() => {
-                // First call rejects, second succeeds
-                if (addEntry.mock.calls.length <= 1) {
-                    return Promise.reject(new Error('log error'));
-                }
-                return Promise.resolve();
-            });
-
-            const result = await handle(makeAction(), defaultPlayerStats, campaignName, null);
-
-            expect(result.type).toBe('popup');
-        });
-
-        it('catches and logs errors from the second addEntry (save_result) without failing', async () => {
-            defaultSaveListener(true);
-            let rejectSecond = false;
-            addEntry.mockImplementation(() => {
-                if (rejectSecond) {
-                    return Promise.reject(new Error('save result log error'));
-                }
-                rejectSecond = true;
-                return Promise.resolve();
-            });
-
-            const result = await handle(makeAction(), defaultPlayerStats, campaignName, null);
-
-            expect(result.type).toBe('popup');
-        });
-
-        it('catches and logs errors from the condition log entry without failing', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-            let rejectCondition = false;
-            addEntry.mockImplementation(() => {
-                if (rejectCondition) {
-                    return Promise.reject(new Error('condition log error'));
-                }
-                rejectCondition = true;
-                return Promise.resolve();
-            });
-
-            const result = await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Charmed');
-        });
-    });
-
-    // ─── setRuntimeValue calls tracking ───
-
-    describe('setRuntimeValue calls', () => {
-        it('sets active Friends tracking before save listener on failure path', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-
-            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            const activeCalls = setRuntimeValue.mock.calls.filter(
-                (c) => c[1] === '_activeFriends_Bard1',
-            );
-            expect(activeCalls).toHaveLength(1);
-            expect(activeCalls[0]).toEqual([
-                'campaign',
-                '_activeFriends_Bard1',
-                'Goblin',
-                campaignName,
-            ]);
-        });
-
-        it('does not clear active Friends tracking on failure path', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-
-            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            const activeCalls = setRuntimeValue.mock.calls.filter(
-                (c) => c[1] === '_activeFriends_Bard1' && c[2] === null,
-            );
-            expect(activeCalls).toHaveLength(0);
-        });
-    });
-
-    // ─── storeSpellLastAttack invocation ───
-
-    describe('storeSpellLastAttack', () => {
-        it('is called with correct parameters on both success and failure paths', async () => {
-            defaultSaveListener(true);
-
-            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            expect(storeSpellLastAttack).toHaveBeenCalledTimes(1);
-            expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, {
-                casterName: 'Bard1',
-                spellName: 'Friends',
-                saveType: 'WIS',
-                saveDc: 10,
-                attackScope: 'single',
-            });
-        });
-    });
-
-    // ─── addTargetResult invocation ───
-
-    describe('addTargetResult', () => {
-        it('is called with success result when save succeeds', async () => {
-            defaultSaveListener(true);
-
-            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            expect(addTargetResult).toHaveBeenCalledTimes(1);
-            expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
-                targetName: 'Goblin',
-                saveResult: 'success',
-                roll: 0,
-                total: 0,
-                conditions: [],
-                appliedDamage: 0,
-            });
-        });
-
-        it('is called with failure result when save fails', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-
-            await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            expect(addTargetResult).toHaveBeenCalledTimes(1);
-            expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
-                targetName: 'Goblin',
-                saveResult: 'failure',
-                roll: 0,
-                total: 0,
-                conditions: ['charmed'],
-                appliedDamage: 0,
-            });
-        });
-    });
-
-    // ─── Popup payload details ───
-
-    describe('popup payload', () => {
-        it('includes automation in failure popup payload', async () => {
-            defaultSaveListener(false);
-            getRuntimeValue.mockReturnValue([]);
-
-            const result = await handle(makeAction({ targetName: 'Goblin', saveDc: 13 }), defaultPlayerStats, campaignName, null);
-
-            expect(result.payload.automation).toEqual({ type: 'friends_cantrip', targetName: 'Goblin', saveDc: 13 });
-        });
-
-        it('includes automation in failure popup payload when success path', async () => {
-            defaultSaveListener(true);
-
-            const result = await handle(makeAction({ targetName: 'Goblin' }), defaultPlayerStats, campaignName, null);
-
-            expect(result.payload.automation).toBeUndefined();
         });
     });
 });

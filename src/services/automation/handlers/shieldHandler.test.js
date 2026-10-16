@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Shield spell reaction handler: toggleBuff seam + rollbackNegatedAttack guard
+// ladder (each guard branch pinned once). Helper internals owned by
+// buffToggle.test.js / damageRollback.test.js — mocked here as delegation only.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle } from './shieldHandler.js';
@@ -50,6 +54,12 @@ describe('shieldHandler', () => {
 
             const result = await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
 
+            expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
+                'TestCharacter',
+                'Shield',
+                { type: 'shield', effect: 'shield' },
+                mockCampaignName
+            );
             expect(expirations.addExpiration).not.toHaveBeenCalled();
             expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
             expect(result).toEqual({
@@ -78,7 +88,9 @@ describe('shieldHandler', () => {
             expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();
             expect(logService.addEntry).not.toHaveBeenCalled();
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('activated');
+            expect(result.payload.description).toBe(
+                'Shield activated — +5 AC until start of your next turn, immune to Magic Missile'
+            );
         });
 
         it('should skip rollback when no attackEvent is found', async () => {
@@ -88,6 +100,7 @@ describe('shieldHandler', () => {
 
             await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
 
+            expect(damageRollback.findAttackRollAgainstTarget).toHaveBeenCalledWith('TestCharacter', mockCampaignName);
             expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();
             expect(logService.addEntry).not.toHaveBeenCalled();
         });
@@ -213,7 +226,7 @@ describe('shieldHandler', () => {
                 attackerName: 'Goblin',
             });
             damageRollback.rollbackDamage.mockResolvedValue(10);
-            logService.addEntry.mockRejectedValue(new Error('log failure'));
+            logService.addEntry.mockRejectedValueOnce(new Error('log failure'));
 
             const result = await handle(makeAction(), mockPlayerStats, mockCampaignName, null);
 

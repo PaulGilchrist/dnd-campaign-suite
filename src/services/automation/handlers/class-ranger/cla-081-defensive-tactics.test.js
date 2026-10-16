@@ -8,6 +8,14 @@
 //  - executeHandler router dispatch through the real automation/index.js registry
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, applyChoice } from './defensiveTacticsHandler.js';
+// CLA-081 flake fix: static top-level import of the real automation/index.js router
+// (this lane's purpose — registry dispatch — still exercises the real registry; only
+// its runtime/log deps are mocked below). vi.mock calls are hoisted above static
+// imports, so the registry's transitive graph still resolves to the mocks. A dynamic
+// `await import('../../index.js')` inside the test paid the giant-graph transform
+// (~3.5s standalone) inside the 5000ms test timeout and flaked under full-suite
+// parallel load; the static import moves that cost to the unbounded collection phase.
+import { executeHandler } from '../../index.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -110,7 +118,6 @@ describe('CLA-081: Defensive Tactics (2024 Ranger Hunter)', () => {
 
     describe('executeHandler integration', () => {
         it('should execute via executeHandler and return modal', async () => {
-            const { executeHandler } = await import('../../index.js');
             getRuntimeValue.mockReset().mockReturnValue(undefined);
 
             const result = await executeHandler(makeAction(), makePlayerStats(), campaignName, null, [makePlayerStats()]);
@@ -121,7 +128,6 @@ describe('CLA-081: Defensive Tactics (2024 Ranger Hunter)', () => {
         });
 
         it('should execute via executeHandler and return popup when choice exists', async () => {
-            const { executeHandler } = await import('../../index.js');
             getRuntimeValue.mockReturnValue('Multiattack Defense');
 
             const result = await executeHandler(makeAction(), makePlayerStats(), campaignName, null, [makePlayerStats()]);

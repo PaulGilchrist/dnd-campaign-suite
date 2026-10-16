@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Contract pin: index.js dispatches automation type `font_of_magic` to this
+// handler; useCharActionsAutomation.js routes the returned modalName
+// `'fontOfMagic'` to open the Font of Magic modal (2024 sorcery resource hub).
+// The handler is a pure constant — one exact-shape pin covers every input,
+// since all four parameters are ignored by signature.
 import { describe, it, expect } from 'vitest';
 
 import { handle } from './fontOfMagicHandler.js';
@@ -5,7 +11,7 @@ import { handle } from './fontOfMagicHandler.js';
 // ── Tests ────────────────────────────────────────────────────────
 
 describe('fontOfMagicHandler.handle', () => {
-  it('should return a modal result with type "modal", modalName "fontOfMagic", and empty payload', async () => {
+  it('returns the fontOfMagic modal descriptor regardless of inputs', async () => {
     const result = await handle();
 
     expect(result).toEqual({
@@ -13,51 +19,16 @@ describe('fontOfMagicHandler.handle', () => {
       modalName: 'fontOfMagic',
       payload: {},
     });
-  });
 
-  it('should return the same modal structure regardless of input parameters', async () => {
-    const action = {
-      name: 'Custom Font of Magic',
-      automation: { type: 'font_of_magic', custom: 'data' },
-    };
-    const playerStats = {
-      name: 'Sorcerer',
-      level: 17,
-      rules: '2024',
-      class: { class_levels: [{ level: 17, class_specific: {} }] },
-      spellAbilities: { spell_slots_level_1: 4 },
-    };
-
-    const result = await handle(
-      action,
-      playerStats,
-      'MyCampaign',
-      'combat-map',
-    );
-
-    expect(result).toEqual({
-      type: 'modal',
-      modalName: 'fontOfMagic',
-      payload: {},
-    });
-  });
-
-  it('should return the same modal structure when all parameters are null or undefined', async () => {
-    const result = await handle(null, null, null, null);
-
-    expect(result).toEqual({
-      type: 'modal',
-      modalName: 'fontOfMagic',
-      payload: {},
-    });
-  });
-
-  it('should return identical results across multiple invocations', async () => {
-    const result1 = await handle();
-    const result2 = await handle({}, {}, 'campaign', 'map');
-    const result3 = await handle(null, null, null, null);
-
-    expect(result1).toEqual(result2);
-    expect(result2).toEqual(result3);
+    // Same constant for the real dispatch signature and for null args.
+    expect(
+      await handle(
+        { name: 'Font of Magic', automation: { type: 'font_of_magic' } },
+        { name: 'Sorcerer', level: 17, rules: '2024' },
+        'test-campaign',
+        'combat-map',
+      )
+    ).toEqual(result);
+    expect(await handle(null, null, null, null)).toEqual(result);
   });
 });

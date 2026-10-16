@@ -1,7 +1,44 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+/**
+ * polymorphHandler.test.js — lane #1936, FIRST of the polymorph PAIR
+ * (sibling #1937 polymorphService.test.js runs immediately after).
+ *
+ * Split verified at source (cf. animalShapes trio precedent):
+ * - THIS lane (polymorphHandler.js handle()): pure gating + payload builder —
+ *   combat-context guard, target-found guard, precondition refusals (already
+ *   polymorphed / 0 hp / shapechanger), enemy WIS save prompt flow,
+ *   resolvePolymorphMaxCR (CR ≤ target level/CR), and the polymorph_select
+ *   popup payload. ZERO writes: setRuntimeValue is pinned never-called here.
+ * - SERVICE lane (#1937 polymorphService.js): applyPolymorph invocation-shape,
+ *   confirmPolymorphTransform (form-stat swap, polymorphOriginal snapshot,
+ *   tempHp/polymorphTempHp, targetEffects rewrite, concentration,
+ *   pendingExpirations) and revertPolymorph. Not re-run here.
+ *
+ * Production-caller liveness (verified 2026-10-16):
+ * - src/services/automation/index.js:537 — registry dispatch `polymorph: handlePolymorph`.
+ * - polymorphService.applyPolymorph ← useSimpleSpellHandlers.js:153 and
+ *   useComplexSpellHandlers.js:81 (two-stage spell flow).
+ * - popup `polymorph_select` ← CharSheet.modals.jsx:63 → PolymorphSelectionModal
+ *   → onPolymorphConfirm → service confirm lane (#1937).
+ *
+ * Mock fidelity notes:
+ * - buildSaveDc mock mirrors the real savePrompt.js contract: numeric
+ *   saveDc passthrough; missing → console.error + default 10 (the old mock
+ *   returned 15 — mock-only semantics, retired).
+ * - abilities-ARRAY prod-bug class (holdMonster #1924): this handler never
+ *   reads playerStats.abilities (only .name; DC arrives numeric from
+ *   applyPolymorph), so the array-shaped mock stats are inert here — the
+ *   `.abilities?.CON?.bonus` object access on array stats lives in
+ *   polymorphService.js:60 and is the service lane's concern.
+ * - makeAction returns a fresh object each call; metaCtx replaces wholesale
+ *   (no stale-merge trap).
+ * - Turn-based only: no timers; the save adjudication is an awaited
+ *   indefinite-prompt promise.
+ */
+
 vi.mock('../../common/savePrompt.js', () => ({
-  buildSaveDc: vi.fn((auto) => auto.saveDc || 15),
+  buildSaveDc: vi.fn((auto) => (typeof auto.saveDc === 'number' ? auto.saveDc : 10)),
   createSaveListener: vi.fn(),
 }));
 
@@ -37,7 +74,7 @@ vi.mock('../../../ui/utils.js', () => ({
 import { handle, resolvePolymorphMaxCR } from './polymorphHandler.js';
 import { createSaveListener } from '../../common/savePrompt.js';
 import { addTargetResult } from '../../common/damageRollback.js';
-import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { getMonsterData } from '../../../npcs/monsterUtils.js';
@@ -52,7 +89,7 @@ function makePlayerStats(overrides = {}) {
     name: casterName,
     level: 10,
     proficiency: 4,
-    abilities: [{ name: 'Charisma', bonus: 3 }],
+    abilities: [{ name: 'Charisma', bonus: 3 }], // array form, inert on this lane (see header)
     spellAbilities: { saveDc: 15 },
     ...overrides,
   };
@@ -68,12 +105,9 @@ function makeAction(metaCtx = {}) {
   };
 }
 
-const baseCombatContext = {
-  creatures: [
-    { name: targetName, type: 'monster', currentHp: 5, maxHp: 7, traits: [] },
-    { name: casterName, type: 'player' },
-  ],
-};
+const casterCreature = { name: casterName, type: 'player' };
+const baseCreature = { name: targetName, type: 'monster', currentHp: 5, maxHp: 7, traits: [] };
+const baseCombatContext = { creatures: [baseCreature, casterCreature] };
 
 function setupBaseMocks({ allies = [casterName], saveResult = { success: false }, existingEffects = [] } = {}) {
   getCombatContext.mockResolvedValue(baseCombatContext);
@@ -88,41 +122,34 @@ function setupBaseMocks({ allies = [casterName], saveResult = { success: false }
   });
 }
 
+function refusalPopup(description) {
+  return { type: 'automation_info', name: 'Polymorph', description };
+}
+
 describe('polymorphHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getMonsterData.mockResolvedValue(undefined); // default: no bestiary hit → CR default 1
   });
 
   describe('combat context validation', () => {
-    it('returns popup when combat context has no creatures', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
+    it.each([
+      ['null context', null],
+      ['context without creatures', {}],
+      ['empty creatures list', { creatures: [] }],
+    ])('returns refusal popup when combat context has %s', async (_label, context) => {
+      getCombatContext.mockResolvedValue(context);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No creatures in combat');
+      expect(result).toEqual({
+        type: 'popup',
+        payload: refusalPopup('No creatures in combat. Polymorph has no effect.'),
+      });
     });
 
-    it('returns popup when combat context is null', async () => {
-      getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('No creatures in combat');
-    });
-
-    it('uses default DC 15 when automation is absent', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      getAllyList.mockReturnValue([]);
-      getRuntimeValue.mockImplementation((key, subKey) => {
-        if (key === 'campaign' && subKey === 'targetEffects') return [];
-        return undefined;
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'poly-prompt',
-        promise: Promise.resolve({ success: false, roll: 5, total: 6 }),
-      });
+    it('routes absent automation through the real buildSaveDc default (10)', async () => {
+      setupBaseMocks({ allies: [], saveResult: { success: false, roll: 5, total: 6 } });
 
       const actionWithoutAutomation = {
         name: 'Polymorph',
@@ -133,8 +160,25 @@ describe('polymorphHandler.handle', () => {
 
       const result = await handle(actionWithoutAutomation, makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('polymorph_select');
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'polymorph_select',
+          targetName,
+          maxCR: 1,
+          casterName,
+          campaignName,
+          spell: actionWithoutAutomation.spell,
+          spellLevel: 4,
+        },
+      });
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
+        targetName,
+        saveType: 'WIS',
+        saveDc: 10,
+        dcSuccess: 'none',
+        disadvantage: false,
+      });
     });
   });
 
@@ -144,7 +188,10 @@ describe('polymorphHandler.handle', () => {
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('No target selected');
+      expect(result).toEqual({
+        type: 'popup',
+        payload: refusalPopup('No target selected. Polymorph has no effect.'),
+      });
     });
 
     it('returns popup when target not found in combat', async () => {
@@ -152,62 +199,15 @@ describe('polymorphHandler.handle', () => {
 
       const result = await handle(makeAction({ polymorphTarget: 'NonExistent' }), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('not found');
-    });
-
-    it('returns popup when target is already polymorphed', async () => {
-      setupBaseMocks({ existingEffects: [{ target: targetName, effect: 'polymorph', source: casterName }] });
-
-      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('already polymorphed');
-      expect(createSaveListener).not.toHaveBeenCalled();
-    });
-
-    it('handles addEntry rejection when target is already polymorphed', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      getAllyList.mockReturnValue([casterName]);
-      getRuntimeValue.mockImplementation((key, subKey) => {
-        if (key === 'campaign' && subKey === 'targetEffects') return [{ target: targetName, effect: 'polymorph', source: casterName }];
-        return undefined;
+      expect(result).toEqual({
+        type: 'popup',
+        payload: refusalPopup('Target NonExistent not found in combat. Polymorph has no effect.'),
       });
-      addEntry.mockRejectedValue(new Error('log write failed'));
-
-      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('already polymorphed');
-    });
-
-    it('detects already polymorphed when target is an array', async () => {
-      setupBaseMocks({ existingEffects: [{ target: [targetName, 'alt'], effect: 'polymorph', source: casterName }] });
-
-      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('already polymorphed');
-    });
-
-    it('returns popup when target has 0 hit points', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', currentHp: 0, maxHp: 7, traits: [] },
-          { name: casterName, type: 'player' },
-        ],
-      });
-      getAllyList.mockReturnValue([casterName]);
-      getRuntimeValue.mockImplementation(() => undefined);
-
-      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('0 hit points');
-      expect(createSaveListener).not.toHaveBeenCalled();
     });
 
     it('reads player HP from runtime store via getTargetCurrentHp', async () => {
       getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'player', currentHp: 5, maxHp: 7, traits: [] },
-          { name: casterName, type: 'player' },
-        ],
+        creatures: [{ name: targetName, type: 'player', currentHp: 5, maxHp: 7, traits: [] }, casterCreature],
       });
       getAllyList.mockReturnValue([casterName]);
       getRuntimeValue.mockImplementation((key, subKey) => {
@@ -217,236 +217,181 @@ describe('polymorphHandler.handle', () => {
 
       const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('0 hit points');
+      expect(result).toEqual({
+        type: 'popup',
+        payload: refusalPopup('Polymorph has no effect on a creature with 0 hit points.'),
+      });
       expect(getRuntimeValue).toHaveBeenCalledWith(targetName, 'currentHitPoints', campaignName);
     });
 
-    it('handles addEntry rejection when target has 0 hit points', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', currentHp: 0, maxHp: 7, traits: [] },
-          { name: casterName, type: 'player' },
-        ],
-      });
-      getAllyList.mockReturnValue([casterName]);
-      getRuntimeValue.mockImplementation(() => undefined);
-      addEntry.mockRejectedValue(new Error('log write failed'));
+    it.each([
+      [
+        'already polymorphed (string target)',
+        () => setupBaseMocks({ existingEffects: [{ target: targetName, effect: 'polymorph', source: casterName }] }),
+        'Goblin is already polymorphed.',
+        'TestCaster casts Polymorph on Goblin, but Goblin is already transformed.',
+      ],
+      [
+        'already polymorphed (array target)',
+        () => setupBaseMocks({ existingEffects: [{ target: [targetName, 'alt'], effect: 'polymorph', source: casterName }] }),
+        'Goblin is already polymorphed.',
+        'TestCaster casts Polymorph on Goblin, but Goblin is already transformed.',
+      ],
+      [
+        'monster at 0 currentHp',
+        () => {
+          setupBaseMocks();
+          getCombatContext.mockResolvedValue({ creatures: [{ ...baseCreature, currentHp: 0 }, casterCreature] });
+        },
+        'Polymorph has no effect on a creature with 0 hit points.',
+        'TestCaster casts Polymorph on Goblin, but a creature with 0 hit points can\'t be polymorphed.',
+      ],
+      [
+        'monster at 0 via hit_points.current',
+        () => {
+          setupBaseMocks();
+          getCombatContext.mockResolvedValue({ creatures: [{ name: targetName, type: 'monster', hit_points: { current: 0 } }, casterCreature] });
+        },
+        'Polymorph has no effect on a creature with 0 hit points.',
+        'TestCaster casts Polymorph on Goblin, but a creature with 0 hit points can\'t be polymorphed.',
+      ],
+      [
+        'shapechanger via trait',
+        () => {
+          setupBaseMocks();
+          getCombatContext.mockResolvedValue({ creatures: [{ ...baseCreature, traits: [{ name: 'Shapechanger' }] }, casterCreature] });
+        },
+        'Polymorph has no effect on a shapechanger.',
+        'TestCaster casts Polymorph on Goblin, but shapechangers are unaffected.',
+      ],
+      [
+        'shapechanger via monsterType exact',
+        () => {
+          setupBaseMocks();
+          getCombatContext.mockResolvedValue({ creatures: [{ name: targetName, type: 'npc', monsterType: 'Shapechanger', currentHp: 5 }, casterCreature] });
+        },
+        'Polymorph has no effect on a shapechanger.',
+        'TestCaster casts Polymorph on Goblin, but shapechangers are unaffected.',
+      ],
+      [
+        'shapechanger via monsterType substring',
+        () => {
+          setupBaseMocks();
+          getCombatContext.mockResolvedValue({ creatures: [{ name: targetName, type: 'npc', monsterType: 'greater shapechanger', currentHp: 5 }, casterCreature] });
+        },
+        'Polymorph has no effect on a shapechanger.',
+        'TestCaster casts Polymorph on Goblin, but shapechangers are unaffected.',
+      ],
+      [
+        'shapechanger via type_tags',
+        () => {
+          setupBaseMocks();
+          getCombatContext.mockResolvedValue({ creatures: [{ ...baseCreature, type_tags: ['shapechanger'] }, casterCreature] });
+        },
+        'Polymorph has no effect on a shapechanger.',
+        'TestCaster casts Polymorph on Goblin, but shapechangers are unaffected.',
+      ],
+    ])('refusal gate: %s', async (_label, setup, description, logDescription) => {
+      setup();
 
       const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('0 hit points');
-    });
-
-    it('returns popup when target is a shapechanger', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', currentHp: 5, maxHp: 7, traits: [{ name: 'Shapechanger' }] },
-          { name: casterName, type: 'player' },
-        ],
-      });
-      getAllyList.mockReturnValue([casterName]);
-      getRuntimeValue.mockImplementation(() => undefined);
-
-      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('shapechanger');
+      expect(result).toEqual({ type: 'popup', payload: refusalPopup(description) });
       expect(createSaveListener).not.toHaveBeenCalled();
-    });
-
-    it('detects shapechanger via type string', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'npc', monsterType: 'Shapechanger', currentHp: 5, maxHp: 7 },
-          { name: casterName, type: 'player' },
-        ],
-      });
-      getAllyList.mockReturnValue([casterName]);
-      getRuntimeValue.mockImplementation(() => undefined);
-
-      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('shapechanger');
-    });
-
-    it('detects shapechanger via type string containing "shapechanger"', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'npc', monsterType: 'greater shapechanger', currentHp: 5, maxHp: 7 },
-          { name: casterName, type: 'player' },
-        ],
-      });
-      getAllyList.mockReturnValue([casterName]);
-      getRuntimeValue.mockImplementation(() => undefined);
-
-      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('shapechanger');
-    });
-
-    it('detects shapechanger via type_tags array', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', currentHp: 5, maxHp: 7, type_tags: ['shapechanger'] },
-          { name: casterName, type: 'player' },
-        ],
-      });
-      getAllyList.mockReturnValue([casterName]);
-      getRuntimeValue.mockImplementation(() => undefined);
-
-      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('shapechanger');
-    });
-
-    it('handles addEntry rejection in shapechanger path', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: targetName, type: 'monster', currentHp: 5, maxHp: 7, traits: [{ name: 'Shapechanger' }] },
-          { name: casterName, type: 'player' },
-        ],
-      });
-      getAllyList.mockReturnValue([casterName]);
-      getRuntimeValue.mockImplementation(() => undefined);
-      addEntry.mockRejectedValue(new Error('log write failed'));
-
-      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('shapechanger');
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: 'Polymorph',
+        description: logDescription,
+      }));
     });
   });
 
   describe('non-ally target save flow', () => {
-    it('returns polymorph_select popup when target fails save', async () => {
-      setupBaseMocks({ saveResult: { success: false, roll: 5, total: 6 } });
+    it('prompts the WIS save, logs cast + failure, returns polymorph_select', async () => {
+      setupBaseMocks({ allies: [], saveResult: { success: false, roll: 5, total: 6 } });
 
       const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('polymorph_select');
-      expect(result.payload.targetName).toBe(targetName);
-      expect(result.payload.casterName).toBe(casterName);
-      expect(result.payload.maxCR).toBeGreaterThan(0);
-      expect(createSaveListener).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({ targetName, saveType: 'WIS', saveDc: 15 }),
-      );
-    });
-
-    it('returns automation_info when target succeeds save', async () => {
-      setupBaseMocks({ saveResult: { success: true, roll: 15, total: 20 } });
-
-      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('resisted');
-      expect(addTargetResult).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({ targetName, saveResult: 'success' }),
-      );
-    });
-
-    it('handles null roll/total in save success with fallback defaults', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      getAllyList.mockReturnValue([]);
-      getRuntimeValue.mockImplementation((key, subKey) => {
-        if (key === 'campaign' && subKey === 'targetEffects') return [];
-        return undefined;
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
+        targetName,
+        saveType: 'WIS',
+        saveDc: 15,
+        dcSuccess: 'none',
+        disadvantage: false,
       });
-      createSaveListener.mockReturnValue({
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: 'Polymorph',
+        description: 'TestCaster casts Polymorph on Goblin! Goblin must make a WIS save (DC 15) or be transformed into a beast.',
         promptId: 'poly-prompt',
-        promise: Promise.resolve({ success: true }),
       });
+      const saveLog = addEntry.mock.calls.find(call => call[1]?.rollType === 'save-polymorph')[1];
+      expect(saveLog).toEqual({
+        type: 'save_result',
+        characterName: casterName,
+        rollType: 'save-polymorph',
+        targetName,
+        saveDc: 15,
+        saveType: 'WIS',
+        success: false,
+        description: 'Goblin failed WIS save against Polymorph and is transformed into a beast.',
+      });
+      expect(result.payload.type).toBe('polymorph_select');
+    });
+
+    it('returns automation_info and records a clean save when target resists', async () => {
+      setupBaseMocks({ allies: [], saveResult: { success: true, roll: 15, total: 20 } });
 
       const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(addTargetResult).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({ targetName, saveResult: 'success', roll: 0, total: 0 }),
-      );
+      expect(result).toEqual({
+        type: 'popup',
+        payload: refusalPopup('Goblin resisted the transformation.'),
+      });
+      expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: 15,
+        total: 20,
+        conditions: [],
+        appliedDamage: 0,
+      });
+      const saveLog = addEntry.mock.calls.find(call => call[1]?.rollType === 'save-polymorph')[1];
+      expect(saveLog.success).toBe(true);
+      expect(saveLog.description).toBe('Goblin succeeded on WIS save against Polymorph.');
     });
 
-    it('passes metamagicHeighten as disadvantage', async () => {
-      setupBaseMocks();
+    it('defaults roll/total to 0 in addTargetResult when the save result omits them', async () => {
+      setupBaseMocks({ allies: [], saveResult: { success: true } });
+
+      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
+
+      expect(result.payload.type).toBe('automation_info');
+      expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
+        targetName,
+        saveResult: 'success',
+        roll: 0,
+        total: 0,
+        conditions: [],
+        appliedDamage: 0,
+      });
+    });
+
+    it('passes metamagicHeighten through as disadvantage', async () => {
+      setupBaseMocks({ allies: [] });
 
       await handle(makeAction({ polymorphTarget: targetName, metamagicHeighten: true }), makePlayerStats(), campaignName, null);
 
-      expect(createSaveListener).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({ disadvantage: true }),
-      );
-    });
-
-    it('logs save-polymorph result entries', async () => {
-      setupBaseMocks({ saveResult: { success: false, roll: 5, total: 6 } });
-
-      await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      const saveResultCalls = vi.mocked(addEntry).mock.calls.filter(call => call[1]?.rollType === 'save-polymorph');
-      expect(saveResultCalls.length).toBeGreaterThan(0);
-      expect(saveResultCalls.some(call => call[1].success === false)).toBe(true);
-    });
-
-    it('handles addEntry rejection in non-ally save prompt path', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      getAllyList.mockReturnValue([]);
-      getRuntimeValue.mockImplementation((key, subKey) => {
-        if (key === 'campaign' && subKey === 'targetEffects') return [];
-        return undefined;
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
+        targetName,
+        saveType: 'WIS',
+        saveDc: 15,
+        dcSuccess: 'none',
+        disadvantage: true,
       });
-      createSaveListener.mockReturnValue({
-        promptId: 'poly-prompt',
-        promise: Promise.resolve({ success: false, roll: 5, total: 6 }),
-      });
-      addEntry.mockRejectedValue(new Error('log write failed'));
-
-      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('polymorph_select');
-    });
-
-    it('handles addEntry rejection in save success path', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      getAllyList.mockReturnValue([]);
-      getRuntimeValue.mockImplementation((key, subKey) => {
-        if (key === 'campaign' && subKey === 'targetEffects') return [];
-        return undefined;
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'poly-prompt',
-        promise: Promise.resolve({ success: true, roll: 15, total: 20 }),
-      });
-      addEntry.mockRejectedValue(new Error('log write failed'));
-
-      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('resisted');
-    });
-
-    it('handles addEntry rejection in save failure path', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      getAllyList.mockReturnValue([]);
-      getRuntimeValue.mockImplementation((key, subKey) => {
-        if (key === 'campaign' && subKey === 'targetEffects') return [];
-        return undefined;
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'poly-prompt',
-        promise: Promise.resolve({ success: false, roll: 5, total: 6 }),
-      });
-      addEntry
-        .mockResolvedValueOnce({})
-        .mockRejectedValueOnce(new Error('log write failed'));
-
-      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('polymorph_select');
     });
   });
 
@@ -460,6 +405,96 @@ describe('polymorphHandler.handle', () => {
       expect(createSaveListener).not.toHaveBeenCalled();
     });
   });
+
+  describe('polymorph_select payload (CR cap + passthrough, zero writes)', () => {
+    it('returns the exact popup payload with default maxCR 1 and writes no state', async () => {
+      setupBaseMocks({ allies: [], saveResult: { success: false, roll: 5, total: 6 } });
+      const action = makeAction({ polymorphTarget: targetName });
+
+      const result = await handle(action, makePlayerStats(), campaignName, null);
+
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'polymorph_select',
+          targetName,
+          maxCR: 1,
+          casterName,
+          campaignName,
+          spell: action.spell,
+          spellLevel: 4,
+        },
+      });
+      expect(setRuntimeValue).not.toHaveBeenCalled(); // application is service lane #1937
+    });
+
+    it('caps beast selection at a PC target level from metaCtx.characters', async () => {
+      setupBaseMocks({ allies: [], saveResult: { success: false, roll: 5, total: 6 } });
+
+      const result = await handle(
+        makeAction({ polymorphTarget: targetName, characters: [{ name: targetName, computedStats: { level: 7 } }] }),
+        makePlayerStats(),
+        campaignName,
+        null,
+      );
+
+      expect(result.payload.maxCR).toBe(7);
+    });
+
+    it('caps beast selection at a monster target CR (fractional)', async () => {
+      setupBaseMocks({ allies: [], saveResult: { success: false, roll: 5, total: 6 } });
+      getMonsterData.mockResolvedValue({ name: targetName, challenge_rating: '1/2' });
+
+      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
+
+      expect(result.payload.maxCR).toBe(0.5);
+      expect(getMonsterData).toHaveBeenCalledWith(targetName, null);
+    });
+  });
+
+  describe('log-write resilience (every addEntry site has .catch)', () => {
+    it.each([
+      [
+        'already-polymorphed gate',
+        () => setupBaseMocks({ existingEffects: [{ target: targetName, effect: 'polymorph', source: casterName }] }),
+        'automation_info',
+      ],
+      [
+        '0 hp gate',
+        () => {
+          setupBaseMocks();
+          getCombatContext.mockResolvedValue({ creatures: [{ ...baseCreature, currentHp: 0 }, casterCreature] });
+        },
+        'automation_info',
+      ],
+      [
+        'shapechanger gate',
+        () => {
+          setupBaseMocks();
+          getCombatContext.mockResolvedValue({ creatures: [{ ...baseCreature, traits: [{ name: 'Shapechanger' }] }, casterCreature] });
+        },
+        'automation_info',
+      ],
+      [
+        'enemy save-fail flow',
+        () => setupBaseMocks({ allies: [], saveResult: { success: false, roll: 5, total: 6 } }),
+        'polymorph_select',
+      ],
+      [
+        'enemy save-success flow',
+        () => setupBaseMocks({ allies: [], saveResult: { success: true, roll: 15, total: 20 } }),
+        'automation_info',
+      ],
+    ])('still returns the %s popup when every addEntry rejects', async (_label, setup, expectedType) => {
+      setup();
+      addEntry.mockRejectedValue(new Error('log write failed'));
+
+      const result = await handle(makeAction({ polymorphTarget: targetName }), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe(expectedType);
+    });
+  });
 });
 
 describe('polymorphHandler.resolvePolymorphMaxCR', () => {
@@ -467,69 +502,19 @@ describe('polymorphHandler.resolvePolymorphMaxCR', () => {
     vi.clearAllMocks();
   });
 
-  it('returns player level for a matching PC', async () => {
-    const characters = [{ name: targetName, computedStats: { level: 7 } }];
+  it.each([
+    ['PC via computedStats.level', targetName, [{ name: targetName, computedStats: { level: 7 } }], null, 7],
+    ['PC via top-level level fallback', targetName, [{ name: targetName, level: 5 }], null, 5],
+    ['PC via exact multiword name', 'Goblin the Brave', [{ name: 'Goblin the Brave', computedStats: { level: 9 } }], null, 9],
+    ['non-number PC level skipped, falls through to monster CR', targetName, [{ name: targetName, computedStats: { level: 'invalid' } }], { challenge_rating: 2 }, 2],
+    ['PC level 0 treated as missing, no monster → default', targetName, [{ name: targetName, computedStats: { level: 0 } }], null, 1],
+    ['monster integer CR', targetName, [], { challenge_rating: 3 }, 3],
+    ['monster fractional CR string', targetName, [], { challenge_rating: '1/2' }, 0.5],
+    ['monster empty-string CR → default', targetName, [], { challenge_rating: '' }, 1],
+    ['custom NPC without bestiary data → default CR 1', targetName, [], null, 1],
+  ])('%s', async (_label, target, characters, monsterData, expected) => {
+    getMonsterData.mockResolvedValue(monsterData);
 
-    const maxCR = await resolvePolymorphMaxCR(targetName, campaignName, characters);
-
-    expect(maxCR).toBe(7);
-  });
-
-  it('falls back to creature level field for a PC', async () => {
-    const characters = [{ name: targetName, level: 5 }];
-
-    const maxCR = await resolvePolymorphMaxCR(targetName, campaignName, characters);
-
-    expect(maxCR).toBe(5);
-  });
-
-  it('returns monster challenge rating for NPCs', async () => {
-    getMonsterData.mockResolvedValue({ name: targetName, challenge_rating: 3 });
-
-    const maxCR = await resolvePolymorphMaxCR(targetName, campaignName, []);
-
-    expect(maxCR).toBe(3);
-  });
-
-  it('parses fractional challenge ratings', async () => {
-    getMonsterData.mockResolvedValue({ name: targetName, challenge_rating: '1/2' });
-
-    const maxCR = await resolvePolymorphMaxCR(targetName, campaignName, []);
-
-    expect(maxCR).toBe(0.5);
-  });
-
-  it('defaults to CR 1 for custom NPCs without a challenge rating', async () => {
-    getMonsterData.mockResolvedValue(null);
-
-    const maxCR = await resolvePolymorphMaxCR(targetName, campaignName, []);
-
-    expect(maxCR).toBe(1);
-  });
-
-  it('matches a PC by exact name', async () => {
-    const characters = [{ name: 'Goblin the Brave', computedStats: { level: 9 } }];
-
-    const maxCR = await resolvePolymorphMaxCR('Goblin the Brave', campaignName, characters);
-
-    expect(maxCR).toBe(9);
-  });
-
-  it('skips PC with non-number level and falls through to monster lookup', async () => {
-    getMonsterData.mockResolvedValue({ name: targetName, challenge_rating: 2 });
-    const characters = [{ name: targetName, computedStats: { level: 'invalid' } }];
-
-    const maxCR = await resolvePolymorphMaxCR(targetName, campaignName, characters);
-
-    expect(maxCR).toBe(2);
-  });
-
-  it('returns default CR 1 when PC has level 0 and monster has no CR', async () => {
-    getMonsterData.mockResolvedValue(null);
-    const characters = [{ name: targetName, computedStats: { level: 0 } }];
-
-    const maxCR = await resolvePolymorphMaxCR(targetName, campaignName, characters);
-
-    expect(maxCR).toBe(1);
+    expect(await resolvePolymorphMaxCR(target, campaignName, characters)).toBe(expected);
   });
 });

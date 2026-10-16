@@ -1,5 +1,32 @@
 // SP-092 regression: 2024 canonical Prismatic Spray damage rays roll 12d6,
 // half on a successful DEX save. 5e twin stays 10d6 (RAW, unautomated).
+//
+// ── prismaticSpray SEXTET seam map (shared subject: prismaticSprayHandler.js) ──
+// Fix SP-092 (commit 2dec3eff3): damage rays rolled 10d6 instead of canonical
+// 12d6. Three fix sites: ① PRISMATIC_RAYS table, ② `auto.damage || '12d6'`
+// fallback in queueRaySave, ③ public/data/2024/spells.json. This lane locks all
+// three plus ray→damage-type routing and save-half semantics (12d6 in payload,
+// log, AND rolled formula; never 10d6).
+//   #1940 .handle   — core flow: combat-context popups, target selection,
+//                     storeSpellLastAttack, ray-roll dispatch counts (no formula pins)
+//   #1941 .helpers  — isPrismaticSprayBlocked pure function (attackBlockers.js)
+//   #1942 .rays     — per-ray save payloads (all 7 rays incl. indigo/violet),
+//                     status application, targetEffects registry writes, expirations
+//   #1943 .save-results — immunity skip, disadvantage, save_result/addTargetResult
+//                     log plumbing, zero-damage guards, ability_use entries
+//   #1944 .summaries    — summary popup text, mixed outcomes, custom-damage passthrough
+//   lane (this) — .damage-regression: 12d6 fix locks only (queue continues: rayOfEnfeeblement)
+// Handoff:
+//   • summaries "falls back to 12d6 when damage is not in automation" duplicates
+//     this lane's "falls back to 12d6 when automation omits damage" — fix-site ②
+//     pin lives HERE; that sibling is a trim candidate.
+//   • save-results "applies half/full damage…" stub computeDamageAfterSave to canned
+//     totals; this lane pins its exact args + real half semantics + options object —
+//     siblings now cover the options-object lane only, keep for that.
+//   • abilities-ARRAY class (holdMonster/polymorph precedents): NOT applicable here —
+//     buildSaveDc is mocked and the handler only reads playerStats.name; verified at
+//     source, no prod-shape mismatch to pin.
+// ──────────────────────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -129,6 +156,7 @@ describe('SP-092 handler dispatches 12d6 per damage ray (2024 lane)', () => {
 
     await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+    expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(1);
     expect(savePrompt.createSaveListener).toHaveBeenCalledWith(
       campaignName,
       expect.objectContaining({ damageFormula: '12d6', damageType: type }),
@@ -149,21 +177,33 @@ describe('SP-092 handler dispatches 12d6 per damage ray (2024 lane)', () => {
 
     await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+    // Fix-site threading: the rolled formula must be 12d6, rolled exactly once.
+    expect(diceRoller.rollExpression).toHaveBeenCalledTimes(1);
+    expect(diceRoller.rollExpression).toHaveBeenCalledWith('12d6');
+    expect(applyDamage.computeDamageAfterSave).toHaveBeenCalledTimes(1);
     expect(applyDamage.computeDamageAfterSave).toHaveBeenCalledWith(35, true, 'half');
+    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledTimes(1);
     expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-      combatContext, 'Thug 1', 17, ['fire'], expect.anything(),
+      combatContext, 'Thug 1', 17, ['fire'],
+      { campaignName, characters: expect.any(Array), ignoreResistance: false, attackerName: casterName },
     );
 
     applyDamage.applyDamageToTarget.mockClear();
+    applyDamage.computeDamageAfterSave.mockClear();
+    diceRoller.rollExpression.mockClear();
     savePrompt.createSaveListener.mockReturnValue({
       promptId: 'p1',
       promise: Promise.resolve({ success: false, roll: 3, total: 3 }),
     });
     await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+    expect(diceRoller.rollExpression).toHaveBeenCalledWith('12d6');
+    expect(applyDamage.computeDamageAfterSave).toHaveBeenCalledTimes(1);
     expect(applyDamage.computeDamageAfterSave).toHaveBeenCalledWith(35, false, 'half');
+    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledTimes(1);
     expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-      combatContext, 'Thug 1', 35, ['fire'], expect.anything(),
+      combatContext, 'Thug 1', 35, ['fire'],
+      { campaignName, characters: expect.any(Array), ignoreResistance: false, attackerName: casterName },
     );
   });
 
@@ -184,6 +224,8 @@ describe('SP-092 handler dispatches 12d6 per damage ray (2024 lane)', () => {
       campaignName,
       expect.objectContaining({ damageFormula: '12d6' }),
     );
+    // The fallback must reach the actual roll too, not just the prompt payload.
+    expect(diceRoller.rollExpression).toHaveBeenCalledWith('12d6');
   });
 });
 

@@ -1,3 +1,6 @@
+// @maintained-by-ai
+// Lane: description composition — own-contract of buildMasteryDescription (pure fn).
+// Sibling lanes own the handler paths that consume it (push/nick/postDamage/main).
 // Redundant, brittle, and low-value tests removed:
 // - Consolidated null/undefined/empty targetName fallback into single test
 // - Consolidated unknown mastery default case into single test
@@ -5,6 +8,7 @@
 // - Removed loop test asserting mastery name appears in every description (obvious from switch)
 // - Removed loop test asserting target name presence in specific descriptions (overly implementation-specific)
 // - Removed negative assertion tests for Topple/Cleave/Graze/Nick (already proven by exact string assertions)
+// - Consolidated per-case exact-string pins into one strict table (same assertions, one test)
 
 import { describe, it, expect } from 'vitest';
 
@@ -13,44 +17,26 @@ import { buildMasteryDescription } from './weaponMasteryHandler.js';
 // ── Tests ────────────────────────────────────────────────────────
 
 describe('buildMasteryDescription', () => {
-    it('should return push description for Push', () => {
-        const result = buildMasteryDescription('Push', 'Goblin');
-        expect(result).toBe('Push applied to Goblin — pushed up to 10 feet straight away from you.');
-    });
-
-    it('should return correct description for Topple', () => {
-        const result = buildMasteryDescription('Topple', 'Ogre');
-        expect(result).toBe('Topple: ready to force a CON save vs Prone.');
-    });
-
-    it('should return correct description for Sap', () => {
-        const result = buildMasteryDescription('Sap', 'Hobgoblin');
-        expect(result).toBe('Sap applied to Hobgoblin — Disadvantage on next attack roll.');
-    });
-
-    it('should return correct description for Slow', () => {
-        const result = buildMasteryDescription('Slow', 'Bugbear');
-        expect(result).toBe('Slow applied to Bugbear — Speed reduced by 10 ft.');
-    });
-
-    it('should return correct description for Vex', () => {
-        const result = buildMasteryDescription('Vex', 'Goblin');
-        expect(result).toBe('Vex applied to Goblin — you have Advantage on next attack.');
-    });
-
-    it('should return correct description for Cleave', () => {
-        const result = buildMasteryDescription('Cleave', 'Ogre');
-        expect(result).toBe('Cleave — make an extra attack against a second creature within 5 ft.');
-    });
-
-    it('should return correct description for Graze', () => {
-        const result = buildMasteryDescription('Graze', 'Hobgoblin');
-        expect(result).toBe('Graze — deal damage equal to ability modifier on a miss.');
-    });
-
-    it('should return correct description for Nick', () => {
-        const result = buildMasteryDescription('Nick', 'Goblin');
-        expect(result).toBe('Nick — make Light weapon extra attack as part of Attack action.');
+    it('returns the exact description for every known mastery', () => {
+        expect({
+            Push: buildMasteryDescription('Push', 'Goblin'),
+            Topple: buildMasteryDescription('Topple', 'Ogre'),
+            Sap: buildMasteryDescription('Sap', 'Hobgoblin'),
+            Slow: buildMasteryDescription('Slow', 'Bugbear'),
+            Vex: buildMasteryDescription('Vex', 'Goblin'),
+            Cleave: buildMasteryDescription('Cleave', 'Ogre'),
+            Graze: buildMasteryDescription('Graze', 'Hobgoblin'),
+            Nick: buildMasteryDescription('Nick', 'Goblin'),
+        }).toEqual({
+            Push: 'Push applied to Goblin — pushed up to 10 feet straight away from you.',
+            Topple: 'Topple: ready to force a CON save vs Prone.',
+            Sap: 'Sap applied to Hobgoblin — Disadvantage on next attack roll.',
+            Slow: 'Slow applied to Bugbear — Speed reduced by 10 ft.',
+            Vex: 'Vex applied to Goblin — you have Advantage on next attack.',
+            Cleave: 'Cleave — make an extra attack against a second creature within 5 ft.',
+            Graze: 'Graze — deal damage equal to ability modifier on a miss.',
+            Nick: 'Nick — make Light weapon extra attack as part of Attack action.',
+        });
     });
 
     it('should use lowercase "target" when targetName is falsy', () => {

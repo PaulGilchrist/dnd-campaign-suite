@@ -1,3 +1,19 @@
+// @maintained-by-ai
+// Sole lane for massHealHandler.js (Mass Heal, level-9 hit-point pool distribution):
+// handle() opener routing (ally-list fallback, max-targets config, total-pool resolution)
+// and confirmMassHeal() application lane (per-target clamp to missing HP, runtime hitPoints
+// truth, hp_change + condition logging, combat-summary-updated dispatch, popup composition).
+//
+// CANONICAL-OWNER decision (massHealUtils shared-branch question): massCureWounds.main is
+// canonical for massHealUtils.js branches (getSpellCastingMod, resolveHealExpression highest-
+// slot-below fallback). This file does NOT import massHealUtils.js — the "highest slot key"
+// pin here re-pins only the *semantics*, exercising massHealHandler.js's own local
+// resolveTotalHealPool fallback (a production duplicate of that util branch), which has no
+// other coverage. Option (i) adopted: massCureWounds.main owns the shared-util pins; this
+// lane keeps the massHeal-local duplicates because they execute different production code.
+// If production ever consolidates massHealHandler onto massHealUtils (option ii via a new
+// massHealUtils.test.js), these local pool pins retire with the duplicate code.
+// production: automation/index.js `mass_heal` dispatch + useCharActionsModalHandlers.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, confirmMassHeal } from './massHealHandler.js';
 
@@ -66,6 +82,17 @@ describe('massHealHandler', () => {
         automation: { type: 'mass_heal' },
     };
 
+    // Overrides MERGE into nested spell/automation — never replace them wholesale.
+    function makeAction(overrides = {}) {
+        const { spell: spellOverrides, automation: automationOverrides, ...rest } = overrides;
+        return {
+            ...baseAction,
+            spell: { ...baseAction.spell, ...spellOverrides },
+            automation: { ...baseAction.automation, ...automationOverrides },
+            ...rest,
+        };
+    }
+
     beforeEach(() => {
         vi.clearAllMocks();
         vi.restoreAllMocks();
@@ -94,7 +121,7 @@ describe('massHealHandler', () => {
             });
         });
 
-        it('returns popup when no allies within range', async () => {
+        it('falls back to combatSummary creatures when ally list is empty and still opens modal', async () => {
             getAllyList.mockReturnValue([]);
 
             const result = await handle(baseAction, casterStats, campaignName, null);
@@ -126,46 +153,38 @@ describe('massHealHandler', () => {
             });
         });
 
-        it('respects maxTargets from automation', async () => {
-            const action = {
-                ...baseAction,
-                automation: { type: 'mass_heal', maxTargets: 5 },
-            };
+        it('returns null when combat context is null', async () => {
+            getCombatContext.mockResolvedValue(null);
 
-            const result = await handle(action, casterStats, campaignName, null);
+            expect(await handle(baseAction, casterStats, campaignName, null)).toBeNull();
+        });
+
+        it('respects maxTargets from automation', async () => {
+            const result = await handle(makeAction({ automation: { maxTargets: 5 } }), casterStats, campaignName, null);
 
             expect(result.payload.maxTargets).toBe(5);
         });
 
         it('respects heal_at_slot_level for pool size', async () => {
-            const action = {
-                ...baseAction,
-                spell: { name: 'Mass Heal', level: 5, heal_at_slot_level: { 5: '200', 9: '700' } },
-            };
-
-            const result = await handle(action, casterStats, campaignName, null);
+            const result = await handle(makeAction({ spell: { level: 5, heal_at_slot_level: { 5: '200', 9: '700' } } }), casterStats, campaignName, null);
 
             expect(result.payload.totalPool).toBe(200);
         });
 
         it('uses highest slot key when slotLevel not in heal_at_slot_level', async () => {
-            const action = {
-                ...baseAction,
-                spell: { name: 'Mass Heal', level: 9, heal_at_slot_level: { 5: '200' } },
-            };
-
-            const result = await handle(action, casterStats, campaignName, null);
+            const result = await handle(makeAction({ spell: { level: 9, heal_at_slot_level: { 5: '200' } } }), casterStats, campaignName, null);
 
             expect(result.payload.totalPool).toBe(200);
         });
     });
 
     describe('confirmMassHeal', () => {
-        it('applies healing to each target from distribution', async () => {
+        it('applies healing to each target from distribution, clamped to missing HP', async () => {
             const distribution = { Fighter: 100, Rogue: 50 };
 
             await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
 
+            // Fighter: max 45, runtime current 20 → clamps 100→25. Rogue: max 30, current 20 → 50→10.
             expect(applyHealingToTarget).toHaveBeenCalledWith(
                 baseCombatSummary,
                 'Fighter',
@@ -176,25 +195,6 @@ describe('massHealHandler', () => {
                 baseCombatSummary,
                 'Rogue',
                 10,
-                campaignName,
-            );
-        });
-
-        it('caps healing at missing HP', async () => {
-            getRuntimeValue.mockImplementation((_name, prop) => {
-                if (prop === 'currentHitPoints') return 44;
-                if (prop === 'activeConditions') return [];
-                return null;
-            });
-
-            const distribution = { Fighter: 100 };
-
-            await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
-
-            expect(applyHealingToTarget).toHaveBeenCalledWith(
-                baseCombatSummary,
-                'Fighter',
-                1,
                 campaignName,
             );
         });
@@ -237,7 +237,7 @@ describe('massHealHandler', () => {
             expect(hpLogs[0][1].sourceName).toBe('Cleric');
         });
 
-        it('removes conditions on each target', async () => {
+        it('removes default conditions on each target', async () => {
             getRuntimeValue.mockImplementation((_name, prop) => {
                 if (prop === 'activeConditions') return ['blinded', 'poisoned'];
                 if (prop === 'currentHitPoints') return 20;
@@ -259,23 +259,16 @@ describe('massHealHandler', () => {
             expect(condLogs.length).toBe(3);
             expect(condLogs[0][1].action).toBe('removed');
             expect(condLogs[0][1].reason).toBe('Mass Heal');
-            if (condLogs.length !== 3) {
-                console.debug('Condition logs:', condLogs.map(c => c[1]));
-            }
         });
 
         it('dispatches combat-summary-updated event', async () => {
             const distribution = { Fighter: 100 };
-            const originalDispatch = window.dispatchEvent;
-            const mockDispatch = vi.fn();
-            window.dispatchEvent = mockDispatch;
+            const mockDispatch = vi.spyOn(window, 'dispatchEvent');
 
             await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
 
             expect(mockDispatch).toHaveBeenCalled();
             expect(mockDispatch.mock.calls[0][0].type).toBe('combat-summary-updated');
-
-            window.dispatchEvent = originalDispatch;
         });
 
         it('returns popup with healing summary', async () => {
@@ -286,18 +279,18 @@ describe('massHealHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Mass Heal');
-            expect(result.payload.description).toContain('Mass Heal healed');
-            expect(result.payload.description).toContain('Fighter');
-            expect(result.payload.description).toContain('Rogue');
+            expect(result.payload.automationType).toBe('mass_heal');
+            // Full-string own-composition pin: 25 + 10 clamped heals across 2 targets.
+            expect(result.payload.description).toBe('Mass Heal healed 35 HP across 2 target(s): Fighter, Rogue.');
         });
 
-        it('handles empty distribution gracefully', async () => {
-            const distribution = {};
-
-            const result = await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
+        it('handles empty distribution gracefully with zero side effects', async () => {
+            const result = await confirmMassHeal({ action: baseAction, playerStats: casterStats, campaignName, distribution: {}, totalPool: 700, bonusHeal: 0, bonusDetails: [] });
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('0 HP');
+            expect(result.payload.description).toBe('Mass Heal healed 0 HP across 0 target(s): none.');
+            expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
         it('uses spell status_effects when present', async () => {
@@ -307,12 +300,7 @@ describe('massHealHandler', () => {
                 return null;
             });
 
-            const spellWithEffects = {
-                ...baseAction.spell,
-                status_effects: ['poisoned', 'exhaustion'],
-            };
-            const action = { ...baseAction, spell: spellWithEffects };
-
+            const action = makeAction({ spell: { status_effects: ['poisoned', 'exhaustion'] } });
             const distribution = { Fighter: 100 };
 
             await confirmMassHeal({ action, playerStats: casterStats, campaignName, distribution, totalPool: 700, bonusHeal: 0, bonusDetails: [] });

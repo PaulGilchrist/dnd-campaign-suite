@@ -1,3 +1,15 @@
+// @maintained-by-ai
+// Lane: target selection (targetNames inclusion/exclusion, caster exclusion,
+// no-creature / caster-only popups) and range parsing + default range 10 for
+// resolveMassFear. The handle() export was deleted from coverage as dead — it
+// has zero production importers (mass_fear routes via attackRiderHandler:728
+// → resolveMassFear, pinned in attackRiderHandler.test.js; stalkersFlurry.js
+// also calls resolveMassFear directly).
+// Sibling lanes: massFearHandler.summary.test.js owns popup summary text +
+// buildSaveDc/saveAbility/condition defaults + default ability name "Mass Fear";
+// massFearHandler.saveResults.test.js owns save-listener config + saveResults
+// processing (full-string default target-log, condition writes, custom-name log).
+// Fully mocked, deterministic, turn-based.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -31,7 +43,7 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
 
 // ── Imports ────────────────────────────────────────────────────
 
-import { handle, resolveMassFear } from './massFearHandler.js';
+import { resolveMassFear } from './massFearHandler.js';
 import * as savePrompt from '../../common/savePrompt.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
@@ -42,7 +54,6 @@ import * as expirations from '../../../rules/effects/expirations.js';
 // ── Helpers ────────────────────────────────────────────────────
 
 const campaignName = 'test-campaign';
-const mapName = 'test-map';
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -62,62 +73,6 @@ function makeCombatSummary(creatures) {
 }
 
 // ── Tests ──────────────────────────────────────────────────────
-
-describe('massFearHandler.handle', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    savePrompt.buildSaveDc.mockReturnValue(13);
-    savePrompt.createSaveListener.mockImplementation((_camp, _cfg) => {
-      return { promptId: 'mass-fear-prompt', promise: Promise.resolve({ success: true }) };
-    });
-    damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-    runtimeState.getRuntimeValue.mockReturnValue(undefined);
-    runtimeState.setRuntimeValue.mockResolvedValue(undefined);
-    logService.addEntry.mockResolvedValue({});
-    expirations.addExpiration.mockReturnValue(undefined);
-  });
-
-  describe('delegation to resolveMassFear', () => {
-    it('calls resolveMassFear with correct arguments', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Goblin' }]));
-      const ps = makePlayerStats();
-      const action = { automation: { saveDc: 13, saveAbility: 'WIS' } };
-
-      const result = await handle(action, ps, campaignName, mapName, null);
-
-      expect(result.type).toBe('popup');
-      expect(savePrompt.buildSaveDc).toHaveBeenCalled();
-    });
-
-    it('uses action as option when automation is missing', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Goblin' }]));
-      const ps = makePlayerStats();
-      const action = { saveDc: 13, saveAbility: 'WIS' };
-
-      const result = await handle(action, ps, campaignName, mapName, null);
-
-      expect(result.type).toBe('popup');
-      expect(savePrompt.buildSaveDc).toHaveBeenCalled();
-    });
-
-    it('passes mapName to resolveMassFear', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary([
-        { name: 'TestCaster', type: 'player' },
-        { name: 'Goblin', type: 'monster' },
-        { name: 'Orc', type: 'monster' },
-      ]));
-      rangeCheck.isWithinRange.mockResolvedValue(true);
-
-      const ps = makePlayerStats();
-      const action = { automation: { saveDc: 13 } };
-
-      const result = await handle(action, ps, campaignName, mapName, null);
-
-      expect(result.type).toBe('popup');
-      expect(rangeCheck.isWithinRange).toHaveBeenCalled();
-    });
-  });
-});
 
 describe('massFearHandler.resolveMassFear - no creatures', () => {
   beforeEach(() => {
@@ -154,20 +109,6 @@ describe('massFearHandler.resolveMassFear - no creatures', () => {
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toBe('No creatures in combat.');
-  });
-
-  it('uses default ability name "Mass Fear" when no name provided', async () => {
-    damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary([]));
-
-    const result = await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 13 },
-          playerStats: makePlayerStats(),
-      });
-
-    expect(result.payload.name).toBe('Mass Fear');
   });
 
   it('uses custom ability name when provided', async () => {
@@ -336,35 +277,7 @@ describe('massFearHandler.resolveMassFear - target selection', () => {
     expect(result.payload.description).toBe('No targets in range.');
   });
 
-  it('includes primary target even when other creatures are out of range', async () => {
-    const cs = makeCombatSummary([
-      { name: 'TestCaster', type: 'player' },
-      { name: 'Goblin', type: 'monster' },
-      { name: 'Orc', type: 'monster' },
-    ]);
-    damageUtils.getCombatContext.mockResolvedValue(cs);
-    rangeCheck.isWithinRange.mockResolvedValue(false);
-    // Override the beforeEach mock so saves fail
-    savePrompt.createSaveListener.mockImplementation((_camp, _cfg) => {
-      return { promptId: 'mass-fear-prompt', promise: Promise.resolve({ success: false }) };
-    });
-
-    // Primary target Goblin is always included, Orc is out of range
-    const result = await resolveMassFear({
-          campaignName,
-          casterName: 'TestCaster',
-          primaryTargetName: 'Goblin',
-          option: { saveDc: 13, saveType: 'WIS', range: '5_ft' },
-          playerStats: makePlayerStats(),
-      });
-
-    expect(result.type).toBe('popup');
-    // Only Goblin is affected (primary target), Orc is out of range
-    expect(result.payload.description).toContain('1 creature(s) affected');
-    expect(result.payload.description).toContain('Goblin');
-  });
-
-  it('parses range from string format "20_ft"', async () => {
+  it('parses range from string format "30_ft"', async () => {
     const cs = makeCombatSummary([
       { name: 'TestCaster', type: 'player' },
       { name: 'Goblin', type: 'monster' },

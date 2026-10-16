@@ -1,3 +1,9 @@
+// @maintained-by-ai: 2026-10-15 — canonical lane for the Inspiring Movement seam of
+// reactionBonusHandler.js (handleInspiringMovement / applyInspiringMovement /
+// resolveInspiringMovementUses / appendAgileStrikes). Fully mocked, deterministic, no
+// timers. Bend Fate / applyD20Modifier / AC bonus / Leap Aside / Veer are canonical in
+// reactionBonusHandler.test.js (main lane); Unbreakable Majesty lives in its own lane;
+// UI lanes (useCharActionsModalHandlers.inspiration, CharReactions.*) pin delegation only.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, applyInspiringMovement } from './reactionBonusHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -7,11 +13,6 @@ import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as automationIndex from '../../index.js';
 
 // ── Mocks (hoisted) ────────────────────────────────────────────
-
-vi.mock('../../common/targetResolver.js', () => ({
-  resolveTarget: vi.fn(),
-  resolveMapPositions: vi.fn(),
-}));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -26,16 +27,13 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock('../../../rules/combat/rangeValidation.js', () => ({
-  getDistanceFeet: vi.fn(),
-  rangeToFeet: vi.fn(),
-}));
-
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
   getTargetFromAttacker: vi.fn(),
 }));
 
+// The real ../../index.js pulls the whole automation registry — mock the dispatch
+// seam the Agile Strikes chain reaches through.
 vi.mock('../../index.js', () => ({
   executeHandler: vi.fn(),
 }));
@@ -81,6 +79,28 @@ function makeAction(automation = {}) {
 
 function makeCombatSummary(creatures) {
   return { creatures };
+}
+
+// 2024 College of Dance data shape: resourceCost 'bardic_inspiration', no uses metadata.
+function make2024Action(overrides = {}) {
+  return makeAction({
+    resourceCost: 'bardic_inspiration',
+    uses_expression: null,
+    usesMax: null,
+    uses: 0,
+    ...overrides,
+  });
+}
+
+function trackedBard(max = 5) {
+  return makePlayerStats({
+    name: 'Bard',
+    _trackedResources: { bardicInspirationUses: { current: max, max } },
+  });
+}
+
+function biCalls() {
+  return useRuntimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'bardicInspirationUses');
 }
 
 // ── No map — no creatures — popup ──────────────────────────────
@@ -166,7 +186,7 @@ describe('handleInspiringMovement — with creatures, no map', () => {
   });
 });
 
-// ── Uses exhaustion ────────────────────────────────────────────
+// ── Uses resolution & exhaustion ───────────────────────────────
 
 describe('handleInspiringMovement — uses exhaustion', () => {
   beforeEach(() => {
@@ -188,6 +208,35 @@ describe('handleInspiringMovement — uses exhaustion', () => {
     expect(result.payload.description).toContain('Long Rest');
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
+
+  it('derives usesMax by evaluating uses_expression', async () => {
+    useRuntimeState.getRuntimeValue.mockReturnValue(null);
+    damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary([
+      { name: 'Fighter', currentHp: 20, maxHp: 30, size: 'Medium', type: 'humanoid' },
+    ]));
+
+    const result = await handle(makeAction({ uses_expression: 'level' }), makePlayerStats(), campaignName, null);
+
+    expect(result.type).toBe('modal');
+    expect(result.payload.usesMax).toBe(3);
+    expect(result.payload.usesKey).toBe('bardicInspirationUses');
+  });
+
+  it('prefers uses_expression over the tracked bardic fallback', async () => {
+    useRuntimeState.getRuntimeValue.mockReturnValue(null);
+    damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary([
+      { name: 'HexWarlock', currentHp: 20, maxHp: 30, size: 'Medium', type: 'humanoid' },
+    ]));
+
+    const result = await handle(
+      make2024Action({ uses_expression: 'level' }),
+      trackedBard(5),
+      campaignName,
+      null
+    );
+
+    expect(result.payload.usesMax).toBe(3);
+  });
 });
 
 // ── applyInspiringMovement ─────────────────────────────────────
@@ -203,13 +252,13 @@ describe('applyInspiringMovement', () => {
     const action = makeAction({ usesMax: 3 });
 
     const result = await applyInspiringMovement({
-    action,
-    playerStats: ps,
-    campaignName,
-    allyName: 'Fighter',
-    halfSpeed: 15,
-    noOAs: true,
-});
+      action,
+      playerStats: ps,
+      campaignName,
+      allyName: 'Fighter',
+      halfSpeed: 15,
+      noOAs: true,
+    });
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Bard', 'bardicInspirationUses', 2, campaignName
@@ -222,13 +271,13 @@ describe('applyInspiringMovement', () => {
     const action = makeAction({ noOAs: true });
 
     await applyInspiringMovement({
-    action,
-    playerStats: ps,
-    campaignName,
-    allyName: 'Fighter',
-    halfSpeed: 15,
-    noOAs: true,
-});
+      action,
+      playerStats: ps,
+      campaignName,
+      allyName: 'Fighter',
+      halfSpeed: 15,
+      noOAs: true,
+    });
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Bard', 'inspiringMovementNoOA', true, campaignName
@@ -241,13 +290,13 @@ describe('applyInspiringMovement', () => {
     const action = makeAction({ noOAs: true });
 
     await applyInspiringMovement({
-    action,
-    playerStats: ps,
-    campaignName,
-    allyName: 'Fighter',
-    halfSpeed: 15,
-    noOAs: true,
-});
+      action,
+      playerStats: ps,
+      campaignName,
+      allyName: 'Fighter',
+      halfSpeed: 15,
+      noOAs: true,
+    });
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Fighter', 'inspiringMovementGranted', true, campaignName
@@ -259,18 +308,52 @@ describe('applyInspiringMovement', () => {
     expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard', targetName: 'Fighter', effects: [{ type: 'inspiring_movement_granted' }], campaignName, rounds: undefined, expireOnCreatureName: 'Bard' });
   });
 
+  it('keeps no-OA off the ally when noOAs is false', async () => {
+    const ps = makePlayerStats({ name: 'Bard' });
+    const action = makeAction({ noOAs: false });
+
+    const result = await applyInspiringMovement({
+      action,
+      playerStats: ps,
+      campaignName,
+      allyName: 'Fighter',
+      halfSpeed: 15,
+      noOAs: false,
+    });
+
+    // Movement grant still reaches the ally…
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Fighter', 'inspiringMovementGranted', true, campaignName
+    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith(
+      expect.objectContaining({ targetName: 'Fighter', effects: [{ type: 'inspiring_movement_granted' }] })
+    );
+    // …but no-OA does not, and the popup drops the no-provocation sentence.
+    // (Self-stamp stays unconditional in the handler — pinned as current behaviour.)
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Bard', 'inspiringMovementNoOA', true, campaignName
+    );
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+      'Fighter', 'inspiringMovementNoOA', true, campaignName
+    );
+    expect(expirations.addExpiration).not.toHaveBeenCalledWith(
+      expect.objectContaining({ targetName: 'Fighter', effects: [{ type: 'inspiring_movement_no_oa' }] })
+    );
+    expect(result.payload.description).not.toContain('does not provoke');
+  });
+
   it('logs to campaign with ally', async () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ noOAs: true });
 
     await applyInspiringMovement({
-    action,
-    playerStats: ps,
-    campaignName,
-    allyName: 'Fighter',
-    halfSpeed: 15,
-    noOAs: true,
-});
+      action,
+      playerStats: ps,
+      campaignName,
+      allyName: 'Fighter',
+      halfSpeed: 15,
+      noOAs: true,
+    });
 
     expect(logService.addEntry).toHaveBeenCalledWith(
       campaignName,
@@ -288,13 +371,13 @@ describe('applyInspiringMovement', () => {
     const action = makeAction({ noOAs: true });
 
     const result = await applyInspiringMovement({
-    action,
-    playerStats: ps,
-    campaignName,
-    allyName: 'Fighter',
-    halfSpeed: 15,
-    noOAs: true,
-});
+      action,
+      playerStats: ps,
+      campaignName,
+      allyName: 'Fighter',
+      halfSpeed: 15,
+      noOAs: true,
+    });
 
     expect(result.type).toBe('popup');
     expect(result.payload.type).toBe('automation_info');
@@ -307,27 +390,6 @@ describe('applyInspiringMovement', () => {
 });
 
 // ── CLA-199: bardic inspiration consumption + Agile Strikes popup ───
-
-function make2024Action(overrides = {}) {
-  return makeAction({
-    resourceCost: 'bardic_inspiration',
-    uses_expression: null,
-    usesMax: null,
-    uses: 0,
-    ...overrides,
-  });
-}
-
-function trackedBard(max = 5) {
-  return makePlayerStats({
-    name: 'Bard',
-    _trackedResources: { bardicInspirationUses: { current: max, max } },
-  });
-}
-
-function biCalls() {
-  return useRuntimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'bardicInspirationUses');
-}
 
 describe('CLA-199 — handleInspiringMovement resolves bardic uses from tracked resources', () => {
   beforeEach(() => {
@@ -366,13 +428,13 @@ describe('CLA-199 — applyInspiringMovement expends Bardic Inspiration', () => 
 
   it('decrements bardicInspirationUses 5→4 when runtime key unset (defaults to tracked max)', async () => {
     const result = await applyInspiringMovement({
-    action: make2024Action(),
-    playerStats: trackedBard(5),
-    campaignName,
-    allyName: 'HexWarlock',
-    halfSpeed: 15,
-    noOAs: true,
-});
+      action: make2024Action(),
+      playerStats: trackedBard(5),
+      campaignName,
+      allyName: 'HexWarlock',
+      halfSpeed: 15,
+      noOAs: true,
+    });
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Bard', 'bardicInspirationUses', 4, campaignName
@@ -392,13 +454,13 @@ describe('CLA-199 — applyInspiringMovement expends Bardic Inspiration', () => 
     useRuntimeState.getRuntimeValue.mockReturnValue(3);
 
     await applyInspiringMovement({
-    action: make2024Action(),
-    playerStats: trackedBard(5),
-    campaignName,
-    allyName: 'HexWarlock',
-    halfSpeed: 15,
-    noOAs: true,
-});
+      action: make2024Action(),
+      playerStats: trackedBard(5),
+      campaignName,
+      allyName: 'HexWarlock',
+      halfSpeed: 15,
+      noOAs: true,
+    });
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Bard', 'bardicInspirationUses', 2, campaignName
@@ -409,26 +471,26 @@ describe('CLA-199 — applyInspiringMovement expends Bardic Inspiration', () => 
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     await applyInspiringMovement({
-    action: make2024Action(),
-    playerStats: trackedBard(5),
-    campaignName,
-    allyName: 'HexWarlock',
-    halfSpeed: 15,
-    noOAs: true,
-});
+      action: make2024Action(),
+      playerStats: trackedBard(5),
+      campaignName,
+      allyName: 'HexWarlock',
+      halfSpeed: 15,
+      noOAs: true,
+    });
 
     expect(biCalls()).toHaveLength(0);
   });
 
   it('does not consume when resourceCost is not bardic_inspiration', async () => {
     await applyInspiringMovement({
-    action: makeAction({ usesMax: null, uses: 0 }),
-    playerStats: trackedBard(5),
-    campaignName,
-    allyName: 'HexWarlock',
-    halfSpeed: 15,
-    noOAs: true,
-});
+      action: makeAction({ usesMax: null, uses: 0 }),
+      playerStats: trackedBard(5),
+      campaignName,
+      allyName: 'HexWarlock',
+      halfSpeed: 15,
+      noOAs: true,
+    });
 
     expect(biCalls()).toHaveLength(0);
   });
@@ -450,13 +512,13 @@ describe('CLA-199 — Agile Strikes chain does not hijack the Inspiring Movement
     damageUtils.getTargetFromAttacker.mockReturnValue(null);
 
     const result = await applyInspiringMovement({
-    action: make2024Action(),
-    playerStats: agilePlayer(),
-    campaignName,
-    allyName: 'HexWarlock',
-    halfSpeed: 15,
-    noOAs: true,
-});
+      action: make2024Action(),
+      playerStats: agilePlayer(),
+      campaignName,
+      allyName: 'HexWarlock',
+      halfSpeed: 15,
+      noOAs: true,
+    });
 
     expect(automationIndex.executeHandler).not.toHaveBeenCalled();
     expect(result.payload.name).toBe('Inspiring Movement');
@@ -471,15 +533,21 @@ describe('CLA-199 — Agile Strikes chain does not hijack the Inspiring Movement
     });
 
     const result = await applyInspiringMovement({
-    action: make2024Action(),
-    playerStats: agilePlayer(),
-    campaignName,
-    allyName: 'HexWarlock',
-    halfSpeed: 15,
-    noOAs: true,
-});
+      action: make2024Action(),
+      playerStats: agilePlayer(),
+      campaignName,
+      allyName: 'HexWarlock',
+      halfSpeed: 15,
+      noOAs: true,
+    });
 
-    expect(automationIndex.executeHandler).toHaveBeenCalled();
+    // Chain composition owned by this seam: default d6 bardic die, dispatched via registry.
+    expect(automationIndex.executeHandler).toHaveBeenCalledWith(
+      { name: 'Agile Strikes', automation: { type: 'agile_strike', bardicDie: 6 } },
+      expect.objectContaining({ name: 'Bard' }),
+      campaignName,
+      null
+    );
     expect(result.payload.name).toBe('Inspiring Movement');
     expect(result.payload.description).toContain('HexWarlock');
     expect(result.payload.description).toContain('Agile Strikes: Hit for 5 Bludgeoning damage');

@@ -1,8 +1,24 @@
-// CLA-383 regression locks: Warding Flare must write te disadvantage_next_attack
+// @maintained-by-ai
+// reactionDebuffHandler octet — lane: WARDING-FLARE ROUTE te-PRODUCER CONTRACT
+// (CLA-383 regression locks): Warding Flare must write te disadvantage_next_attack
 // (te-producer model, mirrors verified Vicious Mockery/Sap/Tumble) instead of the
 // old post-roll second-d20 simulation, refuse without spending once reacted this
 // round (per-trigger/round latch), and never re-fire unlimited times on one
-// resolved lastAttack.
+// resolved lastAttack. Seam map lives in reactionDebuffHandler.attacksVsAlly.test.js
+// header; this lane owns: wardingFlare te-production (te write + addExpiration +
+// latch stamp), the wardingflareUses setRuntimeValue spendUse post-route channel
+// (one of the two TRUE spendUse routes), latch refusal, no-attack/self-attack
+// refusals, and latch re-arm on round wrap.
+// NOT owned here (removed as duplicates / do not re-add): the out-of-range gate
+// pin (.disadvantage.test.js keeps the strictly-stronger copy: exact refusal text,
+// rangeToFeet/isWithinRange arg pins, zero-write economy, refusal row shape).
+// NOTE: wardingFlareRangeGate shares source bug #11 (2-arg resolveMapPositions at
+// reactionDebuffHandler.js:505, real signature is 3-arg — reported, source not
+// touched; kept at mock level, broken arity not cemented as intended behaviour).
+//
+// Deterministic: runtime/logService/range/rollback/expirations/infoPopup fully
+// mocked; no dice paths on this route. Exact-key pins + stable substrings.
+// No churn expected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './reactionDebuffHandler.js';
 
@@ -244,25 +260,6 @@ describe('reactionDebuffHandler — Warding Flare te-producer fix (CLA-383)', ()
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('your own attack');
-    expect(data['War_Cleric.wardingflareUses']).toBe(4);
-    const refusal = logService.addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'warding_flare_refused');
-    expect(refusal).toBeTruthy();
-  });
-
-  it('refuses out-of-range attackers without spending and logs the refusal', async () => {
-    const data = store({ 'War_Cleric.wardingflareUses': 4 });
-    setupThugAttack();
-    targetResolver.resolveMapPositions.mockResolvedValue({
-      attackerPos: { gridX: 0, gridY: 0 },
-      targetPos: { gridX: 20, gridY: 0 },
-    });
-    const rangeCheck = await import('../../../rules/combat/rangeCheck.js');
-    rangeCheck.isWithinRange.mockResolvedValueOnce(false);
-
-    const result = await handle(makeWardingFlareAction(), makeCleric(), campaignName, mapName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('out of range');
     expect(data['War_Cleric.wardingflareUses']).toBe(4);
     const refusal = logService.addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'warding_flare_refused');
     expect(refusal).toBeTruthy();

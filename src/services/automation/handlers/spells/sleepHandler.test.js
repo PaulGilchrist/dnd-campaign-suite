@@ -1,4 +1,29 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+/**
+ * sleepHandler.test.js — FAMILY QUAD seam map (Sleep / shake-awake family, queue #1957–#1959)
+ *
+ *   #1957 sleepShakeHandler.confirm.test.js          sleepShakeHandler.js handleConfirm() — 4-arg + targetName; shake-awake confirm seam
+ *   #1958 sleepShakeHandler.target-selection.test.js sleepShakeHandler.js handle()       — 4-arg; range/target selection for waking others
+ *   #1959 sleepShakeHandler.test.js (main)           sleepShakeHandler.js handle()       — core shake resolution (wakes sleep_staged targets)
+ *   #THIS sleepHandler.test.js (main)                sleepHandler.js       handle()       — 5-arg (action, playerStats, campaignName, mapName, characters);
+ *                                                                                             dispatch key 'sleep' (automation/index.js:532), live via sleepService.triggerSleep ← SleepModal.jsx
+ *
+ * Own lane: 2024-ruleset Sleep spell. Per-target WIS save → fail stages 'sleep_staged'
+ * targetEffect + Incapacitated via stageSleepTargets (sleepService owns the turn-end repeat-save
+ * ladder that escalates to Unconscious — foreign). Immune creatures (undead/construct,
+ * non-sleepers, exhaustion-immune) auto-succeed via isSleepImmune.
+ *
+ * NOTES (honest, pinned where own):
+ * - The 5e HP-pool ascending selection (10/20/30/40/50 by slot) is RETired for this module:
+ *   this handler implements the 2024 save-or-incapacitate rules only (docs/automations-manifest.json
+ *   §6048 expectedBehavior). No ascending-HP code exists here or in sleepService — do not pin it.
+ * - Wake-on-disturb (damage/shake) is the sibling domain: damage-wake hook lives in
+ *   sleepService.wakeSleepOnDamage, shake-awake in sleepShakeHandler — foreign lanes, noted not pinned.
+ *   hypnosis/confusion closed siblings share the wake-on-disturb pattern but are distinct modules.
+ * - No minutes×N legacy here (#1906 family): staged duration is turn-seam + combat-scoped
+ *   (unconsciousRounds default 10 = MA-0068 spec in sleepService — foreign); no wall-clock timers.
+ * - Arity fixed in this lane: handle() is 5-param; every call below passes 5 args.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../common/savePrompt.js', () => ({
   buildSaveDc: vi.fn(),
@@ -11,11 +36,6 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
 
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
 }));
 
 vi.mock('../../common/damageRollback.js', () => ({
@@ -66,6 +86,7 @@ const baseCombatContext = {
   placedItems: [],
 };
 
+// Math.random = 0 → roll 1; 0.999 → roll 20 (floor-boundary of the inline NPC roll)
 function npcRollFail() {
   vi.spyOn(Math, 'random').mockReturnValue(0);
 }
@@ -74,93 +95,127 @@ function npcRollSuccess() {
   vi.spyOn(Math, 'random').mockReturnValue(0.999);
 }
 
+function loggedEntries(type) {
+  return addEntry.mock.calls.map(c => c[1]).filter(e => e && e.type === type);
+}
+
 describe('sleepHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.restoreAllMocks();
     isSleepImmune.mockResolvedValue(false);
     buildSaveDc.mockReturnValue(17);
   });
 
-  describe('combat context validation', () => {
-    it('returns popup when no combat context exists', async () => {
-      getCombatContext.mockResolvedValue(null);
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No creatures in combat');
+  describe('early returns (no side effects)', () => {
+    it('returns popup when no combat context exists, touching nothing', async () => {
+      getCombatContext.mockResolvedValue(null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null, []);
+
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Sleep',
+          description: 'No creatures in combat. Sleep has no effect.',
+        },
+      });
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(storeSpellLastAttack).not.toHaveBeenCalled();
+      expect(createSaveListener).not.toHaveBeenCalled();
+      expect(stageSleepTargets).not.toHaveBeenCalled();
     });
 
     it('returns popup when combat context has no creatures', async () => {
       getCombatContext.mockResolvedValue({ creatures: [] });
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(result.payload.description).toContain('No creatures in combat');
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null, []);
+      expect(result.payload.description).toBe('No creatures in combat. Sleep has no effect.');
+      expect(addEntry).not.toHaveBeenCalled();
     });
 
     it('returns popup when selected targets resolve to none valid', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
-      const result = await handle(makeAction({}, { selectedTargets: ['TestCaster'] }), makePlayerStats(), campaignName, null);
-      expect(result.payload.description).toContain('No valid targets selected');
+      const result = await handle(makeAction({}, { selectedTargets: ['TestCaster'] }), makePlayerStats(), campaignName, null, []);
+      expect(result.payload.description).toBe('No valid targets selected.');
+      // The popup-only lanes must not have stored rollback state either.
+      expect(storeSpellLastAttack).not.toHaveBeenCalled();
+    });
+
+    it('returns popup when every creature is the caster', async () => {
+      getCombatContext.mockResolvedValue({ creatures: [{ name: 'TestCaster', type: 'player' }] });
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null, []);
+      expect(result.payload.description).toBe('No valid targets selected.');
     });
   });
 
   describe('target selection', () => {
-    it('skips the caster and processes the other creatures', async () => {
+    it('skips the caster and processes the other creatures in encounter order', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       npcRollSuccess();
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null, []);
 
-      const loggedTargets = addEntry.mock.calls
-        .map(c => c[1])
-        .filter(e => e && e.type === 'save_result')
-        .map(e => e.targetName);
-      expect(loggedTargets).toEqual(['Thug 1', 'Zombie 1']);
+      expect(loggedEntries('save_result').map(e => e.targetName)).toEqual(['Thug 1', 'Zombie 1']);
     });
 
     it('restricts processing to metaCtx.selectedTargets when provided', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       npcRollSuccess();
 
-      await handle(makeAction({}, { selectedTargets: ['Thug 1'] }), makePlayerStats(), campaignName, null);
+      await handle(makeAction({}, { selectedTargets: ['Thug 1'] }), makePlayerStats(), campaignName, null, []);
 
       expect(createSaveListener).not.toHaveBeenCalled();
-      const loggedTargets = addEntry.mock.calls
-        .map(c => c[1])
-        .filter(e => e && e.type === 'save_result')
-        .map(e => e.targetName);
-      expect(loggedTargets).toEqual(['Thug 1']);
+      expect(loggedEntries('save_result').map(e => e.targetName)).toEqual(['Thug 1']);
     });
 
     it('prefers metaCtx.spellSaveDc over buildSaveDc', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       npcRollSuccess();
 
-      await handle(makeAction({}, { spellSaveDc: 19 }), makePlayerStats(), campaignName, null);
+      await handle(makeAction({}, { spellSaveDc: 19 }), makePlayerStats(), campaignName, null, []);
 
-      const castLog = addEntry.mock.calls.map(c => c[1]).find(e => e && e.type === 'ability_use');
-      expect(castLog.description).toContain('DC 19');
+      const castLog = loggedEntries('ability_use')[0];
+      expect(castLog.description).toBe('TestCaster casts Sleep! 2 target(s) must make a WIS save (DC 19) or become Incapacitated until the end of their next turn.');
+      expect(buildSaveDc).not.toHaveBeenCalled();
     });
   });
 
   describe('immunity gate', () => {
-    it('auto-succeeds immune creatures without rolling or staging', async () => {
+    it('auto-succeeds immune creatures with the exact rollback shape, no roll, no prompt', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       npcRollFail();
       isSleepImmune.mockImplementation(async (_cn, creature) => creature.name === 'Zombie 1');
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null, []);
 
-      const autoLog = addEntry.mock.calls
-        .map(c => c[1])
-        .find(e => e && e.type === 'save_result' && e.targetName === 'Zombie 1');
-      expect(autoLog.success).toBe(true);
-      expect(autoLog.description).toContain('automatically succeeds');
+      const autoLog = loggedEntries('save_result').find(e => e.targetName === 'Zombie 1');
+      expect(autoLog).toMatchObject({
+        type: 'save_result',
+        characterName: 'TestCaster',
+        rollType: 'save-sleep',
+        saveDc: 17,
+        saveType: 'WIS',
+        success: true,
+      });
+      expect(autoLog.description).toBe("Zombie 1 automatically succeeds on the save against Sleep (doesn't sleep or is immune to Exhaustion).");
+      expect(autoLog).not.toHaveProperty('roll');
 
+      expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
+        targetName: 'Zombie 1',
+        saveResult: 'success',
+        roll: null,
+        total: null,
+        conditions: [],
+        appliedDamage: 0,
+      });
+
+      // Only Thug 1 staged; the immune target is excluded.
       expect(stageSleepTargets).toHaveBeenCalledTimes(1);
-      expect(stageSleepTargets.mock.calls[0][2]).toEqual(['Thug 1']);
-      expect(result.payload.description).toContain('1 auto-succeeded');
+      expect(stageSleepTargets).toHaveBeenCalledWith(campaignName, 'TestCaster', ['Thug 1'], 17);
+      expect(result.payload.description).toBe('Sleep (DC 17): 1 Incapacitated until end of next turn, 1 succeeded (1 auto-succeeded).');
     });
 
     it('consults isSleepImmune with characters for player targets', async () => {
@@ -173,68 +228,113 @@ describe('sleepHandler.handle', () => {
       isSleepImmune.mockResolvedValue(true);
       const characters = [{ name: 'Elf', computedStats: { name: 'Elf' } }];
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null, characters);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null, characters);
 
       expect(isSleepImmune).toHaveBeenCalledWith(campaignName, expect.objectContaining({ name: 'Elf' }), characters);
       expect(createSaveListener).not.toHaveBeenCalled();
+      expect(stageSleepTargets).not.toHaveBeenCalled();
+      expect(result.payload.description).toBe('Sleep (DC 17): 0 Incapacitated until end of next turn, 1 succeeded (1 auto-succeeded).');
     });
   });
 
-  describe('npc saves', () => {
-    it('auto-rolls a WIS save for NPCs and logs the result', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      npcRollFail();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(createSaveListener).not.toHaveBeenCalled();
-      const failLog = addEntry.mock.calls
-        .map(c => c[1])
-        .find(e => e && e.type === 'save_result' && e.targetName === 'Thug 1');
-      expect(failLog.success).toBe(false);
-      expect(failLog.saveType).toBe('WIS');
-      expect(failLog.saveDc).toBe(17);
-    });
-
-    it('applies no staging when every target saves', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      npcRollSuccess();
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(stageSleepTargets).not.toHaveBeenCalled();
-      expect(result.payload.description).toContain('0 Incapacitated');
-    });
-
-    it('stages failed saves with the real DC and logs Incapacitated per target', async () => {
+  describe('npc saves (inline auto-roll)', () => {
+    it('auto-rolls a WIS save for NPCs and logs the exact fail shape', async () => {
       getCombatContext.mockResolvedValue({
         creatures: [
           { name: 'Thug 1', type: 'npc', monsterType: 'Humanoid', saveBonuses: { wis: 0 } },
           { name: 'TestCaster', type: 'player' },
         ],
       });
-      npcRollFail();
+      npcRollFail(); // roll 1 + 0 = 1 < 17
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null, []);
 
+      expect(createSaveListener).not.toHaveBeenCalled();
+      const failLog = loggedEntries('save_result').find(e => e.targetName === 'Thug 1');
+      expect(failLog).toMatchObject({
+        success: false,
+        roll: 1,
+        total: 1,
+        saveBonus: 0,
+        saveType: 'WIS',
+        saveDc: 17,
+      });
+      expect(failLog.description).toBe('Thug 1 failed its WIS save (DC 17) against Sleep.');
+    });
+
+    it('honours the NPC WIS save bonus at the exact DC boundary', async () => {
+      getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'Veteran', type: 'npc', monsterType: 'Humanoid', saveBonuses: { wis: 16 } },
+          { name: 'TestCaster', type: 'player' },
+        ],
+      });
+      npcRollSuccess(); // roll 20 + 16 = 36 >= 17
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null, []);
+
+      const saveLog = loggedEntries('save_result')[0];
+      expect(saveLog).toMatchObject({ targetName: 'Veteran', success: true, roll: 20, saveBonus: 16, total: 36 });
+      expect(saveLog.description).toBe('Veteran succeeded on its WIS save (DC 17) against Sleep.');
+      expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        targetName: 'Veteran',
+        saveResult: 'success',
+        conditions: [],
+        appliedDamage: 0,
+      }));
+    });
+
+    it('applies no staging and reports 0 auto-succeeded suffix when every target saves', async () => {
+      getCombatContext.mockResolvedValue(baseCombatContext);
+      isSleepImmune.mockImplementation(async (_cn, creature) => creature.name === 'Zombie 1');
+      npcRollSuccess();
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null, []);
+
+      expect(stageSleepTargets).not.toHaveBeenCalled();
+      // Suffix present only via the one immune target; the no-auto-success form is pinned next.
+      expect(result.payload.description).toBe('Sleep (DC 17): 0 Incapacitated until end of next turn, 2 succeeded (1 auto-succeeded).');
+    });
+
+    it('omits the auto-succeeded suffix when no immunity auto-success occurred', async () => {
+      getCombatContext.mockResolvedValue(baseCombatContext);
+      npcRollSuccess();
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null, []);
+
+      expect(stageSleepTargets).not.toHaveBeenCalled();
+      expect(result.payload.description).toBe('Sleep (DC 17): 0 Incapacitated until end of next turn, 2 succeeded.');
+    });
+
+    it('stages the failed non-immune target in one call with the real DC and logs Incapacitated per target', async () => {
+      getCombatContext.mockResolvedValue(baseCombatContext);
+      isSleepImmune.mockImplementation(async (_cn, creature) => creature.name === 'Zombie 1');
+      npcRollFail(); // both non-immune rolls fail
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null, []);
+
+      expect(stageSleepTargets).toHaveBeenCalledTimes(1);
       expect(stageSleepTargets).toHaveBeenCalledWith(campaignName, 'TestCaster', ['Thug 1'], 17);
 
-      const condLog = addEntry.mock.calls
-        .map(c => c[1])
-        .find(e => e && e.type === 'condition' && e.action === 'applied');
-      expect(condLog).toMatchObject({ characterName: 'Thug 1', condition: 'Incapacitated' });
-      expect(condLog.note).toContain('end of its next turn');
+      const condLogs = loggedEntries('condition').filter(e => e.action === 'applied');
+      expect(condLogs.map(e => e.characterName)).toEqual(['Thug 1']);
+      expect(condLogs[0]).toMatchObject({ condition: 'Incapacitated', reason: 'Sleep spell', sourceName: 'TestCaster' });
+      expect(condLogs[0].note).toBe('Thug 1 falls Incapacitated until the end of its next turn, when it repeats the WIS save (DC 17).');
 
       expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         targetName: 'Thug 1',
         saveResult: 'failure',
+        roll: 1,
+        total: 1,
         conditions: ['incapacitated'],
+        appliedDamage: 0,
       }));
+      expect(result.payload.description).toBe('Sleep (DC 17): 1 Incapacitated until end of next turn, 1 succeeded (1 auto-succeeded).');
     });
   });
 
-  describe('player saves', () => {
-    it('prompts player targets and stages them on a failed prompt save', async () => {
+  describe('player saves (indefinite prompt, no timer)', () => {
+    it('prompts player targets with the exact listener shape and stages them on a failed prompt save', async () => {
       getCombatContext.mockResolvedValue({
         creatures: [
           { name: 'PlayerB', type: 'player', saveBonuses: { wis: 2 } },
@@ -246,90 +346,71 @@ describe('sleepHandler.handle', () => {
         promise: Promise.resolve({ success: false, roll: 4, saveBonus: 2, total: 6 }),
       });
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null, []);
 
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
         targetName: 'PlayerB',
         saveType: 'WIS',
         saveDc: 17,
-      }));
+        dcSuccess: 'none',
+        disadvantage: false,
+        sourceName: 'TestCaster',
+        condition: 'Sleep',
+      });
+
+      const promptLog = loggedEntries('ability_use').find(e => e.promptId === 'sleep-prompt');
+      expect(promptLog.description).toBe('TestCaster casts Sleep! PlayerB must make a WIS save (DC 17) or become Incapacitated.');
+
       expect(stageSleepTargets).toHaveBeenCalledWith(campaignName, 'TestCaster', ['PlayerB'], 17);
 
-      const failLog = addEntry.mock.calls
-        .map(c => c[1])
-        .find(e => e && e.type === 'save_result');
-      expect(failLog).toMatchObject({ targetName: 'PlayerB', success: false, roll: 4, total: 6 });
+      const failLog = loggedEntries('save_result')[0];
+      expect(failLog).toMatchObject({ targetName: 'PlayerB', success: false, roll: 4, total: 6, saveBonus: 2 });
+      expect(failLog.description).toBe('PlayerB failed its WIS save (DC 17) against Sleep.');
     });
 
-    it('applies heighten disadvantage to the chosen player target', async () => {
+    it('applies heighten disadvantage to the chosen player target only', async () => {
       getCombatContext.mockResolvedValue({
         creatures: [
           { name: 'PlayerB', type: 'player' },
+          { name: 'PlayerC', type: 'player' },
           { name: 'TestCaster', type: 'player' },
         ],
       });
-      createSaveListener.mockReturnValue({
-        promptId: 'sleep-heighten',
+      createSaveListener.mockImplementation((_cn, cfg) => ({
+        promptId: `sleep-${cfg.targetName}`,
         promise: Promise.resolve({ success: true, roll: 20, saveBonus: 2, total: 22 }),
-      });
+      }));
 
-      await handle(makeAction({}, { heightenTarget: 'PlayerB' }), makePlayerStats(), campaignName, null);
+      await handle(makeAction({}, { heightenTarget: 'PlayerB' }), makePlayerStats(), campaignName, null, []);
 
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({ disadvantage: true }));
+      const configs = createSaveListener.mock.calls.map(c => c[1]);
+      expect(configs.find(c => c.targetName === 'PlayerB').disadvantage).toBe(true);
+      expect(configs.find(c => c.targetName === 'PlayerC').disadvantage).toBe(false);
     });
   });
 
-  describe('popup payload', () => {
-    it('returns automation_info with a cast summary', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      npcRollFail();
-      isSleepImmune.mockImplementation(async (_cn, creature) => creature.name === 'Zombie 1');
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Sleep');
-      expect(result.payload.description).toContain('DC 17');
-      expect(result.payload.description).toContain('1 Incapacitated');
-      expect(result.payload.description).toContain('1 succeeded');
-    });
-
-    it('logs the cast once with the target count', async () => {
+  describe('cast bookkeeping', () => {
+    it('logs the cast once with the target count, after the rollback store', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       npcRollSuccess();
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null, []);
 
-      const castLogs = addEntry.mock.calls
-        .map(c => c[1])
-        .filter(e => e && e.type === 'ability_use' && e.characterName === 'TestCaster' && !e.promptId);
-      expect(castLogs).toHaveLength(1);
-      expect(castLogs[0].description).toContain('casts Sleep');
-      expect(castLogs[0].description).toContain('2 target(s)');
-    });
-
-    it('records last attack scope as aoe', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      npcRollSuccess();
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, {
         casterName: 'TestCaster',
         spellName: 'Sleep',
         saveType: 'WIS',
         saveDc: 17,
         attackScope: 'aoe',
-      }));
-    });
-  });
+      });
 
-  describe('edge cases', () => {
-    it('returns popup when every creature is the caster', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'TestCaster', type: 'player' }] });
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-      expect(result.payload.description).toContain('No valid targets selected');
+      const castLogs = loggedEntries('ability_use').filter(e => e.characterName === 'TestCaster' && !e.promptId);
+      expect(castLogs).toHaveLength(1);
+      expect(castLogs[0].description).toBe('TestCaster casts Sleep! 2 target(s) must make a WIS save (DC 17) or become Incapacitated until the end of their next turn.');
+
+      // Rollback state is stored before the cast is announced on the log.
+      expect(storeSpellLastAttack.mock.invocationCallOrder[0])
+        .toBeLessThan(addEntry.mock.invocationCallOrder[0]);
     });
 
     it('falls back to buildSaveDc when metaCtx.spellSaveDc is absent', async () => {
@@ -337,24 +418,27 @@ describe('sleepHandler.handle', () => {
       npcRollSuccess();
       buildSaveDc.mockReturnValue(13);
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null, []);
 
-      expect(buildSaveDc).toHaveBeenCalled();
-      const castLog = addEntry.mock.calls.map(c => c[1]).find(e => e && e.type === 'ability_use');
+      expect(buildSaveDc).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ name: 'TestCaster' }));
+      const castLog = loggedEntries('ability_use')[0];
       expect(castLog.description).toContain('DC 13');
     });
+  });
 
+  describe('resilience and naming', () => {
     it('tolerates addEntry rejections during logging', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       npcRollFail();
       addEntry.mockRejectedValue(new Error('log offline'));
 
-      await expect(handle(makeAction(), makePlayerStats(), campaignName, null)).resolves.toMatchObject({
+      await expect(handle(makeAction(), makePlayerStats(), campaignName, null, [])).resolves.toMatchObject({
         type: 'popup',
+        payload: { description: 'Sleep (DC 17): 2 Incapacitated until end of next turn, 0 succeeded.' },
       });
     });
 
-    it('uses action.name in logs when the spell is renamed', async () => {
+    it('uses action.name throughout when the spell is renamed', async () => {
       getCombatContext.mockResolvedValue({
         creatures: [
           { name: 'Thug 1', type: 'npc', monsterType: 'Humanoid' },
@@ -363,11 +447,15 @@ describe('sleepHandler.handle', () => {
       });
       npcRollFail();
 
-      await handle({ ...makeAction(), name: 'Magical Slumber' }, makePlayerStats(), campaignName, null);
+      const result = await handle({ ...makeAction(), name: 'Magical Slumber' }, makePlayerStats(), campaignName, null, []);
 
-      const castLog = addEntry.mock.calls.map(c => c[1]).find(e => e && e.type === 'ability_use');
+      const castLog = loggedEntries('ability_use')[0];
       expect(castLog.abilityName).toBe('Magical Slumber');
-      expect(castLog.description).toContain('Magical Slumber');
+      expect(castLog.description).toBe('TestCaster casts Magical Slumber! 1 target(s) must make a WIS save (DC 17) or become Incapacitated until the end of their next turn.');
+      const saveLog = loggedEntries('save_result')[0];
+      expect(saveLog.description).toBe('Thug 1 failed its WIS save (DC 17) against Magical Slumber.');
+      expect(result.payload.name).toBe('Magical Slumber');
+      expect(result.payload.description).toBe('Magical Slumber (DC 17): 1 Incapacitated until end of next turn, 0 succeeded.');
     });
   });
 });

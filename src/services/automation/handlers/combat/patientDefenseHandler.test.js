@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai — deterministic pins over the patient_defense handler contract (sole FP writer,
+// CLA-247): branch wording, exact FP arithmetic, Dodge toggle/expiration delegation, tempHp max-merge
+// with dice stubbed, popup/log payload composition. Stable unless the handler's own composition changes.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
@@ -48,7 +51,7 @@ function makeAction(overrides = {}) {
         description: 'Take Disengage as Bonus Action, or expend 1 Focus Point for Disengage + Dodge.',
         automation: {
             type: 'patient_defense',
-            cost: { amount: 1 },
+            cost: { resource: 'focus_points', amount: 1 },
             ...overrides.automation,
         },
         ...overrides,
@@ -58,82 +61,108 @@ function makeAction(overrides = {}) {
 function setupRuntimeMocks(mocks) {
     runtimeState.getRuntimeValue.mockImplementation((player, prop, camp) => {
         const key = `${player}:${prop}:${camp}`;
-        if (key in mocks) {
-            return mocks[key];
-        }
-        return undefined;
+        return mocks[key];
     });
 }
 
-// ── Tests: insufficient focus points ──────────────────────────
+// Handler rolls temp HP as rollDie(die) twice: floor(rand * die) + 1.
+// Raw values below sit well away from roll boundaries (raw 0.9 → d6 6, 0.8 → 5, etc.).
+let randomSpy = null;
+function stubRolls(rawValues) {
+    let i = 0;
+    randomSpy = vi.spyOn(Math, 'random').mockImplementation(() => rawValues[i++] ?? 0.5);
+}
 
-describe('patientDefenseHandler — insufficient focus points', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
+beforeEach(() => {
+    vi.clearAllMocks();
+    buffToggle.isBuffActive.mockReturnValue(false);
+});
 
-    it('returns popup with disengage only when focus points are 0', async () => {
+afterEach(() => {
+    randomSpy?.mockRestore();
+    randomSpy = null;
+});
+
+// ── Refuse branch: FP < cost → plain Disengage, no spend ─────
+
+describe('patientDefenseHandler — insufficient focus (plain Disengage refusal)', () => {
+
+    it('FP=0 base: popup Disengage-only, no FP write, no Dodge buff', async () => {
         setupRuntimeMocks({
             'TestMonk:focusPoints:test-campaign': 0,
         });
 
-        const action = makeAction();
-        const playerStats = makePlayerStats(2, 0);
-        const result = await handle(action, playerStats, campaignName);
+        const result = await handle(makeAction(), makePlayerStats(2, 0), campaignName);
 
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.name).toBe('Patient Defense');
-        expect(result.payload.description).toContain('Disengage');
-        expect(result.payload.description).toContain('0/1 Focus Points');
+        expect(result.payload.description).toBe(
+            'TestMonk used Patient Defense: Disengage as a bonus action. (No Focus Points available for Dodge. 0/1 Focus Points)'
+        );
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
         expect(expirations.addExpiration).not.toHaveBeenCalled();
+        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+            type: 'ability_use',
+            characterName: 'TestMonk',
+            abilityName: 'Patient Defense',
+            description: 'TestMonk used Patient Defense to Disengage as a bonus action (no Focus Points available for Dodge).',
+        });
     });
 
-    it('returns popup with disengage only for heightened version when focus points are 0', async () => {
+    it('FP=0 heightened: refusal wording flags temp HP too, zero FP writes (CLA-247)', async () => {
         setupRuntimeMocks({
             'TestMonk:focusPoints:test-campaign': 0,
         });
 
-        const action = makeAction({ name: 'Heightened Patient Defense' });
-        const playerStats = makePlayerStats(10, 0, 6);
-        const result = await handle(action, playerStats, campaignName);
+        const result = await handle(
+            makeAction({ name: 'Heightened Patient Defense' }),
+            makePlayerStats(10, 0, 6),
+            campaignName
+        );
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
         expect(result.payload.name).toBe('Heightened Patient Defense');
-        expect(result.payload.description).toContain('Disengage');
-        expect(result.payload.description).toContain('0/1 Focus Points');
+        expect(result.payload.description).toBe(
+            'TestMonk used Heightened Patient Defense: Disengage as a bonus action. (No Focus Points available for Dodge + Temporary Hit Points. 0/1 Focus Points)'
+        );
+        const focusWrites = runtimeState.setRuntimeValue.mock.calls.filter(
+            call => call[1] === 'focusPoints',
+        );
+        expect(focusWrites).toHaveLength(0);
         expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
         expect(expirations.addExpiration).not.toHaveBeenCalled();
+        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'ability_use',
+            abilityName: 'Heightened Patient Defense',
+            description: 'TestMonk used Heightened Patient Defense to Disengage as a bonus action (no Focus Points available for Dodge).',
+        }));
     });
 });
 
-// ── Tests: successful execution — base Patient Defense ────────
+// ── Spend branch: base Patient Defense ─────────────────────────
 
-describe('patientDefenseHandler — base Patient Defense', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
+describe('patientDefenseHandler — base Patient Defense (spend 1 FP)', () => {
 
-    it('deducts focus, activates Dodge, and returns popup with remaining focus', async () => {
+    it('spends 1 FP, toggles Dodge + expiration, exact popup and log, no dice rolled', async () => {
         setupRuntimeMocks({
             'TestMonk:focusPoints:test-campaign': 2,
         });
+        stubRolls([]);
 
-        const action = makeAction();
-        const playerStats = makePlayerStats(2, 2);
-        const result = await handle(action, playerStats, campaignName);
+        const result = await handle(makeAction(), makePlayerStats(2, 2), campaignName);
 
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.name).toBe('Patient Defense');
-        expect(result.payload.description).toContain('Disengage and Dodge');
-        expect(result.payload.description).toContain('1 Focus Points remaining');
+        expect(result.payload.automationType).toBe('patient_defense');
         expect(result.payload.automation).toEqual({
             type: 'patient_defense',
-            cost: { amount: 1 },
+            cost: { resource: 'focus_points', amount: 1 },
         });
+        expect(result.payload.description).toBe(
+            'TestMonk used Patient Defense: Disengage and Dodge as a bonus action. (1 Focus Points remaining).'
+        );
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'focusPoints', 1, campaignName);
         expect(buffToggle.toggleBuff).toHaveBeenCalledWith('TestMonk', 'Dodge', {
             effect: 'dodge',
@@ -148,191 +177,117 @@ describe('patientDefenseHandler — base Patient Defense', () => {
             abilityName: 'Patient Defense',
             description: 'TestMonk used Patient Defense to Disengage and Dodge',
         });
+        // Base branch grants no temp HP — must not roll dice.
+        expect(randomSpy).not.toHaveBeenCalled();
     });
 
-    it('does not toggle Dodge or add expiration if Dodge is already active', async () => {
+    it('does not toggle Dodge or add expiration if Dodge is already active (still spends FP)', async () => {
         setupRuntimeMocks({
             'TestMonk:focusPoints:test-campaign': 2,
         });
         buffToggle.isBuffActive.mockReturnValue(true);
 
-        const action = makeAction();
-        const playerStats = makePlayerStats(2, 2);
-
-        await handle(action, playerStats, campaignName);
+        await handle(makeAction(), makePlayerStats(2, 2), campaignName);
 
         expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
         expect(expirations.addExpiration).not.toHaveBeenCalled();
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'focusPoints', 1, campaignName);
-
-        // Reset mock to default for subsequent tests
-        buffToggle.isBuffActive.mockReset();
     });
 
-    it('falls back to maxFocusPoints when runtime value is undefined', async () => {
+    it('falls back to class-table maxFocus when runtime focusPoints is undefined', async () => {
         setupRuntimeMocks({});
 
-        const action = makeAction();
-        const playerStats = makePlayerStats(2, 3);
-        const result = await handle(action, playerStats, campaignName);
+        const result = await handle(makeAction(), makePlayerStats(2, 3), campaignName);
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Disengage and Dodge');
-        expect(result.payload.description).toContain('2 Focus Points remaining');
+        expect(result.payload.description).toBe(
+            'TestMonk used Patient Defense: Disengage and Dodge as a bonus action. (2 Focus Points remaining).'
+        );
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'focusPoints', 2, campaignName);
     });
 });
 
-// ── Tests: successful execution — Heightened Patient Defense ──
+// ── Spend branch: heightened (temp HP = 2 × martial arts die) ─
 
-describe('patientDefenseHandler — heightened Patient Defense', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
+describe('patientDefenseHandler — heightened Patient Defense (temp HP)', () => {
 
-    it('deducts focus, grants temp HP, and returns popup with details', async () => {
+    it('spends FP, rolls 2d6 for temp HP, exact popup + log', async () => {
         setupRuntimeMocks({
             'TestMonk:focusPoints:test-campaign': 2,
             'TestMonk:tempHp:test-campaign': 0,
         });
+        stubRolls([0.9, 0.8]); // d6 rolls: 6 + 5 = 11
 
-        const action = makeAction({ name: 'Heightened Patient Defense' });
-        const playerStats = makePlayerStats(10, 2, 6);
-        const result = await handle(action, playerStats, campaignName);
+        const result = await handle(
+            makeAction({ name: 'Heightened Patient Defense' }),
+            makePlayerStats(10, 2, 6),
+            campaignName
+        );
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.name).toBe('Heightened Patient Defense');
-        expect(result.payload.description).toContain('Disengage and Dodge');
-        expect(result.payload.description).toContain('temporary hit points');
-        expect(result.payload.description).toContain('1 Focus Points remaining');
+        expect(result.payload.automationType).toBe('patient_defense');
+        expect(result.payload.description).toBe(
+            'TestMonk used Heightened Patient Defense: Disengage and Dodge as a bonus action. Gained 11 temporary hit points (2 × 6-sided die). (1 Focus Points remaining).'
+        );
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'focusPoints', 1, campaignName);
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'tempHp', expect.any(Number), campaignName);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'tempHp', 11, campaignName);
         expect(buffToggle.toggleBuff).toHaveBeenCalled();
         expect(expirations.addExpiration).toHaveBeenCalled();
         expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
             type: 'ability_use',
             characterName: 'TestMonk',
             abilityName: 'Heightened Patient Defense',
-            description: expect.stringContaining('temporary hit points'),
+            description: 'TestMonk used Heightened Patient Defense to Disengage and Dodge with 11 temporary hit points',
         });
     });
 
-    it('preserves existing temp HP when new roll is lower', async () => {
+    it('keeps higher existing temp HP when new roll is lower', async () => {
         setupRuntimeMocks({
             'TestMonk:focusPoints:test-campaign': 2,
             'TestMonk:tempHp:test-campaign': 10,
         });
-        buffToggle.isBuffActive.mockReturnValue(true);
+        stubRolls([0.55, 0.4]); // d6 rolls: 4 + 3 = 7 < 10
 
-        const action = makeAction({ name: 'Heightened Patient Defense' });
-        const playerStats = makePlayerStats(10, 2, 6);
-
-        await handle(action, playerStats, campaignName);
-
-        // Verify setRuntimeValue was called for tempHp with a value >= existing (10)
-        const tempHpCalls = runtimeState.setRuntimeValue.mock.calls.filter(
-            call => call[1] === 'tempHp',
+        await handle(
+            makeAction({ name: 'Heightened Patient Defense' }),
+            makePlayerStats(10, 2, 6),
+            campaignName
         );
-        expect(tempHpCalls.length).toBe(1);
-        expect(tempHpCalls[0][2]).toBeGreaterThanOrEqual(10);
 
-        // Reset mock to default for subsequent tests
-        buffToggle.isBuffActive.mockReset();
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'tempHp', 10, campaignName);
+    });
+
+    it('replaces existing temp HP when new roll is higher', async () => {
+        setupRuntimeMocks({
+            'TestMonk:focusPoints:test-campaign': 2,
+            'TestMonk:tempHp:test-campaign': 10,
+        });
+        stubRolls([0.99, 0.99]); // d6 rolls: 6 + 6 = 12 > 10
+
+        await handle(
+            makeAction({ name: 'Heightened Patient Defense' }),
+            makePlayerStats(10, 2, 6),
+            campaignName
+        );
+
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'tempHp', 12, campaignName);
     });
 });
 
-// ── Tests: popup payload structure ────────────────────────────
-
-describe('patientDefenseHandler — popup payload structure', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    it('includes automationType in popup payload', async () => {
-        setupRuntimeMocks({
-            'TestMonk:focusPoints:test-campaign': 2,
-        });
-
-        const action = makeAction();
-        const playerStats = makePlayerStats(2, 2);
-        const result = await handle(action, playerStats, campaignName);
-
-        expect(result.payload.automationType).toBe('patient_defense');
-    });
-});
-
-// ── Tests: error handling ─────────────────────────────────────
-
-describe('patientDefenseHandler — error handling', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    it('does not throw when addEntry rejects', async () => {
-        setupRuntimeMocks({
-            'TestMonk:focusPoints:test-campaign': 2,
-        });
-
-        logService.addEntry.mockRejectedValue(new Error('log error'));
-
-        const action = makeAction();
-        const playerStats = makePlayerStats(2, 2);
-        const result = await handle(action, playerStats, campaignName);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('1 Focus Points remaining');
-    });
-});
-
-// ── Tests: automation config variations ───────────────────────
-
-describe('patientDefenseHandler — automation config variations', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    it('handles action without automation property', async () => {
-        setupRuntimeMocks({
-            'TestMonk:focusPoints:test-campaign': 2,
-        });
-
-        const action = { name: 'Patient Defense' };
-        const playerStats = makePlayerStats(2, 2);
-
-        await expect(handle(action, playerStats, campaignName)).rejects.toThrow();
-    });
-
-    it('handles automation without cost property (defaults to 1)', async () => {
-        setupRuntimeMocks({
-            'TestMonk:focusPoints:test-campaign': 2,
-        });
-
-        const action = makeAction({ automation: {} });
-        const playerStats = makePlayerStats(2, 2);
-        const result = await handle(action, playerStats, campaignName);
-
-        expect(result.payload.description).toContain('1 Focus Points remaining');
-    });
-});
-
-// ── Tests: CLA-247 single FP writer ─────────────────────────────
+// ── CLA-247: handler is the sole FP writer ─────────────────────
 
 describe('patientDefenseHandler — CLA-247 single FP writer', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
 
-    it('focus mode spends exactly 1 FP once and popup arithmetic matches (17 → 16)', async () => {
+    it('heightened spends exactly 1 FP once, popup arithmetic matches (17 → 16)', async () => {
         setupRuntimeMocks({
             'TestMonk:focusPoints:test-campaign': 17,
             'TestMonk:tempHp:test-campaign': 0,
         });
+        stubRolls([0.99, 0.99]); // d12 rolls: 12 + 12 = 24
 
-        const action = makeAction({ name: 'Heightened Patient Defense' });
-        const playerStats = makePlayerStats(17, 17, 12);
-
-        const result = await handle(action, playerStats, campaignName);
+        const result = await handle(
+            makeAction({ name: 'Heightened Patient Defense' }),
+            makePlayerStats(17, 17, 12),
+            campaignName
+        );
 
         const focusWrites = runtimeState.setRuntimeValue.mock.calls.filter(
             call => call[1] === 'focusPoints',
@@ -349,36 +304,26 @@ describe('patientDefenseHandler — CLA-247 single FP writer', () => {
         const listener = vi.fn();
         window.addEventListener('focus-points-updated', listener);
 
-        const action = makeAction();
-        const playerStats = makePlayerStats(2, 5);
-
-        await handle(action, playerStats, campaignName);
+        await handle(makeAction(), makePlayerStats(2, 5), campaignName);
 
         expect(listener).toHaveBeenCalledTimes(1);
         window.removeEventListener('focus-points-updated', listener);
     });
+});
 
-    it('FP=0 reaches plain Disengage branch: logs Disengage, spends no FP, no Dodge', async () => {
+// ── Resilience ─────────────────────────────────────────────────
+
+describe('patientDefenseHandler — resilience', () => {
+
+    it('does not throw when addEntry rejects — popup still returned', async () => {
         setupRuntimeMocks({
-            'TestMonk:focusPoints:test-campaign': 0,
+            'TestMonk:focusPoints:test-campaign': 2,
         });
+        logService.addEntry.mockRejectedValueOnce(new Error('log error'));
 
-        const action = makeAction({ name: 'Heightened Patient Defense' });
-        const playerStats = makePlayerStats(17, 17);
+        const result = await handle(makeAction(), makePlayerStats(2, 2), campaignName);
 
-        const result = await handle(action, playerStats, campaignName);
-
-        const focusWrites = runtimeState.setRuntimeValue.mock.calls.filter(
-            call => call[1] === 'focusPoints',
-        );
-        expect(focusWrites).toHaveLength(0);
-        expect(buffToggle.toggleBuff).not.toHaveBeenCalled();
-        expect(result.payload.description).toContain('Disengage as a bonus action');
-        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-            type: 'ability_use',
-            characterName: 'TestMonk',
-            abilityName: 'Heightened Patient Defense',
-            description: expect.stringContaining('Disengage as a bonus action'),
-        }));
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('1 Focus Points remaining');
     });
 });

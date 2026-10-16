@@ -1,8 +1,21 @@
-// WM-004: Push weapon mastery — hit applies instant 10 ft push te (Large or
-// smaller gate via MN-015 validateSizeLimit) + ability_use log.
+// @maintained-by-ai
+// WM-004: Push weapon mastery lane — owns applyPushMastery (weaponMasteryHandler.js ~:277):
+// size-gate delegation to MN-015 validateSizeLimit, direct instant push te write
+// (bypasses registerTargetEffect by design — mirrors shieldBash), own-composed
+// accept/refusal ability_use logs, popup envelope.
+// Lane boundaries:
+// - Description strings owned by weaponMasteryHandler.description.test.js — the popup
+//   here pins delegation to buildMasteryDescription output, never re-pins its text.
+// - Size resolution precedence (monster data → combatSummary fallback) canonically lives
+//   in validateSizeLimit.mn015.test.js — only the accept/refuse branch behaviour of
+//   applyPushMastery is pinned here, so the fallback-miss smoke test was removed.
+// - Registry internals owned by targetEffectDefinitions.test.js — only the existence of
+//   the 'push' te key is pinned here (cross-module contract its generic loops cannot
+//   catch: a dropped entry just shrinks the loop). label/group pins removed.
+// Does not import applyPostDamageMasteryEffects (postDamage lane — disjoint).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { applyMasteryEffect, MASTERY_EFFECTS } from './weaponMasteryHandler.js';
+import { applyMasteryEffect, MASTERY_EFFECTS, buildMasteryDescription } from './weaponMasteryHandler.js';
 import { getEffectDefinition } from '../../../combat/conditions/targetEffectDefinitions.js';
 
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
@@ -39,9 +52,7 @@ const campaignName = 'test-campaign';
 function makePlayerStats(overrides = {}) {
     return {
         name: 'DraconicDragon',
-        proficiency: 6,
         size: 'Medium',
-        abilities: [{ name: 'Strength', bonus: 5 }],
         ...overrides,
     };
 }
@@ -57,90 +68,96 @@ beforeEach(() => {
 });
 
 describe('MASTERY_EFFECTS Push entry', () => {
-    it('has a Push entry shaped consistently with Slow/Sap siblings', () => {
-        expect(MASTERY_EFFECTS.Push).toBeDefined();
-        expect(MASTERY_EFFECTS.Push.effect).toBe('push');
-        expect(MASTERY_EFFECTS.Push.value).toBe(10);
-        expect(MASTERY_EFFECTS.Push.sizeLimit).toBe('large_or_smaller');
+    it('pins the Push entry shape: instant 10 ft push, Large-or-smaller gate, no save', () => {
+        expect(MASTERY_EFFECTS.Push).toMatchObject({
+            effect: 'push',
+            value: 10,
+            sizeLimit: 'large_or_smaller',
+        });
         expect(MASTERY_EFFECTS.Push.requiresSave).toBeUndefined();
     });
 
-    it('push is registered in the target effect registry', () => {
-        const def = getEffectDefinition('push');
-        expect(def).toBeDefined();
-        expect(def.label).toBe('Pushed');
-        expect(def.group).toBe('Movement');
+    it('push te key is registered in the target effect registry (internals owned by targetEffectDefinitions.test.js)', () => {
+        expect(getEffectDefinition('push')).toBeDefined();
     });
 });
 
 describe('applyMasteryEffect Push', () => {
-    it('writes instant push targetEffect value 10 and logs on a Medium target', async () => {
+    it('accept path: writes instant push te verbatim, returns mastery_rider popup carrying buildMasteryDescription, logs ability_use', async () => {
         vi.mocked(damageUtils.getCombatContext).mockResolvedValue(combatSummaryWith('Thug 1', 'Medium'));
         vi.mocked(monsterUtils.getMonsterData).mockResolvedValue({ size: 'Medium' });
 
         const result = await applyMasteryEffect('Push', makePlayerStats(), campaignName, 'Thug 1');
 
-        const setCalls = vi.mocked(useRuntimeState.setRuntimeValue).mock.calls;
-        const teWrite = setCalls.find(c => c[1] === 'targetEffects');
-        expect(teWrite).toBeDefined();
-        const te = teWrite[2].find(t => t.effect === 'push');
-        expect(te).toMatchObject({
+        // Direct write (applyPushMastery bypasses registerTargetEffect): append to the
+        // stored [] with the exact te shape consumers read.
+        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [{
             target: 'Thug 1',
             source: 'Push',
             option: 'Push',
             effect: 'push',
             value: 10,
             duration: 'instant',
+        }], campaignName);
+
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Push',
+                // Delegation pin: the popup carries buildMasteryDescription's output —
+                // its text is pinned exactly in the description lane.
+                description: buildMasteryDescription('Push', 'Thug 1'),
+                automation: { type: 'mastery_rider', masteries: ['Push'] },
+            },
         });
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('pushed up to 10 feet straight away');
-
-        const log = vi.mocked(logService.addEntry).mock.calls.map(c => c[1])
-            .find(e => e.type === 'ability_use' && e.abilityName === 'Push');
-        expect(log).toBeDefined();
-        expect(log.description).toContain('Thug 1');
-        expect(log.description).toContain('pushed 10 feet');
+        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+            type: 'ability_use',
+            characterName: 'DraconicDragon',
+            abilityName: 'Push',
+            description: 'DraconicDragon used Push on Thug 1 — pushed 10 feet straight away.',
+            targetName: 'Thug 1',
+        });
     });
 
-    it('falls back to combatSummary target.size when monster data has no entry', async () => {
-        vi.mocked(damageUtils.getCombatContext).mockResolvedValue(combatSummaryWith('Thug 1', 'Medium'));
-        vi.mocked(monsterUtils.getMonsterData).mockResolvedValue(null);
-
-        const result = await applyMasteryEffect('Push', makePlayerStats(), campaignName, 'Thug 1');
-
-        expect(result.type).toBe('popup');
-        const teWrite = vi.mocked(useRuntimeState.setRuntimeValue).mock.calls.find(c => c[1] === 'targetEffects');
-        expect(teWrite[2].some(t => t.effect === 'push' && t.target === 'Thug 1')).toBe(true);
-    });
-
-    it('refuses a Huge target: no targetEffect, refusal log, no push-applied wording', async () => {
+    it('refuses a Huge target: no te write, refusal popup without rider, own refusal log', async () => {
         vi.mocked(damageUtils.getCombatContext).mockResolvedValue(combatSummaryWith('Hill Giant 1', 'Huge'));
         vi.mocked(monsterUtils.getMonsterData).mockResolvedValue({ size: 'Huge' });
 
         const result = await applyMasteryEffect('Push', makePlayerStats(), campaignName, 'Hill Giant 1');
 
+        // No-side-effect guard: the size gate short-circuits before any write.
         const teWrites = vi.mocked(useRuntimeState.setRuntimeValue).mock.calls.filter(c => c[1] === 'targetEffects');
         expect(teWrites.length).toBe(0);
 
         expect(result.type).toBe('popup');
+        expect(result.payload.name).toBe('Push');
+        // Popup description delegates to validateSizeLimit's refusal composition.
         expect(result.payload.description).toContain('Huge');
-        expect(result.payload.description).toContain('Large or smaller');
+        expect(result.payload.description).toContain('too large');
+        expect(result.payload.automation).toBeUndefined();
 
         const logs = vi.mocked(logService.addEntry).mock.calls.map(c => c[1]);
         const refusal = logs.find(e => e.type === 'ability_use' && e.abilityName === 'Push');
         expect(refusal).toBeDefined();
-        expect(refusal.description).toContain('too large');
+        // Own composition pinned byte-exact up to the delegated validator segment.
+        expect(refusal.description).toMatch(/^DraconicDragon attacked Hill Giant 1 with a Push weapon but did not push it — Push: /);
         expect(refusal.description).not.toContain('pushed 10 feet');
+        expect(refusal.targetName).toBe('Hill Giant 1');
     });
 
-    it('keeps sibling masteries intact: Slow still writes speed_reduction te', async () => {
-        vi.mocked(damageUtils.getCombatContext).mockResolvedValue(combatSummaryWith('Thug 1', 'Medium'));
-
+    it('generic-path sibling intact: Slow writes speed_reduction te value 10 until start of next turn', async () => {
         const result = await applyMasteryEffect('Slow', makePlayerStats(), campaignName, 'Thug 1');
 
         expect(result.type).toBe('popup');
-        const teWrite = vi.mocked(useRuntimeState.setRuntimeValue).mock.calls.find(c => c[1] === 'targetEffects');
-        expect(teWrite[2].some(t => t.effect === 'speed_reduction' && t.value === 10)).toBe(true);
+        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [{
+            target: 'Thug 1',
+            source: 'Slow',
+            option: 'Slow',
+            effect: 'speed_reduction',
+            value: 10,
+            duration: 'until_start_of_next_turn',
+        }], campaignName);
     });
 });

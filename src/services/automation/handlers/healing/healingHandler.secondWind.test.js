@@ -1,5 +1,36 @@
-// CLA-305 regression: generic self_healing expression branch must heal rollTotal+bonus,
-// must not consume a use when no HP is actually gained, and must refuse at 0 HP.
+// @maintained-by-ai
+//
+// ── #1812 secondWind lane — healingHandler.js handleSelfHealing ───────────
+// SUBJECT: the generic self_healing branch of handleSelfHealing in
+// healingHandler.js (CLA-305 regression: must heal rollTotal+bonus, must not
+// consume a use when no HP is actually gained, must refuse at 0 HP).
+// Real data: Second Wind '1d10 + fighter level' (public/data/classes.json:5557,
+// public/data/2024/classes.json:4509). Production caller:
+// src/services/automation/index.js `self_healing:` → handleHealing.
+// LIVE, verified 2026-10-15.
+//
+// This lane owns (amount pins are UNIQUE here — sibling suites mock
+// applyHealingDirectly to fixed returns and never pin the amount argument):
+//   - heal amount = roll total (+ passive bonus, no double-count)
+//   - Second Wind use consumption: exactly one spent iff actualHeal > 0,
+//     skipSync=true write, remainingUses/rollInfo echoed to SSE
+//   - refusal branches: full-HP gate (before any roll), zero-delta race
+//     (no use spent), 0-HP unconscious RAW refusal, 0-use gate ordering
+//     before HP gates
+//   - hit_die_roll branch: healAmount = computeHitDieRecovery total with
+//     resolveHealingBonusesWithDetails NEVER called (CLA-305 no-double-add)
+//   - evaluated-number expressions (3 * monk_level) route through the same
+//     amount fix with their own resourceKey consumption
+//
+// NOT owned here (lane map in healingHandler.battleMedic.test.js):
+//   - handleHealersKit kit seam → healingHandler.battleMedic.test.js
+//   - handleMonkHealing / cla159 picker → monk.test.js, cla159.test.js
+//   - triggerTacticalShift riders (hasTacticalShift mocked false below)
+//     → healingHandler.tacticalShift.test.js
+//   - generic self-path dispatch/gate/uses bookkeeping → healingHandler.test.js (#1815)
+//   - handleUsesHealing / handleFlatHeal → healingHandler.targeted.test.js (#1814)
+//
+// Deterministic: all seams mocked, no timers, inert fetch from setup.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../dice/diceRoller.js', async (importOriginal) => {
@@ -108,7 +139,7 @@ describe('CLA-305 Second Wind generic self_healing branch', () => {
       23,
       campaignName,
     );
-    expect(result.payload.description).toContain('Regained 5 HP');
+    expect(result.payload.description).toBe('Second Wind: 1d10 + 18=23 (5) — Regained 5 HP (3 uses remaining).');
   });
 
   it('adds passive healing bonuses on top of the roll total without double-counting', async () => {
@@ -149,9 +180,7 @@ describe('CLA-305 Second Wind generic self_healing branch', () => {
 
     const result = await handle(makeSecondWind(), makeFighterStats({ currentHitPoints: 94 }), campaignName, null);
 
-    expect(result.payload.description).toContain('Already at full HP');
-    expect(result.payload.description).toContain('No use spent');
-    expect(result.payload.description).toContain('4 uses remaining');
+    expect(result.payload.description).toBe('Second Wind: Already at full HP (4 uses remaining). No use spent.');
     expect(diceRoller.rollExpression).not.toHaveBeenCalled();
     expect(healingRoll.applyHealingDirectly).not.toHaveBeenCalled();
     expect(healingRoll.logHealingToSSE).not.toHaveBeenCalled();
@@ -164,9 +193,7 @@ describe('CLA-305 Second Wind generic self_healing branch', () => {
 
     const result = await handle(makeSecondWind(), makeFighterStats(), campaignName, null);
 
-    expect(result.payload.description).toContain('Already at full HP');
-    expect(result.payload.description).toContain('No use spent');
-    expect(result.payload.description).toContain('4 uses remaining');
+    expect(result.payload.description).toBe('Second Wind: 1d10 + 18=23 (5) — Already at full HP (4 uses remaining). No use spent.');
     const usesCalls = runtimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'secondWindUses');
     expect(usesCalls).toHaveLength(0);
     expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith(campaignName, expect.objectContaining({
@@ -179,7 +206,7 @@ describe('CLA-305 Second Wind generic self_healing branch', () => {
 
     const result = await handle(makeSecondWind(), makeFighterStats({ currentHitPoints: 0 }), campaignName, null);
 
-    expect(result.payload.description).toContain("can't be used while unconscious at 0 Hit Points");
+    expect(result.payload.description).toBe("Second Wind can't be used while unconscious at 0 Hit Points.");
     expect(diceRoller.rollExpression).not.toHaveBeenCalled();
     expect(healingRoll.applyHealingDirectly).not.toHaveBeenCalled();
     const usesCalls = runtimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'secondWindUses');
@@ -191,7 +218,7 @@ describe('CLA-305 Second Wind generic self_healing branch', () => {
 
     const result = await handle(makeSecondWind(), makeFighterStats({ currentHitPoints: 0 }), campaignName, null);
 
-    expect(result.payload.description).toContain('no uses remaining');
+    expect(result.payload.description).toBe('Second Wind has no uses remaining. Recharges on a Short Rest.');
   });
 
   it('hit_die_roll branch keeps computeHitDieRecovery total with no double-add of bonus', async () => {
@@ -206,7 +233,7 @@ describe('CLA-305 Second Wind generic self_healing branch', () => {
     expect(restRules.computeHitDieRecovery).toHaveBeenCalledWith(23, 5);
     expect(healingRoll.applyHealingDirectly).toHaveBeenCalledWith(expect.anything(), 'EvasiveFighter', 12, campaignName);
     expect(automationService.resolveHealingBonusesWithDetails).not.toHaveBeenCalled();
-    expect(result.payload.description).toContain('2 hit dice remaining');
+    expect(result.payload.description).toBe('Second Wind: 1d10=23 (5) — Regained 5 HP (2 hit dice remaining).');
   });
 
   it('flat-expression self heals (3 * monk_level) route roll total through the same fix', async () => {

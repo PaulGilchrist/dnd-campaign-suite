@@ -1,3 +1,26 @@
+// @maintained-by-ai
+// Router-contract oracle for the LIVE `multi_target_spread` route:
+// automation/index.js HANDLER_MAP (:369) → executeHandler ← CharSpecialActions
+// handleAutomationClick (row click via automationRouter routePassiveSpecial).
+//
+// ⚠️ VESTIGIAL FLOW — FLAGGED FOR OWNERS: the emitted `multi_target_selection`
+// popup has NO dedicated UI consumer (zero hits in src/components/ outside this
+// handler; sibling `applyMultiTarget` apply-lane export was confirmed dead and
+// its test deleted). A row click therefore renders only the generic
+// buildAutomationPopupHtml dismiss popup (name + description), and the two-step
+// second-target selection can never complete. Real multi-target spell selection
+// lives on other lanes (spellCastService/modalSpells.js, useSpellMetamagicGates,
+// postCastRiderService.getMultiTargetSpreads) — deliberately NOT covered here.
+// Source owners to decide: build the missing selection UI or delete
+// handler + this test wholesale.
+//
+// Pins kept to the honest minimum: the user-visible automation_info popups
+// (buildAutomationPopupHtml renders payload.name + payload.description), the
+// popup type the live route still returns, first-target exclusion, and the
+// resolveMapPositions side effect. Deep payload structure of the unconsumed
+// selection popup (range defaults, spellFilter, full payload shape) is
+// deliberately NOT pinned.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────
@@ -49,8 +72,11 @@ vi.mock('../../../rules/features/invisibilityService.js', () => ({
 import { handle } from './multiTargetHandler.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
-import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
+import { addEntry } from '../../../ui/logService.js';
+import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 
 import {
   campaignName,
@@ -60,224 +86,88 @@ import {
   makeCombatSummary,
 } from './multiTargetHandler.test-utils.js';
 
+const creatures = [
+  { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
+  { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
+  { name: 'Ally', type: 'player' },
+];
 
-function makeBaseCs(creatures = [], players = []) {
-  return makeCombatSummary(creatures, players);
-}
-
-describe('multiTargetHandler.handle', () => {
+describe('multiTargetHandler.handle (router contract)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getCombatContext.mockResolvedValue(makeBaseCs());
-    getCombatSummary.mockImplementation(() => makeBaseCs());
+    getCombatContext.mockResolvedValue(makeCombatSummary(creatures));
+    getCombatSummary.mockReturnValue(makeCombatSummary(creatures));
   });
 
-  // ── combat context validation ────────────────────────────────
+  // automation_info popups ARE user-visible: handleAutomationClick renders
+  // payload.name + payload.description through buildAutomationPopupHtml.
 
-  describe('combat context validation', () => {
-    it('should return automation_info popup when no combat context exists', async () => {
-      getCombatContext.mockResolvedValue(null);
-      const ps = makePlayerStats();
-      const action = makeAction();
+  it('returns an automation_info popup when no combat context exists', async () => {
+    getCombatContext.mockResolvedValue(null);
 
-      const result = await handle(action, ps, campaignName, mapName);
+    const result = await handle(
+      makeAction({}, { payload: { targetName: 'Goblin' } }),
+      makePlayerStats(),
+      campaignName,
+      mapName
+    );
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Word of Creation');
-      expect(result.payload.description).toContain('No combat context found');
-    });
-
-    it('should return automation_info popup when first target not found in combat summary', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({}, { payload: { targetName: 'Goblin' } });
-      getCombatContext.mockResolvedValue(makeBaseCs([{ name: 'Orc' }]));
-
-      const result = await handle(action, ps, campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No first target found');
-    });
-
-    it('should return automation_info popup when action.payload or targetName is missing', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({}, { payload: null });
-      getCombatContext.mockResolvedValue(makeBaseCs([{ name: 'Goblin' }]));
-
-      const result = await handle(action, ps, campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No first target found');
-    });
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.name).toBe('Word of Creation');
+    expect(result.payload.description).toBe('No combat context found. Cannot apply Word of Creation.');
   });
 
-  // ── multi-target selection popup ─────────────────────────────
+  it('returns an automation_info popup when the first target is missing (unknown name or no payload)', async () => {
+    getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Orc' }]));
 
-  describe('multi-target selection popup', () => {
-    function setupContext(creatures = [], players = []) {
-      const cs = makeBaseCs(creatures, players);
-      getCombatContext.mockResolvedValue(cs);
-      getCombatSummary.mockReturnValue(cs);
-      rangeToFeet.mockReturnValue(30);
+    const unknownTarget = await handle(
+      makeAction({}, { payload: { targetName: 'Goblin' } }),
+      makePlayerStats(),
+      campaignName,
+      mapName
+    );
+    const noPayload = await handle(
+      makeAction({}, { payload: null }),
+      makePlayerStats(),
+      campaignName,
+      mapName
+    );
+
+    for (const result of [unknownTarget, noPayload]) {
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toBe('No first target found. Word of Creation requires a target to spread to a second creature.');
     }
-
-    it('should return multi_target_selection popup with correct payload structure', async () => {
-      setupContext(
-        [
-          { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-          { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
-        ],
-        [{ name: 'TestHero', gridX: 5, gridY: 10 }]
-      );
-
-      const result = await handle(
-        makeAction({}, { payload: { targetName: 'Goblin' } }),
-        makePlayerStats(),
-        campaignName,
-        mapName
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('multi_target_selection');
-      expect(result.payload.name).toBe('Word of Creation');
-      expect(result.payload.firstTargetName).toBe('Goblin');
-      expect(result.payload.range).toBe('30 ft');
-      expect(result.payload.creatureTargets).toEqual(['Orc']);
-      expect(result.payload.spellFilter).toEqual([]);
-      expect(result.payload.automation).toEqual({ range: '30 ft' });
-    });
-
-    it('should exclude the first target from creatureTargets', async () => {
-      setupContext([
-        { name: 'Goblin', type: 'monster' },
-        { name: 'Orc', type: 'monster' },
-        { name: 'Ally', type: 'player' },
-      ]);
-
-      const result = await handle(
-        makeAction({}, { payload: { targetName: 'Goblin' } }),
-        makePlayerStats(),
-        campaignName,
-        mapName
-      );
-
-      expect(result.payload.creatureTargets).not.toContain('Goblin');
-      expect(result.payload.creatureTargets).toContain('Orc');
-      expect(result.payload.creatureTargets).toContain('Ally');
-    });
-
-    it('should use default range when automation.range is missing', async () => {
-      rangeToFeet.mockReturnValue(10);
-      getCombatContext.mockResolvedValue(makeBaseCs([{ name: 'Goblin' }]));
-      getCombatSummary.mockReturnValue(makeBaseCs([{ name: 'Goblin' }]));
-
-      const result = await handle(
-        makeAction({ range: undefined }, { payload: { targetName: 'Goblin' } }),
-        makePlayerStats(),
-        campaignName,
-        mapName
-      );
-
-      expect(result.payload.range).toBe('10 ft');
-    });
-
-    it('should include spellFilter in payload when provided', async () => {
-      setupContext([{ name: 'Goblin' }]);
-
-      const result = await handle(
-        makeAction({ spellFilter: ['evocation', 'conjuration'] }, { payload: { targetName: 'Goblin' } }),
-        makePlayerStats(),
-        campaignName,
-        mapName
-      );
-
-      expect(result.payload.spellFilter).toEqual(['evocation', 'conjuration']);
-    });
-
-    it('should return empty creatureTargets when combat summary has no creatures', async () => {
-      getCombatContext.mockResolvedValue(makeBaseCs([{ name: 'Goblin' }]));
-      getCombatSummary.mockReturnValue(makeBaseCs());
-
-      const result = await handle(
-        makeAction({}, { payload: { targetName: 'Goblin' } }),
-        makePlayerStats(),
-        campaignName,
-        mapName
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('multi_target_selection');
-      expect(result.payload.creatureTargets).toEqual([]);
-    });
-
-    it('should return empty creatureTargets when first target is the only creature', async () => {
-      setupContext([{ name: 'Goblin' }]);
-
-      const result = await handle(
-        makeAction({}, { payload: { targetName: 'Goblin' } }),
-        makePlayerStats(),
-        campaignName,
-        mapName
-      );
-
-      expect(result.payload.creatureTargets).toEqual([]);
-    });
   });
 
-  // ── range-based creature filtering ───────────────────────────
+  it('returns the multi_target_selection popup, excluding the first target from candidates, after resolving caster map positions', async () => {
+    const result = await handle(
+      makeAction({}, { payload: { targetName: 'Goblin' } }),
+      makePlayerStats(),
+      campaignName,
+      mapName
+    );
 
-  describe('range-based creature filtering', () => {
-    it('should include all creatures when range filtering is disabled (null range or null attackerPos)', async () => {
-      const cs = makeBaseCs(
-        [
-          { name: 'Goblin', type: 'monster' },
-          { name: 'Orc', type: 'monster' },
-          { name: 'Ally', type: 'player' },
-        ],
-        [{ name: 'TestHero', gridX: 5, gridY: 10 }]
-      );
-      getCombatContext.mockResolvedValue(cs);
-      getCombatSummary.mockReturnValue(cs);
-      rangeToFeet.mockReturnValue(null);
-      vi.mocked(resolveMapPositions).mockResolvedValue(null);
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('multi_target_selection');
+    expect(result.payload.name).toBe('Word of Creation');
+    expect(result.payload.firstTargetName).toBe('Goblin');
+    expect(result.payload.creatureTargets).toEqual(['Orc', 'Ally']);
+    expect(resolveMapPositions).toHaveBeenCalledWith(campaignName, mapName, 'TestHero');
+  });
 
-      const result = await handle(
-        makeAction({ range: undefined }, { payload: { targetName: 'Goblin' } }),
-        makePlayerStats(),
-        campaignName,
-        mapName
-      );
+  it('is read-only: never logs, writes runtime state, or applies damage/healing', async () => {
+    await handle(
+      makeAction({}, { payload: { targetName: 'Goblin' } }),
+      makePlayerStats(),
+      campaignName,
+      mapName
+    );
 
-      expect(result.payload.creatureTargets).toContain('Orc');
-      expect(result.payload.creatureTargets).toContain('Ally');
-      expect(result.payload.creatureTargets).not.toContain('Goblin');
-    });
-
-    it('should include all creatures when attackerPos is null even with valid range', async () => {
-      const cs = makeBaseCs(
-        [
-          { name: 'Goblin', type: 'monster' },
-          { name: 'Orc', type: 'monster' },
-          { name: 'Ally', type: 'player' },
-        ],
-        [{ name: 'TestHero', gridX: 5, gridY: 10 }]
-      );
-      getCombatContext.mockResolvedValue(cs);
-      getCombatSummary.mockReturnValue(cs);
-      rangeToFeet.mockReturnValue(30);
-      vi.mocked(resolveMapPositions).mockResolvedValue(null);
-
-      const result = await handle(
-        makeAction({}, { payload: { targetName: 'Goblin' } }),
-        makePlayerStats(),
-        campaignName,
-        mapName
-      );
-
-      expect(result.payload.creatureTargets).toContain('Orc');
-      expect(result.payload.creatureTargets).toContain('Ally');
-      expect(result.payload.creatureTargets).not.toContain('Goblin');
-    });
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    expect(applyHealingToTarget).not.toHaveBeenCalled();
   });
 });

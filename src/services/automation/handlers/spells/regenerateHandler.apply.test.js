@@ -1,3 +1,51 @@
+// @maintained-by-ai
+// ── regenerate QUARTET lane #1947 .apply — applyRegenerateEffect application ─────
+// Seam map lives in regenerateHandler.active.test.js header (#1946). Lanes:
+//   #1946 .active — load guard (isRegenerateActive DEAD export removed there).
+//   #1947 .apply  (this) — expression resolution, HP source resolution (runtime vs
+//                          combatSummary), max-HP clamp, applyHealingToTarget
+//                          delegation, logs, regenerate stamp, regenerateActive pin.
+//   #1948 .sp096  — PC 1/1-placeholder fix locks incl. applyResult consumption
+//                          (mock returns {actualHeal,newHp} there; this lane keeps
+//                          the undefined-applyResult fallback path — no overlap).
+//   #1949 .test   — handle() orchestration only.
+//
+// Export liveness re-verified 2026-10-16 (grep incl. string dispatch):
+//   applyRegenerateEffect — LIVE: index.js imports L14 + re-exports L647; sole
+//   production consumer is regenerateService.js confirmRegenerate L27 (the
+//   regenerate_target_selection popup confirm). isRegenerateActive — dead, per
+//   #1946 header; every live 'regenerateActive' reader (turnStartEffects,
+//   restRules short/long, useInitiativeEffects, clearExpirationEffects) reads the
+//   runtime key directly, so THIS file's flag-write pin is the subject's only
+//   forward-contract pin for the key. Strengthened to an exact one-write table.
+//
+// abilities-ARRAY audit: honest verdict — no bug class in this subject.
+//   applyRegenerateEffect reads only playerStats.name and playerStats.hitPoints
+//   (resolveRegenerateMaxHp fallback) and forwards the object untouched to the
+//   mocked evaluateAutoExpression; the array fixture is inert here.
+// diceRoller is un-mocked but unreachable: every evaluateAutoExpression mock in
+// this file returns a number, so rollInitialHeal never calls rollExpression.
+//
+// Trims applied this pass (33 -> 21 its):
+//   • 3x input-validation its -> 1 (single falsy-guard branch; table loop).
+//   • 2x loose 'default to 33' its -> 1 exact '= 33' popup pin (the only surface
+//     where the un-clamped default is visible; old version passed with any >=2).
+//   • 'use evaluated result as heal amount' — misnomer, amount was clamped (2);
+//     same min() path as the healing-cap block.
+//   • Orc no-runtime cap — same storedHp-null branch as Goblin null-fallback.
+//   • 'fall back to playerStats.hitPoints when creature has no currentHp' —
+//     did not test its name (maxHp resolved from creature.maxHp); outcome
+//     (zero-heal at full) pinned by the at-max test.
+//   • actualHeal-0 return-value dup of at-max test (popup assert folded in).
+//   • 'popup description contains' x2 — substrings of the full-string popupText
+//     pinned via EXPECTED_POPUP_TEXT in the automation_info test.
+//   • self-heal source test — zero discriminating power (entry.sourceName is
+//     undefined on ability_use, so the || fell back to characterName, which holds
+//     for every target).
+//   • dedupe + other-target badge filters -> one exact-output-table test pinning
+//     both operands of the filter predicate.
+//   • null targetEffects — same '|| [] || isArray' one-liner as non-array case.
+// ──────────────────────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -51,6 +99,10 @@ function makeAction(overrides = {}) {
     };
 }
 
+function makeCaster() {
+    return { name: casterName, level: 7, proficiency: 4, abilities: [{ name: 'Wisdom', bonus: 3 }], hitPoints: 50 };
+}
+
 function applyEffect(targetName, actionOverrides = {}, runtimeOverrides = {}) {
     getCombatSummary.mockReturnValue(baseCombatSummary);
     getRuntimeValue.mockImplementation((scope, key) => {
@@ -58,14 +110,13 @@ function applyEffect(targetName, actionOverrides = {}, runtimeOverrides = {}) {
         if (key === 'currentHitPoints') return runtimeOverrides.currentHitPoints ?? null;
         return null;
     });
-    return applyRegenerateEffect(
-        makeAction(actionOverrides),
-        { name: casterName, level: 7, proficiency: 4, abilities: [{ name: 'Wisdom', bonus: 3 }], hitPoints: 50 },
-        campaignName,
-        null,
-        targetName,
-    );
+    return applyRegenerateEffect(makeAction(actionOverrides), makeCaster(), campaignName, null, targetName);
 }
+
+// Handler-composed popupText for the standard scenario: roll 10, Goblin 3/7
+// runtime-HP-missing -> clamped heal 4. Reused across popup + log full-string pins.
+const heal10Text = 'Regained 4 HP (rolled 4d8 + 15 = 10)';
+const EXPECTED_POPUP_TEXT = `Regenerate on Goblin: ${heal10Text}. Target gains 1 HP per turn and is restored to full HP when the effect ends.`;
 
 describe('applyRegenerateEffect', () => {
     beforeEach(() => {
@@ -74,19 +125,13 @@ describe('applyRegenerateEffect', () => {
     });
 
     describe('input validation', () => {
-        it('should return null when targetName is missing', async () => {
-            const result = await applyRegenerateEffect(makeAction(), { name: casterName }, campaignName, null, null);
-            expect(result).toBeNull();
-        });
-
-        it('should return null when targetName is undefined', async () => {
-            const result = await applyRegenerateEffect(makeAction(), { name: casterName }, campaignName, null, undefined);
-            expect(result).toBeNull();
-        });
-
-        it('should return null when targetName is empty string', async () => {
-            const result = await applyRegenerateEffect(makeAction(), { name: casterName }, campaignName, null, '');
-            expect(result).toBeNull();
+        it('should return null for any falsy targetName (guard runs before any roll or write)', async () => {
+            for (const targetName of [null, undefined, '']) {
+                const result = await applyRegenerateEffect(makeAction(), { name: casterName }, campaignName, null, targetName);
+                expect(result).toBeNull();
+            }
+            expect(evaluateAutoExpression).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
     });
 
@@ -106,22 +151,17 @@ describe('applyRegenerateEffect', () => {
             expect(evaluateAutoExpression).toHaveBeenCalledWith('3d8 + 10', expect.any(Object));
         });
 
-        it('should default to 33 when expression evaluation returns non-positive number', async () => {
-            evaluateAutoExpression.mockReturnValue(-5);
-            await applyEffect('Goblin', {}, { currentHitPoints: 5 });
-            expect(applyHealingToTarget).toHaveBeenCalled();
-        });
-
-        it('should default to 33 when expression evaluation returns zero', async () => {
+        it('should default the heal to exactly 33 when evaluation returns non-positive (0 or negative)', async () => {
+            // Popup text carries the un-clamped rolled amount, so '= 33' is the
+            // only honest surface for the resolveRegenerateHealAmount default.
             evaluateAutoExpression.mockReturnValue(0);
-            await applyEffect('Goblin', {}, { currentHitPoints: 5 });
-            expect(applyHealingToTarget).toHaveBeenCalled();
-        });
-
-        it('should use evaluated expression result as heal amount', async () => {
-            evaluateAutoExpression.mockReturnValue(25);
-            await applyEffect('Goblin', {}, { currentHitPoints: 5 });
+            let result = await applyEffect('Goblin', {}, { currentHitPoints: 5 });
+            expect(result.payload.description).toContain('rolled 4d8 + 15 = 33');
             expect(applyHealingToTarget).toHaveBeenCalledWith(baseCombatSummary, 'Goblin', 2, campaignName);
+
+            evaluateAutoExpression.mockReturnValue(-5);
+            result = await applyEffect('Goblin', {}, { currentHitPoints: 5 });
+            expect(result.payload.description).toContain('rolled 4d8 + 15 = 33');
         });
     });
 
@@ -132,16 +172,11 @@ describe('applyRegenerateEffect', () => {
             expect(applyHealingToTarget).toHaveBeenCalledWith(baseCombatSummary, 'Goblin', 1, campaignName);
         });
 
-        it('should not heal if target is already at max HP', async () => {
+        it('should skip applyHealingToTarget and still return popup when target is already at max HP', async () => {
             evaluateAutoExpression.mockReturnValue(25);
-            await applyEffect('Goblin', {}, { currentHitPoints: 7 });
+            const result = await applyEffect('Goblin', {}, { currentHitPoints: 7 });
             expect(applyHealingToTarget).not.toHaveBeenCalled();
-        });
-
-        it('should cap healing for targets with no runtime HP stored', async () => {
-            evaluateAutoExpression.mockReturnValue(100);
-            await applyEffect('Orc', {}, { currentHitPoints: null });
-            expect(applyHealingToTarget).toHaveBeenCalledWith(baseCombatSummary, 'Orc', 5, campaignName);
+            expect(result.type).toBe('popup');
         });
     });
 
@@ -163,178 +198,143 @@ describe('applyRegenerateEffect', () => {
             await applyEffect('Goblin', {}, { currentHitPoints: '' });
             expect(applyHealingToTarget).toHaveBeenCalledWith(baseCombatSummary, 'Goblin', 4, campaignName);
         });
-
-        it('should fall back to playerStats.hitPoints when creature has no currentHp', async () => {
-            const cs = { creatures: [{ name: 'Goblin', type: 'monster', maxHp: 7, currentHp: undefined }] };
-            getCombatSummary.mockReturnValue(cs);
-            getRuntimeValue.mockReturnValue(null);
-            evaluateAutoExpression.mockReturnValue(50);
-            await applyRegenerateEffect(makeAction(), { name: casterName, level: 7, proficiency: 4, abilities: [{ name: 'Wisdom', bonus: 3 }], hitPoints: 50 }, campaignName, null, 'Goblin');
-            expect(applyHealingToTarget).not.toHaveBeenCalled();
-        });
     });
 
     describe('regenerateActive flag', () => {
-        it('should set regenerateActive=true on target', async () => {
+        // ONLY flag-write pin in the subject (isRegenerateActive predicate was
+        // removed as dead in #1946). Exact one-write table — the runtime key's
+        // forward contract for turnStartEffects/restRules/clearExpiration readers.
+        it('should write regenerateActive=true to the target exactly once', async () => {
             evaluateAutoExpression.mockReturnValue(10);
             await applyEffect('Goblin');
-            expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'regenerateActive', true, campaignName);
+            const flagWrites = setRuntimeValue.mock.calls.filter(([, key]) => key === 'regenerateActive');
+            expect(flagWrites).toEqual([['Goblin', 'regenerateActive', true, campaignName]]);
         });
     });
 
     describe('targetEffects badge registration', () => {
-        it('should add a target effect entry for the target', async () => {
+        it('should stamp exactly one {target, effect, source} regenerate entry on a clean registry', async () => {
             evaluateAutoExpression.mockReturnValue(10);
             await applyEffect('Goblin');
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign', 'targetEffects',
-                expect.arrayContaining([expect.objectContaining({ target: 'Goblin', effect: 'regenerate', source: casterName })]),
+                [{ target: 'Goblin', effect: 'regenerate', source: casterName }],
                 campaignName,
             );
         });
 
-        it('should preserve existing targetEffects entries', async () => {
+        it('should preserve other effect entries in order and append the regenerate entry', async () => {
             evaluateAutoExpression.mockReturnValue(10);
             await applyEffect('Goblin', {}, { targetEffects: [{ target: 'Goblin', effect: 'faerie_fire', source: 'Wizard' }] });
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign', 'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({ effect: 'faerie_fire' }),
-                    expect.objectContaining({ effect: 'regenerate' }),
-                ]),
+                [
+                    { target: 'Goblin', effect: 'faerie_fire', source: 'Wizard' },
+                    { target: 'Goblin', effect: 'regenerate', source: casterName },
+                ],
                 campaignName,
             );
         });
 
-        it('should remove existing regenerate effect before adding new one', async () => {
+        it('should replace a stale regenerate on this target only — other targets regenerate survives untouched', async () => {
             evaluateAutoExpression.mockReturnValue(10);
-            await applyEffect('Goblin', {}, { targetEffects: [{ target: 'Goblin', effect: 'regenerate', source: 'OldCleric' }, { target: 'Orc', effect: 'faerie_fire', source: 'Wizard' }] });
-            const call = setRuntimeValue.mock.calls.find(([ , key]) => key === 'targetEffects');
-            const newEffects = call[2];
-            const regen = newEffects.filter((te) => te.target === 'Goblin' && te.effect === 'regenerate');
-            expect(regen.length).toBe(1);
-            expect(regen[0].source).toBe(casterName);
-        });
-
-        it('should not remove regenerate effects from other targets', async () => {
-            evaluateAutoExpression.mockReturnValue(10);
-            await applyEffect('Goblin', {}, { targetEffects: [{ target: 'Orc', effect: 'regenerate', source: 'OtherCleric' }] });
-            const call = setRuntimeValue.mock.calls.find(([ , key]) => key === 'targetEffects');
-            const orcRegen = call[2].filter((te) => te.target === 'Orc' && te.effect === 'regenerate');
-            expect(orcRegen.length).toBe(1);
-            expect(orcRegen[0].source).toBe('OtherCleric');
-        });
-
-        it('should handle null targetEffects gracefully', async () => {
-            evaluateAutoExpression.mockReturnValue(10);
-            await applyEffect('Goblin', {}, { targetEffects: null });
+            await applyEffect('Goblin', {}, { targetEffects: [
+                { target: 'Goblin', effect: 'regenerate', source: 'OldCleric' },
+                { target: 'Orc', effect: 'regenerate', source: 'OtherCleric' },
+            ] });
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign', 'targetEffects',
-                expect.arrayContaining([expect.objectContaining({ effect: 'regenerate' })]),
+                [
+                    { target: 'Orc', effect: 'regenerate', source: 'OtherCleric' },
+                    { target: 'Goblin', effect: 'regenerate', source: casterName },
+                ],
                 campaignName,
             );
         });
 
-        it('should handle non-array targetEffects gracefully', async () => {
+        it('should recover from a non-array targetEffects store', async () => {
             evaluateAutoExpression.mockReturnValue(10);
             await applyEffect('Goblin', {}, { targetEffects: 'not-an-array' });
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'campaign', 'targetEffects',
-                expect.arrayContaining([expect.objectContaining({ effect: 'regenerate' })]),
+                [{ target: 'Goblin', effect: 'regenerate', source: casterName }],
                 campaignName,
             );
         });
     });
 
     describe('logging', () => {
-        it('should log an hp_change entry for the initial heal', async () => {
+        it('should log an hp_change entry with exact heal fields', async () => {
             evaluateAutoExpression.mockReturnValue(10);
             await applyEffect('Goblin');
             const hpCalls = addEntry.mock.calls.filter(([, entry]) => entry && entry.type === 'hp_change');
-            expect(hpCalls.length).toBeGreaterThan(0);
-            const hpEntry = hpCalls[0][1];
-            expect(hpEntry.targetName).toBe('Goblin');
-            expect(hpEntry.delta).toBeGreaterThan(0);
-            expect(hpEntry.isHealing).toBe(true);
-            expect(hpEntry.sourceName).toBe(casterName);
-            expect(hpEntry.note).toBe('Regenerate');
-            expect(hpEntry.formula).toBe('4d8 + 15');
+            expect(hpCalls).toHaveLength(1);
+            const entry = hpCalls[0][1];
+            expect(entry).toMatchObject({
+                type: 'hp_change',
+                targetName: 'Goblin',
+                delta: 4,
+                currentHp: 7,
+                maxHp: 7,
+                isHealing: true,
+                sourceName: casterName,
+                note: 'Regenerate',
+                formula: '4d8 + 15',
+                rollTotal: 10,
+            });
+            // Numeric-eval lane produces no individual dice (rolls surfaced in #1948 notation lane).
+            expect(entry.rolls).toBeUndefined();
+            expect(hpCalls[0][0]).toBe(campaignName);
         });
 
-        it('should log an ability_use entry', async () => {
+        it('should log an ability_use entry with the full composed popup text', async () => {
             evaluateAutoExpression.mockReturnValue(10);
             await applyEffect('Goblin');
             const abilityCalls = addEntry.mock.calls.filter(([, entry]) => entry && entry.type === 'ability_use');
-            expect(abilityCalls.length).toBeGreaterThan(0);
-            const entry = abilityCalls[0][1];
-            expect(entry.characterName).toBe(casterName);
-            expect(entry.abilityName).toBe('Regenerate');
-            expect(entry.targetName).toBe('Goblin');
-            expect(entry.description).toContain('Regained');
-            expect(entry.description).toContain('HP');
+            expect(abilityCalls).toHaveLength(1);
+            expect(abilityCalls[0][1]).toMatchObject({
+                characterName: casterName,
+                abilityName: 'Regenerate',
+                targetName: 'Goblin',
+                description: EXPECTED_POPUP_TEXT,
+            });
         });
 
-        it('should log a spell_effect entry', async () => {
+        it('should log a spell_effect entry with the exact effects string', async () => {
             evaluateAutoExpression.mockReturnValue(10);
             await applyEffect('Goblin');
             const spellCalls = addEntry.mock.calls.filter(([, entry]) => entry && entry.type === 'spell_effect');
-            expect(spellCalls.length).toBeGreaterThan(0);
-            const entry = spellCalls[0][1];
-            expect(entry.characterName).toBe(casterName);
-            expect(entry.spellName).toBe('Regenerate');
-            expect(entry.targetName).toBe('Goblin');
-            expect(entry.effects).toContainEqual(expect.stringContaining('Initial heal'));
-            expect(entry.effects).toContainEqual(expect.stringContaining('1 HP/turn'));
+            expect(spellCalls).toHaveLength(1);
+            expect(spellCalls[0][1]).toMatchObject({
+                characterName: casterName,
+                spellName: 'Regenerate',
+                targetName: 'Goblin',
+                effects: ['Initial heal: 4 HP (rolled 4d8 + 15 = 10), Ongoing: 1 HP/turn'],
+            });
         });
 
-        it('should use the resolved expression as formula in hp_change log', async () => {
+        it('should use the resolved slot expression as formula in hp_change log', async () => {
             await applyEffect('Goblin', { spell: { level: 7, heal_at_slot_level: { '7': '6d8 + 20' } } });
             const hpCalls = addEntry.mock.calls.filter(([, entry]) => entry && entry.type === 'hp_change');
             expect(hpCalls[0][1].formula).toBe('6d8 + 20');
         });
-
-        it('should log healing for the caster as source when healing self', async () => {
-            evaluateAutoExpression.mockReturnValue(10);
-            await applyEffect(casterName);
-            const abilityCalls = addEntry.mock.calls.filter(([, entry]) => entry && entry.type === 'ability_use');
-            expect(abilityCalls[0][1].sourceName || abilityCalls[0][1].characterName).toBe(casterName);
-        });
     });
 
     describe('return value', () => {
-        it('should return popup with automation_info type', async () => {
+        it('should return automation_info popup with the handler-composed description', async () => {
             evaluateAutoExpression.mockReturnValue(10);
             const result = await applyEffect('Goblin');
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Regenerate');
-        });
-
-        it('should include description with target name and heal amount', async () => {
-            evaluateAutoExpression.mockReturnValue(20);
-            const result = await applyEffect('Goblin', {}, { currentHitPoints: null });
-            expect(result.payload.description).toContain('Goblin');
-            expect(result.payload.description).toContain('4 HP');
-            expect(result.payload.description).toContain('1 HP per turn');
-        });
-
-        it('should describe ongoing effect in popup', async () => {
-            evaluateAutoExpression.mockReturnValue(20);
-            const result = await applyEffect('Goblin');
-            expect(result.payload.description).toContain('restored to full HP');
-        });
-
-        it('should not call applyHealingToTarget when actualHeal is 0', async () => {
-            evaluateAutoExpression.mockReturnValue(20);
-            const result = await applyEffect('Goblin', {}, { currentHitPoints: 7 });
-            expect(applyHealingToTarget).not.toHaveBeenCalled();
-            expect(result.type).toBe('popup');
+            expect(result.payload.description).toBe(EXPECTED_POPUP_TEXT);
         });
 
         it('should not call applyHealingToTarget when combatSummary is null', async () => {
             getCombatSummary.mockReturnValue(null);
+            getRuntimeValue.mockReturnValue(null);
             evaluateAutoExpression.mockReturnValue(10);
-            const result = await applyRegenerateEffect(makeAction(), { name: casterName, level: 7, proficiency: 4, abilities: [{ name: 'Wisdom', bonus: 3 }], hitPoints: 50 }, campaignName, null, 'Goblin');
+            const result = await applyRegenerateEffect(makeAction(), makeCaster(), campaignName, null, 'Goblin');
             expect(applyHealingToTarget).not.toHaveBeenCalled();
             expect(result.type).toBe('popup');
         });

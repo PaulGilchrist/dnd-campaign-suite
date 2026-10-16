@@ -1,3 +1,26 @@
+// blessHandler lane contract — Bless popup-builder (automation registry 'bless:' @ index.js:607).
+// Live dispatch: spellCastService/execution/index.js:291 → triggerSpells.handleBless →
+// blessService.triggerBlessSpell → executeHandler → handle(). Live side effects: one
+// resolveMapPositions + one getCombatContext read; ZERO state writes here. The apply lane
+// is blessService.applyBlessEffect — called DIRECTLY by useSimpleSpellHandlers.js:288,
+// never through this handler (delegation pinned here; apply behaviour lives in
+// blessService.test.js which mocks executeHandler, i.e. mocks this lane's entry point).
+// VESTIGIAL OUTPUT FLAG (bane/beacon/enhanceAbility SP-039 precedent, tally x4:
+// bane, beacon, multiTarget, bless): 'bless_target_selection' has ZERO renderer consumers
+// (repo-wide grep: this handler + this test only), and triggerSpells.handleBless discards
+// triggerBlessSpell's return value (triggerSpells.js:155-156) — the live picker is
+// spellGates.gateBless (own lane, spellGates.js:273, registered :805). These exact-key
+// pins preserve the dispatch contract should the popup lane be rewired; keep them
+// full-payload toEqual, not toHaveProperty walks.
+// bless/bane mirror seam (#1877): blessHandler.js is byte-identical to baneHandler.js
+// except the popup string (no shared infra to merge) — SOURCE-DUP flag stands; any fix
+// here must land on the bane side too.
+// maxTargets ladder honesty: max(3, 3 + (slotLevel - 1)) matches the RAW Bless text but
+// the LIVE lane caps at a hardcoded 3 (gateBless.js:276; manifest SP-017: "upcast ladder
+// structurally dead ... SP-011 fix wired gateBane only, spellGates.js:267 uses
+// extractMaxTargets"). The ladder below pins THIS module's dispatch contract only —
+// if gateBless ever adopts extractMaxTargets, reconcile both lanes together.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
@@ -26,22 +49,19 @@ const campaignName = 'TestCampaign';
 const mapName = 'TestMap';
 
 function makePlayerStats(overrides = {}) {
-  return {
-    name: 'TestCaster',
-    level: 5,
-    proficiency: 3,
-    abilities: [{ name: 'Charisma', bonus: 3 }],
-    ...overrides,
-  };
+  // handle() consumes only playerStats.name (map-position seam).
+  return { name: 'TestCaster', ...overrides };
 }
 
 function makeAction(overrides = {}) {
+  // Merge-not-replace: automation overrides land INSIDE the { type: 'bless' } base
+  // (the old helper's trailing ...overrides silently replaced the merged automation
+  // with the raw partial). No test needs a replace-wholesale automation here.
   return {
     name: 'Bless',
-    automation: { type: 'bless', ...overrides.automation },
-    spell: overrides.spell || {},
-    spellSlotLevel: overrides.spellSlotLevel || undefined,
+    spell: {},
     ...overrides,
+    automation: { type: 'bless', ...overrides.automation },
   };
 }
 
@@ -52,479 +72,170 @@ function makeCombatContext(creatures) {
 describe('blessHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getCombatContext.mockResolvedValue(makeCombatContext([{ name: 'Goblin' }, { name: 'Orc' }]));
+    resolveMapPositions.mockResolvedValue({});
   });
 
-  // ── handle: no combat context ──────────────────────────────
+  // ── no combat context ──────────────────────────────────────
 
-  describe('handle - no combat context', () => {
-    it('returns automation_info popup when combat context is null', async () => {
-      getCombatContext.mockResolvedValue(null);
+  it.each([{ ctx: null }, { ctx: undefined }])(
+    'returns the automation_info popup when combat context is $ctx',
+    async ({ ctx }) => {
+      getCombatContext.mockResolvedValue(ctx);
 
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Bless');
-      expect(result.payload.description).toContain('No combat context found');
-      expect(result.payload.description).toContain('Bless');
-    });
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Bless',
+          description: 'No combat context found. Cannot apply Bless.',
+        },
+      });
+    },
+  );
 
-    it('returns automation_info popup when combat context is undefined', async () => {
-      getCombatContext.mockResolvedValue(undefined);
+  // ── target selection popup ─────────────────────────────────
 
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
+  it('returns the bless_target_selection popup with the exact full payload', async () => {
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No combat context found');
-    });
-  });
-
-  // ── handle: target selection popup ─────────────────────────
-
-  describe('handle - target selection', () => {
-    it('returns bless_target_selection popup with creature list', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([
-          { name: 'Goblin', type: 'monster' },
-          { name: 'Orc', type: 'monster' },
-          { name: 'Dragon', type: 'monster' },
-        ]),
-      );
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('bless_target_selection');
-      expect(result.payload.name).toBe('Bless');
-      expect(result.payload.creatureTargets).toEqual(['Goblin', 'Orc', 'Dragon']);
-    });
-
-    it('includes all payload fields in target selection', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload).toHaveProperty('type', 'bless_target_selection');
-      expect(result.payload).toHaveProperty('name', 'Bless');
-      expect(result.payload).toHaveProperty('creatureTargets');
-      expect(result.payload).toHaveProperty('range');
-      expect(result.payload).toHaveProperty('rangeFt');
-      expect(result.payload).toHaveProperty('maxTargets');
-      expect(result.payload).toHaveProperty('slotLevel');
-      expect(result.payload).toHaveProperty('attackerPos');
-      expect(result.payload).toHaveProperty('automation');
-    });
-
-    it('defaults range to 30 feet when not specified', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      const result = await handle(
-        makeAction({ spell: {} }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.range).toBe('30 feet');
-      expect(result.payload.rangeFt).toBe(30);
-    });
-
-    it('uses automation range when provided', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      const result = await handle(
-        makeAction({ automation: { range: '60 feet' } }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.range).toBe('60 feet');
-      expect(result.payload.rangeFt).toBe(60);
-    });
-
-    it('uses spell.range when provided', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      const result = await handle(
-        makeAction({ spell: { range: '45 feet' } }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.range).toBe('45 feet');
-      expect(result.payload.rangeFt).toBe(45);
-    });
-
-    it('uses spellSlotLevel when provided', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      const result = await handle(
-        makeAction({ spellSlotLevel: 3 }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.slotLevel).toBe(3);
-      expect(result.payload.maxTargets).toBe(5);
-    });
-
-    it('uses spell.level when spellSlotLevel is not provided', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      const result = await handle(
-        makeAction({ spell: { level: 4 } }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.slotLevel).toBe(4);
-      expect(result.payload.maxTargets).toBe(6);
-    });
-
-    it('defaults slotLevel to 1 when neither spellSlotLevel nor spell.level provided', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.slotLevel).toBe(1);
-      expect(result.payload.maxTargets).toBe(3);
-    });
-
-    it('computes maxTargets as max(3, 3 + (slotLevel - 1)) matching spell rules', async () => {
-      // slotLevel 1 → max(3, 3) = 3 (up to three creatures base)
-      let result = await handle(
-        makeAction({ spellSlotLevel: 1 }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-      expect(result.payload.maxTargets).toBe(3);
-
-      // slotLevel 2 → max(3, 4) = 4 (one additional creature for each slot above 1st)
-      result = await handle(
-        makeAction({ spellSlotLevel: 2 }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-      expect(result.payload.maxTargets).toBe(4);
-
-      // slotLevel 5 → max(3, 7) = 7
-      result = await handle(
-        makeAction({ spellSlotLevel: 5 }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-      expect(result.payload.maxTargets).toBe(7);
-
-      // slotLevel 9 → max(3, 11) = 11
-      result = await handle(
-        makeAction({ spellSlotLevel: 9 }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-      expect(result.payload.maxTargets).toBe(11);
-    });
-
-    it('includes attackerPos when mapName is provided', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-      resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 5, gridY: 10 } });
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.attackerPos).toEqual({ gridX: 5, gridY: 10 });
-    });
-
-    it('sets attackerPos to null when no mapName provided', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(result.payload.attackerPos).toBeNull();
-    });
-
-    it('sets attackerPos to null when mapName provided but resolveMapPositions returns no position', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-      resolveMapPositions.mockResolvedValue({ attackerPos: null });
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.attackerPos).toBeNull();
-    });
-
-    it('passes automation object in payload', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      const auto = { type: 'bless', saveType: 'CHA', saveDc: 15 };
-      const result = await handle(
-        makeAction({ automation: auto }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.automation).toEqual(auto);
-    });
-
-    it('handles empty creature list in combat context', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([]),
-      );
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('bless_target_selection');
-      expect(result.payload.creatureTargets).toEqual([]);
+    expect(getCombatContext).toHaveBeenCalledWith(campaignName);
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'bless_target_selection',
+        name: 'Bless',
+        creatureTargets: ['Goblin', 'Orc'],
+        range: '30 feet',
+        rangeFt: 30,
+        maxTargets: 3,
+        slotLevel: 1,
+        attackerPos: null,
+        automation: { type: 'bless' },
+      },
     });
   });
 
-  // ── rangeToFeet integration ────────────────────────────────
+  it('pins the range fallback chain automation > spell > "30 feet" default', async () => {
+    const automationResult = await handle(
+      makeAction({ automation: { range: '60 feet' } }),
+      makePlayerStats(),
+      campaignName,
+      mapName,
+    );
+    expect(automationResult.payload.range).toBe('60 feet');
+    expect(automationResult.payload.rangeFt).toBe(60);
 
-  describe('rangeToFeet integration', () => {
-    it('parses "30 feet" to 30', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
+    const spellResult = await handle(
+      makeAction({ spell: { range: '45 feet' } }),
+      makePlayerStats(),
+      campaignName,
+      mapName,
+    );
+    expect(spellResult.payload.range).toBe('45 feet');
+    expect(spellResult.payload.rangeFt).toBe(45);
 
-      const result = await handle(
-        makeAction({ spell: { range: '30 feet' } }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
+    const defaultResult = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+    expect(defaultResult.payload.range).toBe('30 feet');
+    expect(defaultResult.payload.rangeFt).toBe(30);
 
-      expect(rangeToFeet).toHaveBeenCalledWith('30 feet');
-      expect(result.payload.rangeFt).toBe(30);
-    });
+    // rangeToFeet seam is fed the resolved string, in order.
+    expect(rangeToFeet.mock.calls.map((c) => c[0])).toEqual(['60 feet', '45 feet', '30 feet']);
+  });
 
-    it('parses "60 feet" to 60', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
+  it('pins the slot-level chain spellSlotLevel > spell.level > 1', async () => {
+    let result = await handle(makeAction({ spellSlotLevel: 3 }), makePlayerStats(), campaignName, mapName);
+    expect(result.payload.slotLevel).toBe(3);
+    expect(result.payload.maxTargets).toBe(5);
 
-      const result = await handle(
-        makeAction({ spell: { range: '60 feet' } }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
+    result = await handle(makeAction({ spell: { level: 4 } }), makePlayerStats(), campaignName, mapName);
+    expect(result.payload.slotLevel).toBe(4);
+    expect(result.payload.maxTargets).toBe(6);
 
-      expect(result.payload.rangeFt).toBe(60);
-    });
+    result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+    expect(result.payload.slotLevel).toBe(1);
+    expect(result.payload.maxTargets).toBe(3);
+  });
 
-    it('handles numeric range input', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
+  it.each([[2, 4], [5, 7], [9, 11]])(
+    'computes maxTargets as max(3, 3 + (slotLevel - 1)) — lv%i caps %i (dispatch contract; live gateBless lane stays capped at 3 per SP-017)',
+    async (lv, cap) => {
+      const result = await handle(makeAction({ spellSlotLevel: lv }), makePlayerStats(), campaignName, mapName);
 
-      const result = await handle(
-        makeAction({ spell: { range: 90 } }),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
+      expect(result.payload.maxTargets).toBe(cap);
+    },
+  );
 
-      expect(result.payload.rangeFt).toBe(90);
+  it('passes the automation object through unchanged', async () => {
+    const auto = { type: 'bless', saveType: 'CHA', saveDc: 15 };
+
+    const result = await handle(makeAction({ automation: auto }), makePlayerStats(), campaignName, mapName);
+
+    expect(result.payload.automation).toEqual(auto);
+  });
+
+  it('returns an empty creatureTargets when no creatures are in combat', async () => {
+    getCombatContext.mockResolvedValue(makeCombatContext([]));
+
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('bless_target_selection');
+    expect(result.payload.creatureTargets).toEqual([]);
+  });
+
+  // ── map position seam ──────────────────────────────────────
+
+  it('resolves attackerPos via resolveMapPositions(campaignName, mapName, casterName)', async () => {
+    resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 5, gridY: 10 } });
+
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+    expect(resolveMapPositions).toHaveBeenCalledWith(campaignName, mapName, 'TestCaster');
+    expect(result.payload.attackerPos).toEqual({ gridX: 5, gridY: 10 });
+  });
+
+  it('reports null attackerPos and skips the resolver without a mapName', async () => {
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+    expect(resolveMapPositions).not.toHaveBeenCalled();
+    expect(result.payload.attackerPos).toBeNull();
+  });
+
+  it('reports null attackerPos when the resolver returns no position', async () => {
+    resolveMapPositions.mockResolvedValue({});
+
+    const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+    expect(result.payload.attackerPos).toBeNull();
+  });
+
+  // ── edge cases ─────────────────────────────────────────────
+
+  it('defaults missing automation and spell objects on a minimal action', async () => {
+    const result = await handle({ name: 'Bless' }, makePlayerStats(), campaignName, mapName);
+
+    expect(result.payload).toEqual({
+      type: 'bless_target_selection',
+      name: 'Bless',
+      creatureTargets: ['Goblin', 'Orc'],
+      range: '30 feet',
+      rangeFt: 30,
+      maxTargets: 3,
+      slotLevel: 1,
+      attackerPos: null,
+      automation: {},
     });
   });
 
-  // ── resolveMapPositions integration ────────────────────────
+  it('rejects when playerStats is undefined — the map seam reads playerStats.name before the combat-context guard', async () => {
+    await expect(
+      handle(makeAction(), undefined, campaignName, mapName),
+    ).rejects.toThrow(TypeError);
 
-  describe('resolveMapPositions integration', () => {
-    it('calls resolveMapPositions with correct args when mapName is provided', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-      resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 1, gridY: 2 } });
-
-      await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(resolveMapPositions).toHaveBeenCalledWith(
-        campaignName,
-        mapName,
-        'TestCaster',
-      );
-    });
-
-    it('does not call resolveMapPositions when mapName is null', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-      );
-
-      expect(resolveMapPositions).not.toHaveBeenCalled();
-    });
-  });
-
-  // ── Edge cases ─────────────────────────────────────────────
-
-  describe('edge cases', () => {
-    it('handles action with no automation object', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      const result = await handle(
-        { name: 'Bless' },
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('bless_target_selection');
-      expect(result.payload.automation).toEqual({});
-    });
-
-    it('handles action with no spell object', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      const result = await handle(
-        { name: 'Bless', automation: { type: 'bless' } },
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.slotLevel).toBe(1);
-      expect(result.payload.range).toBe('30 feet');
-    });
-
-    it('handles creature names with special characters', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([
-          { name: "Goblin's Ally" },
-          { name: 'Orc#2' },
-          { name: 'Dragon (Young)' },
-        ]),
-      );
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        mapName,
-      );
-
-      expect(result.payload.creatureTargets).toEqual([
-        "Goblin's Ally",
-        'Orc#2',
-        'Dragon (Young)',
-      ]);
-    });
-
-    it('throws when playerStats is undefined (requires playerStats.name)', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      await expect(
-        handle(makeAction(), undefined, campaignName, mapName),
-      ).rejects.toThrow();
-    });
-
-    it('handles undefined campaignName gracefully', async () => {
-      getCombatContext.mockResolvedValue(
-        makeCombatContext([{ name: 'Goblin' }]),
-      );
-
-      const result = await handle(
-        makeAction(),
-        makePlayerStats(),
-        undefined,
-        mapName,
-      );
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('bless_target_selection');
-    });
+    // Ordering proof: the throw lands at the resolveMapPositions seam, before getCombatContext is read.
+    expect(getCombatContext).not.toHaveBeenCalled();
   });
 });

@@ -1,3 +1,20 @@
+// @maintained-by-ai
+// PrayerOfHealing latch lane (SP-091). The generic massHealUtils.createMassHealHandler
+// behaviour (casting-mod/expression resolution, modal-vs-popup dispatch, maxTargets
+// slicing, clamp/apply, hp_change logging, heal_multi payload shape, maximization rolls,
+// CLA-038 post-cast gating) is canonically owned by the massCureWounds pair
+// (massCureWoundsHandler.test.js opener + massCureWoundsHandler.confirm.test.js) —
+// NOT re-pinned here. This file owns what is unique to this lane:
+//   1. Prayer config: modalName 'prayerOfHealingTarget', lv2 cap 5 (2024) vs
+//      defaultMaxTargets5e 6 (5e twin), currentRound enforcement pass-through
+//      (the pair pins its ABSENCE for Mass Cure Wounds).
+//   2. The once-per-Long-Rest latch contract end-to-end: refuse with zero heal /
+//      zero short-rest benefit / zero latch mutation, mixed-batch partial heal,
+//      ONE merged setRuntimeBatch (latch stamp + SHORT_REST_RESOURCES re-arm),
+//      5e twin byte-inertness, range advisory, and the Fortified Health consumption
+//      via finalizePrayerPostCast — load-bearing repo-wide (other lanes' FH pins
+//      pointed here and were removed; keep these pins exact).
+// The rules/features/prayerOfHealingService twin lane owns its own module's pins.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../dice/diceRoller.js', () => ({
@@ -47,9 +64,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeBatch } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
-import { getAllyList } from '../../../../hooks/useAllySelection.js';
-import { rollExpression, rollExpressionMaximized } from '../../../dice/diceRoller.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
 import {
     resolveHealingBonusesWithDetails,
     markFortifiedHealthUsed,
@@ -86,218 +101,105 @@ describe('prayerOfHealingHandler', () => {
         automation: { type: 'prayer_of_healing' },
     };
 
+    // Six eligible creatures: exceeds the 2024 cap of 5, matches the 5e twin cap of 6.
+    const sixCreatures = [
+        { name: 'Fighter', maxHp: 45, currentHp: 20, type: 'player' },
+        { name: 'Rogue', maxHp: 30, currentHp: 10, type: 'player' },
+        { name: 'Barbarian', maxHp: 60, currentHp: 30, type: 'npc' },
+        { name: 'Wizard', maxHp: 25, currentHp: 15, type: 'player' },
+        { name: 'Druid', maxHp: 35, currentHp: 25, type: 'npc' },
+        { name: 'Paladin', maxHp: 50, currentHp: 40, type: 'player' },
+    ];
+
+    function sixSummary(round = 4) {
+        return { players: [{ name: 'Cleric', gridX: 1, gridY: 1 }], creatures: sixCreatures, round };
+    }
+
+    // Runtime stub: overrides MERGE per name/prop, never replace wholesale.
+    function stubRuntime({ affected = {}, currentHp = {} } = {}) {
+        getRuntimeValue.mockImplementation((name, prop) => {
+            if (prop === 'prayerOfHealingAffected') return affected[name];
+            if (prop === 'currentHitPoints') return name in currentHp ? currentHp[name] : 20;
+            if (prop === 'activeConditions') return [];
+            return null;
+        });
+    }
+
+    // Confirm args helper: overrides MERGE, never replace wholesale.
+    function confirmArgs(overrides = {}) {
+        return {
+            action: baseAction,
+            playerStats: casterStats,
+            campaignName,
+            selectedTargetNames: ['Fighter'],
+            healExpression: '2d8 + 3',
+            maximize: false,
+            bonusHeal: 0,
+            bonusDetails: [],
+            slotLevel: 2,
+            currentRound: 1,
+            ...overrides,
+        };
+    }
+
+    function entriesByAutomationType(automationType) {
+        return addEntry.mock.calls.filter(([, entry]) => entry.automationType === automationType);
+    }
+
     beforeEach(() => {
         vi.clearAllMocks();
         getCombatContext.mockResolvedValue(baseCombatSummary);
-        getAllyList.mockReturnValue(['Fighter', 'Rogue', 'Barbarian']);
-        isWithinRange.mockResolvedValue(true);
-        getRuntimeValue.mockImplementation((_name, prop, _campaignName) => {
-            if (prop === 'currentHitPoints') return 20;
-            if (prop === 'activeConditions') return [];
-            if (prop === 'prayerOfHealingAffected') return undefined;
-            return null;
-        });
+        stubRuntime();
         rollExpression.mockReturnValue({ total: 10, rolls: [7, 3], modifier: 3 });
-        rollExpressionMaximized.mockReturnValue({ total: 19, rolls: [10, 10], modifier: 3 });
         hasHealingMaximization.mockReturnValue(false);
         resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 0, details: [] });
     });
 
-    describe('handle', () => {
-        it('returns popup when allies are within range (<= maxTargets)', async () => {
+    describe('handle() opener — Prayer config', () => {
+        it('routes eligible <= 5 directly to confirm with the lv2 formula in combat order', async () => {
             const result = await handle(baseAction, casterStats, campaignName, null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('heal_multi');
-            expect(result.payload.results).toHaveLength(3);
+            // Full-string own-composition pin: spell name + lv2 default expression.
+            expect(result.payload.name).toBe('Prayer of Healing');
+            expect(result.payload.formula).toBe('2d8 + 3');
+            expect(result.payload.results.map(r => r.targetName)).toEqual(['Fighter', 'Rogue', 'Barbarian']);
         });
 
-        it('returns modal when > 5 eligible creatures', async () => {
-            const combatSummary = {
-                players: [{ name: 'Cleric', gridX: 1, gridY: 1 }],
-                creatures: [
-                    { name: 'Fighter', maxHp: 45, currentHp: 20, type: 'player' },
-                    { name: 'Rogue', maxHp: 30, currentHp: 10, type: 'player' },
-                    { name: 'Barbarian', maxHp: 60, currentHp: 30, type: 'npc' },
-                    { name: 'Wizard', maxHp: 25, currentHp: 15, type: 'player' },
-                    { name: 'Druid', maxHp: 35, currentHp: 25, type: 'npc' },
-                    { name: 'Paladin', maxHp: 50, currentHp: 40, type: 'player' },
-                ],
-                round: 1,
-            };
-            getCombatContext.mockResolvedValue(combatSummary);
+        it('caps 2024 at five: six eligible open prayerOfHealingTarget modal with round stamp', async () => {
+            getCombatContext.mockResolvedValue(sixSummary(4));
 
             const result = await handle(baseAction, casterStats, campaignName, null);
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('prayerOfHealingTarget');
-            expect(result.payload.creatureTargets).toHaveLength(6);
             expect(result.payload.maxTargets).toBe(5);
+            expect(result.payload.creatureTargets).toEqual(
+                ['Fighter', 'Rogue', 'Barbarian', 'Wizard', 'Druid', 'Paladin'],
+            );
+            // Enforcement pass-through: 2024 modal carries currentRound for the latch stamp
+            // (the massCureWounds pair pins this key's ABSENCE for its non-latch config).
+            expect(result.payload.currentRound).toBe(4);
         });
 
-        it('returns confirm when <= 5 eligible allies', async () => {
-            const result = await handle(baseAction, casterStats, campaignName, null);
+        it('keeps the 5e twin cap at six: same six-eligible combat routes popup, not modal', async () => {
+            getCombatContext.mockResolvedValue(sixSummary(4));
 
+            const result = await handle(baseAction, { ...casterStats, rules: '5e' }, campaignName, null);
+
+            // defaultMaxTargets5e: 6 — six eligible fit the 5e cap, so no modal.
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('heal_multi');
-        });
-
-        it('uses slot level from automation when provided', async () => {
-            const action3rdLevel = {
-                ...baseAction,
-                spell: { ...baseAction.spell, level: 3 },
-                automation: { type: 'prayer_of_healing', slotLevel: 4 },
-            };
-
-            const result = await handle(action3rdLevel, casterStats, campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('heal_multi');
-            expect(result.payload.formula).toContain('3d8 + 3');
-        });
-
-        it('returns popup when heal expression cannot be resolved', async () => {
-            const actionNoHeal = {
-                ...baseAction,
-                spell: { ...baseAction.spell, heal_at_slot_level: {} },
-            };
-
-            const result = await handle(actionNoHeal, casterStats, campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('Could not resolve heal expression');
-        });
-
-        it('returns null when no combat context', async () => {
-            getCombatContext.mockResolvedValue(null);
-
-            const result = await handle(baseAction, casterStats, campaignName, null);
-
-            expect(result).toBeNull();
-        });
-
-        it('includes all creatures in eligible list', async () => {
-            const combatSummary = {
-                players: [{ name: 'Cleric', gridX: 1, gridY: 1 }],
-                creatures: [
-                    { name: 'Cleric', maxHp: 50, currentHp: 25, type: 'player' },
-                    { name: 'Ally', maxHp: 40, currentHp: 15, type: 'player' },
-                ],
-                round: 1,
-            };
-            getCombatContext.mockResolvedValue(combatSummary);
-
-            const result = await handle(baseAction, casterStats, campaignName, null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.results.length).toBe(2);
+            expect(result.payload.results).toHaveLength(6);
         });
     });
 
-    describe('confirmPrayerOfHealing', () => {
-        it('applies healing to each selected target', async () => {
-            const result = await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
-                selectedTargetNames: ['Fighter', 'Rogue'],
-                healExpression: '2d8 + 3',
-                maximize: false,
-                bonusHeal: 0,
-                bonusDetails: [],
-                slotLevel: 2,
-                currentRound: 1,
-            });
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('heal_multi');
-            expect(applyHealingToTarget).toHaveBeenCalledTimes(2);
-        });
-
-        it('returns heal_multi popup with per-target results', async () => {
-            const result = await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
-                selectedTargetNames: ['Fighter', 'Rogue'],
-                healExpression: '2d8 + 3',
-                maximize: false,
-                bonusHeal: 0,
-                bonusDetails: [],
-                slotLevel: 2,
-                currentRound: 1,
-            });
-
-            expect(result.payload).toEqual(expect.objectContaining({
-                type: 'heal_multi',
-                name: 'Prayer of Healing',
-                formula: '2d8 + 3',
-                results: expect.arrayContaining([
-                    expect.objectContaining({ targetName: 'Fighter', healAmount: expect.any(Number) }),
-                    expect.objectContaining({ targetName: 'Rogue', healAmount: expect.any(Number) }),
-                ]),
-            }));
-        });
-
-        it('rolls separately for each target', async () => {
-            rollExpression.mockReturnValue({ total: 8, rolls: [5, 3], modifier: 3 });
-
-            await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
-                selectedTargetNames: ['Fighter', 'Rogue', 'Barbarian'],
-                healExpression: '2d8 + 3',
-                maximize: false,
-                bonusHeal: 0,
-                bonusDetails: [],
-                slotLevel: 2,
-                currentRound: 1,
-            });
-
-            expect(rollExpression).toHaveBeenCalledTimes(3);
-        });
-
-        it('respects maxTargets limit', async () => {
-            const result = await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
-                selectedTargetNames: ['Fighter', 'Rogue', 'Barbarian', 'Extra1', 'Extra2', 'Extra3'],
-                healExpression: '2d8 + 3',
-                maximize: false,
-                bonusHeal: 0,
-                bonusDetails: [],
-                slotLevel: 2,
-                currentRound: 1,
-            });
-
-            // Only 5 targets max, even though 6 were passed
-            expect(result.payload.results.length).toBe(5);
-            expect(applyHealingToTarget).toHaveBeenCalledTimes(5);
-        });
-
+    describe('confirmPrayerOfHealing — SP-091 once-per-Long-Rest latch', () => {
         it('refuses already affected targets (once per Long Rest)', async () => {
-            getRuntimeValue.mockImplementation((_name, prop, _campaignName) => {
-                if (prop === 'prayerOfHealingAffected') return 1;
-                if (prop === 'currentHitPoints') return 20;
-                if (prop === 'activeConditions') return [];
-                return null;
-            });
+            stubRuntime({ affected: { Fighter: 1 } });
 
-            const result = await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
-                selectedTargetNames: ['Fighter'],
-                healExpression: '2d8 + 3',
-                maximize: false,
-                bonusHeal: 0,
-                bonusDetails: [],
-                slotLevel: 2,
-                currentRound: 2,
-            });
+            const result = await confirmPrayerOfHealing(confirmArgs({ currentRound: 2 }));
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
@@ -311,32 +213,24 @@ describe('prayerOfHealingHandler', () => {
                 automationType: 'prayer_of_healing_refused',
                 characterName: 'Fighter',
             }));
+            // No successful cast, so no range advisory either.
+            expect(entriesByAutomationType('prayer_of_healing_range_advisory')).toHaveLength(0);
         });
 
         it('refuses a mixed batch of affected targets but still heals fresh ones', async () => {
-            getRuntimeValue.mockImplementation((name, prop, _campaignName) => {
-                if (prop === 'prayerOfHealingAffected') return name === 'Fighter' ? 1 : undefined;
-                if (prop === 'currentHitPoints') return 20;
-                if (prop === 'activeConditions') return [];
-                return null;
-            });
+            stubRuntime({ affected: { Fighter: 1 } });
 
-            const result = await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
+            const result = await confirmPrayerOfHealing(confirmArgs({
                 selectedTargetNames: ['Fighter', 'Rogue'],
-                healExpression: '2d8 + 3',
-                maximize: false,
-                bonusHeal: 0,
-                bonusDetails: [],
-                slotLevel: 2,
                 currentRound: 2,
-            });
+            }));
 
             expect(result.payload.type).toBe('heal_multi');
             expect(result.payload.results.length).toBe(1);
             expect(result.payload.results[0].targetName).toBe('Rogue');
+            // Fresh target fully healed: Rogue 30 max − 20 current, roll 10 lands unclamped.
+            expect(applyHealingToTarget).toHaveBeenCalledTimes(1);
+            expect(applyHealingToTarget).toHaveBeenCalledWith(expect.any(Object), 'Rogue', 10, campaignName);
             expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
                 type: 'automation',
                 automationType: 'prayer_of_healing_refused',
@@ -344,87 +238,12 @@ describe('prayerOfHealingHandler', () => {
             }));
         });
 
-        it('uses maximized rolls when hasHealingMaximization', async () => {
-            await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
-                selectedTargetNames: ['Fighter'],
-                healExpression: '2d8 + 3',
-                maximize: true,
-                bonusHeal: 0,
-                bonusDetails: [],
-                slotLevel: 2,
-                currentRound: 1,
-            });
-
-            expect(rollExpressionMaximized).toHaveBeenCalledWith('2d8 + 3');
-            expect(rollExpression).not.toHaveBeenCalled();
-        });
-
-        it('posts hp_change log entry for each target', async () => {
-            await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
-                selectedTargetNames: ['Fighter'],
-                healExpression: '2d8 + 3',
-                maximize: false,
-                bonusHeal: 0,
-                bonusDetails: [],
-                slotLevel: 2,
-                currentRound: 1,
-            });
-
-            expect(addEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({
-                    type: 'hp_change',
-                    targetName: 'Fighter',
-                    isHealing: true,
-                    note: 'Prayer of Healing',
-                }),
-            );
-        });
-
-        it('dispatches combat-summary-updated event', async () => {
-            const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
-
-            await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
-                selectedTargetNames: ['Fighter'],
-                healExpression: '2d8 + 3',
-                maximize: false,
-                bonusHeal: 0,
-                bonusDetails: [],
-                slotLevel: 2,
-                currentRound: 1,
-            });
-
-            expect(dispatchEventSpy).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'combat-summary-updated',
-            }));
-            dispatchEventSpy.mockRestore();
-        });
-
-        it('marks target as affected after healing', async () => {
-            await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
-                selectedTargetNames: ['Fighter'],
-                healExpression: '2d8 + 3',
-                maximize: false,
-                bonusHeal: 0,
-                bonusDetails: [],
-                slotLevel: 2,
-                currentRound: 1,
-            });
+        it('marks target as affected with short-rest re-arm in ONE merged batch', async () => {
+            await confirmPrayerOfHealing(confirmArgs());
 
             // SP-091: latch stamp + short-rest re-arm keys land in ONE merged
             // setRuntimeBatch per affected target (§5 single-write rule).
+            expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
             expect(setRuntimeBatch).toHaveBeenCalledWith(
                 'Fighter',
                 expect.objectContaining({
@@ -441,125 +260,67 @@ describe('prayerOfHealingHandler', () => {
             }));
         });
 
-        it('logs the range advisory once per cast with affected targets', async () => {
-            await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
-                selectedTargetNames: ['Fighter', 'Rogue'],
-                healExpression: '2d8 + 3',
-                maximize: false,
-                bonusHeal: 0,
-                bonusDetails: [],
-                slotLevel: 2,
-                currentRound: 1,
-            });
+        it('grants the short-rest benefit even when the heal clamps to zero, without consuming Fortified Health', async () => {
+            stubRuntime({ currentHp: { Fighter: 45 } }); // Fighter at max HP (45).
 
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'automation',
-                automationType: 'prayer_of_healing_range_advisory',
-                characterName: 'Cleric',
+            const result = await confirmPrayerOfHealing(confirmArgs({
+                bonusHeal: 5,
+                bonusDetails: [{ name: 'Fortified Health', amount: 5 }],
             }));
+
+            // Spell still AFFECTS the creature: latch + re-arm land, raw heal clamps to 0.
+            expect(result.payload.results[0].healAmount).toBe(0);
+            expect(result.payload.totalHealed).toBe(0);
+            expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(setRuntimeBatch).toHaveBeenCalledWith(
+                'Fighter',
+                expect.objectContaining({ prayerOfHealingAffected: 1 }),
+                campaignName,
+            );
+            // finalizePrayerPostCast gate: no actual healing → Fortified Health not consumed.
+            expect(markFortifiedHealthUsed).not.toHaveBeenCalled();
         });
 
         it('keeps enforcement inert for the 5e twin ruleset', async () => {
-            getRuntimeValue.mockImplementation((name, prop, _campaignName) => {
-                if (prop === 'prayerOfHealingAffected') return name === 'Fighter' ? 5 : undefined;
-                if (prop === 'currentHitPoints') return 20;
-                if (prop === 'activeConditions') return [];
-                return null;
-            });
+            stubRuntime({ affected: { Fighter: 5 } });
 
-            const result = await confirmPrayerOfHealing({
-                action: baseAction,
+            const result = await confirmPrayerOfHealing(confirmArgs({
                 playerStats: { ...casterStats, rules: '5e' },
-                campaignName,
-                selectedTargetNames: ['Fighter'],
-                healExpression: '2d8 + 3',
-                maximize: false,
-                bonusHeal: 0,
-                bonusDetails: [],
-                slotLevel: 2,
                 currentRound: 7,
-            });
+            }));
 
+            // 5e twin has neither latch-refusal nor short-rest-benefit clause.
             expect(result.payload.results.length).toBe(1);
+            expect(applyHealingToTarget).toHaveBeenCalledTimes(1);
             expect(setRuntimeBatch).not.toHaveBeenCalled();
+            expect(entriesByAutomationType('prayer_of_healing_range_advisory')).toHaveLength(0);
+            expect(entriesByAutomationType('prayer_of_healing_refused')).toHaveLength(0);
+            expect(entriesByAutomationType('short_rest_benefit_applied')).toHaveLength(0);
         });
 
-        it('clamps healing to remaining HP', async () => {
-            const combatSummary = {
-                players: [],
-                creatures: [
-                    { name: 'Fighter', maxHp: 50, currentHp: 5, type: 'player' },
-                ],
-                round: 1,
-            };
-            getCombatContext.mockResolvedValue(combatSummary);
-            getRuntimeValue.mockImplementation((_name, prop) => {
-                if (prop === 'currentHitPoints') return 5;
-                return null;
-            });
+        it('logs the range advisory once per cast with affected targets', async () => {
+            await confirmPrayerOfHealing(confirmArgs({
+                selectedTargetNames: ['Fighter', 'Rogue'],
+            }));
 
-            const result = await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
-                selectedTargetNames: ['Fighter'],
-                healExpression: '2d8 + 3',
-                maximize: false,
-                bonusHeal: 0,
-                bonusDetails: [],
-                slotLevel: 2,
-                currentRound: 1,
-            });
-
-            // Max heal is 50 - 5 = 45
-            expect(result.payload.results[0].healAmount).toBeLessThanOrEqual(45);
+            const advisories = entriesByAutomationType('prayer_of_healing_range_advisory');
+            expect(advisories).toHaveLength(1);
+            expect(advisories[0][1]).toEqual(expect.objectContaining({
+                type: 'automation',
+                characterName: 'Cleric',
+            }));
+            expect(advisories[0][1].description).toContain('Fighter, Rogue');
         });
 
-        it('includes bonusHeal in popup', async () => {
-            resolveHealingBonusesWithDetails.mockReturnValue({
-                totalBonus: 2,
-                details: [{ name: 'Disciple of Life', amount: 2 }],
-            });
-
-            const result = await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
-                selectedTargetNames: ['Fighter'],
-                healExpression: '2d8 + 3',
-                maximize: false,
-                bonusHeal: 2,
-                bonusDetails: [{ name: 'Disciple of Life', amount: 2 }],
-                slotLevel: 2,
-                currentRound: 1,
-            });
-
-            expect(result.payload.bonusHeal).toBe(2);
-            expect(result.payload.bonusHealDetail).toContain('Disciple of Life');
-        });
-
+        // LOAD-BEARING (repo-wide): massCureWounds.confirm and MHW.confirm deleted their
+        // FH pins pointing at finalizePrayerPostCast — this is the canonical consumption pin.
         it('marks Fortified Health used when applicable', async () => {
-            resolveHealingBonusesWithDetails.mockReturnValue({
-                totalBonus: 5,
-                details: [{ name: 'Fortified Health', amount: 5 }],
-            });
-
-            await confirmPrayerOfHealing({
-                action: baseAction,
-                playerStats: casterStats,
-                campaignName,
-                selectedTargetNames: ['Fighter'],
-                healExpression: '2d8 + 3',
-                maximize: false,
+            await confirmPrayerOfHealing(confirmArgs({
                 bonusHeal: 5,
                 bonusDetails: [{ name: 'Fortified Health', amount: 5 }],
-                slotLevel: 2,
-                currentRound: 1,
-            });
+            }));
 
+            expect(markFortifiedHealthUsed).toHaveBeenCalledTimes(1);
             expect(markFortifiedHealthUsed).toHaveBeenCalledWith(casterStats, campaignName);
         });
     });

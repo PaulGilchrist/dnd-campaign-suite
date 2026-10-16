@@ -1,3 +1,42 @@
+// @maintained-by-ai
+/**
+ * calmEmotions TRIO lane #1881 — handle() (trio seam map lives in the header of
+ * calmEmotionsHandler-effects.test.js). Owns handle L266-380 and, via the handle route,
+ * registerCalmEmotionsExpiration L147-156: the 10-round calm_emotions_end CLOCK is THIS
+ * lane's (the eligibility lane pins the CALM_EMOTIONS_DURATION_ROUNDS constant only).
+ * Owns the private helpers handle alone calls — recordCalmTargetResult L382-391 and
+ * logCalmEmotionsSave L393-404 — plus the logCalmEmotionsEligibility L117-139 envelopes:
+ * that logger is OUTSIDE the eligibility lane's L31-111 zero-write range and outside the
+ * effects lane's applier range, and handle is its only production caller in the trio, so
+ * its composed ineligible/advisory envelopes are pinned here (full-string, own-composition).
+ *
+ * NOT this lane (closed 2026-10-16): te SHAPE and latch CONTENT, buff shapes, and the
+ * write-signature asymmetry of the two appliers — owned by calmEmotionsHandler-effects.test.js.
+ * Per that lane's removal rec, the old 'should apply immunity effects on failed save' loose
+ * te-rewalk (arrayContaining + objectContaining {target, effect, mode, dc}) is TRIMMED to a
+ * reaches-applier smoke here: handle reaching applyCalmEmotionsImmunity is proven by the
+ * target-store write landing (setRuntimeObject is called ONLY by that applier in handle's path)
+ * and the default-immunity-leg L351 dispatch by registerTargetEffect (the indifferent applier's
+ * sink) NEVER firing — never by re-pinning te content.
+ * Eligibility TRUTH TABLES (humanoid gate, sphere math, advisory splits) belong to
+ * calmEmotionsHandler-eligibility.test.js — this lane only consumes the resolver's outcome:
+ * eligible targets get prompts, ineligible get none + their log envelope.
+ *
+ * Caller liveness (verified at source 2026-10-16): dispatched via automation/index.js
+ * L244/L578 `calm_emotions: handleCalmEmotions` (non-interactive generic automation route;
+ * the interactive route goes through CalmEmotionsModal.jsx, which owns its own tests).
+ *
+ * Lane patterns: exact-key pins; full-string own-composition log pins (ability_use L331,
+ * save_result L346/L361, popup summary L368-370); no-double-write guards (one expiration
+ * clock per cast even with N targets; exactly one target-store write + one campaign te write
+ * per affected target); mockRejectedValueOnce for the addEntry-resilience leg; real sphere
+ * math only where a measurable map is staged (resilience test), lenient no-map default
+ * everywhere else. No setTimeout / vi.waitFor needed — handle awaits its own chain.
+ *
+ * Turn-based: the expiration registration is a round-latch enqueue (addExpiration, rounds: 10)
+ * cleared at initiative/concentration/rest seams — never a wall-clock; no timers in this file
+ * (Date.now() inside the eligibility logger is a benign timestamp on a mocked sink).
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/savePrompt.js', () => ({
@@ -21,7 +60,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../common/damageRollback.js', () => ({
   storeSpellLastAttack: vi.fn(),
-  addTargetResult: vi.fn(),
+  addTargetResult: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../combat/concentration/concentrationService.js', () => ({
@@ -41,34 +80,50 @@ vi.mock('../../../ui/storage.js', () => ({
 
 const { default: storage } = await import('../../../ui/storage.js');
 
-vi.mock('../../../combat/automation/automationService.js', () => ({
-  playerIsImmuneToCondition: vi.fn(),
-}));
-
 vi.mock('../../../npcs/monsterUtils.js', () => ({
   getMonsterData: vi.fn(),
+}));
+
+vi.mock('../../../maps/mapsService.js', () => ({
+  loadMapData: vi.fn(),
 }));
 
 vi.mock('../../../rules/effects/expirationQueue.js', () => ({
   addExpiration: vi.fn(),
 }));
 
+// Registry spy: handle's default leg must route to the immunity applier (direct
+// setRuntimeValue sink, effects-lane owned) and NEVER to registerTargetEffect —
+// the indifferent applier belongs to the modal's choice routing, not this route.
+vi.mock('../../../combat/conditions/targetEffectDefinitions.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, registerTargetEffect: vi.fn(actual.registerTargetEffect) };
+});
+
 import { handle } from './calmEmotionsHandler.js';
 import { addExpiration } from '../../../rules/effects/expirationQueue.js';
 import { getMonsterData } from '../../../npcs/monsterUtils.js';
+import { loadMapData } from '../../../maps/mapsService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import {
+  getRuntimeValue,
+  setRuntimeValue,
+  setRuntimeObject,
+} from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 import { addConcentration } from '../../../combat/concentration/concentrationService.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
+import { registerTargetEffect } from '../../../combat/conditions/targetEffectDefinitions.js';
 
 const campaignName = 'TestCampaign';
+const CASTER = 'TestWizard';
+const SPELL = 'Calm Emotions';
 
 function makePlayerStats(overrides = {}) {
   return {
-    name: 'TestWizard',
+    name: CASTER,
     level: 10,
     proficiency: 4,
     ...overrides,
@@ -77,12 +132,19 @@ function makePlayerStats(overrides = {}) {
 
 function makeAction(automation = {}, metaCtx = {}) {
   return {
-    name: 'Calm Emotions',
+    name: SPELL,
     automation: {
       type: 'calm_emotions',
       ...automation,
     },
     metaCtx,
+  };
+}
+
+function resolvedListener(success, extra = {}) {
+  return {
+    promptId: success ? 'goblin-prompt' : 'fail-prompt',
+    promise: Promise.resolve({ success, ...extra }),
   };
 }
 
@@ -97,110 +159,124 @@ const multiTargetCombat = {
   ],
 };
 
-describe('calmEmotionsHandler - handle', () => {
+// Humanoid default; Pseudodragon is the canonical ineligible (truth tables — eligibility lane).
+function monsterRouter(name) {
+  if (String(name).startsWith('Pseudodragon')) return { name: 'Pseudodragon', type: 'Dragon' };
+  return { name: 'Bandit', type: 'Humanoid' };
+}
+
+// Lenient no-map geometry by default: every cast consumes a no_map_lenient advisory.
+function activeMapRouter(mapName = 'map1') {
+  getRuntimeValue.mockImplementation((entity, key) => {
+    if (entity === '__map__' && key === 'activeMapName') return mapName;
+    return undefined;
+  });
+}
+
+describe('calmEmotionsHandler - handle (L266-380)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.clearAllMocks(); // keeps implementations; only call books are wiped
     buildSaveDc.mockReturnValue(13);
     getCombatSummary.mockReturnValue(null);
     getRuntimeValue.mockReturnValue(undefined);
+    getMonsterData.mockImplementation(async (name) => monsterRouter(name));
   });
 
-  describe('combat context validation', () => {
-    it('should return popup when no creatures in combat', async () => {
+  describe('combat-context gate', () => {
+    it('returns the no-creatures popup and touches nothing when combat context is null', async () => {
       getCombatContext.mockResolvedValue(null);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Calm Emotions');
-      expect(result.payload.description).toContain('No creatures in combat');
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: SPELL,
+          description: 'No creatures in combat. Calm Emotions has no effect.',
+        },
+      });
+      expect(createSaveListener).not.toHaveBeenCalled();
+      expect(addConcentration).not.toHaveBeenCalled();
+      expect(addExpiration).not.toHaveBeenCalled();
+      expect(storeSpellLastAttack).not.toHaveBeenCalled();
+      expect(storage.set).not.toHaveBeenCalled();
     });
 
-    it('should return popup when creatures array is empty', async () => {
+    it('returns the same popup for an empty creatures array', async () => {
       getCombatContext.mockResolvedValue({ creatures: [] });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No creatures in combat');
+      expect(result.payload.description).toBe('No creatures in combat. Calm Emotions has no effect.');
     });
   });
 
-  describe('concentration registration', () => {
-    it('should register concentration when combat summary is available', async () => {
+  describe('concentration registration + storage/event', () => {
+    it('registers concentration, persists summary, and dispatches combat-summary-updated once', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'prompt',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      const mockCombatSummary = { creatures: [{ name: 'TestWizard' }] };
+      createSaveListener.mockReturnValue(resolvedListener(true));
+      const mockCombatSummary = { creatures: [{ name: CASTER }] };
       getCombatSummary.mockReturnValue(mockCombatSummary);
 
-      const statsWithSaveDc = makePlayerStats({ spellAbilities: { saveDc: 15 } });
-      await handle(makeAction(), statsWithSaveDc, campaignName, null);
+      let dispatched = 0;
+      const onUpdated = () => { dispatched++; };
+      window.addEventListener('combat-summary-updated', onUpdated);
 
-      expect(addConcentration).toHaveBeenCalledWith(
-        mockCombatSummary,
-        'TestWizard',
-        'Calm Emotions',
-        15,
-      );
+      const stats = makePlayerStats({ spellAbilities: { saveDc: 15 } });
+      await handle(makeAction(), stats, campaignName, null);
+
+      expect(getCombatSummary).toHaveBeenCalledWith(campaignName);
+      expect(addConcentration).toHaveBeenCalledWith(mockCombatSummary, CASTER, SPELL, 15);
+      expect(storage.set).toHaveBeenCalledWith('combatSummary', mockCombatSummary, campaignName);
+      expect(dispatched).toBe(1);
+      window.removeEventListener('combat-summary-updated', onUpdated);
     });
 
-    it('should compute spell DC from 8 + proficiency when spellAbilities.saveDc is missing', async () => {
+    it('computes concentration DC as 8 + proficiency when spellAbilities.saveDc is missing', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'prompt',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      const mockCombatSummary = { creatures: [{ name: 'TestWizard' }] };
+      createSaveListener.mockReturnValue(resolvedListener(true));
+      const mockCombatSummary = { creatures: [{ name: CASTER }] };
       getCombatSummary.mockReturnValue(mockCombatSummary);
 
-      const statsNoSaveDc = makePlayerStats({
-        spellAbilities: { modifier: 3 },
-        proficiency: 4,
-      });
+      // 8 + (proficiency 4) = 12; buildSaveDc stays the mocked 13 for the save prompts —
+      // the two DC derivations are independent by design.
+      const statsNoSaveDc = makePlayerStats({ spellAbilities: { modifier: 3 }, proficiency: 4 });
       await handle(makeAction(), statsNoSaveDc, campaignName, null);
 
-      // Handler uses: 8 + (playerStats.proficiency || 2) = 8 + 4 = 12
-      expect(addConcentration).toHaveBeenCalledWith(
-        mockCombatSummary,
-        'TestWizard',
-        'Calm Emotions',
-        12,
-      );
+      expect(addConcentration).toHaveBeenCalledWith(mockCombatSummary, CASTER, SPELL, 12);
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({ saveDc: 13 }));
     });
 
-    it('should not register concentration when combat summary is null', async () => {
+    it('skips concentration and storage entirely when the combat summary is null, but still prompts', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'prompt',
-        promise: Promise.resolve({ success: true }),
-      });
+      createSaveListener.mockReturnValue(resolvedListener(true));
       getCombatSummary.mockReturnValue(null);
+
+      let dispatched = 0;
+      const onUpdated = () => { dispatched++; };
+      window.addEventListener('combat-summary-updated', onUpdated);
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(addConcentration).not.toHaveBeenCalled();
+      expect(storage.set).not.toHaveBeenCalled();
+      expect(dispatched).toBe(0);
+      expect(createSaveListener).toHaveBeenCalledTimes(1);
+      window.removeEventListener('combat-summary-updated', onUpdated);
     });
   });
 
   describe('storeSpellLastAttack', () => {
-    it('should store spell last attack with correct parameters', async () => {
+    it('stores the aoe CHA save context verbatim', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'prompt',
-        promise: Promise.resolve({ success: true }),
-      });
+      createSaveListener.mockReturnValue(resolvedListener(true));
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, {
-        casterName: 'TestWizard',
-        spellName: 'Calm Emotions',
+        casterName: CASTER,
+        spellName: SPELL,
         saveType: 'CHA',
         saveDc: 13,
         attackScope: 'aoe',
@@ -208,13 +284,10 @@ describe('calmEmotionsHandler - handle', () => {
     });
   });
 
-  describe('save prompt creation', () => {
-    it('should call createSaveListener with CHA save config', async () => {
+  describe('save prompt / DC wiring', () => {
+    it('creates one save listener with the exact CHA config', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
+      createSaveListener.mockReturnValue(resolvedListener(true));
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -227,20 +300,15 @@ describe('calmEmotionsHandler - handle', () => {
       });
     });
 
-    it('should skip the caster from targets', async () => {
+    it('excludes the caster from prompted targets', async () => {
       getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'TestWizard' },
-          { name: 'EnemyGoblin' },
-        ],
+        creatures: [{ name: CASTER }, { name: 'EnemyGoblin' }],
       });
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
+      createSaveListener.mockReturnValue(resolvedListener(true));
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+      // Caster is eligible per the resolver but handle filters it out of targets (L310).
       expect(createSaveListener).toHaveBeenCalledTimes(1);
       expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
         targetName: 'EnemyGoblin',
@@ -251,12 +319,9 @@ describe('calmEmotionsHandler - handle', () => {
       });
     });
 
-    it('should apply disadvantage when metamagicHeighten matches target', async () => {
+    it('applies disadvantage when metamagicHeighten matches the target', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
+      createSaveListener.mockReturnValue(resolvedListener(true));
 
       await handle(
         makeAction({}, { metamagicHeighten: 'EnemyGoblin' }),
@@ -275,44 +340,86 @@ describe('calmEmotionsHandler - handle', () => {
     });
   });
 
-  describe('save success', () => {
-    it('should log ability_use and save_result for successful save', async () => {
-      getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: true }),
+  describe('eligibility outcome consumption (routing + gates, not truth tables)', () => {
+    it('never prompts an ineligible non-Humanoid and logs its exact ineligible envelope', async () => {
+      getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'EnemyGoblin' }, { name: 'Pseudodragon' }],
       });
+      createSaveListener.mockReturnValue(resolvedListener(true));
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(createSaveListener).toHaveBeenCalledTimes(1);
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({ targetName: 'EnemyGoblin' }));
+      // Envelope composed by logCalmEmotionsEligibility, executed only via handle — owned here.
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'automation',
+        automationType: 'calm_emotions_ineligible',
+        automationDetail: 'not_humanoid',
+        characterName: 'Pseudodragon',
+        sourceName: CASTER,
+        description: 'Pseudodragon is not affected by Calm Emotions (not a Humanoid).',
+        timestamp: expect.any(Number),
+      });
+    });
+
+    it('consumes the lenient no-map advisory with its exact envelope and still processes targets', async () => {
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      createSaveListener.mockReturnValue(resolvedListener(true));
+      // getRuntimeValue default-undefined => no activeMapName => advisory 'no_map_lenient'.
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'automation',
+        automationType: 'calm_emotions_sphere_advisory',
+        automationDetail: 'no_map_lenient',
+        characterName: CASTER,
+        description: 'Calm Emotions sphere could not be measured for this casting (no_map_lenient) — selection is advisory; GM enforces the 20-foot-radius sphere.',
+        timestamp: expect.any(Number),
+      });
+      expect(loadMapData).not.toHaveBeenCalled();
+      expect(result.payload.description).toBe('No creatures affected by Calm Emotions. 1 creature(s) saved.');
+    });
+  });
+
+  describe('save success path', () => {
+    it('logs ability_use and save_result with full own-composition descriptions', async () => {
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      createSaveListener.mockReturnValue(resolvedListener(true));
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',
-        characterName: 'TestWizard',
-        abilityName: 'Calm Emotions',
-        description: expect.stringContaining('casts Calm Emotions'),
+        characterName: CASTER,
+        abilityName: SPELL,
+        description: 'TestWizard casts Calm Emotions! EnemyGoblin must make a CHA save (DC 13) or be affected.',
         promptId: 'goblin-prompt',
       });
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'save_result',
-        characterName: 'TestWizard',
+        characterName: CASTER,
         rollType: 'save-calm-emotions',
         targetName: 'EnemyGoblin',
         saveDc: 13,
         saveType: 'CHA',
         success: true,
-        description: expect.stringContaining('succeeded on CHA save'),
+        description: 'EnemyGoblin succeeded on CHA save against Calm Emotions.',
       });
     });
 
-    it('should call addTargetResult with success data', async () => {
-      getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({
-          success: true,
-          roll: 12,
-          total: 15,
-        }),
+    it('records target results: saves roll/total verbatim and defaults absent values to 0', async () => {
+      getCombatContext.mockResolvedValue(multiTargetCombat);
+      let callCount = 0;
+      createSaveListener.mockImplementation(() => {
+        callCount++;
+        return {
+          promptId: `prompt-${callCount}`,
+          promise: Promise.resolve(
+            callCount === 1 ? { success: true, roll: 12, total: 15 } : { success: true },
+          ),
+        };
       });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -325,32 +432,8 @@ describe('calmEmotionsHandler - handle', () => {
         conditions: [],
         appliedDamage: 0,
       });
-    });
-
-    it('should include saved count in popup description', async () => {
-      getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('1 creature(s) saved');
-      expect(result.payload.description).toContain('No creatures affected');
-    });
-
-    it('should use default roll/total when not provided', async () => {
-      getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
       expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
-        targetName: 'EnemyGoblin',
+        targetName: 'EnemyOrc',
         saveResult: 'success',
         roll: 0,
         total: 0,
@@ -358,72 +441,63 @@ describe('calmEmotionsHandler - handle', () => {
         appliedDamage: 0,
       });
     });
+
+    it('summarizes an all-save cast verbatim in the popup', async () => {
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      createSaveListener.mockReturnValue(resolvedListener(true));
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.payload.description).toBe('No creatures affected by Calm Emotions. 1 creature(s) saved.');
+    });
   });
 
-  describe('save failure', () => {
-    it('should apply immunity effects on failed save', async () => {
+  describe('save failure path (default immunity leg L351)', () => {
+    it('reaches the immunity applier once per target and never delegates to the indifferent applier', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
-      getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: false }),
-      });
+      createSaveListener.mockReturnValue(resolvedListener(false));
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({
-            target: 'EnemyGoblin',
-            effect: 'calm_emotions',
-            mode: 'immunity',
-            dc: 13,
-          }),
-        ]),
-        campaignName,
-      );
+      // Reaches-applier smoke (te/buff CONTENT is effects-lane owned): setRuntimeObject is
+      // written ONLY inside applyCalmEmotionsImmunity on this route, and the campaign te
+      // write is its single direct 4-arg sink. registerTargetEffect NEVER firing proves the
+      // default leg chose immunity, not indifferent.
+      expect(setRuntimeObject).toHaveBeenCalledTimes(1);
+      expect(setRuntimeObject).toHaveBeenCalledWith('EnemyGoblin', expect.anything(), campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+      expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), campaignName);
+      expect(registerTargetEffect).not.toHaveBeenCalled();
     });
 
-    it('should log ability_use and save_result for failed save', async () => {
+    it('logs the failed-save envelope with full own-composition descriptions', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: false }),
-      });
+      createSaveListener.mockReturnValue(resolvedListener(false));
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',
-        characterName: 'TestWizard',
-        abilityName: 'Calm Emotions',
-        description: expect.stringContaining('casts Calm Emotions'),
-        promptId: 'goblin-prompt',
+        characterName: CASTER,
+        abilityName: SPELL,
+        description: 'TestWizard casts Calm Emotions! EnemyGoblin must make a CHA save (DC 13) or be affected.',
+        promptId: 'fail-prompt',
       });
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'save_result',
-        characterName: 'TestWizard',
+        characterName: CASTER,
         rollType: 'save-calm-emotions',
         targetName: 'EnemyGoblin',
         saveDc: 13,
         saveType: 'CHA',
         success: false,
-        description: expect.stringContaining('failed CHA save'),
+        description: 'EnemyGoblin failed CHA save against Calm Emotions. Granted immunity to Charmed/Frightened.',
       });
     });
 
-    it('should call addTargetResult with failure data', async () => {
+    it('records the failed target result with verbatim roll/total', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({
-          success: false,
-          roll: 3,
-          total: 6,
-        }),
-      });
+      createSaveListener.mockReturnValue(resolvedListener(false, { roll: 3, total: 6 }));
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -437,43 +511,41 @@ describe('calmEmotionsHandler - handle', () => {
       });
     });
 
-    it('should include affected count in popup description', async () => {
+    it('summarizes a failed cast verbatim in the popup', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: false }),
-      });
+      createSaveListener.mockReturnValue(resolvedListener(false));
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('1 creature(s)');
-      expect(result.payload.description).toContain('immune to Charmed');
-      expect(result.payload.description).toContain('0 creature(s) saved');
+      expect(result.payload.description).toBe(
+        'Calm Emotions affects 1 creature(s). EnemyGoblin is immune to Charmed and Frightened. 0 creature(s) saved.',
+      );
     });
   });
 
   describe('multiple targets', () => {
-    it('should process all creatures excluding caster', async () => {
+    it('fans out one prompt + one applier write per target while registering ONE expiration clock per cast', async () => {
       getCombatContext.mockResolvedValue(multiTargetCombat);
-
-      let callCount = 0;
-      createSaveListener.mockImplementation(() => {
-        callCount++;
-        return {
-          promptId: `prompt-${callCount}`,
-          promise: Promise.resolve({ success: callCount === 1 }),
-        };
-      });
+      createSaveListener.mockReturnValue(resolvedListener(false));
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(createSaveListener).toHaveBeenCalledTimes(2);
+      expect(createSaveListener.mock.calls.map(c => c[1].targetName)).toEqual(['EnemyGoblin', 'EnemyOrc']);
       expect(result.type).toBe('popup');
+      expect(result.payload.description).toBe(
+        'Calm Emotions affects 2 creature(s). EnemyGoblin is immune to Charmed and Frightened. EnemyOrc is immune to Charmed and Frightened. 0 creature(s) saved.',
+      );
+      // No-double-write guard: the cast-scoped clock is per-casting, not per-target;
+      // the per-target sinks fan exactly once each.
+      expect(addExpiration).toHaveBeenCalledTimes(1);
+      expect(setRuntimeObject).toHaveBeenCalledTimes(2);
+      expect(setRuntimeObject).toHaveBeenCalledWith('EnemyGoblin', expect.anything(), campaignName);
+      expect(setRuntimeObject).toHaveBeenCalledWith('EnemyOrc', expect.anything(), campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledTimes(2);
     });
 
-    it('should report mixed save results correctly', async () => {
+    it('summarizes mixed save outcomes verbatim in prompt and popup order', async () => {
       getCombatContext.mockResolvedValue(multiTargetCombat);
-
       let callCount = 0;
       createSaveListener.mockImplementation(() => {
         callCount++;
@@ -485,135 +557,46 @@ describe('calmEmotionsHandler - handle', () => {
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toContain('1 creature(s)');
-      expect(result.payload.description).toContain('1 creature(s) saved');
-    });
-
-    it('should report all targets affected when all fail', async () => {
-      getCombatContext.mockResolvedValue(multiTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'multi-prompt',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('2 creature(s)');
-      expect(result.payload.description).toContain('immune to Charmed');
-    });
-
-    it('should report all targets saving', async () => {
-      getCombatContext.mockResolvedValue(multiTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'multi-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('2 creature(s) saved');
-      expect(result.payload.description).toContain('No creatures affected');
-    });
-
-    it('should report no creatures affected when all saved', async () => {
-      getCombatContext.mockResolvedValue(multiTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'multi-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('No creatures affected');
+      expect(createSaveListener.mock.calls.map(c => c[1].targetName)).toEqual(['EnemyGoblin', 'EnemyOrc']);
+      expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        targetName: 'EnemyGoblin',
+        saveResult: 'success',
+      }));
+      expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        targetName: 'EnemyOrc',
+        saveResult: 'failure',
+      }));
+      expect(result.payload.description).toBe(
+        'Calm Emotions affects 1 creature(s). EnemyOrc is immune to Charmed and Frightened. 1 creature(s) saved.',
+      );
     });
   });
 
-  describe('SP-020 fixes', () => {
-    it('B5: registers a 10-round calm_emotions_end expiration clock on the caster', async () => {
+  describe('expiration clock (SP-020 B5 — handle-route mechanism, per trio map)', () => {
+    it('enqueues one 10-round calm_emotions_end round-latch on the caster per cast', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
+      createSaveListener.mockReturnValue(resolvedListener(true));
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+      // Round latch consumed by expirationQueue at initiative seams; expiry handler is
+      // clearExpirationEffects.calm-emotions-end.test.js's lane. Clock shape + count here.
+      expect(addExpiration).toHaveBeenCalledTimes(1);
       expect(addExpiration).toHaveBeenCalledWith({
-        attackerName: 'TestWizard',
-        targetName: 'TestWizard',
-        effects: [{ type: 'calm_emotions_end', source: 'TestWizard' }],
+        attackerName: CASTER,
+        targetName: CASTER,
+        effects: [{ type: 'calm_emotions_end', source: CASTER }],
         campaignName,
         rounds: 10,
         expireOnCreatureName: null,
       });
     });
-
-    it('B2: non-Humanoid creatures are excluded from saves and logged ineligible', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'EnemyGoblin' },
-          { name: 'Pseudodragon' },
-        ],
-      });
-      getMonsterData.mockImplementation(async (name) => {
-        if (String(name).startsWith('Pseudodragon')) return { name: 'Pseudodragon', type: 'Dragon' };
-        return { name: 'Bandit', type: 'Humanoid' };
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledTimes(1);
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({ targetName: 'EnemyGoblin' }));
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'automation',
-        automationType: 'calm_emotions_ineligible',
-        automationDetail: 'not_humanoid',
-        characterName: 'Pseudodragon',
-      }));
-    });
-
-    it('B4: no active map logs a lenient sphere advisory', async () => {
-      getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'automation',
-        automationType: 'calm_emotions_sphere_advisory',
-        automationDetail: 'no_map_lenient',
-      }));
-    });
   });
 
-  describe('popup payload structure', () => {
-    it('should return popup type with automation_info payload', async () => {
+  describe('popup payload', () => {
+    it('carries action.name into both the popup and the ability_use log', async () => {
       getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Calm Emotions');
-    });
-
-    it('should use action.name in the popup', async () => {
-      getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'goblin-prompt',
-        promise: Promise.resolve({ success: false }),
-      });
+      createSaveListener.mockReturnValue(resolvedListener(true));
 
       const customAction = {
         name: 'Custom Calm Emotions',
@@ -622,25 +605,40 @@ describe('calmEmotionsHandler - handle', () => {
       };
       const result = await handle(customAction, makePlayerStats(), campaignName, null);
 
-      expect(result.payload.name).toBe('Custom Calm Emotions');
+      expect(result.type).toBe('popup');
+      expect(result.payload).toEqual({
+        type: 'automation_info',
+        name: 'Custom Calm Emotions',
+        description: 'No creatures affected by Calm Emotions. 1 creature(s) saved.',
+      });
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'ability_use',
+        abilityName: 'Custom Calm Emotions',
+      }));
     });
   });
 
-  describe('storage and event dispatch', () => {
-    it('should call storage.set and dispatch event when concentration is registered', async () => {
-      getCombatContext.mockResolvedValue(singleTargetCombat);
-      createSaveListener.mockReturnValue({
-        promptId: 'prompt',
-        promise: Promise.resolve({ success: true }),
+  describe('log rejection resilience', () => {
+    it('survives an ability_use log rejection and completes the cast (measurable-map geometry)', async () => {
+      // Map staged so advisory/ineligible logs are EMPTY: the first addEntry is handle's
+      // own ability_use (L327), whose .catch (L333) this leg pins. Real 5-ft sphere math:
+      // target two cells (10ft) from caster is inside the 20-ft sphere.
+      activeMapRouter();
+      loadMapData.mockResolvedValue({
+        players: [{ name: CASTER, gridX: 0, gridY: 0 }],
+        placedItems: [{ name: 'EnemyGoblin', gridX: 2, gridY: 0 }],
       });
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      createSaveListener.mockReturnValue(resolvedListener(true));
+      addEntry.mockRejectedValueOnce(new Error('log io'));
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const mockCombatSummary = { creatures: [{ name: 'TestWizard' }] };
-      getCombatSummary.mockReturnValue(mockCombatSummary);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const stats = makePlayerStats({ spellAbilities: { saveDc: 15 } });
-      await handle(makeAction(), stats, campaignName, null);
-
-      expect(storage.set).toHaveBeenCalledWith('combatSummary', mockCombatSummary, campaignName);
+      expect(spy).toHaveBeenCalledWith('[calmEmotions] Error:', expect.any(Error));
+      expect(createSaveListener).toHaveBeenCalledTimes(1);
+      expect(result.payload.description).toBe('No creatures affected by Calm Emotions. 1 creature(s) saved.');
+      spy.mockRestore();
     });
   });
 });

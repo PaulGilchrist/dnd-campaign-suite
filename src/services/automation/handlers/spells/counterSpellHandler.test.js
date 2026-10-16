@@ -1,4 +1,40 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// ── QUAD seam map — counterSpellHandler.js ─────────────────────────────
+// Subject is LIVE: automation/index.js imports `handle` (l.201) and registers
+// it as `reaction_counterspell` in the dispatch table (l.525). Reaction
+// CAST-1, CON save vs the attacker.
+//
+// THIS FILE (#1896) — MAIN lane: handle() up to (but NOT including)
+// handleSaveResult.
+//   • validation gates (5): no combat context / no lastAttack / no spell
+//     detected / no attacker / attacker not in combat — exact refusal popup
+//     envelopes, and every gate returns before ANY side effect (no build
+//     SaveDc, no prompt, no ledger write, no log, no listener)
+//   • spell detection: all four truthy branches of looksLikeSpellAttack
+//     (damageFormula, attackName, saveType, rollType 'spell-save'), each
+//     ISOLATED by nulling the higher-priority branches, plus spell-name
+//     resolution ('unknown spell' when unnamed)
+//   • spell-level honesty pin: the source performs NO spell-level
+//     comparison anywhere in this chain — there is no auto-counter/auto-fail
+//     path for equal/lower-level spells (2024 or 5e); handle() ALWAYS arms
+//     the CON save prompt, saveType hardcoded 'CON' regardless of
+//     auto.saveType. Pinned as-is.
+//   • save prompt creation content: createSaveListener exact args,
+//     buildSaveDc(auto, playerStats) inputs, metamagicHeighten disadvantage,
+//     the initial ability_use trigger log (full string), exactly one
+//     'save-result' listener armed per accepted trigger
+//   • popup envelope: full strict-table payload pins, feature-name
+//     override/default
+// Owned elsewhere — not re-pinned here: handleSaveResult reactions,
+// rollback args, broadcast payload and promptId guard (#1893); addEntry
+// rejections, service-failure propagation, and the FLAGGED rollback-rejection
+// listener leak — current contract reviewed from this lane 2026-10-16,
+// stays pinned there, remains unfixed (#1894); Spell Breaker refund economy
+// and the CLA-322 reaction-spent latch refuse/stamp/re-arm lifecycle,
+// incl. the fresh-round latch stamp (#1895). No game timers — this lane
+// never FIRES the captured listener; listeners are de-armed in afterEach.
+// ─────────────────────────────────────────────────────────────────────────
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
@@ -31,11 +67,13 @@ import { handle } from './counterSpellHandler.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { addEntry } from '../../../ui/logService.js';
-import { findLastAttack } from '../../common/damageRollback.js';
+import { findLastAttack, rollbackSpellEffects } from '../../common/damageRollback.js';
+import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
 const campaignName = 'test-campaign';
+const PROMPT_ID = 'main-prompt';
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -50,6 +88,7 @@ function makePlayerStats(overrides = {}) {
 function makeAction(automation = {}) {
   return {
     name: 'Counterspell',
+    // nested automation overrides MERGE; callers keep untouched fields
     automation: {
       type: 'counterspell',
       saveType: 'CON',
@@ -60,6 +99,7 @@ function makeAction(automation = {}) {
 
 function makeCombatContext(overrides = {}) {
   return {
+    round: 1,
     creatures: [
       { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
       { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
@@ -74,6 +114,7 @@ function makeCombatContext(overrides = {}) {
 }
 
 function makeLastAttack(overrides = {}) {
+  const { attackEvent: attackEventOverrides = {}, ...rest } = overrides;
   return {
     attackEvent: {
       attackerName: 'Goblin',
@@ -82,7 +123,12 @@ function makeLastAttack(overrides = {}) {
       damageName: 'Fire Bolt',
       attackName: 'Fire Bolt',
       saveType: null,
-      ...overrides.attackEvent,
+      primaryDamage: 9,
+      secondaryDamage: 0,
+      affectedTargets: ['TestCaster'],
+      statusEffects: null,
+      // attackEvent overrides MERGE (caller keeps untouched identity fields)
+      ...attackEventOverrides,
     },
     attackerName: 'Goblin',
     targetName: 'TestCaster',
@@ -90,10 +136,17 @@ function makeLastAttack(overrides = {}) {
     secondaryDamage: 0,
     totalDamage: 9,
     damageTypes: ['Fire'],
-    statusEffects: null,
-    affectedTargets: ['TestCaster'],
-    ...overrides,
+    ...rest,
   };
+}
+
+// Capture every 'save-result' registration this lane makes and de-arm it in
+// afterEach — the main lane arms the prompt but never resolves it (save
+// results are #1893's lane), so leaked listeners can't fire into later tests.
+let addEventListenerSpy;
+
+function armedListeners() {
+  return addEventListenerSpy.mock.calls.filter(call => call[0] === 'save-result');
 }
 
 // ── Tests ──────────────────────────────────────────────────────
@@ -101,217 +154,146 @@ function makeLastAttack(overrides = {}) {
 describe('counterSpellHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Re-arm happy-path defaults every test (clearAllMocks drains them).
+    // getRuntimeValue stays a bare vi.fn() → undefined → latch reads as
+    // round 0, so the fresh trigger (round 1) is never refused.
+    getCombatContext.mockResolvedValue(makeCombatContext());
+    findLastAttack.mockResolvedValue(makeLastAttack());
+    buildSaveDc.mockReturnValue(15);
+    createSaveListener.mockReturnValue({ promptId: PROMPT_ID });
+    rollbackSpellEffects.mockResolvedValue({ logDescription: '' });
+    addEventListenerSpy = vi.spyOn(window, 'addEventListener');
   });
 
-  describe('validation', () => {
-    it('should return popup when no combat context exists', async () => {
-      const ps = makePlayerStats();
+  afterEach(() => {
+    armedListeners().forEach(([, cb]) => window.removeEventListener('save-result', cb));
+    addEventListenerSpy.mockRestore();
+  });
+
+  describe('validation gates', () => {
+    it.each([
+      [
+        'no combat context',
+        () => getCombatContext.mockResolvedValue(null),
+        'Counterspell requires an active combat. Select a creature in combat and try again.',
+      ],
+      [
+        'no recent attack',
+        () => findLastAttack.mockResolvedValue({ attackEvent: null }),
+        'Counterspell — No recent attack to counter.',
+      ],
+      [
+        'no spell detected (all four spell indicators neutral)',
+        () => findLastAttack.mockResolvedValue(makeLastAttack({
+          attackEvent: { damageFormula: null, attackName: null, saveType: null },
+        })),
+        'Counterspell — No spell detected in the most recent attack.',
+      ],
+      [
+        'no attacker identified',
+        () => findLastAttack.mockResolvedValue(makeLastAttack({
+          attackEvent: { attackerName: null },
+        })),
+        'Counterspell — Could not identify the spellcaster.',
+      ],
+      [
+        'attacker not in combat',
+        () => findLastAttack.mockResolvedValue(makeLastAttack({
+          attackEvent: { attackerName: 'Wizard' },
+        })),
+        'Counterspell — Wizard is not in combat.',
+      ],
+    ])('%s — exact refusal popup, zero side effects', async (_label, stub, description) => {
+      stub();
       const action = makeAction();
 
-      getCombatContext.mockResolvedValue(null);
+      const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Counterspell');
-      expect(result.payload.description).toContain('requires an active combat');
-      expect(result.payload.automation).toEqual(action.automation);
-    });
-
-    it('should return popup when no lastAttack exists', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue({
-        attackEvent: null,
-        attackerName: null,
-        targetName: null,
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
+      // infoPopup envelope, strict
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Counterspell',
+          description,
+          automation: action.automation,
+        },
       });
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Counterspell');
-      expect(result.payload.description).toContain('No recent attack to counter');
-    });
-
-    it('should return popup when no spell detected in lastAttack', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack({
-        attackEvent: {
-          attackerName: 'Goblin',
-          targetName: 'TestCaster',
-          hit: true,
-          // No spell indicators
-        },
-      }));
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Counterspell');
-      expect(result.payload.description).toContain('No spell detected');
-    });
-
-    it('should return popup when no attacker in lastAttack', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack({
-        attackEvent: {
-          targetName: 'TestCaster',
-          damageFormula: '3d6',
-          damageName: 'Fire Bolt',
-        },
-      }));
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Counterspell');
-      expect(result.payload.description).toContain('Could not identify the spellcaster');
-    });
-
-    it('should return popup when attacker not in combat', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack({
-        attackEvent: {
-          attackerName: 'Wizard',
-          targetName: 'TestCaster',
-          damageFormula: '3d6',
-          damageName: 'Fire Bolt',
-        },
-      }));
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Counterspell');
-      expect(result.payload.description).toContain('Wizard is not in combat');
+      // Every gate returns before DC resolution, prompt, ledger, logs,
+      // listener arming, and rollback
+      expect(buildSaveDc).not.toHaveBeenCalled();
+      expect(createSaveListener).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(armedListeners()).toHaveLength(0);
+      expect(rollbackSpellEffects).not.toHaveBeenCalled();
     });
   });
 
-  describe('spell detection', () => {
-    it('should detect spell by damageFormula', async () => {
-      const ps = makePlayerStats();
+  describe('spell detection (looksLikeSpellAttack branches, isolated)', () => {
+    it.each([
+      ['damageFormula (canonical lastAttack)', {}, 'Fire Bolt'],
+      ['attackName alone', { damageFormula: null }, 'Fire Bolt'],
+      ['saveType alone', { damageFormula: null, attackName: null, saveType: 'CON' }, 'unknown spell'],
+      ['rollType spell-save alone', { damageFormula: null, attackName: null, rollType: 'spell-save' }, 'unknown spell'],
+      ['named spell save-roll', { damageFormula: null, saveType: null, attackName: 'Ray of Frost', rollType: 'spell-save' }, 'Ray of Frost'],
+    ])('detects via %s — spell resolves to \'%s\' full-string popup', async (_label, attackEvent, spellName) => {
+      findLastAttack.mockResolvedValue(makeLastAttack({ attackEvent }));
       const action = makeAction();
 
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack({
-        attackEvent: {
-          attackerName: 'Goblin',
-          targetName: 'TestCaster',
-          damageFormula: '3d6',
-          damageName: 'Fire Bolt',
+      const result = await handle(action, makePlayerStats(), campaignName, null);
+
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Counterspell',
+          targetName: 'Goblin',
+          description: `Goblin's '${spellName}' is being countered — Goblin must make a CON saving throw (DC 15).`,
+          automation: action.automation,
         },
-      }));
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-1' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.targetName).toBe('Goblin');
-      expect(result.payload.description).toContain("is being countered");
-      expect(result.payload.description).toContain('CON saving throw');
-      expect(result.payload.description).toContain('DC 15');
-    });
-
-    it('should detect spell by attackName', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack({
-        attackEvent: {
-          attackerName: 'Goblin',
-          targetName: 'TestCaster',
-          attackName: 'Eldritch Blast',
-          hit: true,
-        },
-      }));
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-2' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.targetName).toBe('Goblin');
-    });
-
-    it('should detect spell by spellName', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack({
-        attackEvent: {
-          attackerName: 'Goblin',
-          targetName: 'TestCaster',
-          attackName: 'Ray of Frost',
-        },
-      }));
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-3' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.targetName).toBe('Goblin');
-    });
-
-    it('should detect spell by saveType', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack({
-        attackEvent: {
-          attackerName: 'Goblin',
-          targetName: 'TestCaster',
-          saveType: 'CON',
-          saveDc: 13,
-        },
-      }));
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-4' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.targetName).toBe('Goblin');
+      });
+      expect(createSaveListener).toHaveBeenCalledTimes(1);
+      expect(armedListeners()).toHaveLength(1);
     });
   });
 
-  describe('save prompt', () => {
-    it('should create CON save prompt on attacker', async () => {
+  describe('spell-level honesty (no auto-counter path exists)', () => {
+    // Source check: handle() never compares spell levels — there is no
+    // auto-counter for lower-level spells and no auto-fail shortcut. It
+    // ALWAYS prompts; saveType is hardcoded CON on the prompt. Pinned as-is.
+    it.each([
+      ['no spell metadata on the action (cantrip target)', {}],
+      ['level-9 upcast target', { spell: { level: 9, isUpcast: true, upcastLevel: 9 } }],
+      ['automation declares a DEX save', { automation: { type: 'counterspell', saveType: 'DEX' } }],
+    ])('still arms the CON save prompt when %s', async (_label, patch) => {
+      const action = { ...makeAction(), ...patch };
+
+      const result = await handle(action, makePlayerStats(), campaignName, null);
+
+      expect(result.payload.description).toBe(
+        "Goblin's 'Fire Bolt' is being countered — Goblin must make a CON saving throw (DC 15).");
+      expect(createSaveListener).toHaveBeenCalledTimes(1);
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
+        targetName: 'Goblin',
+        saveType: 'CON',
+        saveDc: 15,
+        disadvantage: false,
+      });
+    });
+  });
+
+  describe('save prompt creation', () => {
+    it('arms a CON save prompt on the attacker via buildSaveDc(auto, playerStats)', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-5' });
 
       await handle(action, ps, campaignName, null);
 
+      expect(buildSaveDc).toHaveBeenCalledTimes(1);
+      expect(buildSaveDc).toHaveBeenCalledWith(action.automation, ps);
+      expect(createSaveListener).toHaveBeenCalledTimes(1);
       expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
         targetName: 'Goblin',
         saveType: 'CON',
@@ -320,16 +302,10 @@ describe('counterSpellHandler.handle', () => {
       });
     });
 
-    it('should support metamagicHeighten disadvantage', async () => {
-      const ps = makePlayerStats();
+    it('arms with disadvantage when metaCtx.metamagicHeighten is set', async () => {
       const action = { ...makeAction(), metaCtx: { metamagicHeighten: true } };
 
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-6' });
-
-      await handle(action, ps, campaignName, null);
+      await handle(action, makePlayerStats(), campaignName, null);
 
       expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
         targetName: 'Goblin',
@@ -339,56 +315,69 @@ describe('counterSpellHandler.handle', () => {
       });
     });
 
-    it('should log ability_use entry with spell name', async () => {
-      const ps = makePlayerStats();
+    it('logs the ability_use trigger with full composition and promptId', async () => {
       const action = makeAction();
 
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'test-prompt-7' });
+      await handle(action, makePlayerStats(), campaignName, null);
 
-      await handle(action, ps, campaignName, null);
-
+      // Initial trigger log is the only log this lane writes
+      expect(addEntry).toHaveBeenCalledTimes(1);
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',
         characterName: 'TestCaster',
         abilityName: 'Counterspell',
-        description: expect.stringContaining("Countering Goblin's 'Fire Bolt'"),
-        promptId: 'test-prompt-7',
+        description: "Counterspell triggered — Countering Goblin's 'Fire Bolt'. Goblin must make CON save (DC 15)",
+        promptId: PROMPT_ID,
       });
+    });
+
+    it('arms exactly one save-result listener per accepted trigger', async () => {
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(armedListeners()).toHaveLength(1);
+      expect(typeof armedListeners()[0][1]).toBe('function');
     });
   });
 
-  describe('feature name', () => {
-    it('should use action.name when provided', async () => {
-      const ps = makePlayerStats();
-      const action = { ...makeAction(), name: 'Heightened Counterspell' };
+  describe('popup envelope', () => {
+    it('returns the exact automation_info popup on an accepted trigger', async () => {
+      const action = makeAction();
 
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'custom-name-prompt' });
+      const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.name).toBe('Heightened Counterspell');
-      expect(result.payload.description).toContain("is being countered");
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Counterspell',
+          targetName: 'Goblin',
+          description: "Goblin's 'Fire Bolt' is being countered — Goblin must make a CON saving throw (DC 15).",
+          automation: action.automation,
+        },
+      });
     });
 
-    it('should use default name when action.name is falsy', async () => {
-      const ps = makePlayerStats();
+    it('uses action.name as the feature name when provided', async () => {
+      const action = { ...makeAction(), name: 'Heightened Counterspell' };
+
+      const result = await handle(action, makePlayerStats(), campaignName, null);
+
+      expect(result.payload.name).toBe('Heightened Counterspell');
+      // Feature name flows into the trigger log too
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: 'TestCaster',
+        abilityName: 'Heightened Counterspell',
+        description: "Heightened Counterspell triggered — Countering Goblin's 'Fire Bolt'. Goblin must make CON save (DC 15)",
+        promptId: PROMPT_ID,
+      });
+    });
+
+    it('falls back to default name \'Counterspell\' when action.name is falsy', async () => {
       const action = { ...makeAction(), name: null };
 
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'default-name-prompt' });
+      const result = await handle(action, makePlayerStats(), campaignName, null);
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
       expect(result.payload.name).toBe('Counterspell');
     });
   });

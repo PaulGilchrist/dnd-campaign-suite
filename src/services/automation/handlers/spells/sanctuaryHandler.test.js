@@ -1,4 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai: 2026-10-16
+// Press/write side of the Sanctuary lane. handle() is the automation/index.js
+// registry entry for type 'sanctuary' (targetEffects write + expiration anchor,
+// manifest-verified live 2026-10-08); endSanctuary() is the self-break removal,
+// live at useLoggedDiceRollAttack.js:52, contextBuilder-sync.js:57 and
+// spellCastService/execution/index.js:575.
+// The WIS-save prompt consumption seam is owned by
+// hooks/combat/handlers/handleSanctuarySave.test.js (distinct module, inline
+// te lookup — never imports this handler's queries).
+// isSanctuaryActive / getSanctuaryTarget have no direct production caller
+// (re-export only via automation/index.js:635) — one minimal pin each.
+// Breaks at event seams only: rounds: undefined, expireOnCreatureName anchor —
+// never a minutes×N clock (no-timers policy; '1 minute' is combat-scoped).
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -28,15 +41,6 @@ const campaignName = 'TestCampaign';
 const casterName = 'Cleric1';
 const targetName = 'Rogue1';
 
-function makePlayerStats(overrides = {}) {
-    return {
-        name: casterName,
-        level: 5,
-        proficiency: 3,
-        ...overrides,
-    };
-}
-
 function makeAction(automation = {}, metaCtx = {}) {
     return {
         name: 'Sanctuary',
@@ -45,6 +49,14 @@ function makeAction(automation = {}, metaCtx = {}) {
     };
 }
 
+// The setRuntimeValue('campaign', 'targetEffects', ...) write, or undefined.
+const effectWrite = () =>
+    setRuntimeValue.mock.calls.findLast(c => c[0] === 'campaign' && c[1] === 'targetEffects');
+
+afterEach(() => {
+    vi.restoreAllMocks();
+});
+
 // ─── handle ───
 
 describe('sanctuaryHandler.handle', () => {
@@ -52,295 +64,162 @@ describe('sanctuaryHandler.handle', () => {
         vi.clearAllMocks();
     });
 
-    it('returns info popup with correct structure', async () => {
+    it('writes the sanctuary targetEffect with the exact runtime call shape', async () => {
         getRuntimeValue.mockReturnValue([]);
 
-        const result = await handle(makeAction({}, { targetName }), makePlayerStats(), campaignName, null);
+        await handle(makeAction({}, { targetName }), { name: casterName, spellAbilities: { saveDc: 13 } }, campaignName, null);
+
+        expect(getRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects');
+        // 4-arg write: ('campaign', 'targetEffects', list, campaignName).
+        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [{
+            target: targetName,
+            effect: 'sanctuary',
+            source: casterName,
+            duration: '1 minute',
+            saveDc: 13,
+        }], campaignName);
+    });
+
+    it('falls back to 8 + proficiency when spellAbilities.saveDc is missing (with console.error)', async () => {
+        getRuntimeValue.mockReturnValue([]);
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await handle(makeAction({}, { targetName }), { name: casterName, proficiency: 3 }, campaignName, null);
+
+        expect(effectWrite()[2][0].saveDc).toBe(11);
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('replaces an existing sanctuary from the same caster on the same target', async () => {
+        getRuntimeValue.mockReturnValue([
+            { target: targetName, effect: 'sanctuary', source: casterName, duration: '1 minute', saveDc: 10 },
+        ]);
+
+        await handle(makeAction({}, { targetName }), { name: casterName, spellAbilities: { saveDc: 15 } }, campaignName, null);
+
+        const written = effectWrite()[2];
+        expect(written).toHaveLength(1);
+        expect(written[0].saveDc).toBe(15);
+    });
+
+    it('pushes alongside a sanctuary on the same target from a different caster', async () => {
+        // Same target, different source — isolates the source leg of the
+        // replace-key (a missing metaCtx would hit the target leg instead).
+        getRuntimeValue.mockReturnValue([
+            { target: targetName, effect: 'sanctuary', source: 'Cleric2', duration: '1 minute', saveDc: 12 },
+        ]);
+
+        await handle(makeAction({}, { targetName }), { name: casterName, spellAbilities: { saveDc: 15 } }, campaignName, null);
+
+        const written = effectWrite()[2];
+        expect(written).toHaveLength(2);
+        expect(written[0].source).toBe('Cleric2');
+        expect(written[1].source).toBe(casterName);
+        expect(written[1].saveDc).toBe(15);
+    });
+
+    it('returns popup with exact automation_info contract and mechanics description', async () => {
+        getRuntimeValue.mockReturnValue([]);
+
+        const result = await handle(makeAction({}, { targetName }), { name: casterName, spellAbilities: { saveDc: 13 } }, campaignName, null);
 
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.name).toBe('Sanctuary');
         expect(result.payload.targetName).toBe(targetName);
         expect(result.payload.automationType).toBe('sanctuary');
+        expect(result.payload.description).toBe(
+            'Sanctuary activated on Rogue1 — creatures targeting Rogue1 with attacks or damaging spells must succeed on a WIS save or lose the attack/spell. Spell ends if Rogue1 attacks, casts a spell, or deals damage.'
+        );
     });
 
-    it('uses metaCtx.targetName when provided, falls back to Unknown', async () => {
+    it('resolves targetName from metaCtx, falling back to Unknown', async () => {
         getRuntimeValue.mockReturnValue([]);
 
-        const result = await handle(makeAction({}, { targetName: 'Barbarian1' }), makePlayerStats(), campaignName, null);
+        const named = await handle(makeAction({}, { targetName: 'Barbarian1' }), { name: casterName, spellAbilities: { saveDc: 13 } }, campaignName, null);
+        expect(named.payload.targetName).toBe('Barbarian1');
+        expect(named.payload.description).toContain('Barbarian1');
 
-        expect(result.payload.targetName).toBe('Barbarian1');
-        expect(result.payload.description).toContain('Barbarian1');
+        const fallback = await handle(makeAction(), { name: casterName, spellAbilities: { saveDc: 13 } }, campaignName, null);
+        expect(fallback.payload.targetName).toBe('Unknown');
+        expect(effectWrite()[2][0].target).toBe('Unknown');
     });
 
-    it('uses "Unknown" as targetName when no metaCtx provided', async () => {
+    it('logs an ability_use entry with the exact cast description', async () => {
         getRuntimeValue.mockReturnValue([]);
 
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        expect(result.payload.targetName).toBe('Unknown');
-        expect(result.payload.description).toContain('Unknown');
-    });
-
-    it('uses spellAbilities.saveDc when available', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await handle(makeAction({}, { targetName }), makePlayerStats({ spellAbilities: { saveDc: 13 } }), campaignName, null);
-
-        const setCalls = setRuntimeValue.mock.calls;
-        const effectCall = setCalls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
-        expect(effectCall[2][0].saveDc).toBe(13);
-    });
-
-    it('computes saveDc from proficiency when spellAbilities.saveDc is missing', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await handle(makeAction({}, { targetName }), makePlayerStats({ proficiency: 3 }), campaignName, null);
-
-        const setCalls = setRuntimeValue.mock.calls;
-        const effectCall = setCalls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
-        expect(effectCall[2][0].saveDc).toBe(11);
-    });
-
-    it('stores sanctuary effect with correct properties', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await handle(makeAction({}, { targetName }), makePlayerStats({ spellAbilities: { saveDc: 13 } }), campaignName, null);
-
-        const setCalls = setRuntimeValue.mock.calls;
-        const effectCall = setCalls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
-        const effect = effectCall[2][0];
-        expect(effect.target).toBe(targetName);
-        expect(effect.effect).toBe('sanctuary');
-        expect(effect.source).toBe(casterName);
-        expect(effect.duration).toBe('1 minute');
-        expect(effect.saveDc).toBe(13);
-    });
-
-    it('replaces existing sanctuary effect when caster re-casts on same target', async () => {
-        const existingEffect = {
-            target: targetName,
-            effect: 'sanctuary',
-            source: casterName,
-            duration: '1 minute',
-            saveDc: 10,
-        };
-        getRuntimeValue.mockReturnValue([existingEffect]);
-
-        await handle(makeAction({}, { targetName }), makePlayerStats({ spellAbilities: { saveDc: 15 } }), campaignName, null);
-
-        const setCalls = setRuntimeValue.mock.calls;
-        const effectCall = setCalls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
-        expect(effectCall[2]).toHaveLength(1);
-        expect(effectCall[2][0].saveDc).toBe(15);
-    });
-
-    it('does not replace sanctuary from a different caster', async () => {
-        const otherCasterEffect = {
-            target: targetName,
-            effect: 'sanctuary',
-            source: 'Cleric2',
-            duration: '1 minute',
-            saveDc: 12,
-        };
-        getRuntimeValue.mockReturnValue([otherCasterEffect]);
-
-        await handle(makeAction(), makePlayerStats({ spellAbilities: { saveDc: 15 } }), campaignName, null);
-
-        const setCalls = setRuntimeValue.mock.calls;
-        const effectCall = setCalls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
-        expect(effectCall[2]).toHaveLength(2);
-    });
-
-    it('pushes sanctuary effect when none exists for target+source combo', async () => {
-        getRuntimeValue.mockReturnValue([{ target: 'Goblin', effect: 'sanctuary', source: 'Cleric2' }]);
-
-        await handle(makeAction(), makePlayerStats({ spellAbilities: { saveDc: 13 } }), campaignName, null);
-
-        const setCalls = setRuntimeValue.mock.calls;
-        const effectCall = setCalls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
-        expect(effectCall[2]).toHaveLength(2);
-    });
-
-    it('calls addExpiration with correct parameters', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await handle(makeAction({}, { targetName }), makePlayerStats(), campaignName, null);
-
-        expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName, effects: expect.arrayContaining([
-                expect.objectContaining({
-                    type: 'remove_target_effect',
-                    effectKey: 'sanctuary',
-                    source: casterName,
-                }),
-            ]), campaignName, rounds: undefined, expireOnCreatureName: targetName });
-    });
-
-    it('calls addEntry with ability_use log entry', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await handle(makeAction({}, { targetName }), makePlayerStats(), campaignName, null);
+        await handle(makeAction({}, { targetName }), { name: casterName, spellAbilities: { saveDc: 13 } }, campaignName, null);
 
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
             type: 'ability_use',
             characterName: casterName,
             abilityName: 'Sanctuary',
-            description: expect.stringContaining(`Cleric1 casts Sanctuary on ${targetName}`),
+            description: 'Cleric1 casts Sanctuary on Rogue1. Creatures targeting Rogue1 with attacks or damaging spells must succeed on a WIS save or lose the attack/spell.',
             timestamp: expect.any(Number),
         }));
     });
 
-    it('includes WIS save info in log description', async () => {
+    it('anchors expiration on the warded target with no round clock', async () => {
         getRuntimeValue.mockReturnValue([]);
 
-        await handle(makeAction({}, { targetName }), makePlayerStats(), campaignName, null);
+        await handle(makeAction({}, { targetName }), { name: casterName, spellAbilities: { saveDc: 13 } }, campaignName, null);
 
-        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-            description: expect.stringContaining('WIS save'),
-        }));
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: casterName,
+            targetName,
+            effects: [{ type: 'remove_target_effect', effectKey: 'sanctuary', source: casterName }],
+            campaignName,
+            rounds: undefined,
+            expireOnCreatureName: targetName,
+        });
     });
 
-    it('includes popup description with mechanics explanation', async () => {
+    it('handles missing or empty automation without crashing', async () => {
         getRuntimeValue.mockReturnValue([]);
 
-        const result = await handle(makeAction({}, { targetName }), makePlayerStats(), campaignName, null);
+        const missing = await handle({ name: 'Sanctuary' }, { name: casterName, spellAbilities: { saveDc: 13 } }, campaignName, null);
+        const empty = await handle({ name: 'Sanctuary', automation: {} }, { name: casterName, spellAbilities: { saveDc: 13 } }, campaignName, null);
 
-        expect(result.payload.description).toContain('creatures targeting Rogue1 with attacks or damaging spells must succeed on a WIS save');
-        expect(result.payload.description).toContain('Spell ends if Rogue1 attacks, casts a spell, or deals damage');
-    });
-
-    it('passes automation object through to payload', async () => {
-        getRuntimeValue.mockReturnValue([]);
-        const auto = { type: 'sanctuary', duration: '1 minute' };
-
-        const result = await handle(makeAction(auto), makePlayerStats(), campaignName, null);
-
-        expect(result.payload.automation).toEqual(auto);
-    });
-
-    it('handles action with no automation object', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        const result = await handle({ name: 'Sanctuary' }, makePlayerStats(), campaignName, null);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.automationType).toBeUndefined();
-    });
-
-    it('handles action with empty automation object', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        const result = await handle({ name: 'Sanctuary', automation: {} }, makePlayerStats(), campaignName, null);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.automationType).toBeUndefined();
-    });
-
-    it('uses playerStats.name as source in effect', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        const customStats = makePlayerStats({ name: 'Priest2' });
-        await handle(makeAction(), customStats, campaignName, null);
-
-        const setCalls = setRuntimeValue.mock.calls;
-        const effectCall = setCalls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
-        expect(effectCall[2][0].source).toBe('Priest2');
-    });
-
-    it('passes campaignName to setRuntimeValue', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-        const setCalls = setRuntimeValue.mock.calls;
-        const effectCall = setCalls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
-        expect(effectCall[3]).toBe(campaignName);
+        expect(missing.type).toBe('popup');
+        expect(missing.payload.automationType).toBeUndefined();
+        expect(missing.payload.automation).toEqual({});
+        expect(empty.type).toBe('popup');
+        expect(empty.payload.automationType).toBeUndefined();
     });
 });
 
 // ─── isSanctuaryActive ───
+// Public API surface (re-exported via automation/index.js); no direct
+// production caller — minimal pins for the target+effect+source predicate.
 
 describe('isSanctuaryActive', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    it('returns false when no targetEffects exist', () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        const result = isSanctuaryActive(targetName, casterName, campaignName);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns false when targetEffects is null', () => {
-        getRuntimeValue.mockReturnValue(null);
-
-        const result = isSanctuaryActive(targetName, casterName, campaignName);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns false when sanctuary effect is absent', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: targetName, effect: 'shield', source: casterName },
-        ]);
-
-        const result = isSanctuaryActive(targetName, casterName, campaignName);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns true when sanctuary is active on target from caster', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: targetName, effect: 'sanctuary', source: casterName },
-        ]);
-
-        const result = isSanctuaryActive(targetName, casterName, campaignName);
-
-        expect(result).toBe(true);
-    });
-
-    it('returns false when sanctuary is on different target', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: 'Goblin', effect: 'sanctuary', source: casterName },
-        ]);
-
-        const result = isSanctuaryActive(targetName, casterName, campaignName);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns false when sanctuary is from different caster', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: targetName, effect: 'sanctuary', source: 'Cleric2' },
-        ]);
-
-        const result = isSanctuaryActive(targetName, casterName, campaignName);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns false when sanctuary is on different target AND different caster', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: 'Goblin', effect: 'sanctuary', source: 'Cleric2' },
-        ]);
-
-        const result = isSanctuaryActive(targetName, casterName, campaignName);
-
-        expect(result).toBe(false);
-    });
-
-    it('returns true among multiple effects when sanctuary matches', () => {
+    it('returns true only when target+effect+source all match', () => {
         getRuntimeValue.mockReturnValue([
             { target: 'Goblin', effect: 'faerie_fire', source: casterName },
             { target: targetName, effect: 'sanctuary', source: casterName },
             { target: targetName, effect: 'bless', source: casterName },
         ]);
 
-        const result = isSanctuaryActive(targetName, casterName, campaignName);
+        expect(isSanctuaryActive(targetName, casterName, campaignName)).toBe(true);
+    });
 
-        expect(result).toBe(true);
+    it('returns false for each unmatched criterion and an empty or null store', () => {
+        const mismatches = [
+            [{ target: 'Goblin', effect: 'sanctuary', source: casterName }],
+            [{ target: targetName, effect: 'sanctuary', source: 'Cleric2' }],
+            [{ target: targetName, effect: 'shield', source: casterName }],
+            [],
+            null,
+        ];
+        for (const store of mismatches) {
+            getRuntimeValue.mockReturnValue(store);
+            expect(isSanctuaryActive(targetName, casterName, campaignName)).toBe(false);
+        }
     });
 });
 
@@ -351,83 +230,48 @@ describe('endSanctuary', () => {
         vi.clearAllMocks();
     });
 
-    it('returns null when sanctuary is not active', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: 'Goblin', effect: 'faerie_fire', source: casterName },
-        ]);
-
-        const result = endSanctuary(casterName, targetName, campaignName, 'test reason');
-
-        expect(result).toBeNull();
-    });
-
-    it('returns null when targetEffects is null', () => {
-        getRuntimeValue.mockReturnValue(null);
-
-        const result = endSanctuary(casterName, targetName, campaignName, 'test reason');
-
-        expect(result).toBeNull();
-    });
-
-    it('removes sanctuary effect and returns popup', () => {
+    it('filters exactly the matching target+effect+source triple before writing (filter-first)', () => {
         getRuntimeValue.mockReturnValue([
             { target: targetName, effect: 'sanctuary', source: casterName },
+            { target: targetName, effect: 'sanctuary', source: 'Cleric2' },
+            { target: targetName, effect: 'bless', source: 'Cleric2' },
             { target: 'Goblin', effect: 'faerie_fire', source: casterName },
         ]);
 
-        const result = endSanctuary(casterName, targetName, campaignName, 'Target attacked');
+        endSanctuary(casterName, targetName, campaignName, 'Target attacked');
 
-        expect(result).not.toBeNull();
+        const written = effectWrite()[2];
+        expect(written).toHaveLength(3);
+        expect(written.some(te => te.effect === 'sanctuary' && te.source === casterName)).toBe(false);
+        expect(written.some(te => te.effect === 'sanctuary' && te.source === 'Cleric2')).toBe(true);
+        expect(written.some(te => te.effect === 'bless')).toBe(true);
+        expect(written.some(te => te.effect === 'faerie_fire')).toBe(true);
+    });
+
+    it('returns null and writes nothing when there is no match', () => {
+        for (const store of [null, [], [{ target: 'Goblin', effect: 'sanctuary', source: 'Cleric2' }]]) {
+            getRuntimeValue.mockReturnValue(store);
+            expect(endSanctuary(casterName, targetName, campaignName, 'test')).toBeNull();
+        }
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+
+    it('returns popup with exact removal description', () => {
+        getRuntimeValue.mockReturnValue([
+            { target: targetName, effect: 'sanctuary', source: casterName },
+        ]);
+
+        const result = endSanctuary(casterName, targetName, campaignName, 'Target dealt damage');
+
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.name).toBe('Sanctuary');
+        expect(result.payload.targetName).toBe(targetName);
+        expect(result.payload.description).toBe('Rogue1 is no longer warded by Sanctuary. Target dealt damage');
     });
 
-    it('filters only the matching sanctuary effect', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: targetName, effect: 'sanctuary', source: casterName },
-            { target: 'Goblin', effect: 'faerie_fire', source: casterName },
-            { target: targetName, effect: 'bless', source: 'Cleric2' },
-        ]);
-
-        endSanctuary(casterName, targetName, campaignName, 'Target attacked');
-
-        const setCalls = setRuntimeValue.mock.calls;
-        const effectCall = setCalls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
-        expect(effectCall[2]).toHaveLength(2);
-        expect(effectCall[2].some(te => te.effect === 'faerie_fire')).toBe(true);
-        expect(effectCall[2].some(te => te.effect === 'bless')).toBe(true);
-        expect(effectCall[2].some(te => te.effect === 'sanctuary')).toBe(false);
-    });
-
-    it('does not remove sanctuary from a different caster', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: targetName, effect: 'sanctuary', source: 'Cleric2' },
-            { target: targetName, effect: 'sanctuary', source: casterName },
-        ]);
-
-        endSanctuary(casterName, targetName, campaignName, 'Target attacked');
-
-        const setCalls = setRuntimeValue.mock.calls;
-        const effectCall = setCalls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
-        expect(effectCall[2]).toHaveLength(1);
-        expect(effectCall[2][0].source).toBe('Cleric2');
-    });
-
-    it('passes campaignName to setRuntimeValue with sync flag true', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: targetName, effect: 'sanctuary', source: casterName },
-        ]);
-
-        endSanctuary(casterName, targetName, campaignName, 'Target attacked');
-
-        const setCalls = setRuntimeValue.mock.calls;
-        const effectCall = setCalls.find(c => c[0] === 'campaign' && c[1] === 'targetEffects');
-        expect(effectCall[3]).toBe(campaignName);
-        expect(effectCall[4]).toBe(true);
-    });
-
-    it('calls addEntry with condition removed log entry', async () => {
+    it('logs a condition-removed entry with the break reason as note', () => {
         getRuntimeValue.mockReturnValue([
             { target: targetName, effect: 'sanctuary', source: casterName },
         ]);
@@ -445,127 +289,45 @@ describe('endSanctuary', () => {
         }));
     });
 
-    it('includes reason in popup description', () => {
+    it('writes the filtered list through the campaign-scoped runtime key', () => {
         getRuntimeValue.mockReturnValue([
             { target: targetName, effect: 'sanctuary', source: casterName },
         ]);
 
-        const result = endSanctuary(casterName, targetName, campaignName, 'Target dealt damage');
+        endSanctuary(casterName, targetName, campaignName, 'Target attacked');
 
-        expect(result.payload.description).toContain('Target dealt damage');
-    });
-
-    it('includes target name in popup description', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: targetName, effect: 'sanctuary', source: casterName },
-        ]);
-
-        const result = endSanctuary(casterName, targetName, campaignName, 'Expired');
-
-        expect(result.payload.description).toContain(targetName);
-        expect(result.payload.description).toContain('no longer warded by Sanctuary');
-    });
-
-    it('returns null when sanctuary effect is absent (no change)', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: 'Goblin', effect: 'sanctuary', source: 'Cleric2' },
-        ]);
-
-        const result = endSanctuary(casterName, targetName, campaignName, 'test');
-
-        expect(result).toBeNull();
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('returns popup with automation_info type', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: targetName, effect: 'sanctuary', source: casterName },
-        ]);
-
-        const result = endSanctuary(casterName, targetName, campaignName, 'test');
-
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.name).toBe('Sanctuary');
-        expect(result.payload.targetName).toBe(targetName);
+        const call = effectWrite();
+        expect(call[2]).toEqual([]);
+        expect(call[3]).toBe(campaignName);
+        // NOTE: the handler passes a 5th arg (true) but the production
+        // setRuntimeValue signature takes 4 params — it is inert; do not
+        // grow a "sync flag" contract on it.
     });
 });
 
 // ─── getSanctuaryTarget ───
+// Public API surface (re-exported via automation/index.js); no direct
+// production caller — minimal pins for the caster's first sanctuary target.
 
 describe('getSanctuaryTarget', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    it('returns null when no targetEffects exist', () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        const result = getSanctuaryTarget(casterName, campaignName);
-
-        expect(result).toBeNull();
-    });
-
-    it('returns null when targetEffects is null', () => {
-        getRuntimeValue.mockReturnValue(null);
-
-        const result = getSanctuaryTarget(casterName, campaignName);
-
-        expect(result).toBeNull();
-    });
-
-    it('returns null when caster has no sanctuary effect', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: targetName, effect: 'shield', source: casterName },
-        ]);
-
-        const result = getSanctuaryTarget(casterName, campaignName);
-
-        expect(result).toBeNull();
-    });
-
-    it('returns the target when caster has sanctuary active', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: targetName, effect: 'sanctuary', source: casterName },
-        ]);
-
-        const result = getSanctuaryTarget(casterName, campaignName);
-
-        expect(result).toBe(targetName);
-    });
-
-    it('returns null when sanctuary is from a different caster', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: targetName, effect: 'sanctuary', source: 'Cleric2' },
-        ]);
-
-        const result = getSanctuaryTarget(casterName, campaignName);
-
-        expect(result).toBeNull();
-    });
-
-    it('returns the first sanctuary target found for the caster', () => {
+    it('returns the first sanctuary target for the caster among noise', () => {
         getRuntimeValue.mockReturnValue([
             { target: 'Goblin', effect: 'faerie_fire', source: casterName },
             { target: targetName, effect: 'sanctuary', source: casterName },
             { target: 'Orc', effect: 'sanctuary', source: casterName },
         ]);
 
-        const result = getSanctuaryTarget(casterName, campaignName);
-
-        expect(result).toBe(targetName);
+        expect(getSanctuaryTarget(casterName, campaignName)).toBe(targetName);
     });
 
-    it('finds sanctuary among many other effects', () => {
-        getRuntimeValue.mockReturnValue([
-            { target: 'Goblin', effect: 'faerie_fire', source: casterName },
-            { target: 'Goblin', effect: 'bless', source: casterName },
-            { target: 'Goblin', effect: 'shield', source: casterName },
-            { target: targetName, effect: 'sanctuary', source: casterName },
-            { target: 'Goblin', effect: 'hex', source: casterName },
-        ]);
-
-        const result = getSanctuaryTarget(casterName, campaignName);
-
-        expect(result).toBe(targetName);
+    it('returns null when the caster has no sanctuary or the store is null', () => {
+        for (const store of [null, [], [{ target: targetName, effect: 'shield', source: casterName }], [{ target: targetName, effect: 'sanctuary', source: 'Cleric2' }]]) {
+            getRuntimeValue.mockReturnValue(store);
+            expect(getSanctuaryTarget(casterName, campaignName)).toBeNull();
+        }
     });
 });

@@ -1,3 +1,29 @@
+// #1902 dominateHandler.monster — NAME-VARIANT lane of the dominate trio
+// (#1901 beast / THIS monster / #1903 person). Internals canon lives in
+// dominateHandler.beast.test.js (read its header first): cast seam, createSaveListener
+// keys, effects latch, dedup, DC provenance, rollNpcSave delegation (pair #1884/#1885)
+// are NOT re-run here.
+//
+// Verified honestly at source (2026-10-16): handleDominate branches on beast vs monster
+// vs person NOWHERE — automation/index.js:551-553 maps all three keys to the one handler
+// and every flavored string derives from action.name / the automation shell:
+// rollType `save-${spellName.toLowerCase().replace(/\s+/g,'-')}` (dominateHandler.js:48
+// /:99 → 'save-dominate-monster'), condition reason `${spellName} spell` (:91),
+// console prefix `[${spellName}] Error:` (:54/:94/:104/:164). This file therefore exists
+// ONLY to pin the monster-name plumbing, which is unique in-suite: 'save-dominate-monster'
+// appears in no other test file, and '[Dominate Monster] Error:' was pinned nowhere.
+//
+// Monster caller-shape variant (vs the beast shell, which carries saveType): the REAL
+// trigger hop — triggerSpells.js:291-293 handleDominateMonster +
+// checkCompelledDuelAttackExpiry → dominateMonsterService.triggerDominateMonster
+// (dominateMonsterService.js:38-48) — builds the automation shell WITHOUT saveType
+// ({type, saveDc, targetName, advantage}). Pinned here once: the handler still hardcodes
+// saveType:'WIS' at prompt/ledger/rollback, and the prompt target comes from resolveTarget,
+// not automation.targetName. Service-side gating is dominateMonsterService.test.js.
+// Seam notes:
+// - buildSaveDc stubbed to 17 (≠ service shell saveDc 15) so every DC pin proves the
+//   source is buildSaveDc, not action.automation.saveDc (DC trap pattern).
+// - Turn-based: all writes are cast-time only; no timers, no wall-clock decay.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/savePrompt.js', () => ({
@@ -42,12 +68,13 @@ vi.mock('../../../dice/diceRoller.js', () => ({
 import { handle } from './dominateHandler.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { resolveTarget } from '../../common/targetResolver.js';
-import { rollSaveForCreature } from '../../../rules/combat/applyDamage.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { addExpiration } from '../../../rules/effects/expirations.js';
+import { storeSpellLastAttack } from '../../common/damageRollback.js';
 
 const campaignName = 'test-campaign';
+// 17 ≠ service-shell saveDc 15 → pins that DC flows from buildSaveDc.
+const DC = 17;
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -59,277 +86,154 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeAction(automation = {}) {
+// Exact shell shape built by dominateMonsterService.js:38-48 — note the ABSENT saveType
+// (the beast lane's shell includes it), and automation.targetName the handler ignores.
+function makeServiceShell(automation = {}) {
   return {
     name: 'Dominate Monster',
-    automation: { type: 'dominate_monster', saveType: 'WIS', saveDc: 15, ...automation },
+    automation: { type: 'dominate_monster', saveDc: 15, targetName: 'Goblin', advantage: false, ...automation },
   };
 }
 
-function setupBaseMocks(saveResult = { success: true }, isNpc = false) {
+function setupBaseMocks(saveResult = { success: true }) {
   resolveTarget.mockResolvedValue({
-    target: { name: 'Goblin', type: isNpc ? 'npc' : 'player' },
-    cs: {
-      creatures: [
-        { name: 'Goblin', type: isNpc ? 'npc' : 'player', saveBonuses: { WIS: 2 } },
-      ],
-    },
+    target: { name: 'Goblin', type: 'player' },
+    cs: { creatures: [{ name: 'Goblin', type: 'player', saveBonuses: { WIS: 2 } }] },
   });
-  buildSaveDc.mockReturnValue(15);
+  buildSaveDc.mockReturnValue(DC);
   createSaveListener.mockReturnValue({
     promptId: 'test-prompt-id',
     promise: Promise.resolve(saveResult),
   });
 }
 
-describe('dominateHandler.handle (Dominate Monster)', () => {
+describe('dominateHandler.handle (Dominate Monster — name-variant lane)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('target resolution', () => {
-    it('returns popup when no target is selected', async () => {
-      resolveTarget.mockResolvedValue(null);
+  it('saveType-less monster service shell: exact cast seam, WIS hardcoded, monster-name full strings', async () => {
+    setupBaseMocks({ success: true, roll: 12, total: 17 });
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+    const result = await handle(makeServiceShell(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No target selected');
+    // Shell reaches buildSaveDc byte-identical (no saveType), DC trap 17 ≠ 15.
+    expect(buildSaveDc).toHaveBeenCalledWith(
+      { type: 'dominate_monster', saveDc: 15, targetName: 'Goblin', advantage: false },
+      expect.any(Object),
+    );
+    // Prompt target is resolveTarget's, not automation.targetName; saveType 'WIS' is the
+    // handler's hardcode, disambiguated for the trio only through this saveType-less shell.
+    expect(resolveTarget).toHaveBeenCalledWith(campaignName, 'TestCaster');
+    expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
+      targetName: 'Goblin',
+      attackerName: 'TestCaster',
+      saveType: 'WIS',
+      saveDc: DC,
+      dcSuccess: 'none',
+      advantage: false,
+      disadvantage: false,
+      condition: 'charmed',
+    });
+    expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, {
+      casterName: 'TestCaster',
+      spellName: 'Dominate Monster',
+      saveType: 'WIS',
+      saveDc: DC,
+      attackScope: 'single',
+    });
+    expect(addEntry).toHaveBeenCalledWith(campaignName, {
+      type: 'ability_use',
+      characterName: 'TestCaster',
+      abilityName: 'Dominate Monster',
+      description: 'TestCaster casts Dominate Monster on Goblin! Goblin must make a WIS save (DC 17) or become Charmed.',
+      promptId: 'test-prompt-id',
     });
 
-    it('passes advantage from automation config to createSaveListener', async () => {
-      setupBaseMocks();
-
-      await handle(makeAction({ advantage: true }), makePlayerStats(), campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Goblin',
-        attackerName: 'TestCaster',
-        saveType: 'WIS',
-        saveDc: 15,
-        dcSuccess: 'none',
-        advantage: true,
-        disadvantage: false,
-        condition: 'charmed',
-      });
+    // Success leg monster-name plumbing: unique rollType + own-name popup/prose.
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Dominate Monster',
+        description: 'Goblin succeeded on WIS save (DC 17) against Dominate Monster. Roll: 12 + 0 = 17.',
+      },
     });
-
-    it('passes disadvantage when metamagicHeighten is set on action', async () => {
-      setupBaseMocks();
-
-      await handle({ name: 'Dominate Monster', automation: { type: 'dominate_monster', saveType: 'WIS', saveDc: 15 }, metaCtx: { metamagicHeighten: true } }, makePlayerStats(), campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Goblin',
-        attackerName: 'TestCaster',
-        saveType: 'WIS',
-        saveDc: 15,
-        dcSuccess: 'none',
-        advantage: false,
-        disadvantage: true,
-        condition: 'charmed',
-      });
-    });
-  });
-
-  describe('successful save', () => {
-    it('returns popup and logs save_result with success=true', async () => {
-      setupBaseMocks({ success: true });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('succeeded on WIS save');
-      expect(result.payload.description).toContain('Goblin');
-      expect(result.payload.description).toContain('DC 15');
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        targetName: 'Goblin',
-        success: true,
-        rollType: 'save-dominate-monster',
-        saveDc: 15,
-        saveType: 'WIS',
-      }));
-
-      expect(addExpiration).not.toHaveBeenCalled();
+    expect(addEntry).toHaveBeenCalledWith(campaignName, {
+      type: 'save_result',
+      characterName: 'TestCaster',
+      rollType: 'save-dominate-monster',
+      targetName: 'Goblin',
+      saveDc: DC,
+      saveType: 'WIS',
+      success: true,
+      description: 'Goblin succeeded on WIS save against Dominate Monster.',
     });
   });
 
-  describe('failed save', () => {
-    it('applies charmed condition and registers dominated expiration', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
+  it('failed-save prose derives the monster name: rollType, reason, popup full strings', async () => {
+    setupBaseMocks({ success: false, roll: 5, total: 7 });
+    getRuntimeValue.mockReturnValue([]);
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+    const result = await handle(makeServiceShell(), makePlayerStats(), campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        expect.arrayContaining(['charmed']),
-        campaignName,
-      );
-
-      expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'TestCaster', targetName: 'Goblin', effects: expect.arrayContaining([{ type: 'dominated', condition: 'charmed' }]), campaignName });
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        targetName: 'Goblin',
-        success: false,
-        rollType: 'save-dominate-monster',
-        saveDc: 15,
-        saveType: 'WIS',
-      }));
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'condition',
-        action: 'applied',
-        characterName: 'Goblin',
-        condition: 'Charmed',
-        reason: 'Dominate Monster spell',
-      }));
+    expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      type: 'save_result',
+      rollType: 'save-dominate-monster',
+      success: false,
+      description: 'Goblin failed WIS save against Dominate Monster and is Charmed.',
+    }));
+    expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      type: 'condition',
+      action: 'applied',
+      characterName: 'Goblin',
+      condition: 'Charmed',
+      reason: 'Dominate Monster spell',
+    }));
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Dominate Monster',
+        description: 'Goblin failed WIS save (DC 17) against Dominate Monster. Roll: 5 + 0 = 7 — Goblin is Charmed by TestCaster. You have a telepathic link with the target and can issue commands to it (no action required). The spell ends if concentration is lost, on initiative roll, short rest, or long rest.',
+      },
     });
-
-    it('deduplicates charmed when already present', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue(['charmed']);
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['charmed'],
-        campaignName,
-      );
-    });
+    // Charm mechanics themselves (dedup, latch shape, single-write count) are #1901 canon —
+    // only the monster-name identity of the write is checked here.
+    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['charmed'], campaignName);
   });
 
-  describe('NPC target path', () => {
-    it('calls dispatchSaveResult for NPC targets on failed save', async () => {
-      const npcSaveResult = { roll: 8, total: 10, bonus: 2, success: false };
-      rollSaveForCreature.mockReturnValue(npcSaveResult);
-      setupBaseMocks({ success: false }, true);
-      getRuntimeValue.mockReturnValue([]);
+  it('no-target early return still carries the spell name', async () => {
+    resolveTarget.mockResolvedValue(null);
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+    const result = await handle(makeServiceShell(), makePlayerStats(), campaignName, null);
 
-      expect(rollSaveForCreature).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Goblin', type: 'npc', saveBonuses: { WIS: 2 } }),
-        'WIS',
-        15,
-        false,
-        false,
-      );
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'ability_use',
-        description: expect.stringContaining('Goblin must make a WIS save'),
-      }));
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Dominate Monster',
+        description: 'No target selected. Dominate has no effect.',
+      },
     });
-
-    it('handles NPC target missing from creatures array', async () => {
-      resolveTarget.mockResolvedValue({
-        target: { name: 'Dragon', type: 'npc' },
-        cs: {
-          creatures: [],
-        },
-      });
-      buildSaveDc.mockReturnValue(18);
-      createSaveListener.mockReturnValue({
-        promptId: 'npc-prompt-id',
-        promise: Promise.resolve({ success: false }),
-      });
-      getRuntimeValue.mockReturnValue([]);
-
-      await handle(makeAction({ saveDc: 18 }), { name: 'Wizard', level: 15, proficiency: 6, abilities: [{ name: 'Intelligence', bonus: 4 }] }, campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        targetName: 'Dragon',
-        success: false,
-      }));
-    });
+    expect(createSaveListener).not.toHaveBeenCalled();
   });
 
-  describe('edge cases', () => {
-    it('handles missing automation property by defaulting to empty object', async () => {
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin', type: 'player' } });
-      buildSaveDc.mockReturnValue(10);
-      createSaveListener.mockReturnValue({
-        promptId: 'test-prompt-id',
-        promise: Promise.resolve({ success: false }),
-      });
-      getRuntimeValue.mockReturnValue([]);
+  it('log rejection console prefix is [Dominate Monster]: caught, cast proceeds', async () => {
+    setupBaseMocks({ success: false });
+    getRuntimeValue.mockReturnValue([]);
+    addEntry.mockImplementation((campaign, entry) => (
+      entry.type === 'ability_use' ? Promise.reject(new Error('log write failed')) : Promise.resolve()
+    ));
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const result = await handle({ name: 'Dominate Monster' }, makePlayerStats(), campaignName, null);
+    const result = await handle(makeServiceShell(), makePlayerStats(), campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(buildSaveDc).toHaveBeenCalledWith({}, makePlayerStats());
+    await vi.waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith('[Dominate Monster] Error:', expect.any(Error));
     });
-
-    it('stores spell last attack with correct parameters', async () => {
-      const { storeSpellLastAttack } = await import('../../common/damageRollback.js');
-      setupBaseMocks({ success: true });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, {
-        casterName: 'TestCaster',
-        spellName: 'Dominate Monster',
-        saveType: 'WIS',
-        saveDc: 15,
-        attackScope: 'single',
-      });
-    });
-
-    it('handles null target info object', async () => {
-      resolveTarget.mockResolvedValue({});
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No target selected');
-    });
-
-    it('handles addEntry rejection on ability_use (line 84 catch)', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-      addEntry.mockRejectedValue(new Error('log write failed'));
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledTimes(3);
-    });
-
-    it('handles addEntry rejection on save_result success (line 123 catch)', async () => {
-      setupBaseMocks({ success: true });
-      addEntry.mockRejectedValue(new Error('log write failed'));
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledTimes(2);
-    });
-
-    it('handles addEntry rejection on condition apply (line 162 catch)', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-      addEntry.mockRejectedValue(new Error('log write failed'));
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledTimes(3);
-    });
-
-    it('handles addEntry rejection on save_result failure (line 173 catch)', async () => {
-      setupBaseMocks({ success: false });
-      getRuntimeValue.mockReturnValue([]);
-      addEntry.mockRejectedValue(new Error('log write failed'));
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(addEntry).toHaveBeenCalledTimes(3);
-    });
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Goblin');
+    consoleSpy.mockRestore();
   });
 });

@@ -1,5 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Silence automation seam map (verified live 2026-10-16):
+//   handle() is LIVE — registered in automation/index.js as `silence: handleSilence`
+//   (index.js:605). On activation it opens the `silence_target_selection` popup,
+//   which useSpellCastExecutor.js routes to SilenceModal.jsx.
+//   The modal owns target-selection execution (point-model center on first picked
+//   token, outside-radius refusal, per-target activeBuffs grant for Thunder
+//   immunity + VERBAL gate) and is covered by SilenceModal.test.jsx.
+//   The handler's own `handleTargetSelection`/`isSilenceActive` exports are DEAD
+//   code (no production caller, no dynamic dispatch; grep-verified) and pinned
+//   divergent legacy semantics (caster-fixed center, no refusal, no buff grant).
+//   Their former tests were trimmed here; source removal is queued separately.
+// RAW: Silence is cast on self or a point, NO saving throw — this handler never
+// prompts one. Turn-based: expiry rides addExpiration seams (remove_active_buff
+// + clear_silence_zone handled by clearExpirationEffects.js), never a clock.
+
 vi.mock('../../common/buffToggle.js', () => ({
     toggleBuff: vi.fn(() => ({ wasActive: false })),
 }));
@@ -21,19 +36,22 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
+// silenceService must stay fully mocked: silenceHandler.js imports these three
+// names at module load even though addSilencedTarget is only reached by the
+// now-trimmed dead lane.
 vi.mock('../../../rules/features/silenceService.js', () => ({
     isSilenceActive: vi.fn(() => false),
     addSilencedTarget: vi.fn(),
     removeSilencedTargets: vi.fn(() => []),
 }));
 
-import { handle, handleTargetSelection } from './silenceHandler.js';
+import { handle } from './silenceHandler.js';
 import { toggleBuff } from '../../common/buffToggle.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
-import { removeSilencedTargets, addSilencedTarget } from '../../../rules/features/silenceService.js';
+import { removeSilencedTargets } from '../../../rules/features/silenceService.js';
 
 const campaignName = 'test-campaign';
 const casterName = 'ClericBoy';
@@ -46,14 +64,15 @@ function makePlayerStats(overrides = {}) {
 }
 
 function makeAction(overrides = {}) {
+    const { automation: automationOverrides, ...rest } = overrides;
     return {
         name: 'Silence',
         automation: {
             type: 'silence',
             aoeRadius: 20,
-            ...overrides.automation,
+            ...automationOverrides,
         },
-        ...overrides,
+        ...rest,
     };
 }
 
@@ -85,6 +104,8 @@ describe('silenceHandler', () => {
 
             it('uses custom aoeRadius from automation', async () => {
                 const action = makeAction({ automation: { aoeRadius: 30 } });
+                expect(action.automation.type).toBe('silence');
+
                 const result = await handle(action, makePlayerStats(), campaignName, null);
 
                 expect(result.payload.aoeRadius).toBe(30);
@@ -96,11 +117,7 @@ describe('silenceHandler', () => {
                 expect(toggleBuff).toHaveBeenCalledWith(
                     casterName,
                     'Silence',
-                    expect.objectContaining({
-                        type: 'silence',
-                        aoeRadius: 20,
-                        effect: 'silence',
-                    }),
+                    { type: 'silence', aoeRadius: 20, effect: 'silence' },
                     campaignName,
                 );
             });
@@ -254,167 +271,6 @@ describe('silenceHandler', () => {
                 expect(addExpiration).not.toHaveBeenCalled();
                 expect(addEntry).not.toHaveBeenCalled();
             });
-        });
-    });
-
-    describe('handleTargetSelection', () => {
-        it('returns early popup when no targets selected', async () => {
-            const result = await handleTargetSelection(casterName, [], campaignName, 20);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toBe('No targets selected. Silence not cast.');
-        });
-
-        it('sets runtime values for silence state when targets selected', async () => {
-            getCombatContext.mockResolvedValue({
-                players: [{ name: casterName, gridX: 5, gridY: 5 }],
-                creatures: [],
-            });
-
-            const result = await handleTargetSelection(casterName, ['Goblin'], campaignName, 20);
-
-            expect(result.type).toBe('popup');
-            expect(setRuntimeValue).toHaveBeenCalledWith(casterName, 'silenceCaster', true, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(casterName, 'silenceCenter', '{"gridX":5,"gridY":5}', campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(casterName, 'silenceRadius', 20, campaignName);
-        });
-
-        it('applies deafened condition to each selected target', async () => {
-            getCombatContext.mockResolvedValue({
-                players: [{ name: casterName, gridX: 5, gridY: 5 }],
-                creatures: [],
-            });
-
-            await handleTargetSelection(casterName, ['Goblin'], campaignName, 20);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin', 'activeConditions', expect.arrayContaining(['deafened']), campaignName,
-            );
-        });
-
-        it('removes existing deafened before reapplying', async () => {
-            getCombatContext.mockResolvedValue({
-                players: [{ name: casterName, gridX: 5, gridY: 5 }],
-                creatures: [],
-            });
-            getRuntimeValue.mockReturnValue(['deafened', 'blinded']);
-
-            await handleTargetSelection(casterName, ['Goblin'], campaignName, 20);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin', 'activeConditions', ['blinded', 'deafened'], campaignName,
-            );
-        });
-
-        it('adds silenced target to campaign targetEffects', async () => {
-            getCombatContext.mockResolvedValue({
-                players: [{ name: casterName, gridX: 5, gridY: 5 }],
-                creatures: [],
-            });
-
-            await handleTargetSelection(casterName, ['Goblin'], campaignName, 20);
-
-            expect(addSilencedTarget).toHaveBeenCalledWith(casterName, 'Goblin', campaignName);
-        });
-
-        it('adds expiration to remove deafened from each target', async () => {
-            getCombatContext.mockResolvedValue({
-                players: [{ name: casterName, gridX: 5, gridY: 5 }],
-                creatures: [],
-            });
-
-            await handleTargetSelection(casterName, ['Goblin'], campaignName, 20);
-
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: 'Goblin', effects: [{ type: 'condition', condition: 'deafened' }], campaignName });
-        });
-
-        it('posts condition log entry for each target', async () => {
-            getCombatContext.mockResolvedValue({
-                players: [{ name: casterName, gridX: 5, gridY: 5 }],
-                creatures: [],
-            });
-
-            await handleTargetSelection(casterName, ['Goblin'], campaignName, 20);
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'condition',
-                action: 'applied',
-                characterName: 'Goblin',
-                condition: 'Deafened',
-                reason: 'Silence spell',
-                note: expect.stringContaining('Goblin'),
-                timestamp: expect.any(Number),
-            }));
-        });
-
-        it('posts ability_use log entry with summary', async () => {
-            getCombatContext.mockResolvedValue({
-                players: [{ name: casterName, gridX: 5, gridY: 5 }],
-                creatures: [],
-            });
-
-            await handleTargetSelection(casterName, ['Goblin'], campaignName, 20);
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'ability_use',
-                characterName: casterName,
-                abilityName: 'Silence',
-                description: expect.stringContaining('Goblin is Deafened'),
-                timestamp: expect.any(Number),
-            }));
-        });
-
-        it('adds expiration to remove buff and clear silence zone', async () => {
-            getCombatContext.mockResolvedValue({
-                players: [{ name: casterName, gridX: 5, gridY: 5 }],
-                creatures: [],
-            });
-
-            await handleTargetSelection(casterName, ['Goblin'], campaignName, 20);
-
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: casterName, effects: [
-                    { type: 'remove_active_buff', buffName: 'Silence' },
-                    { type: 'clear_silence_zone', casterName },
-                ], campaignName });
-        });
-
-        it('returns popup with correct summary', async () => {
-            getCombatContext.mockResolvedValue({
-                players: [{ name: casterName, gridX: 5, gridY: 5 }],
-                creatures: [],
-            });
-
-            const result = await handleTargetSelection(casterName, ['Goblin', 'Orc'], campaignName, 20);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Silence');
-            expect(result.payload.description).toContain('Silence affects 2 creature(s)');
-            expect(result.payload.description).toContain('Goblin is Deafened');
-            expect(result.payload.description).toContain('Orc is Deafened');
-        });
-
-        it('handles targets passed as strings', async () => {
-            getCombatContext.mockResolvedValue({
-                players: [{ name: casterName, gridX: 5, gridY: 5 }],
-                creatures: [],
-            });
-
-            await handleTargetSelection(casterName, ['Goblin'], campaignName, 20);
-
-            expect(addSilencedTarget).toHaveBeenCalledWith(casterName, 'Goblin', campaignName);
-        });
-
-        it('handles targets passed as objects with name property', async () => {
-            getCombatContext.mockResolvedValue({
-                players: [{ name: casterName, gridX: 5, gridY: 5 }],
-                creatures: [],
-            });
-
-            await handleTargetSelection(casterName, [{ name: 'Goblin' }], campaignName, 20);
-
-            expect(addSilencedTarget).toHaveBeenCalledWith(casterName, 'Goblin', campaignName);
         });
     });
 });

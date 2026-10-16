@@ -1,3 +1,8 @@
+// @maintained-by-ai
+// Pure handler contract: deterministic output from mocked damageUtils/logService/runtimeStore deps.
+// Pins FT-101 Sentinel(Halt) lane registered in automation/index.js HANDLER_MAP (sentinel).
+// te write is pinned as setRuntimeValue delegation with the exact speed_zero effect object;
+// targetEffectDefinitions.test.js owns registry internals.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -35,10 +40,13 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
+// MERGES overrides (name / automation fields), never replaces wholesale.
 function makeAction(overrides = {}) {
+  const { automation, ...rest } = overrides;
   return {
     name: 'Sentinel - Halt',
-    automation: { type: 'sentinel_halt', ...overrides },
+    ...rest,
+    automation: { type: 'sentinel', ...automation },
   };
 }
 
@@ -51,6 +59,11 @@ const baseCombatContext = {
   placedItems: [],
 };
 
+function mockTarget(name) {
+  damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
+  damageUtils.getTargetFromAttacker.mockReturnValue(name ? { name } : null);
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('sentinelHaltHandler.handle', () => {
@@ -58,187 +71,113 @@ describe('sentinelHaltHandler.handle', () => {
     vi.clearAllMocks();
   });
 
-  describe('successful halt with target', () => {
-    it('returns popup with speed reduction description', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+  it('halts the auto-target: full popup string, appends exact speed_zero te, logs ability_use against target', async () => {
+    const action = makeAction();
+    const ps = makePlayerStats();
+    mockTarget('Goblin');
+    const existing = { target: 'Goblin', effect: 'multiattack_defense' };
+    useRuntimeState.getRuntimeValue.mockReturnValue([existing]);
 
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+    // 4th arg (mapName) is unused by the handler — pass a value to pin it is ignored.
+    const result = await handle(action, ps, campaignName, 'IgnoredMap');
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe("Goblin's Speed is reduced to 0 for the rest of the current turn.");
-      expect(result.payload.automation).toBe(action.automation);
-    });
-
-    it('uses custom action name in popup description and payload', async () => {
-      const action = { name: 'Custom Halt', automation: { type: 'sentinel_halt' } };
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toBe("Orc's Speed is reduced to 0 for the rest of the current turn.");
-      expect(result.payload.name).toBe('Custom Halt');
-    });
-
-    it('logs the ability use with target name', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'ability_use',
-          characterName: 'TestFighter',
-          abilityName: 'Sentinel - Halt',
-          description: 'Sentinel - Halt used against Orc',
-        }),
-      );
-    });
-
-    it('sets targetEffects with correct effect object', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({
-            target: 'Goblin',
-            source: 'TestFighter',
-            option: 'Halt',
-            effect: 'speed_zero',
-            value: null,
-            duration: 'end_of_turn',
-          }),
-        ]),
-        campaignName,
-      );
-    });
-
-    it('appends to existing targetEffects without replacing', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      useRuntimeState.getRuntimeValue.mockReturnValue([
-        { target: 'Goblin', effect: 'multiattack_defense' },
-      ]);
-
-      await handle(action, ps, campaignName, null);
-
-      const effectsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        c => c[1] === 'targetEffects',
-      );
-      expect(effectsCall).toBeDefined();
-      expect(effectsCall[2].length).toBe(2);
-      expect(effectsCall[2][0].effect).toBe('multiattack_defense');
-      expect(effectsCall[2][1].option).toBe('Halt');
-    });
-
-    it('uses custom duration from automation config', async () => {
-      const action = makeAction({ duration: 'end_of_round' });
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-      await handle(action, ps, campaignName, null);
-
-      const effectsCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        c => c[1] === 'targetEffects',
-      );
-      expect(effectsCall[2][0].duration).toBe('end_of_round');
-    });
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.name).toBe('Sentinel - Halt');
+    expect(result.payload.description).toBe("Goblin's Speed is reduced to 0 for the rest of the current turn.");
+    expect(result.payload.automation).toBe(action.automation);
+    expect(damageUtils.getCombatContext).toHaveBeenCalledWith(campaignName);
+    // Delegation-only pin: exact effect object appended AFTER existing effects (never replaced).
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [
+      existing,
+      {
+        target: 'Goblin',
+        source: 'TestFighter',
+        option: 'Halt',
+        effect: 'speed_zero',
+        value: null,
+        duration: 'end_of_turn',
+      },
+    ], campaignName);
+    expect(logService.addEntry).toHaveBeenCalledWith(
+      campaignName,
+      expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'TestFighter',
+        abilityName: 'Sentinel - Halt',
+        description: 'Sentinel - Halt used against Goblin',
+      }),
+    );
   });
 
-  describe('no target scenarios', () => {
-    it('returns info popup when no target is available', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+  it('propagates custom action.name and automation.duration through popup payload and te write', async () => {
+    const action = makeAction({ name: 'Custom Halt', automation: { duration: 'end_of_round' } });
+    const ps = makePlayerStats();
+    mockTarget('Orc');
+    useRuntimeState.getRuntimeValue.mockReturnValue([]);
 
-      // null context
-      damageUtils.getCombatContext.mockResolvedValue(null);
-      let result = await handle(action, ps, campaignName, null);
-      expect(result.type).toBe('popup');
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result.payload.name).toBe('Custom Halt');
+    expect(result.payload.description).toBe("Orc's Speed is reduced to 0 for the rest of the current turn.");
+    const effectsCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'targetEffects');
+    expect(effectsCall[2]).toEqual([
+      {
+        target: 'Orc',
+        source: 'TestFighter',
+        option: 'Halt',
+        effect: 'speed_zero',
+        value: null,
+        duration: 'end_of_round',
+      },
+    ]);
+  });
+
+  it('still returns popup and writes speed_zero when addEntry rejects (log failure is non-fatal)', async () => {
+    const action = makeAction();
+    const ps = makePlayerStats();
+    mockTarget('Goblin');
+    useRuntimeState.getRuntimeValue.mockReturnValue([]);
+    logService.addEntry.mockRejectedValueOnce(new Error('log error'));
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toBe("Goblin's Speed is reduced to 0 for the rest of the current turn.");
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [
+      expect.objectContaining({ target: 'Goblin', effect: 'speed_zero' }),
+    ], campaignName);
+  });
+
+  it('returns manual-application popup with action.name, logs without target, and never touches targetEffects when no target', async () => {
+    const ps = makePlayerStats();
+
+    // Combat context null: must not even query the attacker's target.
+    const action = makeAction({ name: 'Custom Halt' });
+    damageUtils.getCombatContext.mockResolvedValue(null);
+    let result = await handle(action, ps, campaignName, null);
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.name).toBe('Custom Halt');
+    expect(result.payload.description).toBe('Custom Halt — <i>No target selected — effect noted for manual application.</i>');
+    expect(result.payload.automation).toBe(action.automation);
+    expect(damageUtils.getTargetFromAttacker).not.toHaveBeenCalled();
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(logService.addEntry).toHaveBeenCalledWith(
+      campaignName,
+      expect.objectContaining({ description: 'Custom Halt used' }),
+    );
+
+    // getTargetFromAttacker returns null, then an object without a name.
+    vi.clearAllMocks();
+    damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
+    for (const noTarget of [null, {}]) {
+      damageUtils.getTargetFromAttacker.mockReturnValue(noTarget);
+      result = await handle(action, ps, campaignName, null);
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('No target selected');
-
-      // undefined context
-      damageUtils.getCombatContext.mockResolvedValue(undefined);
-      result = await handle(action, ps, campaignName, null);
-      expect(result.payload.description).toContain('No target selected');
-
-      // getTargetFromAttacker returns null
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue(null);
-      result = await handle(action, ps, campaignName, null);
-      expect(result.payload.description).toContain('No target selected');
-
-      // getTargetFromAttacker returns object without name
-      damageUtils.getTargetFromAttacker.mockReturnValue({});
-      result = await handle(action, ps, campaignName, null);
-      expect(result.payload.description).toContain('No target selected');
-    });
-
-    it('uses action.name in popup when no target', async () => {
-      const action = { name: 'Custom Halt', automation: { type: 'sentinel_halt' } };
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.name).toBe('Custom Halt');
-      expect(result.payload.description).toContain('Custom Halt');
-    });
-
-    it('logs the ability use without target name', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      await handle(action, ps, campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'ability_use',
-          description: 'Sentinel - Halt used',
-        }),
-      );
-    });
-
-    it('does not call setRuntimeValue when no target', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      await handle(action, ps, campaignName, null);
-
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-    });
+    }
+    expect(logService.addEntry.mock.calls.at(-1)[1].description).toBe('Custom Halt used');
   });
 });

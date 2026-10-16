@@ -1,3 +1,40 @@
+// @maintained-by-ai
+//
+// ── CLA-159 standalone Hand of Healing lane — healingHandler.js seams ─────
+// SUBJECT: handleMonkHealing / performMonkHeal / applyMonkHeal / collectTouchTargets
+// in healingHandler.js, reached via handle()'s isMonkHealing dispatch
+// (healExpression includes 'martial_arts_die' && 'WIS'; type 'healing' so
+// isSelf=false). Production caller: src/services/automation/index.js
+// `healing:` / `self_healing:` → handleHealing. LIVE, verified 2026-10-15.
+//
+// This lane owns:
+//   - CLA-160 armed initiative-card target honored → CLA-092 canonical
+//     applyHealingToTarget choke + canonical lv20 d12 formula (pinned exact)
+//   - CLA-163 touch-range picker when unarmed: pending modal, NO roll or
+//     heal before confirmHeal, self remains selectable, 5ft range filter via
+//     isWithinRange
+//   - picker confirm path: d12+WIS roll, choke application, SSE log, Focus
+//     Point spend addEntry; self-at-cap honest zero-delta 'Already at full HP'
+//   - CLA-092 out-of-combat fallback (no combatSummary → applyHealingDirectly
+//     to self, choke NOT called)
+//
+// Sibling suites on this module (lane map in healingHandler.battleMedic.test.js;
+// do NOT duplicate their lanes):
+//   #1811 monk.test.js         → modal payload basics, martialArtsDie defaults,
+//                                 Physician's Touch (self_healing isSelf=true shortcuts)
+//   #1812 secondWind.test.js   → handleSelfHealing generic self branch
+//   #1813 tacticalShift.test.js→ triggerTacticalShift on Second Wind
+//   #1814 targeted.test.js     → handleUsesHealing / handleFlatHeal
+//   #1815 healingHandler.test.js → self-path gates, uses tracking, hit_die_roll
+//   battleMedic.test.js        → handleHealersKit kit seam (retains the silent
+//                                 self-default that CLA-159 removed from this monk
+//                                 lane — quirk pinned there, NOT here)
+//   bonusAttacksHandler.cla144 → MONK FEATURE lane flurry-of-healing, distinct
+//                                 module; no shared seam with this file.
+//
+// Deterministic: all seams mocked, no timers, no fetch reachable from this
+// lane (fetchTargetCharacterData lives on the kit path only).
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../dice/diceRoller.js', () => ({
@@ -24,7 +61,6 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
-  getTargetFromAttacker: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
@@ -32,12 +68,11 @@ vi.mock('../../../rules/combat/rangeCheck.js', () => ({
 }));
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
-  resolveHealingBonuses: vi.fn(),
   resolveHealingBonusesWithDetails: vi.fn(),
   markFortifiedHealthUsed: vi.fn(),
-  hasHealingMaximization: vi.fn(),
   hasHealingMaximizationForTarget: vi.fn(),
   hasRerollHealingOnes: vi.fn(),
+  hasTacticalShift: vi.fn(() => false),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -61,6 +96,7 @@ import * as targetResolver from '../../common/targetResolver.js';
 import * as healingRoll from '../../common/healingRoll.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 import { addEntry } from '../../../ui/logService.js';
 
@@ -100,6 +136,7 @@ describe('CLA-159 standalone Hand of Healing lane', () => {
     automationService.resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 0, details: [] });
     automationService.hasHealingMaximizationForTarget.mockReturnValue(false);
     automationService.hasRerollHealingOnes.mockReturnValue(false);
+    rangeCheck.isWithinRange.mockImplementation(async () => true);
     healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 100, maxHp: 183, actualHeal: 5 });
     applyHealing.applyHealingToTarget.mockReturnValue({ actualHeal: 5, oldHp: 1, newHp: 6, maxHp: 11 });
   });
@@ -113,6 +150,10 @@ describe('CLA-159 standalone Hand of Healing lane', () => {
     expect(result.type).toBe('modal');
     expect(result.payload.pending).toBeUndefined();
     expect(result.payload.targetName).toBe('Bandit 1');
+    // Canonical lv20 d12 die axis (roll 5 + WIS 7 = 12 on the choke);
+    // 1d10 ladder regression disproved by the exact-string pin below and
+    // by the picker-confirm test's identical formula.
+    expect(result.payload.formula).toBe('1d12 + 7');
     expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(combatCs, 'Bandit 1', 12, campaignName);
     expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith(campaignName, expect.objectContaining({
       targetName: 'Bandit 1',
@@ -132,6 +173,21 @@ describe('CLA-159 standalone Hand of Healing lane', () => {
     expect(diceRoller.rollExpression).not.toHaveBeenCalled();
     expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
     expect(healingRoll.applyHealingDirectly).not.toHaveBeenCalled();
+  });
+
+  it('picker filters to touch range (5ft): far creature excluded, in-range and self offered', async () => {
+    const farBandit = { name: 'Bandit 2', type: 'monster', currentHp: 9, maxHp: 11 };
+    const wideCs = { creatures: [monkCsEntry, woundedBandit, farBandit], round: 1, activeCreatureName: 'Disciplined_Monk' };
+    targetResolver.resolveTarget.mockResolvedValue(null);
+    damageUtils.getCombatContext.mockResolvedValue(wideCs);
+    rangeCheck.isWithinRange.mockImplementation(async (_attacker, targetName) => targetName !== 'Bandit 2');
+
+    const result = await handle(hohAction, monkStats, campaignName, null, []);
+
+    expect(result.payload.pending).toBe(true);
+    expect(result.payload.creatureTargets.map(t => t.name)).toEqual(['Disciplined_Monk', 'Bandit 1']);
+    expect(rangeCheck.isWithinRange).toHaveBeenCalledWith('Disciplined_Monk', 'Bandit 1', 5);
+    expect(rangeCheck.isWithinRange).toHaveBeenCalledWith('Disciplined_Monk', 'Bandit 2', 5);
   });
 
   it('picker confirm heals the chosen wounded target with canonical d12+WIS and logs the Focus Point spend', async () => {
@@ -170,16 +226,6 @@ describe('CLA-159 standalone Hand of Healing lane', () => {
       type: 'ability_use',
       description: expect.stringContaining('Already at full HP'),
     }));
-  });
-
-  it('records the canonical 2024 lv20 d12 die in the formula (die axis disproved, classes.json untouched)', async () => {
-    targetResolver.resolveTarget.mockResolvedValue({ target: woundedBandit, cs: combatCs });
-    damageUtils.getCombatContext.mockResolvedValue(combatCs);
-
-    const result = await handle(hohAction, monkStats, campaignName, null, []);
-
-    expect(result.payload.formula).toContain('1d12');
-    expect(result.payload.formula).not.toContain('1d10');
   });
 
   it('outside combat (no combat context) falls back to self via applyHealingDirectly', async () => {

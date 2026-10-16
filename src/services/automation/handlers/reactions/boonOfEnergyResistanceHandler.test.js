@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Unit contract for the Boon of Energy Resistance chooser (registered in
+// automation/index.js as boon_of_energy_resistance). Pins the handle/modal
+// branches, the once-per-rest isChange guard (order-insensitive), valid-type
+// filtering, and log branches. Consumer lanes live elsewhere
+// (applyDamage.energy-resistance.test.js reads the chosenTypes key at hit
+// resolution; CharSpecialActions*.test.jsx mock this handler for rendering).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, applyTypeChoice } from './boonOfEnergyResistanceHandler.js';
 
@@ -31,14 +38,15 @@ function makePlayerStats(overrides = {}) {
 }
 
 function makeAction(overrides = {}) {
+    const { automation: automationOverrides, ...rest } = overrides;
     return {
         name: 'Boon of Energy Resistance',
         automation: {
             type: 'boon_of_energy_resistance',
             count: 2,
-            ...overrides.automation,
+            ...automationOverrides,
         },
-        ...overrides,
+        ...rest,
     };
 }
 
@@ -77,6 +85,16 @@ describe('boonOfEnergyResistanceHandler', () => {
             expect(result.payload.existingTypes).toBeUndefined();
             expect(result.payload.damageTypes).toBeDefined();
             expect(result.payload.maxSelections).toBe(2);
+        });
+
+        it('returns modal when chosen types is an empty array even if used this rest', async () => {
+            getChosenRuntimeValue.mockReturnValue([]);
+            getRuntimeValue.mockReturnValue(true);
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            expect(result.type).toBe('modal');
+            expect(result.payload.existingTypes).toEqual([]);
         });
 
         it('uses custom validTypes and count from automation', async () => {

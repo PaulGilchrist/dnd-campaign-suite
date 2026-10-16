@@ -1,4 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// #1943 .save-results lane — save-result event flow for prismaticSprayHandler.js.
+// SEXTET seam map lives in prismaticSprayHandler.damage-regression.test.js — READ FIRST.
+// Owns: immunity-skip plumbing, disadvantage flags, save_result/addTargetResult log
+// wiring, zero/null-damage guards, ability_use entries, per-target save-outcome flow.
+// Does NOT pin: 12d6 fix sites (damage-regression lane), ray-table payloads / status
+// writes (#1942 rays), dispatch counts (#1940 handle), summary prose (#1944).
+//
+// DECISION on #1939 handoff rec (canned computeDamageAfterSave stubs): REBUILT, not shed.
+// The old 'applies half/full damage on save' pins stubbed computeDamageAfterSave to
+// canned totals whose ARGS were ignored — a wrong `succeeded` argument at either
+// applyRayDamage call site was uncatchable here. Both pins are replaced by ONE
+// mixed-outcome flow test running the REAL computeDamageAfterSave (importActual partial
+// mock — keep-real, no re-implementation of #1939's floor pin; partial-mock feasibility
+// proven by charmSpellUtils.metamagic-disadvantage.test.js on this same module).
+// Unique flow value kept in THIS lane: single-cast multi-target processSpraySaves
+// correlation (saveIndex ↔ saveResults ↔ promises) — Goblin SAVES while Orc FAILS, so
+// per-target damage amounts, per-target save_result/addTargetResult dispatch, and the
+// damage-ray condition-absence guards all diverge in one cast; #1939's single-target
+// two-cast pin cannot catch target-misbinding. The zero/null not.toHaveBeenCalled
+// guards are retained — they now prove the REAL floor path (saved raw 1 →
+// floor(1/2)=0, failed raw 0 → 0) never reaching applyDamageToTarget.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
@@ -33,10 +54,17 @@ vi.mock('../../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
-vi.mock('../../../rules/combat/applyDamage.js', () => ({
-  applyDamageToTarget: vi.fn(() => Promise.resolve()),
-  computeDamageAfterSave: vi.fn(),
-}));
+// Keep-real SPY computeDamageAfterSave: the real half/full/none semantics executes
+// live while the spy captures args — a wrong `succeeded` argument is caught here;
+// damage APPLICATION stays mocked (lane boundary).
+vi.mock('../../../rules/combat/applyDamage.js', async (importActual) => {
+  const actual = await importActual();
+  return {
+    ...actual,
+    computeDamageAfterSave: vi.fn(actual.computeDamageAfterSave),
+    applyDamageToTarget: vi.fn(() => Promise.resolve()),
+  };
+});
 
 // ── Imports ────────────────────────────────────────────────────
 
@@ -45,6 +73,7 @@ import * as savePrompt from '../../common/savePrompt.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as logService from '../../../ui/logService.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import * as expirations from '../../../rules/effects/expirations.js';
 import * as damageRollback from '../../common/damageRollback.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as applyDamage from '../../../rules/combat/applyDamage.js';
@@ -53,6 +82,13 @@ import * as applyDamage from '../../../rules/combat/applyDamage.js';
 
 const campaignName = 'TestCampaign';
 const casterName = 'TestWizard';
+
+const originalRandom = Math.random;
+
+// Rig pickRays' Math.random consumption: floor(Math.random()*sides)+1 === dieValue
+function forceRoll(dieValue, sides) {
+  Math.random = () => (dieValue - 0.5) / sides;
+}
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -110,41 +146,35 @@ describe('prismaticSprayHandler.handle - save results', () => {
     useRuntimeState.getRuntimeValue.mockReturnValue(null);
   });
 
+  afterEach(() => {
+    Math.random = originalRandom;
+  });
+
   describe('immunity handling for damage rays', () => {
     it('skips save for targets immune to the damage type', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
 
-      // Force Red ray (fire) which Dragon is immune to
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire) — Dragon is immune
       savePrompt.createSaveListener.mockReturnValue(failSaveListener());
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      Math.random = originalRandom;
-
       // Dragon should be skipped, only Goblin and Orc get save listeners
       expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(2);
       const targetNames = savePrompt.createSaveListener.mock.calls.map(c => c[1].targetName);
-      expect(targetNames).toContain('Goblin');
-      expect(targetNames).toContain('Orc');
-      expect(targetNames).not.toContain('Dragon');
+      expect(targetNames).toEqual(['Goblin', 'Orc']);
     });
 
     it('includes immunity message in results summary', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire)
       savePrompt.createSaveListener.mockReturnValue(failSaveListener());
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      Math.random = originalRandom;
 
       expect(result.payload.description).toContain('immune');
       expect(result.payload.description).toContain('Fire immunity');
@@ -159,13 +189,10 @@ describe('prismaticSprayHandler.handle - save results', () => {
       });
       savePrompt.buildSaveDc.mockReturnValue(15);
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire)
       savePrompt.createSaveListener.mockReturnValue(failSaveListener());
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      Math.random = originalRandom;
 
       // Goblin should be skipped
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
@@ -175,15 +202,11 @@ describe('prismaticSprayHandler.handle - save results', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire)
       savePrompt.createSaveListener.mockReturnValue(failSaveListener());
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      Math.random = originalRandom;
 
       expect(result.payload.description).toContain('1 ray(s) immune');
     });
@@ -194,18 +217,15 @@ describe('prismaticSprayHandler.handle - save results', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
       savePrompt.createSaveListener.mockReturnValue(failSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire)
       await handle(
         { ...makeAction(), metaCtx: { selectedTargets: ['Goblin'], heightenTarget: 'Goblin' } },
         makePlayerStats(),
         campaignName,
         null,
       );
-      Math.random = originalRandom;
 
       expect(savePrompt.createSaveListener).toHaveBeenCalledWith(
         campaignName,
@@ -220,18 +240,15 @@ describe('prismaticSprayHandler.handle - save results', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
       savePrompt.createSaveListener.mockReturnValue(failSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire)
       await handle(
         { ...makeAction(), metaCtx: { selectedTargets: ['Goblin'], heightenTarget: 'Orc' } },
         makePlayerStats(),
         campaignName,
         null,
       );
-      Math.random = originalRandom;
 
       expect(savePrompt.createSaveListener).toHaveBeenCalledWith(
         campaignName,
@@ -248,13 +265,10 @@ describe('prismaticSprayHandler.handle - save results', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
       savePrompt.createSaveListener.mockReturnValue(successSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire)
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
 
       const saveResultCall = logService.addEntry.mock.calls.find(
         c => c[1].type === 'save_result',
@@ -276,13 +290,10 @@ describe('prismaticSprayHandler.handle - save results', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
       savePrompt.createSaveListener.mockReturnValue(successSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire)
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
 
       expect(damageRollback.addTargetResult).toHaveBeenCalledWith(
         campaignName,
@@ -297,48 +308,32 @@ describe('prismaticSprayHandler.handle - save results', () => {
       );
     });
 
-    it('applies half damage for damage rays on successful save', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(15); // half of 30
-      savePrompt.createSaveListener.mockReturnValue(successSaveListener());
-
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
-
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 15, ['fire'], { campaignName, characters: expect.any(Array), ignoreResistance: false, attackerName: casterName });
-    });
-
     it('does not apply half damage when rollExpression returns null', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue(null);
-      applyDamage.computeDamageAfterSave.mockReturnValue(15);
       savePrompt.createSaveListener.mockReturnValue(successSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire)
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
 
+      // The null-roll early-return happens BEFORE the damage computation.
+      expect(applyDamage.computeDamageAfterSave).not.toHaveBeenCalled();
       expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
     });
 
-    it('does not apply damage when half damage is 0', async () => {
+    it('does not apply damage when real half of raw 1 floors to 0', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 1 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(0); // floor(1/2) = 0
       savePrompt.createSaveListener.mockReturnValue(successSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire)
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
 
+      // REAL computeDamageAfterSave: floor(1/2) = 0 — the zero-on-save semantics
+      // is now proven through the real function, not a canned stub.
+      expect(applyDamage.computeDamageAfterSave).toHaveBeenCalledWith(1, true, 'half');
       expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
     });
 
@@ -346,13 +341,10 @@ describe('prismaticSprayHandler.handle - save results', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(15);
       savePrompt.createSaveListener.mockReturnValue(successSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire)
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
 
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
         'Goblin',
@@ -360,6 +352,92 @@ describe('prismaticSprayHandler.handle - save results', () => {
         expect.anything(),
         campaignName,
       );
+      expect(expirations.addExpiration).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('save-outcome flow through the REAL computeDamageAfterSave (mixed cast)', () => {
+    it('one cast, diverging saves: saving target pays real half (floor(35/2)=17), failing target pays full 30', async () => {
+      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
+      savePrompt.buildSaveDc.mockReturnValue(15);
+      // rollExpression fires per target in save-resolution order: Goblin, then Orc.
+      diceRoller.rollExpression
+        .mockReturnValueOnce({ total: 35 })
+        .mockReturnValueOnce({ total: 30 });
+      // Captured listeners bound BY cfg.targetName: Goblin saves, Orc fails — the
+      // only shape that exercises processSpraySaves' saveIndex↔saveResults correlation.
+      const savesByTarget = {
+        Goblin: { success: true, roll: 14, total: 14 },
+        Orc: { success: false, roll: 5, total: 5 },
+      };
+      savePrompt.createSaveListener.mockImplementation((campaign, cfg) => ({
+        promptId: `p-${cfg.targetName}`,
+        promise: Promise.resolve(savesByTarget[cfg.targetName]),
+      }));
+
+      forceRoll(1, 8); // Red (fire) for both targets; Dragon skipped (immune)
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(savePrompt.createSaveListener).toHaveBeenCalledTimes(2);
+
+      // Args are CAUGHT by the real function: a swapped `succeeded` at either
+      // applyRayDamage call site routes 35→17 to the wrong target below, and a
+      // mangled dcSuccess falls through the real dcSuccess==='half' gate to 0.
+      expect(applyDamage.computeDamageAfterSave).toHaveBeenCalledTimes(2);
+      expect(applyDamage.computeDamageAfterSave).toHaveBeenCalledWith(35, true, 'half');
+      expect(applyDamage.computeDamageAfterSave).toHaveBeenCalledWith(30, false, 'half');
+
+      // Damage lands on the right creature with the right amount and options.
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledTimes(2);
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
+        baseCombatContext, 'Goblin', 17, ['fire'],
+        { campaignName, characters: [], ignoreResistance: false, attackerName: casterName },
+      );
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
+        baseCombatContext, 'Orc', 30, ['fire'],
+        { campaignName, characters: [], ignoreResistance: false, attackerName: casterName },
+      );
+
+      // save_result entries dispatched per target, outcomes and half/full prose matched.
+      const saveResults = logService.addEntry.mock.calls
+        .filter(c => c[1].type === 'save_result')
+        .map(c => c[1]);
+      expect(saveResults).toEqual([
+        {
+          type: 'save_result',
+          characterName: casterName,
+          rollType: 'save-prismatic-spray',
+          targetName: 'Goblin',
+          saveDc: 15,
+          saveType: 'DEX',
+          success: true,
+          description: 'Goblin succeeded DEX save against Red ray, taking half 12d6 fire damage.',
+        },
+        {
+          type: 'save_result',
+          characterName: casterName,
+          rollType: 'save-prismatic-spray',
+          targetName: 'Orc',
+          saveDc: 15,
+          saveType: 'DEX',
+          success: false,
+          description: 'Orc failed DEX save against Red ray, taking full 12d6 fire damage.',
+        },
+      ]);
+
+      // Rollback ledger mirrors the same per-target save/fail split.
+      expect(damageRollback.addTargetResult).toHaveBeenCalledTimes(2);
+      expect(damageRollback.addTargetResult).toHaveBeenCalledWith(campaignName, {
+        targetName: 'Goblin', saveResult: 'success', roll: 14, total: 14, conditions: [], appliedDamage: 0,
+      });
+      expect(damageRollback.addTargetResult).toHaveBeenCalledWith(campaignName, {
+        targetName: 'Orc', saveResult: 'failure', roll: 5, total: 5, conditions: [], appliedDamage: 0,
+      });
+
+      // Damage rays NEVER write conditions or expirations — even on a FAILED save
+      // (indigo/violet status writes belong to the #1942 rays lane).
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(expirations.addExpiration).not.toHaveBeenCalled();
     });
   });
 
@@ -368,14 +446,11 @@ describe('prismaticSprayHandler.handle - save results', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
       useRuntimeState.getRuntimeValue.mockReturnValue([]);
       savePrompt.createSaveListener.mockReturnValue(failSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire)
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
 
       const saveResultCall = logService.addEntry.mock.calls.find(
         c => c[1].type === 'save_result',
@@ -393,35 +468,18 @@ describe('prismaticSprayHandler.handle - save results', () => {
       );
     });
 
-    it('applies full damage for damage rays on failed save', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
-      useRuntimeState.getRuntimeValue.mockReturnValue([]);
-      savePrompt.createSaveListener.mockReturnValue(failSaveListener());
-
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
-
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin', 30, ['fire'], { campaignName, characters: expect.any(Array), ignoreResistance: false, attackerName: casterName });
-    });
-
     it('does not apply damage when full damage is 0', async () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 0 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(0);
       useRuntimeState.getRuntimeValue.mockReturnValue([]);
       savePrompt.createSaveListener.mockReturnValue(failSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire)
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
 
+      // Real function returns raw 0 on failure — the `finalDamage > 0` gate holds.
+      expect(applyDamage.computeDamageAfterSave).toHaveBeenCalledWith(0, false, 'half');
       expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
     });
 
@@ -429,14 +487,11 @@ describe('prismaticSprayHandler.handle - save results', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
       useRuntimeState.getRuntimeValue.mockReturnValue([]);
       savePrompt.createSaveListener.mockReturnValue(failSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red/Fire)
+      forceRoll(1, 8); // Red (fire)
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
 
       expect(damageRollback.addTargetResult).toHaveBeenCalledWith(
         campaignName,
@@ -455,13 +510,10 @@ describe('prismaticSprayHandler.handle - save results', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
       savePrompt.createSaveListener.mockReturnValue(failSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 0.3; // firstRoll = 3 (Yellow/lightning) for all targets - damage rays
+      forceRoll(3, 8); // Yellow (lightning) for all targets — damage rays
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
 
       const abilityEntries = logService.addEntry.mock.calls.filter(
         c => c[1].type === 'ability_use',
@@ -482,7 +534,6 @@ describe('prismaticSprayHandler.handle - save results', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
       savePrompt.createSaveListener.mockReturnValue({
         promptId: 'prismatic-test-prompt',
         promise: Promise.resolve({ success: false, roll: 5, total: 5 }),
@@ -500,13 +551,10 @@ describe('prismaticSprayHandler.handle - save results', () => {
       damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
       savePrompt.buildSaveDc.mockReturnValue(15);
       diceRoller.rollExpression.mockReturnValue({ total: 30 });
-      applyDamage.computeDamageAfterSave.mockReturnValue(30);
       savePrompt.createSaveListener.mockReturnValue(failSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 0; // firstRoll = 1 (Red)
+      forceRoll(1, 8); // Red
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
 
       const abilityEntry = logService.addEntry.mock.calls.find(
         c => c[1].type === 'ability_use',
@@ -520,10 +568,8 @@ describe('prismaticSprayHandler.handle - save results', () => {
       savePrompt.buildSaveDc.mockReturnValue(15);
       savePrompt.createSaveListener.mockReturnValue(failSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 5 / 8; // firstRoll = 6 (Indigo)
+      forceRoll(6, 8); // Indigo
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
 
       const abilityEntry = logService.addEntry.mock.calls.find(
         c => c[1].type === 'ability_use',
@@ -537,10 +583,8 @@ describe('prismaticSprayHandler.handle - save results', () => {
       savePrompt.buildSaveDc.mockReturnValue(15);
       savePrompt.createSaveListener.mockReturnValue(failSaveListener());
 
-      const originalRandom = Math.random;
-      Math.random = () => 6 / 8; // firstRoll = 7 (Violet)
+      forceRoll(7, 8); // Violet
       await handle(makeAction(), makePlayerStats(), campaignName, null);
-      Math.random = originalRandom;
 
       const abilityEntry = logService.addEntry.mock.calls.find(
         c => c[1].type === 'ability_use',

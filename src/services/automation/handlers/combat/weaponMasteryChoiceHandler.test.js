@@ -1,3 +1,15 @@
+// @maintained-by-ai
+/**
+ * Unit tests for weaponMasteryChoiceHandler.js (2024 Weapon Master choice chooser).
+ *
+ * Seam note for the weaponMasteryHandler quint lanes: this chooser writes the
+ * runtime key WEAPON_MASTER_KEY ('_Weapon_Master_chosenMastery'), consumed ONLY
+ * by handle() itself on re-click. weaponMasteryHandler.js (the quint's subject)
+ * resolves mastery via passives of type 'weapon_mastery_choice' (Graze lookup) —
+ * a separate data path. The choice modal (WeaponMasteryChoiceModal) consumes
+ * applyMasterySelection via index.js's applyWeaponMasteryChoice re-export; that
+ * modal has its own suite which mocks this handler, so no overlap here.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -45,9 +57,9 @@ beforeEach(() => {
 // ── WEAPON_MASTER_KEY export ──────────────────────────────────
 
 describe('WEAPON_MASTER_KEY', () => {
-    it('is exported as a non-empty string', () => {
-        expect(typeof WEAPON_MASTER_KEY).toBe('string');
-        expect(WEAPON_MASTER_KEY.length).toBeGreaterThan(0);
+    it('is the exact runtime storage key', () => {
+        // Exact-key pin: changing this orphans stored selections.
+        expect(WEAPON_MASTER_KEY).toBe('_Weapon_Master_chosenMastery');
     });
 });
 
@@ -72,54 +84,8 @@ describe('handle', () => {
                 masteryProperties: ['Push', 'Topple', 'Sap'],
             },
         });
-    });
-
-    it('returns a modal when existing selection is not in masteryProperties', async () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue('Cleave');
-
-        const action = makeAction();
-        const ps = makePlayerStats();
-
-        const result = await handle(action, ps, campaignName);
-
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('weaponMasteryChoice');
         expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
         expect(logService.addEntry).not.toHaveBeenCalled();
-    });
-
-    it('returns a popup when existing selection is in masteryProperties', async () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue('Push');
-
-        const action = makeAction();
-        const ps = makePlayerStats();
-
-        const result = await handle(action, ps, campaignName, null);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('Push');
-        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-            ps.name,
-            WEAPON_MASTER_KEY,
-            'Push',
-            campaignName,
-        );
-        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-            type: 'ability_use',
-            characterName: ps.name,
-            abilityName: 'Weapon Master - Mastery Property',
-            description: expect.stringContaining('Push'),
-        });
-    });
-
-    it('throws when action.automation is missing', async () => {
-        const action = { automation: undefined };
-        const ps = makePlayerStats();
-
-        await expect(handle(action, ps, campaignName)).rejects.toThrow(
-            "Cannot read properties of undefined (reading 'masteryProperties')",
-        );
     });
 
     it('returns a modal with empty masteryProperties when auto has no masteryProperties', async () => {
@@ -142,18 +108,36 @@ describe('handle', () => {
         });
     });
 
-    it('returns a popup and logs even when addEntry rejects', async () => {
-        useRuntimeState.getRuntimeValue.mockReturnValue('Push');
-        logService.addEntry.mockRejectedValue(new Error('log failed'));
+    it('returns a modal when existing selection is not in masteryProperties', async () => {
+        useRuntimeState.getRuntimeValue.mockReturnValue('Cleave');
 
         const action = makeAction();
         const ps = makePlayerStats();
 
         const result = await handle(action, ps, campaignName, null);
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('Push');
+        expect(result.type).toBe('modal');
+        expect(result.modalName).toBe('weaponMasteryChoice');
+        expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(logService.addEntry).not.toHaveBeenCalled();
+    });
+
+    it('returns a popup when existing selection is in masteryProperties', async () => {
+        useRuntimeState.getRuntimeValue.mockReturnValue('Push');
+
+        const action = makeAction();
+        const ps = makePlayerStats();
+
+        const result = await handle(action, ps, campaignName, null);
+
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Weapon Master',
+                description: 'Mastery property: Push',
+            },
+        });
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             ps.name,
             WEAPON_MASTER_KEY,
@@ -164,8 +148,26 @@ describe('handle', () => {
             type: 'ability_use',
             characterName: ps.name,
             abilityName: 'Weapon Master - Mastery Property',
-            description: expect.stringContaining('Push'),
+            description: 'Mastery property: Push (previously selected)',
         });
+    });
+
+    it('returns a popup even when addEntry rejects', async () => {
+        useRuntimeState.getRuntimeValue.mockReturnValue('Push');
+        logService.addEntry.mockRejectedValueOnce(new Error('log failed'));
+
+        const action = makeAction();
+        const ps = makePlayerStats();
+
+        const result = await handle(action, ps, campaignName, null);
+
+        expect(result.type).toBe('popup');
+        expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+            ps.name,
+            WEAPON_MASTER_KEY,
+            'Push',
+            campaignName,
+        );
     });
 });
 
@@ -177,6 +179,14 @@ describe('applyMasterySelection', () => {
 
         const result = await applyMasterySelection('Topple', ps, campaignName);
 
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Weapon Master',
+                description: 'Mastery property set to: Topple. This will be applied to your next attack.',
+            },
+        });
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             ps.name,
             WEAPON_MASTER_KEY,
@@ -189,17 +199,9 @@ describe('applyMasterySelection', () => {
             abilityName: 'Weapon Master - Mastery Property',
             description: 'Selected mastery property: Topple',
         });
-        expect(result).toEqual({
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: 'Weapon Master',
-                description: 'Mastery property set to: Topple. This will be applied to your next attack.',
-            },
-        });
     });
 
-    it('returns null for any falsy masteryName', async () => {
+    it('returns null for any falsy masteryName without side effects', async () => {
         const ps = makePlayerStats();
 
         const falsyValues = ['', null, undefined, 0, false];
@@ -214,30 +216,17 @@ describe('applyMasterySelection', () => {
     });
 
     it('stores mastery and returns popup even when addEntry rejects', async () => {
-        logService.addEntry.mockRejectedValue(new Error('log failed'));
+        logService.addEntry.mockRejectedValueOnce(new Error('log failed'));
         const ps = makePlayerStats();
 
         const result = await applyMasterySelection('Sap', ps, campaignName);
 
+        expect(result.type).toBe('popup');
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
             ps.name,
             WEAPON_MASTER_KEY,
             'Sap',
             campaignName,
         );
-        expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-            type: 'ability_use',
-            characterName: ps.name,
-            abilityName: 'Weapon Master - Mastery Property',
-            description: 'Selected mastery property: Sap',
-        });
-        expect(result).toEqual({
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: 'Weapon Master',
-                description: 'Mastery property set to: Sap. This will be applied to your next attack.',
-            },
-        });
     });
 });

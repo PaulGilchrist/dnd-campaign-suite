@@ -18,10 +18,6 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
-}));
-
 const campaignName = 'TestCampaign';
 
 function makePlayerStats(overrides = {}) {
@@ -574,7 +570,7 @@ describe('removeCurseHandler.applyRemoveCurse', () => {
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('No curses or attunement found');
       expect(addEntry).not.toHaveBeenCalled();
-      expect(addEntry).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
     it('should return info popup when only non-cursed buffs exist', async () => {
@@ -687,7 +683,6 @@ describe('removeCurseHandler.applyRemoveCurse', () => {
         { targetName: 'Goblin' },
       );
 
-      expect(addEntry).not.toHaveBeenCalled();
       expect(addEntry).not.toHaveBeenCalled();
     });
   });

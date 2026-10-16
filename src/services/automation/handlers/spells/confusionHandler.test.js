@@ -1,3 +1,66 @@
+// @maintained-by-ai
+/**
+ * confusion TRIO seam map — two modules, three lanes (full map header:
+ * confusionHandler.saveResults.test.js #1889):
+ *  - THIS LANE (#1890, main) — confusionHandler.js handle() ORCHESTRATION:
+ *        no-creatures early-return popup (+ no-side-effect guard),
+ *        concentration registration (DC resolution branches, storage.set +
+ *        combat-summary-updated dispatch), storeSpellLastAttack wiring,
+ *        target selection (metaCtx / empty-metaCtx / caster-exclusion fallback /
+ *        name-resolution skip), createSaveListener prompt options (exact object:
+ *        WIS, dcSuccess 'none', condition 'charmed', heightenTarget→disadvantage),
+ *        ability_use log CONTENT (exact own-composition entry incl. promptId),
+ *        action-name flow-through, and popup summary strings (full own-composition
+ *        pins: all-fail / all-save / mixed).
+ *        Production liveness verified 2026-10-16: dispatched via automation/
+ *        index.js L257 import + L589 `confusion: handleConfusion`. handle() calls
+ *        NO applyEndOfTurnConfusionSave/removeConfusionEffect — those live only
+ *        in confusionTurnStartHandler.js (#1891's module); their zero-prod-caller
+ *        audit stays with #1891, untouched here.
+ *  - #1889 saveResults (CLOSED) — SAME module, save-outcome helpers
+ *        (recordConfusionSaveSuccess/applyConfusionFailure): save_result/
+ *        addTargetResult shapes, ?? 0 fallback, condition append order, strict
+ *        expiration tuple, campaign-te exact writes. NOT re-pinned here.
+ *        Log-count coupling kept honest: their 1-target-success cast counts 2
+ *        addEntry (1 ability_use + 1 save_result); this lane's 2-target-fail
+ *        cast counts 4 (2 ability_use + 2 condition) — both agree with the
+ *        handler's per-target log map (fail logs condition, not save_result).
+ *  - #1891 confusionTurnStartHandler.test.js — DIFFERENT module (turn-start
+ *        1d10 table, end-of-turn save prompt, effect removal).
+ *
+ * Reassignment notes (verified at source 2026-10-16):
+ *  - 'reports individual affected creatures' + 'mentions confused behavior' +
+ *        affected-count fragments folded into full-string summary pins
+ *        ('summarises an all-fail cast...' covers joined results + behavior tail).
+ *  - 'reports saved creature count in the summary' folded into the mixed +
+ *        all-save full-string pins.
+ *  - 'includes promptId...' folded into the exact ability_use object pin.
+ *  - 'uses action.name...' + 'uses the action name in the popup payload' merged
+ *        into 'custom action name flows through ability_use and popup'.
+ *  - 'uses custom playerStats name...' deleted — the ability_use description is
+ *        now pinned as a full literal, so the caster-name slot is proven.
+ *  - 'targets all non-caster creatures when no metaCtx.targets' deleted —
+ *        same fallback branch as 'excludes caster when falling back...' (kept).
+ *  - 'handles targets passed as string array in metaCtx' deleted — exact
+ *        duplicate of 'uses metaCtx.targets when provided'.
+ *  - 'handles single non-caster target' deleted — call-count covered by
+ *        target-selection pins, count-1 prose shares the pinned template.
+ *  - 'does not apply disadvantage when target does not match heightenTarget'
+ *        folded into 'applies disadvantage only to the heightenTarget' (pins
+ *        true AND false in one cast); disadvantage:false default also pinned by
+ *        the exact createSaveListener options object.
+ *  - 'dispatches combat-summary-updated' + 'stores combatSummary via storage'
+ *        merged — same concentration-added seam.
+ *  - 'uses WIS save type and computed DC' + 'passes condition as charmed'
+ *        merged into one exact full-options toHaveBeenCalledWith; its
+ *        buildSaveDc(auto, ps) pin lives in #1889 (DC-computed-once seam).
+ *  - Scattered positional getRuntimeValue.mockReturnValue([]) replaced with a
+ *        mockRuntime key-router default (reads are incidental to this lane;
+ *        read-targeting resilience lives in #1889).
+ *
+ * Turn-based only: no timers in this file; concentration is a latch, the 1d10
+ * behavior roll belongs to the turn-start seam (#1891).
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -106,11 +169,24 @@ function successSaveListener() {
   };
 }
 
+// Key-router default: handle()'s failure path incidentally reads
+// getRuntimeValue(target, 'activeConditions') and ('campaign', 'targetEffects').
+// Route by runtime key so reads never return undefined mid-loop; read-precision
+// resilience pins belong to #1889.
+function mockRuntime(reads = {}) {
+  getRuntimeValue.mockImplementation((_owner, key) => {
+    if (key === 'activeConditions') return reads.activeConditions ?? [];
+    if (key === 'targetEffects') return reads.targetEffects ?? [];
+    return undefined;
+  });
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('confusionHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRuntime();
   });
 
   describe('when no combat context exists', () => {
@@ -123,8 +199,11 @@ describe('confusionHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No creatures in combat');
-      expect(result.payload.description).toContain('Confusion has no effect');
+      expect(result.payload.description).toBe('No creatures in combat. Confusion has no effect.');
+      // Early-return seam (L115-124): nothing downstream may fire.
+      expect(addConcentration).not.toHaveBeenCalled();
+      expect(storeSpellLastAttack).not.toHaveBeenCalled();
+      expect(createSaveListener).not.toHaveBeenCalled();
     });
 
     it('returns a popup when combat context has no creatures', async () => {
@@ -136,8 +215,7 @@ describe('confusionHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No creatures in combat');
-      expect(result.payload.description).toContain('Confusion has no effect');
+      expect(result.payload.description).toBe('No creatures in combat. Confusion has no effect.');
     });
   });
 
@@ -166,7 +244,7 @@ describe('confusionHandler.handle', () => {
       const action = makeAction();
       const ctx = makeCombatContext([{ name: 'Goblin' }]);
       getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
+      buildSaveDc.mockReturnValue(13); // differs — concentration DC must come from spellAbilities
       createSaveListener.mockReturnValue(successSaveListener());
       getCombatSummary.mockReturnValue({ creatures: [{ name: casterName }] });
 
@@ -213,24 +291,7 @@ describe('confusionHandler.handle', () => {
       expect(addConcentration).not.toHaveBeenCalled();
     });
 
-    it('dispatches combat-summary-updated event when concentration is added', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([{ name: 'Goblin' }]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
-      createSaveListener.mockReturnValue(successSaveListener());
-      getCombatSummary.mockReturnValue({ creatures: [{ name: casterName }] });
-
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-
-      await handle(action, ps, campaignName, null);
-
-      expect(dispatchSpy).toHaveBeenCalledWith(new CustomEvent('combat-summary-updated'));
-      dispatchSpy.mockRestore();
-    });
-
-    it('stores combatSummary via storage when concentration is added', async () => {
+    it('dispatches combat-summary-updated and stores combatSummary via storage when concentration is added', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       const ctx = makeCombatContext([{ name: 'Goblin' }]);
@@ -240,9 +301,13 @@ describe('confusionHandler.handle', () => {
       const cs = { creatures: [{ name: casterName }] };
       getCombatSummary.mockReturnValue(cs);
 
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+
       await handle(action, ps, campaignName, null);
 
+      expect(dispatchSpy).toHaveBeenCalledWith(new CustomEvent('combat-summary-updated'));
       expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, campaignName);
+      dispatchSpy.mockRestore();
     });
   });
 
@@ -286,8 +351,7 @@ describe('confusionHandler.handle', () => {
 
       expect(createSaveListener).toHaveBeenCalledTimes(2);
       const targetNames = createSaveListener.mock.calls.map(c => c[1].targetName);
-      expect(targetNames).toContain('Goblin');
-      expect(targetNames).toContain('Orc');
+      expect(targetNames).toEqual(['Goblin', 'Orc']);
     });
 
     it('excludes caster when falling back to all creatures', async () => {
@@ -306,32 +370,14 @@ describe('confusionHandler.handle', () => {
 
       expect(createSaveListener).toHaveBeenCalledTimes(2);
       const targetNames = createSaveListener.mock.calls.map(c => c[1].targetName);
-      expect(targetNames).toContain('Goblin');
-      expect(targetNames).toContain('Orc');
-      expect(targetNames).not.toContain(casterName);
-    });
-
-    it('targets all non-caster creatures when no metaCtx.targets', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin' },
-        { name: 'Orc' },
-        { name: 'Giant Spider' },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
-      createSaveListener.mockReturnValue(successSaveListener());
-
-      await handle(action, ps, campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledTimes(3);
+      expect(targetNames).toEqual(['Goblin', 'Orc']);
     });
 
     it('handles empty metaCtx.targets by falling back to all non-caster creatures', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       const ctx = makeCombatContext([
+        { name: casterName },
         { name: 'Goblin' },
         { name: 'Orc' },
       ]);
@@ -344,6 +390,8 @@ describe('confusionHandler.handle', () => {
       await handle(action, ps, campaignName, null);
 
       expect(createSaveListener).toHaveBeenCalledTimes(2);
+      const targetNames = createSaveListener.mock.calls.map(c => c[1].targetName);
+      expect(targetNames).not.toContain(casterName);
     });
 
     it('skips targets not found in combat context', async () => {
@@ -367,9 +415,7 @@ describe('confusionHandler.handle', () => {
     it('handles all creatures being the caster (no enemies)', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: casterName },
-      ]);
+      const ctx = makeCombatContext([{ name: casterName }]);
       getCombatContext.mockResolvedValue(ctx);
       buildSaveDc.mockReturnValue(13);
       createSaveListener.mockReturnValue(successSaveListener());
@@ -377,42 +423,40 @@ describe('confusionHandler.handle', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(createSaveListener).not.toHaveBeenCalled();
-      expect(result.payload.description).toContain('No creatures affected');
+      expect(result.payload.description).toBe('No creatures affected by Confusion. 0 creature(s) saved.');
     });
   });
 
-  describe('disadvantage from metaCtx', () => {
-    it('applies disadvantage when target matches heightenTarget', async () => {
+  describe('save prompt options', () => {
+    it('passes the exact prompt options to createSaveListener', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       const ctx = makeCombatContext([{ name: 'Goblin' }]);
       getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
-      createSaveListener.mockReturnValue(successSaveListener());
-
-      action.metaCtx = { targets: ['Goblin'], heightenTarget: 'Goblin' };
+      buildSaveDc.mockReturnValue(15);
+      createSaveListener.mockReturnValue(failSaveListener());
 
       await handle(action, ps, campaignName, null);
 
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      // Exact full options object — WIS type, DC from buildSaveDc,
+      // dcSuccess 'none', condition charmed, no heightenTarget → disadvantage false.
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
         targetName: 'Goblin',
-        disadvantage: true,
-      }));
+        saveType: 'WIS',
+        saveDc: 15,
+        dcSuccess: 'none',
+        disadvantage: false,
+        condition: 'charmed',
+      });
     });
 
-    it('does not apply disadvantage when target does not match heightenTarget', async () => {
+    it('applies disadvantage only to the heightenTarget', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       const ctx = makeCombatContext([{ name: 'Goblin' }, { name: 'Orc' }]);
       getCombatContext.mockResolvedValue(ctx);
       buildSaveDc.mockReturnValue(13);
-
-      createSaveListener.mockImplementation((_campaignName, _params) => {
-        return {
-          promptId: 'confusion-prompt',
-          promise: Promise.resolve({ success: true, roll: 18, total: 20 }),
-        };
-      });
+      createSaveListener.mockReturnValue(successSaveListener());
 
       action.metaCtx = { targets: ['Goblin', 'Orc'], heightenTarget: 'Goblin' };
 
@@ -422,43 +466,10 @@ describe('confusionHandler.handle', () => {
         targetName: c[1].targetName,
         disadvantage: c[1].disadvantage,
       }));
-      expect(calls).toContainEqual({ targetName: 'Goblin', disadvantage: true });
-      expect(calls).toContainEqual({ targetName: 'Orc', disadvantage: false });
-    });
-  });
-
-  describe('save prompt creation', () => {
-    it('uses WIS save type and computed DC from buildSaveDc', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({ saveDc: 15 });
-      const ctx = makeCombatContext([{ name: 'Goblin' }]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      await handle(action, ps, campaignName, null);
-
-      expect(buildSaveDc).toHaveBeenCalledWith(action.automation, ps);
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        saveType: 'WIS',
-        saveDc: 15,
-      }));
-    });
-
-    it('passes condition as charmed to createSaveListener', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([{ name: 'Goblin' }]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      await handle(action, ps, campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        condition: 'charmed',
-        dcSuccess: 'none',
-      }));
+      expect(calls).toEqual([
+        { targetName: 'Goblin', disadvantage: true },
+        { targetName: 'Orc', disadvantage: false },
+      ]);
     });
   });
 
@@ -476,6 +487,8 @@ describe('confusionHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
+      // Coupled with #1889's per-target counts: fail path logs
+      // ability_use + condition per target (no save_result addEntry on failure).
       expect(addEntry).toHaveBeenCalledTimes(4);
       const abilityEntries = addEntry.mock.calls.filter(
         call => call[1].type === 'ability_use',
@@ -483,40 +496,26 @@ describe('confusionHandler.handle', () => {
       expect(abilityEntries.length).toBe(2);
     });
 
-    it('includes caster name, ability name, and target in description', async () => {
+    it('logs an ability_use entry with exact own-composition fields', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       const ctx = makeCombatContext([{ name: 'Goblin' }]);
       getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
+      buildSaveDc.mockReturnValue(15);
       createSaveListener.mockReturnValue(failSaveListener());
 
       await handle(action, ps, campaignName, null);
 
-      const abilityEntry = addEntry.mock.calls[0][1];
-      expect(abilityEntry.type).toBe('ability_use');
-      expect(abilityEntry.characterName).toBe(casterName);
-      expect(abilityEntry.abilityName).toBe('Confusion');
-      expect(abilityEntry.description).toContain('Goblin');
-      expect(abilityEntry.description).toContain('WIS save');
-      expect(abilityEntry.description).toContain('DC 13');
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: 'Confusion',
+        description: 'TestCaster casts Confusion! Goblin must make a WIS save (DC 15) or become Confused (can\'t take Bonus Actions or Reactions, subject to 1d10 behavior each turn).',
+        promptId: 'confusion-prompt',
+      });
     });
 
-    it('includes promptId in ability_use entry', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([{ name: 'Goblin' }]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      await handle(action, ps, campaignName, null);
-
-      const abilityEntry = addEntry.mock.calls[0][1];
-      expect(abilityEntry.promptId).toBe('confusion-prompt');
-    });
-
-    it('uses action.name in ability_use log entry', async () => {
+    it('flows the custom action name through ability_use and popup', async () => {
       const ps = makePlayerStats();
       const action = { name: "Tasha's Confusion", automation: { type: 'confusion', saveType: 'WIS', saveDc: 13 } };
       const ctx = makeCombatContext([{ name: 'Goblin' }]);
@@ -524,31 +523,17 @@ describe('confusionHandler.handle', () => {
       buildSaveDc.mockReturnValue(10);
       createSaveListener.mockReturnValue(failSaveListener());
 
-      await handle(action, ps, campaignName, null);
+      const result = await handle(action, ps, campaignName, null);
 
       const abilityEntry = addEntry.mock.calls.find(c => c[1].type === 'ability_use')[1];
       expect(abilityEntry.abilityName).toBe("Tasha's Confusion");
-    });
-
-    it('uses custom playerStats name in ability_use log description', async () => {
-      const ps = makePlayerStats({ name: 'WizardX' });
-      const action = makeAction();
-      const ctx = makeCombatContext([{ name: 'Goblin' }]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      await handle(action, ps, campaignName, null);
-
-      const abilityEntry = addEntry.mock.calls.find(c => c[1].type === 'ability_use')[1];
-      expect(abilityEntry.characterName).toBe('WizardX');
-      expect(abilityEntry.description).toContain('WizardX');
+      expect(abilityEntry.characterName).toBe(casterName);
+      expect(result.payload.name).toBe("Tasha's Confusion");
     });
   });
 
   describe('summary popup', () => {
-    it('reports affected creature count when some fail', async () => {
+    it('summarises an all-fail cast with the exact own-composition description', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       const ctx = makeCombatContext([
@@ -557,7 +542,6 @@ describe('confusionHandler.handle', () => {
       ]);
       getCombatContext.mockResolvedValue(ctx);
       buildSaveDc.mockReturnValue(10);
-      getRuntimeValue.mockReturnValue([]);
       createSaveListener.mockReturnValue(failSaveListener());
 
       const result = await handle(action, ps, campaignName, null);
@@ -565,35 +549,20 @@ describe('confusionHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('Confusion');
-      expect(result.payload.description).toContain('Confusion affects 2 creature(s)');
-      expect(result.payload.description).toContain('Confused');
-      expect(result.payload.description).toContain('creature(s) saved');
+      // Full string: affected count + joined per-target results + saved count
+      // + behavior tail (folds the old fragment pins).
+      expect(result.payload.description).toBe(
+        "Confusion affects 2 creature(s). Goblin is Confused. Orc is Confused. 0 creature(s) saved. Affected creatures can't take Bonus Actions or Reactions and are subject to confused behavior each turn."
+      );
     });
 
-    it('reports individual affected creatures in the summary', async () => {
+    it('summarises mixed results with exact counts in the full description', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       const ctx = makeCombatContext([
         { name: 'Goblin' },
         { name: 'Orc' },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Goblin is Confused');
-      expect(result.payload.description).toContain('Orc is Confused');
-    });
-
-    it('reports saved creature count in the summary', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin' },
-        { name: 'Orc' },
+        { name: 'Giant Spider' },
       ]);
       getCombatContext.mockResolvedValue(ctx);
       buildSaveDc.mockReturnValue(10);
@@ -601,16 +570,18 @@ describe('confusionHandler.handle', () => {
       let callCount = 0;
       createSaveListener.mockImplementation(() => {
         callCount++;
+        // First two succeed, third fails
         return {
           promptId: 'confusion-prompt',
-          promise: Promise.resolve({ success: callCount === 1 }),
+          promise: Promise.resolve({ success: callCount <= 2 }),
         };
       });
-      getRuntimeValue.mockReturnValue([]);
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.description).toContain('creature(s) saved');
+      expect(result.payload.description).toBe(
+        "Confusion affects 1 creature(s). Giant Spider is Confused. 2 creature(s) saved. Affected creatures can't take Bonus Actions or Reactions and are subject to confused behavior each turn."
+      );
     });
 
     it('reports no creatures affected when all save', async () => {
@@ -627,37 +598,7 @@ describe('confusionHandler.handle', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No creatures affected by Confusion');
-      expect(result.payload.description).toContain('creature(s) saved');
-    });
-
-    it('uses the action name in the popup payload', async () => {
-      const ps = makePlayerStats();
-      const action = { name: 'My Confusion', automation: { type: 'confusion', saveType: 'WIS', saveDc: 13 } };
-      const ctx = makeCombatContext([{ name: 'Goblin' }]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      createSaveListener.mockReturnValue(failSaveListener());
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.name).toBe('My Confusion');
-    });
-
-    it('mentions confused behavior in the summary when affected', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([{ name: 'Goblin' }]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('can\'t take Bonus Actions or Reactions');
-      expect(result.payload.description).toContain('confused behavior');
+      expect(result.payload.description).toBe('No creatures affected by Confusion. 2 creature(s) saved.');
     });
   });
 
@@ -668,73 +609,11 @@ describe('confusionHandler.handle', () => {
       getCombatContext.mockResolvedValue(ctx);
       buildSaveDc.mockReturnValue(10);
       createSaveListener.mockReturnValue(failSaveListener());
-      getRuntimeValue.mockReturnValue([]);
 
       const result = await handle({ name: 'Confusion' }, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
       expect(buildSaveDc).toHaveBeenCalledWith({}, ps);
-    });
-
-    it('handles single non-caster target', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([{ name: 'Goblin' }]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue(failSaveListener());
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledTimes(1);
-      expect(result.payload.description).toContain('Confusion affects 1 creature(s)');
-    });
-
-    it('handles mixed success/failure across multiple targets', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin' },
-        { name: 'Orc' },
-        { name: 'Giant Spider' },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(10);
-      getRuntimeValue.mockReturnValue([]);
-
-      let callCount = 0;
-      createSaveListener.mockImplementation(() => {
-        callCount++;
-        // First two succeed, third fails
-        return {
-          promptId: 'confusion-prompt',
-          promise: Promise.resolve({ success: callCount <= 2, roll: callCount <= 2 ? 18 : 5, total: callCount <= 2 ? 20 : 7 }),
-        };
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Confusion affects 1 creature(s)');
-      expect(result.payload.description).toContain('2 creature(s) saved');
-    });
-
-    it('handles targets passed as string array in metaCtx', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-      const ctx = makeCombatContext([
-        { name: 'Goblin' },
-        { name: 'Orc' },
-      ]);
-      getCombatContext.mockResolvedValue(ctx);
-      buildSaveDc.mockReturnValue(13);
-      createSaveListener.mockReturnValue(successSaveListener());
-
-      action.metaCtx = { targets: ['Goblin', 'Orc'] };
-
-      await handle(action, ps, campaignName, null);
-
-      expect(createSaveListener).toHaveBeenCalledTimes(2);
     });
   });
 });

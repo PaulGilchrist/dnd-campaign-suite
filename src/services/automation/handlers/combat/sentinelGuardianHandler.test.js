@@ -1,3 +1,6 @@
+// @maintained-by-ai
+// Pure handler contract: deterministic output from mocked damageUtils/logService deps.
+// Pins FT-100 Sentinel(Guardian) lane registered in automation/index.js (sentinel_guardian).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -49,6 +52,11 @@ const baseCombatContext = {
   placedItems: [],
 };
 
+function mockTarget(name) {
+  damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
+  damageUtils.getTargetFromAttacker.mockReturnValue(name ? { name } : null);
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('sentinelGuardianHandler.handle', () => {
@@ -56,283 +64,139 @@ describe('sentinelGuardianHandler.handle', () => {
     vi.clearAllMocks();
   });
 
-  describe('attack_roll result', () => {
-    it('returns attack_roll with correct payload when target and melee attack exist', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+  it('returns attack_roll against the auto-target, queries context by campaignName, and logs ability_use', async () => {
+    const action = makeAction();
+    const ps = makePlayerStats();
+    mockTarget('Goblin');
+    logService.addEntry.mockResolvedValue({ id: 1 });
 
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+    // 4th arg (mapName) is unused by the handler — pass a value to pin it is ignored.
+    const result = await handle(action, ps, campaignName, 'IgnoredMap');
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('attack_roll');
-      expect(result.payload.attack).toBe(ps.attacks[0]);
-      expect(result.payload.targetName).toBe('Goblin');
-      expect(result.payload.sourceName).toBe('Sentinel - Guardian');
-    });
-
-    it('uses action.name from custom action in attack_roll payload', async () => {
-      const action = { name: 'Custom Sentinel', automation: { type: 'sentinel_guardian' } };
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('attack_roll');
-      expect(result.payload.sourceName).toBe('Custom Sentinel');
-      expect(result.payload.targetName).toBe('Orc');
-    });
-
-    it('selects first melee attack when multiple melee attacks available', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats({
-        attacks: [
-          { name: 'Mace', type: 'Action', range: 'melee' },
-          { name: 'Dagger', type: 'Bonus Action', range: 'melee' },
-          { name: 'Shortbow', type: 'Action', range: 'ranged' },
-        ],
-      });
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.attack.name).toBe('Mace');
-    });
-
-    it('falls back to first attack when no melee attack available', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats({ attacks: [{ name: 'Shortbow', type: 'Action', range: 'ranged' }] });
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('attack_roll');
-      expect(result.payload.attack.name).toBe('Shortbow');
-    });
-
-    it('returns popup when no attacks available', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats({ attacks: [] });
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe('Sentinel - Guardian: No melee attack available.');
-    });
+    expect(result.type).toBe('attack_roll');
+    expect(result.payload.attack).toBe(ps.attacks[0]);
+    expect(result.payload.targetName).toBe('Goblin');
+    expect(result.payload.sourceName).toBe('Sentinel - Guardian');
+    expect(damageUtils.getCombatContext).toHaveBeenCalledWith(campaignName);
+    expect(logService.addEntry).toHaveBeenCalledWith(
+      campaignName,
+      expect.objectContaining({
+        type: 'ability_use',
+        characterName: ps.name,
+        abilityName: action.name,
+        description: 'Sentinel - Guardian used against Goblin',
+      }),
+    );
   });
 
-  describe('popup result (no target)', () => {
-    it('returns info popup when combat context is null', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+  it('propagates custom action.name through attack_roll payload and log description', async () => {
+    const action = { name: 'Custom Guardian', automation: { type: 'sentinel_guardian' } };
+    const ps = makePlayerStats();
+    mockTarget('Orc');
 
-      damageUtils.getCombatContext.mockResolvedValue(null);
+    const result = await handle(action, ps, campaignName, null);
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No target selected');
-      expect(result.payload.name).toBe('Sentinel - Guardian');
-    });
-
-    it('returns info popup with custom action name when combat context is null', async () => {
-      const action = { name: 'Custom Sentinel', automation: { type: 'sentinel_guardian' } };
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.name).toBe('Custom Sentinel');
-      expect(result.payload.description).toContain('Custom Sentinel');
-    });
-
-    it('returns info popup when getTargetFromAttacker returns null', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No target selected');
-    });
+    expect(result.type).toBe('attack_roll');
+    expect(result.payload.sourceName).toBe('Custom Guardian');
+    expect(result.payload.targetName).toBe('Orc');
+    expect(logService.addEntry).toHaveBeenCalledWith(
+      campaignName,
+      expect.objectContaining({
+        abilityName: 'Custom Guardian',
+        description: 'Custom Guardian used against Orc',
+      }),
+    );
   });
 
-  describe('log entry', () => {
-    it('calls addEntry with ability_use type and correct fields on success', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      logService.addEntry.mockResolvedValue({ id: 1 });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'ability_use',
-          characterName: ps.name,
-          abilityName: action.name,
-          description: 'Sentinel - Guardian used against Goblin',
-        }),
-      );
+  it('selects the first Action-type melee attack, skipping non-melee and non-Action attacks', async () => {
+    const action = makeAction();
+    const ps = makePlayerStats({
+      attacks: [
+        { name: 'Rapier', type: 'Reaction', range: 'melee' },
+        { name: 'Dagger', type: 'Bonus Action', range: 'melee' },
+        { name: 'Battleaxe', type: 'Action', range: 'melee' },
+        { name: 'Shortbow', type: 'Action', range: 'ranged' },
+      ],
     });
+    mockTarget('Goblin');
 
-    it('uses dynamic action.name in log entry description', async () => {
-      const action = { name: 'Custom Guardian', automation: { type: 'sentinel_guardian' } };
-      const ps = makePlayerStats();
+    const result = await handle(action, ps, campaignName, null);
 
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
-      logService.addEntry.mockResolvedValue({ id: 1 });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'ability_use',
-          abilityName: 'Custom Guardian',
-          description: 'Custom Guardian used against Orc',
-        }),
-      );
-    });
+    expect(result.payload.attack.name).toBe('Battleaxe');
   });
 
-  describe('edge cases', () => {
-    it('returns popup when playerStats.attacks is undefined', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats({ attacks: undefined });
+  it('falls back to first attack when no melee attack available', async () => {
+    const action = makeAction();
+    const ps = makePlayerStats({ attacks: [{ name: 'Shortbow', type: 'Action', range: 'ranged' }] });
+    mockTarget('Goblin');
 
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+    const result = await handle(action, ps, campaignName, null);
 
-      const result = await handle(action, ps, campaignName, null);
+    expect(result.type).toBe('attack_roll');
+    expect(result.payload.attack.name).toBe('Shortbow');
+  });
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toBe('Sentinel - Guardian: No melee attack available.');
-    });
+  it('returns popup when playerStats.attacks is missing', async () => {
+    const action = makeAction();
+    const ps = makePlayerStats({ attacks: undefined });
+    mockTarget('Goblin');
 
-    it('returns popup when combat context has no creatures', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+    const result = await handle(action, ps, campaignName, null);
 
-      damageUtils.getCombatContext.mockResolvedValue({ creatures: [], players: [], placedItems: [] });
-      damageUtils.getTargetFromAttacker.mockReturnValue(null);
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.description).toBe('Sentinel - Guardian: No melee attack available.');
+    // The handler logs the use before attack selection, so the log still fires.
+    expect(logService.addEntry).toHaveBeenCalledWith(
+      campaignName,
+      expect.objectContaining({ description: 'Sentinel - Guardian used against Goblin' }),
+    );
+  });
 
-      const result = await handle(action, ps, campaignName, null);
+  it('returns info popup and never calls getTargetFromAttacker when combat context is null', async () => {
+    const action = makeAction();
+    const ps = makePlayerStats();
+    damageUtils.getCombatContext.mockResolvedValue(null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No target selected');
-    });
+    const result = await handle(action, ps, campaignName, null);
 
-    it('returns popup when getTargetFromAttacker returns object without name property', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.name).toBe('Sentinel - Guardian');
+    expect(result.payload.description).toContain('No target selected');
+    expect(damageUtils.getTargetFromAttacker).not.toHaveBeenCalled();
+    expect(logService.addEntry).not.toHaveBeenCalled();
+  });
 
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({});
+  it('returns info popup when target is null or has no name property', async () => {
+    const action = makeAction();
+    const ps = makePlayerStats();
 
-      const result = await handle(action, ps, campaignName, null);
+    mockTarget(null);
+    let result = await handle(action, ps, campaignName, null);
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.description).toContain('No target selected');
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.description).toContain('No target selected');
-    });
+    // Target object without a name must not crash or produce a nameless OA.
+    vi.clearAllMocks();
+    damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
+    damageUtils.getTargetFromAttacker.mockReturnValue({});
+    result = await handle(action, ps, campaignName, null);
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('No target selected');
+    expect(logService.addEntry).not.toHaveBeenCalled();
+  });
 
-    it('proceeds normally when addEntry rejects', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+  it('proceeds with attack_roll when addEntry rejects', async () => {
+    const action = makeAction();
+    const ps = makePlayerStats();
+    mockTarget('Goblin');
+    logService.addEntry.mockRejectedValueOnce(new Error('log error'));
 
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      logService.addEntry.mockRejectedValue(new Error('log error'));
+    const result = await handle(action, ps, campaignName, null);
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('attack_roll');
-      expect(result.payload.targetName).toBe('Goblin');
-    });
-
-    it('passes campaignName through to addEntry', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      logService.addEntry.mockResolvedValue({ id: 1 });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
-    });
-
-    it('ignores the mapName parameter (4th arg)', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-      logService.addEntry.mockResolvedValue({ id: 1 });
-
-      const result = await handle(action, ps, campaignName, 'TestMap');
-
-      expect(result.type).toBe('attack_roll');
-      expect(result.payload.targetName).toBe('Goblin');
-    });
-
-    it('selects first melee attack with type filter for Action only', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats({
-        attacks: [
-          { name: 'Rapier', type: 'Reaction', range: 'melee' },
-          { name: 'Battleaxe', type: 'Action', range: 'melee' },
-        ],
-      });
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.attack.name).toBe('Battleaxe');
-    });
-
-    it('selects melee attack even if it is not Action type but is first melee', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats({
-        attacks: [
-          { name: 'Lance', type: 'Action', range: 'melee' },
-        ],
-      });
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.attack.name).toBe('Lance');
-    });
+    expect(result.type).toBe('attack_roll');
+    expect(result.payload.targetName).toBe('Goblin');
   });
 });

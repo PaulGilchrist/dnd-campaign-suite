@@ -1,3 +1,8 @@
+// @maintained-by-ai
+// Lane: postCastRiderHandler.js (automation handler, HANDLER_MAP['post_cast_rider'] — index.js:363).
+// Live: Beguiling Magic (2024 classes.json College of Glamour passive_rule+riderSave) →
+// useConfirmableFlow triggerPostCastRiderSaves → executeHandler → this handle().
+// Sibling postCastRiderService.test.js is a DIFFERENT module (rules/spells service lane).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handle } from './postCastRiderHandler.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';

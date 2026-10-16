@@ -59,6 +59,7 @@ describe('eyebiteHandler.handle', () => {
             creatures: [{ name: 'Goblin', type: 'npc' }],
         });
         buildSaveDc.mockReturnValue(15);
+        mapsService.loadMapData.mockResolvedValue(null);
     }
 
     it('returns a modal with modalName eyebiteEffect', async () => {
@@ -68,6 +69,21 @@ describe('eyebiteHandler.handle', () => {
 
         expect(result.type).toBe('modal');
         expect(result.modalName).toBe('eyebiteEffect');
+    });
+
+    it('payload carries save DC, caster context, and combat summary', async () => {
+        defaultMocks();
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload).toMatchObject({
+            saveDc: 15,
+            attackerName: 'Necromancer1',
+            campaignName: 'TestCampaign',
+            featureName: 'Eyebite',
+            durationRounds: 10,
+            combatSummary: { creatures: [{ name: 'Goblin', type: 'npc' }] },
+        });
     });
 
     it('defaults rangeFeet to 60 when automation range is absent', async () => {
@@ -103,55 +119,28 @@ describe('eyebiteHandler.handle', () => {
         const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
         expect(result.payload.attackerPos).toBeNull();
+        expect(mapsService.loadMapData).not.toHaveBeenCalled();
     });
 
     it('handles map load failure gracefully', async () => {
         defaultMocks();
-        mapsService.loadMapData.mockRejectedValue(new Error('Map not found'));
+        mapsService.loadMapData.mockRejectedValueOnce(new Error('Map not found'));
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
         expect(result.type).toBe('modal');
         expect(result.payload.attackerPos).toBeNull();
     });
-
-    it('returns modal even when no creatures in combat', async () => {
-        getCombatContext.mockResolvedValue({ creatures: [] });
-        buildSaveDc.mockReturnValue(15);
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('eyebiteEffect');
-    });
-
-    it('includes eyebiteRecast flag in metaCtx when provided', async () => {
-        defaultMocks();
-
-        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-        // The handler returns a modal; metaCtx is managed by the caller (useSpellMetamagicFlow)
-        // but the eyebiteRecast flag should be passed through when set
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('eyebiteEffect');
-    });
 });
 
 // ─── getEffectOptions ───
 
 describe('getEffectOptions', () => {
-    it('returns an array of 3 effect options', () => {
-        const options = getEffectOptions();
-
-        expect(Array.isArray(options)).toBe(true);
-        expect(options.length).toBe(3);
-    });
-
-    it('includes all effect options with correct keys and conditions', () => {
-        const options = getEffectOptions();
-
-        expect(options).toContainEqual({ key: 'asleep', label: 'Asleep', condition: 'unconscious' });
-        expect(options).toContainEqual({ key: 'panicked', label: 'Panicked', condition: 'frightened' });
-        expect(options).toContainEqual({ key: 'sickened', label: 'Sickened', condition: 'poisoned' });
+    it('returns the three eyebite effect options', () => {
+        expect(getEffectOptions()).toEqual([
+            { key: 'asleep', label: 'Asleep', condition: 'unconscious' },
+            { key: 'panicked', label: 'Panicked', condition: 'frightened' },
+            { key: 'sickened', label: 'Sickened', condition: 'poisoned' },
+        ]);
     });
 });

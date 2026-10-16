@@ -1,8 +1,23 @@
+// @maintained-by-ai: 2026-10-15 — deterministic full-mock lane over the stable
+// FT-103 gate/latch/economy contracts; no churn expected as the app moves.
 // FT-103: Polearm Master Reactive Strike reaction lane — clickable GM-armed
 // reach-entry adjudication: equipped-polearm gate (playerStats.inventory.equipped,
 // never campaign-global lastAttack identity), target = armed entering creature
 // (never lastAttack.attackerName), once-per-round reaction latch
 // _Reactive_Strike_usedRound from a FRESH getCombatContext, spend + refusal logs.
+//
+// REACTIVE STRIKE owns creature_enters_reach_while_holding_polearm (own gate
+// gateReactiveStrike + own latch key). Trio map on reactionDamageHandler.js
+// (test-trim audit 2026-10-15): handOfHarm.test.js owns the holder-hit save
+// trigger (distinct trigger/gate/latch — zero overlap verified); the MAIN
+// reactionDamageHandler.test.js owns the generic save/no-save paths, energy
+// redirection, Thought Shield and CLA-297 Retaliation. Flag TO the main lane:
+// its 'returns popup when isPolearmWeapon returns false' re-pins this file's
+// holding-refusal contract but never reaches isPolearmWeapon (rig has no
+// inventory — it is really the empty-equipped leg); merge/trim candidate there,
+// full-pin home stays HERE. The component row/dispatch seam lives in
+// CharReactions.reactiveStrike.test.jsx with executeHandler mocked — no
+// handler-internals overlap.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './reactionDamageHandler.js';
 
@@ -203,23 +218,13 @@ describe('FT-103 Reactive Strike lane', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', LATCH_KEY, 2, campaignName);
     });
 
-    it('refuses with no polearm equipped: popup + refusal log, no latch stamp, no attack', async () => {
-        const fighter = polearmFighter({
-            inventory: { equipped: ['Scimitar'] },
-            attacks: [{ name: 'Scimitar', type: 'Action', range: 5, hitBonus: 8, damage: '1d6+4', damageType: 'Slashing' }],
-        });
-
-        const result = await handle(makeAction(), fighter, campaignName, null, []);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('requires you to be holding');
-        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-            automationType: 'reactive_strike_refused',
-        }));
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('ignores a stale polearm lastAttack when nothing polearm is equipped (FT-102 gate family)', async () => {
+    // Merged (test-trim 2026-10-15): the two identical-scimitar-rig refusals —
+    // armed-state refusal legs + the FT-102 stale-polearm-lastAttack ignore —
+    // exercise the same findEquippedPolearmAttack→null branch; kept as one test
+    // with the union of pins. This is the honest isPolearmWeapon-consults-false
+    // leg the MAIN lane's 'returns popup when isPolearmWeapon returns false'
+    // names but never reaches (that rig has no inventory at all).
+    it('refuses with no polearm equipped (stale polearm lastAttack ignored, FT-102 gate family): popup + refusal log, no latch stamp, no attack', async () => {
         const fighter = polearmFighter({
             inventory: { equipped: ['Scimitar'] },
             attacks: [{ name: 'Scimitar', type: 'Action', range: 5, hitBonus: 8, damage: '1d6+4', damageType: 'Slashing' }],
@@ -227,8 +232,16 @@ describe('FT-103 Reactive Strike lane', () => {
         findLastAttack.mockResolvedValue({ attackEvent: { damageName: 'Glaive', attackName: 'Glaive' }, attackerName: 'Bandit 1' });
 
         const result = await handle(makeAction(), fighter, campaignName, null, []);
+
         expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('requires you to be holding');
+        // Equipped state decides the gate — never the campaign-global lastAttack identity.
+        expect(isPolearmWeapon).toHaveBeenCalledWith('Scimitar');
         expect(findLastAttack).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            automationType: 'reactive_strike_refused',
+        }));
     });
 
     it('refuses without an armed target, nothing spent', async () => {

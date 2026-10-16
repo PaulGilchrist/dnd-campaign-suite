@@ -1,3 +1,17 @@
+/**
+ * SOLE lane for powerWordStunHandler.js (verified: no sibling *.test files).
+ * Live: automation/index.js `power_word_stun` → automationRouter → triggerSpells
+ * → powerWordStunService.triggerPowerWordStun.
+ * Prod-bug audit (abilities-ARRAY class, holdMonster #1924 / polymorphService #1937):
+ * CLEAN at this source — handler reads only playerStats.name; DC arrives numeric
+ * via buildSaveDc (mocked here), so no abilities-shape coupling; fixture trimmed
+ * to consumed shape.
+ * House rule pinned: >150 HP → speed_zero (expireOnCreatureName=caster turn seam,
+ * rounds: undefined), not RAW "no effect". ≤150 → stunned, no save, with
+ * activeConditionMeta { dc, ability:'con' } for recurring CON saves.
+ * Trimmed: duplicate save_result-rejection test (identical global-reject setup
+ * to the stunned-path rejection test; handler uses the same .catch on both entries).
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/savePrompt.js', () => ({
@@ -38,6 +52,7 @@ import { resolveTarget } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
+import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 
 const campaignName = 'test-campaign';
 const casterName = 'TestCaster';
@@ -77,14 +92,15 @@ const highHpCombatContext = {
   placedItems: [],
 };
 
-function setupMocks(targetName, hp, existingConditions = [], existingEffects = []) {
+// hp selects the context (its creature HP is baked in: Goblin 5 / Dragon 300);
+// targetName must match the creature in the chosen context for the HP band to apply.
+function setupMocks(targetName, hp, existingConditions = []) {
   const combatContext = hp !== null && hp <= 150 ? lowHpCombatContext : highHpCombatContext;
   getCombatContext.mockResolvedValue(combatContext);
   buildSaveDc.mockReturnValue(15);
   resolveTarget.mockResolvedValue({ target: { name: targetName } });
   getRuntimeValue.mockImplementation((_entity, key, _camp) => {
     if (key === 'activeConditions') return existingConditions;
-    if (key === 'targetEffects') return existingEffects;
     return null;
   });
 }
@@ -140,6 +156,19 @@ describe('powerWordStunHandler.handle - target with 150 HP or fewer', () => {
     setupMocks('Goblin', 5);
     const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+    expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      casterName,
+      spellName: 'Power Word Stun',
+      saveType: 'CON',
+      saveDc: 15,
+      attackScope: 'single',
+    }));
+    expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      targetName: 'Goblin',
+      saveResult: 'failure',
+      conditions: ['stunned'],
+      appliedDamage: 0,
+    }));
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Goblin',
       'activeConditions',
@@ -185,9 +214,7 @@ describe('powerWordStunHandler.handle - target with 150 HP or fewer', () => {
     buildSaveDc.mockReturnValue(15);
     resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
     getRuntimeValue.mockImplementation((_entity, key, _camp) => {
-      if (key === 'activeConditions') return null;
-      if (key === 'targetEffects') return [];
-      return null;
+      if (key === 'activeConditions') return null;      return null;
     });
 
     await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -224,6 +251,11 @@ describe('powerWordStunHandler.handle - target with more than 150 HP', () => {
     setupMocks('Dragon', 300);
     await handle(makeAction(), makePlayerStats(), campaignName, null);
 
+    expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+      targetName: 'Dragon',
+      saveResult: 'failure',
+      conditions: ['speed_zero'],
+    }));
     expect(addExpiration).toHaveBeenCalledWith({ attackerName: casterName, targetName: 'Dragon', effects: expect.arrayContaining([
         expect.objectContaining({ type: 'speed_zero', condition: 'speed_zero' }),
       ]), campaignName, rounds: undefined, expireOnCreatureName: casterName });
@@ -249,9 +281,7 @@ describe('powerWordStunHandler.handle - target with more than 150 HP', () => {
     buildSaveDc.mockReturnValue(15);
     resolveTarget.mockResolvedValue({ target: { name: 'Dragon' } });
     getRuntimeValue.mockImplementation((_entity, key, _camp) => {
-      if (key === 'activeConditions') return ['frightened'];
-      if (key === 'targetEffects') return [];
-      return null;
+      if (key === 'activeConditions') return ['frightened'];      return null;
     });
 
     await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -413,22 +443,6 @@ describe('powerWordStunHandler.handle - addEntry error handling', () => {
     const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
     expect(result.payload.description).toContain('Speed is 0');
-  });
-
-  it('should handle addEntry rejection for save_result entry', async () => {
-    getCombatContext.mockResolvedValue(lowHpCombatContext);
-    buildSaveDc.mockReturnValue(15);
-    resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-    getRuntimeValue.mockImplementation((_entity, key, _camp) => {
-      if (key === 'activeConditions') return [];
-      if (key === 'activeConditionMeta') return {};
-      return null;
-    });
-    addEntry.mockImplementation(() => Promise.reject(new Error('log error')));
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(result.type).toBe('popup');
   });
 });
 

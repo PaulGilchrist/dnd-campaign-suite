@@ -73,12 +73,13 @@ describe('foresightHandler', () => {
     expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info', name: 'Foresight' } });
   });
 
-  it('passes through action name for custom spell names', async () => {
+  it('prefers action.name over spell.name and passes service null through uncoerced', async () => {
     resolveTarget.mockResolvedValue({ target: { name: targetName } });
-    triggerForesight.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info', name: 'My Foresight' } });
+    triggerForesight.mockResolvedValue(null);
 
+    // spell.name stays 'Foresight' — first-arg { name: 'My Foresight' } pins action.name precedence
     const action = makeAction({ name: 'My Foresight' });
-    await handle(action, makePlayerStats(), campaignName, mapName);
+    const result = await handle(action, makePlayerStats(), campaignName, mapName);
 
     expect(triggerForesight).toHaveBeenCalledWith(
       { name: 'My Foresight' },
@@ -87,14 +88,6 @@ describe('foresightHandler', () => {
       campaignName,
       mapName,
     );
-  });
-
-  it('returns null when triggerForesight returns null', async () => {
-    resolveTarget.mockResolvedValue({ target: { name: targetName } });
-    triggerForesight.mockResolvedValue(null);
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
     expect(result).toBeNull();
   });
 });

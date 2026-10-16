@@ -40,6 +40,7 @@ vi.mock('../../../encounters/combatData.js', () => ({
 // ── Imported mocks ─────────────────────────────────────────────
 
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
+import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
@@ -75,7 +76,7 @@ describe('compelledDuelHandler', () => {
         getCombatSummary.mockReturnValue({ creatures: [] });
     });
 
-    describe('handle — failed save', () => {
+    describe('handle — failed save applies the duel', () => {
         it('returns popup with correct structure and content', async () => {
             buildSaveDc.mockReturnValue(10);
 
@@ -126,6 +127,13 @@ describe('compelledDuelHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
+            expect(storeSpellLastAttack).toHaveBeenCalledWith('test-campaign', {
+                casterName: 'Paladin',
+                spellName: 'Compelled Duel',
+                saveType: 'WIS',
+                saveDc: 10,
+                attackScope: 'single',
+            });
             expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
                 targetName: 'Goblin',
                 attackerName: 'Paladin',
@@ -133,6 +141,21 @@ describe('compelledDuelHandler', () => {
                 saveDc: 10,
                 dcSuccess: 'none',
                 disadvantage: false,
+            });
+        });
+
+        it('flags disadvantage on the prompt when heightened', async () => {
+            buildSaveDc.mockReturnValue(10);
+
+            await handle(makeAction({ metaCtx: { metamagicHeighten: true } }), makePlayerStats(), 'test-campaign', null);
+
+            expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
+                targetName: 'Goblin',
+                attackerName: 'Paladin',
+                saveType: 'WIS',
+                saveDc: 10,
+                dcSuccess: 'none',
+                disadvantage: true,
             });
         });
 
@@ -218,7 +241,6 @@ describe('compelledDuelHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            const { addTargetResult } = await import('../../common/damageRollback.js');
             expect(addTargetResult).toHaveBeenCalledWith('test-campaign', {
                 targetName: 'Goblin',
                 saveResult: 'failure',
@@ -246,6 +268,14 @@ describe('compelledDuelHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('succeeded on the WIS save');
+            expect(addTargetResult).toHaveBeenCalledWith('test-campaign', {
+                targetName: 'Goblin',
+                saveResult: 'success',
+                roll: 0,
+                total: 0,
+                conditions: [],
+                appliedDamage: 0,
+            });
         });
 
         it('logs the save result on successful save', async () => {

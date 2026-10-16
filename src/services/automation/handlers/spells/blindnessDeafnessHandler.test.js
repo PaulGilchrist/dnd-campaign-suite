@@ -1,3 +1,16 @@
+// blindnessDeafnessHandler lane contract — save-or-suck modal-opener (automation registry
+// 'blindness_deafness' @ index.js:526; modalName routed via useSpellCastExecutor.js:132 →
+// BlindnessDeafnessModal, rendered at CharActionModals.jsx:161). Pure payload builder:
+// ZERO state writes, ZERO te writes here — the CON-save, addCondition, blindnessDeafness_<cond>
+// runtime keys and expirations all live in the modal's apply lane (own lane, pinned by
+// BlindnessDeafnessModal.*.test.jsx which mocks this handler). No clock anywhere: the CON
+// save prompt waits indefinitely via the modal. Turn-based seam only.
+// NOT part of the *_target_selection vestigial tally (bane/beacon/bless/multiTarget): this
+// emits type:'modal' whose renderer consumer chain is live end-to-end, and getEffectOptions
+// is consumed live by BlindnessDeafnessModal.jsx — exact-table pins here preserve the
+// {key,label,condition} shape the modal feeds into addCondition + effectKey composition.
+// payload field set is the modal's props contract — keep the golden-path toEqual exact.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/savePrompt.js', () => ({
@@ -27,48 +40,27 @@ const casterName = 'TestCaster';
 const mapName = 'dungeon-level-1';
 
 function makePlayerStats(overrides = {}) {
-    return {
-        name: casterName,
-        level: 10,
-        proficiency: 4,
-        abilities: [{ name: 'Intelligence', bonus: 3 }],
-        ...overrides,
-    };
+    // handle() consumes only playerStats.name (buildSaveDc is mocked; map lookup is by name).
+    return { name: casterName, ...overrides };
 }
 
-function makeAction(automation = {}) {
+function makeAction(overrides = {}) {
+    // Merge-not-replace: automation overrides land INSIDE the automation base object.
     return {
         name: 'Blindness/Deafness',
-        automation: { type: 'blindness_deafness', saveDc: 15, ...automation },
+        ...overrides,
+        automation: { type: 'blindness_deafness', saveDc: 15, ...overrides.automation },
     };
 }
 
-// ─── getEffectOptions ───
-
 describe('getEffectOptions', () => {
-    it('returns the two effect options', () => {
-        const options = getEffectOptions();
-        expect(options).toHaveLength(2);
-    });
-
-    it('includes blinded option', () => {
-        const options = getEffectOptions();
-        const blinded = options.find(o => o.key === 'blinded');
-        expect(blinded).toBeDefined();
-        expect(blinded.label).toBe('Blinded');
-        expect(blinded.condition).toBe('blinded');
-    });
-
-    it('includes deafened option', () => {
-        const options = getEffectOptions();
-        const deafened = options.find(o => o.key === 'deafened');
-        expect(deafened).toBeDefined();
-        expect(deafened.label).toBe('Deafened');
-        expect(deafened.condition).toBe('deafened');
+    it('returns the exact blinded/deafened options table the modal consumes', () => {
+        expect(getEffectOptions()).toEqual([
+            { key: 'blinded', label: 'Blinded', condition: 'blinded' },
+            { key: 'deafened', label: 'Deafened', condition: 'deafened' },
+        ]);
     });
 });
-
-// ─── handle ───
 
 describe('blindnessDeafnessHandler.handle', () => {
     beforeEach(() => {
@@ -82,230 +74,139 @@ describe('blindnessDeafnessHandler.handle', () => {
         loadMapData.mockResolvedValue(null);
     });
 
-    describe('return type', () => {
-        it('returns a modal type result', async () => {
+    it('returns the blindnessDeafness modal with the exact full payload and feeds its seams', async () => {
+        const action = makeAction();
+        const playerStats = makePlayerStats();
+        const cs = {
+            creatures: [
+                { name: 'Goblin', currentHp: 5, maxHp: 7 },
+                { name: 'Orc', currentHp: 15, maxHp: 22 },
+            ],
+            players: [{ name: casterName, gridX: 1, gridY: 2 }],
+            placedItems: [{ name: 'Crate' }],
+        };
+        getCombatContext.mockResolvedValue(cs);
+        const errorSpy = vi.spyOn(console, 'error');
+
+        const result = await handle(action, playerStats, campaignName, null);
+
+        expect(buildSaveDc).toHaveBeenCalledWith({ type: 'blindness_deafness', saveDc: 15 }, playerStats);
+        expect(getCombatContext).toHaveBeenCalledWith(campaignName);
+        expect(result).toEqual({
+            type: 'modal',
+            modalName: 'blindnessDeafness',
+            payload: {
+                combatSummary: cs,
+                attackerName: casterName,
+                attackerPos: null,
+                saveDc: 15,
+                campaignName,
+                mapData: null,
+                featureName: 'Blindness/Deafness',
+                rangeFeet: 120,
+            },
+        });
+        // valid DC: no error logging (handler logs only on null/default-10, below)
+        expect(errorSpy).not.toHaveBeenCalled();
+        errorSpy.mockRestore();
+    });
+
+    it.each([{ dc: null }, { dc: 10 } ])(
+        'logs console.error when saveDc computes to $dc but still opens the modal carrying it',
+        async ({ dc }) => {
+            buildSaveDc.mockReturnValue(dc);
+            const errorSpy = vi.spyOn(console, 'error');
+
             const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+            expect(errorSpy).toHaveBeenCalledWith(
+                expect.stringContaining('Could not compute spell save DC'),
+            );
             expect(result.type).toBe('modal');
-        });
+            expect(result.payload.saveDc).toBe(dc);
+            errorSpy.mockRestore();
+        },
+    );
 
-        it('sets modalName to blindnessDeafness', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(result.modalName).toBe('blindnessDeafness');
-        });
+    it('pins the rangeFeet chain: rangeToFeet(automation.range), defaulting to 120', async () => {
+        rangeToFeet.mockReturnValue(60);
+        let result = await handle(makeAction({ automation: { range: '60ft' } }), makePlayerStats(), campaignName, null);
+        expect(result.payload.rangeFeet).toBe(60);
 
-        it('includes combatSummary in payload', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(result.payload.combatSummary).toEqual({
-                creatures: [{ name: 'Goblin' }],
-                players: [{ name: casterName, gridX: 5, gridY: 10 }],
-            });
-        });
+        rangeToFeet.mockReturnValue(150);
+        result = await handle(makeAction({ automation: { range: '150ft' } }), makePlayerStats(), campaignName, null);
+        expect(result.payload.rangeFeet).toBe(150);
 
-        it('includes attackerName in payload', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(result.payload.attackerName).toBe(casterName);
-        });
+        rangeToFeet.mockReturnValue(null);
+        result = await handle(makeAction({ automation: { range: '5ft' } }), makePlayerStats(), campaignName, null);
+        expect(result.payload.rangeFeet).toBe(120); // null/0 → rules default
 
-        it('includes campaignName in payload', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(result.payload.campaignName).toBe(campaignName);
-        });
+        result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+        expect(result.payload.rangeFeet).toBe(120); // missing range → same default
 
-        it('includes featureName from action.name', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(result.payload.featureName).toBe('Blindness/Deafness');
-        });
-
-        it('uses custom action name in featureName', async () => {
-            const customAction = { name: 'My Blindness Spell', automation: { type: 'blindness_deafness' } };
-            const result = await handle(customAction, makePlayerStats(), campaignName, null);
-            expect(result.payload.featureName).toBe('My Blindness Spell');
-        });
+        // seam is fed automation.range verbatim, in call order
+        expect(rangeToFeet.mock.calls.map(c => c[0])).toEqual(['60ft', '150ft', '5ft', undefined]);
     });
 
-    describe('saveDc', () => {
-        it('includes saveDc from buildSaveDc in payload', async () => {
-            buildSaveDc.mockReturnValue(16);
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(result.payload.saveDc).toBe(16);
-        });
+    it('resolves attackerPos by caster name from the map and passes mapData through', async () => {
+        const mockMapData = {
+            name: mapName,
+            players: [
+                { name: 'OtherPlayer', gridX: 3, gridY: 7 },
+                { name: casterName, gridX: 10, gridY: 20 },
+            ],
+            tiles: [],
+        };
+        loadMapData.mockResolvedValue(mockMapData);
 
-        it('logs error when saveDc is null', async () => {
-            buildSaveDc.mockReturnValue(null);
-            const spy = vi.spyOn(console, 'error');
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(spy).toHaveBeenCalledWith(
-                expect.stringContaining('Could not compute spell save DC'),
-            );
-            spy.mockRestore();
-        });
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-        it('logs error when saveDc is 10 (default)', async () => {
-            buildSaveDc.mockReturnValue(10);
-            const spy = vi.spyOn(console, 'error');
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(spy).toHaveBeenCalledWith(
-                expect.stringContaining('Could not compute spell save DC'),
-            );
-            spy.mockRestore();
-        });
-
-        it('does not log error for valid saveDc', async () => {
-            buildSaveDc.mockReturnValue(15);
-            const spy = vi.spyOn(console, 'error');
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(spy).not.toHaveBeenCalled();
-            spy.mockRestore();
-        });
+        expect(loadMapData).toHaveBeenCalledWith(campaignName, mapName);
+        expect(result.payload.attackerPos).toEqual({ gridX: 10, gridY: 20 });
+        expect(result.payload.mapData).toBe(mockMapData);
     });
 
-    describe('rangeFeet', () => {
-        it('defaults to 120 when rangeToFeet returns null', async () => {
-            rangeToFeet.mockReturnValue(null);
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(result.payload.rangeFeet).toBe(120);
-        });
+    it.each([{ map: null }, { map: '' } ])(
+        'leaves attackerPos/mapData null and skips loadMapData without a mapName ($map)',
+        async ({ map }) => {
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, map);
 
-        it('uses rangeToFeet result when available', async () => {
-            rangeToFeet.mockReturnValue(60);
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(result.payload.rangeFeet).toBe(60);
-        });
-
-        it('uses rangeToFeet result for custom range', async () => {
-            rangeToFeet.mockReturnValue(150);
-            const action = makeAction({ range: '150ft' });
-            const result = await handle(action, makePlayerStats(), campaignName, null);
-            expect(result.payload.rangeFeet).toBe(150);
-        });
-
-        it('passes automation.range to rangeToFeet', async () => {
-            rangeToFeet.mockReturnValue(120);
-            const action = makeAction({ range: '120ft' });
-            await handle(action, makePlayerStats(), campaignName, null);
-            expect(rangeToFeet).toHaveBeenCalledWith('120ft');
-        });
-    });
-
-    describe('attackerPos', () => {
-        it('is null when no mapName is provided', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(result.payload.attackerPos).toBeNull();
-        });
-
-        it('is null when mapName is empty string', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, '');
-            expect(result.payload.attackerPos).toBeNull();
-        });
-
-        it('is null when map is loaded but caster not found in players', async () => {
-            loadMapData.mockResolvedValue({
-                players: [{ name: 'OtherPlayer', gridX: 3, gridY: 7 }],
-            });
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-            expect(result.payload.attackerPos).toBeNull();
-        });
-
-        it('includes grid position when caster found on map', async () => {
-            loadMapData.mockResolvedValue({
-                players: [
-                    { name: 'OtherPlayer', gridX: 3, gridY: 7 },
-                    { name: casterName, gridX: 10, gridY: 20 },
-                ],
-            });
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-            expect(result.payload.attackerPos).toEqual({ gridX: 10, gridY: 20 });
-        });
-
-        it('calls loadMapData with campaignName and mapName', async () => {
-            loadMapData.mockResolvedValue({
-                players: [{ name: casterName, gridX: 5, gridY: 10 }],
-            });
-            await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-            expect(loadMapData).toHaveBeenCalledWith(campaignName, mapName);
-        });
-
-        it('handles map loading failure gracefully', async () => {
-            loadMapData.mockRejectedValue(new Error('map not found'));
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+            expect(loadMapData).not.toHaveBeenCalled();
             expect(result.payload.attackerPos).toBeNull();
             expect(result.payload.mapData).toBeNull();
-        });
+        },
+    );
+
+    it('reports null attackerPos but still ships mapData when the caster is not on the map', async () => {
+        loadMapData.mockResolvedValue({ players: [{ name: 'OtherPlayer', gridX: 3, gridY: 7 }] });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload.attackerPos).toBeNull();
+        expect(result.payload.mapData).toEqual({ players: [{ name: 'OtherPlayer', gridX: 3, gridY: 7 }] });
     });
 
-    describe('mapData', () => {
-        it('is null when no mapName is provided', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(result.payload.mapData).toBeNull();
-        });
+    it('degrades to null attackerPos/mapData when the map load rejects (warns, never throws)', async () => {
+        loadMapData.mockRejectedValueOnce(new Error('map not found'));
+        const warnSpy = vi.spyOn(console, 'warn');
 
-        it('is null when map loading fails', async () => {
-            loadMapData.mockRejectedValue(new Error('map not found'));
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-            expect(result.payload.mapData).toBeNull();
-        });
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-        it('includes mapData when successfully loaded', async () => {
-            const mockMapData = { name: mapName, players: [], tiles: [] };
-            loadMapData.mockResolvedValue(mockMapData);
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-            expect(result.payload.mapData).toBe(mockMapData);
-        });
+        expect(result.payload.attackerPos).toBeNull();
+        expect(result.payload.mapData).toBeNull();
+        expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining('Attacker position unavailable'),
+            expect.any(Error),
+        );
+        warnSpy.mockRestore();
     });
 
-    describe('playerStats variations', () => {
-        it('uses playerStats name as attackerName', async () => {
-            const ps = makePlayerStats({ name: 'WizardGirl' });
-            const result = await handle(makeAction(), ps, campaignName, null);
-            expect(result.payload.attackerName).toBe('WizardGirl');
-        });
+    it('fails fast with a TypeError when the action has no automation, before any combat read', async () => {
+        await expect(
+            handle({ name: 'Blindness/Deafness' }, makePlayerStats(), campaignName, null),
+        ).rejects.toThrow(TypeError);
 
-        it('handles playerStats with minimal properties', async () => {
-            const ps = { name: 'MinimalCaster' };
-            const result = await handle(makeAction(), ps, campaignName, null);
-            expect(result.payload.attackerName).toBe('MinimalCaster');
-        });
-    });
-
-    describe('action variations', () => {
-        it('throws when action has no automation property', async () => {
-            buildSaveDc.mockReturnValue(10);
-            await expect(
-                handle({ name: 'Blindness/Deafness' }, makePlayerStats(), campaignName, null),
-            ).rejects.toThrow();
-        });
-
-        it('uses custom automation type in action', async () => {
-            const customAction = {
-                name: 'Blindness/Deafness',
-                automation: { type: 'blindness_deafness', saveDc: 14, range: '60ft' },
-            };
-            rangeToFeet.mockReturnValue(60);
-            buildSaveDc.mockReturnValue(14);
-            const result = await handle(customAction, makePlayerStats(), campaignName, null);
-            expect(result.payload.saveDc).toBe(14);
-            expect(result.payload.rangeFeet).toBe(60);
-        });
-    });
-
-    describe('combat context', () => {
-        it('passes campaignName to getCombatContext', async () => {
-            await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(getCombatContext).toHaveBeenCalledWith(campaignName);
-        });
-
-        it('includes whatever combat context the server returns', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Goblin', currentHp: 5, maxHp: 7 },
-                    { name: 'Orc', currentHp: 15, maxHp: 22 },
-                ],
-                players: [{ name: casterName, gridX: 1, gridY: 2 }],
-                placedItems: [{ name: 'Crate' }],
-            });
-            const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-            expect(result.payload.combatSummary.creatures).toHaveLength(2);
-            expect(result.payload.combatSummary.placedItems).toHaveLength(1);
-        });
+        // Ordering proof: the auto.range read throws before getCombatContext is touched.
+        expect(getCombatContext).not.toHaveBeenCalled();
     });
 });

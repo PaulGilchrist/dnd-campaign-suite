@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Nick mastery lane (weaponMasteryHandler.applyNickMastery): once-per-turn latch
+// written to the player's '_Nick_UsedRound' runtime key as a PLAIN round number
+// (consumers attackCalc2024 / CharBonusActions compare it against
+// getCurrentCombatRound()). Self-mode flag — no targetEffect is ever written.
+// Description-lane strings owned by weaponMasteryHandler.description.test.js;
+// this file only pins the refusal text composed inside applyNickMastery itself.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -37,7 +44,7 @@ describe('applyMasteryEffect — Nick', () => {
     getRuntimeValue.mockReturnValue(null);
   });
 
-  it('marks _Nick_UsedRound with the current round number and logs ability_use', async () => {
+  it('latches _Nick_UsedRound to the current round, logs ability_use, and returns the Nick mastery_rider popup', async () => {
     const result = await applyMasteryEffect('Nick', playerStats, 'test-campaign', 'Rug');
 
     expect(setRuntimeValue).toHaveBeenCalledWith('Fighter', '_Nick_UsedRound', 4, 'test-campaign');
@@ -45,19 +52,16 @@ describe('applyMasteryEffect — Nick', () => {
       'test-campaign',
       expect.objectContaining({
         type: 'ability_use',
+        characterName: 'Fighter',
         abilityName: 'Nick',
+        description: 'Fighter used Nick on Rug — Light weapon extra attack is now part of the Attack action.',
         targetName: 'Rug',
       })
     );
     expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
     expect(result.payload.name).toBe('Nick');
-  });
-
-  it('writes a plain round number (not an object) so consumers can match getCurrentCombatRound', async () => {
-    await applyMasteryEffect('Nick', playerStats, 'test-campaign', 'Rug');
-    const write = setRuntimeValue.mock.calls.find(c => c[1] === '_Nick_UsedRound');
-    expect(typeof write[2]).toBe('number');
-    expect(write[2]).toBe(getCurrentCombatRound('test-campaign'));
+    expect(result.payload.automation).toEqual({ type: 'mastery_rider', masteries: ['Nick'] });
   });
 
   // WM-003 F3: the refusal is still a refusal (zero latch write) but must LOG
@@ -74,10 +78,13 @@ describe('applyMasteryEffect — Nick', () => {
         type: 'automation',
         automationType: 'nick_refused',
         characterName: 'Fighter',
+        targetName: 'Rug',
+        description: 'Fighter can use Nick only once per turn.',
       })
     );
     expect(result.payload.refused).toBe(true);
-    expect(result.payload.description).toMatch(/once per turn/i);
+    expect(result.payload.name).toBe('Nick');
+    expect(result.payload.description).toBe('Fighter can use Nick only once per turn.');
   });
 
   it('allows Nick again on a later round when the stored round is stale', async () => {
@@ -88,7 +95,25 @@ describe('applyMasteryEffect — Nick', () => {
 
     expect(setRuntimeValue).toHaveBeenCalledWith('Fighter', '_Nick_UsedRound', 5, 'test-campaign');
     expect(result.type).toBe('popup');
+    expect(result.payload.refused).toBeUndefined();
     expect(result.payload.description || '').not.toMatch(/once per turn/i);
+  });
+
+  it('latches and logs without a target when targetName is omitted', async () => {
+    const result = await applyMasteryEffect('Nick', playerStats, 'test-campaign', undefined);
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('Fighter', '_Nick_UsedRound', 4, 'test-campaign');
+    expect(addEntry).toHaveBeenCalledWith(
+      'test-campaign',
+      expect.objectContaining({
+        type: 'ability_use',
+        abilityName: 'Nick',
+        description: 'Fighter used Nick — Light weapon extra attack is now part of the Attack action.',
+        targetName: null,
+      })
+    );
+    expect(result.type).toBe('popup');
+    expect(result.payload.refused).toBeUndefined();
   });
 
   it('does NOT mark _Nick_UsedRound when a different mastery is chosen (Skip/replace)', async () => {

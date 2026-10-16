@@ -1,5 +1,41 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// ── QUAD seam map — counterSpellHandler.js ─────────────────────────────
+// Subject is LIVE: automation/index.js imports `handle` (l.201) and registers
+// it as `reaction_counterspell` in the dispatch table (l.525). Reaction
+// consumption precedent = handlers/reactions/ block — distinct modules, all
+// maintained. CAST-1 reaction, CON save vs the attacker.
+//
+// THIS FILE (#1893) — SAVE-RESULT lane: handleSaveResult() only.
+//   • failed-save rollback: rollbackSpellEffects args (incl. affectedTargets
+//     passthrough), exact save_result shape, exact ability_use rollback log
+//   • success counterspell negation log
+//   • promptId guard (stale/foreign prompts ignored, listener stays armed)
+//   • 'counterspell-save-result' broadcast payload
+//   Canonical for 'should log save_result and rollback on failed save' —
+//   strict superset of deleted counter_debug.test.js (exact save_result
+//   shape + rollbackSpellEffects args + ability_use log). Do not weaken.
+// #1894 counterSpellHandler.rejections.test.js — addEntry rejection paths
+//   (mockRejectedValueOnce) + getRuntimeValue null/undefined/negative guards.
+// #1895 counterSpellHandler.spellBreaker.test.js — Spell Breaker (War
+//   Magic) slot refunds + CLA-322 reaction-spent round latch.
+// #1896 counterSpellHandler.test.js — handle() validation, spell detection,
+//   CON save prompt creation, popup returns.
+//
+// HANDOFF to #1895 (Spell Breaker content removed from this lane; its
+// exact-named tests already supersede each one):
+//   'should restore a spell slot on successful save when spell_breaker
+//    passive includes Counterspell'
+//     → 'refunds at the actual cast slot level and logs Spell Breaker when
+//        the save succeeds'
+//   'should not restore a spell slot when spell_breaker passive is missing'
+//     → 'does not refund without the Spell Breaker passive (5e regression
+//        gate)'
+//   'should not restore a spell slot on failed save even with spell_breaker'
+//     → 'does not refund when the attacker fails the save (counterspell
+//        succeeded)'
+// ─────────────────────────────────────────────────────────────────────────
+
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
 vi.mock('../../common/savePrompt.js', () => ({
@@ -31,7 +67,6 @@ import { handle } from './counterSpellHandler.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { addEntry } from '../../../ui/logService.js';
-import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { findLastAttack, rollbackSpellEffects } from '../../common/damageRollback.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -61,6 +96,7 @@ function makeAction(automation = {}) {
 
 function makeCombatContext(overrides = {}) {
   return {
+    round: 1,
     creatures: [
       { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
       { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
@@ -75,6 +111,7 @@ function makeCombatContext(overrides = {}) {
 }
 
 function makeLastAttack(overrides = {}) {
+  const { attackEvent: attackEventOverrides = {}, ...rest } = overrides;
   return {
     attackEvent: {
       attackerName: 'Goblin',
@@ -83,7 +120,12 @@ function makeLastAttack(overrides = {}) {
       damageName: 'Fire Bolt',
       attackName: 'Fire Bolt',
       saveType: null,
-      ...overrides.attackEvent,
+      primaryDamage: 9,
+      secondaryDamage: 0,
+      affectedTargets: ['TestCaster'],
+      statusEffects: null,
+      // attackEvent overrides MERGE (caller keeps untouched identity fields)
+      ...attackEventOverrides,
     },
     attackerName: 'Goblin',
     targetName: 'TestCaster',
@@ -91,10 +133,20 @@ function makeLastAttack(overrides = {}) {
     secondaryDamage: 0,
     totalDamage: 9,
     damageTypes: ['Fire'],
-    statusEffects: null,
-    affectedTargets: ['TestCaster'],
-    ...overrides,
+    ...rest,
   };
+}
+
+// Run handle() and return { savedCallback, addEventListenerSpy } wired to
+// the handler's window 'save-result' listener. Awaiting savedCallback awaits
+// handleSaveResult end-to-end (rollback + logs) — no timer races.
+async function triggerAndCapture(action, playerStats) {
+  const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+  await handle(action, playerStats, campaignName, null);
+  const savedCallback = addEventListenerSpy.mock.calls.find(
+    call => call[0] === 'save-result'
+  )[1];
+  return { savedCallback, addEventListenerSpy };
 }
 
 // ── Tests ──────────────────────────────────────────────────────
@@ -102,34 +154,21 @@ function makeLastAttack(overrides = {}) {
 describe('counterSpellHandler.handleSaveResult', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getCombatContext.mockResolvedValue(makeCombatContext());
+    findLastAttack.mockResolvedValue(makeLastAttack());
+    buildSaveDc.mockReturnValue(15);
+    createSaveListener.mockReturnValue({ promptId: 'save-test-prompt' });
+    rollbackSpellEffects.mockResolvedValue({
+      targetsHealed: 0,
+      conditionsRemoved: [],
+      effectsRemoved: 0,
+      damageHealed: 0,
+      logDescription: '',
+    });
   });
 
   describe('save result handling', () => {
     it('should log save_result and rollback on failed save', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue({
-        attackEvent: {
-          attackerName: 'Goblin',
-          targetName: 'TestCaster',
-          damageFormula: '3d6',
-          damageName: 'Fire Bolt',
-          attackName: 'Fire Bolt',
-          primaryDamage: 9,
-          secondaryDamage: 0,
-          affectedTargets: ['TestCaster'],
-          statusEffects: null,
-        },
-        attackerName: 'Goblin',
-        targetName: 'TestCaster',
-        primaryDamage: 9,
-        secondaryDamage: 0,
-        totalDamage: 9,
-        damageTypes: ['Fire'],
-      });
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'save-test-prompt' });
       rollbackSpellEffects.mockResolvedValue({
         targetsHealed: 1,
         conditionsRemoved: [{ targetName: 'TestCaster', condition: 'burning' }],
@@ -138,19 +177,20 @@ describe('counterSpellHandler.handleSaveResult', () => {
         logDescription: "Goblin's spell 'Fire Bolt' was countered — 9 HP healed, 1 condition(s) removed, 2 target effect(s) cleared on TestCaster.",
       });
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+      const { savedCallback, addEventListenerSpy } = await triggerAndCapture(
+        makeAction(), makePlayerStats()
+      );
 
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'save-test-prompt',
-          success: false,
-        },
+      // Pin the internal broadcast (fire → before branch → seen by riders)
+      let broadcastDetail = null;
+      const broadcastListener = (e) => { broadcastDetail = e.detail; };
+      window.addEventListener('counterspell-save-result', broadcastListener);
+
+      await savedCallback({
+        detail: { promptId: 'save-test-prompt', success: false },
       });
 
-      // Wait for async addEntry calls to complete
-      await new Promise(r => setTimeout(r, 10));
-
+      expect(rollbackSpellEffects).toHaveBeenCalledTimes(1);
       expect(rollbackSpellEffects).toHaveBeenCalledWith(
         expect.objectContaining({
           attackerName: 'Goblin',
@@ -163,7 +203,7 @@ describe('counterSpellHandler.handleSaveResult', () => {
         expect.objectContaining({ creatures: expect.any(Array) }),
       );
 
-      // First call was ability_use for the counter triggered, second is save_result
+      // Initial trigger log is ability_use; failed-save result is save_result
       const saveResultCall = addEntry.mock.calls.find(
         call => call[1]?.type === 'save_result' && call[1]?.success === false
       );
@@ -179,7 +219,7 @@ describe('counterSpellHandler.handleSaveResult', () => {
         description: 'Goblin failed CON save. Counterspell counters \'Fire Bolt\'!',
       });
 
-      // Third call should be the ability_use log for the rollback
+      // Rollback log carries the exact logDescription from rollbackSpellEffects
       const abilityUseCall = addEntry.mock.calls.find(
         call => call[1]?.type === 'ability_use' && call[1]?.description?.includes('was countered')
       );
@@ -191,25 +231,31 @@ describe('counterSpellHandler.handleSaveResult', () => {
         description: "Goblin's spell 'Fire Bolt' was countered — 9 HP healed, 1 condition(s) removed, 2 target effect(s) cleared on TestCaster.",
       });
 
+      expect(broadcastDetail).toEqual({
+        promptId: 'save-test-prompt',
+        attackerName: 'Goblin',
+        spellName: 'Fire Bolt',
+        saveDc: 15,
+        success: false,
+        spellResult: 'failed',
+        counterspellResult: 'counters',
+      });
+
+      window.removeEventListener('counterspell-save-result', broadcastListener);
       addEventListenerSpy.mockRestore();
     });
 
     it('should log save_result on successful save', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+      const { savedCallback, addEventListenerSpy } = await triggerAndCapture(
+        makeAction(), makePlayerStats()
+      );
 
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'save-test-prompt-2' });
+      let broadcastDetail = null;
+      const broadcastListener = (e) => { broadcastDetail = e.detail; };
+      window.addEventListener('counterspell-save-result', broadcastListener);
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'save-test-prompt-2',
-          success: true,
-        },
+      await savedCallback({
+        detail: { promptId: 'save-test-prompt', success: true },
       });
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
@@ -223,135 +269,37 @@ describe('counterSpellHandler.handleSaveResult', () => {
         description: 'Goblin succeeded on CON save. Counterspell fails to counter \'Fire Bolt\'.',
       });
 
-      addEventListenerSpy.mockRestore();
-    });
-  });
+      // Spell resolved — nothing to roll back (no-side-effect guard)
+      expect(rollbackSpellEffects).not.toHaveBeenCalled();
 
-  describe('spell_breaker passive', () => {
-    it('should restore a spell slot on successful save when spell_breaker passive includes Counterspell', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-      const ps = makePlayerStats({
-        automation: {
-          passives: [
-            { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
-          ],
-        },
+      expect(broadcastDetail).toEqual({
+        promptId: 'save-test-prompt',
+        attackerName: 'Goblin',
+        spellName: 'Fire Bolt',
+        saveDc: 15,
+        success: true,
+        spellResult: 'succeeded',
+        counterspellResult: 'fails to counter',
       });
 
-      getRuntimeValue.mockReturnValue(3);
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'spellbreaker-prompt' });
-
-      await handle(makeAction(), ps, campaignName, null);
-
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'spellbreaker-prompt',
-          success: true,
-        },
-      });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCaster',
-        'spell_slots_level_3',
-        4,
-        campaignName,
-      );
-      addEventListenerSpy.mockRestore();
-    });
-
-    it('should not restore a spell slot when spell_breaker passive is missing', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      getRuntimeValue.mockReturnValue(3);
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'nospellbreaker-prompt' });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'nospellbreaker-prompt',
-          success: true,
-        },
-      });
-
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(expect.any(String), expect.stringContaining('spell_slots_level_'), expect.any(Number), campaignName);
-      addEventListenerSpy.mockRestore();
-    });
-
-    it('should not restore a spell slot on failed save even with spell_breaker', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      getRuntimeValue.mockReturnValue(3);
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'failspellbreaker-prompt' });
-      rollbackSpellEffects.mockResolvedValue({
-        targetsHealed: 0,
-        conditionsRemoved: [],
-        effectsRemoved: 0,
-        damageHealed: 0,
-        logDescription: '',
-      });
-
-      await handle(makeAction(), makePlayerStats({
-        automation: {
-          passives: [
-            { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
-          ],
-        },
-      }), campaignName, null);
-
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'failspellbreaker-prompt',
-          success: false,
-        },
-      });
-
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(expect.any(String), expect.stringContaining('spell_slots_level_'), expect.any(Number), campaignName);
+      window.removeEventListener('counterspell-save-result', broadcastListener);
       addEventListenerSpy.mockRestore();
     });
   });
 
   describe('AoE spell handling', () => {
     it('should use affectedTargets from lastAttack for rollback', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue({
+      findLastAttack.mockResolvedValue(makeLastAttack({
         attackEvent: {
-          attackerName: 'Goblin',
-          targetName: 'TestCaster',
-          damageFormula: '3d6',
           damageName: 'Fireball',
           attackName: 'Fireball',
           saveType: 'DEX',
           saveDc: 14,
           saveResult: 'failure',
-          primaryDamage: 9,
-          secondaryDamage: 0,
           affectedTargets: ['TestCaster', 'Orc'],
           statusEffects: ['burning'],
         },
-        attackerName: 'Goblin',
-        targetName: 'TestCaster',
-        primaryDamage: 9,
-        secondaryDamage: 0,
-        totalDamage: 9,
-        damageTypes: ['Fire'],
-      });
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'aoe-prompt' });
+      }));
       rollbackSpellEffects.mockResolvedValue({
         targetsHealed: 2,
         conditionsRemoved: [],
@@ -360,16 +308,15 @@ describe('counterSpellHandler.handleSaveResult', () => {
         logDescription: "Goblin's spell 'Fireball' was countered — 18 HP healed, no conditions to remove, no target effects to clear on TestCaster, Orc.",
       });
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
+      const { savedCallback, addEventListenerSpy } = await triggerAndCapture(
+        makeAction(), makePlayerStats()
+      );
 
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'aoe-prompt',
-          success: false,
-        },
+      await savedCallback({
+        detail: { promptId: 'save-test-prompt', success: false },
       });
 
+      // Handler passes the full attackEvent through — affectedTargets intact
       expect(rollbackSpellEffects).toHaveBeenCalledWith(
         expect.objectContaining({
           affectedTargets: ['TestCaster', 'Orc'],
@@ -380,39 +327,39 @@ describe('counterSpellHandler.handleSaveResult', () => {
         expect.objectContaining({ creatures: expect.any(Array) }),
       );
 
+      // Rollback log mirrors the AoE logDescription verbatim
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: 'TestCaster',
+        abilityName: 'Counterspell',
+        description: "Goblin's spell 'Fireball' was countered — 18 HP healed, no conditions to remove, no target effects to clear on TestCaster, Orc.",
+      });
+
       addEventListenerSpy.mockRestore();
     });
   });
 
   describe('handleSaveResult early return', () => {
     it('should ignore events with mismatched promptId', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+      const { savedCallback, addEventListenerSpy } = await triggerAndCapture(
+        makeAction(), makePlayerStats()
+      );
 
-      getCombatContext.mockResolvedValue(makeCombatContext());
-      findLastAttack.mockResolvedValue(makeLastAttack());
-      buildSaveDc.mockReturnValue(15);
-      createSaveListener.mockReturnValue({ promptId: 'correct-prompt' });
-      rollbackSpellEffects.mockResolvedValue({
-        targetsHealed: 0,
-        conditionsRemoved: [],
-        effectsRemoved: 0,
-        damageHealed: 0,
-        logDescription: '',
+      await savedCallback({
+        detail: { promptId: 'wrong-prompt', success: false },
       });
 
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'wrong-prompt',
-          success: false,
-        },
-      });
-
-      await new Promise(r => setTimeout(r, 10));
-
+      // Guard rejects foreign prompts — no rollback, no result logs
       expect(rollbackSpellEffects).not.toHaveBeenCalled();
+      expect(addEntry.mock.calls.filter(call => call[1]?.type === 'save_result')).toHaveLength(0);
+
+      // Positive control: listener stays armed — the correct prompt still resolves
+      await savedCallback({
+        detail: { promptId: 'save-test-prompt', success: false },
+      });
+
+      expect(rollbackSpellEffects).toHaveBeenCalledTimes(1);
+
       addEventListenerSpy.mockRestore();
     });
   });

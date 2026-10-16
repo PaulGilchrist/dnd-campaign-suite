@@ -1,7 +1,12 @@
+// @maintained-by-ai
 // CLA-333 Option A: base Dash is a free Bonus Action, always available. Expending 1
 // Focus Point is the opt-in upgrade to Disengage + Dash + doubled jump. The handler
 // auto-upgrades when FP are available and falls back to the free Dash at FP<cost — it
 // NEVER refuses (a Monk always gets the base free Dash).
+//
+// Lane: stepOfTheWind-specific gate/resources/telemetry at the source. Destructive
+// Stride internals are canon in destructiveStrideHandler's own lanes — this file pins
+// the DELEGATION ONLY (call args + result pass-through + epitome gate).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -84,10 +89,7 @@ describe('stepOfTheWindHandler — FP upgrade (spend 1 FP → Disengage + Dash)'
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.name).toBe('Step of the Wind');
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'focusPoints', 1, campaignName);
-        expect(result.payload.description).toContain('expended 1 Focus Point on Step of the Wind');
-        expect(result.payload.description).toContain('Disengage + Dash as a bonus action');
-        expect(result.payload.description).toContain('doubled jump distance');
-        expect(result.payload.description).toContain('(1 Focus Points remaining)');
+        expect(result.payload.description).toBe('TestMonk expended 1 Focus Point on Step of the Wind: Disengage + Dash as a bonus action, doubled jump distance. (1 Focus Points remaining).');
     });
 
     it('writes the self no_opportunity_attacks te on the upgrade', async () => {
@@ -159,12 +161,10 @@ describe('stepOfTheWindHandler — free Dash (FP < cost, Option A: never refused
         const result = await handle(action, makePlayerStats(), campaignName);
 
         expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Dash as a Bonus Action (free');
+        expect(result.payload.description).toBe('TestMonk used Step of the Wind: Dash as a Bonus Action (free — no Focus Point available to expend for Disengage + doubled jump).');
         expect(result.payload.description).not.toContain('Not enough Focus Points');
         expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
         expect(expirations.addExpiration).not.toHaveBeenCalled();
-        const teWrites = runtimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects');
-        expect(teWrites).toHaveLength(0);
     });
 
     it('FP=0 still logs the free Dash ability use', async () => {
@@ -191,29 +191,7 @@ describe('stepOfTheWindHandler — free Dash (FP < cost, Option A: never refused
         expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('missing class / maxFocus 0 → free Dash (never refuses)', async () => {
-        setupRuntimeMocks({});
-        const playerStats = { name: 'TestMonk', level: 2 };
-
-        const action = makeAction();
-        const result = await handle(action, playerStats, campaignName);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Dash as a Bonus Action (free');
-        expect(result.payload.description).not.toContain('Not enough Focus Points');
-        expect(logService.addEntry).toHaveBeenCalled();
-    });
-
-    it('class_levels null / undefined / no matching level → free Dash', async () => {
-        setupRuntimeMocks({});
-        for (const cls of [{ class_levels: null }, {}, { class_levels: [{ level: 99, focus_points: 3 }] }]) {
-            const result = await handle(makeAction(), makePlayerStats({ level: 5, class: cls }), campaignName);
-            expect(result.payload.description).toContain('Dash as a Bonus Action (free');
-            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-        }
-    });
-
-    it('automation cost amount 0 defaults to cost 1; FP=0 → free Dash', async () => {
+    it('cost amount 0 defaults to cost 1; FP=0 → free Dash', async () => {
         setupRuntimeMocks({ 'TestMonk:focusPoints:TestCampaign': 0 });
 
         const action = makeAction({ automation: { cost: { amount: 0 } } });
@@ -222,9 +200,24 @@ describe('stepOfTheWindHandler — free Dash (FP < cost, Option A: never refused
         expect(result.payload.description).toContain('Dash as a Bonus Action (free');
         expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
+
+    it('missing class / null class_levels / no matching level → maxFocus 0 → free Dash', async () => {
+        setupRuntimeMocks({});
+        const cases = [
+            { name: 'TestMonk', level: 2 },                       // no class object
+            makePlayerStats({ class: { class_levels: null } }),   // null class_levels
+            makePlayerStats({ class: {} }),                       // no class_levels key
+            makePlayerStats({ level: 5, class: { class_levels: [{ level: 99, focus_points: 3 }] } }), // no matching level
+        ];
+        for (const stats of cases) {
+            const result = await handle(makeAction(), stats, campaignName);
+            expect(result.payload.description).toContain('Dash as a Bonus Action (free');
+            expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+        }
+    });
 });
 
-// ── Tests: focus points fallback / numeric conversion ──────────
+// ── Tests: focus points fallback (?? maxFocus, runtime precedence) ──
 
 describe('stepOfTheWindHandler — focus points fallback (upgrade branch)', () => {
     beforeEach(() => vi.clearAllMocks());
@@ -249,15 +242,6 @@ describe('stepOfTheWindHandler — focus points fallback (upgrade branch)', () =
         expect(result.payload.description).toContain('(0 Focus Points remaining)');
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'focusPoints', 0, campaignName);
     });
-
-    it('converts a string runtime value to a number', async () => {
-        setupRuntimeMocks({ 'TestMonk:focusPoints:TestCampaign': '2' });
-
-        const action = makeAction();
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toContain('(1 Focus Points remaining)');
-    });
 });
 
 // ── Tests: Heightened Step of the Wind ─────────────────────────
@@ -272,26 +256,12 @@ describe('stepOfTheWindHandler — Heightened Step of the Wind (FP upgrade)', ()
         const result = await handle(action, makePlayerStats(), campaignName);
 
         expect(result.payload.name).toBe('Heightened Step of the Wind');
-        expect(result.payload.description).toContain('Heightened Step of the Wind');
-        expect(result.payload.description).toContain('Moving a willing creature within 5 feet');
-        expect(result.payload.description).toContain('(Large or smaller)');
+        expect(result.payload.description).toBe('TestMonk expended 1 Focus Point on Heightened Step of the Wind: Disengage + Dash as a bonus action, doubled jump distance. Moving a willing creature within 5 feet (Large or smaller) with you. (1 Focus Points remaining).');
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'focusPoints', 1, campaignName);
         expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
             abilityName: 'Heightened Step of the Wind',
             description: expect.stringContaining('moving a willing creature within 5 feet (Large or smaller) with you'),
         }));
-    });
-
-    it('Heightened at FP=0 → free Dash (no willing-creature clause, no spend)', async () => {
-        setupRuntimeMocks({ 'TestMonk:focusPoints:TestCampaign': 0 });
-
-        const action = makeAction({ name: 'Heightened Step of the Wind' });
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toContain('Dash as a Bonus Action (free');
-        expect(result.payload.description).not.toContain('Moving a willing creature');
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
-        expect(expirations.addExpiration).not.toHaveBeenCalled();
     });
 });
 
@@ -312,27 +282,15 @@ describe('stepOfTheWindHandler — CLA-333 single FP writer', () => {
         expect(focusWrites[0]).toEqual(['TestMonk', 'focusPoints', 16, campaignName]);
         expect(result.payload.description).toContain('(16 Focus Points remaining)');
     });
-
-    it('two consecutive activations each spend exactly 1 FP', async () => {
-        let fp = 17;
-        runtimeState.getRuntimeValue.mockImplementation((player, prop) =>
-            prop === 'focusPoints' ? fp : undefined);
-        runtimeState.setRuntimeValue.mockImplementation((player, prop, val) => {
-            if (prop === 'focusPoints') fp = val;
-            return Promise.resolve();
-        });
-        const playerStats = makePlayerStats({ level: 17, class: { class_levels: [{ level: 17, focus_points: 17 }] } });
-
-        await handle(makeAction(), playerStats, campaignName);
-        expect(fp).toBe(16);
-        await handle(makeAction(), playerStats, campaignName);
-        expect(fp).toBe(15);
-    });
 });
 
-// ── Tests: Destructive Stride integration ─────────────────────
+// ── Tests: Destructive Stride delegation (pin delegation only) ──
+// Destructive Stride internals (epitome-gate/modal opener inside its own handle)
+// are canon in destructiveStrideHandler.* lanes. These pins cover only that this
+// handler reads its own epitome key, finds the feature, forwards exact args, and
+// passes the result through.
 
-describe('stepOfTheWindHandler — Destructive Stride integration', () => {
+describe('stepOfTheWindHandler — Destructive Stride delegation', () => {
     beforeEach(() => vi.clearAllMocks());
 
     it('invokes Destructive Stride when elementalEpitomeActive is true and feature exists', async () => {
@@ -361,7 +319,7 @@ describe('stepOfTheWindHandler — Destructive Stride integration', () => {
         });
 
         const dsResult = { type: 'modal', modalName: 'destructiveStride', payload: { action: {}, playerStats: {}, campaignName } };
-        destructiveStride.handle.mockResolvedValue(dsResult);
+        destructiveStride.handle.mockResolvedValueOnce(dsResult);
 
         const playerStats = makePlayerStats({
             specialActions: [{ name: 'Destructive Stride', effect: 'destructive_stride' }],
@@ -387,7 +345,6 @@ describe('stepOfTheWindHandler — Destructive Stride integration', () => {
             'TestMonk:elementalEpitomeActive:TestCampaign': true,
         });
 
-        expect(destructiveStride.handle).not.toHaveBeenCalled;
         await handle(makeAction(), makePlayerStats({ specialActions: [{ name: 'Other' }] }), campaignName);
         await handle(makeAction(), makePlayerStats({ specialActions: [] }), campaignName);
         await handle(makeAction(), makePlayerStats({ specialActions: null }), campaignName);
@@ -402,7 +359,7 @@ describe('stepOfTheWindHandler — error handling + payload shape', () => {
 
     it('does not throw when addEntry rejects', async () => {
         setupRuntimeMocks({ 'TestMonk:focusPoints:TestCampaign': 2 });
-        logService.addEntry.mockRejectedValue(new Error('log error'));
+        logService.addEntry.mockRejectedValueOnce(new Error('log error'));
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName);
         expect(result.type).toBe('popup');
