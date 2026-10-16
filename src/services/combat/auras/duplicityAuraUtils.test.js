@@ -1,15 +1,16 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
+  getRuntimeValue: vi.fn(() => []),
 }));
 
 vi.mock('../../rules/combat/rangeCheck.js', () => ({
-  isWithinRange: vi.fn(),
+  isWithinRange: vi.fn(async () => false),
 }));
 
 vi.mock('../../rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(),
+  getCombatContext: vi.fn(async () => null),
 }));
 
 import { getDuplicityAdvantageAgainst } from './duplicityAuraUtils.js';
@@ -17,347 +18,138 @@ import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
 
-function makePlayer(name, gridX = 0, gridY = 0) {
-  return { name, gridX, gridY };
+// Duplicity (source semantics): a non-attacker creature holding a 'create_illusion'
+// activeBuff flagged isImprovedDuplicity forces advantage on attackers listed in its
+// 'invokeDuplicityAdvantageTargets' picker list while within 5 ft. Grid lane measures
+// via isWithinRange (names, not coords); skipRangeCheck returns first match unmeasured;
+// with no mapData the candidate list is the awaited combat-summary party, filtered to
+// type 'player' (the only production no-map caller, resolveDuplicityAura, always skips).
+const CAMPAIGN = 'test-campaign';
+
+const grid = (...names) => ({ players: names.map(name => ({ name, gridX: 0, gridY: 0 })) });
+const duplicity = () => ({ effect: 'create_illusion', isImprovedDuplicity: true });
+
+function resetMocks() {
+  getRuntimeValue.mockReset().mockReturnValue([]);
+  isWithinRange.mockReset().mockResolvedValue(false);
+  getCombatContext.mockReset().mockResolvedValue(null);
 }
 
-function makeMapData(players, placedItems = []) {
-  return { players, placedItems };
-}
-
-function makeDuplicityBuff() {
-  return { effect: 'create_illusion', isImprovedDuplicity: true };
-}
-
-function runtimeWith({ buffsByHolder = {}, grantedByHolder = {} }) {
+// Seeds runtime per (name, key); inRange may be a bool or per-source predicate.
+function seed({ buffs = {}, grants = {}, inRange = true } = {}) {
   getRuntimeValue.mockImplementation((name, key) => {
-    if (key === 'activeBuffs') return buffsByHolder[name] || [];
-    if (key === 'invokeDuplicityAdvantageTargets') return grantedByHolder[name] || [];
+    if (key === 'activeBuffs') return name in buffs ? buffs[name] : [];
+    if (key === 'invokeDuplicityAdvantageTargets') return name in grants ? grants[name] : [];
     return [];
   });
+  isWithinRange.mockImplementation(async source =>
+    typeof inRange === 'function' ? inRange(source) : inRange);
 }
 
-describe('getDuplicityAdvantageAgainst', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getRuntimeValue.mockReset();
-    isWithinRange.mockReset();
-    getCombatContext.mockReset();
-    getRuntimeValue.mockImplementation(() => []);
-    isWithinRange.mockResolvedValue(true);
-    getCombatContext.mockResolvedValue(null);
-  });
+describe('getDuplicityAdvantageAgainst — grid lane', () => {
+  beforeEach(resetMocks);
 
-  it('returns false when mapData is undefined and no combat summary exists', async () => {
-    getCombatContext.mockResolvedValue(null);
-    const result = await getDuplicityAdvantageAgainst({ attackerName: 'A', campaignName: 'C', mapData: undefined });
-    expect(result).toEqual({ advantage: false });
-  });
+  it('forces advantage for a granted ally within 5 ft of the buff holder', async () => {
+    seed({ buffs: { Cleric: [duplicity()] }, grants: { Cleric: ['Attacker'] } });
 
-  it('returns false when mapData is null and combat summary has no players', async () => {
-    getCombatContext.mockResolvedValue({ creatures: [] });
-    const result = await getDuplicityAdvantageAgainst({ attackerName: 'A', campaignName: 'C', mapData: null });
-    expect(result).toEqual({ advantage: false });
-  });
-
-  it('returns false when mapData.players is missing or empty', async () => {
-    expect(await getDuplicityAdvantageAgainst({ attackerName: 'A', campaignName: 'C', mapData: {} })).toEqual({ advantage: false });
-    expect(await getDuplicityAdvantageAgainst({ attackerName: 'A', campaignName: 'C', mapData: makeMapData([]) })).toEqual({ advantage: false });
-  });
-
-  it('returns false when no player has Improved Duplicity', async () => {
-    runtimeWith({ buffsByHolder: {}, grantedByHolder: { Cleric: ['Attacker'] } });
-
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Cleric')]),
-    });
-    expect(result).toEqual({ advantage: false });
-  });
-
-  it('returns advantage when a granted ally attacks and the buff holder is in range', async () => {
-    runtimeWith({
-      buffsByHolder: { Cleric: [makeDuplicityBuff()] },
-      grantedByHolder: { Cleric: ['Attacker'] },
-    });
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Cleric')]),
-    });
-    expect(result).toEqual({ advantage: true, source: 'Cleric' });
-  });
-
-  it('returns false when the attacker is NOT on the picker-granted list', async () => {
-    runtimeWith({
-      buffsByHolder: { Cleric: [makeDuplicityBuff()] },
-      grantedByHolder: { Cleric: ['War_Cleric'] },
-    });
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Cleric')]),
-    });
-    expect(result).toEqual({ advantage: false });
-  });
-
-  it('returns false when the granted list is empty even with the buff active', async () => {
-    runtimeWith({
-      buffsByHolder: { Cleric: [makeDuplicityBuff()] },
-      grantedByHolder: { Cleric: [] },
-    });
-
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Cleric')]),
-    });
-    expect(result).toEqual({ advantage: false });
-  });
-
-  it('reads the granted list with the campaignName', async () => {
-    runtimeWith({
-      buffsByHolder: { Cleric: [makeDuplicityBuff()] },
-      grantedByHolder: { Cleric: ['Attacker'] },
-    });
-
-    await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'MyCampaign',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Cleric')]),
-    });
-    expect(getRuntimeValue).toHaveBeenCalledWith('Cleric', 'invokeDuplicityAdvantageTargets', 'MyCampaign');
-  });
-
-  it('skips the attacker even if they have Improved Duplicity and listed themselves', async () => {
-    runtimeWith({
-      buffsByHolder: { Attacker: [makeDuplicityBuff()] },
-      grantedByHolder: { Attacker: ['Attacker'] },
-    });
-
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([makePlayer('Attacker')]),
-    });
-    expect(result).toEqual({ advantage: false });
-  });
-
-  it('ignores a buff that has create_illusion but NOT isImprovedDuplicity', async () => {
-    runtimeWith({
-      buffsByHolder: { Cleric: [{ effect: 'create_illusion' }] },
-      grantedByHolder: { Cleric: ['Attacker'] },
-    });
-
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Cleric')]),
-    });
-    expect(result).toEqual({ advantage: false });
-  });
-
-  it('handles invalid buff types gracefully', async () => {
-    getRuntimeValue
-      .mockReturnValueOnce(null)
-      .mockReturnValueOnce(undefined)
-      .mockReturnValueOnce('not-an-array')
-      .mockReturnValueOnce(42)
-      .mockReturnValueOnce([makeDuplicityBuff()])
-      .mockReturnValueOnce(undefined);
-
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([
-        makePlayer('P1'), makePlayer('P2'), makePlayer('P3'), makePlayer('P4'), makePlayer('P5'),
-      ]),
-    });
-    expect(result).toEqual({ advantage: false });
-  });
-
-  it('handles a non-array granted list gracefully', async () => {
-    runtimeWith({
-      buffsByHolder: { Cleric: [makeDuplicityBuff()] },
-      grantedByHolder: { Cleric: 'not-an-array' },
-    });
-
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Cleric')]),
-    });
-    expect(result).toEqual({ advantage: false });
-  });
-
-  it('returns false when Improved Duplicity is out of range', async () => {
-    runtimeWith({
-      buffsByHolder: { Cleric: [makeDuplicityBuff()] },
-      grantedByHolder: { Cleric: ['Attacker'] },
-    });
-    isWithinRange.mockResolvedValue(false);
-
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Cleric')]),
-    });
-    expect(result).toEqual({ advantage: false });
-  });
-
-  it('iterates players until finding one with Improved Duplicity granting to the attacker', async () => {
-    runtimeWith({
-      buffsByHolder: { Cleric2: [makeDuplicityBuff()] },
-      grantedByHolder: { Cleric2: ['Attacker'] },
-    });
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([makePlayer('Cleric1'), makePlayer('Cleric2'), makePlayer('Attacker')]),
-    });
-    expect(result).toEqual({ advantage: true, source: 'Cleric2' });
-  });
-
-  it('calls isWithinRange with 5 ft range', async () => {
-    runtimeWith({
-      buffsByHolder: { Cleric: [makeDuplicityBuff()] },
-      grantedByHolder: { Cleric: ['Attacker'] },
-    });
-    isWithinRange.mockResolvedValue(true);
-
-    await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'MyCampaign',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Cleric')]),
-    });
+    expect(await getDuplicityAdvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData: grid('Attacker', 'Cleric') }))
+      .toEqual({ advantage: true, source: 'Cleric' });
+    expect(getRuntimeValue).toHaveBeenCalledWith('Cleric', 'invokeDuplicityAdvantageTargets', CAMPAIGN);
     expect(isWithinRange).toHaveBeenCalledWith('Cleric', 'Attacker', 5);
+    expect(getCombatContext).not.toHaveBeenCalled();
   });
 
-  it('skips the range check when skipRangeCheck is true', async () => {
-    runtimeWith({
-      buffsByHolder: { Cleric: [makeDuplicityBuff()] },
-      grantedByHolder: { Cleric: ['Attacker'] },
+  it.each([
+    ['attacker is the holder and self-granted', { buffs: { Attacker: [duplicity()] }, grants: { Attacker: ['Attacker'] } }],
+    ['create_illusion without isImprovedDuplicity flag', { buffs: { Cleric: [{ effect: 'create_illusion' }] }, grants: { Cleric: ['Attacker'] } }],
+    ['isImprovedDuplicity flag without create_illusion effect', { buffs: { Cleric: [{ effect: 'mirror_image', isImprovedDuplicity: true }] }, grants: { Cleric: ['Attacker'] } }],
+    ['granted list present but no buff held', { grants: { Cleric: ['Attacker'] } }],
+    ['buff held but granted list empty', { buffs: { Cleric: [duplicity()] } }],
+    ['attacker absent from granted list', { buffs: { Cleric: [duplicity()] }, grants: { Cleric: ['War_Cleric'] } }],
+    ['granted list is a non-array', { buffs: { Cleric: [duplicity()] }, grants: { Cleric: 'not-an-array' } }],
+    ['granting holder out of 5 ft range', { buffs: { Cleric: [duplicity()] }, grants: { Cleric: ['Attacker'] }, inRange: false }],
+    ['solo attacker grid', {}, grid('Attacker')],
+    ['empty grid never falls back to the combat context', {}, { players: [], placedItems: [] }],
+  ])('%s → no advantage', async (_label, setup, mapData = grid('Attacker', 'Cleric')) => {
+    seed(setup);
+
+    expect(await getDuplicityAdvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData }))
+      .toEqual({ advantage: false });
+    expect(getCombatContext).not.toHaveBeenCalled();
+  });
+
+  it('skips garbage buffs and out-of-range holders until the first valid in-range source', async () => {
+    seed({
+      buffs: { P1: 'not-an-array', P2: null, Stale: [{ effect: 'create_illusion' }], Cleric: [duplicity()] },
+      grants: { Stale: ['Attacker'], Cleric: ['Attacker'] },
+      inRange: source => source === 'Cleric',
     });
 
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Cleric')]),
-      skipRangeCheck: true,
-    });
-    expect(result).toEqual({ advantage: true, source: 'Cleric' });
+    expect(await getDuplicityAdvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData: grid('Attacker', 'P1', 'P2', 'Stale', 'Cleric') }))
+      .toEqual({ advantage: true, source: 'Cleric' });
+  });
+
+  it('skipRangeCheck grants the first matching holder without measuring range', async () => {
+    seed({ buffs: { Cleric: [duplicity()] }, grants: { Cleric: ['Attacker'] }, inRange: false });
+
+    expect(await getDuplicityAdvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData: grid('Attacker', 'Cleric'), skipRangeCheck: true }))
+      .toEqual({ advantage: true, source: 'Cleric' });
     expect(isWithinRange).not.toHaveBeenCalled();
   });
 
-  it('returns false when only the attacker exists in mapData', async () => {
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([makePlayer('Attacker')]),
+  it('appends placedItems as candidates, deduped against players but not against each other (quirk)', async () => {
+    seed({
+      buffs: { Cleric: [duplicity()], Illusion: [duplicity()], Sprite: [duplicity()] },
+      grants: { Cleric: ['Attacker'], Illusion: ['Attacker'], Sprite: ['Attacker'] },
+      inRange: source => source === 'Sprite',
     });
-    expect(result).toEqual({ advantage: false });
-  });
-
-  it('combines players and placedItems into allCreatures', async () => {
-    runtimeWith({
-      buffsByHolder: { Illusion: [makeDuplicityBuff()] },
-      grantedByHolder: { Illusion: ['Attacker'] },
-    });
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([], [
-        { name: 'Illusion', gridX: 3, gridY: 4 },
-      ]),
-    });
-    expect(result).toEqual({ advantage: true, source: 'Illusion' });
-  });
-
-  it('skips duplicate placedItems that share a name with a player', async () => {
-    runtimeWith({
-      buffsByHolder: { Cleric: [makeDuplicityBuff()] },
-      grantedByHolder: { Cleric: ['Attacker'] },
-    });
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData(
-        [makePlayer('Cleric')],
-        [{ name: 'Cleric', gridX: 1, gridY: 1 }],
-      ),
-    });
-    expect(result).toEqual({ advantage: true, source: 'Cleric' });
-  });
-
-  it('falls back to the combat summary party when mapData is missing (no-map mode)', async () => {
-    getCombatContext.mockResolvedValue({
-      creatures: [
-        { name: 'Divine_Cleric', type: 'player' },
-        { name: 'War_Cleric', type: 'player' },
-        { name: 'Wight 1', type: 'npc' },
+    const mapData = {
+      players: [{ name: 'Attacker' }, { name: 'Cleric' }],
+      placedItems: [
+        { name: 'Cleric', gridX: 9, gridY: 9 },
+        { name: 'Illusion', gridX: 2, gridY: 2 },
+        { name: 'Illusion', gridX: 4, gridY: 4 },
+        { name: 'Sprite', gridX: 1, gridY: 1 },
       ],
-    });
-    runtimeWith({
-      buffsByHolder: { Divine_Cleric: [makeDuplicityBuff()] },
-      grantedByHolder: { Divine_Cleric: ['War_Cleric'] },
-    });
+    };
 
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'War_Cleric',
-      campaignName: 'test-campaign',
-      skipRangeCheck: true,
-    });
-    expect(result).toEqual({ advantage: true, source: 'Divine_Cleric' });
+    expect(await getDuplicityAdvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData }))
+      .toEqual({ advantage: true, source: 'Sprite' });
+    const buffChecks = name => getRuntimeValue.mock.calls.filter(([n, k]) => n === name && k === 'activeBuffs').length;
+    expect(buffChecks('Cleric')).toBe(1);
+    expect(buffChecks('Illusion')).toBe(2);
+  });
+});
+
+describe('getDuplicityAdvantageAgainst — gridless combat-context lane (skipRangeCheck)', () => {
+  beforeEach(resetMocks);
+
+  const party = [
+    { name: 'Divine_Cleric', type: 'player' },
+    { name: 'War_Cleric', type: 'player' },
+    { name: 'Wight 1', type: 'npc' },
+  ];
+
+  it('pulls the party from the awaited combat context and grants a listed ally', async () => {
+    getCombatContext.mockResolvedValue({ creatures: party });
+    seed({ buffs: { Divine_Cleric: [duplicity()] }, grants: { Divine_Cleric: ['War_Cleric'] } });
+
+    expect(await getDuplicityAdvantageAgainst({ attackerName: 'War_Cleric', campaignName: CAMPAIGN, skipRangeCheck: true }))
+      .toEqual({ advantage: true, source: 'Divine_Cleric' });
+    expect(getCombatContext).toHaveBeenCalledWith(CAMPAIGN);
+    expect(isWithinRange).not.toHaveBeenCalled();
   });
 
-  it('returns false in no-map mode when the granted ally is not on the list', async () => {
-    getCombatContext.mockResolvedValue({
-      creatures: [
-        { name: 'Divine_Cleric', type: 'player' },
-        { name: 'War_Cleric', type: 'player' },
-      ],
-    });
-    runtimeWith({
-      buffsByHolder: { Divine_Cleric: [makeDuplicityBuff()] },
-      grantedByHolder: { Divine_Cleric: [] },
-    });
+  it.each([
+    ['no combat context available', null, {}, {}],
+    ['buff held only by an NPC (party filtered to players)', { creatures: party }, { buffs: { 'Wight 1': [duplicity()] } }, { grants: { 'Wight 1': ['War_Cleric'] } }],
+    ['player holder with no granted targets', { creatures: party }, { buffs: { Divine_Cleric: [duplicity()] } }, {}],
+  ])('%s → no advantage', async (_label, summary, buffs, grants) => {
+    getCombatContext.mockResolvedValue(summary);
+    seed({ ...buffs, ...grants });
 
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'War_Cleric',
-      campaignName: 'test-campaign',
-      skipRangeCheck: true,
-    });
-    expect(result).toEqual({ advantage: false });
-  });
-
-  it('ignores non-player creatures when falling back to the combat summary', async () => {
-    getCombatContext.mockResolvedValue({
-      creatures: [
-        { name: 'Divine_Cleric', type: 'player' },
-        { name: 'Wight 1', type: 'npc' },
-      ],
-    });
-    runtimeWith({
-      buffsByHolder: { Wight: [makeDuplicityBuff()] },
-      grantedByHolder: { Wight: ['War_Cleric'] },
-    });
-
-    const result = await getDuplicityAdvantageAgainst({
-      attackerName: 'War_Cleric',
-      campaignName: 'test-campaign',
-      skipRangeCheck: true,
-    });
-    expect(result).toEqual({ advantage: false });
+    expect(await getDuplicityAdvantageAgainst({ attackerName: 'War_Cleric', campaignName: CAMPAIGN, skipRangeCheck: true }))
+      .toEqual({ advantage: false });
+    expect(isWithinRange).not.toHaveBeenCalled();
   });
 });

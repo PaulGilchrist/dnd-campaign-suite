@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -12,8 +13,10 @@ vi.mock('../../rules/combat/rangeCheck.js', () => ({
   isWithinRange: vi.fn(),
 }));
 
+// Delegation-only mock: getAuraRangeFromStats internals are owned by
+// auraOfProtection.test.js — here we only pin that its output is forwarded.
 vi.mock('./auraOfProtection.js', () => ({
-  getAuraRangeFromStats: vi.fn(() => 10),
+  getAuraRangeFromStats: vi.fn(),
 }));
 
 import { getElderChampionSaveDisadvantage } from './elderChampionAuraUtils.js';
@@ -22,168 +25,93 @@ import { getAllyList } from '../../../hooks/useAllySelection.js';
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { getAuraRangeFromStats } from './auraOfProtection.js';
 
+const BASE = { attackerName: 'ElderChampion', attackerStats: {}, targetName: 'Enemy' };
+
 describe('getElderChampionSaveDisadvantage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    getRuntimeValue.mockReset();
-    getAllyList.mockReset();
-    isWithinRange.mockReset();
-    getAuraRangeFromStats.mockReset();
+    vi.resetAllMocks();
+    getAuraRangeFromStats.mockReturnValue(10);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
-  it('returns { disadvantage: false } when attackerStats is null', async () => {
-    const result = await getElderChampionSaveDisadvantage({
-      attackerName: 'ElderChampion',
-      attackerStats: null,
-      targetName: 'Target',
-    });
-    expect(result).toEqual({ disadvantage: false });
-    expect(getRuntimeValue).not.toHaveBeenCalled();
-    expect(getAllyList).not.toHaveBeenCalled();
-    expect(isWithinRange).not.toHaveBeenCalled();
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it('returns { disadvantage: false } when attackerStats is undefined', async () => {
-    const result = await getElderChampionSaveDisadvantage({
-      attackerName: 'ElderChampion',
-      attackerStats: undefined,
-      targetName: 'Target',
-    });
-    expect(result).toEqual({ disadvantage: false });
-    expect(getRuntimeValue).not.toHaveBeenCalled();
-  });
+  it.each([null, undefined])(
+    'short-circuits before any lookup when attackerStats is %p',
+    async (attackerStats) => {
+      const result = await getElderChampionSaveDisadvantage({ ...BASE, attackerStats });
 
-  it('returns { disadvantage: false } when elderChampionActive is not set on attacker', async () => {
-    getRuntimeValue.mockReturnValue(false);
+      expect(result).toEqual({ disadvantage: false });
+      expect(getRuntimeValue).not.toHaveBeenCalled();
+      expect(getAllyList).not.toHaveBeenCalled();
+      expect(isWithinRange).not.toHaveBeenCalled();
+    }
+  );
 
-    const result = await getElderChampionSaveDisadvantage({
-      attackerName: 'ElderChampion',
-      attackerStats: {},
-      targetName: 'Target',
-    });
+  it.each([false, null, undefined])(
+    'short-circuits at the aura gate when elderChampionActive is %p',
+    async (active) => {
+      getRuntimeValue.mockReturnValue(active);
 
-    expect(result).toEqual({ disadvantage: false });
-    expect(getRuntimeValue).toHaveBeenCalledWith('ElderChampion', 'elderChampionActive');
-    expect(getAllyList).not.toHaveBeenCalled();
-    expect(isWithinRange).not.toHaveBeenCalled();
-  });
+      const result = await getElderChampionSaveDisadvantage(BASE);
 
-  it('returns { disadvantage: false } when elderChampionActive is null', async () => {
-    getRuntimeValue.mockReturnValue(null);
+      expect(result).toEqual({ disadvantage: false });
+      expect(getRuntimeValue).toHaveBeenCalledWith('ElderChampion', 'elderChampionActive');
+      expect(getAllyList).not.toHaveBeenCalled();
+      expect(isWithinRange).not.toHaveBeenCalled();
+    }
+  );
 
-    const result = await getElderChampionSaveDisadvantage({
-      attackerName: 'ElderChampion',
-      attackerStats: {},
-      targetName: 'Target',
-    });
-
-    expect(result).toEqual({ disadvantage: false });
-    expect(getRuntimeValue).toHaveBeenCalledWith('ElderChampion', 'elderChampionActive');
-  });
-
-  it('returns { disadvantage: false } when target is in attacker\'s ally list', async () => {
+  it('spares targets in the attacker ally list without a range check', async () => {
     getRuntimeValue.mockReturnValue(true);
-    getAllyList.mockReturnValue(['Ally1', 'Target', 'Ally2']);
+    getAllyList.mockReturnValue(['Ally1', 'Enemy', 'Ally2']);
 
-    const result = await getElderChampionSaveDisadvantage({
-      attackerName: 'ElderChampion',
-      attackerStats: {},
-      targetName: 'Target',
-    });
+    const result = await getElderChampionSaveDisadvantage(BASE);
 
     expect(result).toEqual({ disadvantage: false });
-    expect(getRuntimeValue).toHaveBeenCalledWith('ElderChampion', 'elderChampionActive');
     expect(getAllyList).toHaveBeenCalledWith('ElderChampion');
+    expect(getAuraRangeFromStats).not.toHaveBeenCalled();
     expect(isWithinRange).not.toHaveBeenCalled();
   });
 
-  it('returns { disadvantage: false } when target is not in ally list but is an enemy', async () => {
+  it.each([true, 'yes'])(
+    'gives out-of-range enemies disadvantage when gate is %p, forwarding the aura range',
+    async (active) => {
+      getRuntimeValue.mockReturnValue(active);
+      getAllyList.mockReturnValue(['Ally1']);
+      getAuraRangeFromStats.mockReturnValue(30);
+      isWithinRange.mockResolvedValue(true);
+
+      const result = await getElderChampionSaveDisadvantage(BASE);
+
+      expect(result).toEqual({ disadvantage: true, source: 'ElderChampion' });
+      expect(getAuraRangeFromStats).toHaveBeenCalledWith(BASE.attackerStats);
+      expect(isWithinRange).toHaveBeenCalledWith('ElderChampion', 'Enemy', 30);
+    }
+  );
+
+  it('returns no disadvantage when the target is outside the aura range', async () => {
     getRuntimeValue.mockReturnValue(true);
-    getAllyList.mockReturnValue(['Ally1', 'Ally2']);
+    getAllyList.mockReturnValue(['Ally1']);
     isWithinRange.mockResolvedValue(false);
 
-    const result = await getElderChampionSaveDisadvantage({
-      attackerName: 'ElderChampion',
-      attackerStats: {},
-      targetName: 'Enemy',
-    });
+    const result = await getElderChampionSaveDisadvantage(BASE);
 
     expect(result).toEqual({ disadvantage: false });
-    expect(getAllyList).toHaveBeenCalledWith('ElderChampion');
     expect(isWithinRange).toHaveBeenCalledWith('ElderChampion', 'Enemy', 10);
   });
 
-  it('returns { disadvantage: true, source: attackerName } when target is outside ally list and in range', async () => {
-    getRuntimeValue.mockReturnValue(true);
-    getAllyList.mockReturnValue(['Ally1', 'Ally2']);
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getElderChampionSaveDisadvantage({
-      attackerName: 'ElderChampion',
-      attackerStats: {},
-      targetName: 'Enemy',
-    });
-
-    expect(result).toEqual({ disadvantage: true, source: 'ElderChampion' });
-    expect(getAllyList).toHaveBeenCalledWith('ElderChampion');
-    expect(isWithinRange).toHaveBeenCalledWith('ElderChampion', 'Enemy', 10);
-  });
-
-  it('passes the aura range from getAuraRangeFromStats to isWithinRange', async () => {
-    getRuntimeValue.mockReturnValue(true);
-    getAllyList.mockReturnValue([]);
-    getAuraRangeFromStats.mockReturnValue(30);
-    isWithinRange.mockResolvedValue(true);
-
-    await getElderChampionSaveDisadvantage({
-      attackerName: 'ElderChampion',
-      attackerStats: { auraRange: 30 },
-      targetName: 'Enemy',
-    });
-
-    expect(getAuraRangeFromStats).toHaveBeenCalledWith({ auraRange: 30 });
-    expect(isWithinRange).toHaveBeenCalledWith('ElderChampion', 'Enemy', 30);
-  });
-
-  it('returns { disadvantage: false } when isWithinRange throws an error', async () => {
+  it('falls back to no disadvantage instead of throwing when the range check fails', async () => {
     getRuntimeValue.mockReturnValue(true);
     getAllyList.mockReturnValue([]);
     isWithinRange.mockRejectedValue(new Error('map load failed'));
 
-    const result = await getElderChampionSaveDisadvantage({
-      attackerName: 'ElderChampion',
-      attackerStats: {},
-      targetName: 'Enemy',
-    });
+    const result = await getElderChampionSaveDisadvantage(BASE);
 
     expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('returns { disadvantage: false } when isWithinRange returns false', async () => {
-    getRuntimeValue.mockReturnValue(true);
-    getAllyList.mockReturnValue([]);
-    isWithinRange.mockResolvedValue(false);
-
-    const result = await getElderChampionSaveDisadvantage({
-      attackerName: 'ElderChampion',
-      attackerStats: {},
-      targetName: 'DistantEnemy',
-    });
-
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('works with elderChampionActive set to truthy non-boolean', async () => {
-    getRuntimeValue.mockReturnValue('yes');
-    getAllyList.mockReturnValue([]);
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getElderChampionSaveDisadvantage({
-      attackerName: 'ElderChampion',
-      attackerStats: {},
-      targetName: 'Enemy',
-    });
-
-    expect(result).toEqual({ disadvantage: true, source: 'ElderChampion' });
+    expect(console.warn).toHaveBeenCalled();
   });
 });
+

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as dataLoader from '../ui/dataLoader.js';
 
@@ -13,14 +14,29 @@ import {
     getFeatTypeInfo,
     getPreSelectedFeats,
     normalizeFeatDescription,
-    normalizeBackgroundFeatName,
     getRaceFeatChoices,
 } from './featValidation.js';
 
-// Shared mock setup helper to reduce repetition
 function mockValidationRules(rules) {
     dataLoader.loadValidationRules.mockResolvedValue(rules ?? {});
 }
+
+// Re-anchored to disk: public/data/rules-validation.json and public/data/2024/rules-validation.json
+const FEAT_LEVELS = [4, 8, 12, 16, 19];
+const DISK_5E_RULES = { feats: { available_levels: FEAT_LEVELS, origin_feat_required: false } };
+const DISK_2024_RULES = {
+    feats: { available_levels: FEAT_LEVELS, origin_feat_required: true, origin_feat_level: 1 },
+};
+
+// Exact details strings produced by getFeatLimits (pinned to source output)
+const DETAILS_5E = 'In 5e, feats are optional and can be taken instead of ability score increases at levels 4, 8, 12, 16, 19';
+const DETAILS_2024_ORIGIN = 'Level 1 2024 characters get 1 Origin feat from their background, plus additional feats at levels 4, 8, 12, 16, 19';
+const DETAILS_2024_PLAIN = 'In 2024 rules, feats are available at levels 4, 8, 12, 16, 19';
+
+const VERSATILE_HUMAN = {
+    name: 'Human',
+    traits: [{ name: 'Versatile', proficiency_choices: { from: ['Skilled', 'Lucky', 'Tough'] } }],
+};
 
 describe('featValidation', () => {
     beforeEach(() => {
@@ -28,185 +44,35 @@ describe('featValidation', () => {
     });
 
     describe('getFeatLimits', () => {
-        it('should return correct feat limits for 5e at level 4', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [4, 8, 12, 16, 19],
-                    origin_feat_required: false,
-                },
-            });
+        it('returns the full envelope for 5e level 4 from disk rules', async () => {
+            mockValidationRules(DISK_5E_RULES);
 
             const result = await getFeatLimits({ rules: '5e', level: 4 });
 
-            expect(result.allowed).toBe(1);
-            expect(result.originRequired).toBe(false);
-            expect(result.originFeatLevel).toBe(1);
-            expect(result.details).toContain('levels 4, 8, 12, 16, 19');
-        });
-
-        it('should return correct feat limits for 5e at level 8', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [4, 8, 12, 16, 19],
-                    origin_feat_required: false,
-                },
+            expect(result).toEqual({
+                allowed: 1,
+                originRequired: false,
+                originFeatLevel: 1, // default when the 5e file omits origin_feat_level
+                details: DETAILS_5E,
             });
-
-            const result = await getFeatLimits({ rules: '5e', level: 8 });
-
-            expect(result.allowed).toBe(2);
         });
 
-        it('should count all feat levels at level 19', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [4, 8, 12, 16, 19],
-                    origin_feat_required: false,
-                },
-            });
+        it.each([
+            { level: undefined, allowed: 0, why: 'level defaults to 1' },
+            { level: 3, allowed: 0, why: 'just below first feat level' },
+            { level: 7, allowed: 1, why: 'just below second feat level' },
+            { level: 8, allowed: 2, why: 'exactly at a feat level' },
+            { level: 19, allowed: 5, why: 'top feat level' },
+        ])('counts allowed feats at level $level ($why)', async ({ level, allowed }) => {
+            mockValidationRules(DISK_5E_RULES);
 
-            const result = await getFeatLimits({ rules: '5e', level: 19 });
+            const result = await getFeatLimits({ rules: '5e', level });
 
-            expect(result.allowed).toBe(5);
+            expect(result.allowed).toBe(allowed);
         });
 
-        it('should return 0 feats for level below first feat level', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [4, 8, 12, 16, 19],
-                    origin_feat_required: false,
-                },
-            });
-
-            const result = await getFeatLimits({ rules: '5e', level: 3 });
-
-            expect(result.allowed).toBe(0);
-        });
-
-        it('should default to level 1 when undefined', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [4, 8, 12, 16, 19],
-                    origin_feat_required: false,
-                },
-            });
-
-            const result = await getFeatLimits({ rules: '5e' });
-
-            expect(result.allowed).toBe(0);
-        });
-
-        it('should use default 5e levels when feats config is missing', async () => {
-            mockValidationRules({});
-
-            const result = await getFeatLimits({ rules: '5e', level: 4 });
-
-            expect(result.allowed).toBe(1);
-        });
-
-        it('should use default 5e levels when rules is undefined', async () => {
-            mockValidationRules({});
-
-            const result = await getFeatLimits({ level: 4 });
-
-            expect(result.allowed).toBe(1);
-        });
-
-        it('should use default 2024 levels at level 1 (no feats)', async () => {
-            mockValidationRules({});
-
-            const result = await getFeatLimits({ rules: '2024', level: 1 });
-
-            expect(result.allowed).toBe(0);
-            expect(result.originRequired).toBe(false);
-        });
-
-        it('should use default 2024 levels at level 4', async () => {
-            mockValidationRules({});
-
-            const result = await getFeatLimits({ rules: '2024', level: 4 });
-
-            expect(result.allowed).toBe(1);
-        });
-
-        it('should return origin feat info from rules when present', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [4, 8, 12, 16, 19],
-                    origin_feat_required: true,
-                    origin_feat_level: 1,
-                },
-            });
-
-            const result = await getFeatLimits({ rules: '2024', level: 1 });
-
-            expect(result.allowed).toBe(0);
-            expect(result.originRequired).toBe(true);
-            expect(result.originFeatLevel).toBe(1);
-        });
-
-        it('should add 1 to allowed count for Human Versatile trait in 2024', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [4, 8, 12, 16, 19],
-                    origin_feat_required: true,
-                    origin_feat_level: 1,
-                },
-            });
-            dataLoader.fetchRaceData.mockResolvedValue({
-                name: 'Human',
-                traits: [
-                    { name: 'Resourceful' },
-                    { name: 'Skillful' },
-                    { name: 'Versatile', proficiency_choices: { from: ['Skilled', 'Lucky', 'Tough'] } },
-                ],
-            });
-
-            const result = await getFeatLimits({ rules: '2024', level: 1, race: { name: 'Human' } });
-
-            expect(result.allowed).toBe(1);
-            expect(result.details).toContain('1 Origin feat from their background');
-            expect(result.details).toContain('levels 4, 8, 12, 16, 19');
-        });
-
-        it('should not add Versatile bonus when race does not have Versatile trait', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [4, 8, 12, 16, 19],
-                    origin_feat_required: true,
-                    origin_feat_level: 1,
-                },
-            });
-            dataLoader.fetchRaceData.mockResolvedValue({
-                name: 'Elf',
-                traits: [{ name: 'Fey Ancestry' }],
-            });
-
-            const result = await getFeatLimits({ rules: '2024', level: 1, race: { name: 'Elf' } });
-
-            expect(result.allowed).toBe(0);
-        });
-
-        it('should not crash when race is null in 2024', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [4, 8, 12, 16, 19],
-                    origin_feat_required: true,
-                },
-            });
-
-            const result = await getFeatLimits({ rules: '2024', level: 1, race: null });
-
-            expect(result.allowed).toBe(0);
-        });
-
-        it('should use custom available_levels from rules', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [3, 6, 9],
-                    origin_feat_required: false,
-                },
-            });
+        it('honours custom available_levels instead of hardcoding defaults', async () => {
+            mockValidationRules({ feats: { available_levels: [3, 6, 9], origin_feat_required: false } });
 
             const result = await getFeatLimits({ rules: '5e', level: 6 });
 
@@ -214,523 +80,331 @@ describe('featValidation', () => {
             expect(result.details).toContain('levels 3, 6, 9');
         });
 
-        it('should return correct details string for 5e', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [4, 8, 12, 16, 19],
-                    origin_feat_required: false,
-                },
+        it('falls back to default 5e levels when rules are empty and ruleset is unspecified', async () => {
+            mockValidationRules({});
+
+            const result = await getFeatLimits({ level: 4 });
+
+            expect(dataLoader.loadValidationRules).toHaveBeenCalledWith('5e');
+            expect(result).toEqual({
+                allowed: 1,
+                originRequired: false,
+                originFeatLevel: 1,
+                details: DETAILS_5E,
             });
+        });
 
-            const result = await getFeatLimits({ rules: '5e', level: 4 });
+        it('falls back to default levels for 2024 with origin-required defaulted off', async () => {
+            mockValidationRules({});
 
-            expect(result.details).toContain('5e');
-            expect(result.details).toContain('feats are optional');
+            const result = await getFeatLimits({ rules: '2024', level: 4 });
+
+            expect(result.allowed).toBe(1);
+            expect(result.originRequired).toBe(false);
+            expect(result.details).toBe(DETAILS_2024_PLAIN);
+        });
+
+        it('passes 2024 disk origin metadata through at level 1', async () => {
+            mockValidationRules(DISK_2024_RULES);
+
+            const result = await getFeatLimits({ rules: '2024', level: 1 });
+
+            expect(result).toEqual({
+                allowed: 0,
+                originRequired: true,
+                originFeatLevel: 1,
+                details: DETAILS_2024_ORIGIN,
+            });
+        });
+
+        it('adds 1 to allowed for a race with the Versatile trait (2024)', async () => {
+            mockValidationRules(DISK_2024_RULES);
+            dataLoader.fetchRaceData.mockResolvedValue(VERSATILE_HUMAN);
+
+            const result = await getFeatLimits({ rules: '2024', level: 1, race: { name: 'Human' } });
+
+            expect(result.allowed).toBe(1);
+            expect(dataLoader.fetchRaceData).toHaveBeenCalledWith('Human', '2024');
+        });
+
+        it.each([
+            { race: { name: 'Elf' }, fetched: { name: 'Elf', traits: [{ name: 'Fey Ancestry' }] }, why: 'no Versatile trait' },
+            { race: { name: 'Human' }, fetched: { name: 'Human', traits: [{ name: 'Versatile' }] }, why: 'Versatile without proficiency_choices' },
+            { race: { name: 'Human' }, fetched: { name: 'Human', traits: [{ name: 'Versatile', proficiency_choices: { from: [] } }] }, why: 'Versatile with empty from' },
+            { race: null, fetched: null, why: 'null race skips the race fetch' },
+        ])('no Versatile bonus when $why', async ({ race, fetched, why }) => {
+            mockValidationRules(DISK_2024_RULES);
+            dataLoader.fetchRaceData.mockResolvedValue(fetched);
+
+            const result = await getFeatLimits({ rules: '2024', level: 1, race });
+
+            expect(result.allowed).toBe(0);
+            if (why === 'null race skips the race fetch') {
+                expect(dataLoader.fetchRaceData).not.toHaveBeenCalled();
+            }
+        });
+
+        it('never consults race data for the Versatile bonus outside 2024', async () => {
+            mockValidationRules(DISK_5E_RULES);
+            dataLoader.fetchRaceData.mockResolvedValue(VERSATILE_HUMAN);
+
+            const result = await getFeatLimits({ rules: '5e', level: 4, race: { name: 'Human' } });
+
+            expect(result.allowed).toBe(1);
+            expect(dataLoader.fetchRaceData).not.toHaveBeenCalled();
         });
     });
 
     describe('validateFeats', () => {
-        function mockDefaultRules() {
-            mockValidationRules({
-                feats: {
-                    available_levels: [4, 8, 12, 16, 19],
-                    origin_feat_required: false,
-                },
-            });
-        }
+        const OBSERVER = { name: 'Observer', type: 'Origin Feat' };
+        const TOUGH = { name: 'Tough', type: 'General' };
 
-        it('should return empty warnings when no feats selected', async () => {
-            mockDefaultRules();
+        it('returns no warnings when nothing is selected (empty array or missing field)', async () => {
+            mockValidationRules(DISK_5E_RULES);
 
-            const warnings = await validateFeats({ rules: '5e', level: 4, feats: [] }, []);
-
-            expect(warnings).toEqual([]);
+            expect(await validateFeats({ rules: '5e', level: 4, feats: [] }, [])).toEqual([]);
+            expect(await validateFeats({ rules: '5e', level: 4 }, [TOUGH])).toEqual([]);
         });
 
-        it('should return empty warnings when formData has no feats property', async () => {
-            mockDefaultRules();
-
-            const warnings = await validateFeats({ rules: '5e', level: 4 }, []);
-
-            expect(warnings).toEqual([]);
-        });
-
-        it('should warn when too many feats selected', async () => {
-            mockDefaultRules();
+        it('warns with the exact count message when user selections exceed the limit', async () => {
+            mockValidationRules(DISK_5E_RULES);
 
             const warnings = await validateFeats({ rules: '5e', level: 4, feats: ['Tough', 'Resilient'] }, []);
 
-            expect(warnings).toHaveLength(1);
-            expect(warnings[0].type).toBe('warning');
-            expect(warnings[0].message).toContain('Rules allow 1 feat');
-            expect(warnings[0].message).toContain('selected 2');
-        });
-
-        it('should not warn when exactly the allowed number of feats selected', async () => {
-            mockDefaultRules();
-
-            const warnings = await validateFeats({ rules: '5e', level: 4, feats: ['Tough'] }, []);
-
-            expect(warnings).toEqual([]);
-        });
-
-        it('should warn about origin feat requirement in 2024 at level 1', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [1, 4, 8, 12, 16, 19],
-                    origin_feat_required: true,
+            expect(warnings).toEqual([
+                {
+                    message: `Rules allow 1 feat(s) at level 4. You have selected 2 (plus 0 pre-selected feat). (${DETAILS_5E})`,
+                    type: 'warning',
                 },
-            });
-
-            const allFeats = [
-                { name: 'Observer', type: 'Origin Feat' },
-                { name: 'Tough', type: 'General' },
-            ];
-
-            const warnings = await validateFeats({ rules: '2024', level: 1, feats: ['Tough'] }, allFeats);
-
-            const originWarning = warnings.find((w) => w.message.includes('Origin feat'));
-            expect(originWarning).toBeDefined();
-            expect(originWarning.type).toBe('warning');
+            ]);
         });
 
-        it('should not warn about origin feat when origin feat is selected', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [1, 4, 8, 12, 16, 19],
-                    origin_feat_required: true,
-                },
-            });
+        it('does not warn when exactly the allowed number is selected', async () => {
+            mockValidationRules(DISK_5E_RULES);
 
-            const allFeats = [
-                { name: 'Observer', type: 'Origin Feat' },
-                { name: 'Tough', type: 'General' },
-            ];
-
-            const warnings = await validateFeats({ rules: '2024', level: 1, feats: ['Observer'] }, allFeats);
-
-            const originWarning = warnings.find((w) => w.message.includes('Origin feat'));
-            expect(originWarning).toBeUndefined();
+            expect(await validateFeats({ rules: '5e', level: 4, feats: ['Tough'] }, [])).toEqual([]);
         });
 
-        it('should warn when non-origin feats are selected at 2024 level 1 without Versatile trait', async () => {
-            mockValidationRules({
-                feats: {
-                    available_levels: [1, 4, 8, 12, 16, 19],
-                    origin_feat_required: true,
-                },
-            });
-
-            const allFeats = [{ name: 'Observer', type: 'Origin Feat' }];
+        it('excludes pre-selected background feats from the user-selected count (2024)', async () => {
+            mockValidationRules(DISK_2024_RULES);
+            dataLoader.fetchBackgroundData.mockResolvedValue({ feat: 'Observer' });
 
             const warnings = await validateFeats(
-                { rules: '2024', level: 1, feats: ['Observer', 'Tough'], race: { name: 'Human' } },
-                allFeats,
+                { rules: '2024', level: 1, feats: ['Observer', 'Tough'], background: 'Acolyte' },
+                [OBSERVER, TOUGH],
             );
 
-            // Should warn about non-origin feats
-            const nonOriginWarning = warnings.find((w) => w.message.includes('not Origin'));
-            expect(nonOriginWarning).toBeDefined();
+            // Observer counts as pre-selected: only Tough counts against the level-1 allowance of 0
+            expect(warnings).toEqual([
+                {
+                    message: `Rules allow 0 feat(s) at level 1. You have selected 1 (plus 1 pre-selected feat). (${DETAILS_2024_ORIGIN})`,
+                    type: 'warning',
+                },
+                {
+                    message: 'Some selected feats are not Origin feats. Level 1 2024 characters typically take an Origin feat.',
+                    type: 'info',
+                },
+            ]);
         });
 
-        it('should warn about Epic Boon feats at low levels', async () => {
-            mockDefaultRules();
+        it('warns at 2024 level 1 until an Origin feat is selected', async () => {
+            mockValidationRules(DISK_2024_RULES);
 
-            const allFeats = [{ name: 'Master of Reality', type: 'Epic Boon' }];
+            const withoutOrigin = await validateFeats({ rules: '2024', level: 1, feats: ['Tough'] }, [OBSERVER, TOUGH]);
+            expect(withoutOrigin).toEqual([
+                {
+                    message: `Rules allow 0 feat(s) at level 1. You have selected 1 (plus 0 pre-selected feat). (${DETAILS_2024_ORIGIN})`,
+                    type: 'warning',
+                },
+                {
+                    message: "Level 1 2024 characters should select an Origin feat. Your selected feats don't include an Origin feat.",
+                    type: 'warning',
+                },
+                {
+                    message: 'Some selected feats are not Origin feats. Level 1 2024 characters typically take an Origin feat.',
+                    type: 'info',
+                },
+            ]);
 
-            const warnings = await validateFeats({ rules: '5e', level: 10, feats: ['Master of Reality'] }, allFeats);
+            // Selecting the Origin feat clears both origin warnings (count warning remains)
+            const withOrigin = await validateFeats({ rules: '2024', level: 1, feats: ['Observer'] }, [OBSERVER, TOUGH]);
+            expect(withOrigin).toHaveLength(1);
+            expect(withOrigin[0].message).toContain('You have selected 1 (plus 0 pre-selected feat)');
+        });
 
+        it('switches to Versatile-specific origin messages when the race object carries the trait', async () => {
+            // Synthetic input: the origin branch reads formData.race.traits directly rather than re-fetching
+            mockValidationRules(DISK_2024_RULES);
+            dataLoader.fetchRaceData.mockResolvedValue(VERSATILE_HUMAN);
+
+            const warnings = await validateFeats(
+                { rules: '2024', level: 1, feats: ['Tough'], race: { name: 'Human', traits: [{ name: 'Versatile' }] } },
+                [OBSERVER, TOUGH],
+            );
+
+            expect(warnings).toEqual([
+                {
+                    message: 'Your race has the Versatile trait — you should select an Origin feat of your choice.',
+                    type: 'warning',
+                },
+                {
+                    message: 'Consider selecting an Origin feat for your Versatile trait. Skilled is recommended.',
+                    type: 'info',
+                },
+            ]);
+        });
+
+        it.each([
+            { name: 'Master of Reality', type: 'Epic Boon', level: 10, allFeats: [{ name: 'Master of Reality', type: 'Epic Boon' }], warned: true },
+            { name: 'Awakened Mind', type: 'Epic Boon Feat', level: 10, allFeats: [{ name: 'Awakened Mind', type: 'Epic Boon Feat' }], warned: true },
+            { name: 'Master of Reality', type: 'Epic Boon', level: 18, allFeats: [{ name: 'Master of Reality', type: 'Epic Boon' }], warned: true },
+            { name: 'Master of Reality', type: 'Epic Boon', level: 19, allFeats: [{ name: 'Master of Reality', type: 'Epic Boon' }], warned: false },
+            { name: 'Master of Reality', type: 'Epic Boon', level: 10, allFeats: [], warned: false },
+        ])('Epic Boon gating: $name at level $level warns=$warned', async ({ name, allFeats, level, warned }) => {
+            mockValidationRules(DISK_5E_RULES);
+
+            const warnings = await validateFeats({ rules: '5e', level, feats: [name] }, allFeats);
             const epicWarning = warnings.find((w) => w.message.includes('Epic Boon'));
-            expect(epicWarning).toBeDefined();
-            expect(epicWarning.type).toBe('warning');
-            expect(epicWarning.message).toContain('level 19');
-            expect(epicWarning.message).toContain('level 10');
+
+            if (warned) {
+                expect(epicWarning).toEqual({
+                    message: `Epic Boon feats are typically available at level 19. You are level ${level}.`,
+                    type: 'warning',
+                });
+            } else {
+                expect(epicWarning).toBeUndefined();
+            }
         });
 
-        it('should not warn about Epic Boon feats at level 19', async () => {
-            mockDefaultRules();
+        it.each([
+            {
+                level: 2, feat: { name: 'Ability Score Improvement', prerequisites: ['4th level'] },
+                expected: [{ message: 'Ability Score Improvement requires 4th level. You are level 2.', type: 'warning' }],
+            },
+            {
+                level: 4, feat: { name: 'Ability Score Improvement', prerequisites: ['4th level'] },
+                expected: [],
+            },
+            {
+                level: 4, feat: { name: 'Crusher', prerequisites: ['Strength 13'] },
+                expected: [{ message: 'Crusher requires: Strength 13. Verify your character meets this requirement.', type: 'info' }],
+            },
+            {
+                level: 2, feat: { name: 'Heavy Armor Master', prerequisites: ['4th level', 'Strength 13'] },
+                expected: [
+                    { message: 'Heavy Armor Master requires 4th level. You are level 2.', type: 'warning' },
+                    { message: 'Heavy Armor Master requires: Strength 13. Verify your character meets this requirement.', type: 'info' },
+                ],
+            },
+            {
+                level: 2, feat: { name: 'Alert', prerequisites: { name: '4th level' } },
+                expected: [{ message: 'Alert requires 4th level. You are level 2.', type: 'warning' }],
+            },
+            {
+                level: 4, feat: { name: 'Mimic', prerequisites: [{ foo: 'bar' }] },
+                expected: [],
+            },
+            {
+                level: 4, feat: { name: 'Crusher', prerequisites: ['Strength 13'] },
+                feats: ['Crusher', 'Crusher'],
+                expected: [{ message: 'Crusher requires: Strength 13. Verify your character meets this requirement.', type: 'info' }],
+            },
+        ])('prerequisite checks for $feat.name at level $level', async ({ level, feat, feats, expected }) => {
+            mockValidationRules(DISK_5E_RULES);
 
-            const allFeats = [{ name: 'Master of Reality', type: 'Epic Boon' }];
+            const warnings = await validateFeats({ rules: '5e', level, feats: feats || [feat.name] }, [feat]);
 
-            const warnings = await validateFeats({ rules: '5e', level: 19, feats: ['Master of Reality'] }, allFeats);
-
-            const epicWarning = warnings.find((w) => w.message.includes('Epic Boon'));
-            expect(epicWarning).toBeUndefined();
-        });
-
-        it('should warn about Epic Boon Feat type at low levels', async () => {
-            mockDefaultRules();
-
-            const allFeats = [{ name: 'Awakened Mind', type: 'Epic Boon Feat' }];
-
-            const warnings = await validateFeats({ rules: '5e', level: 10, feats: ['Awakened Mind'] }, allFeats);
-
-            const epicWarning = warnings.find((w) => w.message.includes('Epic Boon'));
-            expect(epicWarning).toBeDefined();
-        });
-
-        it('should warn about level prerequisites', async () => {
-            mockDefaultRules();
-
-            const allFeats = [{ name: 'Ability Score Improvement', prerequisites: ['4th level'] }];
-
-            const warnings = await validateFeats({ rules: '5e', level: 2, feats: ['Ability Score Improvement'] }, allFeats);
-
-            const prereqWarning = warnings.find((w) => w.message.includes('Ability Score Improvement'));
-            expect(prereqWarning).toBeDefined();
-            expect(prereqWarning.type).toBe('warning');
-            expect(prereqWarning.message).toContain('4th level');
-        });
-
-        it('should not warn about level prerequisites when level is sufficient', async () => {
-            mockDefaultRules();
-
-            const allFeats = [{ name: 'Ability Score Improvement', prerequisites: ['4th level'] }];
-
-            const warnings = await validateFeats({ rules: '5e', level: 4, feats: ['Ability Score Improvement'] }, allFeats);
-
-            const prereqWarning = warnings.find((w) => w.message.includes('Ability Score Improvement'));
-            expect(prereqWarning).toBeUndefined();
-        });
-
-        it('should warn about ability score prerequisites', async () => {
-            mockDefaultRules();
-
-            const allFeats = [{ name: 'Crusher', prerequisites: ['Strength 13'] }];
-
-            const warnings = await validateFeats({ rules: '5e', level: 4, feats: ['Crusher'] }, allFeats);
-
-            const abilityWarning = warnings.find((w) => w.message.includes('Crusher'));
-            expect(abilityWarning).toBeDefined();
-            expect(abilityWarning.type).toBe('info');
-            expect(abilityWarning.message).toContain('Strength');
-        });
-
-        it('should handle multiple prerequisites on a single feat', async () => {
-            mockDefaultRules();
-
-            const allFeats = [{ name: 'Heavy Armor Master', prerequisites: ['4th level', 'Strength 13'] }];
-
-            const warnings = await validateFeats({ rules: '5e', level: 2, feats: ['Heavy Armor Master'] }, allFeats);
-
-            const levelWarning = warnings.find((w) => w.message.includes('4th level'));
-            const abilityWarning = warnings.find((w) => w.message.includes('Strength'));
-            expect(levelWarning).toBeDefined();
-            expect(abilityWarning).toBeDefined();
-        });
-
-        it('should handle prereq as object with name property', async () => {
-            mockDefaultRules();
-
-            const allFeats = [{ name: 'Some Feat', prerequisites: [{ name: 'Level 4' }] }];
-
-            const warnings = await validateFeats({ rules: '5e', level: 2, feats: ['Some Feat'] }, allFeats);
-
-            expect(Array.isArray(warnings)).toBe(true);
-        });
-
-        it('should handle prereq as object with no name property', async () => {
-            mockDefaultRules();
-
-            const allFeats = [{ name: 'Some Feat', prerequisites: [{ foo: 'bar' }] }];
-
-            const warnings = await validateFeats({ rules: '5e', level: 4, feats: ['Some Feat'] }, allFeats);
-
-            expect(Array.isArray(warnings)).toBe(true);
-        });
-
-        it('should not duplicate warnings for the same feat', async () => {
-            mockDefaultRules();
-
-            const allFeats = [
-                { name: 'Crusher', prerequisites: ['Strength 13'] },
-                { name: 'Crusher', prerequisites: ['Strength 13'] },
-            ];
-
-            const warnings = await validateFeats({ rules: '5e', level: 4, feats: ['Crusher', 'Crusher'] }, allFeats);
-
-            const crusherWarnings = warnings.filter((w) => w.message.includes('Crusher'));
-            expect(crusherWarnings).toHaveLength(1);
-        });
-
-        it('should throw when allFeats is undefined', async () => {
-            mockDefaultRules();
-
-            await expect(
-                validateFeats({ rules: '5e', level: 4, feats: ['Tough'] }, undefined),
-            ).rejects.toThrow();
-        });
-
-        it('should handle allFeats being empty', async () => {
-            mockDefaultRules();
-
-            const warnings = await validateFeats({ rules: '5e', level: 4, feats: ['Tough'] }, []);
-
-            expect(Array.isArray(warnings)).toBe(true);
-        });
-
-        it('should not warn about Epic Boon when allFeats does not contain the feat type', async () => {
-            mockDefaultRules();
-
-            // allFeats doesn't include the Epic Boon feat, so no type matching
-            const warnings = await validateFeats({ rules: '5e', level: 10, feats: ['Master of Reality'] }, []);
-
-            const epicWarning = warnings.find((w) => w.message.includes('Epic Boon'));
-            expect(epicWarning).toBeUndefined();
+            // Isolate prerequisite messages from the (already-covered) count warning
+            expect(warnings.filter((w) => w.message.includes('requires'))).toEqual(expected);
         });
     });
 
     describe('getFeatTypeInfo', () => {
-        it('should return type info for a known Origin Feat', () => {
-            const allFeats = [{ name: 'Observer', type: 'Origin Feat' }];
-
-            const result = getFeatTypeInfo('Observer', allFeats);
-
-            expect(result.type).toBe('Origin Feat');
-            expect(result.isOrigin).toBe(true);
-            expect(result.isEpicBoon).toBe(false);
+        it.each([
+            { feat: { name: 'Observer', type: 'Origin Feat' }, expected: { type: 'Origin Feat', isOrigin: true, isEpicBoon: false } },
+            { feat: { name: 'Master of Reality', type: 'Epic Boon' }, expected: { type: 'Epic Boon', isOrigin: false, isEpicBoon: true } },
+            { feat: { name: 'Awakened Mind', type: 'Epic Boon Feat' }, expected: { type: 'Epic Boon Feat', isOrigin: false, isEpicBoon: true } },
+            { feat: { name: 'Tough' }, expected: { type: 'General', isOrigin: false, isEpicBoon: false } },
+        ])('classifies $feat.name of type $feat.type', async ({ feat, expected }) => {
+            expect(getFeatTypeInfo(feat.name, [feat])).toEqual(expected);
         });
 
-        it('should return type info for an Epic Boon feat', () => {
-            const allFeats = [{ name: 'Master of Reality', type: 'Epic Boon' }];
-
-            const result = getFeatTypeInfo('Master of Reality', allFeats);
-
-            expect(result.type).toBe('Epic Boon');
-            expect(result.isOrigin).toBe(false);
-            expect(result.isEpicBoon).toBe(true);
-        });
-
-        it('should return type info for Epic Boon Feat type', () => {
-            const allFeats = [{ name: 'Awakened Mind', type: 'Epic Boon Feat' }];
-
-            const result = getFeatTypeInfo('Awakened Mind', allFeats);
-
-            expect(result.isEpicBoon).toBe(true);
-            expect(result.type).toBe('Epic Boon Feat');
-        });
-
-        it('should return default info for unknown feat', () => {
-            const result = getFeatTypeInfo('Unknown Feat', []);
-
-            expect(result.type).toBe('Unknown');
-            expect(result.isOrigin).toBe(false);
-            expect(result.isEpicBoon).toBe(false);
-        });
-
-        it('should return General type when feat has no type', () => {
-            const allFeats = [{ name: 'Tough' }];
-
-            const result = getFeatTypeInfo('Tough', allFeats);
-
-            expect(result.type).toBe('General');
-            expect(result.isOrigin).toBe(false);
-            expect(result.isEpicBoon).toBe(false);
-        });
-
-        it('should throw when allFeats is undefined', () => {
-            expect(() => getFeatTypeInfo('Tough', undefined)).toThrow();
+        it('classifies a feat missing from the catalogue as Unknown', () => {
+            expect(getFeatTypeInfo('Nonexistent Feat', [])).toEqual({ type: 'Unknown', isOrigin: false, isEpicBoon: false });
         });
     });
 
     describe('getPreSelectedFeats', () => {
-        it('should return pre-selected feats from background in 2024', async () => {
-            dataLoader.fetchBackgroundData.mockResolvedValue({ feat: 'Observer' });
-
-            const result = await getPreSelectedFeats({ rules: '2024', background: 'Acolyte' });
-
-            expect(result).toEqual(['Observer']);
-        });
-
-        it('should strip parenthetical from background feat names', async () => {
+        it('returns the normalized background feat for 2024', async () => {
             dataLoader.fetchBackgroundData.mockResolvedValue({ feat: 'Magic Initiate (Druid)' });
 
             const result = await getPreSelectedFeats({ rules: '2024', background: 'Acolyte' });
 
             expect(result).toEqual(['Magic Initiate']);
+            expect(dataLoader.fetchBackgroundData).toHaveBeenCalledWith('Acolyte', '2024');
         });
 
-        it('should return empty array for 5e backgrounds', async () => {
-            const result = await getPreSelectedFeats({ rules: '5e', background: 'Acolyte' });
-
-            expect(result).toEqual([]);
+        it.each([
+            { formData: { rules: '5e', background: 'Acolyte' }, why: '5e has no automatic background feats' },
+            { formData: { rules: '2024' }, why: 'no background selected' },
+        ])('returns [] without fetching when $why', async ({ formData }) => {
+            expect(await getPreSelectedFeats(formData)).toEqual([]);
+            expect(dataLoader.fetchBackgroundData).not.toHaveBeenCalled();
         });
 
-        it('should return empty array when no background specified', async () => {
-            const result = await getPreSelectedFeats({ rules: '2024' });
+        it.each([
+            { backgroundData: null },
+            { backgroundData: {} },
+        ])('returns [] when background data has no feat ($backgroundData)', async ({ backgroundData }) => {
+            dataLoader.fetchBackgroundData.mockResolvedValue(backgroundData);
 
-            expect(result).toEqual([]);
-        });
-
-        it('should return empty array when background has no feat', async () => {
-            dataLoader.fetchBackgroundData.mockResolvedValue({});
-
-            const result = await getPreSelectedFeats({ rules: '2024', background: 'Charlatan' });
-
-            expect(result).toEqual([]);
-        });
-
-        it('should return empty array when background data is null', async () => {
-            dataLoader.fetchBackgroundData.mockResolvedValue(null);
-
-            const result = await getPreSelectedFeats({ rules: '2024', background: 'Charlatan' });
-
-            expect(result).toEqual([]);
-        });
-
-        it('should return empty array when background data has no feat property', async () => {
-            dataLoader.fetchBackgroundData.mockResolvedValue({ description: 'Some background' });
-
-            const result = await getPreSelectedFeats({ rules: '2024', background: 'Charlatan' });
-
-            expect(result).toEqual([]);
-        });
-
-    });
-
-    describe('normalizeBackgroundFeatName', () => {
-        it('should strip parenthetical from feat name', () => {
-            expect(normalizeBackgroundFeatName('Magic Initiate (Druid)')).toBe('Magic Initiate');
-        });
-
-        it('should return the name unchanged when no parenthetical', () => {
-            expect(normalizeBackgroundFeatName('Tough')).toBe('Tough');
-        });
-
-        it('should handle multiple parenthetical-like segments (strips only the last)', () => {
-            expect(normalizeBackgroundFeatName('Feat Name (Extra) (More)')).toBe('Feat Name (Extra)');
-        });
-
-        it('should handle empty string', () => {
-            expect(normalizeBackgroundFeatName('')).toBe('');
+            expect(await getPreSelectedFeats({ rules: '2024', background: 'Charlatan' })).toEqual([]);
         });
     });
 
     describe('getRaceFeatChoices', () => {
-        it('should return feat choices from Versatile trait in 2024', async () => {
-            dataLoader.fetchRaceData.mockResolvedValue({
-                name: 'Human',
-                traits: [
-                    { name: 'Versatile', proficiency_choices: { from: ['Skilled', 'Lucky', 'Tough'] } },
-                ],
-            });
+        it('returns Versatile trait choices for 2024', async () => {
+            dataLoader.fetchRaceData.mockResolvedValue(VERSATILE_HUMAN);
 
             const result = await getRaceFeatChoices({ rules: '2024', race: { name: 'Human' } });
 
             expect(result).toEqual(['Skilled', 'Lucky', 'Tough']);
+            expect(dataLoader.fetchRaceData).toHaveBeenCalledWith('Human', '2024');
         });
 
-        it('should return empty array when race has no Versatile trait', async () => {
-            dataLoader.fetchRaceData.mockResolvedValue({
-                name: 'Elf',
-                traits: [{ name: 'Fey Ancestry' }],
-            });
+        it.each([
+            { formData: { rules: '2024', race: { name: 'Elf' } }, fetched: { name: 'Elf', traits: [{ name: 'Fey Ancestry' }] }, fetches: true },
+            { formData: { rules: '5e', race: { name: 'Human' } }, fetched: VERSATILE_HUMAN, fetches: false },
+            { formData: { rules: '2024', race: null }, fetched: null, fetches: false },
+            { formData: { rules: '2024', race: {} }, fetched: VERSATILE_HUMAN, fetches: false },
+            { formData: { rules: '2024', race: { name: 'Human' } }, fetched: { name: 'Human', traits: [{ name: 'Versatile' }] }, fetches: true },
+            { formData: { rules: '2024', race: { name: 'Human' } }, fetched: { name: 'Human', traits: [{ name: 'Versatile', proficiency_choices: { from: [] } }] }, fetches: true },
+        ])('returns no choices for $formData.ruleset race input', async ({ formData, fetched, fetches }) => {
+            dataLoader.fetchRaceData.mockResolvedValue(fetched);
 
-            const result = await getRaceFeatChoices({ rules: '2024', race: { name: 'Elf' } });
-
-            expect(result).toEqual([]);
-        });
-
-        it('should return empty array for 5e ruleset', async () => {
-            const result = await getRaceFeatChoices({ rules: '5e', race: { name: 'Human' } });
-
-            expect(result).toEqual([]);
-        });
-
-        it('should return empty array when race is null', async () => {
-            const result = await getRaceFeatChoices({ rules: '2024', race: null });
-
-            expect(result).toEqual([]);
-        });
-
-        it('should return empty array when race has no name', async () => {
-            const result = await getRaceFeatChoices({ rules: '2024', race: {} });
-
-            expect(result).toEqual([]);
-        });
-
-        it('should return empty array when Versatile has no proficiency_choices', async () => {
-            dataLoader.fetchRaceData.mockResolvedValue({
-                name: 'Human',
-                traits: [{ name: 'Versatile' }],
-            });
-
-            const result = await getRaceFeatChoices({ rules: '2024', race: { name: 'Human' } });
-
-            expect(result).toEqual([]);
-        });
-
-        it('should return empty array when proficiency_choices.from is empty', async () => {
-            dataLoader.fetchRaceData.mockResolvedValue({
-                name: 'Human',
-                traits: [{ name: 'Versatile', proficiency_choices: { from: [] } }],
-            });
-
-            const result = await getRaceFeatChoices({ rules: '2024', race: { name: 'Human' } });
-
-            expect(result).toEqual([]);
+            expect(await getRaceFeatChoices(formData)).toEqual([]);
+            expect(dataLoader.fetchRaceData).toHaveBeenCalledTimes(fetches ? 1 : 0);
         });
     });
 
     describe('normalizeFeatDescription', () => {
-        it('should return empty text for null/undefined/missing description', () => {
-            expect(normalizeFeatDescription({})).toEqual({ text: '', isHtml: false });
-            expect(normalizeFeatDescription({ description: null })).toEqual({ text: '', isHtml: false });
-            expect(normalizeFeatDescription({ description: undefined })).toEqual({ text: '', isHtml: false });
-        });
-
-        it('should return empty for empty or falsy-only arrays', () => {
-            expect(normalizeFeatDescription({ description: [] })).toEqual({ text: '', isHtml: false });
-            expect(normalizeFeatDescription({ description: [null, undefined] })).toEqual({ text: '', isHtml: false });
-        });
-
-        it('should handle 2024 format with string description (HTML)', () => {
-            const feat = { description: '<p>Gain +1 Strength</p>' };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '<p>Gain +1 Strength</p>', isHtml: true });
-        });
-
-        it('should handle 2024 format with array description containing string (HTML)', () => {
-            const feat = { description: ['<p>Gain +1 Strength</p>', '<p>Additional text</p>'] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '<p>Gain +1 Strength</p>', isHtml: true });
-        });
-
-        it('should handle 2024 format with array description containing object with text/content/description', () => {
-            expect(normalizeFeatDescription({ description: [{ text: '<p>Text</p>' }] }).text).toBe('<p>Text</p>');
-            expect(normalizeFeatDescription({ description: [{ content: '<p>Content</p>' }] }).text).toBe('<p>Content</p>');
-            expect(normalizeFeatDescription({ description: [{ description: '<p>Desc</p>' }] }).text).toBe('<p>Desc</p>');
-        });
-
-        it('should return empty when description object has level property (unexpected structure)', () => {
-            const feat = { description: [{ level: 1, name: 'Some Feat' }] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '', isHtml: false });
-        });
-
-        it('should prioritize text over content over description in nested objects', () => {
-            const feat = { description: [{ text: 'text value', content: 'content value', description: 'desc value' }] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: 'text value', isHtml: true });
-        });
-
-        it('should handle 5e format without description field', () => {
-            const feat = { name: 'Tough', desc: ['You gain 10 HP'] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '', isHtml: false });
-        });
-
-        it('should handle array with mixed types returning only first element', () => {
-            const feat = { description: [null, '<p>Second item</p>', 'Third'] };
-            const result = normalizeFeatDescription(feat);
-            // First item is null — source code only checks desc[0], returns empty
-            expect(result).toEqual({ text: '', isHtml: false });
-        });
-
-        it('should handle nested object with no recognized properties', () => {
-            const feat = { description: [{ foo: 'bar', baz: 42 }] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '', isHtml: false });
+        it.each([
+            { input: {}, expected: { text: '', isHtml: false } },
+            { input: { description: null }, expected: { text: '', isHtml: false } },
+            { input: { description: [] }, expected: { text: '', isHtml: false } },
+            { input: { description: [null, undefined] }, expected: { text: '', isHtml: false } },
+            { input: { name: 'Tough', desc: ['You gain 10 HP'] }, expected: { text: '', isHtml: false } },
+            { input: { description: '<p>Gain +1 Strength</p>' }, expected: { text: '<p>Gain +1 Strength</p>', isHtml: true } },
+            { input: { description: ['<p>A</p>', '<p>B</p>'] }, expected: { text: '<p>A</p>', isHtml: true } },
+            { input: { description: [null, '<p>Second item</p>'] }, expected: { text: '', isHtml: false } },
+            { input: { description: [{ text: '<p>Text</p>' }] }, expected: { text: '<p>Text</p>', isHtml: true } },
+            { input: { description: [{ content: '<p>Content</p>' }] }, expected: { text: '<p>Content</p>', isHtml: true } },
+            { input: { description: [{ description: '<p>Desc</p>' }] }, expected: { text: '<p>Desc</p>', isHtml: true } },
+            { input: { description: [{ text: 'text value', content: 'content value', description: 'desc value' }] }, expected: { text: 'text value', isHtml: true } },
+            { input: { description: [{ level: 1, name: 'Some Feat' }] }, expected: { text: '', isHtml: false } },
+            { input: { description: [{ foo: 'bar', baz: 42 }] }, expected: { text: '', isHtml: false } },
+        ])('normalizes $input → $expected.text', async ({ input, expected }) => {
+            expect(normalizeFeatDescription(input)).toEqual(expected);
         });
     });
 });

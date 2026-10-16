@@ -1,9 +1,10 @@
+// @maintained-by-ai: 2026-10-16 — deterministic act() flushes replace real-time waitFor (full-suite load flake fix)
 // SP-024: Color Spray (2024, save_only) — Blinded condition never expired.
 // Pins the fail-grant expiry clock: ONE addExpiration per failing target
 // ({rounds:1, expireOnCreatureName: caster} — CLA-045 end-of-next-turn convention),
 // no clock on successful saves, per-spell duration honored, and the
 // ResultsSummaryModal failed-target count fix.
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AOEConditionModal from './AOEConditionModal.jsx';
 
@@ -75,6 +76,26 @@ const combatSummary = {
 
 const blindedEffects = [{ type: 'blinded', condition: 'blinded' }];
 
+// Deterministic flush inside act() — mirrors the initiative.overlays batch-run
+// flake fix (2026-10). The modal's confirm/save-result lanes are async and
+// un-awaited by fireEvent: handleCreatureSelectionConfirm chains
+// addEntry → resolveAllSaves → setPendingPrompts OUTSIDE act, and the effect
+// that registers the window 'save-result' listener only runs after React
+// flushes that render (a scheduler task). Real-time waitFor polls the mock
+// call list, which turns true BEFORE the listener exists — under full-suite
+// parallel load the render task starves and a save-result event dispatches
+// into a void (flake, 2026-10). Every async hop here resolves on pre-resolved
+// mocks, so yielding ONE macrotask inside act() drains the whole chain:
+// the microtask queue empties completely before the timer fires, and act's
+// exit flush runs React's queued render + effects synchronously. Bounded
+// event-loop yield only — no game-state timers.
+function flush(action) {
+    return act(async () => {
+        if (action) action();
+        await new Promise(resolve => setTimeout(resolve, 0));
+    });
+}
+
 function makeProps(overrides = {}) {
     return {
         action: baseAction,
@@ -122,8 +143,9 @@ describe('AOEConditionModal — SP-024 fail-grant expiry clock', () => {
         render(<AOEConditionModal {...makeProps({ saveDc: ALWAYS_FAIL_DC })} />);
         selectTargets('Goblin 1', 'Goblin 2');
         clickApply();
+        await flush();
 
-        await waitFor(() => expect(addExpiration).toHaveBeenCalledTimes(2));
+        expect(addExpiration).toHaveBeenCalledTimes(2);
 
         expect(addExpiration).toHaveBeenCalledWith({
             attackerName: casterName,
@@ -153,9 +175,9 @@ describe('AOEConditionModal — SP-024 fail-grant expiry clock', () => {
         render(<AOEConditionModal {...makeProps({ saveDc: ALWAYS_SAVE_DC })} />);
         selectTargets('Goblin 1');
         clickApply();
+        await flush();
 
-        await waitFor(() => expect(persistAndNotify).toHaveBeenCalled());
-
+        expect(persistAndNotify).toHaveBeenCalled();
         expect(addExpiration).not.toHaveBeenCalled();
         const condWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions');
         expect(condWrites).toHaveLength(0);
@@ -166,17 +188,24 @@ describe('AOEConditionModal — SP-024 fail-grant expiry clock', () => {
         selectTargets('PlayerAlly');
         clickApply();
 
-        // player target goes through the save-prompt listener
-        await waitFor(() => expect(setRuntimeValue.mock.calls.some(c => c[1] === 'pendingSaveListenerPrompts')).toBe(true));
+        // player target goes through the save-prompt listener.
+        // Flush first, THEN read the prompt write: the write happens inside
+        // resolveAllSaves, but the window 'save-result' listener only
+        // registers after the pendingPrompts render flushes. Flushing before
+        // firing guarantees the listener exists (was the load-dependent flake).
+        await flush();
+        expect(setRuntimeValue.mock.calls.some(c => c[1] === 'pendingSaveListenerPrompts')).toBe(true);
         expect(addExpiration).not.toHaveBeenCalled();
 
         const promptId = setRuntimeValue.mock.calls
             .find(c => c[1] === 'pendingSaveListenerPrompts')[2][0];
-        fireEvent(window, new CustomEvent('save-result', {
+        // fire + flush in one act() so handleSaveResult's un-awaited
+        // setState tail (setResults/setPendingPrompts) settles deterministically
+        await flush(() => fireEvent(window, new CustomEvent('save-result', {
             detail: { promptId, success: false, roll: 4, total: 4, saveBonus: 0 },
-        }));
+        })));
 
-        await waitFor(() => expect(addExpiration).toHaveBeenCalledTimes(1));
+        expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(setRuntimeValue).toHaveBeenCalledWith('PlayerAlly', 'activeConditions', expect.arrayContaining(['blinded']), campaignName);
         expect(addExpiration).toHaveBeenCalledWith({
             attackerName: casterName,
@@ -186,6 +215,9 @@ describe('AOEConditionModal — SP-024 fail-grant expiry clock', () => {
             rounds: 1,
             expireOnCreatureName: casterName,
         });
+        // the prompt is consumed — results summary shows the resolved fail
+        expect(setRuntimeValue.mock.calls.filter(c => c[1] === 'pendingSaveListenerPrompts')).toHaveLength(1);
+        expect(document.body.textContent).toMatch(/0\s*targets saved,\s*1\s*target failed/);
     });
 
     it('successful PLAYER save-result arms nothing', async () => {
@@ -193,23 +225,28 @@ describe('AOEConditionModal — SP-024 fail-grant expiry clock', () => {
         selectTargets('PlayerAlly');
         clickApply();
 
-        await waitFor(() => expect(setRuntimeValue.mock.calls.some(c => c[1] === 'pendingSaveListenerPrompts')).toBe(true));
+        // flush before firing so the save-result listener is registered (see flake note above)
+        await flush();
+        expect(setRuntimeValue.mock.calls.some(c => c[1] === 'pendingSaveListenerPrompts')).toBe(true);
 
         const promptId = setRuntimeValue.mock.calls
             .find(c => c[1] === 'pendingSaveListenerPrompts')[2][0];
-        fireEvent(window, new CustomEvent('save-result', {
+        await flush(() => fireEvent(window, new CustomEvent('save-result', {
             detail: { promptId, success: true, roll: 15, total: 16, saveBonus: 1 },
-        }));
+        })));
 
-        await waitFor(() => expect(persistAndNotify).toHaveBeenCalled());
+        expect(persistAndNotify).toHaveBeenCalled();
         expect(addExpiration).not.toHaveBeenCalled();
+        const condWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions');
+        expect(condWrites).toHaveLength(0);
     });
 
     it('duration is derived from spell data: "2 rounds" clock stays anchored on the caster', async () => {
         render(<AOEConditionModal {...makeProps({ saveDc: ALWAYS_FAIL_DC, duration: '2 rounds' })} />);
         selectTargets('Goblin 1');
         clickApply();
-        await waitFor(() => expect(addExpiration).toHaveBeenCalledTimes(1));
+        await flush();
+        expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({ rounds: 2, expireOnCreatureName: casterName }));
     });
 
@@ -217,9 +254,11 @@ describe('AOEConditionModal — SP-024 fail-grant expiry clock', () => {
         render(<AOEConditionModal {...makeProps({ saveDc: ALWAYS_FAIL_DC, effects: [{ type: 'restrained', condition: 'restrained' }], conditionLabel: 'Restrained', duration: 'Concentration, up to 1 minute' })} />);
         selectTargets('Goblin 2');
         clickApply();
-        await waitFor(() => expect(persistAndNotify).toHaveBeenCalled());
+        await flush();
+        expect(persistAndNotify).toHaveBeenCalled();
         expect(addExpiration).not.toHaveBeenCalled();
         const condWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions');
+        expect(condWrites).toHaveLength(1);
         expect(condWrites[0][2]).toContain('restrained');
     });
 
@@ -227,15 +266,17 @@ describe('AOEConditionModal — SP-024 fail-grant expiry clock', () => {
         const { container } = render(<AOEConditionModal {...makeProps({ saveDc: ALWAYS_FAIL_DC })} />);
         selectTargets('Goblin 1', 'Goblin 2');
         clickApply();
+        await flush();
 
-        await waitFor(() => expect(container.textContent).toMatch(/0\s*targets saved,\s*2\s*targets failed/));
+        expect(container.textContent).toMatch(/0\s*targets saved,\s*2\s*targets failed/);
     });
 
     it('success summary counts saved targets', async () => {
         const { container } = render(<AOEConditionModal {...makeProps({ saveDc: ALWAYS_SAVE_DC })} />);
         selectTargets('Goblin 1', 'Goblin 2');
         clickApply();
+        await flush();
 
-        await waitFor(() => expect(container.textContent).toMatch(/2\s*targets saved,\s*0\s*targets failed/));
+        expect(container.textContent).toMatch(/2\s*targets saved,\s*0\s*targets failed/);
     });
 });

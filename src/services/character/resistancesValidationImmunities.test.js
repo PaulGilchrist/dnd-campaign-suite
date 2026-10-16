@@ -1,3 +1,17 @@
+// @maintained-by-ai
+// QUARTET lane (see resistancesValidation.test.js header seam map): class-side immunity
+// extraction + level gates — extractClassImmunities via getResistanceLimits.
+// Disk anchors, verified against public/data/classes.json + public/data/2024/classes.json:
+// ZERO real class features on disk grant a valid damage immunity. The only "Immunity to"
+// prose is condition immunity or flavor: 5e Monk Ki Empowered Strikes lv6 ("…immunity to
+// nonmagical attacks and damage." — the case-insensitive regex matches, valid-type filter
+// must reject "nonmagical"); 2024 Paladin Oath of Devotion Aura of Devotion lv7 ("Immunity
+// to Charmed condition…"). All POSITIVE-immunity fixtures below are therefore synthetic.
+// Divergence note: engine immunity thresholds elsewhere in the app (Monk>9/Paladin>2) are
+// a different lane — this validation lane's gates are plain feature.level <= level.
+// Dead code flag (#1916): the named "Mindless Rage" branch in extractClassImmunities is an
+// empty no-op block — untestable by behavior; candidates for deletion in the source.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as dataLoader from '../ui/dataLoader.js';
 
@@ -9,27 +23,72 @@ vi.mock('../ui/dataLoader.js', () => ({
 
 import { getResistanceLimits } from './resistancesValidation.js';
 
-// ── Factories ────────────────────────────────────────────────────────────────
+// ── Fixtures / helpers ───────────────────────────────────────────────────────
 
 const emptyRaceData = () => ({ name: 'Human', traits: [] });
 
 const baseArgs = (overrides = {}) => ({
   rules: '5e',
   race: { name: 'Human' },
-  class: { name: 'Wizard' },
+  class: { name: 'Fighter' },
   level: 1,
   ...overrides,
 });
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+function mockClassData(classData) {
+  vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+  vi.mocked(dataLoader.fetchClassData).mockResolvedValue(classData);
+}
 
-/**
- * Assert that `result.resistances` is empty and `result.immunities` contains
- * exactly the given types (ignoring order).
- */
-function expectImmunitiesOnly(result, expected) {
+// Synthetic base class_levels with one damage-immunity feature at featureLevel.
+const baseClassAt = (featureLevel, description) => ({
+  class_levels: [
+    { level: 1, features: [] },
+    { level: featureLevel, features: [{ name: 'Damage Immunity', description }] },
+  ],
+});
+
+// Subclass-container fixture: correct container for the ruleset plus, when decoy is set,
+// the WRONG ruleset's container carrying a DIFFERENT damage type (Cold) so that reading
+// the wrong container is observable, not masked by matching types.
+const subclassFixture = ({ rules, featureLevel, description, decoy }) => ({
+  class_levels: [{ level: 1, features: [] }],
+  ...(rules === '5e'
+    ? {
+        subclasses: [
+          {
+            name: 'Test Subclass',
+            class_levels: [
+              { level: featureLevel, features: [{ name: 'Subclass Feature', description }] },
+            ],
+          },
+        ],
+        ...(decoy
+          ? {
+              majors: [
+                { name: 'Decoy Major', features: [{ level: 1, name: 'Decoy Feature', description: 'You gain Immunity to Cold damage.' }] },
+              ],
+            }
+          : {}),
+      }
+    : {
+        majors: [
+          { name: 'Path of the Test', features: [{ level: featureLevel, name: 'Major Feature', description }] },
+        ],
+        ...(decoy
+          ? {
+              subclasses: [
+                { name: 'Decoy Subclass', class_levels: [{ level: 1, features: [{ name: 'Decoy Feature', description: 'You gain Immunity to Cold damage.' }] }] },
+              ],
+            }
+          : {}),
+      }),
+});
+
+// Race fixture is traitless: the race side (Limits lane) must contribute nothing here.
+function expectImmunityLimits(result, expected) {
   expect(result.resistances).toEqual([]);
-  expect(result.immunities.sort()).toEqual(expected.sort());
+  expect(result.immunities.sort()).toEqual([...expected].sort());
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -39,148 +98,113 @@ describe('resistancesValidation getResistanceLimits - class immunities', () => {
     vi.clearAllMocks();
   });
 
-  describe('extractClassImmunities (via getResistanceLimits)', () => {
-    it.each([
-      { desc: 'Fire', name: 'Fire immunity', featureDesc: 'You gain Immunity to Fire damage.', expected: ['Fire'] },
-      { desc: 'Psychic', name: 'Psychic immunity', featureDesc: 'You gain Immunity to Psychic damage.', expected: ['Psychic'] },
-    ])('extracts $name from class features at or below level', async ({ featureDesc, expected }) => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-        class_levels: [
-          { level: 1, features: [] },
-          { level: 10, features: [{ name: 'Damage Immunity', description: featureDesc }] },
-        ],
-      });
+  it.each([
+    {
+      name: 'includes feature exactly at character level (boundary)',
+      level: 10,
+      classData: baseClassAt(10, 'You gain Immunity to Fire damage.'),
+      expected: ['Fire'],
+    },
+    {
+      name: 'excludes feature one level above character level (boundary)',
+      level: 9,
+      classData: baseClassAt(10, 'You gain Immunity to Fire damage.'),
+      expected: [],
+    },
+    {
+      name: 'extracts multiple damage immunities from one feature',
+      level: 1,
+      classData: baseClassAt(1, 'You gain Immunity to Fire damage and Immunity to Cold damage.'),
+      expected: ['Fire', 'Cold'],
+    },
+    {
+      name: 'keeps valid damage types, drops condition names in same description',
+      level: 1,
+      classData: baseClassAt(1, 'You gain Immunity to Charmed and Immunity to Fire.'),
+      expected: ['Fire'],
+    },
+    {
+      name: 'condition-only immunity yields nothing',
+      level: 1,
+      classData: baseClassAt(1, 'You gain Immunity to Charmed and Frightened.'),
+      expected: [],
+    },
+    {
+      name: 'array descriptions are joined before matching',
+      level: 1,
+      classData: baseClassAt(1, ['You gain', 'Immunity to', 'Radiant damage.']),
+      expected: ['Radiant'],
+    },
+    {
+      name: 'disk anchor: real 5e Monk Ki Empowered Strikes lv6 prose grants nothing',
+      level: 6,
+      classData: baseClassAt(6, 'Your unarmed strikes count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks and damage.'),
+      expected: [],
+    },
+  ])('base class_levels: $name', async ({ level, classData, expected }) => {
+    mockClassData(classData);
 
-      const result = await getResistanceLimits(
-        baseArgs({ level: 10, race: { name: 'Human' }, class: { name: 'Fighter' } }),
-      );
+    const result = await getResistanceLimits(baseArgs({ level }));
 
-      expectImmunitiesOnly(result, expected);
-    });
+    expectImmunityLimits(result, expected);
+  });
 
-    it.each([
-      { desc: 'Fire', featureDesc: 'You gain Immunity to Fire damage.', expected: [] },
-      { desc: 'Lightning', featureDesc: 'You gain Immunity to Lightning damage.', expected: [] },
-    ])('excludes immunities from levels above character level ($desc)', async ({ featureDesc, expected }) => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-        class_levels: [
-          { level: 1, features: [] },
-          { level: 10, features: [{ name: 'Damage Immunity', description: featureDesc }] },
-        ],
-      });
+  it.each([
+    {
+      name: '5e extracts subclasses feature at gate and ignores majors decoy',
+      rules: '5e',
+      fixture: { rules: '5e', featureLevel: 7, description: 'You gain Immunity to Lightning damage.', decoy: true },
+      level: 7,
+      expected: ['Lightning'],
+    },
+    {
+      name: '5e excludes subclasses feature above character level',
+      rules: '5e',
+      fixture: { rules: '5e', featureLevel: 14, description: 'You gain Immunity to Fire damage.', decoy: false },
+      level: 7,
+      expected: [],
+    },
+    {
+      name: '2024 extracts majors feature at gate and ignores subclasses decoy',
+      rules: '2024',
+      fixture: { rules: '2024', featureLevel: 3, description: 'You gain Immunity to Fire damage.', decoy: true },
+      level: 3,
+      expected: ['Fire'],
+    },
+    {
+      name: '2024 excludes majors feature above character level',
+      rules: '2024',
+      fixture: { rules: '2024', featureLevel: 10, description: 'You gain Immunity to Fire damage.', decoy: false },
+      level: 3,
+      expected: [],
+    },
+    {
+      name: 'disk anchor: real 2024 Aura of Devotion lv7 condition immunity grants nothing',
+      rules: '2024',
+      fixture: { rules: '2024', featureLevel: 7, description: 'You and your allies have Immunity to Charmed condition while in Aura of Protection.', decoy: false },
+      level: 7,
+      expected: [],
+    },
+  ])('subclass containers ($rules): $name', async ({ rules, fixture, level, expected }) => {
+    mockClassData(subclassFixture(fixture));
 
-      const result = await getResistanceLimits(
-        baseArgs({ level: 5, race: { name: 'Human' }, class: { name: 'Fighter' } }),
-      );
+    const result = await getResistanceLimits(baseArgs({ rules, level }));
 
-      expectImmunitiesOnly(result, expected);
-    });
+    expectImmunityLimits(result, expected);
+    // Ruleset routing into dataLoader (observable through the discriminating mock args).
+    expect(dataLoader.fetchClassData).toHaveBeenCalledWith('Fighter', rules);
+  });
 
-    it.each([
-      { name: 'multi-immunity feature', featureDesc: 'You gain Immunity to Fire damage and Immunity to Cold damage.', expected: ['Fire', 'Cold'] },
-      { name: 'mixed damage + condition immunities', featureDesc: 'You gain Immunity to Charmed and Immunity to Fire.', expected: ['Fire'] },
-      { name: 'condition-only immunities (Mindless Rage)', featureDesc: 'You gain Immunity to Charmed and Frightened.', expected: [] },
-    ])('filters $name correctly', async ({ featureDesc, expected }) => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-        class_levels: [
-          { level: 6, features: [{ name: 'Feature', description: featureDesc }] },
-        ],
-      });
+  it.each([
+    { name: 'null classData (unresolved fetch)', classData: undefined },
+    { name: 'classData without class_levels', classData: { name: 'WeirdClass' } },
+    { name: 'empty class_levels', classData: { class_levels: [] } },
+    { name: 'level entry without features key', classData: { class_levels: [{ level: 1 }] } },
+  ])('tolerates missing class data: $name', async ({ classData }) => {
+    mockClassData(classData);
 
-      const result = await getResistanceLimits(
-        baseArgs({ level: 6, race: { name: 'Human' }, class: { name: 'Fighter' } }),
-      );
+    const result = await getResistanceLimits(baseArgs());
 
-      expectImmunitiesOnly(result, expected);
-    });
-
-    it.each([
-      { rules: '5e', structure: 'subclasses.class_levels', classData: { class_levels: [{ level: 1, features: [] }], subclasses: [{ name: 'Test Subclass', class_levels: [{ level: 7, features: [{ name: 'Subclass Feature', description: 'You gain Immunity to Lightning damage.' }] }] }] } },
-      { rules: '2024', structure: 'majors.features', classData: { class_levels: [{ level: 1, features: [] }], majors: [{ name: 'Path of the Test', features: [{ level: 3, name: 'Test Feature', description: 'You gain Immunity to Fire damage.' }] }] } },
-    ])('extracts immunities from $structure at or below level', async ({ rules, classData }) => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(classData);
-
-      const result = await getResistanceLimits(
-        baseArgs({ rules, level: rules === '5e' ? 7 : 3, race: { name: 'Human' }, class: { name: 'Fighter' } }),
-      );
-
-      expectImmunitiesOnly(result, rules === '5e' ? ['Lightning'] : ['Fire']);
-    });
-
-    it.each([
-      { rules: '5e', structure: 'subclasses.class_levels', classData: { class_levels: [{ level: 1, features: [] }], subclasses: [{ name: 'Test Subclass', class_levels: [{ level: 14, features: [{ name: 'Late Feature', description: 'You gain Immunity to Fire damage.' }] }] }] } },
-      { rules: '2024', structure: 'majors.features', classData: { class_levels: [{ level: 1, features: [] }], majors: [{ name: 'High Level Path', features: [{ level: 10, name: 'Late Feature', description: 'You gain Immunity to Fire damage.' }] }] } },
-    ])('excludes $structure immunities above character level', async ({ rules, classData }) => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(classData);
-
-      const result = await getResistanceLimits(
-        baseArgs({ rules, level: rules === '5e' ? 7 : 5, race: { name: 'Human' }, class: { name: 'Fighter' } }),
-      );
-
-      expectImmunitiesOnly(result, []);
-    });
-
-    it('handles null classData, missing class_levels, and empty features', async () => {
-      const nullResult = await getResistanceLimits(
-        baseArgs({ race: { name: 'Human' }, class: { name: 'Nonexistent' } }),
-      );
-      expectImmunitiesOnly(nullResult, []);
-
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({ name: 'WeirdClass' });
-      const noLevelsResult = await getResistanceLimits(
-        baseArgs({ race: { name: 'Human' }, class: { name: 'WeirdClass' } }),
-      );
-      expectImmunitiesOnly(noLevelsResult, []);
-
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-        class_levels: [{ level: 1, features: [] }],
-      });
-      const emptyFeaturesResult = await getResistanceLimits(
-        baseArgs({ level: 1, race: { name: 'Human' }, class: { name: 'Wizard' } }),
-      );
-      expectImmunitiesOnly(emptyFeaturesResult, []);
-    });
-
-    it('extracts immunity from feature with array description', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-        class_levels: [
-          {
-            level: 1,
-            features: [{ name: 'Damage Immunity', description: ['You gain', 'Immunity to', 'Radiant damage.'] }],
-          },
-        ],
-      });
-
-      const result = await getResistanceLimits(
-        baseArgs({ level: 1, race: { name: 'Human' }, class: { name: 'Fighter' } }),
-      );
-
-      expectImmunitiesOnly(result, ['Radiant']);
-    });
-
-    it('rejects invalid damage types from immunity descriptions', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-        class_levels: [
-          {
-            level: 1,
-            features: [{ name: 'Fake Immunity', description: 'You gain Immunity to Magic and Sneaky.' }],
-          },
-        ],
-      });
-
-      const result = await getResistanceLimits(
-        baseArgs({ level: 1, race: { name: 'Human' }, class: { name: 'Fighter' } }),
-      );
-
-      expectImmunitiesOnly(result, []);
-    });
+    expectImmunityLimits(result, []);
   });
 });

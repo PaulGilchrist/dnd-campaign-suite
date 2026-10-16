@@ -1,11 +1,12 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
+  getRuntimeValue: vi.fn(() => []),
 }));
 
 vi.mock('../../rules/combat/rangeCheck.js', () => ({
-  isWithinRange: vi.fn(),
+  isWithinRange: vi.fn(async () => false),
 }));
 
 vi.mock('../../encounters/combatData.js', () => ({
@@ -18,406 +19,178 @@ import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { getCombatSummary, getCombatContext } from '../../encounters/combatData.js';
 
-function makePlayer(name, gridX = 0, gridY = 0) {
-  return { name, gridX, gridY };
+// Corona (source semantics): a non-target player holding an 'sunlight_aura' activeBuff
+// imposes save disadvantage on a target listed in their 'coronaOfLightEnemies' when the
+// damageType is in the buff's enemiesDisadvantageSaves (case-normalized). Grid lane
+// measures range via isWithinRange (buff.distance parsed, default 60 ft); the CLA-063
+// skipRangeCheck lane is gridless and pulls players from the cached combat summary.
+const CAMPAIGN = 'test-campaign';
+
+const grid = (...names) => ({ players: names.map(name => ({ name, gridX: 0, gridY: 0 })) });
+const corona = (extra = {}) => ({ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire', 'Radiant'], ...extra });
+const makeSummary = (names = ['War_Cleric', 'Bandit 1']) => ({
+  round: 1,
+  creatures: names.map((name, i) => ({ name, type: i === 0 ? 'player' : 'npc' })),
+});
+
+function resetMocks() {
+  getRuntimeValue.mockReset().mockReturnValue([]);
+  isWithinRange.mockReset().mockResolvedValue(false);
+  getCombatSummary.mockReset().mockReturnValue(null);
+  getCombatContext.mockReset().mockResolvedValue(null);
 }
 
-function makeMapData(players) {
-  return { players };
-}
+describe('getCoronaSaveDisadvantage — grid lane', () => {
+  beforeEach(resetMocks);
 
-function makeCoronaBuff(distance, enemiesDisadvantageSaves = ['Fire', 'Radiant']) {
-  const buff = { effect: 'sunlight_aura', enemiesDisadvantageSaves };
-  if (distance !== undefined) buff.distance = distance;
-  return buff;
-}
-
-describe('getCoronaSaveDisadvantage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getRuntimeValue.mockReset();
-    isWithinRange.mockReset();
-    getRuntimeValue.mockImplementation((_name, key) => {
-      if (key === 'coronaOfLightEnemies') return [];
-      return [];
-    });
-    isWithinRange.mockResolvedValue(false);
-  });
-
-  it('returns false when mapData is undefined', async () => {
-    const result = await getCoronaSaveDisadvantage({ targetName: 'Target', mapData: undefined });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('returns false when mapData is null', async () => {
-    const result = await getCoronaSaveDisadvantage({ targetName: 'Target', mapData: null });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('returns false when mapData.players is missing or empty', async () => {
-    expect(await getCoronaSaveDisadvantage({ targetName: 'Target', mapData: {} })).toEqual({ disadvantage: false });
-    expect(await getCoronaSaveDisadvantage({ targetName: 'Target', mapData: makeMapData([]) })).toEqual({ disadvantage: false });
-  });
-
-  it('returns false when no player has corona aura buff', async () => {
-    getRuntimeValue.mockImplementation(() => []);
-
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Target',
-      mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-      damageType: 'Fire',
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('skips the target itself even if they have corona aura buff', async () => {
-    getRuntimeValue.mockReturnValue([makeCoronaBuff()]);
-
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Target',
-      mapData: makeMapData([makePlayer('Target')]),
-      damageType: 'Fire',
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('returns disadvantage with source when a non-target player has corona buff and is in range', async () => {
-    getRuntimeValue.mockImplementation((name) => name === 'Paladin' ? [makeCoronaBuff()] : []);
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Target',
-      mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-      damageType: 'Fire',
-    });
-    expect(result).toEqual({ disadvantage: true, source: 'Paladin' });
-  });
-
-  it('returns the first non-target player with corona buff', async () => {
-    getRuntimeValue.mockImplementation((name) =>
-      name === 'Paladin1' || name === 'Paladin2' ? [makeCoronaBuff()] : [],
-    );
-    isWithinRange.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Target',
-      mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin1'), makePlayer('Paladin2')]),
-      damageType: 'Fire',
-    });
-    expect(result).toEqual({ disadvantage: true, source: 'Paladin2' });
-  });
-
-  it('handles invalid buff types gracefully', async () => {
-    getRuntimeValue
-      .mockReturnValueOnce(null)
-      .mockReturnValueOnce(undefined)
-      .mockReturnValueOnce('not-an-array')
-      .mockReturnValueOnce(42)
-      .mockReturnValueOnce([makeCoronaBuff()]);
-
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Target',
-      mapData: makeMapData([
-        makePlayer('Target'), makePlayer('P1'), makePlayer('P2'), makePlayer('P3'), makePlayer('P4'), makePlayer('P5'),
-      ]),
-      damageType: 'Fire',
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('returns false when corona buff is out of range', async () => {
-    getRuntimeValue.mockImplementation(() => [makeCoronaBuff()]);
-    isWithinRange.mockResolvedValue(false);
-
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Target',
-      mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-      damageType: 'Fire',
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('respects enemiesDisadvantageSaves filter for damage type', async () => {
-    getRuntimeValue.mockImplementation((name) => name === 'Paladin' ? [makeCoronaBuff(undefined, ['Radiant'])] : []);
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Target',
-      mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-      damageType: 'Fire',
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('passes correct parameters to isWithinRange', async () => {
-    getRuntimeValue.mockImplementation((name) => name === 'Paladin' ? [makeCoronaBuff('60 ft')] : []);
-    isWithinRange.mockResolvedValue(true);
-
-    await getCoronaSaveDisadvantage({
-      targetName: 'Target',
-      campaignName: 'MyCampaign',
-      activeMapName: 'MyMap',
-      mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-      damageType: 'Fire',
-    });
-    expect(isWithinRange).toHaveBeenCalledWith('Paladin', 'Target', 60);
-  });
-
-  it('respects coronaOfLightEnemies list', async () => {
+  // Seeds runtime per (name, key) and returns the mapData grid to pass in.
+  function seed({ players = ['Target', 'Paladin'], buffs = {}, enemies = {}, inRange = true } = {}) {
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'coronaOfLightEnemies' && name === 'Paladin') return ['Target'];
-      if (key === 'activeBuffs' && name === 'Paladin') return [makeCoronaBuff()];
+      if (key === 'activeBuffs') return name in buffs ? buffs[name] : [];
+      if (key === 'coronaOfLightEnemies') return name in enemies ? enemies[name] : [];
       return [];
     });
-    isWithinRange.mockResolvedValue(true);
+    isWithinRange.mockImplementation(async (source) =>
+      typeof inRange === 'function' ? inRange(source) : inRange);
+    return grid(...players);
+  }
 
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Target',
-      mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-      damageType: 'Fire',
-    });
-    expect(result).toEqual({ disadvantage: true, source: 'Paladin' });
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['players list empty', { players: [] }],
+  ])('returns false with no grid (%s) and never consults the combat summary without skipRangeCheck', async (_label, mapData) => {
+    seed({ buffs: { Paladin: [corona()] }, inRange: true });
+
+    expect(await getCoronaSaveDisadvantage({ targetName: 'Target', campaignName: CAMPAIGN, mapData, damageType: 'Fire' }))
+      .toEqual({ disadvantage: false });
+    expect(getCombatSummary).not.toHaveBeenCalled();
+    expect(isWithinRange).not.toHaveBeenCalled();
   });
 
-  it('returns false when target not in coronaOfLightEnemies list', async () => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'coronaOfLightEnemies' && name === 'Paladin') return ['Other'];
-      if (key === 'activeBuffs' && name === 'Paladin') return [makeCoronaBuff()];
-      return [];
-    });
+  it.each([
+    ['in-range source, matching Fire save', { buffs: { Paladin: [corona()] } }, 'Fire', { disadvantage: true, source: 'Paladin' }],
+    ['damageType omitted passes the type gate', { buffs: { Paladin: [corona()] } }, undefined, { disadvantage: true, source: 'Paladin' }],
+    ['lowercase incoming damageType matches', { buffs: { Paladin: [corona({ enemiesDisadvantageSaves: ['Fire'] })] } }, 'fire', { disadvantage: true, source: 'Paladin' }],
+    ['non-string first enemies-list entry stays lenient', { buffs: { Paladin: [corona()] }, enemies: { Paladin: [42] } }, 'Fire', { disadvantage: true, source: 'Paladin' }],
+    ['target holding the buff is skipped', { buffs: { Target: [corona()] } }, 'Fire', { disadvantage: false }],
+    ['no player holds the buff', {}, 'Fire', { disadvantage: false }],
+    ['only source out of range', { inRange: false }, 'Fire', { disadvantage: false }],
+    ['second source used when first is out of range', { players: ['Target', 'P1', 'P2'], buffs: { P1: [corona()], P2: [corona()] }, inRange: (s) => s === 'P2' }, 'Fire', { disadvantage: true, source: 'P2' }],
+    ['garbage buff payloads skipped, loop reaches valid source', { buffs: { P1: null, P2: 'not-an-array', P3: [corona()] }, players: ['Target', 'P1', 'P2', 'P3'], inRange: (s) => s === 'P3' }, 'Fire', { disadvantage: true, source: 'P3' }],
+    ['damageType not in enemiesDisadvantageSaves', { buffs: { Paladin: [corona({ enemiesDisadvantageSaves: ['Radiant'] })] } }, 'Fire', { disadvantage: false }],
+    ['empty enemiesDisadvantageSaves blocks everything', { buffs: { Paladin: [corona({ enemiesDisadvantageSaves: [] })] } }, 'Fire', { disadvantage: false }],
+    ['buff without enemiesDisadvantageSaves matches nothing', { buffs: { Paladin: [{ effect: 'sunlight_aura' }] } }, 'Fire', { disadvantage: false }],
+    ['target absent from coronaOfLightEnemies', { enemies: { Paladin: ['Other'] } }, 'Fire', { disadvantage: false }],
+  ])('%s', async (_label, setup, damageType, expected) => {
+    const mapData = seed(setup);
 
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Target',
-      mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-      damageType: 'Fire',
-    });
-    expect(result).toEqual({ disadvantage: false });
+    expect(await getCoronaSaveDisadvantage({ targetName: 'Target', campaignName: CAMPAIGN, mapData, damageType }))
+      .toEqual(expected);
   });
 
-  it('uses default 60 ft range when coronaBuff.distance is absent', async () => {
-    getRuntimeValue.mockImplementation((name) => name === 'Paladin' ? [{ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire'] }] : []);
-    isWithinRange.mockResolvedValue(true);
+  it.each([
+    ['missing distance defaults to 60 ft', undefined, 60],
+    ['"60 ft" parses to 60', '60 ft', 60],
+    ['"30 ft" parses to 30', '30 ft', 30],
+    ['unparseable distance falls back to 60', 'far away', 60],
+  ])('range passed to isWithinRange: %s', async (_label, distance, expectedFeet) => {
+    const mapData = seed({ buffs: { Paladin: [corona({ distance })] } });
 
-    await getCoronaSaveDisadvantage({
-      targetName: 'Target',
-      mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-      damageType: 'Fire',
-    });
-    expect(isWithinRange).toHaveBeenCalledWith('Paladin', 'Target', 60);
-  });
-
-  it('normalizes damageType case to match against enemiesDisadvantageSaves', async () => {
-    getRuntimeValue.mockImplementation((name) => name === 'Paladin' ? [makeCoronaBuff(undefined, ['Fire', 'radiant'])] : []);
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Target',
-      mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-      damageType: 'FIRE',
-    });
-    expect(result).toEqual({ disadvantage: true, source: 'Paladin' });
-  });
-
-  it('returns false when enemiesDisadvantageSaves is empty array', async () => {
-    getRuntimeValue.mockImplementation((name) => name === 'Paladin' ? [makeCoronaBuff(undefined, [])] : []);
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Target',
-      mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-      damageType: 'Fire',
-    });
-    expect(result).toEqual({ disadvantage: false });
+    expect(await getCoronaSaveDisadvantage({ targetName: 'Target', campaignName: CAMPAIGN, mapData, damageType: 'Fire' }))
+      .toEqual({ disadvantage: true, source: 'Paladin' });
+    expect(isWithinRange).toHaveBeenCalledWith('Paladin', 'Target', expectedFeet);
   });
 });
 
-// ── CLA-063: skipRangeCheck lanes, gridless-lenient without mapData ──
-
-function makeCombatSummaryWith(creatures) {
-  return { round: 1, creatures };
-}
-
+// ── CLA-063: skipRangeCheck gridless lane — participants come from the combat
+// summary cache (cold-cache falls back to one awaited context fetch). ──
 describe('getCoronaSaveDisadvantage — skipRangeCheck gridless lane (CLA-063)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getRuntimeValue.mockReset();
-    isWithinRange.mockReset();
-    getCombatSummary.mockReset().mockReturnValue(null);
-    getCombatContext.mockReset().mockResolvedValue(null);
-  });
+  beforeEach(resetMocks);
 
-  function seedCleric(campaignName, enemies) {
+  function seed({ enemies = ['Bandit 1'], summary = makeSummary() } = {}) {
     getRuntimeValue.mockImplementation((name, key) => {
       if (name !== 'War_Cleric') return [];
-      if (key === 'activeBuffs') return [{ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire', 'Radiant'] }];
+      if (key === 'activeBuffs') return [corona()];
       if (key === 'coronaOfLightEnemies') return enemies;
       return [];
     });
-    getCombatSummary.mockReturnValue(makeCombatSummaryWith([
-      { name: 'War_Cleric', type: 'player' },
-      { name: 'Bandit 1', type: 'npc' },
-    ]));
+    getCombatSummary.mockReturnValue(summary);
   }
 
-  it('returns disadvantage for a targeted enemy + Fire save with no mapData', async () => {
-    seedCleric('test-campaign', ['Bandit 1']);
+  it.each([
+    ['Fire save on a marked enemy', {}, { disadvantage: true, source: 'War_Cleric' }],
+    ['damageType case normalized ("radiant")', { damageType: 'radiant' }, { disadvantage: true, source: 'War_Cleric' }],
+    ['non-Fire/Radiant damage type', { damageType: 'Cold' }, { disadvantage: false }],
+    ['target absent from coronaOfLightEnemies', { enemies: ['Other'] }, { disadvantage: false }],
+    ['no combat summary and no context', { summary: null }, { disadvantage: false }],
+  ])('%s', async (_label, { enemies, summary, damageType = 'Fire' }, expected) => {
+    seed({ enemies, summary });
 
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Bandit 1',
-      campaignName: 'test-campaign',
-      damageType: 'Fire',
-      skipRangeCheck: true,
-    });
-    expect(result).toEqual({ disadvantage: true, source: 'War_Cleric' });
+    expect(await getCoronaSaveDisadvantage({ targetName: 'Bandit 1', campaignName: CAMPAIGN, damageType, skipRangeCheck: true }))
+      .toEqual(expected);
     expect(isWithinRange).not.toHaveBeenCalled();
   });
 
-  it('returns disadvantage for Radiant damageType (case-normalized) with no mapData', async () => {
-    seedCleric('test-campaign', ['Bandit 1']);
-
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Bandit 1',
-      campaignName: 'test-campaign',
-      damageType: 'radiant',
-      skipRangeCheck: true,
-    });
-    expect(result).toEqual({ disadvantage: true, source: 'War_Cleric' });
-  });
-
-  it('returns false for non-Fire/Radiant damageType', async () => {
-    seedCleric('test-campaign', ['Bandit 1']);
-
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Bandit 1',
-      campaignName: 'test-campaign',
-      damageType: 'Cold',
-      skipRangeCheck: true,
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('returns false when target is not in coronaOfLightEnemies', async () => {
-    seedCleric('test-campaign', ['Other']);
-
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Bandit 1',
-      campaignName: 'test-campaign',
-      damageType: 'Radiant',
-      skipRangeCheck: true,
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('falls back to combat-context fetch when the summary cache is cold', async () => {
-    seedCleric('test-campaign', ['Bandit 1']);
+  it('never measures range even when mapData players are present, and skips the summary entirely', async () => {
+    seed();
     getCombatSummary.mockReturnValue(null);
-    getCombatContext.mockResolvedValue(makeCombatSummaryWith([
-      { name: 'War_Cleric', type: 'player' },
-      { name: 'Bandit 1', type: 'npc' },
-    ]));
 
-    const result = await getCoronaSaveDisadvantage({
+    expect(await getCoronaSaveDisadvantage({
       targetName: 'Bandit 1',
-      campaignName: 'test-campaign',
+      campaignName: CAMPAIGN,
+      mapData: grid('War_Cleric', 'Bandit 1'),
       damageType: 'Fire',
       skipRangeCheck: true,
-    });
-    expect(result).toEqual({ disadvantage: true, source: 'War_Cleric' });
-    expect(getCombatContext).toHaveBeenCalledWith('test-campaign');
-  });
-
-  it('returns false when no combat summary at all', async () => {
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Bandit 1',
-      campaignName: 'test-campaign',
-      damageType: 'Fire',
-      skipRangeCheck: true,
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('never checks range when skipRangeCheck is set even with mapData players', async () => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (name !== 'War_Cleric') return [];
-      if (key === 'activeBuffs') return [{ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire', 'Radiant'] }];
-      if (key === 'coronaOfLightEnemies') return ['Bandit 1'];
-      return [];
-    });
-
-    const result = await getCoronaSaveDisadvantage({
-      targetName: 'Bandit 1',
-      campaignName: 'test-campaign',
-      mapData: makeMapData([makePlayer('War_Cleric'), makePlayer('Bandit 1')]),
-      damageType: 'Fire',
-      skipRangeCheck: true,
-    });
-    expect(result).toEqual({ disadvantage: true, source: 'War_Cleric' });
+    })).toEqual({ disadvantage: true, source: 'War_Cleric' });
     expect(isWithinRange).not.toHaveBeenCalled();
+    expect(getCombatContext).not.toHaveBeenCalled();
+  });
+
+  it('falls back to one combat-context fetch when the summary cache is cold', async () => {
+    seed({ summary: null });
+    getCombatContext.mockResolvedValue(makeSummary());
+
+    expect(await getCoronaSaveDisadvantage({ targetName: 'Bandit 1', campaignName: CAMPAIGN, damageType: 'Fire', skipRangeCheck: true }))
+      .toEqual({ disadvantage: true, source: 'War_Cleric' });
+    expect(getCombatContext).toHaveBeenCalledWith(CAMPAIGN);
   });
 });
 
-describe('getCoronaSaveDisadvantageSync (CLA-063 sync save lanes)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getRuntimeValue.mockReset();
-    getCombatSummary.mockReset().mockReturnValue(null);
-  });
+// ── CLA-063: sync lane for save consumers that cannot await (aoeService). ──
+describe('getCoronaSaveDisadvantageSync (CLA-063)', () => {
+  beforeEach(resetMocks);
 
-  function seedCleric() {
+  function seed({ enemies = ['Bandit 1'], mapData, summary = makeSummary() } = {}) {
     getRuntimeValue.mockImplementation((name, key) => {
       if (name !== 'War_Cleric') return [];
-      if (key === 'activeBuffs') return [{ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire', 'Radiant'] }];
-      if (key === 'coronaOfLightEnemies') return ['Bandit 1'];
+      if (key === 'activeBuffs') return [corona()];
+      if (key === 'coronaOfLightEnemies') return enemies;
       return [];
     });
-    getCombatSummary.mockReturnValue(makeCombatSummaryWith([
-      { name: 'War_Cleric', type: 'player' },
-      { name: 'Bandit 1', type: 'npc' },
-    ]));
+    getCombatSummary.mockReturnValue(summary);
+    return mapData;
   }
 
-  it('returns disadvantage for targeted enemy + Fire/Radiant with skipRangeCheck and no mapData', () => {
-    seedCleric();
-    expect(getCoronaSaveDisadvantageSync({ targetName: 'Bandit 1', campaignName: 'test-campaign', damageType: 'Radiant', skipRangeCheck: true }))
-      .toEqual({ disadvantage: true, source: 'War_Cleric' });
-    expect(getCoronaSaveDisadvantageSync({ targetName: 'Bandit 1', campaignName: 'test-campaign', damageType: 'Fire', skipRangeCheck: true }))
-      .toEqual({ disadvantage: true, source: 'War_Cleric' });
-  });
+  it.each([
+    ['Fire save on a marked enemy', {}, { disadvantage: true, source: 'War_Cleric' }],
+    ['damageType case normalized ("radiant")', { damageType: 'radiant' }, { disadvantage: true, source: 'War_Cleric' }],
+    ['non-Fire/Radiant damage type', { damageType: 'Cold' }, { disadvantage: false }],
+    ['target absent from coronaOfLightEnemies', { enemies: ['Other'] }, { disadvantage: false }],
+    ['mapData players used without any combat summary', { mapData: grid('War_Cleric', 'Bandit 1'), summary: null }, { disadvantage: true, source: 'War_Cleric' }],
+    ['no summary and no mapData', { summary: null }, { disadvantage: false }],
+  ])('%s', async (_label, { enemies, mapData, summary, damageType = 'Fire' }, expected) => {
+    seed({ enemies, mapData, summary });
 
-  it('returns false for non-Fire/Radiant and for non-enemies', () => {
-    seedCleric();
-    expect(getCoronaSaveDisadvantageSync({ targetName: 'Bandit 1', campaignName: 'test-campaign', damageType: 'Cold', skipRangeCheck: true }))
-      .toEqual({ disadvantage: false });
-
-    seedCleric();
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (name !== 'War_Cleric') return [];
-      if (key === 'activeBuffs') return [{ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire', 'Radiant'] }];
-      if (key === 'coronaOfLightEnemies') return ['Somebody Else'];
-      return [];
-    });
-    expect(getCoronaSaveDisadvantageSync({ targetName: 'Bandit 1', campaignName: 'test-campaign', damageType: 'Fire', skipRangeCheck: true }))
-      .toEqual({ disadvantage: false });
+    expect(getCoronaSaveDisadvantageSync({ targetName: 'Bandit 1', campaignName: CAMPAIGN, mapData, damageType, skipRangeCheck: true }))
+      .toEqual(expected);
+    expect(getCombatContext).not.toHaveBeenCalled();
   });
 
   it('stays conservative-false without skipRangeCheck (cannot measure range sync)', () => {
-    seedCleric();
-    expect(getCoronaSaveDisadvantageSync({ targetName: 'Bandit 1', campaignName: 'test-campaign', damageType: 'Fire' }))
-      .toEqual({ disadvantage: false });
-  });
+    seed();
 
-  it('honors mapData players without needing combat summary', () => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (name !== 'Paladin') return [];
-      if (key === 'activeBuffs') return [{ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire'] }];
-      return [];
-    });
-    expect(getCoronaSaveDisadvantageSync({
-      targetName: 'Target',
-      campaignName: 'test-campaign',
-      mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-      damageType: 'Fire',
-      skipRangeCheck: true,
-    })).toEqual({ disadvantage: true, source: 'Paladin' });
+    expect(getCoronaSaveDisadvantageSync({ targetName: 'Bandit 1', campaignName: CAMPAIGN, damageType: 'Fire' }))
+      .toEqual({ disadvantage: false });
   });
 });

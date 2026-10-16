@@ -1,4 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// getPreSelectedSpells — spells auto-granted by class/subclass, race/subrace, and feats.
+// Fixtures are anchored to the real disk data (public/data/[2024/]classes|races|feats.json)
+// and outputs are pinned exactly, so fabricated rules can never sneak back in.
+// Production caller is useWizardSpells; its own test mocks this module, so the
+// extraction behavior is covered only here.
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getPreSelectedSpells } from './getPreSelectedSpells.js';
 
 vi.mock('../ui/dataLoader.js', () => ({
@@ -9,457 +15,116 @@ vi.mock('../ui/dataLoader.js', () => ({
 
 import { loadClassData, loadRaceData, loadFeatData } from '../ui/dataLoader.js';
 
+import classes5e from '../../../public/data/classes.json';
+import races5e from '../../../public/data/races.json';
+import feats5e from '../../../public/data/feats.json';
+import classes2024 from '../../../public/data/2024/classes.json';
+import races2024 from '../../../public/data/2024/races.json';
+import feats2024 from '../../../public/data/2024/feats.json';
+
 describe('getPreSelectedSpells', () => {
-  const mockWizardClass = [
-    {
-      name: 'Wizard',
-      index: 'wizard',
-      subclasses: [
-        {
-          name: 'School of Evocation',
-          index: 'school_of_evocation',
-          spells: [
-            { spell: { name: 'Magic Missile' }, prerequisites: [{ type: 'level', name: '2nd-level spell slot' }] },
-          ],
-        },
-      ],
-    },
-  ];
-
-  const mockClericClass = [
-    {
-      name: 'Cleric',
-      index: 'cleric',
-      subclasses: [
-        {
-          name: 'Light Domain',
-          index: 'light_domain',
-          spells: [
-            { spell: { name: 'Burning Hands' }, prerequisites: [] },
-          ],
-        },
-      ],
-    },
-  ];
-
-  const mockHighElfRace = [
-    {
-      name: 'High Elf',
-      index: 'high-elf',
-      traits: [{ description: '<em>Fire Bolt</em> cantrip' }],
-      subraces: [
-        {
-          name: 'Grey Elf',
-          racial_traits: [{ description: '<em>Light</em> cantrip' }],
-          description: 'Learn <em>Guidance</em>',
-        },
-      ],
-    },
-  ];
-
-  const mockFeats = [
-    { name: 'Magic Initiate', index: 'magic-initiate', description: 'Choose a class and learn spells from its spell list' },
-    { name: 'Fey Touched', index: 'fey-touched', description: '' },
-    { name: 'Shadow Touched', index: 'shadow-touched', description: '' },
-    { name: 'War Caster', index: 'war-caster', description: '<em>Shield</em> cantrip', benefits: [{ type: 'spell', description: '<em>Burning Hands</em>' }] },
-  ];
-
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(loadClassData).mockResolvedValue(mockWizardClass);
-    vi.mocked(loadRaceData).mockResolvedValue(mockHighElfRace);
-    vi.mocked(loadFeatData).mockResolvedValue(mockFeats);
+    // Version-discriminating loaders: every rules:'2024' row below only passes if
+    // the module forwards the ruleset correctly to each data loader.
+    loadClassData.mockImplementation(v => Promise.resolve(v === '2024' ? classes2024 : classes5e));
+    loadRaceData.mockImplementation(v => Promise.resolve(v === '2024' ? races2024 : races5e));
+    loadFeatData.mockImplementation(v => Promise.resolve(v === '2024' ? feats2024 : feats5e));
   });
 
-  describe('null/undefined/empty input handling', () => {
-    it.each([
-      [null, 'null formData'],
-      [undefined, 'undefined formData'],
-      [{}, 'empty object formData'],
-      [{ rules: '5e' }, 'formData with only rules'],
-    ])('returns empty array for %s (%s)', async (input) => {
-      const result = await getPreSelectedSpells(input);
-      expect(result).toEqual([]);
-    });
+  it('returns [] for formData without any spell-granting selection', async () => {
+    for (const input of [null, undefined, {}, { rules: '5e' }, { rules: '2024' }, { level: '5' }, { feats: null }, { feats: [] }]) {
+      expect(await getPreSelectedSpells(input), `input: ${JSON.stringify(input)}`).toEqual([]);
+    }
   });
 
-  describe('class/subclass spell extraction', () => {
-    it('extracts subclass spells when class and subclass are provided', async () => {
-      const formData = {
-        rules: '5e',
-        level: 3,
-        class: { name: 'Wizard', subclass: { name: 'School of Evocation' } },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual(['Magic Missile']);
-    });
-
-    it('does not extract subclass spells when only class is provided', async () => {
-      const formData = {
-        rules: '5e',
-        level: 3,
-        class: { name: 'Wizard' },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
-    });
-
-    it('filters subclass spells by character level using prerequisites', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        class: { name: 'Wizard', subclass: { name: 'School of Evocation' } },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
-    });
-
-    it('uses default level 1 when level is missing', async () => {
-      // Light Domain's Burning Hands has no prerequisites (empty array), so it's available at level 1
-      const formData = {
-        rules: '5e',
-        class: { name: 'Cleric', subclass: { name: 'Light Domain' } },
-      };
-      vi.mocked(loadClassData).mockResolvedValue(mockClericClass);
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual(['Burning Hands']);
-    });
-
-    it('handles invalid class name gracefully', async () => {
-      const formData = {
-        rules: '5e',
-        level: 3,
-        class: { name: 'NonExistentClass', subclass: { name: 'Subclass' } },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
-    });
-
-    it('finds class by index when name does not match', async () => {
-      const formData = {
-        rules: '5e',
-        level: 3,
-        class: { name: 'wizard', subclass: { name: 'School of Evocation' } },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual(['Magic Missile']);
-    });
-
-    it('handles missing class property gracefully', async () => {
-      const formData = { rules: '5e', level: 3 };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
+  // Real 5e disk data: Cleric → Light Domain has bonus spell tiers at cleric 1
+  // (Burning Hands, Faerie Fire), cleric 3 (Flaming Sphere, Scorching Ray),
+  // cleric 5 (Daylight, Fireball). Wizard subclasses have NO spells arrays on disk.
+  describe.each([
+    { label: 'defaults to level 1 when level is missing', formData: { rules: '5e', class: { name: 'Cleric', subclass: { name: 'Light' } } }, expected: ['Burning Hands', 'Faerie Fire'] },
+    { label: 'level 0 falls back to level 1', formData: { rules: '5e', level: 0, class: { name: 'Cleric', subclass: { name: 'Light' } } }, expected: ['Burning Hands', 'Faerie Fire'] },
+    { label: 'unparseable level falls back to level 1', formData: { rules: '5e', level: 'invalid', class: { name: 'Cleric', subclass: { name: 'Light' } } }, expected: ['Burning Hands', 'Faerie Fire'] },
+    { label: 'level 1 includes only cleric-1 prereq spells', formData: { rules: '5e', level: 1, class: { name: 'Cleric', subclass: { name: 'Light' } } }, expected: ['Burning Hands', 'Faerie Fire'] },
+    { label: 'level 2 stays at the cleric-1 tier', formData: { rules: '5e', level: 2, class: { name: 'Cleric', subclass: { name: 'Light' } } }, expected: ['Burning Hands', 'Faerie Fire'] },
+    { label: 'level 3 adds the cleric-3 tier', formData: { rules: '5e', level: 3, class: { name: 'Cleric', subclass: { name: 'Light' } } }, expected: ['Burning Hands', 'Faerie Fire', 'Flaming Sphere', 'Scorching Ray'] },
+    { label: 'string level "3" parses like numeric 3', formData: { rules: '5e', level: '3', class: { name: 'Cleric', subclass: { name: 'Light' } } }, expected: ['Burning Hands', 'Faerie Fire', 'Flaming Sphere', 'Scorching Ray'] },
+    { label: 'resolves class and subclass by lowercase index', formData: { rules: '5e', level: 3, class: { name: 'cleric', subclass: { name: 'light' } } }, expected: ['Burning Hands', 'Faerie Fire', 'Flaming Sphere', 'Scorching Ray'] },
+    { label: 'level 5 adds the cleric-5 tier', formData: { rules: '5e', level: 5, class: { name: 'Cleric', subclass: { name: 'Light' } } }, expected: ['Burning Hands', 'Faerie Fire', 'Flaming Sphere', 'Scorching Ray', 'Daylight', 'Fireball'] },
+    { label: 'class without subclass grants no spells', formData: { rules: '5e', level: 5, class: { name: 'Cleric' } }, expected: [] },
+    { label: 'Wizard subclasses carry no authored spells on disk', formData: { rules: '5e', level: 5, class: { name: 'Wizard', subclass: { name: 'Evocation' } } }, expected: [] },
+    { label: 'unknown class resolves to nothing', formData: { rules: '5e', level: 5, class: { name: 'NonExistentClass', subclass: { name: 'NonExistent' } } }, expected: [] },
+  ])('5e class/subclass (%s)', ({ formData, expected }) => {
+    it('returns exactly the spells available at that level', async () => {
+      expect(await getPreSelectedSpells(formData)).toEqual(expected);
     });
   });
 
-  describe('race spell extraction', () => {
-    it('extracts cantrips from race traits', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        race: { name: 'High Elf' },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toContain('Fire Bolt');
-    });
-
-    it('extracts cantrips from subrace traits and description', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        race: { name: 'High Elf', subrace: { name: 'Grey Elf' } },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toContain('Light');
-      expect(result).toContain('Guidance');
-    });
-
-    it('handles missing race property gracefully', async () => {
-      const formData = { rules: '5e', level: 1 };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
-    });
-
-    it('handles missing race data gracefully', async () => {
-      const formData = { rules: '5e', level: 1, race: { name: 'NonExistentRace' } };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
-    });
-
-    it('finds subrace in 2024 from parent race subraces', async () => {
-      const formData = {
-        rules: '2024',
-        level: 1,
-        race: { name: 'High Elf', subrace: { name: 'Grey Elf' } },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toContain('Light');
-    });
-
-    it('finds subrace as separate race entry in 5e', async () => {
-      const extendedRaces = [
-        ...mockHighElfRace,
-        { name: 'Grey Elf', index: 'grey-elf', traits: [{ description: '<em>Acid Splash</em>' }], subraces: [] },
-      ];
-      vi.mocked(loadRaceData).mockResolvedValue(extendedRaces);
-
-      const formData = {
-        rules: '5e',
-        level: 1,
-        race: { name: 'High Elf', subrace: { name: 'Grey Elf' } },
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toContain('Acid Splash');
+  // Race extraction pulls spell names from <em> markup and "know/learn X cantrip"
+  // phrases in real disk trait text — outputs are pinned verbatim.
+  describe.each([
+    {
+      label: 'Tiefling Infernal Legacy surfaces the thaumaturgy cantrip phrase verbatim (lowercase)',
+      formData: { rules: '5e', level: 1, race: { name: 'Tiefling' } },
+      expected: ['thaumaturgy'],
+    },
+    {
+      label: '5e Elf+High Elf resolves subrace via parent fallback; trait text "know one cantrip of your choice" yields only the bogus fragment "one" (known regex quirk — reported, not a real spell grant)',
+      formData: { rules: '5e', level: 1, race: { name: 'Elf', subrace: { name: 'High Elf' } } },
+      expected: ['one'],
+    },
+    {
+      label: '2024 Elf traits surface nothing (lineage traits skipped, no spell-name phrases)',
+      formData: { rules: '2024', level: 1, race: { name: 'Elf' } },
+      expected: [],
+    },
+  ])('race/subrace extraction (%s)', ({ formData, expected }) => {
+    it('returns exactly the disk-derived spell list', async () => {
+      expect(await getPreSelectedSpells(formData)).toEqual(expected);
     });
   });
 
-  describe('feat spell extraction', () => {
-    it('does not extract spells from Magic Initiate feat (spells are user-selected)', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        feats: ['Magic Initiate'],
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
-    });
-
-    it('extracts Misty Step from Fey Touched', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        feats: ['Fey Touched'],
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual(['Misty Step']);
-    });
-
-    it('extracts Invisibility from Shadow Touched', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        feats: ['Shadow Touched'],
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual(['Invisibility']);
-    });
-
-    it('extracts spells from War Caster feat benefits and description', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        feats: ['War Caster'],
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual(['Burning Hands']);
-    });
-
-    it('combines spells from multiple feats', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        feats: ['Magic Initiate', 'Fey Touched'],
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual(['Misty Step']);
-    });
-
-    it('handles missing, null, or empty feats gracefully', async () => {
-      const noFeats = await getPreSelectedSpells({ rules: '5e', level: 1 });
-      expect(noFeats).toEqual([]);
-
-      const nullFeats = await getPreSelectedSpells({ rules: '5e', level: 1, feats: null });
-      expect(nullFeats).toEqual([]);
-
-      const emptyFeats = await getPreSelectedSpells({ rules: '5e', level: 1, feats: [] });
-      expect(emptyFeats).toEqual([]);
-    });
-
-    it('handles non-existent feat gracefully', async () => {
-      const formData = {
-        rules: '5e',
-        level: 1,
-        feats: ['NonExistentFeat'],
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toEqual([]);
+  // 2024 Barbarian Path of the Wild Heart majors spell tiers on disk:
+  // Speak with Animals (lvl 1), Beast Sense (lvl 2), Commune with Nature (lvl 10).
+  describe.each([
+    { level: 1, expected: ['Speak with Animals'] },
+    { level: 2, expected: ['Speak with Animals', 'Beast Sense'] },
+    { level: 9, expected: ['Speak with Animals', 'Beast Sense'] },
+    { level: 10, expected: ['Speak with Animals', 'Beast Sense', 'Commune with Nature'] },
+  ])('2024 Path of the Wild Heart majors at level %s', ({ level, expected }) => {
+    it('gates major spells by their disk level, exactly', async () => {
+      expect(await getPreSelectedSpells({ rules: '2024', level, class: { name: 'Barbarian', major: { name: 'Path of the Wild Heart' } } })).toEqual(expected);
     });
   });
 
-  describe('deduplication and combined sources', () => {
-    it('deduplicates spells that appear from multiple sources', async () => {
-      const formData = {
-        rules: '5e',
-        level: 3,
-        class: { name: 'Cleric', subclass: { name: 'Light Domain' } },
-        race: { name: 'High Elf' },
-        feats: ['War Caster'],
-      };
-      vi.mocked(loadClassData).mockResolvedValue(mockClericClass);
-      const result = await getPreSelectedSpells(formData);
-      const burningHandsCount = result.filter(s => s === 'Burning Hands').length;
-      expect(burningHandsCount).toBe(1);
-    });
+  it('does not pull spells from other majors of the same class', async () => {
+    expect(await getPreSelectedSpells({ rules: '2024', level: 10, class: { name: 'Barbarian', major: { name: 'Path of the Berserker' } } })).toEqual([]);
+  });
 
-    it('combines spells from class, race, and feats into a single deduplicated set', async () => {
-      const formData = {
-        rules: '5e',
-        level: 3,
-        class: { name: 'Wizard', subclass: { name: 'School of Evocation' } },
-        race: { name: 'High Elf' },
-        feats: ['Fey Touched'],
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toContain('Magic Missile');
-      expect(result).toContain('Fire Bolt');
-      expect(result).toContain('Misty Step');
-      expect(new Set(result).size).toBe(result.length);
-    });
-
-    it('deduplicates cantrips from race and subrace', async () => {
-      const extendedRaces = [
-        ...mockHighElfRace,
-        { name: 'Half-Elf', index: 'half-elf', traits: [{ description: '<em>Guidance</em> cantrip' }], subraces: [] },
-      ];
-      vi.mocked(loadRaceData).mockResolvedValue(extendedRaces);
-
-      const formData = {
-        rules: '5e',
-        level: 1,
-        race: { name: 'Half-Elf' },
-        feats: ['Magic Initiate'],
-      };
-      const result = await getPreSelectedSpells(formData);
-      expect(result).toContain('Guidance');
-      const guidanceCount = result.filter(s => s === 'Guidance').length;
-      expect(guidanceCount).toBe(1);
+  describe.each([
+    { label: '2024 Druid gets Druidic (Speak with Animals)', formData: { rules: '2024', level: 1, class: { name: 'Druid' } }, expected: ['Speak with Animals'] },
+    { label: '5e Druid does not', formData: { rules: '5e', level: 1, class: { name: 'Druid' } }, expected: [] },
+    { label: '2024 non-Druid classes do not', formData: { rules: '2024', level: 1, class: { name: 'Wizard' } }, expected: [] },
+    { label: '2024 Fey Touched grants exactly Misty Step', formData: { rules: '2024', level: 1, feats: ['Fey Touched'] }, expected: ['Misty Step'] },
+    { label: '2024 Shadow Touched grants exactly Invisibility', formData: { rules: '2024', level: 1, feats: ['Shadow Touched'] }, expected: ['Invisibility'] },
+    { label: '2024 Magic Initiate grants no real spell — only the bogus "two" fragment from "learn two cantrips" (user-chosen spells stay un-preselected; reported quirk)', formData: { rules: '2024', level: 1, feats: ['Magic Initiate'] }, expected: ['two'] },
+    { label: '5e Magic Initiate contributes nothing (disk descriptions are string arrays, extraction gate never fires)', formData: { rules: '5e', level: 1, feats: ['Magic Initiate'] }, expected: [] },
+    { label: '5e feats scope is version-correct: Fey Touched does not exist in 5e disk data', formData: { rules: '5e', level: 1, feats: ['Fey Touched'] }, expected: [] },
+  ])('hardcoded and feat grants (%s)', ({ formData, expected }) => {
+    it('returns exactly the granted spell list', async () => {
+      expect(await getPreSelectedSpells(formData)).toEqual(expected);
     });
   });
 
-  describe('level parsing', () => {
-    it('parses numeric and string levels', async () => {
-      const base = { class: { name: 'Wizard', subclass: { name: 'School of Evocation' } } };
-      const numeric = await getPreSelectedSpells({ rules: '5e', level: 3, ...base });
-      expect(numeric).toContain('Magic Missile');
-
-      const stringLevel = await getPreSelectedSpells({ rules: '5e', level: '3', ...base });
-      expect(stringLevel).toContain('Magic Missile');
-    });
-
-    it('defaults to level 1 for invalid, zero, or empty string levels', async () => {
-      const base = { rules: '5e', class: { name: 'Wizard', subclass: { name: 'School of Evocation' } } };
-      const invalid = await getPreSelectedSpells({ ...base, level: 'invalid' });
-      expect(invalid).not.toContain('Magic Missile');
-
-      const zero = await getPreSelectedSpells({ ...base, level: 0 });
-      expect(zero).not.toContain('Magic Missile');
-
-      const empty = await getPreSelectedSpells({ ...base, level: '' });
-      expect(empty).not.toContain('Magic Missile');
-    });
-  });
-
-  describe('ruleset selection', () => {
-    it('defaults to 5e when rules is missing', async () => {
-      await getPreSelectedSpells({ level: 1, race: { name: 'High Elf' } });
-      expect(loadRaceData).toHaveBeenCalledWith('5e');
-    });
-
-    it('uses 2024 rules when specified for all data loaders', async () => {
-      await getPreSelectedSpells({ rules: '2024', level: 1, race: { name: 'High Elf' } });
-      expect(loadRaceData).toHaveBeenCalledWith('2024');
-
-      await getPreSelectedSpells({ rules: '2024', level: 3, class: { name: 'Wizard', subclass: { name: 'School of Evocation' } } });
-      expect(loadClassData).toHaveBeenCalledWith('2024');
-
-      await getPreSelectedSpells({ rules: '2024', level: 1, feats: ['Magic Initiate'] });
-      expect(loadFeatData).toHaveBeenCalledWith('2024');
-    });
-  });
-
-  describe('Druidic feature (2024 ruleset)', () => {
-    it('adds Speak with Animals for Druid in 2024 but not 5e', async () => {
-      const druid2024 = await getPreSelectedSpells({ rules: '2024', level: 1, class: { name: 'Druid' } });
-      expect(druid2024).toContain('Speak with Animals');
-
-      const druid5e = await getPreSelectedSpells({ rules: '5e', level: 1, class: { name: 'Druid' } });
-      expect(druid5e).not.toContain('Speak with Animals');
-    });
-
-    it('does not add Speak with Animals for non-Druid classes in 2024', async () => {
-      const result = await getPreSelectedSpells({ rules: '2024', level: 1, class: { name: 'Wizard' } });
-      expect(result).not.toContain('Speak with Animals');
-    });
-  });
-
-  describe('2024 Barbarian Path of the Wild Heart', () => {
-    it('extracts Animal Speaker spells from major spells array', async () => {
-      const classes = [
-        {
-          name: 'Barbarian',
-          majors: [
-            {
-              name: 'Path of the Wild Heart',
-              spells: [
-                { name: 'Speak with Animals', level: 1 },
-                { name: 'Beast Sense', level: 2 },
-                { name: 'Commune with Nature', level: 10 },
-              ],
-            },
-          ],
-        },
-      ];
-      vi.mocked(loadClassData).mockResolvedValue(classes);
-
-      const result = await getPreSelectedSpells({ rules: '2024', level: 3, class: { name: 'Barbarian', major: { name: 'Path of the Wild Heart' } } });
-      expect(result).toContain('Speak with Animals');
-      expect(result).toContain('Beast Sense');
-      expect(result).not.toContain('Commune with Nature');
-    });
-
-    it('includes Commune with Nature when level 10 or higher', async () => {
-      const classes = [
-        {
-          name: 'Barbarian',
-          majors: [
-            {
-              name: 'Path of the Wild Heart',
-              spells: [
-                { name: 'Speak with Animals', level: 1 },
-                { name: 'Beast Sense', level: 2 },
-                { name: 'Commune with Nature', level: 10 },
-              ],
-            },
-          ],
-        },
-      ];
-      vi.mocked(loadClassData).mockResolvedValue(classes);
-
-      const result = await getPreSelectedSpells({ rules: '2024', level: 10, class: { name: 'Barbarian', major: { name: 'Path of the Wild Heart' } } });
-      expect(result).toContain('Commune with Nature');
-    });
-
-    it('does not extract spells for non-Wild Heart Barbarian majors', async () => {
-      const classes = [
-        {
-          name: 'Barbarian',
-          majors: [
-            { name: 'Path of the Berserker' },
-            {
-              name: 'Path of the Wild Heart',
-              spells: [
-                { name: 'Speak with Animals', level: 1 },
-                { name: 'Beast Sense', level: 2 },
-              ],
-            },
-          ],
-        },
-      ];
-      vi.mocked(loadClassData).mockResolvedValue(classes);
-
-      const result = await getPreSelectedSpells({ rules: '2024', level: 3, class: { name: 'Barbarian', major: { name: 'Path of the Berserker' } } });
-      expect(result).not.toContain('Speak with Animals');
-      expect(result).not.toContain('Beast Sense');
-    });
+  it('merges class, race, and feat sources in order, deduplicated', async () => {
+    const formData = {
+      rules: '2024',
+      level: 3,
+      class: { name: 'Barbarian', major: { name: 'Path of the Wild Heart' } },
+      race: { name: 'Elf' },
+      feats: ['Fey Touched', 'Fey Touched'],
+    };
+    const result = await getPreSelectedSpells(formData);
+    expect(result).toEqual(['Speak with Animals', 'Beast Sense', 'Misty Step']);
+    expect(new Set(result).size).toBe(result.length);
   });
 });

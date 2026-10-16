@@ -1,3 +1,17 @@
+// @maintained-by-ai
+// skillValidation PAIR seam map (this file = core lane; choice-sources = skillValidation-choice-sources.test.js):
+//   • core (HERE): getSkillLimits totals, fromClass/fromRace/fromBackground shapes, null-data
+//     defaults per ruleset, 5e hardcoded background default, getPreSelectedSkills auto-vs-choice
+//     accumulation. Attribution/pools and the 5e 'In 5e rules' prefix: owned by the choice-sources
+//     lane — cited, not re-pinned here.
+//   • skillValidation.major-feature.test.js: canonical home for the 'major' lane (Student of War).
+//     skillValidation-feats.test.js: canonical home for Boon of Skill short-circuit (including
+//     getPreSelectedSkills all-18). skillValidation.validation.test.js: validateSkills messages /
+//     getSkillInfo. skillValidation.expertise.test.js: expertise slots.
+// rules-validation.json (both rulesets) has NO skill entries — details strings are built from the
+// limits.js templates, so the 2024 base clause is pinned verbatim against that template here (only
+// this lane pins it). Background rows re-anchored verbatim to public/data/2024/backgrounds.json
+// (reuse the choice-sources disk rows); remaining fixtures are synthetic parse-shapes, marked as such.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as dataLoader from '../ui/dataLoader.js';
 
@@ -16,21 +30,21 @@ import {
   getPreSelectedSkills,
 } from './skillValidation.js';
 
-describe('skillValidation', () => {
+describe('skillValidation - core lane (limits totals, fromX shapes, pre-selected)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe('getSkillLimits', () => {
-    it('should return skill limits for 2024 ruleset with class, race, and background', async () => {
+    it('2024: allowed sums class+race+background and each fromX keeps its own shape', async () => {
       vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-        skill_proficiencies: 'Choose 2 from Arcana, History',
+        skill_proficiencies: 'Choose 2 from Arcana, History', // synthetic choice shape
       });
       vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-        skill_proficiencies: 'Insight',
+        skill_proficiencies: 'Insight', // synthetic fixed-grant shape
       });
       vi.mocked(dataLoader.fetchBackgroundData).mockResolvedValue({
-        skill_proficiencies: 'Deception and Persuasion',
+        skill_proficiencies: 'Deception and Sleight of Hand', // verbatim public/data/2024/backgrounds.json Charlatan
       });
 
       const result = await getSkillLimits({
@@ -38,21 +52,29 @@ describe('skillValidation', () => {
         class: { name: 'Wizard' },
         race: { name: 'Human' },
         background: 'Charlatan',
-      });
+      }, []);
 
+      // class 2 + race 1 + background 2 (+0 feats)
       expect(result.allowed).toBe(5);
-      expect(result.fromClass.isChoice).toBe(true);
-      expect(result.fromClass.count).toBe(2);
-      expect(result.fromRace.skills).toEqual(['Insight']);
-      expect(result.fromBackground.skills).toEqual(['Deception', 'Persuasion']);
+      expect(result.fromClass).toEqual({ count: 2, skills: ['Arcana', 'History'], isChoice: true });
+      expect(result.fromRace).toEqual({ count: 1, skills: ['Insight'], isChoice: false });
+      expect(result.fromBackground).toEqual({ count: 2, skills: ['Deception', 'Sleight of Hand'], isChoice: false });
+      // 2024 details template (limits.js), pinned once here; feat suffixes owned by choice-sources lane
+      expect(result.details).toBe(
+        'You get 2 skill choice(s) from Arcana, History, 1 from your race, and 2 from your background (5 total)'
+      );
     });
 
-    it('should return skill limits for 5e ruleset with class and background', async () => {
+    it('5e: background default is hardcoded count-only and never fetched, even when background data exists', async () => {
       vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
         skill_proficiencies: 'Choose 2 from Arcana, History',
       });
       vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
         skill_proficiencies: 'Insight',
+      });
+      // 2024-Acolyte disk row as wrong-container decoy: the 5e lane must not consume it
+      vi.mocked(dataLoader.fetchBackgroundData).mockResolvedValue({
+        skill_proficiencies: 'Insight and Religion',
       });
 
       const result = await getSkillLimits({
@@ -60,32 +82,31 @@ describe('skillValidation', () => {
         class: { name: 'Wizard' },
         race: { name: 'Human' },
         background: 'Acolyte',
-      });
+      }, []);
 
+      // class 2 + race 1 + hardcoded background 2 (+0 feats)
       expect(result.allowed).toBe(5);
-      expect(result.fromClass.isChoice).toBe(true);
-      expect(result.fromBackground.count).toBe(2);
+      expect(result.fromClass).toEqual({ count: 2, skills: ['Arcana', 'History'], isChoice: true });
+      expect(result.fromRace).toEqual({ count: 1, skills: ['Insight'], isChoice: false });
+      expect(result.fromBackground).toEqual({ count: 2, skills: [], isChoice: true });
+      expect(dataLoader.fetchBackgroundData).not.toHaveBeenCalled();
     });
 
-    it('should return correct defaults when all data is null', async () => {
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(null);
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(null);
-      vi.mocked(dataLoader.fetchBackgroundData).mockResolvedValue(null);
-
-      const result5e = await getSkillLimits({ rules: '5e' });
+    it('all-null data still yields each ruleset\'s own baseline: 5e keeps background 2, 2024 grants nothing', async () => {
+      const result5e = await getSkillLimits({ rules: '5e' }, []);
       expect(result5e.allowed).toBe(2);
       expect(result5e.fromClass).toEqual({ count: 0, skills: [], isChoice: true });
       expect(result5e.fromRace).toEqual({ count: 0, skills: [], isChoice: false });
       expect(result5e.fromBackground).toEqual({ count: 2, skills: [], isChoice: true });
 
-      const result2024 = await getSkillLimits({ rules: '2024' });
+      const result2024 = await getSkillLimits({ rules: '2024' }, []);
       expect(result2024.allowed).toBe(0);
-      expect(result2024.fromClass.count).toBe(0);
-      expect(result2024.fromRace.count).toBe(0);
-      expect(result2024.fromBackground.count).toBe(0);
+      expect(result2024.fromClass).toEqual({ count: 0, skills: [], isChoice: true });
+      expect(result2024.fromRace).toEqual({ count: 0, skills: [], isChoice: false });
+      expect(result2024.fromBackground).toEqual({ count: 0, skills: [], isChoice: false });
     });
 
-    it('should handle race with no skill_proficiencies field', async () => {
+    it('race with no skill_proficiencies adds nothing to allowed and keeps fromRace empty', async () => {
       vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
         skill_proficiencies: 'Choose 1 from Arcana',
       });
@@ -95,48 +116,41 @@ describe('skillValidation', () => {
         rules: '2024',
         class: { name: 'Wizard' },
         race: { name: 'Human' },
-      });
+      }, []);
 
-      expect(result.fromRace.count).toBe(0);
-      expect(result.fromRace.skills).toEqual([]);
-    });
-
-    it('should default to 2 skill choices when no class, race, or background provided in 5e', async () => {
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(null);
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(null);
-      vi.mocked(dataLoader.fetchBackgroundData).mockResolvedValue(null);
-
-      const result = await getSkillLimits({ rules: '5e' });
-
-      expect(result.allowed).toBe(2);
-      expect(result.fromClass.count).toBe(0);
-      expect(result.fromBackground.count).toBe(2);
+      expect(result.fromRace).toEqual({ count: 0, skills: [], isChoice: false });
+      // class 1 + empty race + no background: empty race contributed exactly 0
+      expect(result.allowed).toBe(1);
     });
   });
 
   describe('getPreSelectedSkills', () => {
-    it('should return pre-selected skills from race, background, and class (not choices)', async () => {
+    it('accumulates fixed race then fixed class grants (2024)', async () => {
       vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-        skill_proficiencies: 'Insight and Perception',
+        skill_proficiencies: 'Insight and Perception', // synthetic fixed-grant shape
       });
       vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-        skill_proficiencies: 'Arcana',
+        skill_proficiencies: 'Arcana', // synthetic fixed-grant shape
       });
 
       const result = await getPreSelectedSkills({
         rules: '2024',
         class: { name: 'Wizard' },
         race: { name: 'Dwarf' },
-      });
+      }, []);
 
       expect(result).toEqual(['Insight', 'Perception', 'Arcana']);
     });
 
-    it('should return pre-selected skills from background in 2024', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({});
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({});
+    it('2024: fixed background pre-selects while choice race and choice class are excluded', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        skill_proficiencies: 'Choose 1 from Insight, Perception',
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        skill_proficiencies: 'Choose 2 from Arcana, History',
+      });
       vi.mocked(dataLoader.fetchBackgroundData).mockResolvedValue({
-        skill_proficiencies: 'Deception and Persuasion',
+        skill_proficiencies: 'Deception and Sleight of Hand', // verbatim public/data/2024/backgrounds.json Charlatan
       });
 
       const result = await getPreSelectedSkills({
@@ -144,16 +158,18 @@ describe('skillValidation', () => {
         class: { name: 'Wizard' },
         race: { name: 'Human' },
         background: 'Charlatan',
-      });
+      }, []);
 
-      expect(result).toEqual(['Deception', 'Persuasion']);
+      // only the fixed background list — neither choice pool may leak into pre-selection
+      expect(result).toEqual(['Deception', 'Sleight of Hand']);
     });
 
-    it('should not pre-select skills for 5e backgrounds', async () => {
+    it('5e backgrounds never pre-select, even when fetchable 2024-style data is available', async () => {
       vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({});
       vi.mocked(dataLoader.fetchClassData).mockResolvedValue({});
+      // 2024-Acolyte disk row as decoy: if the 5e lane wrongly consumed it, this would leak
       vi.mocked(dataLoader.fetchBackgroundData).mockResolvedValue({
-        skill_proficiencies: 'Deception and Persuasion',
+        skill_proficiencies: 'Insight and Religion', // verbatim public/data/2024/backgrounds.json Acolyte
       });
 
       const result = await getPreSelectedSkills({
@@ -161,32 +177,10 @@ describe('skillValidation', () => {
         class: { name: 'Wizard' },
         race: { name: 'Human' },
         background: 'Acolyte',
-      });
+      }, []);
 
       expect(result).toEqual([]);
-    });
-
-    it('should not include choice skills as pre-selected', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-        skill_proficiencies: 'Choose 1 from Insight, Perception',
-      });
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-        skill_proficiencies: 'Choose 2 from Arcana, History',
-      });
-
-      const result = await getPreSelectedSkills({
-        rules: '2024',
-        class: { name: 'Wizard' },
-        race: { name: 'Human' },
-      });
-
-      expect(result).toEqual([]);
-    });
-
-    it('should return empty array when no race or class provided', async () => {
-      const result = await getPreSelectedSkills({ rules: '2024' });
-
-      expect(result).toEqual([]);
+      expect(dataLoader.fetchBackgroundData).not.toHaveBeenCalled();
     });
   });
 });

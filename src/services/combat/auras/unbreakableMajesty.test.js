@@ -1,3 +1,14 @@
+// @maintained-by-ai
+// Unbreakable Majesty (2024 Paladin) — module internals.
+// Consumers (hitResolution attack-side, navigationHandlers round-wrap,
+// CharSummary/CreatureCard badges) mock this module wholesale in their own
+// lanes, so runtime-store key spellings, per-round tracker semantics, and the
+// prompt envelope are pinned here and only here.
+// Zero-clock compliance: no wall-clock timers anywhere in this module — the
+// per-attacker trigger is a round stamp gated at turn seams (CLA-370: at
+// round-wrap the caller passes the explicit roundToSet because the
+// combatSummary cache lags one round behind).
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
@@ -27,340 +38,186 @@ import {
 import { getRuntimeValue, setRuntimeValue, getRuntimeKeysByPrefix } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCurrentCombatRound } from '../../encounters/combatData.js';
 
-// ── Tests ───────────────────────────────────────────────────────
+/**
+ * In-memory runtime store keyed by the exact storage keys the module uses —
+ * order-independent, stateful, and it catches key-spelling regressions.
+ */
+function fakeRuntimeStore(initial = {}) {
+  const store = { ...initial };
+  getRuntimeValue.mockImplementation((_, key) => store[key]);
+  setRuntimeValue.mockImplementation((_, key, value) => { store[key] = value; });
+  return store;
+}
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  getRuntimeKeysByPrefix.mockReturnValue([]);
+});
 
 describe('isUnbreakableMajestyActive', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns true only when runtime value is strictly true', () => {
-    getRuntimeValue.mockReturnValue(true);
-    expect(isUnbreakableMajestyActive('Paladin', 'Campaign')).toBe(true);
-
-    getRuntimeValue.mockReturnValue(false);
-    expect(isUnbreakableMajestyActive('Paladin', 'Campaign')).toBe(false);
-
-    getRuntimeValue.mockReturnValue(null);
-    expect(isUnbreakableMajestyActive('Paladin', 'Campaign')).toBe(false);
-
-    getRuntimeValue.mockReturnValue(undefined);
-    expect(isUnbreakableMajestyActive('Paladin', 'Campaign')).toBe(false);
-
-    // Truthy strings and numbers should not be treated as true
-    getRuntimeValue.mockReturnValue('true');
-    expect(isUnbreakableMajestyActive('Paladin', 'Campaign')).toBe(false);
-
-    getRuntimeValue.mockReturnValue(1);
-    expect(isUnbreakableMajestyActive('Paladin', 'Campaign')).toBe(false);
+  it('is true only for a strictly-true flag on the unbreakableMajestyActive key (campaign threaded)', () => {
+    const cases = [
+      [true, true],
+      [false, false],
+      [null, false],
+      [undefined, false],
+      ['true', false], // truthy strings must not arm the aura
+      [1, false],
+      [{ round: 1 }, false],
+    ];
+    for (const [stored, expected] of cases) {
+      getRuntimeValue.mockReturnValue(stored);
+      expect(isUnbreakableMajestyActive('Paladin', 'Campaign')).toBe(expected);
+    }
+    expect(getRuntimeValue).toHaveBeenCalledWith('Paladin', 'unbreakableMajestyActive', 'Campaign');
   });
 });
 
 describe('getUnbreakableMajestySaveDc', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns the numeric DC from runtime or coerces numeric strings', () => {
-    getRuntimeValue.mockReturnValue(15);
-    expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(15);
-
-    getRuntimeValue.mockReturnValue('18');
-    expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(18);
-  });
-
-  it('returns 0 when runtime value is null, undefined, or empty string', () => {
-    getRuntimeValue.mockReturnValue(null);
-    expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(0);
-
-    getRuntimeValue.mockReturnValue(undefined);
-    expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(0);
-
-    getRuntimeValue.mockReturnValue('');
-    expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(0);
-  });
-
-  it('returns NaN for a non-numeric string via Number coercion', () => {
+  it('reads unbreakableMajestySaveDc and coerces via Number(value || 0)', () => {
+    const cases = [
+      [15, 15],
+      ['18', 18], // numeric strings accepted
+      [0, 0],
+      ['0', 0],
+      [false, 0],
+      [null, 0],
+      [undefined, 0],
+      ['', 0],
+    ];
+    for (const [stored, expected] of cases) {
+      getRuntimeValue.mockReturnValue(stored);
+      expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBe(expected);
+    }
+    // quirk, pinned honestly: no guard on garbage — NaN propagates to callers.
     getRuntimeValue.mockReturnValue('abc');
     expect(getUnbreakableMajestySaveDc('Paladin', 'Campaign')).toBeNaN();
+
+    expect(getRuntimeValue).toHaveBeenCalledWith('Paladin', 'unbreakableMajestySaveDc', 'Campaign');
   });
 });
 
 describe('clearUnbreakableMajesty', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('clears both the active flag and the save DC with correct arguments', () => {
+  it('nulls both keys, exact envelopes in active-then-DC order, nothing else', () => {
     clearUnbreakableMajesty('Paladin', 'Campaign');
 
-    expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'Paladin', 'unbreakableMajestyActive', null, 'Campaign');
-    expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'Paladin', 'unbreakableMajestySaveDc', null, 'Campaign');
-
-    vi.clearAllMocks();
-    clearUnbreakableMajesty('MyPaladin', 'MyCampaign');
-
-    expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'MyPaladin', 'unbreakableMajestyActive', null, 'MyCampaign');
-    expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'MyPaladin', 'unbreakableMajestySaveDc', null, 'MyCampaign');
+    expect(setRuntimeValue.mock.calls).toEqual([
+      ['Paladin', 'unbreakableMajestyActive', null, 'Campaign'],
+      ['Paladin', 'unbreakableMajestySaveDc', null, 'Campaign'],
+    ]);
   });
 });
 
 describe('hasAttackerTriggeredMajesty', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns true when attacker triggered in the current round', () => {
+  it('is true only when the attacker\'s stamp round matches the campaign round', () => {
+    fakeRuntimeStore({
+      unbreakableMajestyBlocked_Goblin: { round: 3 }, // fresh stamp this round
+      unbreakableMajestyBlocked_Orc: { round: 2 },    // stale stamp — re-armed
+      unbreakableMajestyBlocked_Kobold: { other: 'data' }, // malformed stamp
+    });
     getCurrentCombatRound.mockReturnValue(3);
-    getRuntimeValue.mockReturnValue({ round: 3 });
-    expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(true);
-  });
-
-  it('returns false when attacker triggered in a different round or has not triggered yet', () => {
-    getCurrentCombatRound.mockReturnValue(4);
-    getRuntimeValue.mockReturnValue({ round: 3 });
-    expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(false);
-
-    getCurrentCombatRound.mockReturnValue(3);
-    getRuntimeValue.mockReturnValue(null);
-    expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(false);
-
-    getRuntimeValue.mockReturnValue(undefined);
-    expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(false);
-
-    getRuntimeValue.mockReturnValue({ other: 'data' });
-    expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(false);
-  });
-
-  it('tracks attackers independently by name', () => {
-    getCurrentCombatRound.mockReturnValue(3);
-    getRuntimeValue.mockImplementation((_, key) =>
-      key === 'unbreakableMajestyBlocked_Goblin' ? { round: 3 } : null,
-    );
 
     expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(true);
     expect(hasAttackerTriggeredMajesty('Paladin', 'Orc', 'Campaign')).toBe(false);
+    expect(hasAttackerTriggeredMajesty('Paladin', 'Kobold', 'Campaign')).toBe(false);
+    expect(hasAttackerTriggeredMajesty('Paladin', 'Troll', 'Campaign')).toBe(false); // never triggered
+    expect(getCurrentCombatRound).toHaveBeenCalledWith('Campaign');
+  });
+
+  it('quirk: missing stamp passes the gate when current round is undefined (undefined === undefined)', () => {
+    getCurrentCombatRound.mockReturnValue(undefined);
+    getRuntimeValue.mockReturnValue(undefined);
+
+    expect(hasAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign')).toBe(true);
   });
 });
 
 describe('markAttackerTriggeredMajesty', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  it('writes the per-attacker stamp with the round read at call time, exact envelope', () => {
+    getCurrentCombatRound.mockReturnValue(7);
 
-  it('marks the attacker with the current round using the correct storage key', () => {
-    getCurrentCombatRound.mockReturnValue(5);
-    markAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Paladin',
-      'unbreakableMajestyBlocked_Goblin',
-      { round: 5 },
-      'Campaign',
-    );
+    markAttackerTriggeredMajesty('Paladin', 'Knight 1', 'Campaign');
 
-    vi.clearAllMocks();
-    getCurrentCombatRound.mockReturnValue(3);
-    markAttackerTriggeredMajesty('MyPaladin', 'Drake', 'MyCampaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'MyPaladin',
-      'unbreakableMajestyBlocked_Drake',
-      { round: 3 },
-      'MyCampaign',
-    );
-  });
-
-  it('uses the current round at call time, not a cached value', () => {
-    getCurrentCombatRound.mockReturnValue(1);
-    markAttackerTriggeredMajesty('Paladin', 'Goblin', 'Campaign');
-    getCurrentCombatRound.mockReturnValue(99);
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Paladin',
-      'unbreakableMajestyBlocked_Goblin',
-      { round: 1 },
-      'Campaign',
-    );
+    expect(setRuntimeValue.mock.calls).toEqual([
+      ['Paladin', 'unbreakableMajestyBlocked_Knight 1', { round: 7 }, 'Campaign'],
+    ]);
   });
 });
 
 describe('clearPerRoundMajestyTrackers', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getRuntimeKeysByPrefix.mockReturnValue([]);
-  });
-
-  it('clears outdated trackers and keeps current ones', () => {
-    getCurrentCombatRound.mockReturnValue(3);
-    getRuntimeKeysByPrefix.mockReturnValue([
-      'unbreakableMajestyBlocked_Goblin',
-      'unbreakableMajestyBlocked_Orc',
-    ]);
-
-    getRuntimeValue.mockImplementation((_, key) => {
-      if (key === 'unbreakableMajestyBlocked_Goblin') return { round: 1 };
-      if (key === 'unbreakableMajestyBlocked_Orc') return { round: 3 };
-      return null;
+  it('clears every stamp whose round differs from current (past AND future), keeps current, skips nulls', () => {
+    const store = fakeRuntimeStore({
+      unbreakableMajestyBlocked_Past: { round: 3 },
+      unbreakableMajestyBlocked_Current: { round: 4 },
+      unbreakableMajestyBlocked_Older: { round: 2 },
+      unbreakableMajestyBlocked_Future: { round: 9 }, // quirk: gate is !== not < — future clears too
+      unbreakableMajestyBlocked_Null: null,           // already-empty: skipped
     });
+    getRuntimeKeysByPrefix.mockReturnValue([
+      'unbreakableMajestyBlocked_Past',
+      'unbreakableMajestyBlocked_Current',
+      'unbreakableMajestyBlocked_Older',
+      'unbreakableMajestyBlocked_Future',
+      'unbreakableMajestyBlocked_Null',
+    ]);
+    getCurrentCombatRound.mockReturnValue(4);
 
     clearPerRoundMajestyTrackers('Paladin', 'Campaign');
 
+    // Fallback path: with no explicit round, must ask for the campaign-keyed round.
     expect(getRuntimeKeysByPrefix).toHaveBeenCalledWith('Paladin', 'unbreakableMajestyBlocked_');
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Paladin',
-      'unbreakableMajestyBlocked_Goblin',
-      null,
-      'Campaign',
-    );
-    expect(setRuntimeValue).not.toHaveBeenCalledWith(
-      'Paladin',
-      'unbreakableMajestyBlocked_Orc',
-      null,
-      'Campaign',
-    );
+    expect(getCurrentCombatRound).toHaveBeenCalledWith('Campaign');
+    expect(store).toEqual({
+      unbreakableMajestyBlocked_Past: null,
+      unbreakableMajestyBlocked_Current: { round: 4 },
+      unbreakableMajestyBlocked_Older: null,
+      unbreakableMajestyBlocked_Future: null,
+      unbreakableMajestyBlocked_Null: null,
+    });
+    // Exactly the three clears, campaign threaded — no writes for kept/null keys.
+    expect(setRuntimeValue.mock.calls).toEqual([
+      ['Paladin', 'unbreakableMajestyBlocked_Past', null, 'Campaign'],
+      ['Paladin', 'unbreakableMajestyBlocked_Older', null, 'Campaign'],
+      ['Paladin', 'unbreakableMajestyBlocked_Future', null, 'Campaign'],
+    ]);
   });
 
-  it('does not touch keys without the majesty-block prefix', () => {
+  it('no tracked keys: reads prefix, writes nothing, never throws', () => {
     getCurrentCombatRound.mockReturnValue(1);
-    getRuntimeKeysByPrefix.mockReturnValue([]);
-
-    clearPerRoundMajestyTrackers('Paladin', 'Campaign');
-
-    expect(getRuntimeKeysByPrefix).toHaveBeenCalledWith('Paladin', 'unbreakableMajestyBlocked_');
-    expect(getRuntimeValue).not.toHaveBeenCalled();
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('handles no tracked keys without error', () => {
-    getCurrentCombatRound.mockReturnValue(1);
-    getRuntimeKeysByPrefix.mockReturnValue([]);
 
     expect(() => clearPerRoundMajestyTrackers('Paladin', 'Campaign')).not.toThrow();
-    expect(getRuntimeValue).not.toHaveBeenCalled();
     expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  it('skips keys whose stored value is null', () => {
-    getCurrentCombatRound.mockReturnValue(2);
-    getRuntimeKeysByPrefix.mockReturnValue(['unbreakableMajestyBlocked_Goblin']);
-    getRuntimeValue.mockReturnValue(null);
+  it('CLA-370 round-wrap re-arm: explicit roundToSet beats the lagging cache', () => {
+    const store = fakeRuntimeStore();
 
-    clearPerRoundMajestyTrackers('Paladin', 'Campaign');
-
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('clears only outdated trackers among many', () => {
-    getCurrentCombatRound.mockReturnValue(4);
-    getRuntimeKeysByPrefix.mockReturnValue([
-      'unbreakableMajestyBlocked_A',
-      'unbreakableMajestyBlocked_B',
-      'unbreakableMajestyBlocked_C',
-    ]);
-
-    getRuntimeValue.mockImplementation((_, key) => {
-      if (key === 'unbreakableMajestyBlocked_A') return { round: 3 };
-      if (key === 'unbreakableMajestyBlocked_B') return { round: 4 };
-      if (key === 'unbreakableMajestyBlocked_C') return { round: 2 };
-      return null;
-    });
-
-    clearPerRoundMajestyTrackers('Paladin', 'Campaign');
-
-    expect(setRuntimeValue).toHaveBeenCalledTimes(2);
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Paladin',
-      'unbreakableMajestyBlocked_A',
-      null,
-      'Campaign',
-    );
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Paladin',
-      'unbreakableMajestyBlocked_C',
-      null,
-      'Campaign',
-    );
-  });
-});
-
-describe('CLA-370 campaign round threading and re-arm', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getRuntimeKeysByPrefix.mockReturnValue([]);
-  });
-
-  it('reads the current round with the campaign name in mark and has', () => {
-    getCurrentCombatRound.mockReturnValue(7);
-    getRuntimeValue.mockReturnValue(null);
-    expect(hasAttackerTriggeredMajesty('Bard', 'Knight 1', 'Campaign')).toBe(false);
-    expect(getCurrentCombatRound).toHaveBeenCalledWith('Campaign');
-
-    markAttackerTriggeredMajesty('Bard', 'Knight 1', 'Campaign');
-    expect(getCurrentCombatRound).toHaveBeenLastCalledWith('Campaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Bard',
-      'unbreakableMajestyBlocked_Knight 1',
-      { round: 7 },
-      'Campaign',
-    );
-  });
-
-  it('re-arms the prompt at round wrap: round-1 stamp clears and round-2 first hit is fresh', () => {
-    const store = {};
-    getRuntimeValue.mockImplementation((_, key) => store[key]);
-    setRuntimeValue.mockImplementation((_, key, value) => { store[key] = value; });
-    getRuntimeKeysByPrefix.mockReturnValue(['unbreakableMajestyBlocked_Knight 1']);
-
-    // Round 1: first hit stamps the tracker; a re-hit in the same round stays gated.
+    // Round 1: first hit stamps the tracker; re-hits stay gated.
     getCurrentCombatRound.mockReturnValue(1);
     markAttackerTriggeredMajesty('Bard', 'Knight 1', 'Campaign');
     expect(hasAttackerTriggeredMajesty('Bard', 'Knight 1', 'Campaign')).toBe(true);
 
-    // Round-wrap: cache still lags at round 1 during the wrap loop — the caller
-    // passes roundToSet=2 so the stale stamp must be cleared.
+    // Round-wrap seam: cache still lags at round 1 — caller passes roundToSet=2,
+    // so the {round:1} stamp must clear even though it equals the cached round.
+    getRuntimeKeysByPrefix.mockReturnValue(['unbreakableMajestyBlocked_Knight 1']);
     clearPerRoundMajestyTrackers('Bard', 'Campaign', 2);
     expect(store['unbreakableMajestyBlocked_Knight 1']).toBeNull();
 
-    // Round 2 first hit: gate re-armed, prompt can fire again.
+    // Round 2: gate re-armed, prompt can fire again; stamp uses the real round.
     getCurrentCombatRound.mockReturnValue(2);
     expect(hasAttackerTriggeredMajesty('Bard', 'Knight 1', 'Campaign')).toBe(false);
-
-    // Stamp in round 2 uses the real round, not 1.
     markAttackerTriggeredMajesty('Bard', 'Knight 1', 'Campaign');
     expect(store['unbreakableMajestyBlocked_Knight 1']).toEqual({ round: 2 });
-  });
-
-  it('falls back to the campaign-keyed round read when no explicit round is passed', () => {
-    getRuntimeKeysByPrefix.mockReturnValue(['unbreakableMajestyBlocked_Orc']);
-    getCurrentCombatRound.mockReturnValue(4);
-    getRuntimeValue.mockReturnValue({ round: 3 });
-
-    clearPerRoundMajestyTrackers('Bard', 'Campaign');
-
-    expect(getCurrentCombatRound).toHaveBeenCalledWith('Campaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Bard', 'unbreakableMajestyBlocked_Orc', null, 'Campaign');
   });
 });
 
 describe('buildMajestyPromptData', () => {
-  it('returns correct prompt data structure with attacker as target and defender as source', () => {
-    const result = buildMajestyPromptData('Paladin', 'Goblin', 15);
-    expect(result).toEqual({
+  it('exact envelope: attacker is the CHA save target, defender is the source, DC passthrough', () => {
+    expect(buildMajestyPromptData('Paladin', 'Goblin', 15)).toEqual({
       targetName: 'Goblin',
       saveType: 'CHA',
       saveDc: 15,
       sourceName: 'Paladin',
     });
-
-    // Verify name swapping
-    const result2 = buildMajestyPromptData('My Paladin', 'Dragon', 20);
-    expect(result2.sourceName).toBe('My Paladin');
-    expect(result2.targetName).toBe('Dragon');
-
-    // Verify saveType is always CHA
-    const result3 = buildMajestyPromptData('Paladin', 'Goblin', 10);
-    expect(result3.saveType).toBe('CHA');
-
-    // Verify saveDc passes through unchanged
-    const result4 = buildMajestyPromptData('Paladin', 'Goblin', 25);
-    expect(result4.saveDc).toBe(25);
   });
 });

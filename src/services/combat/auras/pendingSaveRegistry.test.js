@@ -1,199 +1,81 @@
+// @maintained-by-ai
 import { describe, it, expect } from 'vitest';
 
-import { registerPendingSavePrompt, getPendingSavePrompt } from './pendingSaveRegistry.js';
+import {
+  registerPendingSavePrompt,
+  getPendingSavePrompt,
+  peekPendingSavePrompt,
+} from './pendingSaveRegistry.js';
 
+// The module is a pure in-memory Map singleton with no timers — staged save
+// prompts wait indefinitely until consumed (constitution: prompts never
+// auto-resolve on a clock). Vitest gives each test file a fresh module
+// registry, and each test below uses its own static key and consumes
+// everything it registers, so no cross-test contamination.
 describe('pendingSaveRegistry', () => {
-  // The module uses a singleton Map. Tests rely on unique keys and the
-  // delete-on-get behavior to avoid cross-test contamination.
+  it('hands back a registered prompt exactly once, then re-arms after consumption', () => {
+    const promptId = 'test-lifecycle';
+    const prompt1 = { spellName: 'Fireball', dc: 15, saveType: 'dexterity', targetName: 'Thorin' };
+    const prompt2 = { spellName: 'Lightning Bolt', dc: 17, saveType: 'dexterity', targetName: 'Thorin' };
 
-  describe('registerPendingSavePrompt', () => {
-    it('should store a prompt for a given promptId', () => {
-      const promptId = `test-save-1-${Date.now()}`;
-      const promptData = {
-        spellName: 'Fireball',
-        dc: 15,
-        saveType: 'dexterity',
-      };
+    // Nothing staged yet.
+    expect(getPendingSavePrompt(promptId)).toBeNull();
 
-      registerPendingSavePrompt(promptId, promptData);
+    registerPendingSavePrompt(promptId, prompt1);
 
-      const retrieved = getPendingSavePrompt(promptId);
-      expect(retrieved).toEqual(promptData);
-    });
+    expect(getPendingSavePrompt(promptId)).toStrictEqual(prompt1);
+    // get consumes the entry: second read finds nothing.
+    expect(getPendingSavePrompt(promptId)).toBeNull();
 
-    it('should overwrite an existing prompt for the same promptId', () => {
-      const promptId = `test-save-2-${Date.now()}`;
-      const data1 = { spellName: 'Fireball', dc: 15 };
-      const data2 = { spellName: 'Lightning Bolt', dc: 17 };
-
-      registerPendingSavePrompt(promptId, data1);
-      registerPendingSavePrompt(promptId, data2);
-
-      const retrieved = getPendingSavePrompt(promptId);
-      expect(retrieved).toEqual(data2);
-    });
-
-    it('should store different prompts for different promptIds', () => {
-      const dataA = { spellName: 'Fireball', dc: 15 };
-      const dataB = { spellName: 'Hold Monster', dc: 18 };
-      const idA = `id-a-${Date.now()}`;
-      const idB = `id-b-${Date.now()}`;
-
-      registerPendingSavePrompt(idA, dataA);
-      registerPendingSavePrompt(idB, dataB);
-
-      expect(getPendingSavePrompt(idA)).toEqual(dataA);
-      expect(getPendingSavePrompt(idB)).toEqual(dataB);
-    });
-
-    it('should store empty object as promptData', () => {
-      const promptId = `test-save-empty-${Date.now()}`;
-      const promptData = {};
-
-      registerPendingSavePrompt(promptId, promptData);
-
-      const retrieved = getPendingSavePrompt(promptId);
-      expect(retrieved).toEqual({});
-    });
-
-    it('should store null as promptData', () => {
-      const promptId = `test-save-null-${Date.now()}`;
-      const promptData = null;
-
-      registerPendingSavePrompt(promptId, promptData);
-
-      const retrieved = getPendingSavePrompt(promptId);
-      expect(retrieved).toBeNull();
-    });
-
-    it('should store complex nested promptData', () => {
-      const promptId = `test-save-complex-${Date.now()}`;
-      const promptData = {
-        spellName: 'Dominate Person',
-        dc: 18,
-        saveType: 'wisdom',
-        effects: [
-          { type: 'charmed', duration: 'concentration' },
-          { type: 'incapacitated', duration: 'concentration' },
-        ],
-        metadata: { casterLevel: 15, source: 'player' },
-      };
-
-      registerPendingSavePrompt(promptId, promptData);
-
-      const retrieved = getPendingSavePrompt(promptId);
-      expect(retrieved).toEqual(promptData);
-    });
+    // After consumption the same promptId can stage a new prompt.
+    registerPendingSavePrompt(promptId, prompt2);
+    expect(getPendingSavePrompt(promptId)).toStrictEqual(prompt2);
+    expect(getPendingSavePrompt(promptId)).toBeNull();
   });
 
-  describe('getPendingSavePrompt', () => {
-    it('should return null when no prompt is registered for the promptId', () => {
-      const result = getPendingSavePrompt(`nonexistent-${Date.now()}`);
-      expect(result).toBeNull();
-    });
+  it('overwrites with the latest prompt when the same promptId is registered twice before consumption', () => {
+    const promptId = 'test-overwrite';
+    const stale = { spellName: 'Fireball', dc: 15, saveType: 'dexterity', targetName: 'Thorin' };
+    const fresh = { spellName: 'Hold Monster', dc: 18, saveType: 'wisdom', targetName: 'Thorin' };
 
-    it('should retrieve and delete the prompt (one-time use)', () => {
-      const promptId = `test-save-delete-${Date.now()}`;
-      const promptData = { spellName: 'Fireball', dc: 15 };
+    registerPendingSavePrompt(promptId, stale);
+    registerPendingSavePrompt(promptId, fresh);
 
-      registerPendingSavePrompt(promptId, promptData);
-
-      // First retrieval should return the data and delete it
-      const first = getPendingSavePrompt(promptId);
-      expect(first).toEqual(promptData);
-
-      // Second retrieval should return null (prompt was deleted)
-      const second = getPendingSavePrompt(promptId);
-      expect(second).toBeNull();
-    });
-
-    it('should handle string promptIds', () => {
-      const promptId = `simple-string-id-${Date.now()}`;
-      const promptData = { spellName: 'Burning Hands', dc: 13 };
-
-      registerPendingSavePrompt(promptId, promptData);
-
-      const retrieved = getPendingSavePrompt(promptId);
-      expect(retrieved).toEqual(promptData);
-    });
-
-    it('should handle numeric-looking string promptIds', () => {
-      const promptId = `12345-${Date.now()}`;
-      const promptData = { spellName: 'Magic Missile', dc: 14 };
-
-      registerPendingSavePrompt(promptId, promptData);
-
-      const retrieved = getPendingSavePrompt(promptId);
-      expect(retrieved).toEqual(promptData);
-    });
-
-    it('should handle UUID-style promptIds', () => {
-      const promptId = `550e8400-e29b-41d4-a716-446655440000-${Date.now()}`;
-      const promptData = { spellName: 'Counterspell', dc: 16 };
-
-      registerPendingSavePrompt(promptId, promptData);
-
-      const retrieved = getPendingSavePrompt(promptId);
-      expect(retrieved).toEqual(promptData);
-    });
+    expect(getPendingSavePrompt(promptId)).toStrictEqual(fresh);
+    // Overwrite does not append: consumption is still one-time.
+    expect(getPendingSavePrompt(promptId)).toBeNull();
   });
 
-  describe('integration', () => {
-    it('should support register-then-use-then-reuse cycle with different data', () => {
-      const promptId = `test-reuse-cycle-${Date.now()}`;
-      const data1 = { spellName: 'Fireball', dc: 15 };
-      const data2 = { spellName: 'Lightning Bolt', dc: 17 };
+  it('consumes only the requested promptId, leaving other pending prompts intact', () => {
+    const idA = 'test-key-a';
+    const idB = 'test-key-b';
+    const promptA = { spellName: 'Burning Hands', dc: 13, saveType: 'dexterity', targetName: 'Aria' };
+    const promptB = { spellName: 'Dominate Person', dc: 18, saveType: 'wisdom', targetName: 'Bram' };
 
-      // Register first prompt
-      registerPendingSavePrompt(promptId, data1);
+    registerPendingSavePrompt(idA, promptA);
+    registerPendingSavePrompt(idB, promptB);
 
-      // Get and verify it
-      const retrieved1 = getPendingSavePrompt(promptId);
-      expect(retrieved1).toEqual(data1);
+    expect(getPendingSavePrompt(idA)).toStrictEqual(promptA);
+    // Consuming idA must not disturb idB.
+    expect(peekPendingSavePrompt(idB)).toStrictEqual(promptB);
+    expect(getPendingSavePrompt(idB)).toStrictEqual(promptB);
+    expect(getPendingSavePrompt(idA)).toBeNull();
+    expect(getPendingSavePrompt(idB)).toBeNull();
+  });
 
-      // Prompt is now deleted, so null
-      expect(getPendingSavePrompt(promptId)).toBeNull();
+  it('peek reads a pending prompt without consuming it, so get still delivers it', () => {
+    const promptId = 'test-peek';
+    const prompt = { spellName: 'Fireball', dc: 15, saveType: 'dexterity', targetName: 'Thorin' };
 
-      // Register a new prompt for the same promptId
-      registerPendingSavePrompt(promptId, data2);
+    expect(peekPendingSavePrompt(promptId)).toBeNull();
 
-      // Get and verify the new one
-      const retrieved2 = getPendingSavePrompt(promptId);
-      expect(retrieved2).toEqual(data2);
-    });
+    registerPendingSavePrompt(promptId, prompt);
 
-    it('should handle multiple prompts concurrently', () => {
-      const prompts = [
-        { id: `concurrent-1-${Date.now()}`, data: { spellName: 'Fireball', dc: 15 } },
-        { id: `concurrent-2-${Date.now()}`, data: { spellName: 'Hold Monster', dc: 18 } },
-        { id: `concurrent-3-${Date.now()}`, data: { spellName: 'Wish', dc: 20 } },
-      ];
-
-      // Register all prompts
-      for (const { id, data } of prompts) {
-        registerPendingSavePrompt(id, data);
-      }
-
-      // Retrieve and verify each one
-      for (const { id, data } of prompts) {
-        expect(getPendingSavePrompt(id)).toEqual(data);
-      }
-
-      // All should now be null
-      for (const { id } of prompts) {
-        expect(getPendingSavePrompt(id)).toBeNull();
-      }
-    });
-
-    it('should handle rapid register-get-delete cycles', () => {
-      const promptId = `test-rapid-cycle-${Date.now()}`;
-
-      for (let i = 0; i < 5; i++) {
-        registerPendingSavePrompt(promptId, { round: i });
-        const retrieved = getPendingSavePrompt(promptId);
-        expect(retrieved).toEqual({ round: i });
-        expect(getPendingSavePrompt(promptId)).toBeNull();
-      }
-    });
+    // Peeking (as App.jsx does on reconnect) leaves the prompt staged...
+    expect(peekPendingSavePrompt(promptId)).toStrictEqual(prompt);
+    expect(peekPendingSavePrompt(promptId)).toStrictEqual(prompt);
+    // ...so the eventual consumer still gets it exactly once.
+    expect(getPendingSavePrompt(promptId)).toStrictEqual(prompt);
+    expect(peekPendingSavePrompt(promptId)).toBeNull();
   });
 });

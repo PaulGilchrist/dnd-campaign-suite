@@ -1,15 +1,16 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
+  getRuntimeValue: vi.fn(() => []),
 }));
 
 vi.mock('../../rules/combat/rangeCheck.js', () => ({
-  isWithinRange: vi.fn(),
+  isWithinRange: vi.fn(async () => false),
 }));
 
 vi.mock('../../rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(),
+  getCombatContext: vi.fn(async () => null),
 }));
 
 import { getLionDisadvantageAgainst } from './lionAuraUtils.js';
@@ -17,249 +18,137 @@ import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
 
-function makePlayer(name, gridX = 0, gridY = 0) {
-  return { name, gridX, gridY };
+// Lion (source semantics): any non-attacker creature on the candidate list holding an
+// activeBuff with optionName === 'Lion' (exact string — not duplicity's 'effect' key,
+// no extra flag, no picker list) forces disadvantage, measured via isWithinRange
+// (names, not coords) at parseInt(buff.range) || 5 — so garbage range strings like
+// 'unlimited' and 0 collapse to 5. skipRangeCheck returns the first matching holder
+// unmeasured; reachable on the grid lane via the unplaced-target branch of
+// accumulateAuraCounts (contextBuilder-map.js). With no mapData the candidate list is
+// the awaited combat-summary party filtered to type 'player'; the only production
+// gridless caller, resolveLionAura (contextBuilder-sync.js), ALWAYS passes
+// skipRangeCheck — the gridless measured path is unreachable in prod and untested.
+// Pattern-sibling: duplicityAuraUtils.test.js (same ctx/skip skeleton, trimmed).
+const CAMPAIGN = 'test-campaign';
+
+const grid = (...names) => ({ players: names.map(name => ({ name, gridX: 0, gridY: 0 })) });
+const lion = (range) => range === undefined ? { optionName: 'Lion' } : { optionName: 'Lion', range };
+
+function resetMocks() {
+  getRuntimeValue.mockReset().mockReturnValue([]);
+  isWithinRange.mockReset().mockResolvedValue(false);
+  getCombatContext.mockReset().mockResolvedValue(null);
 }
 
-function makeMapData(players) {
-  return { players };
+// Seeds runtime per player name; inRange may be a bool or per-source predicate.
+function seed({ buffs = {}, inRange = true } = {}) {
+  getRuntimeValue.mockImplementation((name) => (name in buffs ? buffs[name] : []));
+  isWithinRange.mockImplementation(async source =>
+    typeof inRange === 'function' ? inRange(source) : inRange);
 }
 
-function makeLionBuff(range) {
-  const buff = { optionName: 'Lion' };
-  if (range !== undefined) buff.range = range;
-  return buff;
-}
+describe('getLionDisadvantageAgainst — grid lane', () => {
+  beforeEach(resetMocks);
 
-describe('getLionDisadvantageAgainst', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getRuntimeValue.mockReset();
-    isWithinRange.mockReset();
-    getCombatContext.mockReset();
-    getRuntimeValue.mockImplementation(() => []);
-    isWithinRange.mockResolvedValue(false);
-    getCombatContext.mockResolvedValue(null);
-  });
+  it('forces disadvantage for an in-range ally Lion holder and pins its lookups', async () => {
+    seed({ buffs: { Barbarian: [{ optionName: 'Bear' }, lion()] } });
 
-  it('returns false when mapData is undefined and no combat summary exists', async () => {
-    getCombatContext.mockResolvedValue(null);
-    const result = await getLionDisadvantageAgainst({ attackerName: 'A', campaignName: 'C', mapData: undefined });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('returns false when mapData is null and combat summary has no players', async () => {
-    getCombatContext.mockResolvedValue({ creatures: [] });
-    const result = await getLionDisadvantageAgainst({ attackerName: 'A', campaignName: 'C', mapData: null });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('returns false when mapData.players is missing or empty', async () => {
-    expect(await getLionDisadvantageAgainst({ attackerName: 'A', mapData: {} })).toEqual({ disadvantage: false });
-    expect(await getLionDisadvantageAgainst({ attackerName: 'A', mapData: makeMapData([]) })).toEqual({ disadvantage: false });
-  });
-
-  it('returns disadvantage when a non-attacker player has Lion buff and is in range', async () => {
-    getRuntimeValue.mockImplementation((name) => name === 'Barbarian' ? [makeLionBuff()] : []);
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getLionDisadvantageAgainst({
-      attackerName: 'Attacker',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-    });
-    expect(result).toEqual({ disadvantage: true, source: 'Barbarian' });
-  });
-
-  it('skips the attacker even if they have Lion buff', async () => {
-    getRuntimeValue.mockImplementation(() => [makeLionBuff()]);
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getLionDisadvantageAgainst({
-      attackerName: 'Attacker',
-      mapData: makeMapData([makePlayer('Attacker')]),
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('returns false when no player has Lion buff', async () => {
-    getRuntimeValue.mockImplementation(() => []);
-
-    const result = await getLionDisadvantageAgainst({
-      attackerName: 'Attacker',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('skips non-Lion buffs and finds Lion among mixed buffs', async () => {
-    getRuntimeValue.mockImplementation(() => [
-      { optionName: 'Bear' },
-      makeLionBuff(),
-    ]);
-    isWithinRange.mockResolvedValue(true);
-
-    const result = await getLionDisadvantageAgainst({
-      attackerName: 'Attacker',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-    });
-    expect(result).toEqual({ disadvantage: true, source: 'Barbarian' });
-  });
-
-  it('handles invalid buff types gracefully (null, undefined, non-array)', async () => {
-    getRuntimeValue
-      .mockReturnValueOnce(null)
-      .mockReturnValueOnce(undefined)
-      .mockReturnValueOnce('not-an-array')
-      .mockReturnValueOnce(42)
-      .mockReturnValueOnce([makeLionBuff()]);
-
-    const result = await getLionDisadvantageAgainst({
-      attackerName: 'Attacker',
-      mapData: makeMapData([
-        makePlayer('P1'), makePlayer('P2'), makePlayer('P3'), makePlayer('P4'), makePlayer('P5'),
-      ]),
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('returns false when Lion buff is out of range', async () => {
-    getRuntimeValue.mockImplementation(() => [makeLionBuff()]);
-    isWithinRange.mockResolvedValue(false);
-
-    const result = await getLionDisadvantageAgainst({
-      attackerName: 'Attacker',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('uses custom range from lionBuff.range', async () => {
-    getRuntimeValue.mockImplementation(() => [makeLionBuff('10 ft')]);
-    isWithinRange.mockResolvedValue(true);
-
-    await getLionDisadvantageAgainst({
-      attackerName: 'Attacker',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-    });
-    expect(isWithinRange).toHaveBeenCalledWith('Barbarian', 'Attacker', 10);
-  });
-
-  it('uses default 5 ft range when lionBuff.range is absent', async () => {
-    getRuntimeValue.mockImplementation(() => [{ optionName: 'Lion' }]);
-    isWithinRange.mockResolvedValue(true);
-
-    await getLionDisadvantageAgainst({
-      attackerName: 'Attacker',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-    });
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData: grid('Attacker', 'Barbarian') }))
+      .toEqual({ disadvantage: true, source: 'Barbarian' });
+    expect(getRuntimeValue).toHaveBeenCalledWith('Barbarian', 'activeBuffs', CAMPAIGN);
     expect(isWithinRange).toHaveBeenCalledWith('Barbarian', 'Attacker', 5);
+    expect(getCombatContext).not.toHaveBeenCalled();
   });
 
-  it('iterates players until finding one with Lion buff in range', async () => {
-    getRuntimeValue.mockImplementation((name) => name === 'Player1' ? [] : name === 'Player2' ? [makeLionBuff()] : []);
-    isWithinRange.mockResolvedValue(true);
+  it.each([
+    ['attacker is the only Lion holder', { buffs: { Attacker: [lion()] } }],
+    ['no player holds Lion (near-miss name and other buffs)', { buffs: { Barbarian: [{ optionName: 'Bear' }], Druid: [{ optionName: 'Lioness' }] } }],
+    ['Lion holder out of 5 ft range', { buffs: { Barbarian: [lion()] }, inRange: false }],
+    ['non-array buff values survive iteration', { buffs: { Barbarian: 'not-an-array', Druid: null, Monk: 42 } }],
+    ['solo attacker grid', {}, grid('Attacker')],
+    ['mapData without players never falls back to the combat context', {}, { placedItems: [] }],
+  ])('%s → no disadvantage', async (_label, setup, mapData = grid('Attacker', 'Barbarian')) => {
+    seed(setup);
 
-    const result = await getLionDisadvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'C',
-      mapData: makeMapData([makePlayer('Player1'), makePlayer('Player2'), makePlayer('Attacker')]),
-    });
-    expect(result).toEqual({ disadvantage: true, source: 'Player2' });
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData }))
+      .toEqual({ disadvantage: false });
+    expect(getCombatContext).not.toHaveBeenCalled();
   });
 
-  it('returns false when multiple Lion buffs are all out of range', async () => {
-    getRuntimeValue.mockImplementation(() => [makeLionBuff()]);
-    isWithinRange.mockResolvedValue(false);
-
-    const result = await getLionDisadvantageAgainst({
-      attackerName: 'Attacker',
-      mapData: makeMapData([makePlayer('Barbarian1'), makePlayer('Barbarian2'), makePlayer('Attacker')]),
+  it('skips garbage, stale and non-Lion buffs until the first valid in-range holder (first match wins)', async () => {
+    seed({
+      buffs: {
+        P1: 'not-an-array',
+        Stale: [lion()],
+        First: [{ optionName: 'Bear' }, lion()],
+        Second: [lion()],
+      },
+      inRange: source => source !== 'Stale',
     });
-    expect(result).toEqual({ disadvantage: false });
+
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData: grid('Attacker', 'P1', 'Stale', 'First', 'Second') }))
+      .toEqual({ disadvantage: true, source: 'First' });
+    expect(isWithinRange).toHaveBeenCalledTimes(2); // Stale measured-and-failed, First measured-and-won; Second never reached
   });
 
-  it('calls isWithinRange with correct parameters', async () => {
-    getRuntimeValue.mockImplementation((name) => name === 'Barbarian' ? [makeLionBuff()] : []);
-    isWithinRange.mockResolvedValue(true);
+  it.each([
+    [{ range: '10 ft' }, 10],
+    [{ range: '30ft' }, 30],
+    [{ range: 'unlimited' }, 5], // parseInt NaN → 5 fallback
+    [{ range: 0 }, 5], // falsy range → '5 ft'
+    [{}, 5],
+  ])('buff range %o measures at %i ft', async (buff, expectedRange) => {
+    seed({ buffs: { Barbarian: [lion(buff.range)] } });
 
-    await getLionDisadvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'MyCampaign',
-      activeMapName: 'MyMap',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-    });
-    expect(isWithinRange).toHaveBeenCalledWith('Barbarian', 'Attacker', 5);
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData: grid('Attacker', 'Barbarian') }))
+      .toEqual({ disadvantage: true, source: 'Barbarian' });
+    expect(isWithinRange).toHaveBeenCalledWith('Barbarian', 'Attacker', expectedRange);
   });
 
-  it('calls getRuntimeValue with correct arguments', async () => {
-    getRuntimeValue.mockImplementation((name) => name === '__campaign__' ? 'MyCampaign' : name === '__map__' ? 'MyMap' : []);
+  it('skipRangeCheck grants the first matching holder without measuring range', async () => {
+    seed({ buffs: { Barbarian: [lion()] }, inRange: false });
 
-    await getLionDisadvantageAgainst({
-      attackerName: 'Attacker',
-      campaignName: 'MyCampaign',
-      mapData: makeMapData([makePlayer('Attacker'), makePlayer('Barbarian')]),
-    });
-    expect(getRuntimeValue).toHaveBeenCalledWith('Barbarian', 'activeBuffs', 'MyCampaign');
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData: grid('Attacker', 'Barbarian'), skipRangeCheck: true }))
+      .toEqual({ disadvantage: true, source: 'Barbarian' });
+    expect(isWithinRange).not.toHaveBeenCalled();
+
+    // the attacker is still skipped even unmeasured
+    expect(await getLionDisadvantageAgainst({ attackerName: 'Attacker', campaignName: CAMPAIGN, mapData: grid('Attacker'), skipRangeCheck: true }))
+      .toEqual({ disadvantage: false });
+  });
+});
+
+describe('getLionDisadvantageAgainst — gridless combat-context lane (always skipped in prod)', () => {
+  beforeEach(resetMocks);
+
+  const party = [
+    { name: 'Thug 1', type: 'npc' },
+    { name: 'DraconicDragon', type: 'player' },
+    { name: 'HexWarlock', type: 'player' },
+  ];
+
+  it('pulls the party from the awaited combat context, filters NPCs, grants a Lion holder unmeasured', async () => {
+    getCombatContext.mockResolvedValue({ creatures: party });
+    seed({ buffs: { 'Thug 1': [lion()], DraconicDragon: [lion()] } });
+
+    expect(await getLionDisadvantageAgainst({ attackerName: 'HexWarlock', campaignName: CAMPAIGN, skipRangeCheck: true }))
+      .toEqual({ disadvantage: true, source: 'DraconicDragon' });
+    expect(getCombatContext).toHaveBeenCalledWith(CAMPAIGN);
+    expect(getRuntimeValue).not.toHaveBeenCalledWith('Thug 1', 'activeBuffs', CAMPAIGN);
+    expect(isWithinRange).not.toHaveBeenCalled();
   });
 
-  it('returns false when only the attacker exists in mapData', async () => {
-    const result = await getLionDisadvantageAgainst({
-      attackerName: 'Attacker',
-      mapData: makeMapData([makePlayer('Attacker')]),
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
+  it.each([
+    ['no combat context available', null, {}],
+    ['summary without creatures', {}, {}],
+    ['Lion buff held only by an NPC', { creatures: party }, { buffs: { 'Thug 1': [lion()] } }],
+    ['party holds no Lion buff', { creatures: party }, {}],
+  ])('%s → no disadvantage', async (_label, summary, setup) => {
+    getCombatContext.mockResolvedValue(summary);
+    seed(setup);
 
-  it('falls back to the combat summary party when mapData is missing (no-map mode)', async () => {
-    getCombatContext.mockResolvedValue({
-      creatures: [
-        { name: 'DraconicDragon', type: 'player' },
-        { name: 'HexWarlock', type: 'player' },
-        { name: 'Thug 1', type: 'npc' },
-      ],
-    });
-    getRuntimeValue.mockImplementation((name) => name === 'DraconicDragon' ? [makeLionBuff()] : []);
-
-    const result = await getLionDisadvantageAgainst({
-      attackerName: 'HexWarlock',
-      campaignName: 'test-campaign',
-      skipRangeCheck: true,
-    });
-    expect(result).toEqual({ disadvantage: true, source: 'DraconicDragon' });
-  });
-
-  it('returns false in no-map mode when no ally has the Lion buff', async () => {
-    getCombatContext.mockResolvedValue({
-      creatures: [
-        { name: 'DraconicDragon', type: 'player' },
-        { name: 'HexWarlock', type: 'player' },
-      ],
-    });
-    getRuntimeValue.mockImplementation(() => []);
-
-    const result = await getLionDisadvantageAgainst({
-      attackerName: 'HexWarlock',
-      campaignName: 'test-campaign',
-      skipRangeCheck: true,
-    });
-    expect(result).toEqual({ disadvantage: false });
-  });
-
-  it('applies the range check in no-map mode when skipRangeCheck is not set', async () => {
-    getCombatContext.mockResolvedValue({
-      creatures: [
-        { name: 'DraconicDragon', type: 'player' },
-        { name: 'HexWarlock', type: 'player' },
-      ],
-    });
-    getRuntimeValue.mockImplementation((name) => name === 'DraconicDragon' ? [makeLionBuff()] : []);
-    isWithinRange.mockResolvedValue(false);
-
-    const result = await getLionDisadvantageAgainst({
-      attackerName: 'HexWarlock',
-      campaignName: 'test-campaign',
-    });
-    expect(result).toEqual({ disadvantage: false });
-    expect(isWithinRange).toHaveBeenCalledWith('DraconicDragon', 'HexWarlock', 5);
+    expect(await getLionDisadvantageAgainst({ attackerName: 'HexWarlock', campaignName: CAMPAIGN, skipRangeCheck: true }))
+      .toEqual({ disadvantage: false });
+    expect(isWithinRange).not.toHaveBeenCalled();
   });
 });

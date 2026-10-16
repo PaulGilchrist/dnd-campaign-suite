@@ -1,3 +1,19 @@
+// @maintained-by-ai
+// auraComboEffects lane — the aggregate seam: membership/range gating + per-passive
+// appliers producing the {speedBonus, immunities, resistances} envelope consumed by
+// applyDamage.js:777, auraConditionImmunity.js (delegates here) and CharSheet.jsx:574.
+//
+// auras/ folder lane map (for successors — don't re-pin what lives there):
+// - auraOfProtection.js: primitives lane — hasAura/getAuraRangeFromStats/getChaModifier/
+//   hasCannotActCondition/computeAuraBonus; CANNOT_ACT list + 10/30 range constants pinned there.
+// - auraConditionImmunity.js: CLA-019 channel — delegates membership here; covers/split/log pinned there.
+// - corona/duplicity/elderChampion/lion/wolfAuraUtils: individual token auras, own lanes.
+// - bardicInspirationState / pendingPopupRegistry / pendingSaveRegistry / unbreakableMajesty: state registries.
+//
+// Fixtures are disk-shaped against public/data/2024/classes.json (Aura of Alacrity's
+// bonusExpression is "+10 ft.", Aura of Warding carries a resistances array). Aura metadata
+// rides passive automation fields, NOT targetEffects registry keys. No clocks here: gating
+// is call-time (isWithinRange + cannot-act conditions) — auras never expire on a timer.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -6,7 +22,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../../hooks/useAllySelection.js', () => ({
-  getAllyList: vi.fn((name) => [name]),
+  getAllyList: vi.fn(),
 }));
 
 vi.mock('../../rules/combat/rangeCheck.js', () => ({
@@ -18,559 +34,152 @@ import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
 import { getAllyList } from '../../../hooks/useAllySelection.js';
 
-function makeSourceEntry(name, computedStats) {
-  return { name, computedStats };
+const ZERO_ENVELOPE = {
+  speedBonus: 0,
+  speedSource: null,
+  immunities: [],
+  immunitySources: {},
+  resistances: [],
+  resistanceSource: null,
+};
+
+// Every aura channel on one source: a zero envelope from this entry proves a
+// gate fired, not that the entry had nothing to give.
+function fullAuraPassives({ without = [] } = {}) {
+  return [
+    { name: 'Aura of Protection' },
+    { name: 'Aura of Alacrity', effect: 'speed_bonus', bonusExpression: '10' },
+    { name: 'Aura of Courage', conditionImmunity: 'frightened' },
+    { name: 'Aura of Devotion', conditionImmunity: 'charmed' },
+    { name: 'Aura of Warding', resistances: ['necrotic'] },
+  ].filter(p => !without.includes(p.name));
 }
 
-function makePassive(name, extra = {}) {
-  return { name, ...extra };
+function auraBearer(name, passives = fullAuraPassives()) {
+  return { name, computedStats: { automation: { passives } } };
 }
 
 describe('computeAuraComboEffects', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    getRuntimeValue.mockReturnValue([]);
     getAllyList.mockReturnValue(['Cleric']);
+    isWithinRange.mockResolvedValue(true);
   });
 
-  // ── Early returns / edge cases ────────────────────────────────
+  it.each([
+    ['no characters', () => [], null],
+    ['source with no name', () => [auraBearer('')], null],
+    ['null/undefined computedStats', () => [{ name: 'Paladin', computedStats: null }, { name: 'Bard', computedStats: undefined }], null],
+    ['source without Aura of Protection', () => [auraBearer('Wizard', fullAuraPassives({ without: ['Aura of Protection'] }))], null],
+    ['source with a cannot-act condition', () => [auraBearer('Paladin')], () => getRuntimeValue.mockReturnValue(['stunned'])],
+    ['target absent from ally list', () => [auraBearer('Paladin')], () => getAllyList.mockReturnValue(['OtherPlayer'])],
+    ['source out of range', () => [auraBearer('Paladin')], () => isWithinRange.mockResolvedValue(false)],
+  ])('returns the zero envelope when %s', async (_case, characters, setup) => {
+    setup?.();
+    const result = await computeAuraComboEffects({ targetName: 'Cleric', characters: characters() });
+    expect(result).toEqual(ZERO_ENVELOPE);
+  });
 
-  it('returns all-zero/null defaults when characters is empty', async () => {
-    const result = await computeAuraComboEffects({ targetName: 'Cleric', characters: [] });
+  it('applies every aura channel from one contributing source', async () => {
+    const result = await computeAuraComboEffects({
+      targetName: 'Cleric',
+      characters: [auraBearer('Paladin')],
+    });
     expect(result).toEqual({
-      speedBonus: 0,
-      speedSource: null,
-      immunities: [],
-      immunitySources: {},
-      resistances: [],
-      resistanceSource: null,
+      speedBonus: 10,
+      speedSource: 'Paladin',
+      immunities: ['frightened', 'charmed'],
+      immunitySources: { frightened: 'Paladin', charmed: 'Paladin' },
+      resistances: ['necrotic'],
+      resistanceSource: 'Paladin',
     });
   });
 
-  it('skips entries with no name', async () => {
-    const result = await computeAuraComboEffects({
+  it('competes speed across sources while merging immunities and deduping resistances', async () => {
+    // Paladin1: lower speed, Courage, Warding. Paladin2: higher speed, Devotion.
+    // Cleric (target) is its own aura host despite listing no allies — self-bypass.
+    getAllyList.mockImplementation(name => (name === 'Cleric' ? [] : ['Cleric']));
+    const p1 = auraBearer('Paladin1', [
+      { name: 'Aura of Protection' },
+      { name: 'Aura of Alacrity', effect: 'speed_bonus', bonusExpression: '10' },
+      { name: 'Aura of Courage', conditionImmunity: 'frightened' },
+      { name: 'Aura of Warding', resistances: ['necrotic', 'radiant'] },
+    ]);
+    const p2 = auraBearer('Paladin2', [
+      { name: 'Aura of Protection' },
+      { name: 'Aura of Alacrity', effect: 'speed_bonus', bonusExpression: '20' },
+      { name: 'Aura of Devotion', conditionImmunity: 'charmed' },
+    ]);
+    const self = auraBearer('Cleric', [
+      { name: 'Aura of Protection' },
+      { name: 'Aura of Warding', resistances: ['necrotic', 'psychic'] },
+    ]);
+    const result = await computeAuraComboEffects({ targetName: 'Cleric', characters: [p1, p2, self] });
+    expect(result).toEqual({
+      speedBonus: 20,
+      speedSource: 'Paladin2',
+      immunities: ['frightened', 'charmed'],
+      immunitySources: { frightened: 'Paladin1', charmed: 'Paladin2' },
+      resistances: ['necrotic', 'radiant', 'psychic'],
+      resistanceSource: 'Cleric',
+    });
+  });
+
+  it.each([
+    ['+10 ft.', 10],
+    ['15', 15],
+    [undefined, 10],
+    ['abc', 0],
+    ['0', 0],
+  ])('parses bonusExpression %s into speedBonus %s', async (expression, expected) => {
+    const entry = auraBearer('Paladin', [
+      { name: 'Aura of Protection' },
+      { name: 'Aura of Alacrity', effect: 'speed_bonus', bonusExpression: expression },
+    ]);
+    const result = await computeAuraComboEffects({ targetName: 'Cleric', characters: [entry] });
+    expect(result.speedBonus).toBe(expected);
+    expect(result.speedSource).toBe(expected > 0 ? 'Paladin' : null);
+  });
+
+  it('selects the highest speed bonus and keeps the first on ties', async () => {
+    const mk = (name, expr) => auraBearer(name, [
+      { name: 'Aura of Protection' },
+      { name: 'Aura of Alacrity', effect: 'speed_bonus', bonusExpression: expr },
+    ]);
+    const winner = await computeAuraComboEffects({ targetName: 'Cleric', characters: [mk('Paladin1', '15'), mk('Paladin2', '10')] });
+    expect(winner.speedBonus).toBe(15);
+    expect(winner.speedSource).toBe('Paladin1');
+
+    const tied = await computeAuraComboEffects({ targetName: 'Cleric', characters: [mk('Paladin1', '10'), mk('Paladin2', '10')] });
+    expect(tied.speedBonus).toBe(10);
+    expect(tied.speedSource).toBe('Paladin1');
+  });
+
+  it('ignores foreign aura names, mismatched effect payloads, and empty resistance lists', async () => {
+    const noise = auraBearer('Paladin', [
+      { name: 'Aura of Protection' },
+      { name: 'Aura of Alacrity', effect: 'other_effect', bonusExpression: '10' },
+      { name: 'Aura of Courage', conditionImmunity: 'charmed' },
+      { name: 'Aura of Devotion', conditionImmunity: 'frightened' },
+      { name: 'Aura of Warding', resistances: [] },
+      { name: 'Aura of Warding' },
+      { name: 'Other Aura', effect: 'speed_bonus', bonusExpression: '20', conditionImmunity: 'frightened', resistances: ['fire'] },
+    ]);
+    const result = await computeAuraComboEffects({ targetName: 'Cleric', characters: [noise] });
+    expect(result).toEqual(ZERO_ENVELOPE);
+  });
+
+  it('queries isWithinRange with 10 ft by default and 30 ft with Aura Expansion', async () => {
+    const expanded = auraBearer('ElderPaladin', [
+      ...fullAuraPassives(),
+      { name: 'Aura Expansion' },
+    ]);
+    await computeAuraComboEffects({
       targetName: 'Cleric',
-      characters: [makeSourceEntry('', { automation: { passives: [makePassive('Aura of Protection')] } })],
+      characters: [auraBearer('Paladin'), expanded],
     });
-    expect(result.speedBonus).toBe(0);
-    expect(result.speedSource).toBeNull();
-  });
-
-  it('skips entries with null/undefined computedStats', async () => {
-    const result = await computeAuraComboEffects({
-      targetName: 'Cleric',
-      characters: [makeSourceEntry('Paladin', null), makeSourceEntry('Paladin', undefined)],
-    });
-    expect(result.speedBonus).toBe(0);
-    expect(result.speedSource).toBeNull();
-  });
-
-  it('skips entries without Aura of Protection', async () => {
-    const result = await computeAuraComboEffects({
-      targetName: 'Cleric',
-      characters: [makeSourceEntry('Wizard', { automation: { passives: [makePassive('Spell Sniper')] } })],
-    });
-    expect(result.speedBonus).toBe(0);
-    expect(result.speedSource).toBeNull();
-  });
-
-  it('skips sources with a cannot-act condition', async () => {
-    getRuntimeValue.mockReturnValue(['stunned']);
-    const result = await computeAuraComboEffects({
-      targetName: 'Cleric',
-      characters: [makeSourceEntry('Paladin', { automation: { passives: [makePassive('Aura of Protection')] } })],
-    });
-    expect(result.speedBonus).toBe(0);
-    expect(result.speedSource).toBeNull();
-  });
-
-  it('skips sources whose ally list does not include the target', async () => {
-    getRuntimeValue.mockReturnValue([]);
-    getAllyList.mockReturnValue(['OtherPlayer']);
-    const result = await computeAuraComboEffects({
-      targetName: 'Cleric',
-      characters: [makeSourceEntry('Paladin', { automation: { passives: [makePassive('Aura of Protection')] } })],
-    });
-    expect(result.speedBonus).toBe(0);
-  });
-
-  it('skips sources out of range', async () => {
-    getRuntimeValue.mockReturnValue([]);
-    isWithinRange.mockResolvedValue(false);
-    const result = await computeAuraComboEffects({
-      targetName: 'Cleric',
-      characters: [makeSourceEntry('Paladin', { automation: { passives: [makePassive('Aura of Protection')] } })],
-    });
-    expect(result.speedBonus).toBe(0);
-  });
-
-  // ── Speed bonus (Aura of Alacrity) ────────────────────────────
-
-  describe('speed bonus (Aura of Alacrity)', () => {
-    it('returns speed bonus when Aura of Alacrity with speed_bonus effect is present', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Alacrity', { effect: 'speed_bonus', bonusExpression: '10' })] },
-        })],
-      });
-      expect(result.speedBonus).toBe(10);
-      expect(result.speedSource).toBe('Paladin');
-    });
-
-    it('defaults speed bonus to 10 when bonusExpression is absent', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Alacrity', { effect: 'speed_bonus' })] },
-        })],
-      });
-      expect(result.speedBonus).toBe(10);
-      expect(result.speedSource).toBe('Paladin');
-    });
-
-    it('skips speed bonus when bonusExpression is non-numeric', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Alacrity', { effect: 'speed_bonus', bonusExpression: 'abc' })] },
-        })],
-      });
-      expect(result.speedBonus).toBe(0);
-      expect(result.speedSource).toBeNull();
-    });
-
-    it('selects the highest speed bonus from multiple sources', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const p1 = makeSourceEntry('Paladin1', {
-        automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Alacrity', { effect: 'speed_bonus', bonusExpression: '10' })] },
-      });
-      const p2 = makeSourceEntry('Paladin2', {
-        automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Alacrity', { effect: 'speed_bonus', bonusExpression: '15' })] },
-      });
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [p1, p2],
-      });
-      expect(result.speedBonus).toBe(15);
-      expect(result.speedSource).toBe('Paladin2');
-    });
-
-    it('does not apply speed bonus when effect is not speed_bonus', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      getAllyList.mockReturnValue(['Cleric']);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Alacrity', { effect: 'other_effect' })] },
-        })],
-      });
-      expect(result.speedBonus).toBe(0);
-      expect(result.speedSource).toBeNull();
-    });
-
-    it('does not apply speed bonus when passive name is not Aura of Alacrity', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      getAllyList.mockReturnValue(['Cleric']);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Other Aura', { effect: 'speed_bonus', bonusExpression: '20' })] },
-        })],
-      });
-      expect(result.speedBonus).toBe(0);
-      expect(result.speedSource).toBeNull();
-    });
-  });
-
-  // ── Condition immunity (Aura of Courage) ──────────────────────
-
-  describe('condition immunity (Aura of Courage)', () => {
-    it('adds frightened immunity when Aura of Courage passive is present', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Courage', { conditionImmunity: 'frightened' })] },
-        })],
-      });
-      expect(result.immunities).toContain('frightened');
-      expect(result.immunitySources.frightened).toBe('Paladin');
-    });
-
-    it('does not add frightened immunity when conditionImmunity is not frightened', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      getAllyList.mockReturnValue(['Cleric']);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Courage', { conditionImmunity: 'charmed' })] },
-        })],
-      });
-      expect(result.immunities).not.toContain('frightened');
-      expect(result.immunitySources.frightened).toBeUndefined();
-    });
-
-    it('does not add frightened immunity when passive name is not Aura of Courage', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      getAllyList.mockReturnValue(['Cleric']);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Other Aura', { conditionImmunity: 'frightened' })] },
-        })],
-      });
-      expect(result.immunities).not.toContain('frightened');
-    });
-
-    it('records multiple sources for the same immunity (last one wins in source)', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const p1 = makeSourceEntry('Paladin1', {
-        automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Courage', { conditionImmunity: 'frightened' })] },
-      });
-      const p2 = makeSourceEntry('Paladin2', {
-        automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Courage', { conditionImmunity: 'frightened' })] },
-      });
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [p1, p2],
-      });
-      expect(result.immunities).toContain('frightened');
-      expect(result.immunitySources.frightened).toBe('Paladin2');
-    });
-  });
-
-  // ── Condition immunity (Aura of Devotion) ─────────────────────
-
-  describe('condition immunity (Aura of Devotion)', () => {
-    it('adds charmed immunity when Aura of Devotion passive is present', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Devotion', { conditionImmunity: 'charmed' })] },
-        })],
-      });
-      expect(result.immunities).toContain('charmed');
-      expect(result.immunitySources.charmed).toBe('Paladin');
-    });
-
-    it('does not add charmed immunity when conditionImmunity is not charmed', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      getAllyList.mockReturnValue(['Cleric']);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Devotion', { conditionImmunity: 'frightened' })] },
-        })],
-      });
-      expect(result.immunities).not.toContain('charmed');
-      expect(result.immunitySources.charmed).toBeUndefined();
-    });
-
-    it('does not add charmed immunity when passive name is not Aura of Devotion', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      getAllyList.mockReturnValue(['Cleric']);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Other Aura', { conditionImmunity: 'charmed' })] },
-        })],
-      });
-      expect(result.immunities).not.toContain('charmed');
-    });
-
-    it('records multiple sources for charmed immunity (last one wins)', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const p1 = makeSourceEntry('Paladin1', {
-        automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Devotion', { conditionImmunity: 'charmed' })] },
-      });
-      const p2 = makeSourceEntry('Paladin2', {
-        automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Devotion', { conditionImmunity: 'charmed' })] },
-      });
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [p1, p2],
-      });
-      expect(result.immunitySources.charmed).toBe('Paladin2');
-    });
-  });
-
-  // ── Damage resistances (Aura of Warding) ──────────────────────
-
-  describe('damage resistances (Aura of Warding)', () => {
-    it('adds damage resistances when Aura of Warding passive is present with resistances array', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Warding', { resistances: ['fire', 'cold'] })] },
-        })],
-      });
-      expect(result.resistances).toContain('fire');
-      expect(result.resistances).toContain('cold');
-      expect(result.resistanceSource).toBe('Paladin');
-    });
-
-    it('does not add resistances when resistances array is empty', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      getAllyList.mockReturnValue(['Cleric']);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Warding', { resistances: [] })] },
-        })],
-      });
-      expect(result.resistances).toEqual([]);
-      expect(result.resistanceSource).toBeNull();
-    });
-
-    it('does not add resistances when resistances is undefined', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      getAllyList.mockReturnValue(['Cleric']);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Warding')] },
-        })],
-      });
-      expect(result.resistances).toEqual([]);
-      expect(result.resistanceSource).toBeNull();
-    });
-
-    it('does not add resistances when passive name is not Aura of Warding', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      getAllyList.mockReturnValue(['Cleric']);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Other Aura', { resistances: ['fire'] })] },
-        })],
-      });
-      expect(result.resistances).toEqual([]);
-    });
-
-    it('merges resistances from multiple sources', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const p1 = makeSourceEntry('Paladin1', {
-        automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Warding', { resistances: ['fire'] })] },
-      });
-      const p2 = makeSourceEntry('Paladin2', {
-        automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Warding', { resistances: ['cold'] })] },
-      });
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [p1, p2],
-      });
-      expect(result.resistances).toContain('fire');
-      expect(result.resistances).toContain('cold');
-      expect(result.resistanceSource).toBe('Paladin2');
-    });
-
-    it('deduplicates resistances from multiple sources', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const p1 = makeSourceEntry('Paladin1', {
-        automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Warding', { resistances: ['fire', 'psychic'] })] },
-      });
-      const p2 = makeSourceEntry('Paladin2', {
-        automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Warding', { resistances: ['fire', 'radiant'] })] },
-      });
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [p1, p2],
-      });
-      expect(result.resistances.filter(r => r === 'fire').length).toBe(1);
-      expect(result.resistances).toContain('psychic');
-      expect(result.resistances).toContain('radiant');
-    });
-  });
-
-  // ── Combined effects ──────────────────────────────────────────
-
-  describe('combined effects', () => {
-    it('applies all aura effects from a single source simultaneously', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [
-            makePassive('Aura of Protection'),
-            makePassive('Aura of Alacrity', { effect: 'speed_bonus', bonusExpression: '10' }),
-            makePassive('Aura of Courage', { conditionImmunity: 'frightened' }),
-            makePassive('Aura of Devotion', { conditionImmunity: 'charmed' }),
-            makePassive('Aura of Warding', { resistances: ['fire'] }),
-          ] },
-        })],
-      });
-      expect(result.speedBonus).toBe(10);
-      expect(result.speedSource).toBe('Paladin');
-      expect(result.immunities).toContain('frightened');
-      expect(result.immunities).toContain('charmed');
-      expect(result.resistances).toContain('fire');
-    });
-
-    it('applies effects from multiple sources, selecting best speed and merging others', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const p1 = makeSourceEntry('Paladin1', {
-        automation: { passives: [
-          makePassive('Aura of Protection'),
-          makePassive('Aura of Alacrity', { effect: 'speed_bonus', bonusExpression: '10' }),
-          makePassive('Aura of Courage', { conditionImmunity: 'frightened' }),
-        ] },
-      });
-      const p2 = makeSourceEntry('Paladin2', {
-        automation: { passives: [
-          makePassive('Aura of Protection'),
-          makePassive('Aura of Alacrity', { effect: 'speed_bonus', bonusExpression: '20' }),
-          makePassive('Aura of Devotion', { conditionImmunity: 'charmed' }),
-          makePassive('Aura of Warding', { resistances: ['fire', 'cold'] }),
-        ] },
-      });
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [p1, p2],
-      });
-      expect(result.speedBonus).toBe(20);
-      expect(result.speedSource).toBe('Paladin2');
-      expect(result.immunities).toContain('frightened');
-      expect(result.immunities).toContain('charmed');
-      expect(result.resistances).toContain('fire');
-      expect(result.resistances).toContain('cold');
-      expect(result.resistanceSource).toBe('Paladin2');
-    });
-  });
-
-  // ── Ally filtering ────────────────────────────────────────────
-
-  describe('ally filtering', () => {
-    it('uses getAllyList to filter candidates', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      getAllyList.mockReturnValue(['Ally1']);
-      isWithinRange.mockResolvedValue(true);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Alacrity', { effect: 'speed_bonus', bonusExpression: '10' })] },
-        })],
-      });
-      expect(result.speedBonus).toBe(0);
-    });
-
-    it('applies effects when target is in ally list', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      getAllyList.mockReturnValue(['Cleric']);
-      isWithinRange.mockResolvedValue(true);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Alacrity', { effect: 'speed_bonus', bonusExpression: '10' })] },
-        })],
-      });
-      expect(result.speedBonus).toBe(10);
-      expect(result.speedSource).toBe('Paladin');
-    });
-
-    it('skips source when ally list is empty but target not included (defaults to self)', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      getAllyList.mockReturnValue([]);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Alacrity', { effect: 'speed_bonus', bonusExpression: '10' })] },
-        })],
-      });
-      expect(result.speedBonus).toBe(0);
-    });
-  });
-
-  // ── Range checking ────────────────────────────────────────────
-
-  describe('range checking', () => {
-    it('calls isWithinRange with default 10 ft range', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection')] },
-        })],
-      });
-      expect(isWithinRange).toHaveBeenCalledWith('Paladin', 'Cleric', 10);
-    });
-
-    it('calls isWithinRange with 30 ft range when Aura Expansion is present', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura Expansion')] },
-        })],
-      });
-      expect(isWithinRange).toHaveBeenCalledWith('Paladin', 'Cleric', 30);
-    });
-  });
-
-  // ── Return value structure ────────────────────────────────────
-
-  describe('return value structure', () => {
-    it('returns an object with all expected keys', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection')] },
-        })],
-      });
-      expect(result).toHaveProperty('speedBonus');
-      expect(result).toHaveProperty('speedSource');
-      expect(result).toHaveProperty('immunities');
-      expect(result).toHaveProperty('immunitySources');
-      expect(result).toHaveProperty('resistances');
-      expect(result).toHaveProperty('resistanceSource');
-    });
-
-    it('returns immunities as array and immunitySources as object', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Courage', { conditionImmunity: 'frightened' })] },
-        })],
-      });
-      expect(Array.isArray(result.immunities)).toBe(true);
-      expect(typeof result.immunitySources).toBe('object');
-      expect(result.immunitySources).not.toBeNull();
-    });
-
-    it('returns resistances as array and resistanceSource as string or null', async () => {
-      getRuntimeValue.mockReturnValue([]);
-      isWithinRange.mockResolvedValue(true);
-      const result = await computeAuraComboEffects({
-        targetName: 'Cleric',
-        characters: [makeSourceEntry('Paladin', {
-          automation: { passives: [makePassive('Aura of Protection'), makePassive('Aura of Warding', { resistances: ['fire'] })] },
-        })],
-      });
-      expect(Array.isArray(result.resistances)).toBe(true);
-      expect(result.resistanceSource).toBe('Paladin');
-    });
+    expect(isWithinRange).toHaveBeenCalledWith('Paladin', 'Cleric', 10);
+    expect(isWithinRange).toHaveBeenCalledWith('ElderPaladin', 'Cleric', 30);
   });
 });

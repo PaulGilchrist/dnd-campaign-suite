@@ -1,3 +1,18 @@
+// @maintained-by-ai
+// QUARTET SEAM MAP (resistancesValidation family — don't duplicate across these lanes):
+//   resistancesValidation.test.js           → THIS FILE: validateResistances message contract (ungranted /
+//                                             duplicates / unselected-grants / empty-selection info) + the
+//                                             getPreSelectedResistances wrapper shape (strips limits.details).
+//   resistancesValidationLimits.test.js     → getResistanceLimits race-side resistance extraction (5e + 2024).
+//   resistancesValidationImmunities.test.js → getResistanceLimits class-side immunity extraction + level gates.
+//   resistancesValidationInfo.test.js       → getResistanceInfo granted/source API.
+// Consumers: src/hooks/wizard/useWizardResistances.js (validateFn + preSelect slots).
+// Disk anchors: Tiefling 'Hellish Resistance' / "You have resistance to fire damage." is verbatim from
+// public/data/races.json; 2024 trait strings verified against public/data/2024/races.json (Limits lane).
+// public/data/rules-validation.json contains NO resistances templates — these four message templates are
+// hardcoded in resistancesValidation.js, so full-string pins below match the source templates exactly,
+// including the info message's raw `level || 1` interpolation.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as dataLoader from '../ui/dataLoader.js';
 
@@ -12,10 +27,26 @@ import {
   validateResistances,
 } from './resistancesValidation.js';
 
-// ── Factories ────────────────────────────────────────────────────────────────
+// ── Fixtures ─────────────────────────────────────────────────────────────────
+// Race trait matches public/data/races.json verbatim (array description form).
 
 const emptyRaceData = () => ({ name: 'Human', traits: [] });
 const emptyClassData = () => ({ class_levels: [] });
+
+const tieflingRaceData = () => ({
+  name: 'Tiefling',
+  traits: [
+    { name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] },
+  ],
+});
+
+// Synthetic class feature (5e base classes grant no level-1 damage immunities;
+// mirrors the synthetic class fixtures of the Immunities lane).
+const fireImmunityClassData = () => ({
+  class_levels: [
+    { level: 1, features: [{ name: 'Damage Immunity', description: 'You gain Immunity to Fire damage.' }] },
+  ],
+});
 
 const baseArgs = (overrides = {}) => ({
   rules: '5e',
@@ -25,29 +56,27 @@ const baseArgs = (overrides = {}) => ({
   ...overrides,
 });
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Assert that `warnings` contains at least one warning of the given type
- * whose message includes the given substring.
- */
-function expectWarning(warnings, type, substring) {
-  const match = warnings.find(
-    (w) => w.type === type && w.message.includes(substring),
-  );
-  expect(match).toBeDefined();
+function mockData(raceData, classData) {
+  vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(raceData);
+  vi.mocked(dataLoader.fetchClassData).mockResolvedValue(classData);
 }
 
-/**
- * Assert that `warnings` does NOT contain a warning of the given type with
- * the given substring (negative assertion).
- */
-function expectNoWarning(warnings, type, substring) {
-  const match = warnings.find(
-    (w) => w.type === type && w.message.includes(substring),
-  );
-  expect(match).toBeUndefined();
-}
+// ── Exact message templates (from resistancesValidation.js source) ─────────
+
+const UNGRANTED_RES_MULTI =
+  'These resistances are not granted by your race, class, or background: Fire, Cold. Verify with your DM.';
+const UNGRANTED_RES_COLD =
+  'These resistances are not granted by your race, class, or background: Cold. Verify with your DM.';
+const UNGRANTED_IMM =
+  'These immunities are not granted by your race, class, or background: Fire. Verify with your DM.';
+const DUP_RES =
+  'Some resistances are selected multiple times. Each resistance should only be selected once.';
+const DUP_IMM =
+  'Some immunities are selected multiple times. Each immunity should only be selected once.';
+const GRANTS_RES_INFO =
+  'Your race/class grants these resistances that are not selected: Fire. You may want to select them.';
+const GRANTS_IMM_INFO =
+  'Your race/class grants these immunities that are not selected: Fire. You may want to select them.';
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -56,293 +85,156 @@ describe('resistancesValidation', () => {
     vi.clearAllMocks();
   });
 
-  // ── getPreSelectedResistances ────────────────────────────────────────────
-
   describe('getPreSelectedResistances', () => {
-    it('returns pre-selected resistances and immunities from race and class', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-        name: 'Tiefling',
-        traits: [
-          {
-            name: 'Hellish Resistance',
-            description: ['You have resistance to fire damage.'],
-          },
-        ],
-      });
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+    it('passes limits through as { resistances, immunities } only, and stays empty on null data', async () => {
+      mockData(tieflingRaceData(), fireImmunityClassData());
 
       const result = await getPreSelectedResistances(
-        baseArgs({ race: { name: 'Tiefling' } }),
+        baseArgs({ race: { name: 'Tiefling' }, class: { name: 'Fighter' } }),
       );
 
-      expect(result.resistances).toContain('Fire');
-      expect(result.immunities).toEqual([]);
-    });
+      // Wrapper contract: forwards both arrays and strips limits' `details`.
+      expect(result).toEqual({ resistances: ['Fire'], immunities: ['Fire'] });
 
-    it('returns empty arrays when race and class are empty objects', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(null);
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(null);
+      mockData(null, null);
 
-      const result = await getPreSelectedResistances(
-        baseArgs({ race: {}, class: {} }),
-      );
+      const emptyResult = await getPreSelectedResistances(baseArgs());
 
-      expect(result.resistances).toEqual([]);
-      expect(result.immunities).toEqual([]);
+      expect(emptyResult).toEqual({ resistances: [], immunities: [] });
     });
   });
 
-  // ── validateResistances ──────────────────────────────────────────────────
-
   describe('validateResistances', () => {
-    const emptyDataArgs = () =>
-      baseArgs({
-        resistances: [],
-        immunities: [],
-      });
+    it.each([
+      {
+        name: 'ungranted resistances (multi listed comma-joined)',
+        raceData: emptyRaceData(),
+        classData: emptyClassData(),
+        args: { resistances: ['Fire', 'Cold'], immunities: [] },
+        expected: [{ message: UNGRANTED_RES_MULTI, type: 'warning' }],
+      },
+      {
+        name: 'ungranted immunities',
+        raceData: emptyRaceData(),
+        classData: emptyClassData(),
+        args: { resistances: [], immunities: ['Fire'] },
+        expected: [{ message: UNGRANTED_IMM, type: 'warning' }],
+      },
+    ])('warns with exact message about $name', async ({ raceData, classData, args, expected }) => {
+      mockData(raceData, classData);
 
-    it('warns about ungranted resistances', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+      const warnings = await validateResistances(baseArgs(args));
+
+      expect(warnings).toEqual(expected);
+    });
+
+    it.each([
+      {
+        name: 'resistances',
+        raceData: tieflingRaceData(),
+        classData: emptyClassData(),
+        args: { race: { name: 'Tiefling' }, resistances: ['Fire', 'Fire'], immunities: [] },
+        expected: { message: DUP_RES, type: 'warning' },
+      },
+      {
+        name: 'immunities',
+        raceData: emptyRaceData(),
+        classData: fireImmunityClassData(),
+        args: { class: { name: 'Fighter' }, resistances: [], immunities: ['Fire', 'Fire'] },
+        expected: { message: DUP_IMM, type: 'warning' },
+      },
+    ])('warns about duplicate $name even when the type is granted', async ({ raceData, classData, args, expected }) => {
+      mockData(raceData, classData);
+
+      const warnings = await validateResistances(baseArgs(args));
+
+      // Fire is granted, so the duplicate warning is the ONLY output.
+      expect(warnings).toEqual([expected]);
+    });
+
+    it('emits exactly one warning per issue category (ungranted and duplicate coexist, in order)', async () => {
+      mockData(tieflingRaceData(), emptyClassData());
 
       const warnings = await validateResistances(
-        baseArgs({ resistances: ['Fire'], immunities: [] }),
+        baseArgs({ race: { name: 'Tiefling' }, resistances: ['Fire', 'Fire', 'Cold'], immunities: [] }),
       );
 
-      expectWarning(warnings, 'warning', 'not granted');
-      expect(warnings.filter((w) => w.type === 'warning').length).toBeGreaterThanOrEqual(1);
+      expect(warnings.map((w) => w.message)).toEqual([UNGRANTED_RES_COLD, DUP_RES]);
     });
 
-    it('warns about ungranted immunities', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+    it.each([
+      {
+        name: 'race-granted',
+        raceData: tieflingRaceData(),
+        classData: emptyClassData(),
+        args: { race: { name: 'Tiefling' } },
+        expected: GRANTS_RES_INFO,
+      },
+      {
+        name: 'class-granted',
+        raceData: emptyRaceData(),
+        classData: fireImmunityClassData(),
+        args: { class: { name: 'Fighter' } },
+        expected: GRANTS_IMM_INFO,
+      },
+    ])('infos about $name grants left unselected (plus empty-selection info)', async ({ raceData, classData, args, expected }) => {
+      mockData(raceData, classData);
 
-      const warnings = await validateResistances(
-        baseArgs({ resistances: [], immunities: ['Fire'] }),
-      );
+      const warnings = await validateResistances(baseArgs({ ...args, resistances: [], immunities: [] }));
 
-      expectWarning(warnings, 'warning', 'immunities are not granted');
+      // Quirk pinned honestly: an empty selection also fires the "does not grant any"
+      // info, so unselected grants always produce exactly two info entries.
+      expect(warnings).toHaveLength(2);
+      expect(warnings[1]).toEqual({ message: expected, type: 'info' });
     });
 
-    it('warns about both ungranted resistances and immunities together', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+    it.each([
+      {
+        name: '5e defaults',
+        raceData: emptyRaceData(),
+        classData: emptyClassData(),
+        args: { resistances: [], immunities: [] },
+        expected: 'Your 5e Human Wizard does not grant any resistances or immunities at level 1.',
+      },
+      {
+        name: '2024 with null selections and level interpolation',
+        raceData: emptyRaceData(),
+        classData: emptyClassData(),
+        args: { rules: '2024', race: { name: 'Elf' }, class: { name: 'Ranger' }, level: 3, resistances: null, immunities: null },
+        expected: 'Your 2024 Elf Ranger does not grant any resistances or immunities at level 3.',
+      },
+    ])('infos exactly once when nothing is selected ($name)', async ({ raceData, classData, args, expected }) => {
+      mockData(raceData, classData);
 
-      const warnings = await validateResistances(
-        baseArgs({ resistances: ['Fire'], immunities: ['Cold'] }),
-      );
+      const warnings = await validateResistances(baseArgs(args));
 
-      expectWarning(warnings, 'warning', 'resistances are not granted');
-      expectWarning(warnings, 'warning', 'immunities are not granted');
+      expect(warnings).toEqual([{ message: expected, type: 'info' }]);
     });
 
-    it('warns about duplicate resistances', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
-
-      const warnings = await validateResistances(
-        baseArgs({ resistances: ['Fire', 'Fire'], immunities: [] }),
-      );
-
-      expectWarning(warnings, 'warning', 'multiple times');
-    });
-
-    it('warns about duplicate immunities', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
-
-      const warnings = await validateResistances(
-        baseArgs({ resistances: [], immunities: ['Fire', 'Fire'] }),
-      );
-
-      expectWarning(warnings, 'warning', 'immunities');
-      expectWarning(warnings, 'warning', 'multiple times');
-    });
-
-    it('returns info when no resistances or immunities selected and none granted', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
-
-      const warnings = await validateResistances(emptyDataArgs());
-
-      expectWarning(warnings, 'info', 'does not grant');
-    });
-
-    it('warns about unselected granted resistances', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-        name: 'Tiefling',
-        traits: [
-          {
-            name: 'Hellish Resistance',
-            description: ['You have resistance to fire damage.'],
-          },
-        ],
-      });
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+    it('produces no warnings when every selected type is granted', async () => {
+      mockData(tieflingRaceData(), fireImmunityClassData());
 
       const warnings = await validateResistances(
         baseArgs({
-          rules: '5e',
           race: { name: 'Tiefling' },
-          class: { name: 'Wizard' },
-          level: 1,
-          resistances: [],
-          immunities: [],
-        }),
-      );
-
-      expectWarning(warnings, 'info', 'grants these resistances');
-    });
-
-    it('warns about unselected granted immunities', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-        class_levels: [
-          {
-            level: 1,
-            features: [
-              {
-                name: 'Immunity',
-                description: 'You gain Immunity to Fire damage.',
-              },
-            ],
-          },
-        ],
-      });
-
-      const warnings = await validateResistances(
-        baseArgs({
-          race: { name: 'Human' },
           class: { name: 'Fighter' },
-          level: 1,
-          resistances: [],
-          immunities: [],
+          resistances: ['Fire'],
+          immunities: ['Fire'],
         }),
       );
 
-      expectWarning(warnings, 'info', 'grants these immunities');
+      expect(warnings).toEqual([]);
     });
 
-    it('uses "2024" in info message for 2024 ruleset', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
-
-      const warnings = await validateResistances(
-        baseArgs({ rules: '2024', resistances: [], immunities: [] }),
-      );
-
-      expectWarning(warnings, 'info', '2024');
-    });
-
-    it('handles null resistances and immunities fields', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
-
-      const warnings = await validateResistances(
-        baseArgs({ resistances: null, immunities: null }),
-      );
-
-      expectWarning(warnings, 'info', 'does not grant');
-    });
-
-    it('includes race and class names in info message', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
-
-      const warnings = await validateResistances(
-        baseArgs({ race: { name: 'Elf' }, class: { name: 'Ranger' }, resistances: [], immunities: [] }),
-      );
-
-      const infoMsg = warnings.find((w) => w.type === 'info' && w.message.includes('does not grant'));
-      expect(infoMsg.message).toContain('Elf');
-      expect(infoMsg.message).toContain('Ranger');
-    });
-
-    it('does not warn when all selected resistances are granted', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-        name: 'Tiefling',
-        traits: [
-          {
-            name: 'Hellish Resistance',
-            description: ['You have resistance to fire damage.'],
-          },
-        ],
-      });
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
-
-      const warnings = await validateResistances(
-        baseArgs({ race: { name: 'Tiefling' }, resistances: ['Fire'], immunities: [] }),
-      );
-
-      expectNoWarning(warnings, 'warning', 'not granted');
-    });
-
-    it('does not warn when all selected immunities are granted', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-        class_levels: [
-          {
-            level: 1,
-            features: [
-              {
-                name: 'Immunity',
-                description: 'You gain Immunity to Fire damage.',
-              },
-            ],
-          },
-        ],
-      });
-
-      const warnings = await validateResistances(
-        baseArgs({ class: { name: 'Fighter' }, resistances: [], immunities: ['Fire'] }),
-      );
-
-      expectNoWarning(warnings, 'warning', 'immunities are not granted');
-    });
-
-    it('does not warn when selected resistances partially overlap with granted', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-        name: 'Tiefling',
-        traits: [
-          {
-            name: 'Hellish Resistance',
-            description: ['You have resistance to fire damage.'],
-          },
-        ],
-      });
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+    it('names only the ungranted subset when selection partially overlaps grants', async () => {
+      mockData(tieflingRaceData(), emptyClassData());
 
       const warnings = await validateResistances(
         baseArgs({ race: { name: 'Tiefling' }, resistances: ['Fire', 'Cold'], immunities: [] }),
       );
 
-      // Fire is granted, Cold is not — should still warn about Cold
-      expectWarning(warnings, 'warning', 'not granted');
-    });
-
-    it('warns about each ungranted type individually in the message', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
-
-      const warnings = await validateResistances(
-        baseArgs({ resistances: ['Fire', 'Cold'], immunities: [] }),
-      );
-
-      const match = warnings.find((w) => w.type === 'warning' && w.message.includes('not granted'));
-      expect(match.message).toContain('Fire');
-      expect(match.message).toContain('Cold');
-    });
-
-    it('returns exactly one warning per issue category', async () => {
-      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
-      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
-
-      const warnings = await validateResistances(
-        baseArgs({ resistances: ['Fire', 'Fire', 'Cold'], immunities: [] }),
-      );
-
-      const warningWarnings = warnings.filter((w) => w.type === 'warning');
-      expect(warningWarnings.length).toBe(2); // one for ungranted, one for duplicates
+      // Fire is granted (and selected) — only Cold is reported, and no grants info fires.
+      expect(warnings).toEqual([{ message: UNGRANTED_RES_COLD, type: 'warning' }]);
     });
   });
 });
