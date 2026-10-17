@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { render, screen, cleanup } from '@testing-library/react';
@@ -177,8 +178,6 @@ function createProps(overrides = {}) {
         cannotAct: false,
         mapName: null,
         characters: [],
-        modalState: {},
-        setModalState: vi.fn(),
         ...overrides,
     };
 }
@@ -211,8 +210,10 @@ describe('CharReactions - Basic Rendering', () => {
 
     afterEach(cleanup);
 
-    // Consolidated: both configs exercise the same guard (no spells rendered) via
-    // different inputs; the spells.test.jsx file covers the stronger variants.
+    // Section-absence guard (reactionSpells.length > 0). spells.test.jsx owns the
+    // positive spell-row rendering; this file owns the negative for both branches
+    // of buildReactions: empty eligible-name set (filter leg) and null
+    // spellAbilities (guard leg).
     it.each([
         ['no reaction spells are configured', () => {
             getReactionSpellNames.mockReturnValue(new Set());
@@ -223,8 +224,24 @@ describe('CharReactions - Basic Rendering', () => {
                 playerStats: { ...basePlayerStats, spellAbilities: null },
             });
         }],
-    ])('does not render the reaction spells section when %s', (label, buildProps) => {
+    ])('does not render the reaction spells section when %s', (_label, buildProps) => {
         render(<CharReactions {...buildProps()} />);
         expect(screen.queryByText('Range')).not.toBeInTheDocument();
+        expect(screen.queryByText('Shield')).not.toBeInTheDocument();
+        expect(screen.queryByText('Hellish Rebuke')).not.toBeInTheDocument();
+        // Reactions list still renders — the guard hides only the spell table.
+        expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
+    });
+
+    // Dynamic-grant negative (appendDynamicReactions, CharReactions.jsx:82):
+    // without the PWH stance the Stand row must never appear. Positive grant
+    // is pinned by the click lane in handlers.test.jsx and the dedupe pin in
+    // edgeCases.test.jsx — this is the app-wide-gap counterpart.
+    it('does not render the Stand (Power Word Heal) row when the PWH stance is not granted', () => {
+        // beforeEach pins powerWordHealStandPermission=false.
+        render(<CharReactions {...createProps()} />);
+        expect(screen.queryByText('Stand (Power Word Heal):')).not.toBeInTheDocument();
+        // Sanity: rows do render in this config, so the absence above is meaningful.
+        expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
     });
 });

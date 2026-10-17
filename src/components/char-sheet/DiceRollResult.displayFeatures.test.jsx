@@ -1,280 +1,174 @@
 import { render, screen } from '@testing-library/react';
 import DiceRollResult from './DiceRollResult.jsx';
 
-describe('DiceRollResult', () => {
-    describe('dice type icons', () => {
-        it.each`
-            type               | rollType         | expectedIcon
-            ${'d20'}           | ${undefined}     | ${'fa-dice-d20'}
-            ${'attack'}        | ${'attack'}      | ${'fa-crosshairs'}
-            ${'save'}          | ${'save'}        | ${'fa-shield-halved'}
-            ${'save-damage'}   | ${undefined}     | ${'fa-shield-halved'}
-            ${'initiative'}    | ${undefined}     | ${'fa-gavel'}
-            ${'heal'}          | ${undefined}     | ${'fa-heart'}
-            ${'damage'}        | ${undefined}     | ${'fa-bolt'}
-            ${'aoe-damage'}    | ${undefined}     | ${'fa-bolt'}
-            ${'graze-damage'}  | ${undefined}     | ${'fa-bolt'}
-            ${'overchannel-damage'} | ${undefined} | ${'fa-bolt'}
-        `('shows correct icon for type: $type', ({ type, rollType, expectedIcon }) => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Roll"
-                    type={type}
-                    rolls={[10]}
-                    bonus={0}
-                    rollType={rollType}
-                />
-            );
-            const icon = container.querySelector('.dice-roll-header .fa-solid');
-            expect(icon).toHaveClass(expectedIcon);
-        });
+// Display-FEATURES lane of the DiceRollResult family: header dice-type icons,
+// d20 Reliable Talent indicator, roll-adjustment notices (Elemental Adept,
+// Great Weapon Fighting), and the heal-outcome lines. The hit/miss, save, and
+// damage-applied exact-line text and Quick Roll gating are owned by
+// DiceRollResult.combatDisplay.test.jsx; damage_type_choice rendering is owned
+// by DiceRollResult.damageTypeChoice.test.jsx; Trance of Order flooring is
+// owned by DiceRollResult.flooring.test.jsx; Starry Form flooring by
+// DiceRollResult.rendering.test.jsx.
+
+const renderResult = (props = {}) => render(
+    <DiceRollResult name="Roll" type="d20" rolls={[10]} bonus={0} {...props} />
+);
+
+describe('header dice-type icons', () => {
+    it.each`
+        type                   | expectedIcon
+        ${'d20'}               | ${'fa-dice-d20'}
+        ${'attack'}            | ${'fa-crosshairs'}
+        ${'save'}              | ${'fa-shield-halved'}
+        ${'save-damage'}       | ${'fa-shield-halved'}
+        ${'initiative'}        | ${'fa-gavel'}
+        ${'heal'}              | ${'fa-heart'}
+        ${'damage'}            | ${'fa-bolt'}
+        ${'aoe-damage'}        | ${'fa-bolt'}
+        ${'graze-damage'}      | ${'fa-bolt'}
+        ${'overchannel-damage'}| ${'fa-bolt'}
+    `('headers type $type with icon $expectedIcon', ({ type, expectedIcon }) => {
+        renderResult({ type });
+        const header = screen.getByText('Roll');
+        const icon = header.querySelector('.fa-solid');
+        expect(icon).toHaveClass(expectedIcon);
     });
+});
 
-    describe('elemental adept display', () => {
-        it('shows 0× count when bonus > 0 but no 1s in rolls', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Fire Bolt"
-                    type="damage"
-                    rolls={[3, 6, 4]}
-                    bonus={0}
-                    elementalAdeptBonus={1}
-                />
-            );
-            const el = container.querySelector('.dice-roll-elemental-adept');
-            expect(el.textContent).toContain('0× 1 → 2');
-            expect(el.textContent).toContain('+1');
+describe('Reliable Talent indicator', () => {
+    it.each([
+        { label: 'floors skill check of 3', rollType: 'skill', roll: 3, line: 'Reliable Talent: d20 3 → 10' },
+        { label: 'floors skill check at boundary 9', rollType: 'skill', roll: 9, line: 'Reliable Talent: d20 9 → 10' },
+        { label: 'floors ability check of 3', rollType: 'check', roll: 3, line: 'Reliable Talent: d20 3 → 10' },
+        { label: 'hidden at boundary 10', rollType: 'skill', roll: 10, line: null },
+        { label: 'hidden for attacks', rollType: 'attack', roll: 3, line: null },
+        { label: 'hidden for saves', rollType: 'save', roll: 3, line: null },
+    ])('$label', ({ rollType, roll, line }) => {
+        renderResult({
+            name: 'Athletics',
+            rolls: [roll],
+            bonus: 5,
+            rollType,
+            reliableTalent: true,
         });
+        if (line) {
+            expect(screen.getByText(line)).toBeInTheDocument();
+            // floored d20 feeds the displayed total: 10 + 5
+            expect(screen.getByText('15')).toBeInTheDocument();
+        } else {
+            expect(screen.queryByText(/Reliable Talent/)).not.toBeInTheDocument();
+        }
     });
+});
 
-    describe('gwf (Great Weapon Fighting) display', () => {
-        it('shows GWF display when gwfApplied and gwfOriginalRolls are provided', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="damage"
-                    rolls={[2, 4]}
-                    bonus={0}
-                    gwfApplied={true}
-                    gwfOriginalRolls={[1, 4]}
-                    gwfDisplayRolls={[2, 4]}
-                />
-            );
-            const gwf = container.querySelector('.dice-roll-gwf');
-            expect(gwf).toBeInTheDocument();
-            expect(gwf.textContent).toContain('Great Weapon Fighting');
-            expect(gwf.textContent).toContain('1, 4');
-            expect(gwf.textContent).toContain('2, 4');
-        });
-
-        it('falls back to safeRolls when gwfDisplayRolls is not provided', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="damage"
-                    rolls={[2, 4]}
-                    bonus={0}
-                    gwfApplied={true}
-                    gwfOriginalRolls={[1, 4]}
-                />
-            );
-            const gwf = container.querySelector('.dice-roll-gwf');
-            expect(gwf.textContent).toContain('2, 4');
-        });
-
-        it('does not show GWF when gwfApplied is false', () => {
-            render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="damage"
-                    rolls={[2, 4]}
-                    bonus={0}
-                    gwfApplied={false}
-                    gwfOriginalRolls={[1, 4]}
-                />
-            );
+describe('Great Weapon Fighting notice', () => {
+    it.each([
+        {
+            label: 'shows original → displayed rolls',
+            props: { gwfApplied: true, gwfOriginalRolls: [1, 4], gwfDisplayRolls: [2, 4] },
+            line: 'Great Weapon Fighting: 1, 4 → 2, 4',
+        },
+        {
+            label: 'falls back to final rolls when gwfDisplayRolls is missing',
+            props: { gwfApplied: true, gwfOriginalRolls: [1, 4] },
+            line: 'Great Weapon Fighting: 1, 4 → 2, 4',
+        },
+        {
+            label: 'hidden when gwfApplied is false',
+            props: { gwfApplied: false, gwfOriginalRolls: [1, 4] },
+            line: null,
+        },
+        {
+            label: 'hidden when gwfOriginalRolls is missing',
+            props: { gwfApplied: true },
+            line: null,
+        },
+    ])('$label', ({ props, line }) => {
+        renderResult({ name: 'Longsword', type: 'damage', rolls: [2, 4], ...props });
+        if (line) {
+            expect(screen.getByText(line)).toBeInTheDocument();
+        } else {
             expect(screen.queryByText(/Great Weapon Fighting/)).not.toBeInTheDocument();
-        });
+        }
+    });
+});
 
-        it('does not show GWF when gwfOriginalRolls is missing', () => {
-            render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="damage"
-                    rolls={[2, 4]}
-                    bonus={0}
-                    gwfApplied={true}
-                />
-            );
-            expect(screen.queryByText(/Great Weapon Fighting/)).not.toBeInTheDocument();
-        });
+describe('Elemental Adept notice', () => {
+    it.each([
+        { label: 'counts no ones', rolls: [3, 6, 4], line: 'Elemental Adept: 0× 1 → 2 (+1)' },
+        { label: 'counts each natural 1', rolls: [1, 5, 1], line: 'Elemental Adept: 2× 1 → 2 (+1)' },
+    ])('$label', ({ rolls, line }) => {
+        renderResult({ name: 'Fire Bolt', type: 'damage', rolls, elementalAdeptBonus: 1 });
+        expect(screen.getByText(line)).toBeInTheDocument();
     });
 
-    describe('reliable talent display', () => {
-        it.each`
-            roll   | expectedRoll
-            ${3}   | ${'d20 3'}
-            ${9}   | ${'d20 9'}
-        `('shows reliable talent indicator for d20 roll $roll (≤9)', ({ roll, expectedRoll }) => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Athletics"
-                    type="d20"
-                    rolls={[roll]}
-                    bonus={5}
-                    rollType="skill"
-                    reliableTalent={true}
-                />
-            );
-            const rt = container.querySelector('.dice-roll-reliable-talent');
-            expect(rt).toBeInTheDocument();
-            expect(rt.textContent).toContain('Reliable Talent');
-            expect(rt.textContent).toContain(expectedRoll);
-            expect(rt.textContent).toContain('10');
-        });
+    it('hidden without an elemental adept bonus', () => {
+        renderResult({ name: 'Fire Bolt', type: 'damage', rolls: [1, 3], elementalAdeptBonus: 0 });
+        expect(screen.queryByText(/Elemental Adept/)).not.toBeInTheDocument();
+    });
+});
 
-        it('does not show reliable talent indicator when d20 roll is 10', () => {
-            render(
-                <DiceRollResult
-                    name="Athletics"
-                    type="d20"
-                    rolls={[10]}
-                    bonus={5}
-                    rollType="skill"
-                    reliableTalent={true}
-                />
-            );
-            expect(screen.queryByText(/Reliable Talent/)).not.toBeInTheDocument();
-        });
-
-        it('does not show reliable talent for non-check/non-skill roll types', () => {
-            render(
-                <DiceRollResult
-                    name="Attack"
-                    type="d20"
-                    rolls={[3]}
-                    bonus={5}
-                    rollType="attack"
-                    reliableTalent={true}
-                />
-            );
-            expect(screen.queryByText(/Reliable Talent/)).not.toBeInTheDocument();
-        });
-
-        it('does not show reliable talent for save rollType', () => {
-            render(
-                <DiceRollResult
-                    name="DEX Save"
-                    type="d20"
-                    rolls={[3]}
-                    bonus={5}
-                    rollType="save"
-                    reliableTalent={true}
-                />
-            );
-            expect(screen.queryByText(/Reliable Talent/)).not.toBeInTheDocument();
-        });
+describe('heal outcome lines', () => {
+    const renderHeal = (props = {}) => renderResult({
+        name: 'Cure Wounds',
+        type: 'heal',
+        rolls: [5, 3],
+        total: 8,
+        targetName: 'Ally',
+        ...props,
     });
 
-    describe('heal display', () => {
-        it('shows heal applied without reduction', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Cure Wounds"
-                    type="heal"
-                    rolls={[5, 3]}
-                    bonus={0}
-                    total={8}
-                    finalHeal={8}
-                    targetName="Ally"
-                />
-            );
-            const heal = container.querySelector('.dice-roll-heal-applied');
-            expect(heal.textContent).toContain('8');
-            expect(heal.textContent).toContain('healing applied');
-            expect(heal.textContent).toContain('Ally');
-            expect(heal.textContent).not.toContain('reduced');
-        });
-
-        it('shows heal applied with reduction and HP change', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Cure Wounds"
-                    type="heal"
-                    rolls={[5, 3]}
-                    bonus={0}
-                    total={10}
-                    finalHeal={6}
-                    healReduced={true}
-                    targetName="Ally"
-                    targetCurrentHp={2}
-                />
-            );
-            const heal = container.querySelector('.dice-roll-heal-applied');
-            expect(heal.textContent).toContain('6');
-            expect(heal.textContent).toContain('reduced from 10');
-            expect(heal.textContent).toContain('HP:');
-        });
-
-        it.each`
-            finalHeal
-            ${0}
-            ${-3}
-        `('shows already at full HP when finalHeal is $finalHeal', ({ finalHeal }) => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Cure Wounds"
-                    type="heal"
-                    rolls={[5, 3]}
-                    bonus={0}
-                    total={8}
-                    finalHeal={finalHeal}
-                    targetName="Ally"
-                />
-            );
-            const heal = container.querySelector('.dice-roll-heal-applied');
-            expect(heal.textContent).toContain('already at full HP');
-            expect(heal.textContent).not.toContain('healing applied');
-        });
-
-        it('shows bonus heal when bonusHeal is greater than 0', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Cure Wounds"
-                    type="heal"
-                    rolls={[5, 3]}
-                    bonus={0}
-                    total={8}
-                    finalHeal={8}
-                    bonusHeal={3}
-                    bonusHealDetail="Divine Spark"
-                    targetName="Ally"
-                />
-            );
-            const bonus = container.querySelector('.dice-roll-heal-bonus');
-            expect(bonus).toBeInTheDocument();
-            expect(bonus.textContent).toContain('+3');
-            expect(bonus.textContent).toContain('Divine Spark');
-        });
-
-        it.each`
-            bonusHeal
-            ${0}
-            ${undefined}
-        `('does not show bonus heal when bonusHeal is $bonusHeal', ({ bonusHeal }) => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Cure Wounds"
-                    type="heal"
-                    rolls={[5, 3]}
-                    bonus={0}
-                    total={8}
-                    finalHeal={8}
-                    bonusHeal={bonusHeal}
-                    targetName="Ally"
-                />
-            );
-            expect(container.querySelector('.dice-roll-heal-bonus')).not.toBeInTheDocument();
-        });
+    it.each([
+        {
+            label: 'full heal applied',
+            props: { finalHeal: 8 },
+            sentence: '8 healing applied to Ally',
+            bonusLine: null,
+        },
+        {
+            label: 'reduced heal with HP change',
+            props: { total: 10, finalHeal: 6, healReduced: true, targetCurrentHp: 2 },
+            sentence: '6 healing applied to Ally (reduced from 10) — HP: 8 → 2',
+            bonusLine: null,
+        },
+        {
+            label: 'bonus heal detail',
+            props: { finalHeal: 8, bonusHeal: 3, bonusHealDetail: 'Divine Spark' },
+            sentence: '8 healing applied to Ally',
+            bonusLine: 'Bonus: +3 (Divine Spark)',
+        },
+        {
+            label: 'no bonus line when bonusHeal is 0',
+            props: { finalHeal: 8, bonusHeal: 0 },
+            sentence: '8 healing applied to Ally',
+            bonusLine: null,
+        },
+        {
+            label: 'no bonus line when bonusHeal is undefined',
+            props: { finalHeal: 8 },
+            sentence: '8 healing applied to Ally',
+            bonusLine: null,
+        },
+        {
+            label: 'already at full HP when finalHeal is 0',
+            props: { finalHeal: 0 },
+            sentence: 'Ally is already at full HP',
+            bonusLine: null,
+        },
+        {
+            label: 'already at full HP when finalHeal is negative',
+            props: { finalHeal: -3 },
+            sentence: 'Ally is already at full HP',
+            bonusLine: null,
+        },
+    ])('$label', ({ props, sentence, bonusLine }) => {
+        renderHeal(props);
+        expect(screen.getByText(/healing applied|already at full HP/, { selector: 'span' }))
+            .toHaveTextContent(sentence);
+        if (bonusLine) {
+            expect(screen.getByText(bonusLine)).toBeInTheDocument();
+        } else {
+            expect(screen.queryByText(/Bonus: \+/)).not.toBeInTheDocument();
+        }
     });
 });

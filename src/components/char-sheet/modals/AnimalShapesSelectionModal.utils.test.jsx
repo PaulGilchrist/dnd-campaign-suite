@@ -1,7 +1,24 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+// LANE OWNERSHIP — AnimalShapesSelectionModal test trio
+// - AnimalShapesSelectionModal.behavior.test.jsx (behavior lane): interaction lifecycle and
+//   callback contract — loading/error states, Cancel/Close/Escape semantics, overlay click
+//   inertness, Transform gating transitions and the exact onConfirm payload.
+// - AnimalShapesSelectionModal.test.jsx (rendering lane): modal skeleton structure, creature
+//   filtering rules (type / CR cap / size), per-target search filtering, selection badge text.
+// - THIS FILE (presentation/utils lane): header title/icon customization including the
+//   fa-paw/'Animal Shapes' default-prop fallback, exact per-beast presentation row
+//   (CR fraction formatting, size, speed formatting with fixed walk→climb→swim→fly order,
+//   "No actions" fallback), exact avatar src and image-error fallback, deterministic sort
+//   order, and custom-CR instruction paragraph text (including the `maxCR || 4` display
+//   fallback). No gating, callback, filtering-rule, or search contracts live here.
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AnimalShapesSelectionModal from './AnimalShapesSelectionModal.jsx';
 
+// Deterministic bestiary stub. Sort renders Frog (CR 0) before Eagle/Panther/Wolf
+// (CR 1/4) before Brown Bear/Crocodile/Giant Spider (CR 1); Ghast is Undead and never
+// appears (filtering itself is owned by the rendering lane — its exact absence here is
+// incidental to pinning the utils mock). Frog carries empty actions (pins the
+// "No actions" fallback) and scrambled speed keys (pins formatSpeed's fixed key order).
 const mockBeasts = [
     {
         index: 'wolf',
@@ -66,6 +83,15 @@ const mockBeasts = [
         speed: { walk: 40, climb: 20 },
         actions: [{ name: 'Bite' }, { name: 'Multiattack' }, { name: 'Dash' }],
     },
+    {
+        index: 'frog',
+        name: 'Frog',
+        type: 'Beast',
+        size: 'Small',
+        challenge_rating: '0',
+        speed: { fly: 10, swim: 5, walk: 20 },
+        actions: [],
+    },
 ];
 
 vi.mock('../../../services/ui/dataLoader.js', () => ({
@@ -86,103 +112,140 @@ function makeProps(overrides) {
     return { ...baseProps, ...(overrides || {}) };
 }
 
-describe('AnimalShapesSelectionModal - utility rendering', () => {
+// Locate a target's section via its header's accessible text, so every query is
+// scoped to one target rather than positional.
+function sectionFor(targetName) {
+    return screen.getByText(targetName).closest('.animal-shapes-target-section');
+}
+
+function beastItemFor(targetName, beastName) {
+    const item = Array.from(sectionFor(targetName).querySelectorAll('.animal-shapes-beast-item'))
+        .find(el => el.querySelector('.animal-shapes-beast-name')?.childNodes[0].textContent.trim() === beastName);
+    if (!item) throw new Error(`No beast item "${beastName}" in section for ${targetName}`);
+    return item;
+}
+
+function beastNamesInSection(targetName) {
+    return Array.from(sectionFor(targetName).querySelectorAll('.animal-shapes-beast-name'))
+        .map(el => el.childNodes[0].textContent.trim());
+}
+
+// Render and wait for the loaded footer — its accessible name confirms the
+// presentation list (not the loading placeholder) is on screen.
+async function renderLoaded(props) {
+    const result = render(<AnimalShapesSelectionModal {...props} />);
+    await screen.findByRole('button', { name: `Transform (0/${props.targets.length})` });
+    return result;
+}
+
+describe('AnimalShapesSelectionModal - presentation utils', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    describe('customization props', () => {
-        it('renders custom title in the header', async () => {
-            render(<AnimalShapesSelectionModal {...makeProps({ title: 'Wild Shape Selection' })} />);
-            await waitFor(() => {
-                expect(screen.getByText('Wild Shape Selection')).toBeInTheDocument();
-            });
-        });
+    describe('header title and icon', () => {
+        it.each([
+            { label: 'custom title and icon', title: 'Wild Shape Selection', icon: 'fa-dragon' },
+            { label: 'default props fallback', title: undefined, icon: undefined },
+        ])('%s — header-scoped icon with exact class list', async ({ title, icon }) => {
+            const expectedTitle = title ?? 'Animal Shapes';
+            const expectedIconClass = `fa-solid ${icon ?? 'fa-paw'}`;
 
-        it('renders custom icon in the header', async () => {
-            render(<AnimalShapesSelectionModal {...makeProps({ icon: 'fa-dragon' })} />);
-            await waitFor(() => {
-                const icons = document.querySelectorAll('i.fa-solid.fa-dragon');
-                expect(icons.length).toBeGreaterThan(0);
-            });
-        });
-    });
+            await renderLoaded(makeProps({ title, icon }));
 
-    describe('speed display', () => {
-        it('renders combined movement speeds for beasts with multiple types', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                const section = document.querySelectorAll('.animal-shapes-target-section')[0];
-                const wolfItem = Array.from(section.querySelectorAll('.animal-shapes-beast-item')).find(item => {
-                    const nameEl = item.querySelector('.animal-shapes-beast-name');
-                    return nameEl && nameEl.childNodes[0].textContent.trim() === 'Wolf';
-                });
-                expect(wolfItem).not.toBeNull();
-                const statsEl = wolfItem.querySelector('.animal-shapes-beast-stats');
-                expect(statsEl.textContent.trim()).toBe('Walk 40, Climb 20, Swim 20');
-            });
+            // The title text node is a direct child of the header div, so getByText
+            // resolves to the header itself — scoping the icon assertion to the header.
+            const header = screen.getByText(expectedTitle);
+            expect(header.className).toBe('sp-header');
+
+            const icons = header.querySelectorAll('i');
+            expect(icons).toHaveLength(1);
+            expect(icons[0].className).toBe(expectedIconClass);
         });
     });
 
-    describe('beast image error handling', () => {
-        it('hides the img element when image loading fails', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                const images = document.querySelectorAll('.animal-shapes-beast-avatar img');
-                expect(images.length).toBeGreaterThan(0);
-            });
+    describe('sort order', () => {
+        it('lists beasts CR-ascending then alphabetically, exactly', async () => {
+            await renderLoaded(makeProps());
 
-            const images = document.querySelectorAll('.animal-shapes-beast-avatar img');
-            fireEvent.error(images[0]);
-
-            await waitFor(() => {
-                expect(images[0].style.display).toBe('none');
-            });
+            expect(beastNamesInSection('Alric')).toEqual([
+                'Frog',
+                'Eagle', 'Panther', 'Wolf',
+                'Brown Bear', 'Crocodile', 'Giant Spider',
+            ]);
         });
     });
 
-    describe('sorting order', () => {
-        it('displays beasts sorted by CR ascending then alphabetically by name', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                const section = document.querySelectorAll('.animal-shapes-target-section')[0];
-                const items = section.querySelectorAll('.animal-shapes-beast-item');
-                const names = Array.from(items).map(item => {
-                    const nameEl = item.querySelector('.animal-shapes-beast-name');
-                    return nameEl ? nameEl.childNodes[0].textContent.trim() : '';
-                });
+    describe('beast presentation rows', () => {
+        it.each([
+            {
+                name: 'Wolf',
+                crText: 'CR 0.25',
+                speedText: 'Walk 40, Climb 20, Swim 20',
+                actionsText: 'Bite, Dash',
+            },
+            {
+                name: 'Eagle',
+                crText: 'CR 0.25',
+                speedText: 'Fly 50',
+                actionsText: 'Beak, Talons',
+            },
+            {
+                name: 'Brown Bear',
+                crText: 'CR 1',
+                speedText: 'Walk 40, Climb 20',
+                actionsText: 'Bite, Multiattack, Dash',
+            },
+            {
+                // Empty actions → "No actions" fallback; scrambled speed keys →
+                // output must still follow walk→climb→swim→fly (no climb here).
+                name: 'Frog',
+                crText: 'CR 0',
+                speedText: 'Walk 20, Swim 5, Fly 10',
+                actionsText: 'No actions',
+            },
+        ])('formats $name row with exact CR, size, speed, and action text', async ({ name, crText, speedText, actionsText }) => {
+            await renderLoaded(makeProps());
 
-                // Verify the list is non-empty
-                expect(names.length).toBeGreaterThan(0);
+            const item = beastItemFor('Alric', name);
+            expect(Array.from(item.classList)).toEqual(['animal-shapes-beast-item']);
 
-                // CR 0.25 beasts (Eagle, Panther, Wolf) should appear before CR 1 beasts (Brown Bear, Crocodile, Giant Spider)
-                const isCR1 = (name) => name === 'Brown Bear' || name === 'Crocodile' || name === 'Giant Spider';
-                const isCRQuarter = (name) => name === 'Eagle' || name === 'Panther' || name === 'Wolf';
-                const cr1BeastIndices = names.filter(isCR1).map(name => names.indexOf(name));
-                const crQuarterIndices = names.filter(isCRQuarter).map(name => names.indexOf(name));
+            const beast = mockBeasts.find(b => b.name === name);
+            expect(item.querySelector('.animal-shapes-beast-size').textContent).toBe(beast.size);
+            expect(item.querySelector('.animal-shapes-beast-cr').textContent).toBe(crText);
+            expect(item.querySelector('.animal-shapes-beast-stats').textContent).toBe(speedText);
+            expect(item.querySelector('.animal-shapes-beast-actions').textContent).toBe(actionsText);
+        });
+    });
 
-                const maxQuarterIndex = Math.max(...crQuarterIndices);
-                const minCR1Index = Math.min(...cr1BeastIndices);
+    describe('avatar image error fallback', () => {
+        it('hides only the failed image and keeps its row intact; sibling images stay visible', async () => {
+            await renderLoaded(makeProps());
 
-                expect(maxQuarterIndex).toBeLessThan(minCR1Index);
+            const wolfImg = within(beastItemFor('Alric', 'Wolf')).getByRole('img', { name: 'Wolf' });
+            const bearImg = within(beastItemFor('Alric', 'Brown Bear')).getByRole('img', { name: 'Brown Bear' });
 
-                // Within CR 0.25, alphabetical order: Eagle < Panther < Wolf
-                expect(names.indexOf('Eagle')).toBeLessThan(names.indexOf('Panther'));
-                expect(names.indexOf('Panther')).toBeLessThan(names.indexOf('Wolf'));
+            expect(wolfImg.getAttribute('src')).toBe('https://paulgilchrist.github.io/dnd-tools/images/wolf.jpg');
+            expect(wolfImg.style.display).toBe('');
 
-                // Within CR 1, alphabetical order: Brown Bear < Crocodile < Giant Spider
-                expect(names.indexOf('Brown Bear')).toBeLessThan(names.indexOf('Crocodile'));
-                expect(names.indexOf('Crocodile')).toBeLessThan(names.indexOf('Giant Spider'));
-            });
+            fireEvent.error(wolfImg);
+
+            expect(wolfImg.style.display).toBe('none');
+            expect(bearImg.style.display).toBe('');
+            expect(beastItemFor('Alric', 'Wolf')).toBeInTheDocument();
         });
     });
 
     describe('instruction text', () => {
-        it('displays the correct CR limit in the instruction paragraph', async () => {
-            render(<AnimalShapesSelectionModal {...makeProps({ maxCR: 2 })} />);
-            await waitFor(() => {
-                expect(screen.getByText(/Choose a beast form \(CR 2 or lower, Large or smaller\)/)).toBeInTheDocument();
-            });
+        it.each([
+            { label: 'integer CR', maxCR: 2, text: 'Choose a beast form (CR 2 or lower, Large or smaller) for each target:' },
+            { label: 'fractional CR', maxCR: 0.5, text: 'Choose a beast form (CR 0.5 or lower, Large or smaller) for each target:' },
+            // maxCR omitted → the `maxCR || 4` display fallback renders CR 4.
+            { label: 'missing CR falls back to 4', maxCR: undefined, text: 'Choose a beast form (CR 4 or lower, Large or smaller) for each target:' },
+        ])('shows the exact instruction paragraph for $label', async ({ maxCR, text }) => {
+            await renderLoaded(makeProps({ maxCR }));
+
+            expect(screen.getByText(text)).toBeInTheDocument();
         });
     });
 });

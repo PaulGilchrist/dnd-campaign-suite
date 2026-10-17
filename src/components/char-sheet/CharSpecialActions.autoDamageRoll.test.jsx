@@ -1,258 +1,53 @@
-import React from 'react';
+// @maintained-by-ai
+// CharSpecialActions autoDamageRoll seam map (family opener):
+// - THIS FILE pins ONLY the component seam in CharSpecialActions.jsx (~L719-733):
+//   the autoDamageRoll callback handed to useLoggedDiceRoll — its wiring/delegation
+//   (normalizeAutoDamage + resolveAttackDamageStandalone args, isCrit passthrough,
+//   rollDamage/setPopupHtml identity) and the component-local ripostePopup →
+//   setPopupHtml rendering.
+// - Damage-application internals (formula → dice roll, crit doubling, ctx assembly,
+//   pipeline steps) are owned by the damage lanes: useAttackDamageResolution.standalone.test.js,
+//   useAttackDamageResolution.*.test.js, normalizeAutoDamage.test.js,
+//   src/services/combat/steps/attackRollDamageSteps-*.test.js. Do not duplicate here.
+// - CharSpecialActions sibling lanes (same folder): automationClickHandlers, combatHandlers,
+//   craftingHandlers, elementalEffects, featureChoice, gnomishLineage, handlers, modals,
+//   modalsInline, modalOnClose.{elemental,weapons}, twinklingConstellations, uncovered.handlers,
+//   useMagicDevice — they honor this map: never re-pin the autoDamageRoll seam there.
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpecialActions from './CharSpecialActions.jsx';
+import { normalizeAutoDamage, resolveAttackDamageStandalone } from './useAttackDamageResolution.js';
 
-// Mock useDiceRollPopup and DiceRollContext
-vi.mock('../../hooks/combat/DiceRollContext.js', () => {
-  const mockContext = React.createContext({ setPopupHtml: vi.fn() });
-  return {
-    DiceRollContext: mockContext,
-    useDiceRollPopup: vi.fn(() => ({ setPopupHtml: vi.fn() })),
-  };
-});
+// Capture the autoDamageRoll callback + rollDamage that the component wires into the hook.
+let capturedOptions = null;
+let capturedRollDamage = null;
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  default: vi.fn((_name, _campaign, options) => {
+    capturedOptions = options;
+    capturedRollDamage = vi.fn();
+    return { rollAttack: vi.fn(), rollDamage: capturedRollDamage };
+  }),
+}));
 
-import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
-import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
+// Capture popup writes (real context default is an inert no-op setter).
+let capturedSetPopupHtml = null;
+vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
+  useDiceRollPopup: vi.fn(() => ({ popupHtml: null, setPopupHtml: capturedSetPopupHtml })),
+}));
 
-const renderWithDiceRollContext = (component, options = {}) => {
-  const wrapper = ({ children }) => (
-    <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
-      {children}
-    </DiceRollContext.Provider>
-  );
-  return render(component, { wrapper, ...options });
-};
+// Isolate the component seam: damage-resolution internals are owned by the damage lanes.
+vi.mock('./useAttackDamageResolution.js', () => ({
+  normalizeAutoDamage: vi.fn(() => ({ attack: { name: 'Longsword' }, ctx: {} })),
+  resolveAttackDamageStandalone: vi.fn(() => Promise.resolve()),
+}));
 
-// Mock executeHandler
+// Avoid loading the automation handler hub and fighting-styles fetch (irrelevant to this seam).
 vi.mock('../../services/automation/index.js', () => ({
   executeHandler: vi.fn(),
 }));
-
-// Mock automation service (single definition)
-vi.mock('../../services/combat/automation/automationService.js', () => ({
-  hasAutomation: vi.fn((action) => !!(action?.automation)),
-  isInteractiveAutomation: vi.fn((action) => {
-    if (!action?.automation) return false;
-    const auto = Array.isArray(action.automation) ? action.automation[0] : action.automation;
-    const interactiveTypes = ['teleport', 'signature_spells', 'spell_mastery', 'combat_superiority', 'weapon_kind_mastery', 'weapon_mastery_choice'];
-    if (auto.type === 'passive_rule') {
-      const interactiveEffects = ['abjuration_savant', 'divination_savant', 'evocation_savant', 'illusion_savant'];
-      return interactiveEffects.includes(auto.effect);
-    }
-    return interactiveTypes.includes(auto.type);
-  }),
-  hasTwoWeaponFighting: vi.fn(() => false),
-}));
-
-// Mock TeleportModal
-vi.mock('./modals/TeleportModal.jsx', () => ({
-  default: ({ action, onClose }) => (
-    <div data-testid="teleport-modal">
-      <span>{action?.name || 'Teleport'}</span>
-      <button onClick={onClose}>Close</button>
-    </div>
-  ),
-}));
-
-// Mock SignatureSpellsModal
-vi.mock('./modals/arcane/SignatureSpellsModal.jsx', () => ({
-  default: ({ payload: _payload, onConfirm, onClose }) => (
-    <div data-testid="signature-spells-modal" role="presentation" onClick={onClose}>
-      <h3>Signature Spells</h3>
-      <button onClick={() => onConfirm('Fireball', 'Haste')}>Confirm</button>
-      <button onClick={onClose}>Close</button>
-    </div>
-  ),
-}));
-
-// Mock SpellMasteryModal
-vi.mock('./modals/arcane/SpellMasteryModal.jsx', () => ({
-  default: ({ payload: _payload, onConfirm, onClose }) => (
-    <div data-testid="spell-mastery-modal" role="presentation" onClick={onClose}>
-      <h3>Spell Mastery</h3>
-      <button onClick={() => onConfirm('Mage Armor', 'Shield')}>Confirm</button>
-      <button onClick={onClose}>Close</button>
-    </div>
-  ),
-}));
-
-// Mock SavantModal
-vi.mock('./modals/arcane/SavantModal.jsx', () => ({
-  default: ({ payload, onConfirm, onClose }) => (
-    <div data-testid={`${payload?.school?.toLowerCase() || 'savant'}-savant-modal`} role="presentation" onClick={onClose}>
-      <span>{payload?.school || 'Savant'} Savant</span>
-      <button onClick={() => onConfirm(payload?.spellOptions?.[0] || 'Shield', payload?.spellOptions?.[1] || 'Mage Armor')}>Confirm</button>
-      <button onClick={onClose}>Close</button>
-    </div>
-  ),
-}));
-
-// Mock WeaponKindMasteryModal
-vi.mock('./modals/WeaponKindMasteryModal.jsx', () => ({
-  default: ({ action, _playerStats, _campaignName, _meleeOnly, onClose, _existing }) => (
-    <div data-testid="weapon-kind-mastery-modal">
-      <span>{action?.name || 'Weapon Kind Mastery'}</span>
-      <button onClick={onClose}>Close</button>
-    </div>
-  ),
-}));
-
-// Mock WeaponMasteryChoiceModal
-vi.mock('./modals/WeaponMasteryChoiceModal.jsx', () => ({
-  default: ({ action: _action, _playerStats, _campaignName, _masteryProperties, onClose, _onConfirm }) => (
-    <div data-testid="weapon-mastery-choice-modal">
-      <span>Weapon Mastery Choice</span>
-      <button onClick={onClose}>Close</button>
-      <button onClick={() => _onConfirm && _onConfirm('Finesse')}>Confirm</button>
-    </div>
-  ),
-}));
-
-// Mock CombatSuperiorityModal
-vi.mock('./modals/CombatSuperiorityModal.jsx', () => ({
-  default: ({ _payload, onConfirm, _onReopenSelection, _onClose }) => (
-    <div data-testid="combat-superiority-modal">
-      <span>Combat Superiority</span>
-      <button onClick={() => onConfirm([], null)}>Close</button>
-    </div>
-  ),
-}));
-
-// Mock renderMarkdownInline
-vi.mock('../../services/ui/sanitize.js', () => ({
-  sanitizeHtml: vi.fn((html) => html),
-  renderMarkdown: vi.fn((md) => md),
-  renderMarkdownInline: vi.fn((md) => md),
-}));
-
-// Mock fighting styles
 vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadFightingStyles: vi.fn(() => Promise.resolve([
-    { name: 'Great Weapon Fighting', description: 'When you roll damage for an attack you make with a Melee weapon that you are holding with two hands, you can treat any 1 or 2 on a damage die as a 3. The weapon must have the Two-Handed or Versatile property to gain this benefit.' },
-    { name: 'Protection', description: 'When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield.' },
-  ])),
+  loadFightingStyles: vi.fn(() => Promise.resolve([])),
 }));
-
-// Mock the handler functions called by modal confirm callbacks
-vi.mock('../../services/automation/handlers/class-wizard/signatureSpellsHandler.js', () => ({
-  onSignatureSpellsSelected: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-wizard/spellMasteryHandler.js', () => ({
-  onSpellMasterySelected: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-wizard/SavantHandler.js', () => ({
-  onSavantSelected: vi.fn(),
-}));
-
-// Mock dice roller
-vi.mock('../../services/dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(),
-  rollExpressionDoubled: vi.fn(),
-  rollExpressionMaximized: vi.fn(),
-}));
-
-// Mock postCastRiderService (used by normalizeAutoDamage)
-vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
-  getEmpoweredEvocationFeatures: vi.fn(() => []),
-  getEmpoweredEvocationIntModifier: vi.fn(() => 0),
-}));
-
-// Mock runtime state (used by pipeline steps)
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(() => null),
-  setRuntimeValue: vi.fn(() => Promise.resolve()),
-  setRuntimeObject: vi.fn(() => Promise.resolve()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
-}));
-
-// Mock log service (used by pipeline steps)
-vi.mock('../../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-// Mock combat automation data
-vi.mock('../../../services/encounters/combatData.js', () => ({
-  getCurrentCombatRound: vi.fn(() => 1),
-  loadCombatSummary: vi.fn(() => Promise.resolve({ lastAttack: {}, creatures: [] })),
-}));
-
-// Mock save prompt
-vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-  createSaveListener: vi.fn(() => ({ promptId: 'test-id', promise: Promise.resolve({ success: true }) })),
-}));
-
-// Mock buff service
-vi.mock('../../../services/automation/common/buffToggle.js', () => ({
-  getActiveBuffs: vi.fn(() => []),
-}));
-
-// Mock resource check
-vi.mock('../../../services/automation/common/resourceCheck.js', () => ({
-  spendResource: vi.fn(() => false),
-}));
-
-// Mock bardic inspiration
-vi.mock('../../../services/combat/auras/bardicInspirationState.js', () => ({
-  hasBardicInspirationOffense: vi.fn(() => false),
-  getBardicInspirationDieSize: vi.fn(() => 0),
-}));
-
-// Mock combat prompts
-vi.mock('../../../services/combat/prompts/bardicInspirationPromptUtils.js', () => ({
-  sendBardicInspirationOffensePrompt: vi.fn(),
-}));
-
-// Mock damage utils
-vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => Promise.resolve({ target: null, targetName: null, resistanceNotice: '' })),
-  getTargetFromAttacker: vi.fn(() => null),
-}));
-
-// Mock apply damage
-vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
-  applyDamageToTarget: vi.fn(() => ({ finalDamage: 0 })),
-}));
-
-// Mock feature modules
-vi.mock('./features/index.js', () => ({
-  featureModules: [],
-}));
-
-// Mock ui utils
-vi.mock('../../../services/ui/utils.js', () => ({
-  default: {
-    showCombatLog: vi.fn(),
-    showCombatLogEntry: vi.fn(),
-    getFormattedTime: vi.fn(() => ''),
-    getFormattedDate: vi.fn(() => ''),
-    parseExpression: vi.fn(),
-  },
-}));
-
-// Capture the autoDamageRoll callback and rollDamage function
-let capturedAutoDamageRoll = null;
-let capturedRollDamageFn = null;
-
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  return {
-    __esModule: true,
-    default: vi.fn((characterName, campaignName, options) => {
-      capturedAutoDamageRoll = options?.autoDamageRoll || null;
-      const mockRollDamage = vi.fn();
-      capturedRollDamageFn = mockRollDamage;
-      return {
-        rollAttack: vi.fn(),
-        rollDamage: mockRollDamage,
-        autoDamageRoll: options?.autoDamageRoll,
-      };
-    }),
-  };
-});
-
-// Mock useCombatSuperiorityModal
 vi.mock('../../hooks/combat/useCombatSuperiorityModal.js', () => ({
   useCombatSuperiorityModal: vi.fn(() => ({
     combatSuperiorityModal: null,
@@ -262,144 +57,97 @@ vi.mock('../../hooks/combat/useCombatSuperiorityModal.js', () => ({
   })),
 }));
 
-import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
-
-const basePlayerStats = {
+const playerStats = {
   name: 'TestCharacter',
   specialActions: [],
-  class: {
-    fightingStyles: [],
-  },
+  class: { fightingStyles: [] },
   actions: [],
   bonusActions: [],
   reactions: [],
   characterAdvancement: [],
 };
 
-function createPlayerStats(overrides = {}) {
-  return { ...basePlayerStats, ...overrides };
+const autoDamage = {
+  name: 'Longsword Attack',
+  formula: '2d6+3',
+  damageType: 'Slashing',
+  targetName: 'Goblin',
+  attackerName: 'TestCharacter',
+};
+
+function renderAndCaptureAutoDamageRoll() {
+  render(<CharSpecialActions playerStats={playerStats} campaignName="test-campaign" characters={[]} />);
+  expect(capturedOptions?.autoDamageRoll).toBeTypeOf('function');
+  return capturedOptions.autoDamageRoll;
 }
 
-describe('CharSpecialActions - autoDamageRoll callback', () => {
+describe('CharSpecialActions - autoDamageRoll seam', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    capturedAutoDamageRoll = null;
-    capturedRollDamageFn = null;
-    rollExpression.mockReturnValue({ total: 7, rolls: [5, 2], modifier: 0 });
-    rollExpressionDoubled.mockReturnValue({ total: 14, rolls: [5, 2, 5, 2], modifier: 0, doubledRolls: [5, 2, 5, 2] });
+    capturedOptions = null;
+    capturedRollDamage = null;
+    capturedSetPopupHtml = vi.fn();
+    normalizeAutoDamage.mockReturnValue({ attack: { name: 'Longsword' }, ctx: {} });
   });
 
-  function getAutoDamageRoll() {
-    return capturedAutoDamageRoll;
-  }
+  it('delegates to normalizeAutoDamage + resolveAttackDamageStandalone, forwarding isCrit and the hook rollDamage', async () => {
+    const autoDamageRoll = renderAndCaptureAutoDamageRoll();
 
-  function getRollDamageCalls() {
-    return (capturedRollDamageFn?.mock?.calls || []).map(c => c[0]);
-  }
+    await autoDamageRoll(autoDamage, false);
+    await autoDamageRoll(autoDamage, true);
 
-  describe('formula parsing and damage roll', () => {
-    it.each([
-      { isCrit: false, formula: '2d6+3', expectedTotal: 8, expectedRolls: [6, 2], attackName: 'Longsword Attack' },
-      { isCrit: true, formula: '2d6+3', expectedTotal: 16, expectedRolls: [6, 2, 6, 2], attackName: 'Longsword Attack' },
-    ])('calls rollDamage with formula ($description)', async ({ isCrit, formula, expectedTotal, expectedRolls, attackName }) => {
-      if (isCrit) {
-        rollExpressionDoubled.mockReturnValue({ total: expectedTotal, rolls: expectedRolls, modifier: 0, doubledRolls: expectedRolls });
-      } else {
-        rollExpression.mockReturnValue({ total: expectedTotal, rolls: expectedRolls, modifier: 0 });
-      }
+    // Normalization receives the raw autoDamage, per-click isCrit, and the acting stats.
+    expect(normalizeAutoDamage.mock.calls.map(c => [c[0], c[1], c[2]]))
+      .toEqual([[autoDamage, false, playerStats], [autoDamage, true, playerStats]]);
 
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Combat Superiority', description: 'Use a maneuver.', automation: { type: 'combat_superiority' } },
-        ],
-      });
-
-      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />);
-
-      const autoDamageRoll = getAutoDamageRoll();
-      expect(autoDamageRoll).toBeDefined();
-
-      const mockAutoDamage = {
-        name: attackName,
-        formula,
-        damageType: 'Slashing',
-        targetName: 'Goblin',
-        attackerName: 'TestCharacter',
-      };
-
-      await autoDamageRoll(mockAutoDamage, isCrit);
-
-      const expectedRollFn = isCrit ? rollExpressionDoubled : rollExpression;
-      expect(expectedRollFn).toHaveBeenCalled();
-
-      const calls = getRollDamageCalls();
-      expect(calls).toHaveLength(1);
-      expect(calls[0].name).toBe(attackName);
-      expect(calls[0].total).toBe(expectedTotal);
-      expect(calls[0].rolls).toEqual(expectedRolls);
-      expect(calls[0].context.isAutoCrit).toBe(isCrit);
-      expect(calls[0].context.damageType).toBe('Slashing');
-      expect(calls[0].context.targetName).toBe('Goblin');
-      expect(calls[0].context.attackerName).toBe('TestCharacter');
-    });
-  });
-
-  describe('riposte popup handling', () => {
-    let capturedSetPopupHtml = null;
-
-    function renderWithPopup() {
-      capturedSetPopupHtml = null;
-      const mockCtx = {
-        popupHtml: null,
-        setPopupHtml: (html) => { capturedSetPopupHtml = html; },
-      };
-      vi.mocked(useDiceRollPopup).mockReturnValue(mockCtx);
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Combat Superiority', description: 'Use a maneuver.', automation: { type: 'combat_superiority' } },
-        ],
-      });
-
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[]} />, {
-        wrapper: ({ children }) => (
-          <DiceRollContext.Provider value={mockCtx}>
-            {children}
-          </DiceRollContext.Provider>
-        ),
-      });
-      return getAutoDamageRoll();
+    // Resolution is triggered once per click with the normalized attack/ctx and the
+    // hook's rollDamage + popup setter (the roll-trigger the popup depends on).
+    expect(resolveAttackDamageStandalone).toHaveBeenCalledTimes(2);
+    expect(capturedRollDamage).not.toHaveBeenCalled();
+    const normalized = normalizeAutoDamage.mock.results[0].value;
+    for (const [, , deps] of resolveAttackDamageStandalone.mock.calls) {
+      expect(deps.playerStats).toBe(playerStats);
+      expect(deps.campaignName).toBe('test-campaign');
+      expect(deps.rollDamage).toBe(capturedRollDamage);
+      expect(deps.setPopupHtml).toBe(capturedSetPopupHtml);
     }
-
-    it.each([
-      { payload: '<b>Counterattack!</b> You deal extra damage.', expected: '<b>Counterattack!</b> You deal extra damage.', description: 'string payload' },
-      { payload: { name: 'Combat Superiority', description: 'You strike back at the attacker.' }, expectedContains: ['Combat Superiority', 'You strike back at the attacker.'], description: 'object payload with name' },
-      { payload: { description: 'Some riposte effect.' }, expectedContains: ['Combat Superiority', 'Some riposte effect.'], description: 'object payload without name uses fallback' },
-    ])('shows riposte popup when autoDamage has ripostePopup as $description', async ({ payload, expected, expectedContains }) => {
-      rollExpression.mockReturnValue({ total: 5, rolls: [3, 2], modifier: 0 });
-
-      const autoDamageRoll = renderWithPopup();
-
-      const mockAutoDamage = {
-        name: 'Riposte',
-        formula: '2d6+ 1 [Superiority]',
-        damageType: 'Slashing',
-        targetName: 'Goblin',
-        attackerName: 'TestCharacter',
-        ripostePopup: payload,
-      };
-
-      await autoDamageRoll(mockAutoDamage, false);
-
-      if (expected) {
-        expect(capturedSetPopupHtml).toBe(expected);
-      } else {
-        for (const text of expectedContains) {
-          expect(capturedSetPopupHtml).toContain(text);
-        }
-      }
-    });
+    expect(resolveAttackDamageStandalone.mock.calls.map(([attack, ctx]) => [attack, ctx]))
+      .toEqual([[normalized.attack, normalized.ctx], [normalized.attack, normalized.ctx]]);
+    // Crit flag reaches the normalized ctx untouched (2nd click only).
+    expect(normalizeAutoDamage.mock.calls[1][1]).toBe(true);
+    // No ripostePopup on these payloads → no popup fired by the component itself.
+    expect(capturedSetPopupHtml).not.toHaveBeenCalled();
   });
 
+  it.each([
+    {
+      description: 'string payload passes through verbatim',
+      payload: '<b>Counterattack!</b> You deal extra damage.',
+      expected: '<b>Counterattack!</b> You deal extra damage.',
+    },
+    {
+      description: 'object payload renders name and description',
+      payload: { name: 'Riposte', description: 'You strike back at the attacker.' },
+      expectedContains: ['Riposte', 'You strike back at the attacker.'],
+    },
+    {
+      description: 'object payload without name falls back to Combat Superiority',
+      payload: { description: 'Some riposte effect.' },
+      expectedContains: ['Combat Superiority', 'Some riposte effect.'],
+    },
+  ])('sets riposte popup for $description', async ({ payload, expected, expectedContains }) => {
+    const autoDamageRoll = renderAndCaptureAutoDamageRoll();
 
+    await autoDamageRoll({ ...autoDamage, ripostePopup: payload }, false);
+
+    expect(capturedSetPopupHtml).toHaveBeenCalledTimes(1);
+    const html = capturedSetPopupHtml.mock.calls[0][0];
+    if (expected) {
+      expect(html).toBe(expected);
+    } else {
+      for (const text of expectedContains) {
+        expect(html).toContain(text);
+      }
+    }
+  });
 });

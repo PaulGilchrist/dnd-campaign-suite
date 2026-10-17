@@ -1,10 +1,22 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+// @maintained-by-ai
+// CharSpecialActions combat-action click handlers seam:
+//   - Destructive Stride: Confirm Target → SecondaryTargetModal handoff,
+//     Confirm Popup branch, and the CLA-113 OBJECT-signature applyTargetChoice call.
+//   - Moonlight Step fallback YES path (confirmTeleport carries slotLevel).
+//   - Portent die choice (apply args + popup, and error-close via catch).
+// Not covered here (covered elsewhere): modal OPEN dispatch for every modal
+// (CharSpecialActions.modals.test.jsx parametrized table), Moonlight Step
+// render + NO-close (CharSpecialActions.modalsInline.test.jsx), brew_poison /
+// delegate clicks + executeHandler popup results (CharSpecialActions.automationClickHandlers.test.jsx).
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import './CharSpecialActions.modalMocks.jsx';
 import CharSpecialActions from './CharSpecialActions.jsx';
 import { executeHandler } from '../../services/automation/index.js';
 import { applyPortentChoice } from '../../services/automation/handlers/class-wizard/portentHandler.js';
 import { applyTargetChoice } from '../../services/automation/handlers/combat/destructiveStrideHandler.js';
+import { confirmTeleport } from '../../services/automation/handlers/class-warlock/tempTeleportHandler.js';
+import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
 import { mockRuntimeStore } from './CharSpecialActions.modalMocks.jsx';
 
 const basePlayerStats = {
@@ -28,292 +40,181 @@ function createSpecialAction(name, automation) {
   return { name, description: `${name} description.`, automation };
 }
 
+let setPopupHtml;
+
+function renderWithAction(action) {
+  render(
+    <CharSpecialActions
+      playerStats={createPlayerStats({ specialActions: [action] })}
+      campaignName="test"
+    />
+  );
+  fireEvent.click(screen.getAllByText(new RegExp(action.name))[0]);
+}
+
+// Mocked DestructiveStrideModal re-emits its own confirm payloads (CLA-113:
+// the real modal self-applies applyDamageTypeChoice), so the executeHandler
+// payload only needs action/playerStats/campaignName to open it.
+async function openStrideTargetModal() {
+  executeHandler.mockResolvedValue({
+    type: 'modal',
+    modalName: 'destructiveStride',
+    payload: {
+      action: { name: 'Destructive Stride' },
+      playerStats: createPlayerStats(),
+      campaignName: 'test',
+    },
+  });
+  renderWithAction(createSpecialAction('Destructive Stride', { type: 'destructive_stride' }));
+  await waitFor(() => {
+    expect(screen.getByTestId('destructive-stride-modal')).toBeInTheDocument();
+  });
+  fireEvent.click(screen.getByText('Confirm Target'));
+  await waitFor(() => {
+    expect(screen.getByTestId('secondary-target-modal')).toBeInTheDocument();
+  });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  Object.keys(mockRuntimeStore).forEach(key => delete mockRuntimeStore[key]);
+  setPopupHtml = vi.fn();
+  vi.mocked(useDiceRollPopup).mockReturnValue({ setPopupHtml });
+});
+
 describe('CharSpecialActions - Destructive Stride', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(mockRuntimeStore).forEach(key => delete mockRuntimeStore[key]);
+  it('hands off to the secondary target modal on Confirm Target', async () => {
+    await openStrideTargetModal();
+
+    // Handoff content comes from the grid's SecondaryTargetModal wiring.
+    expect(screen.getByText('Choose a creature within 5 ft. that you entered a space near while striding. A creature can take this damage only once per turn.')).toBeInTheDocument();
+    expect(screen.getByText('Strike')).toBeInTheDocument();
+    expect(screen.queryByTestId('destructive-stride-modal')).not.toBeInTheDocument();
   });
 
-  describe('handleDestructiveStrideConfirm', () => {
-    it('opens destructive stride target modal when result is modal', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'destructiveStride',
-        payload: {
-          action: { name: 'Destructive Stride' },
-          playerStats: createPlayerStats(),
-          campaignName: 'test',
-          chosenType: 'bludgeoning',
-          martialArtsDie: '1d6',
-        },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          createSpecialAction('Destructive Stride', { type: 'destructive_stride' }),
-        ],
-      });
-
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-
-      expect(executeHandler).not.toHaveBeenCalled();
-
-      fireEvent.click(screen.getAllByText(/Destructive Stride/)[0]);
-
-      await waitFor(() => {
-        expect(executeHandler).toHaveBeenCalledTimes(1);
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('destructive-stride-modal')).toBeInTheDocument();
-      });
-
-      expect(within(screen.getByTestId('destructive-stride-modal')).getByText('Destructive Stride')).toBeInTheDocument();
-
-      fireEvent.click(screen.getByText('Confirm Target'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('secondary-target-modal')).toBeInTheDocument();
-      });
-    });
-
-    it('shows popup when result is popup', async () => {
-      const mockSetPopupHtml = vi.fn();
-      vi.mocked((await import('../../hooks/combat/DiceRollContext.js')).useDiceRollPopup).mockReturnValue({ setPopupHtml: mockSetPopupHtml });
-
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'destructiveStride',
-        payload: {
-          action: { name: 'Destructive Stride' },
-          playerStats: createPlayerStats(),
-          campaignName: 'test',
-          chosenType: 'piercing',
-          martialArtsDie: '1d4',
-        },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          createSpecialAction('Destructive Stride', { type: 'destructive_stride' }),
-        ],
-      });
-
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-
-      fireEvent.click(screen.getAllByText(/Destructive Stride/)[0]);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('destructive-stride-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm Popup'));
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalled();
-      });
-
-      expect(mockSetPopupHtml).toHaveBeenCalledTimes(1);
-      const popupCall = mockSetPopupHtml.mock.calls[0][0];
-      expect(popupCall).toContain('Destructive Stride');
-      expect(popupCall).toContain('Struck target.');
-      expect(screen.queryByTestId('destructive-stride-modal')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('handleDestructiveStrideTargetConfirm', () => {
-    it('calls applyTargetChoice and shows popup on result', async () => {
-      const mockSetPopupHtml = vi.fn();
-      vi.mocked((await import('../../hooks/combat/DiceRollContext.js')).useDiceRollPopup).mockReturnValue({ setPopupHtml: mockSetPopupHtml });
-
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'destructiveStride',
-        payload: {
-          action: { name: 'Destructive Stride' },
-          playerStats: createPlayerStats(),
-          campaignName: 'test',
-          chosenType: 'bludgeoning',
-          martialArtsDie: '1d6',
-        },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          createSpecialAction('Destructive Stride', { type: 'destructive_stride' }),
-        ],
-      });
-
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-
-      fireEvent.click(screen.getAllByText(/Destructive Stride/)[0]);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('destructive-stride-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm Target'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('secondary-target-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Strike'));
-
-      await waitFor(() => {
-        expect(applyTargetChoice).toHaveBeenCalledOnce();
-      });
-
-      expect(mockSetPopupHtml).toHaveBeenCalled();
-      const popupCall = mockSetPopupHtml.mock.calls[0][0];
-      expect(popupCall).toContain('Destructive Stride');
-      expect(popupCall).toContain('Struck target.');
-    });
-
-    // CLA-113: applyTargetChoice has an OBJECT-destructure signature — the
-    // positional call left campaignName undefined (getCombatSummary(undefined)=null
-    // → silent zero damage). Pin the object shape (host-1 twin).
-    it('CLA-113: calls applyTargetChoice with the OBJECT signature, never positional', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'destructiveStride',
-        payload: {
-          action: { name: 'Destructive Stride' },
-          playerStats: createPlayerStats(),
-          campaignName: 'test',
-          chosenType: 'bludgeoning',
-          martialArtsDie: '1d6',
-        },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          createSpecialAction('Destructive Stride', { type: 'destructive_stride' }),
-        ],
-      });
-
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-
-      fireEvent.click(screen.getAllByText(/Destructive Stride/)[0]);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('destructive-stride-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm Target'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('secondary-target-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Strike'));
-
-      await waitFor(() => {
-        expect(applyTargetChoice).toHaveBeenCalledOnce();
-      });
-
-      const arg = applyTargetChoice.mock.calls[0][0];
-      expect(arg).toEqual(expect.objectContaining({
-        action: expect.objectContaining({ name: 'Destructive Stride' }),
+  it('shows the popup and closes without a target modal on Confirm Popup', async () => {
+    executeHandler.mockResolvedValue({
+      type: 'modal',
+      modalName: 'destructiveStride',
+      payload: {
+        action: { name: 'Destructive Stride' },
+        playerStats: createPlayerStats(),
         campaignName: 'test',
-        targetName: expect.any(String),
-      }));
-      expect(arg.playerStats).toBeDefined();
-      expect(applyTargetChoice.mock.calls[0].length).toBe(1);
+      },
     });
+    renderWithAction(createSpecialAction('Destructive Stride', { type: 'destructive_stride' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('destructive-stride-modal')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Confirm Popup'));
+
+    await waitFor(() => {
+      expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    });
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Destructive Stride'));
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Struck target.'));
+    expect(screen.queryByTestId('destructive-stride-modal')).not.toBeInTheDocument();
+    // Popup branch must NOT open the target-choice modal.
+    expect(screen.queryByTestId('secondary-target-modal')).not.toBeInTheDocument();
+  });
+
+  it('applies the stride damage with the CLA-113 OBJECT signature and shows the popup on Strike', async () => {
+    await openStrideTargetModal();
+
+    fireEvent.click(screen.getByText('Strike'));
+
+    // CLA-113: applyTargetChoice has an OBJECT-destructure signature — a
+    // positional call left campaignName undefined (getCombatSummary(undefined)
+    // = null → silent zero damage). Pin the single-object call shape.
+    await waitFor(() => {
+      expect(applyTargetChoice).toHaveBeenCalledOnce();
+    });
+    expect(applyTargetChoice.mock.calls[0]).toHaveLength(1);
+    expect(applyTargetChoice).toHaveBeenCalledWith({
+      action: expect.objectContaining({ name: 'Destructive Stride' }),
+      playerStats: expect.any(Object),
+      campaignName: 'test',
+      targetName: 'Enemy1',
+      chosenType: 'Fire',
+      martialArtsDie: 6,
+    });
+
+    await waitFor(() => {
+      expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Struck target.'));
+    });
+    expect(screen.queryByTestId('secondary-target-modal')).not.toBeInTheDocument();
   });
 });
 
 describe('CharSpecialActions - Moonlight Step Fallback', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(mockRuntimeStore).forEach(key => delete mockRuntimeStore[key]);
-  });
-
-  describe('handleMoonlightStepFallbackConfirm', () => {
-    it('renders the moonlight step fallback modal with correct slot level and handles user choice', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'moonlightStepFallback',
-        payload: {
-          action: { name: 'Moonlight Step' },
-          playerStats: createPlayerStats(),
-          campaignName: 'test',
-          slotLevel: 3,
-        },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          createSpecialAction('Moonlight Step', { type: 'teleport', effect: 'moonlight_step_teleport' }),
-        ],
-      });
-
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-
-      fireEvent.click(screen.getAllByText(/Moonlight Step/)[0]);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Consume a level 3 spell slot to use Moonlight Step/)).toBeInTheDocument();
-        expect(screen.getByText('Yes, Consume Slot')).toBeInTheDocument();
-        expect(screen.getByText('No')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('No'));
-
-      await waitFor(() => {
-        expect(screen.queryByText(/Consume a level 3 spell slot to use Moonlight Step/)).not.toBeInTheDocument();
-      });
+  it('consumes the offered spell slot via confirmTeleport on Yes, then shows the popup', async () => {
+    executeHandler.mockResolvedValue({
+      type: 'modal',
+      modalName: 'moonlightStepFallback',
+      payload: {
+        action: { name: 'Moonlight Step' },
+        playerStats: createPlayerStats(),
+        campaignName: 'test',
+        slotLevel: 3,
+      },
     });
+
+    renderWithAction(createSpecialAction('Moonlight Step', { type: 'teleport', effect: 'moonlight_step_teleport' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Consume a level 3 spell slot to use Moonlight Step/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Yes, Consume Slot'));
+
+    // slotLevel from the fallback payload must reach confirmTeleport.
+    await waitFor(() => {
+      expect(confirmTeleport).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Moonlight Step' }),
+        expect.any(Object),
+        'test',
+        false,
+        3,
+      );
+    });
+    await waitFor(() => {
+      expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Teleported.'));
+    });
+    expect(screen.queryByText(/Consume a level 3 spell slot/)).not.toBeInTheDocument();
   });
 });
 
 describe('CharSpecialActions - Portent Die Choice', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(mockRuntimeStore).forEach(key => delete mockRuntimeStore[key]);
-  });
+  function mockPortentModal(payloadOverrides) {
+    executeHandler.mockResolvedValue({
+      type: 'modal',
+      modalName: 'portentDiceChoice',
+      payload: {
+        action: { name: 'Portent' },
+        playerStats: createPlayerStats(),
+        campaignName: 'test',
+        context: {},
+        ...payloadOverrides,
+      },
+    });
+    renderWithAction(createSpecialAction('Portent', { type: 'portent' }));
+  }
 
-  describe('handlePortentDieChoice', () => {
-    it('calls applyPortentChoice and shows popup on result', async () => {
-      const mockSetPopupHtml = vi.fn();
-      vi.mocked((await import('../../hooks/combat/DiceRollContext.js')).useDiceRollPopup).mockReturnValue({ setPopupHtml: mockSetPopupHtml });
+  it('applies the chosen die with the full event context and shows the popup', async () => {
+    mockPortentModal({
+      targetName: 'Orc',
+      eventType: 'save',
+      eventData: { d20: 10, bonus: 2, saveType: 'Dexterity' },
+      diceOptions: [5, 15],
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Orc')).toBeInTheDocument();
+    });
 
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'portentDiceChoice',
-        payload: {
-          action: { name: 'Portent' },
-          playerStats: createPlayerStats(),
-          campaignName: 'test',
-          targetName: 'Orc',
-          eventType: 'save',
-          eventData: { d20: 10, bonus: 2, saveType: 'Dexterity' },
-          context: {},
-          diceOptions: [5, 15],
-        },
-      });
+    fireEvent.click(screen.getByText('5'));
 
-      const playerStats = createPlayerStats({
-        specialActions: [
-          createSpecialAction('Portent', { type: 'portent' }),
-        ],
-      });
-
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-
-      fireEvent.click(screen.getAllByText(/Portent/)[0]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Orc')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('5'));
-
-      await waitFor(() => {
-        expect(applyPortentChoice).toHaveBeenCalledOnce();
-      });
-
+    await waitFor(() => {
       expect(applyPortentChoice).toHaveBeenCalledWith({
         action: expect.objectContaining({ name: 'Portent' }),
         playerStats: expect.any(Object),
@@ -324,54 +225,31 @@ describe('CharSpecialActions - Portent Die Choice', () => {
         context: expect.any(Object),
         chosenDie: 5,
       });
+    });
+    await waitFor(() => {
+      expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Die applied.'));
+    });
+    expect(screen.queryByText('Orc')).not.toBeInTheDocument();
+  });
 
-      expect(mockSetPopupHtml).toHaveBeenCalled();
-      const popupCall = mockSetPopupHtml.mock.calls[0][0];
-      expect(popupCall).toContain('Portent');
-      expect(popupCall).toContain('Die applied');
+  it('closes the modal without a popup when applying the die fails', async () => {
+    applyPortentChoice.mockRejectedValueOnce(new Error('Portent failed'));
+    mockPortentModal({
+      targetName: 'Troll',
+      eventType: 'attack',
+      eventData: { d20: 18, bonus: 5, targetName: 'Troll', hit: true },
+      diceOptions: [3, 8],
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Troll')).toBeInTheDocument();
     });
 
-    it('handles error in applyPortentChoice by closing modal', async () => {
-      const playerStats = createPlayerStats({
-        specialActions: [
-          createSpecialAction('Portent', { type: 'portent' }),
-        ],
-      });
+    fireEvent.click(screen.getByText('3'));
 
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'portentDiceChoice',
-        payload: {
-          action: { name: 'Portent' },
-          playerStats: createPlayerStats(),
-          campaignName: 'test',
-          targetName: 'Troll',
-          eventType: 'attack',
-          eventData: { d20: 18, bonus: 5, targetName: 'Troll', hit: true },
-          context: {},
-          diceOptions: [3, 8],
-        },
-      });
-
-      applyPortentChoice.mockRejectedValue(new Error('Portent failed'));
-
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-
-      fireEvent.click(screen.getAllByText(/Portent/)[0]);
-
-      await waitFor(() => {
-        expect(screen.getByText('Troll')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('3'));
-
-      await waitFor(() => {
-        expect(screen.queryByText('Troll')).not.toBeInTheDocument();
-      });
+    await waitFor(() => {
+      expect(screen.queryByText('Troll')).not.toBeInTheDocument();
     });
+    expect(applyPortentChoice).toHaveBeenCalledOnce();
+    expect(setPopupHtml).not.toHaveBeenCalled();
   });
 });
-
-// Stride of the Elements, Elemental Epitome, and cannotAct guard tests
-// removed: fully covered by elementalEffects.test.jsx (more thorough assertions)
-// and modals.test.jsx (parametrized cannotAct test). No behavioral gap.

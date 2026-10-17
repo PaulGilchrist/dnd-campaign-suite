@@ -1,152 +1,39 @@
 // CLA-368 regression: the Special Actions "Twinkling Constellations:" row must
-// be clickable, dispatch twinklingConstellationHandler, open the constellation
-// chooser modal, and apply the chosen constellation via the twinkling applier
-// (previously the row rendered inert <b className=""> with no onClick — the
-// downstream modal→apply plumbing was dead code).
+// be clickable, dispatch through executeHandler, open the constellation chooser
+// modal, apply the chosen constellation via the TWINKLING applier (never the
+// Starry Form one), and close on Done/Cancel. Previously the row rendered an
+// inert <b className=""> with no onClick — the downstream modal→apply plumbing
+// was dead code. Clickability is pinned behaviourally: if the row goes inert
+// again the chooser never opens and every case here fails.
+// - The chooser is the REAL ConstellationSelectionModal (its own behaviour is
+//   covered by modals/ConstellationSelectionModal.test.jsx) so this file pins
+//   the grid→modal wiring: select-then-Choose applies, Cancel stays inert.
+// - Base mocks come from the shared CharSpecialActions.modalMocks.jsx family
+//   module; only the two constellation appliers are stubbed locally so the
+//   apply identity can be pinned and no real buff state is written.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+// Shared family mocks must load BEFORE the component so its imports are mocked.
+import './CharSpecialActions.modalMocks.jsx';
 import CharSpecialActions from './CharSpecialActions.jsx';
+import { mockRuntimeStore } from './CharSpecialActions.modalMocks.jsx';
+import { executeHandler } from '../../services/automation/index.js';
+import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
+import { applyConstellationOption as applyTwinkling } from '../../services/automation/handlers/class-sorcerer/twinklingConstellationHandler.js';
+import { applyConstellationOption as applyStarry } from '../../services/automation/handlers/class-sorcerer/starryFormHandler.js';
 
-// Mock executeHandler
-vi.mock('../../services/automation/index.js', () => ({
-  executeHandler: vi.fn(),
-}));
-
-// Mock automation service — twinkling_constellations must be interactive
-vi.mock('../../services/combat/automation/automationService.js', () => ({
-  hasAutomation: vi.fn((action) => !!(action?.automation)),
-  isInteractiveAutomation: vi.fn((action) => {
-    if (!action?.automation) return false;
-    const auto = Array.isArray(action.automation) ? action.automation[0] : action.automation;
-    const interactiveTypes = ['twinkling_constellations'];
-    return interactiveTypes.includes(auto.type);
-  }),
-}));
-
-// Mock the twinkling applier (asserted as the modal's applyOption prop)
+// Twinkling applier — echoes the chosen option into the result description so
+// the modal's result view can be pinned per constellation.
 vi.mock('../../services/automation/handlers/class-sorcerer/twinklingConstellationHandler.js', () => ({
   handle: vi.fn(),
-  applyConstellationOption: vi.fn(() => Promise.resolve({
-    type: 'popup',
-    payload: {
-      type: 'automation_info',
-      name: 'Twinkling Constellations',
-      description: 'Dragon constellation chosen (Twinkling Constellations).',
-    },
-  })),
+  applyConstellationOption: vi.fn(),
 }));
 
-// Stub the constellation chooser modal
-vi.mock('./modals/ConstellationSelectionModal.jsx', () => ({
-  default: ({ action, playerStats, campaignName, applyOption, onConfirm, onClose }) => (
-    <div data-testid="constellation-modal" className="sp-overlay">
-      <div className="sp-modal">
-        <div className="sp-header">{action?.name || 'Constellations'}</div>
-        <div className="sp-body">
-          {['Archer', 'Chalice', 'Dragon'].map((opt) => (
-            <button key={opt} className="sp-roll-btn" onClick={() => { applyOption(action, playerStats, campaignName, opt); onConfirm(opt); }}>
-              {opt}
-            </button>
-          ))}
-        </div>
-        <div className="sp-actions">
-          <button onClick={onClose}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  ),
+// Starry Form applier — identity-pin only: the twinkling lane must never route here.
+vi.mock('../../services/automation/handlers/class-sorcerer/starryFormHandler.js', () => ({
+  handle: vi.fn(),
+  applyConstellationOption: vi.fn(),
 }));
-
-// Mock modals rendered by CharSpecialActionsModals (harness parity with sibling tests)
-vi.mock('./modals/TeleportModal.jsx', () => ({ default: () => <div data-testid="teleport-modal">Teleport</div> }));
-vi.mock('./modals/arcane/SignatureSpellsModal.jsx', () => ({ default: () => <div data-testid="signature-spells-modal">Signature Spells</div> }));
-vi.mock('./modals/arcane/SpellMasteryModal.jsx', () => ({ default: () => <div data-testid="spell-mastery-modal">Spell Mastery</div> }));
-vi.mock('./modals/arcane/SavantModal.jsx', () => ({ default: () => <div data-testid="savant-modal">Savant</div> }));
-vi.mock('./modals/WeaponKindMasteryModal.jsx', () => ({ default: () => <div data-testid="weapon-kind-mastery-modal">Weapon Kind Mastery</div> }));
-vi.mock('./modals/WeaponMasteryChoiceModal.jsx', () => ({ default: () => <div data-testid="weapon-mastery-choice-modal">Weapon Mastery Choice</div> }));
-vi.mock('./modals/CombatSuperiorityModal.jsx', () => ({ default: () => <div data-testid="combat-superiority-modal">Combat Superiority</div> }));
-vi.mock('./modals/ResourcePoolModal.jsx', () => ({ default: () => <div data-testid="resource-pool-modal">Resource Pool</div> }));
-vi.mock('./modals/NaturalRecoveryModal.jsx', () => ({ default: () => <div data-testid="natural-recovery-modal">Natural Recovery</div> }));
-vi.mock('./modals/CircleOfTheLandSpellsModal.jsx', () => ({ default: () => <div data-testid="circle-of-the-land-modal">Circle Spells</div> }));
-vi.mock('./modals/ElementalAffinityModal.jsx', () => ({ default: () => <div data-testid="elemental-affinity-modal">Elemental Affinity</div> }));
-vi.mock('./modals/WildMagicSurgeModal.jsx', () => ({ default: () => <div data-testid="wild-magic-surge-modal">Wild Magic Surge</div> }));
-vi.mock('./modals/StrideOfTheElementsModal.jsx', () => ({ default: () => <div data-testid="stride-modal">Stride of the Elements</div> }));
-vi.mock('./modals/ElementalEpitomeModal.jsx', () => ({ default: () => <div data-testid="epitome-modal">Elemental Epitome</div> }));
-vi.mock('./modals/DestructiveStrideModal.jsx', () => ({ default: () => <div data-testid="destructive-stride-modal">Destructive Stride</div> }));
-vi.mock('./modals/QuiveringPalmModal.jsx', () => ({ default: () => <div data-testid="quivering-palm-modal">Quivering Palm</div> }));
-vi.mock('./modals/shared/SecondaryTargetModal.jsx', () => ({ default: () => <div data-testid="secondary-target-modal">Secondary Target</div> }));
-vi.mock('./modals/StepsOfTheFeyTauntModal.jsx', () => ({ default: () => <div data-testid="steps-of-the-fey-modal">Steps of the Fey Taunt</div> }));
-vi.mock('./modals/MistyWandererModal.jsx', () => ({ default: () => <div data-testid="misty-wanderer-modal">Misty Wanderer</div> }));
-vi.mock('./modals/HurlThroughHellModal.jsx', () => ({ default: () => <div data-testid="hurl-through-hell-modal">Hurl Through Hell</div> }));
-vi.mock('./modals/ClairvoyantCombatantModal.jsx', () => ({ default: () => <div data-testid="clairvoyant-combatant-modal">Clairvoyant Combatant</div> }));
-vi.mock('./modals/FeyReinforcementsModal.jsx', () => ({ default: () => <div data-testid="fey-reinforcements-modal">Fey Reinforcements</div> }));
-vi.mock('./modals/FiendishLegacyModal.jsx', () => ({ default: () => <div data-testid="fiendish-legacy-modal">Fiendish Legacy</div> }));
-vi.mock('./modals/SingleResistanceSelectionModal.jsx', () => ({ default: () => <div data-testid="single-resistance-modal">Single Resistance</div> }));
-vi.mock('./modals/MultiResistanceSelectionModal.jsx', () => ({ default: () => <div data-testid="multi-resistance-modal">Multi Resistance</div> }));
-vi.mock('./modals/shared/CreatureSelectionModal.jsx', () => ({ default: () => <div data-testid="creature-selection-modal">Creature Selection</div> }));
-vi.mock('./FeatureChoiceModal.jsx', () => ({ default: () => <div data-testid="feature-choice-modal">Feature Choice</div> }));
-vi.mock('./ElfisLineageModal.jsx', () => ({ default: () => <div data-testid="elfish-lineage-modal">Elfish Lineage</div> }));
-vi.mock('./GnomishLineageModal.jsx', () => ({ default: () => <div data-testid="gnomish-lineage-modal">Gnomish Lineage</div> }));
-vi.mock('./AspectOfTheWildsModal.jsx', () => ({ default: () => <div data-testid="aspect-of-the-wilds-modal">Aspect of the Wilds</div> }));
-
-vi.mock('../../services/ui/sanitize.js', () => ({
-  sanitizeHtml: vi.fn((html) => html),
-  renderMarkdown: vi.fn((md) => md),
-  renderMarkdownInline: vi.fn((md) => md),
-}));
-
-vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadFightingStyles: vi.fn(() => Promise.resolve([])),
-}));
-
-const runtimeStore = {};
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((_key, runtimeKey) => runtimeStore[runtimeKey] ?? null),
-  setRuntimeValue: vi.fn((_key, runtimeKey, value, _campaign) => {
-    runtimeStore[runtimeKey] = value;
-    return Promise.resolve();
-  }),
-  useRuntimeValue: vi.fn((_key, runtimeKey) => runtimeStore[runtimeKey] ?? null),
-}));
-
-let _capturedPopup = null;
-vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
-  useDiceRollPopup: vi.fn(() => ({
-    setPopupHtml: (html) => { _capturedPopup = html; },
-  })),
-}));
-
-vi.mock('../../hooks/combat/useCombatSuperiorityModal.js', () => ({
-  useCombatSuperiorityModal: vi.fn(() => ({
-    combatSuperiorityModal: null,
-    setCombatSuperiorityModal: vi.fn(),
-    handleCombatSuperiorityConfirm: vi.fn(),
-    handleCombatSuperiorityReopenSelection: vi.fn(),
-  })),
-}));
-
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
-  default: vi.fn(() => ({
-    rollAttack: vi.fn(),
-    rollDamage: vi.fn(),
-  })),
-}));
-
-vi.mock('../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('./useAttackDamageResolution.js', () => ({
-  normalizeAutoDamage: vi.fn(() => ({ attack: {}, ctx: {} })),
-  resolveAttackDamageStandalone: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => Promise.resolve({ creatures: [] })),
-}));
-
-import { executeHandler } from '../../services/automation/index.js';
-import { applyConstellationOption } from '../../services/automation/handlers/class-sorcerer/twinklingConstellationHandler.js';
 
 const basePlayerStats = {
   name: 'StarDruid',
@@ -160,85 +47,105 @@ const basePlayerStats = {
   proficiency: 6,
 };
 
-function makeTwinklingRow() {
-  return {
-    name: 'Twinkling Constellations',
-    description: 'At the start of each of your turns you can change constellation.',
-    automation: { type: 'twinkling_constellations', options: ['Archer', 'Chalice', 'Dragon'], casting_time: 'passive', hasAutomation: true },
-  };
+const twinklingRow = {
+  name: 'Twinkling Constellations',
+  description: 'At the start of each of your turns you can change constellation.',
+  automation: { type: 'twinkling_constellations', options: ['Archer', 'Chalice', 'Dragon'], casting_time: 'passive', hasAutomation: true },
+};
+
+const playerStats = { ...basePlayerStats, specialActions: [twinklingRow] };
+
+const rowLabel = () => screen.getByText('Twinkling Constellations:');
+const chooserOpen = () => screen.findByText('Choose a constellation:');
+const optionButton = (option) => screen.getByRole('button', { name: new RegExp(`^${option}`) });
+
+function openChooser() {
+  render(<CharSpecialActions playerStats={playerStats} campaignName="test-campaign" />);
+  fireEvent.click(rowLabel());
 }
 
 describe('CharSpecialActions - Twinkling Constellations row (CLA-368)', () => {
+  let capturedPopup = null;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    _capturedPopup = null;
-    Object.keys(runtimeStore).forEach(k => delete runtimeStore[k]);
-  });
-
-  it('renders the row clickable and opens the constellation chooser on click', async () => {
-    const row = makeTwinklingRow();
+    capturedPopup = null;
+    Object.keys(mockRuntimeStore).forEach(k => delete mockRuntimeStore[k]);
+    // Capture popup writes (shared modalMocks default is an inert vi.fn setter).
+    vi.mocked(useDiceRollPopup).mockReturnValue({
+      setPopupHtml: (html) => { capturedPopup = html; },
+    });
     executeHandler.mockResolvedValue({
       type: 'modal',
       modalName: 'twinklingConstellation',
-      payload: { action: row, playerStats: basePlayerStats, campaignName: 'test' },
+      payload: { action: twinklingRow, playerStats: basePlayerStats, campaignName: 'test-campaign' },
     });
-
-    render(<CharSpecialActions playerStats={{ ...basePlayerStats, specialActions: [row] }} campaignName="test" />);
-
-    const label = screen.getByText('Twinkling Constellations:');
-    expect(label.className).toBe('clickable');
-
-    fireEvent.click(label);
-
-    await waitFor(() => {
-      expect(executeHandler).toHaveBeenCalled();
-      expect(screen.getByTestId('constellation-modal')).toBeInTheDocument();
-    });
+    vi.mocked(applyTwinkling).mockImplementation((action, stats, campaign, option) => Promise.resolve({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Twinkling Constellations',
+        description: `${option} constellation chosen (Twinkling Constellations).`,
+      },
+    }));
   });
 
-  it('applies the chosen constellation through the twinkling applier', async () => {
-    const row = makeTwinklingRow();
-    executeHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'twinklingConstellation',
-      payload: { action: row, playerStats: basePlayerStats, campaignName: 'test' },
-    });
+  it('row click dispatches executeHandler and opens the chooser with twinkled options', async () => {
+    openChooser();
 
-    render(<CharSpecialActions playerStats={{ ...basePlayerStats, specialActions: [row] }} campaignName="test" />);
+    await chooserOpen();
+    expect(executeHandler).toHaveBeenCalledWith(twinklingRow, playerStats, 'test-campaign', undefined, undefined);
 
-    fireEvent.click(screen.getByText('Twinkling Constellations:'));
-    await waitFor(() => expect(screen.getByTestId('constellation-modal')).toBeInTheDocument());
-
-    fireEvent.click(screen.getByText('Dragon'));
-
-    await waitFor(() => {
-      expect(applyConstellationOption).toHaveBeenCalledWith(row, basePlayerStats, 'test', 'Dragon');
-    });
+    // Grid renders the chooser with isTwinkled={true}: upgraded 2d8 dice offered.
+    expect(optionButton('Archer')).toHaveAccessibleName(/2d8/);
+    expect(optionButton('Chalice')).toHaveAccessibleName(/2d8/);
+    expect(optionButton('Dragon')).toHaveAccessibleName(/Fly Speed 20 feet/);
   });
 
-  it('closes the chooser on cancel without applying', async () => {
-    const row = makeTwinklingRow();
-    executeHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'twinklingConstellation',
-      payload: { action: row, playerStats: basePlayerStats, campaignName: 'test' },
-    });
+  it.each(['Archer', 'Chalice', 'Dragon'])(
+    'applying %s routes through the twinkling applier only after Choose, then confirms',
+    async (option) => {
+      openChooser();
+      await chooserOpen();
 
-    render(<CharSpecialActions playerStats={{ ...basePlayerStats, specialActions: [row] }} campaignName="test" />);
+      const choose = screen.getByRole('button', { name: 'Choose' });
+      expect(choose).toBeDisabled();
 
-    fireEvent.click(screen.getByText('Twinkling Constellations:'));
-    await waitFor(() => expect(screen.getByTestId('constellation-modal')).toBeInTheDocument());
+      fireEvent.click(optionButton(option));
+      // Selecting alone must not apply — the grid's single-application lane awaits Choose.
+      expect(applyTwinkling).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByText('Cancel'));
+      fireEvent.click(choose);
+
+      await waitFor(() => {
+        expect(applyTwinkling).toHaveBeenCalledWith(twinklingRow, basePlayerStats, 'test-campaign', option);
+      });
+      expect(applyStarry).not.toHaveBeenCalled();
+      expect(await screen.findByText(`${option} constellation chosen (Twinkling Constellations).`)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+      expect(screen.queryByText('Choose a constellation:')).not.toBeInTheDocument();
+    }
+  );
+
+  it('closes the chooser on cancel without applying or mutating runtime state', async () => {
+    openChooser();
+    await chooserOpen();
+
+    // Select first — a cancel after selecting must still stay fully inert.
+    fireEvent.click(optionButton('Dragon'));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => {
-      expect(screen.queryByTestId('constellation-modal')).not.toBeInTheDocument();
+      expect(screen.queryByText('Choose a constellation:')).not.toBeInTheDocument();
     });
-    expect(applyConstellationOption).not.toHaveBeenCalled();
+    expect(applyTwinkling).not.toHaveBeenCalled();
+    expect(applyStarry).not.toHaveBeenCalled();
+    expect(executeHandler).toHaveBeenCalledTimes(1);
+    expect(Object.keys(mockRuntimeStore)).toHaveLength(0);
   });
 
   it('shows the lv<10 refusal popup without opening the chooser', async () => {
-    const row = makeTwinklingRow();
     executeHandler.mockResolvedValue({
       type: 'popup',
       payload: {
@@ -248,13 +155,13 @@ describe('CharSpecialActions - Twinkling Constellations row (CLA-368)', () => {
       },
     });
 
-    render(<CharSpecialActions playerStats={{ ...basePlayerStats, specialActions: [row] }} campaignName="test" />);
-
-    fireEvent.click(screen.getByText('Twinkling Constellations:'));
+    openChooser();
 
     await waitFor(() => {
-      expect(_capturedPopup).toContain('requires level 10');
+      expect(capturedPopup).toContain('requires level 10');
     });
-    expect(screen.queryByTestId('constellation-modal')).not.toBeInTheDocument();
+    expect(capturedPopup).toContain('Twinkling Constellations');
+    expect(screen.queryByText('Choose a constellation:')).not.toBeInTheDocument();
+    expect(applyTwinkling).not.toHaveBeenCalled();
   });
 });

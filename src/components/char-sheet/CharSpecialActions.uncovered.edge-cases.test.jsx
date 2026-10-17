@@ -1,45 +1,54 @@
+// Branch-coverage lane for CharSpecialActions — pins ONLY the branches no
+// other CharSpecialActions.* test reaches:
+//   1. buildUniqueSpecialActions cross-list collision guards: name filtering
+//      against actions / bonusActions / reactions / characterAdvancement,
+//      unique-name preservation, and Map dedup keep-last semantics. Handed
+//      off to this file by CharSpecialActions.test.jsx's header ("cross-list
+//      action filtering lives in uncovered.edge-cases.test.jsx"). Positive
+//      controls ("Control Action:") pin real filtering, not whole-list loss.
+//   2. useEffect cancelled-guard: unmount while loadFightingStyles is pending
+//      (ownership pointed here by CharSpecialActions.test.jsx header).
+//      React ignores post-unmount setState, so the guard is not DOM-observable
+//      — kept as a crash-guard with a precondition pin (the loader must have
+//      been called). mockReturnValueOnce scopes the deferred promise to THIS
+//      mount so it can never poison later renders in this file.
+//   3. Portent event display label (getEventDisplayLabel): all six label
+//      branches (attack with/without targetName, ability with/without
+//      checkName, save with/without saveType). Asserted nowhere else —
+//      combatHandlers/modalsInline open the same modal but pin only the
+//      die-choice handler and roll math, never the label text. Migrated
+//      here from CharSpecialActions.uncovered.feature-modals.test.jsx
+//      (deleted; that file had shrunk to this one test, and its own header
+//      recommended the merge). Labels are pinned inside the portent-modal
+//      container so a stray match elsewhere on the sheet cannot satisfy them.
 //
-// CLEANING SUMMARY:
+// Owned elsewhere (do not re-pin here):
+//   - Row/section composition, fighting-style append, fighting-style
+//     shadow-guard, featuresToIgnore + 'Level 1 Spell [Instance' exclusion,
+//     Shape-Shift runtime row → CharSpecialActions.test.jsx
+//   - executeHandler popup-result rendering incl. fallback name (the popup
+//     branch never opens modals — no-modal negatives live there too) →
+//     CharSpecialActions.automationClickHandlers.test.jsx
+//   - modalName routing → CharSpecialActions.modals.test.jsx; close/dismiss
+//     inertness → CharSpecialActions.modalOnClose.* quartet
+//   - Confirm/skip handler paths incl. creature-selection flows → .handlers,
+//     .modalsInline, .combatHandlers, .craftingHandlers, .uncovered.handlers
 //
-// Removed:
-//   - FeatureChoiceModal early return test (line ~421): redundant with
-//     CharSpecialActions.featureChoice.test.jsx which tests the same
-//     behavior with more thorough assertions (open/close, handler calls,
-//     runtime state updates). No behavioral gap.
+// Removed in this pass:
+//   - "does not render creature selection when $name handler returns popup"
+//     (Bolstering Performance / Encouraging Song): both automation types fall
+//     through to the identical handleAutomationClick popup branch already
+//     pinned by automationClickHandlers.test.jsx; the type choice was not a
+//     distinct branch and the no-modal assertion was vacuous there.
+//   - Standalone "unique names" test: folded into the collision table's
+//     positive controls plus a kept-all test with all four lists populated.
 //
-//   - MoonlightStepFallback onClose test (line ~637): fully covered by
-//     CharSpecialActions.combatHandlers.test.jsx which tests the same
-//     modal close path. No behavioral gap.
-//
-// Consolidated:
-//   - Bolstering Performance and Encouraging Song modal early return tests
-//     (lines ~471-535) merged into a single parameterized test. Both tests
-//     followed identical structure: click action → executeHandler returns
-//     popup → assert no creature-selection-modal. Parameterized to cover
-//     both automation types in one test with a clear data table.
-//
-// Kept:
-//   - useEffect cancelled guard test: valuable behavioral coverage for the
-//     cleanup pattern (let cancelled = false; return () => { cancelled = true; }).
-//     Brittle due to unmount-during-async pattern, but tests a real edge case
-//     that would cause a console error if broken. Acceptable fragility for
-//     the confidence it provides.
-//
-//   - Action filtering tests (6 tests): most comprehensive dedup/cross-list
-//     coverage in the entire test suite. Tests cover filtering across all
-//     four action lists (actions, bonusActions, reactions, characterAdvancement),
-//     unique action preservation, and specialActions deduplication. Critical
-//     behavioral coverage — keep despite structural nature.
-//
-// Refactored:
-//   - Replaced ~390 lines of duplicated mocks with a single import of the
-//     shared CharSpecialActions.modalMocks.jsx module. Reduces mock
-//     maintenance burden and ensures consistency across test files.
-
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+// Mocks come from the shared CharSpecialActions.modalMocks.jsx family module.
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import './CharSpecialActions.modalMocks.jsx';
 import CharSpecialActions from './CharSpecialActions.jsx';
+import { loadFightingStyles } from '../../services/ui/dataLoader.js';
 import { executeHandler } from '../../services/automation/index.js';
 
 const basePlayerStats = {
@@ -59,169 +68,189 @@ function createPlayerStats(overrides = {}) {
   return { ...basePlayerStats, ...overrides };
 }
 
-// CharSpecialActions.featureChoice.test.jsx (open modal, skip/close, handler calls,
-// runtime state for defensive_tactics/hunter_prey/damage_bonus). No behavioral gap.
+// Rows render their name as the exact "<Name>:" label — use it for
+// role-free exact-match queries (family pattern, per CharSpecialActions.test.jsx).
+const CONTROL_ACTION = { name: 'Control Action', description: 'Stays visible.' };
 
 describe('CharSpecialActions - useEffect cancelled guard', () => {
-  it('does not set fightingStylesMap if component unmounts during async load', async () => {
+  it('survives loadFightingStyles resolving after unmount', async () => {
     let resolveLoad;
     const loadPromise = new Promise((resolve) => { resolveLoad = resolve; });
+    // once-semantics: this mount consumes the deferred loader promise; every
+    // later mount in this file falls back to the shared mock's immediate value.
+    vi.mocked(loadFightingStyles).mockReturnValueOnce(loadPromise);
 
-    vi.mocked((await import('../../services/ui/dataLoader.js')).loadFightingStyles).mockReturnValue(loadPromise);
+    const { unmount } = render(
+      <CharSpecialActions
+        playerStats={createPlayerStats({ class: { fightingStyles: ['Great Weapon Fighting'] } })}
+        campaignName="test"
+      />
+    );
+    // Precondition: without this call the "guard survived" conclusion is vacuous.
+    expect(loadFightingStyles).toHaveBeenCalledTimes(1);
 
-    const { unmount } = render(<CharSpecialActions playerStats={createPlayerStats()} campaignName="test" />);
-
-    // Unmount immediately before the promise resolves
+    // Unmount before the promise resolves so the cleanup flag flips.
     unmount();
 
-    // Resolve the promise - should not throw
+    // Resolving after unmount must not throw (cancelled guard skips
+    // setFightingStylesMap; DOM is gone either way — crash-guard, see header).
     await act(async () => {
-      resolveLoad([{ name: 'Great Weapon Fighting', description: '' }]);
+      resolveLoad([{ name: 'Great Weapon Fighting', description: 'Raging swinging.' }]);
     });
 
-    // If we got here without an error, the cancelled guard works
-    expect(screen.queryByText('Great Weapon Fighting')).not.toBeInTheDocument();
+    expect(screen.queryByText('Great Weapon Fighting:')).not.toBeInTheDocument();
   });
 });
 
-// consolidated from 2 near-identical tests into 1 parameterized test. Both tested
-// the same pattern: executeHandler returns popup → no creature-selection-modal.
-// Parameterized data table covers both automation types.
+describe('CharSpecialActions - cross-list action filtering', () => {
+  // One case per independent guard clause in buildUniqueSpecialActions.
+  it.each([
+    { listKey: 'actions' },
+    { listKey: 'bonusActions' },
+    { listKey: 'reactions' },
+    { listKey: 'characterAdvancement' },
+  ])('filters out a special action whose name collides with the $listKey list', ({ listKey }) => {
+    const dup = { name: 'Duplicated Name', description: 'Shown elsewhere.' };
+    render(
+      <CharSpecialActions
+        playerStats={createPlayerStats({
+          specialActions: [dup, CONTROL_ACTION],
+          [listKey]: [dup],
+        })}
+        campaignName="test"
+      />
+    );
 
-describe('CharSpecialActions - Modal handler early return (no creature selection)', () => {
+    // Positive control: only the colliding row was dropped, the section still renders.
+    expect(screen.getByText('Control Action:')).toBeInTheDocument();
+    expect(screen.getByText('Stays visible.')).toBeInTheDocument();
+    expect(screen.queryByText('Duplicated Name:')).not.toBeInTheDocument();
+    expect(screen.queryByText('Shown elsewhere.')).not.toBeInTheDocument();
+  });
+
+  it('keeps every special action when no name collides across the four populated lists', () => {
+    const names = ['Alpha', 'Beta', 'Gamma', 'Delta'];
+    render(
+      <CharSpecialActions
+        playerStats={createPlayerStats({
+          specialActions: names.map(n => ({ name: n, description: `${n} detail.` })),
+          actions: [{ name: 'Attack', description: 'Make an attack.' }],
+          bonusActions: [{ name: 'Second Wind', description: 'Regain hit points.' }],
+          reactions: [{ name: 'Reaction Attack', description: 'Attack as a reaction.' }],
+          characterAdvancement: [{ name: 'Feat', description: 'Take a feat.' }],
+        })}
+        campaignName="test"
+      />
+    );
+
+    for (const name of names) {
+      expect(screen.getByText(`${name}:`)).toBeInTheDocument();
+    }
+  });
+
+  it('deduplicates same-name specialActions keeping the LAST definition (Map semantics)', () => {
+    render(
+      <CharSpecialActions
+        playerStats={createPlayerStats({
+          specialActions: [
+            { name: 'Attack', description: 'First definition.' },
+            { name: 'Attack', description: 'Second definition.' },
+          ],
+        })}
+        campaignName="test"
+      />
+    );
+
+    expect(screen.getAllByText('Attack:')).toHaveLength(1);
+    // Keep-last pin: one row alone cannot distinguish first- vs last-wins.
+    expect(screen.getByText('Second definition.')).toBeInTheDocument();
+    expect(screen.queryByText('First definition.')).not.toBeInTheDocument();
+  });
+});
+
+describe('CharSpecialActions - Portent event display label', () => {
+  // Opens the real (unmocked) inline PortentBlock via the interactive
+  // 'portent' automation lane; getEventDisplayLabel picks one of six label
+  // strings from eventType + eventData — each row pins one branch exactly.
+  async function openPortentModal(eventType, eventData) {
+    // mockResolvedValue (not Once): overwritten per case, so a failed test
+    // can never leave a stale Once queued for the next one.
+    executeHandler.mockResolvedValue({
+      type: 'modal',
+      modalName: 'portentDiceChoice',
+      payload: {
+        targetName: 'Goblin',
+        eventType,
+        eventData,
+        diceOptions: [3, 7],
+      },
+    });
+    render(
+      <CharSpecialActions
+        playerStats={createPlayerStats({
+          specialActions: [
+            { name: 'Portent', description: 'Replace a roll.', automation: { type: 'portent' } },
+          ],
+        })}
+        campaignName="test"
+      />
+    );
+    fireEvent.click(screen.getAllByText(/Portent/)[0]);
+    return screen.findByTestId('portent-modal');
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it.each([
-    { name: 'Bolstering Performance', automation: { type: 'temp_hp_buff' }, popupName: 'Bolstering Performance' },
-    { name: 'Encouraging Song', automation: { type: 'heroic_inspiration_buff' }, popupName: 'Encouraging Song' },
-  ])('does not render creature selection when $name handler returns popup', async ({ name, automation, popupName }) => {
-    executeHandler.mockResolvedValue({
-      type: 'popup',
-      payload: { name: popupName, description: 'Action completed.' },
-    });
+    {
+      case: 'attack with targetName',
+      eventType: 'attack',
+      eventData: { d20: 15, bonus: 3, targetName: 'Orc', hit: true },
+      label: 'Attack vs AC Orc',
+    },
+    {
+      case: 'attack without targetName',
+      eventType: 'attack',
+      eventData: { d20: 15, bonus: 3, hit: false },
+      label: 'Attack vs AC unknown',
+    },
+    {
+      case: 'ability with checkName',
+      eventType: 'ability',
+      eventData: { d20: 12, bonus: 5, checkName: 'Sleight of Hand' },
+      label: 'Sleight of Hand',
+    },
+    {
+      case: 'ability without checkName',
+      eventType: 'ability',
+      eventData: { d20: 12, bonus: 5 },
+      label: 'Ability check',
+    },
+    {
+      // Original migrated pin: lowercase payload saveType must render upper.
+      case: 'save with saveType',
+      eventType: 'save',
+      eventData: { d20: 10, bonus: 3, saveType: 'dexterity' },
+      label: 'DEXTERITY',
+    },
+    {
+      case: 'save without saveType',
+      eventType: 'save',
+      eventData: { d20: 10, bonus: 3 },
+      label: 'Save',
+    },
+  ])('shows "$label" in the Portent modal for a $case event', async ({ eventType, eventData, label }) => {
+    const modal = await openPortentModal(eventType, eventData);
 
-    const playerStats = createPlayerStats({
-      specialActions: [
-        { name, description: `${name} description.`, automation },
-      ],
-    });
-
-    render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-
-    await act(async () => {
-      fireEvent.click(screen.getAllByText(new RegExp(name))[0]);
-    });
-
-    await waitFor(() => {
-      expect(executeHandler).toHaveBeenCalled();
-    });
-
-    await waitFor(() => {
-      expect(screen.queryByTestId('creature-selection-modal')).not.toBeInTheDocument();
-    });
+    expect(within(modal).getByText(label)).toBeInTheDocument();
+    // Rendered ONCE: no duplicate raw/lowercase variant of the label.
+    expect(within(modal).getAllByText(label)).toHaveLength(1);
+    if (label !== 'Save') {
+      expect(within(modal).queryByText('Save')).not.toBeInTheDocument();
+    }
+    // Modal fully mounted (not a stray text fragment mid-render).
+    expect(within(modal).getByText('Choose a foretelling roll:')).toBeInTheDocument();
   });
 });
-
-// coverage in the test suite. Tests cover all four action lists (actions,
-// bonusActions, reactions, characterAdvancement), unique action preservation,
-// and specialActions deduplication. Critical behavioral coverage.
-
-describe('CharSpecialActions - Action filtering', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  function renderWithDuplicates(specialActions, actionsList, actionsKey) {
-    const playerStats = createPlayerStats({
-      specialActions,
-      [actionsKey]: actionsList,
-    });
-    render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-    return playerStats;
-  }
-
-  it('filters out actions that appear in actions list', async () => {
-    renderWithDuplicates(
-      [{ name: 'Attack', description: 'Make an attack.' }],
-      [{ name: 'Attack', description: 'Make an attack.' }],
-      'actions'
-    );
-
-    await waitFor(() => {
-      expect(screen.queryByText(/Attack/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('filters out actions that appear in bonusActions list', async () => {
-    renderWithDuplicates(
-      [{ name: 'Second Wind', description: 'Regain hit points.' }],
-      [{ name: 'Second Wind', description: 'Regain hit points.' }],
-      'bonusActions'
-    );
-
-    await waitFor(() => {
-      expect(screen.queryByText(/Second Wind/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('filters out actions that appear in reactions list', async () => {
-    renderWithDuplicates(
-      [{ name: 'Reaction Attack', description: 'Attack as a reaction.' }],
-      [{ name: 'Reaction Attack', description: 'Attack as a reaction.' }],
-      'reactions'
-    );
-
-    await waitFor(() => {
-      expect(screen.queryByText(/Reaction Attack/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('filters out actions that appear in characterAdvancement list', async () => {
-    renderWithDuplicates(
-      [{ name: 'Feat', description: 'Take a feat.' }],
-      [{ name: 'Feat', description: 'Take a feat.' }],
-      'characterAdvancement'
-    );
-
-    await waitFor(() => {
-      expect(screen.queryByText(/Feat/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('does not filter specialActions that have unique names across all lists', async () => {
-    const playerStats = createPlayerStats({
-      specialActions: [
-        { name: 'Unique Action', description: 'A unique action.' },
-      ],
-      actions: [{ name: 'Attack', description: 'Make an attack.' }],
-      bonusActions: [{ name: 'Second Wind', description: 'Regain hit points.' }],
-      reactions: [{ name: 'Reaction Attack', description: 'Attack as a reaction.' }],
-      characterAdvancement: [{ name: 'Feat', description: 'Take a feat.' }],
-    });
-    render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Unique Action/)).toBeInTheDocument();
-    });
-  });
-
-  it('deduplicates specialActions with the same name, keeping the last occurrence', async () => {
-    const playerStats = createPlayerStats({
-      specialActions: [
-        { name: 'Attack', description: 'First definition.' },
-        { name: 'Attack', description: 'Second definition.' },
-      ],
-    });
-    render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-
-    await waitFor(() => {
-      const instances = screen.getAllByText(/Attack/);
-      expect(instances).toHaveLength(1);
-    });
-  });
-});
-
-// CharSpecialActions.combatHandlers.test.jsx (renders modal, clicks No, asserts
-// modal closed). Same behavior tested with same assertions. No behavioral gap.

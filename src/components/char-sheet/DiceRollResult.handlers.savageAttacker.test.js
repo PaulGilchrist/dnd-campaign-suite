@@ -5,6 +5,7 @@ import { createDiceRollHandlers } from './DiceRollResult.handlers';
 describe('createDiceRollHandlers - handleSavageAttacker', () => {
     let state;
     let props;
+    let randomSpy;
 
     beforeEach(() => {
         state = {
@@ -25,50 +26,117 @@ describe('createDiceRollHandlers - handleSavageAttacker', () => {
     });
 
     afterEach(() => {
-        vi.restoreAllMocks();
+        randomSpy?.mockRestore();
     });
 
-    it('forwards the original rolls only — the reroll click alone never changes damage', () => {
-        vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    // Deterministic dice: a constant Math.random makes every d6 roll the same face.
+    const rollMax = () => { randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.999); }; // d6 → 6
+    const rollMin = () => { randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.001); }; // d6 → 1
+
+    it('higher reroll offers a choice while the engine still sees the original damage untouched', () => {
+        rollMax();
 
         const handlers = createDiceRollHandlers(props, state);
         handlers.handleSavageAttacker();
 
+        expect(state.setSavageAttackerResult).toHaveBeenCalledWith({
+            original: '2, 3',
+            rerolled: '6, 6',
+            originalRolls: [2, 3],
+            newRolls: [6, 6],
+            originalTotal: 5,
+            newTotal: 12,
+            better: true,
+            awaitingChoice: true,
+        });
         expect(state.setSavageAttackerUsed).toHaveBeenCalledWith(true);
-        const data = props.onSavageAttacker.mock.calls[0][0];
-        expect(data.rolls).toEqual([2, 3]);
-        expect(data.originalRolls).toEqual([2, 3]);
-        expect(data.newRolls).toEqual([6, 6]);
-        expect(data.rawDamage).toBe(5);
+        // The reroll click alone never changes damage: rolls/rawDamage stay original.
+        expect(props.onSavageAttacker).toHaveBeenCalledWith({
+            damageFormula: '2d6',
+            rolls: [2, 3],
+            rawDamage: 5,
+            targetName: 'Orc',
+            damageTypes: ['Slashing'],
+            originalRolls: [2, 3],
+            newRolls: [6, 6],
+        });
     });
 
-    it('marks awaitingChoice when the reroll total is higher (player must choose)', () => {
-        vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    it('lower reroll auto-keeps the original, requests no choice, and moves no damage', () => {
+        rollMin();
 
         const handlers = createDiceRollHandlers(props, state);
         handlers.handleSavageAttacker();
 
-        const result = state.setSavageAttackerResult.mock.calls[0][0];
-        expect(result.awaitingChoice).toBe(true);
-        expect(result.originalTotal).toBe(5);
-        expect(result.newTotal).toBe(12);
-        expect(result.better).toBe(true);
+        expect(state.setSavageAttackerResult).toHaveBeenCalledWith({
+            original: '2, 3',
+            rerolled: '1, 1',
+            originalRolls: [2, 3],
+            newRolls: [1, 1],
+            originalTotal: 5,
+            newTotal: 2,
+            better: false,
+            awaitingChoice: false,
+        });
+        expect(state.setSavageAttackerUsed).toHaveBeenCalledWith(true);
+        expect(props.onSavageAttacker).toHaveBeenCalledWith({
+            damageFormula: '2d6',
+            rolls: [2, 3],
+            rawDamage: 5,
+            targetName: 'Orc',
+            damageTypes: ['Slashing'],
+            originalRolls: [2, 3],
+            newRolls: [1, 1],
+        });
     });
 
-    it('auto-keeps original and requests no choice when the reroll is lower (no heal possible)', () => {
-        vi.spyOn(Math, 'random').mockReturnValue(0.001);
+    it('equal reroll total is not better — original kept, no choice offered', () => {
+        props.rolls = [6, 6];
+        props.total = 12;
+        rollMax();
 
         const handlers = createDiceRollHandlers(props, state);
         handlers.handleSavageAttacker();
 
-        const result = state.setSavageAttackerResult.mock.calls[0][0];
-        expect(result.awaitingChoice).toBe(false);
-        expect(result.better).toBe(false);
-        const data = props.onSavageAttacker.mock.calls[0][0];
-        expect(data.rolls).toEqual([2, 3]);
+        expect(state.setSavageAttackerResult).toHaveBeenCalledWith({
+            original: '6, 6',
+            rerolled: '6, 6',
+            originalRolls: [6, 6],
+            newRolls: [6, 6],
+            originalTotal: 12,
+            newTotal: 12,
+            better: false,
+            awaitingChoice: false,
+        });
     });
 
-    it('keep choice forwards the explicit decision and clears awaitingChoice', () => {
+    it.each([
+        ['empty rolls', { rolls: [] }],
+        ['missing formula', { formula: '' }],
+        ['formula without a dice term', { formula: 'modifier only' }],
+        ['formula dice count mismatching the rolls', { formula: '3d6' }],
+    ])('reroll click is inert when %s', (_label, override) => {
+        Object.assign(props, override);
+
+        const handlers = createDiceRollHandlers(props, state);
+        handlers.handleSavageAttacker();
+
+        expect(props.onSavageAttacker).not.toHaveBeenCalled();
+        expect(state.setSavageAttackerResult).not.toHaveBeenCalled();
+        expect(state.setSavageAttackerUsed).not.toHaveBeenCalled();
+    });
+
+    it('reroll click is inert without an onSavageAttacker callback', () => {
+        delete props.onSavageAttacker;
+
+        const handlers = createDiceRollHandlers(props, state);
+        handlers.handleSavageAttacker();
+
+        expect(state.setSavageAttackerResult).not.toHaveBeenCalled();
+        expect(state.setSavageAttackerUsed).not.toHaveBeenCalled();
+    });
+
+    it.each(['reroll', 'original'])('keep("%s") locks the decision and forwards the full choice payload', (keep) => {
         state.savageAttackerResult = {
             original: '2, 3',
             rerolled: '6, 6',
@@ -80,39 +148,33 @@ describe('createDiceRollHandlers - handleSavageAttacker', () => {
             awaitingChoice: true,
         };
 
+        const handlers = createDiceRollHandlers(props, state);
+        handlers.handleSavageAttackerKeep(keep);
+
+        expect(state.setSavageAttackerResult).toHaveBeenCalledWith({
+            ...state.savageAttackerResult,
+            awaitingChoice: false,
+            kept: keep,
+        });
+        expect(props.onSavageAttackerChoice).toHaveBeenCalledWith({
+            keep,
+            originalRolls: [2, 3],
+            newRolls: [6, 6],
+            originalTotal: 5,
+            newTotal: 12,
+            rawDamage: 5,
+            modifier: 0,
+            targetName: 'Orc',
+            damageTypes: ['Slashing'],
+        });
+    });
+
+    it('keep choice is inert before any reroll and once the decision is made', () => {
+        // Nothing rolled yet.
         const handlers = createDiceRollHandlers(props, state);
         handlers.handleSavageAttackerKeep('reroll');
 
-        expect(state.setSavageAttackerResult).toHaveBeenCalledWith(
-            expect.objectContaining({ awaitingChoice: false, kept: 'reroll' })
-        );
-        const choice = props.onSavageAttackerChoice.mock.calls[0][0];
-        expect(choice.keep).toBe('reroll');
-        expect(choice.originalTotal).toBe(5);
-        expect(choice.newTotal).toBe(12);
-        expect(choice.targetName).toBe('Orc');
-    });
-
-    it('keep-original choice forwards decision without touching damage', () => {
-        state.savageAttackerResult = {
-            original: '2, 3',
-            rerolled: '6, 6',
-            originalRolls: [2, 3],
-            newRolls: [6, 6],
-            originalTotal: 5,
-            newTotal: 12,
-            better: true,
-            awaitingChoice: true,
-        };
-
-        const handlers = createDiceRollHandlers(props, state);
-        handlers.handleSavageAttackerKeep('original');
-
-        const choice = props.onSavageAttackerChoice.mock.calls[0][0];
-        expect(choice.keep).toBe('original');
-    });
-
-    it('keep choice is inert once the decision is made', () => {
+        // Decision already settled.
         state.savageAttackerResult = {
             originalRolls: [2, 3],
             newRolls: [6, 6],
@@ -121,10 +183,9 @@ describe('createDiceRollHandlers - handleSavageAttacker', () => {
             awaitingChoice: false,
             kept: 'reroll',
         };
-
-        const handlers = createDiceRollHandlers(props, state);
         handlers.handleSavageAttackerKeep('reroll');
 
         expect(props.onSavageAttackerChoice).not.toHaveBeenCalled();
+        expect(state.setSavageAttackerResult).not.toHaveBeenCalled();
     });
 });

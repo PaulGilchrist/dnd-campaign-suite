@@ -1,6 +1,7 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import CharReactions from './CharReactions.jsx';
 
 vi.mock('../common/popup.jsx', () => ({
@@ -71,7 +72,6 @@ vi.mock('../../services/combat/baseCombatActions.js', () => ({
 }));
 vi.mock('../../services/combat/automation/automationService.js', () => ({
     hasAutomation: vi.fn(() => false),
-    hasTacticalShift: vi.fn(() => false),
     hasSpeedyOpportunityDisadvantage: vi.fn(() => false),
 }));
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
@@ -136,15 +136,14 @@ vi.mock('../../services/ui/formatUtils.js', () => ({
     signFormatter: { format: (val) => (val >= 0 ? '+' : '') + val },
 }));
 
-import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js';
+import { useRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { hasAutomation, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js';
 import { getCategories } from '../../services/character/featureCategories.js';
 import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js';
 import { addEntry } from '../../services/ui/logService.js';
-import { resolveSpellDamageAtLevel } from '../../services/rules/core/spellDamageUtils.js';
 import { _getMockSetPopupHtml } from '../../hooks/combat/DiceRollContext.js';
 
 const campaignName = 'test-campaign';
@@ -180,177 +179,142 @@ function createProps(overrides = {}) {
         cannotAct: false,
         mapName: null,
         characters: [],
-        modalState: {},
-        setModalState: vi.fn(),
         ...overrides,
     };
 }
 
-describe('CharReactions - handleOpportunityAttack', () => {
+// Drain the click's promise chain (all-async, timer-free) so negative
+// "did not roll / did not log" assertions run after the lane has finished.
+async function flushClickChain() {
+    await act(async () => {
+        await Promise.resolve();
+    });
+}
+
+describe('CharReactions - Opportunity Attack click lane', () => {
     let setPopupHtml;
+    let rollAttack;
+
     beforeEach(() => {
         vi.clearAllMocks();
         setPopupHtml = _getMockSetPopupHtml();
+        rollAttack = vi.fn();
+        useLoggedDiceRoll.mockReturnValue({ rollAttack, rollDamage: vi.fn() });
         useRuntimeValue.mockReturnValue([]);
         getRuntimeValue.mockReturnValue(null);
-        setRuntimeValue.mockReturnValue(undefined);
         hasAutomation.mockReturnValue(false);
-        hasTacticalShift.mockReturnValue(false);
         hasSpeedyOpportunityDisadvantage.mockReturnValue(false);
         buildFeatureDetailHtml.mockImplementation((r) => `<div>${r.name}</div>`);
         getCategories.mockReturnValue({ featuresToIgnore: [] });
         getReactionSpellNames.mockReturnValue(new Set());
-        resolveSpellDamageAtLevel.mockReturnValue(null);
         getCombatContext.mockResolvedValue(null);
-        getTargetFromAttacker.mockReturnValue(null);
-        useLoggedDiceRoll.mockReturnValue({ rollAttack: vi.fn(), rollDamage: vi.fn() });
     });
 
-    // ─── Core OA roll paths ─────────────────────────────────────────────────────
-    // Consolidated: removed redundant tests that verified the same OA roll behavior
-    // using different setups (test "uses first melee attack" was a strict subset of
-    // the core "falls through" test; test "handles rejection" reached identical
-    // end state; test "passes isOpportunityAttack flag" duplicated the
-    // expect.objectContaining assertion with brittle mock.calls[0][2] access).
-
-    it('falls through to normal OA roll when no combat context', async () => {
-        const rollAttack = vi.fn();
-        useLoggedDiceRoll.mockImplementation(() => ({ rollAttack, rollDamage: vi.fn() }));
+    // No applicable target-side refusal: the OA must roll the melee attack
+    // flagged isOpportunityAttack, with no popup and no log entry. Covers all
+    // three short-circuit branches of the refusal resolver plus the
+    // unprotected-target path (CLA-353: a permanent tactical_shift_no_oa
+    // passive alone never refuses — cs combatants carry no passives, so only
+    // live runtime protections gate the roll).
+    // [label, setup]
+    it.each([
+        ['no combat context', () => getCombatContext.mockResolvedValue(null)],
+        ['combat context lookup rejects', () => getCombatContext.mockRejectedValue(new Error('network error'))],
+        ['no combat target', () => {
+            getCombatContext.mockResolvedValue({});
+            getTargetFromAttacker.mockReturnValue(null);
+        }],
+        ['unprotected target (CLA-353 passive must not refuse)', () => {
+            getCombatContext.mockResolvedValue({});
+            getTargetFromAttacker.mockReturnValue({ name: 'Enemy1', passives: [{ name: 'tactical_shift_no_oa' }] });
+        }],
+    ])('rolls the melee attack flagged isOpportunityAttack when there is %s', async (_label, setup) => {
+        setup();
         render(<CharReactions {...createProps()} />);
-        const reaction = screen.getByText('Opportunity Attack:');
-        fireEvent.click(reaction);
-        await waitFor(() => expect(rollAttack).toHaveBeenCalled());
-        expect(rollAttack).toHaveBeenCalledWith(
+        fireEvent.click(screen.getByText('Opportunity Attack:'));
+
+        await waitFor(() => expect(rollAttack).toHaveBeenCalledWith(
             'Longsword',
             6,
             expect.objectContaining({ isOpportunityAttack: true })
-        );
+        ));
+        expect(setPopupHtml).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('falls through to OA roll when getCombatContext rejects', async () => {
-        const rollAttack = vi.fn();
-        useLoggedDiceRoll.mockImplementation(() => ({ rollAttack, rollDamage: vi.fn() }));
-        getCombatContext.mockRejectedValue(new Error('network error'));
-        render(<CharReactions {...createProps()} />);
-        const reaction = screen.getByText('Opportunity Attack:');
-        fireEvent.click(reaction);
-        await waitFor(() => expect(rollAttack).toHaveBeenCalled());
-        expect(rollAttack).toHaveBeenCalledWith(
-            'Longsword',
+    // Weapon picker: prefer a melee-reach attack; fall back to the first
+    // attack when none is in melee reach.
+    // [label, attacks, expectedWeapon]
+    it.each([
+        ['only a ranged attack exists', [{ name: 'Ranged Bolt', type: 'Action', range: 120, hitBonus: 6 }], 'Ranged Bolt'],
+        ['a ranged attack is listed before the melee one', [
+            { name: 'Ranged Bolt', type: 'Action', range: 120, hitBonus: 6 },
+            { name: 'Longsword', type: 'Action', range: 5, hitBonus: 6 },
+        ], 'Longsword'],
+    ])('picks %s as the OA weapon', async (_label, attacks, expectedWeapon) => {
+        render(<CharReactions {...createProps({ playerStats: { ...basePlayerStats, attacks } })} />);
+        fireEvent.click(screen.getByText('Opportunity Attack:'));
+
+        await waitFor(() => expect(rollAttack).toHaveBeenCalledWith(
+            expectedWeapon,
             6,
             expect.objectContaining({ isOpportunityAttack: true })
-        );
+        ));
     });
 
-    it('falls through to OA roll when combat context exists but target is null', async () => {
-        const rollAttack = vi.fn();
-        useLoggedDiceRoll.mockImplementation(() => ({ rollAttack, rollDamage: vi.fn() }));
+    it('does nothing when the character has no attacks', async () => {
+        render(<CharReactions {...createProps({ playerStats: { ...basePlayerStats, attacks: [] } })} />);
+        fireEvent.click(screen.getByText('Opportunity Attack:'));
+
+        await flushClickChain();
+        expect(rollAttack).not.toHaveBeenCalled();
+        expect(setPopupHtml).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+
+    // Protected-target refusals (CLA-353): gated on the per-character
+    // inspiringMovementNoOA runtime key OR a live campaign-level
+    // no_opportunity_attacks te — never a permanent passive. The refusal
+    // popup names the protector, is logged, and the attack does not roll.
+    // [label, protector, runtimeSetup]
+    it.each([
+        ['inspiringMovementNoOA', 'Inspiring Movement', () => getRuntimeValue.mockImplementation((charKey, key) =>
+            key === 'inspiringMovementNoOA' ? true : null)],
+        ['a campaign no_opportunity_attacks te', 'Tactical Shift', () => getRuntimeValue.mockImplementation((charKey, key) =>
+            charKey === 'campaign' && key === 'targetEffects'
+                ? [{ target: 'Enemy1', source: 'Tactical Shift', effect: 'no_opportunity_attacks', duration: 'until_start_of_next_turn' }]
+                : null)],
+    ])('refuses with a popup naming %label and logs it', async (_label, protector, runtimeSetup) => {
         getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue(null);
+        getTargetFromAttacker.mockReturnValue({ name: 'Enemy1' });
+        runtimeSetup();
+
         render(<CharReactions {...createProps()} />);
-        const reaction = screen.getByText('Opportunity Attack:');
-        fireEvent.click(reaction);
-        await waitFor(() => expect(rollAttack).toHaveBeenCalled());
-        expect(rollAttack).toHaveBeenCalledWith(
-            'Longsword',
-            6,
-            expect.objectContaining({ isOpportunityAttack: true })
-        );
-    });
+        fireEvent.click(screen.getByText('Opportunity Attack:'));
 
-    it('falls back to first attack when no melee attacks exist', async () => {
-        const rollAttack = vi.fn();
-        useLoggedDiceRoll.mockImplementation(() => ({ rollAttack, rollDamage: vi.fn() }));
-        getCombatContext.mockResolvedValue(null);
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                attacks: [
-                    { name: 'Ranged Bolt', type: 'Action', range: 120, hitBonus: 6 },
-                ],
-            },
-        });
-        render(<CharReactions {...props} />);
-        const reaction = screen.getByText('Opportunity Attack:');
-        fireEvent.click(reaction);
-        await waitFor(() => expect(rollAttack).toHaveBeenCalled());
-        expect(rollAttack).toHaveBeenCalledWith('Ranged Bolt', 6, expect.any(Object));
-    });
-
-    it('does nothing when no attacks available', async () => {
-        const rollAttack = vi.fn();
-        useLoggedDiceRoll.mockImplementation(() => ({ rollAttack, rollDamage: vi.fn() }));
-        getCombatContext.mockResolvedValue(null);
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                attacks: [],
-            },
-        });
-        render(<CharReactions {...props} />);
-        const reaction = screen.getByText('Opportunity Attack:');
-        fireEvent.click(reaction);
-        await new Promise(r => setTimeout(r, 50));
+        // The log fires after the popup, so waiting on it proves both ran.
+        await waitFor(() => expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            name: 'Opportunity Attack',
+            description: expect.stringContaining(protector),
+        })));
+        expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Enemy1'));
+        expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining(protector));
         expect(rollAttack).not.toHaveBeenCalled();
     });
 
-    // ─── Protected target popups ────────────────────────────────────────────────
-    // CLA-353: protection is gated on inspiringMovementNoOA (per-character runtime key)
-    // or a live campaign-level no_opportunity_attacks te (Tactical Shift / Step of the
-    // Wind) — never on a permanent passive, since cs combatants carry no passives.
-
-    it.each([
-        { name: 'inspiringMovementNoOA', te: null, protector: 'Inspiring Movement', setup: (gtrv) => { gtrv.mockImplementation((ck, k) => k === 'inspiringMovementNoOA' ? true : null); } },
-        { name: 'no_opportunity_attacks te (Tactical Shift)', te: [{ target: 'Enemy1', source: 'Tactical Shift', effect: 'no_opportunity_attacks', duration: 'until_start_of_next_turn' }], protector: 'Tactical Shift', setup: (gtrv) => { gtrv.mockImplementation((ck, k) => (ck === 'campaign' && k === 'targetEffects') ? [{ target: 'Enemy1', source: 'Tactical Shift', effect: 'no_opportunity_attacks', duration: 'until_start_of_next_turn' }] : null); } },
-    ])('shows protected popup naming $protector when target is protected via $name', async ({ te, protector, setup }) => {
+    // Agile Movement is an informational popup (disadvantage), not a refusal:
+    // unlike protected-target refusals it never logs.
+    it('shows the Agile Movement popup without rolling or logging when the target has speedy disadvantage', async () => {
         getCombatContext.mockResolvedValue({});
         getTargetFromAttacker.mockReturnValue({ name: 'Enemy1' });
-        const setupFn = setup;
-        setupFn(getRuntimeValue);
-        render(<CharReactions {...createProps()} />);
-        const reaction = screen.getByText('Opportunity Attack:');
-        fireEvent.click(reaction);
-        await new Promise(r => setTimeout(r, 100));
-        expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Enemy1'));
-        expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining(protector));
-        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-            name: 'Opportunity Attack',
-            description: expect.stringContaining(protector),
-        }));
-        void te;
-    });
-
-    // CLA-353: a lv5+ Fighter's permanent tactical_shift_no_oa passive alone must NOT
-    // refuse the OA — no te means the attack rolls normally.
-    it('does not refuse OA from a permanent tactical_shift_no_oa passive alone (CLA-353)', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue({ name: 'Enemy1' });
-        getRuntimeValue.mockReturnValue(null);
-        hasTacticalShift.mockReturnValue(true);
-        const rollAttack = vi.fn();
-        useLoggedDiceRoll.mockImplementation(() => ({ rollAttack, rollDamage: vi.fn() }));
-        render(<CharReactions {...createProps()} />);
-        const reaction = screen.getByText('Opportunity Attack:');
-        fireEvent.click(reaction);
-        await new Promise(r => setTimeout(r, 100));
-        expect(setPopupHtml).not.toHaveBeenCalledWith(expect.stringContaining('cannot be targeted'));
-        expect(rollAttack).toHaveBeenCalled();
-    });
-
-    it('shows Agile Movement popup when target has speedy disadvantage', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue({ name: 'Enemy1' });
-        getRuntimeValue.mockImplementation((charKey, key) => {
-            if (key === 'inspiringMovementNoOA') return false;
-            return null;
-        });
-        hasTacticalShift.mockReturnValue(false);
         hasSpeedyOpportunityDisadvantage.mockReturnValue(true);
+
         render(<CharReactions {...createProps()} />);
-        const reaction = screen.getByText('Opportunity Attack:');
-        fireEvent.click(reaction);
-        await new Promise(r => setTimeout(r, 100));
+        fireEvent.click(screen.getByText('Opportunity Attack:'));
+
+        await waitFor(() => expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Agile Movement')));
         expect(hasSpeedyOpportunityDisadvantage).toHaveBeenCalledWith({ name: 'Enemy1' });
-        expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Agile Movement'));
+        expect(rollAttack).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 });

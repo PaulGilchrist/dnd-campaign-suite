@@ -1,257 +1,131 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import DiceRollResult from './DiceRollResult.jsx';
 
-describe('DiceRollResult', () => {
-    describe('hit/miss display', () => {
-        it.each`
-            hit      | rolls  | bonus | expectedText
-            ${true}  | ${[18]}| ${5}  | ${'HIT'}
-            ${false} | ${[8]} | ${3}  | ${'MISS'}
-        `('shows $expectedText when hit is $hit with rolls: $rolls, bonus: $bonus', ({ hit, rolls, bonus, expectedText }) => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={rolls}
-                    bonus={bonus}
-                    targetName="Goblin"
-                    targetAc={14}
-                    hit={hit}
-                    rollType="attack"
-                />
-            );
-            const hitMiss = container.querySelector(`.dice-roll-hit-miss.${hit ? 'hit' : 'miss'}`);
-            expect(hitMiss.textContent).toContain(expectedText);
-        });
+// Display-lane owner of the DiceRollResult family: the hit/miss line,
+// auto-miss line, waiting-for-player-save prompt (+ Quick Roll interaction),
+// save-result line, and damage-applied line. Boon / choice / reroll lanes
+// are owned by the sibling DiceRollResult.*.test.jsx files.
 
-        it.each`
-            type           | rollType
-            ${'damage'}    | ${undefined}
-            ${'save-damage'} | ${'attack'}
-        `('does not show hit/miss for type: $type, rollType: $rollType', ({ type, rollType }) => {
-            render(
-                <DiceRollResult
-                    name="Fireball"
-                    type={type}
-                    rolls={[6]}
-                    bonus={0}
-                    targetName="Goblin"
-                    hit={true}
-                    rollType={rollType}
-                />
-            );
-            expect(screen.queryByText(/HIT/)).not.toBeInTheDocument();
-        });
+const renderAttack = (props = {}) => render(
+    <DiceRollResult
+        name="Longsword"
+        type="attack"
+        rolls={[18]}
+        bonus={5}
+        targetName="Goblin"
+        targetAc={14}
+        rollType="attack"
+        {...props}
+    />
+);
 
-        it('shows auto-miss with cover reason or default out of range', () => {
-            const { container: c1 } = render(
-                <DiceRollResult
-                    name="Longbow"
-                    type="attack"
-                    rolls={[12]}
-                    bonus={4}
-                    targetName="Goblin"
-                    targetAc={14}
-                    hit={false}
-                    rollType="attack"
-                    isAutoMiss={true}
-                    coverReason="Half cover"
-                />
-            );
-            expect(c1.querySelector('.dice-roll-hit-miss.miss').textContent).toContain('AUTO-MISS');
-            expect(c1.querySelector('.dice-roll-hit-miss.miss').textContent).toContain('Half cover');
+const renderFireball = (props = {}) => render(
+    <DiceRollResult
+        name="Fireball"
+        type="damage"
+        rolls={[6]}
+        bonus={0}
+        {...props}
+    />
+);
 
-            const { container: c2 } = render(
-                <DiceRollResult
-                    name="Longbow"
-                    type="attack"
-                    rolls={[12]}
-                    bonus={4}
-                    targetName="Goblin"
-                    hit={false}
-                    rollType="attack"
-                    isAutoMiss={true}
-                />
-            );
-            expect(c2.querySelector('.dice-roll-hit-miss.miss').textContent).toContain('AUTO-MISS');
-            expect(c2.querySelector('.dice-roll-hit-miss.miss').textContent).toContain('out of range');
-        });
+const queryOutcomeLine = () => screen.queryByText(/✓ HIT|✗ MISS|AUTO-MISS/);
+
+describe('hit/miss line', () => {
+    it.each([
+        { rolls: [18], bonus: 5, hit: true, line: '✓ HIT (23 vs AC 14)' },
+        { rolls: [8], bonus: 3, hit: false, line: '✗ MISS (11 vs AC 14)' },
+    ])('renders the full outcome line "$line" for rolls $rolls + $bonus', ({ rolls, bonus, hit, line }) => {
+        renderAttack({ rolls, bonus, hit });
+        expect(screen.getByText(line)).toBeInTheDocument();
     });
 
-    describe('waiting for player save', () => {
-        it('shows waiting message with target name and save type', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    waitingForPlayerSave={true}
-                    targetName="Goblin"
-                    saveDc={14}
-                    saveType="DEX"
-                />
-            );
-            const waiting = container.querySelector('.dice-roll-save-waiting');
-            expect(waiting.textContent).toContain('Goblin');
-            expect(waiting.textContent).toContain('DEX');
-            expect(waiting.textContent).toContain('DC 14');
-        });
-
-        it('shows quick roll button and calls onQuickRoll when clicked', () => {
-            const onQuickRoll = vi.fn();
-            render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    waitingForPlayerSave={true}
-                    targetName="Goblin"
-                    saveDc={14}
-                    saveType="DEX"
-                    onQuickRoll={onQuickRoll}
-                />
-            );
-            expect(screen.getByText(/Quick Roll/)).toBeInTheDocument();
-            fireEvent.click(screen.getByText(/Quick Roll/));
-            expect(onQuickRoll).toHaveBeenCalled();
-        });
-
-        it('does not show waiting message when waitingForPlayerSave is false', () => {
-            render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    waitingForPlayerSave={false}
-                    targetName="Goblin"
-                    saveDc={14}
-                    saveType="DEX"
-                />
-            );
-            expect(screen.queryByText(/Waiting for/)).not.toBeInTheDocument();
-        });
+    it('recomputes the outcome from total vs AC when the hit prop disagrees', () => {
+        renderAttack({ hit: false });
+        expect(screen.getByText('✓ HIT (23 vs AC 14)')).toBeInTheDocument();
     });
 
-    describe('save result display', () => {
-        it('shows save success with roll detail when saveResult.success is true', () => {
-            render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    saveResult={{ success: true, total: 18, roll: 14, bonus: 4 }}
-                    saveDc={15}
-                />
-            );
-            expect(screen.getByText(/SAVE SUCCESS/)).toBeInTheDocument();
-            expect(screen.getByText(/18 vs DC 15/)).toBeInTheDocument();
-            expect(screen.getByText(/d20 14 \+ 4/)).toBeInTheDocument();
-        });
-
-        it('shows save failure when saveResult.success is false', () => {
-            render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    saveResult={{ success: false, total: 12, roll: 8, bonus: 4 }}
-                    saveDc={15}
-                />
-            );
-            expect(screen.getByText(/SAVE FAILURE/)).toBeInTheDocument();
-        });
-
-        it('shows save roll detail with zero bonus', () => {
-            render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    saveResult={{ success: true, total: 14, roll: 14, bonus: 0 }}
-                    saveDc={15}
-                />
-            );
-            expect(screen.getByText(/d20 14 \+ 0/)).toBeInTheDocument();
-        });
-
-        it('does not show save result when saveResult is falsy', () => {
-            render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    saveResult={null}
-                    saveDc={15}
-                />
-            );
-            expect(screen.queryByText(/SAVE SUCCESS/)).not.toBeInTheDocument();
-            expect(screen.queryByText(/SAVE FAILURE/)).not.toBeInTheDocument();
-        });
+    it.each([
+        { type: 'damage', rollType: undefined },
+        { type: 'save-damage', rollType: 'attack' },
+    ])('shows no hit/miss line for type $type / rollType $rollType even when hit is true', ({ type, rollType }) => {
+        renderFireball({ type, rollType, targetName: 'Goblin', hit: true });
+        expect(queryOutcomeLine()).not.toBeInTheDocument();
     });
 
-    describe('damage applied display', () => {
-        it('shows damage applied without reduction', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6, 5, 4]}
-                    bonus={0}
-                    finalDamage={15}
-                    damageApplied={true}
-                    targetName="Goblin"
-                    originalTotal={15}
-                />
-            );
-            const damageEl = container.querySelector('.dice-roll-damage-applied');
-            expect(damageEl.textContent).toContain('15');
-            expect(damageEl.textContent).toContain('damage applied');
-            expect(damageEl.textContent).toContain('Goblin');
-        });
+    it.each([
+        { extraProps: { coverReason: 'Half cover' }, line: '✗ AUTO-MISS (Half cover)' },
+        { extraProps: { rangeReason: 'Beyond long range' }, line: '✗ AUTO-MISS (Beyond long range)' },
+        { extraProps: {}, line: '✗ AUTO-MISS (out of range)' },
+    ])('renders $line when isAutoMiss overrides the rolled result', ({ extraProps, line }) => {
+        renderAttack({ hit: true, isAutoMiss: true, ...extraProps });
+        expect(screen.getByText(line)).toBeInTheDocument();
+    });
+});
 
-        it('shows damage applied with reduction and HP change', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6, 5, 4]}
-                    bonus={0}
-                    total={15}
-                    finalDamage={8}
-                    damageApplied={true}
-                    damageReduced={true}
-                    targetName="Orc"
-                    targetCurrentHp={5}
-                />
-            );
-            const damageEl = container.querySelector('.dice-roll-damage-applied');
-            expect(damageEl.textContent).toContain('8');
-            expect(damageEl.textContent).toContain('damage applied');
-            expect(damageEl.textContent).toContain('Orc');
-            expect(damageEl.textContent).toContain('reduced from 15');
-            expect(damageEl.textContent).toContain('HP:');
-        });
+describe('waiting for player save', () => {
+    const waitingProps = { waitingForPlayerSave: true, targetName: 'Goblin', saveDc: 14, saveType: 'DEX' };
 
-        it('does not show damage applied when finalDamage is undefined', () => {
-            render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6, 5, 4]}
-                    bonus={0}
-                    finalDamage={undefined}
-                    damageApplied={true}
-                    targetName="Goblin"
-                />
-            );
-            expect(screen.queryByText(/damage applied/)).not.toBeInTheDocument();
-        });
+    it('names the target, save type and DC while waiting', () => {
+        renderFireball(waitingProps);
+        expect(screen.getByText('Goblin')).toBeInTheDocument();
+        expect(screen.getByText(/to roll DEX save \(DC 14\)/)).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Quick Roll/ })).not.toBeInTheDocument();
+    });
+
+    it('offers a Quick Roll button that calls onQuickRoll with no arguments', () => {
+        const onQuickRoll = vi.fn();
+        renderFireball({ ...waitingProps, onQuickRoll });
+        fireEvent.click(screen.getByRole('button', { name: /Quick Roll/ }));
+        expect(onQuickRoll).toHaveBeenCalledTimes(1);
+        expect(onQuickRoll).toHaveBeenCalledWith();
+    });
+
+    it('shows no waiting prompt when waitingForPlayerSave is false', () => {
+        renderFireball({ ...waitingProps, waitingForPlayerSave: false });
+        expect(screen.queryByText(/Waiting for/)).not.toBeInTheDocument();
+    });
+});
+
+describe('save result line', () => {
+    it.each([
+        { label: 'success', saveResult: { success: true, total: 18, roll: 14, bonus: 4 }, line: '✓ SAVE SUCCESS (18 vs DC 15)', detail: '(d20 14 + 4)' },
+        { label: 'failure', saveResult: { success: false, total: 12, roll: 8, bonus: 4 }, line: '✗ SAVE FAILURE (12 vs DC 15)', detail: '(d20 8 + 4)' },
+        { label: 'zero bonus', saveResult: { success: true, total: 14, roll: 14, bonus: 0 }, line: '✓ SAVE SUCCESS (14 vs DC 15)', detail: '(d20 14 + 0)' },
+    ])('renders the $label line with exact roll detail', ({ saveResult, line, detail }) => {
+        renderFireball({ saveResult, saveDc: 15 });
+        expect(screen.getByText(line)).toBeInTheDocument();
+        expect(screen.getByText(detail)).toBeInTheDocument();
+    });
+
+    it.each([null, undefined])('shows no save result line for saveResult %s', (saveResult) => {
+        renderFireball({ saveResult, saveDc: 15 });
+        expect(screen.queryByText(/SAVE (SUCCESS|FAILURE)/)).not.toBeInTheDocument();
+    });
+});
+
+describe('damage applied line', () => {
+    it.each([
+        {
+            label: 'flat damage',
+            props: { finalDamage: 15, damageApplied: true, targetName: 'Goblin' },
+            sentence: '15 damage applied to Goblin',
+        },
+        {
+            label: 'reduced damage with HP change',
+            props: { total: 15, finalDamage: 8, damageApplied: true, damageReduced: true, targetName: 'Orc', targetCurrentHp: 5 },
+            sentence: '8 damage applied to Orc (reduced from 15) — HP: 13 → 5',
+        },
+    ])('renders $label verbatim', ({ props, sentence }) => {
+        renderFireball(props);
+        expect(screen.getByText(/damage applied to/, { selector: 'span' })).toHaveTextContent(sentence);
+    });
+
+    it.each([
+        { label: 'finalDamage is undefined', props: { damageApplied: true, targetName: 'Goblin' } },
+        { label: 'damageApplied is false', props: { finalDamage: 15, damageApplied: false, targetName: 'Goblin' } },
+    ])('shows no damage-applied line when $label', ({ props }) => {
+        renderFireball(props);
+        expect(screen.queryByText(/damage applied/)).not.toBeInTheDocument();
     });
 });

@@ -1,81 +1,21 @@
-// CLA-374 regression: the Special Actions "Use Magic Device:" row must render
-// clickable (real isInteractiveAutomation, NOT mocked — locks INTERACTIVE_
-// HANDLER_TYPES membership) and dispatch through executeHandler to
-// handleUseMagicDevice, showing the activation popup (previously the row was
-// inert <b className=""> with zero popup/log/state — pitfall 42l family).
+// CLA-374 regression: the Special Actions "Use Magic Device:" row must be
+// clickable and dispatch through executeHandler to handleUseMagicDevice,
+// surfacing the activation/deactivation clause popup (previously the row was
+// an inert <b className=""> with zero popup/log/state — pitfall 42l family).
+// Clickability is pinned behaviourally: if the row goes inert again the click
+// never dispatches and every case here fails. Real INTERACTIVE_HANDLER_TYPES
+// membership is pinned by the service-level regression
+// (services/combat/automation/automationService.interactive.useMagicDevice.test.js).
+// - Base mocks come from the shared CharSpecialActions.modalMocks.jsx family
+//   module (its interactiveTypes mirrors the real service, CLA-374 entry included).
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+// Shared family mocks must load BEFORE the component so its imports are mocked.
+import './CharSpecialActions.modalMocks.jsx';
 import CharSpecialActions from './CharSpecialActions.jsx';
-
-// Mock executeHandler — assert dispatch reachability for use_magic_device
-vi.mock('../../services/automation/index.js', () => ({
-  executeHandler: vi.fn(),
-}));
-
-// NOTE: automationService.js is deliberately NOT mocked — the real
-// isInteractiveAutomation/INTERACTIVE_HANDLER_TYPES is the fix under test.
-
-vi.mock('../../services/ui/sanitize.js', () => ({
-  sanitizeHtml: vi.fn((html) => html),
-  renderMarkdown: vi.fn((md) => md),
-  renderMarkdownInline: vi.fn((md) => md),
-}));
-
-vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadFightingStyles: vi.fn(() => Promise.resolve([])),
-}));
-
-const runtimeStore = {};
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((_key, runtimeKey) => runtimeStore[runtimeKey] ?? null),
-  setRuntimeValue: vi.fn((_key, runtimeKey, value, _campaign) => {
-    runtimeStore[runtimeKey] = value;
-    return Promise.resolve();
-  }),
-  useRuntimeValue: vi.fn((_key, runtimeKey) => runtimeStore[runtimeKey] ?? null),
-}));
-
-let _capturedPopup = null;
-vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
-  useDiceRollPopup: vi.fn(() => ({
-    setPopupHtml: (html) => { _capturedPopup = html; },
-  })),
-}));
-
-vi.mock('../../hooks/combat/useCombatSuperiorityModal.js', () => ({
-  useCombatSuperiorityModal: vi.fn(() => ({
-    combatSuperiorityModal: null,
-    setCombatSuperiorityModal: vi.fn(),
-    handleCombatSuperiorityConfirm: vi.fn(),
-    handleCombatSuperiorityReopenSelection: vi.fn(),
-  })),
-}));
-
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
-  default: vi.fn(() => ({
-    rollAttack: vi.fn(),
-    rollDamage: vi.fn(),
-  })),
-}));
-
-vi.mock('../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('./useAttackDamageResolution.js', () => ({
-  normalizeAutoDamage: vi.fn(() => ({ attack: {}, ctx: {} })),
-  resolveAttackDamageStandalone: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => Promise.resolve({ creatures: [] })),
-}));
-
-vi.mock('./CharSpecialActionsModals.jsx', () => ({
-  default: () => null,
-}));
-
+import { mockRuntimeStore } from './CharSpecialActions.modalMocks.jsx';
 import { executeHandler } from '../../services/automation/index.js';
+import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
 
 const basePlayerStats = {
   name: 'AasimarTest',
@@ -90,58 +30,102 @@ const basePlayerStats = {
   proficiency: 6,
 };
 
-function makeUseMagicDeviceRow() {
+const useMagicDeviceRow = {
+  name: 'Use Magic Device',
+  description: 'Attune to up to 4 magic items at once.',
+  automation: {
+    type: 'use_magic_device',
+    attunementLimit: 4,
+    chargeReroll: '1d6',
+    chargeRerollSuccess: 6,
+    scrollAbility: 'INT',
+    scrollCheckDC: '10 + spell_level',
+    scrollDisintegratesOnFail: true,
+    casting_time: 'passive',
+    hasAutomation: true,
+  },
+};
+
+const playerStats = { ...basePlayerStats, specialActions: [useMagicDeviceRow] };
+
+const rowLabel = () => screen.getByText('Use Magic Device:');
+
+function activationPopup() {
   return {
-    name: 'Use Magic Device',
-    description: 'Attune to up to 4 magic items at once.',
-    automation: {
-      type: 'use_magic_device',
-      attunementLimit: 4,
-      chargeReroll: '1d6',
-      chargeRerollSuccess: 6,
-      scrollAbility: 'INT',
-      scrollCheckDC: '10 + spell_level',
-      scrollDisintegratesOnFail: true,
-      casting_time: 'passive',
-      hasAutomation: true,
+    type: 'popup',
+    payload: {
+      type: 'automation_info',
+      name: 'Use Magic Device',
+      automationType: 'use_magic_device',
+      description: 'Use Magic Device activated. Attune to up to 4 magic items.',
+    },
+  };
+}
+
+function deactivationPopup() {
+  return {
+    type: 'popup',
+    payload: {
+      type: 'automation_info',
+      name: 'Use Magic Device',
+      automationType: 'use_magic_device',
+      description: 'Use Magic Device ended. Attunement limit returns to normal.',
     },
   };
 }
 
 describe('CharSpecialActions - Use Magic Device row (CLA-374)', () => {
+  let capturedPopup = null;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    _capturedPopup = null;
-    Object.keys(runtimeStore).forEach(k => delete runtimeStore[k]);
+    capturedPopup = null;
+    Object.keys(mockRuntimeStore).forEach(k => delete mockRuntimeStore[k]);
+    // Capture popup writes (shared modalMocks default is an inert vi.fn setter).
+    vi.mocked(useDiceRollPopup).mockReturnValue({
+      setPopupHtml: (html) => { capturedPopup = html; },
+    });
+    executeHandler.mockResolvedValue(activationPopup());
   });
 
-  it('renders the row clickable (real INTERACTIVE_HANDLER_TYPES membership)', () => {
-    render(<CharSpecialActions playerStats={{ ...basePlayerStats, specialActions: [makeUseMagicDeviceRow()] }} campaignName="test" />);
-    const label = screen.getByText('Use Magic Device:');
-    expect(label.className).toBe('clickable');
+  it('renders the row with its description and dispatches executeHandler on click', async () => {
+    render(<CharSpecialActions playerStats={playerStats} campaignName="test-campaign" />);
+
+    expect(screen.getByText('Attune to up to 4 magic items at once.')).toBeInTheDocument();
+
+    fireEvent.click(rowLabel());
+
+    await waitFor(() => {
+      expect(executeHandler).toHaveBeenCalledWith(useMagicDeviceRow, playerStats, 'test-campaign', undefined, undefined);
+    });
   });
 
-  it('row click dispatches executeHandler for use_magic_device', async () => {
-    const row = makeUseMagicDeviceRow();
-    executeHandler.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Use Magic Device',
-        automationType: 'use_magic_device',
-        description: 'Use Magic Device activated. Attune to up to 4 magic items.',
-      },
-    });
+  it.each([
+    ['activation', activationPopup, 'activated. Attune to up to 4 magic items'],
+    ['deactivation', deactivationPopup, 'ended. Attunement limit returns to normal'],
+  ])('click shows the %s clause popup via the grid lane', async (_case, popup, expectedText) => {
+    executeHandler.mockResolvedValue(popup());
 
-    render(<CharSpecialActions playerStats={{ ...basePlayerStats, specialActions: [row] }} campaignName="test" />);
-
-    fireEvent.click(screen.getByText('Use Magic Device:'));
+    render(<CharSpecialActions playerStats={playerStats} campaignName="test-campaign" />);
+    fireEvent.click(rowLabel());
 
     await waitFor(() => {
-      expect(executeHandler).toHaveBeenCalledWith(row, expect.objectContaining({ name: 'AasimarTest' }), 'test', undefined, undefined);
+      expect(capturedPopup).toContain(expectedText);
     });
-    await waitFor(() => {
-      expect(_capturedPopup).toContain('Attune to up to 4 magic items');
-    });
+    expect(capturedPopup).toContain('Use Magic Device');
+    expect(capturedPopup).toContain('click to dismiss');
+    // The row lane is popup-only: nothing else in the grid fires.
+    expect(mockRuntimeStore).toEqual({});
+  });
+
+  it('stays inert when cannotAct: no dispatch, no popup, no runtime writes', async () => {
+    render(<CharSpecialActions playerStats={playerStats} campaignName="test-campaign" cannotAct />);
+
+    fireEvent.click(rowLabel());
+    await waitFor(() => expect(screen.getByText('Use Magic Device:')).toBeInTheDocument());
+
+    expect(executeHandler).not.toHaveBeenCalled();
+    expect(capturedPopup).toBeNull();
+    expect(mockRuntimeStore).toEqual({});
   });
 });

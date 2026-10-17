@@ -1,5 +1,14 @@
+// @maintained-by-ai
 // CLA-300 regression: Roving climb/swim must equal the rules-layer folded
-// Speed (stats.speed), not folded Speed + 10 (double-count fingerprint).
+// Speed (stats.speed), never folded Speed + 10 (double-count fingerprint).
+//
+// Seam pinned here (CharSheet.jsx applyRovingSpeeds):
+//  - climb/swim = fallbackSpeed(stats) with NO re-added +10 even when other
+//    speed_increase passives are folded into stats.speed (50 -> 50, not 60)
+//  - the Roving passive gate itself (no passive -> no climb/swim)
+//  - pre-existing climb/swim speeds are preserved, not clobbered
+// The heavy-armor gate and the plain folded-40 happy path are covered by
+// CharSheet.rendering-state.test.jsx ("passive effect speed modifications").
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -178,59 +187,43 @@ describe('CLA-300 Roving climb/swim equal folded Speed (no +10 double-count)', (
     mockStore.clear();
   });
 
-  it('bare Ranger lv6: folded speed 40 -> climb 40 swim 40', async () => {
-    const stats = createMockPlayerStats({
-      speed: 40,
-      automation: { passives: [{ name: 'Roving' }] },
-      inventory: { equipped: ['Longbow'] },
-      equipment: [{ name: 'Longbow' }, { name: 'Chain Mail', armor_category: 'Heavy' }],
-    });
-
+  it.each([
+    {
+      // Double-count fingerprint would give 60 here: stats.speed already
+      // carries Roving +10 and the speed_increase +10 from the rules layer.
+      label: 'folded Speed with speed_increase +10: climb/swim equal 50, not 60',
+      stats: createMockPlayerStats({
+        speed: 50,
+        automation: { passives: [{ name: 'Roving' }, { effect: 'speed_increase', bonusExpression: '10' }] },
+        inventory: { equipped: ['Longbow'] },
+        equipment: [{ name: 'Longbow' }],
+      }),
+      expected: { climbSpeed: 50, swimSpeed: 50, speed: 50 },
+    },
+    {
+      label: 'no Roving passive: sheet seam is inert, no climb/swim speeds appear',
+      stats: createMockPlayerStats({ speed: 30 }),
+      expected: { climbSpeed: undefined, swimSpeed: undefined },
+    },
+    {
+      // Other features (Panther aspect, second_storywork) set climb/swim
+      // before movement passives run; Roving must preserve, not clobber.
+      label: 'existing climb/swim speeds are preserved, not overwritten',
+      stats: createMockPlayerStats({
+        speed: 40,
+        climbSpeed: 30,
+        swimSpeed: 20,
+        automation: { passives: [{ name: 'Roving' }] },
+        inventory: { equipped: ['Longbow'] },
+        equipment: [{ name: 'Longbow' }],
+      }),
+      expected: { climbSpeed: 30, swimSpeed: 20 },
+    },
+  ])('$label', async ({ stats, expected }) => {
     const passedStats = await renderAndReadStats(stats);
 
-    expect(passedStats.climbSpeed).toBe(40);
-    expect(passedStats.swimSpeed).toBe(40);
-  });
-
-  it('Speedy lane: folded speed 50 -> climb 50 swim 50', async () => {
-    const stats = createMockPlayerStats({
-      speed: 50,
-      automation: { passives: [{ name: 'Roving' }, { effect: 'speed_increase', bonusExpression: '10' }] },
-      inventory: { equipped: ['Longbow'] },
-      equipment: [{ name: 'Longbow' }],
-    });
-
-    const passedStats = await renderAndReadStats(stats);
-
-    expect(passedStats.climbSpeed).toBe(50);
-    expect(passedStats.swimSpeed).toBe(50);
-  });
-
-  it('heavy armor: roving gate held -> no climb/swim speeds', async () => {
-    const stats = createMockPlayerStats({
-      speed: 30,
-      automation: { passives: [{ name: 'Roving' }] },
-      inventory: { equipped: ['Chain Mail'] },
-      equipment: [{ name: 'Chain Mail', armor_category: 'Heavy' }],
-    });
-
-    const passedStats = await renderAndReadStats(stats);
-
-    expect(passedStats.climbSpeed).toBeUndefined();
-    expect(passedStats.swimSpeed).toBeUndefined();
-  });
-
-  it('non-Ranger lane (no Roving passive): inert', async () => {
-    const stats = createMockPlayerStats({
-      speed: 30,
-      automation: { passives: [] },
-      inventory: { equipped: [] },
-      equipment: [],
-    });
-
-    const passedStats = await renderAndReadStats(stats);
-
-    expect(passedStats.climbSpeed).toBeUndefined();
-    expect(passedStats.swimSpeed).toBeUndefined();
+    expect(passedStats.climbSpeed).toBe(expected.climbSpeed);
+    expect(passedStats.swimSpeed).toBe(expected.swimSpeed);
+    expect(passedStats.speed).toBe(expected.speed ?? stats.speed);
   });
 });

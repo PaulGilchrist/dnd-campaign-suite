@@ -1,9 +1,15 @@
-// MN-017: CharReactions must flush handler logEntries to the campaign log
-// (the drop shared with MN-013 Parry / CLA-228) — mirror of the MN-016 Rally flush.
+// @maintained-by-ai
+// MN-017: CharReactions.handleAutomationReaction must flush handler logEntries to the
+// campaign log on EVERY handled result type (the drop shared with MN-013 Parry / CLA-228) —
+// mirror of the MN-016 Rally flush. Three lanes, three pins:
+//   attack_roll → flush + rollAttack; popup refusal → no flush, no roll (reaction unspent,
+//   unique pin vs reactiveStrike #47); popup WITH logEntries → flush, still no roll.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CharReactions from './CharReactions.jsx';
+
+const { mockSetPopupHtml } = vi.hoisted(() => ({ mockSetPopupHtml: vi.fn() }));
 
 vi.mock('../common/popup.jsx', () => ({
     default: ({ children }) => React.createElement('div', { 'data-testid': 'popup' }, children),
@@ -49,7 +55,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
     default: vi.fn(),
 }));
 vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
-    useDiceRollPopup: vi.fn(() => ({ setPopupHtml: vi.fn() })),
+    useDiceRollPopup: vi.fn(() => ({ setPopupHtml: mockSetPopupHtml })),
 }));
 vi.mock('../../services/combat/baseCombatActions.js', () => ({
     OPPORTUNITY_ATTACK: { name: 'Opportunity Attack', description: 'Can attack creature that moves out of your reach' },
@@ -157,7 +163,7 @@ function createProps() {
     };
 }
 
-describe('CharReactions — MN-017 Riposte logEntries flush', () => {
+describe('CharReactions — MN-017 automation handler logEntries flush', () => {
     const rollAttack = vi.fn();
 
     beforeEach(() => {
@@ -167,7 +173,7 @@ describe('CharReactions — MN-017 Riposte logEntries flush', () => {
         hasAutomation.mockImplementation((r) => r.name === 'Riposte');
     });
 
-    it('accepted riposte attack_roll result: rolls vs attacker AND flushes the ability_use logEntry', async () => {
+    it('attack_roll result: flushes the ability_use entry AND arms rollAttack vs the attacker with auto damage', async () => {
         executeHandler.mockResolvedValue({
             type: 'attack_roll',
             payload: { attack: basePlayerStats.attacks[0], targetName: 'Thug 1' },
@@ -177,17 +183,24 @@ describe('CharReactions — MN-017 Riposte logEntries flush', () => {
         render(<CharReactions {...createProps()} />);
         fireEvent.click(screen.getByText('Riposte:'));
 
-        await waitFor(() => expect(rollAttack).toHaveBeenCalled());
-        expect(rollAttack.mock.calls[0][0]).toBe('Shortsword');
-        expect(rollAttack.mock.calls[0][2].targetName).toBe('Thug 1');
+        await waitFor(() => expect(rollAttack).toHaveBeenCalledTimes(1));
+        expect(rollAttack).toHaveBeenCalledWith('Shortsword', 9, expect.objectContaining({
+            targetName: 'Thug 1',
+            isOpportunityAttack: true,
+            autoDamageFormula: '1d6+4',
+            autoDamageName: 'Shortsword',
+            damageType: 'Piercing',
+        }));
+        expect(addEntry).toHaveBeenCalledTimes(1);
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
             type: 'ability_use',
+            characterName: 'EvasiveFighter',
             abilityName: 'Riposte',
             targetName: 'Thug 1',
         }));
     });
 
-    it('refusal popup result (ungated click refused): popup shown, no roll, no log flush', async () => {
+    it('popup refusal (ungated click refused): refusal payload reaches the popup, no roll, NO log flush', async () => {
         executeHandler.mockResolvedValue({
             type: 'popup',
             payload: { type: 'automation_info', name: 'Riposte', description: 'The last attack against you was not a miss.' },
@@ -196,12 +209,16 @@ describe('CharReactions — MN-017 Riposte logEntries flush', () => {
         render(<CharReactions {...createProps()} />);
         fireEvent.click(screen.getByText('Riposte:'));
 
-        await waitFor(() => expect(executeHandler).toHaveBeenCalled());
+        await waitFor(() => expect(executeHandler).toHaveBeenCalledTimes(1));
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'automation_info',
+            description: 'The last attack against you was not a miss.',
+        }));
         expect(rollAttack).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('popup result WITH logEntries (e.g. Parry use) also flushes to the campaign log', async () => {
+    it('popup result WITH logEntries (e.g. Parry use) still flushes once — flush precedes the type branch', async () => {
         executeHandler.mockResolvedValue({
             type: 'popup',
             payload: { type: 'automation_info', name: 'Riposte', description: 'Riposte resolved.' },
@@ -211,7 +228,13 @@ describe('CharReactions — MN-017 Riposte logEntries flush', () => {
         render(<CharReactions {...createProps()} />);
         fireEvent.click(screen.getByText('Riposte:'));
 
-        await waitFor(() => expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({ abilityName: 'Riposte' })));
+        await waitFor(() => expect(addEntry).toHaveBeenCalledTimes(1));
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'ability_use',
+            characterName: 'EvasiveFighter',
+            abilityName: 'Riposte',
+        }));
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ description: 'Riposte resolved.' }));
         expect(rollAttack).not.toHaveBeenCalled();
     });
 });

@@ -1,6 +1,11 @@
-// FT-103: Reactive Strike reaction row — clickable, dispatches through the
-// hasAutomation → executeHandler lane, and the returned attack_roll rides the
-// verified OA adjudication seam (rollAttack with armed target + auto damage).
+// @maintained-by-ai
+// FT-103 char-sheet UI lane — delegation pins only for the Reactive Strike row.
+// Row clickability, the generic hasAutomation → executeHandler dispatch lane, and
+// the non-clickable contrast are pinned in CharReactions.edgeCases.test.jsx (FT-103);
+// the FT-102 gate/economy lives in the reactionDamage handler lane. These two tests
+// lock only the outcome contract of the handler result: an accepted attack_roll arms
+// rollAttack against the entering target with auto damage; a popup refusal rolls
+// nothing (reaction unspent).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -168,30 +173,15 @@ function createProps(overrides = {}) {
     };
 }
 
-describe('CharReactions - FT-103 Reactive Strike row', () => {
+describe('CharReactions - FT-103 Reactive Strike delegation pins', () => {
     let rollAttack;
     beforeEach(() => {
         vi.clearAllMocks();
         rollAttack = vi.fn();
         useLoggedDiceRoll.mockReturnValue({ rollAttack, rollDamage: vi.fn() });
-        executeHandler.mockResolvedValue(null);
     });
 
-    it('renders the Reactive Strike row clickable', () => {
-        render(<CharReactions {...createProps()} />);
-        expect(screen.getByText('Reactive Strike:')).toHaveClass('clickable');
-    });
-
-    it('click dispatches the reaction through the automation router', async () => {
-        render(<CharReactions {...createProps()} />);
-        fireEvent.click(screen.getByText('Reactive Strike:'));
-        await waitFor(() => expect(executeHandler).toHaveBeenCalled());
-        const [reaction, playerStats] = executeHandler.mock.calls[0];
-        expect(reaction.name).toBe('Reactive Strike');
-        expect(playerStats.name).toBe('EvasiveFighter');
-    });
-
-    it('attack_roll result resolves against the chosen entering target via the OA adjudication seam', async () => {
+    it('accepted attack_roll arms rollAttack once against the entering target with OA flags and auto damage', async () => {
         executeHandler.mockResolvedValue({
             type: 'attack_roll',
             payload: {
@@ -203,7 +193,7 @@ describe('CharReactions - FT-103 Reactive Strike row', () => {
         render(<CharReactions {...createProps()} />);
         fireEvent.click(screen.getByText('Reactive Strike:'));
 
-        await waitFor(() => expect(rollAttack).toHaveBeenCalled());
+        await waitFor(() => expect(rollAttack).toHaveBeenCalledTimes(1));
         expect(rollAttack).toHaveBeenCalledWith(
             'Glaive',
             8,
@@ -217,7 +207,7 @@ describe('CharReactions - FT-103 Reactive Strike row', () => {
         );
     });
 
-    it('popup refusal result surfaces the popup html (no attack roll)', async () => {
+    it('popup refusal fires no attack roll — the reaction is never spent', async () => {
         executeHandler.mockResolvedValue({
             type: 'popup',
             payload: { type: 'automation_info', name: 'Reactive Strike', description: 'You have already used Reactive Strike this round.' },
@@ -225,7 +215,7 @@ describe('CharReactions - FT-103 Reactive Strike row', () => {
         render(<CharReactions {...createProps()} />);
         fireEvent.click(screen.getByText('Reactive Strike:'));
 
-        await waitFor(() => expect(executeHandler).toHaveBeenCalled());
+        await waitFor(() => expect(executeHandler).toHaveBeenCalledTimes(1));
         expect(rollAttack).not.toHaveBeenCalled();
     });
 });

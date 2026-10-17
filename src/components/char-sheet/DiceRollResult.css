@@ -411,3 +411,22 @@
     color: #f44336;
     font-weight: bold;
 }
+
+/* Damage type choice section (DamageTypeChoiceSection) */
+.damage-type-choice-body {
+    text-align: center;
+    margin-top: 16px;
+}
+
+.damage-type-choice-options {
+    margin-top: 12px;
+}
+
+.damage-type-choice-label {
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+.damage-type-choice-btn {
+    margin: 0 6px 8px 6px;
+}

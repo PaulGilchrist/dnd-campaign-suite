@@ -1,3 +1,16 @@
+// @maintained-by-ai
+// modalOnClose quartet seam map (#76-79):
+//   combat (this file) — Quivering Palm / Steps of the Fey Taunt / Hurl Through Hell /
+//                        Clairvoyant Combatant: Close-dismiss rows + cannotAct guard.
+//                        Each close row guards its own setXModal(null) wiring in
+//                        CharSpecialActionsModals.jsx and asserts dismissal is inert
+//                        (no re-dispatch of executeHandler, no runtime-store writes).
+//   arcane             — CharSpecialActions.modalOnClose.arcane.test.jsx
+//   elemental          — CharSpecialActions.modalOnClose.elemental.test.jsx (owns reopen ordering)
+//   weapons          — CharSpecialActions.modalOnClose.weapons.test.jsx
+// Not duplicated here:
+//   Open routing (executeHandler args + modal render for these four) lives in
+//   CharSpecialActions.modals.test.jsx — the strongest version of those tests.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import './CharSpecialActions.modalMocks.jsx';
@@ -26,28 +39,24 @@ const combatModalTests = [
   {
     name: 'Quivering Palm',
     modalName: 'quiveringPalm',
-    actionName: 'Quivering Palm',
     automation: { type: 'quivering_palm' },
     testId: 'quivering-palm-modal',
   },
   {
     name: 'Steps of the Fey Taunt',
     modalName: 'stepsOfTheFeyTaunt',
-    actionName: 'Steps of the Fey Taunt',
     automation: { type: 'steps_of_the_fey_taunt' },
     testId: 'steps-of-the-fey-taunt-modal',
   },
   {
     name: 'Hurl Through Hell',
     modalName: 'hurlThroughHell',
-    actionName: 'Hurl Through Hell',
     automation: { type: 'hurl_through_hell' },
     testId: 'hurl-through-hell-modal',
   },
   {
     name: 'Clairvoyant Combatant',
     modalName: 'clairvoyantCombatant',
-    actionName: 'Clairvoyant Combatant',
     automation: { type: 'clairvoyant_combatant' },
     testId: 'clairvoyant-combatant-modal',
   },
@@ -59,12 +68,12 @@ describe('CharSpecialActions - Combat feature modal onClose handlers', () => {
     Object.keys(mockRuntimeStore).forEach(key => delete mockRuntimeStore[key]);
   });
 
-  describe.each(combatModalTests)('$name modal onClose', ({ modalName, actionName, automation, testId }) => {
-    it('opens the modal and closes it when onClose is called', async () => {
+  describe.each(combatModalTests)('$name modal onClose', ({ name: actionName, modalName, automation, testId }) => {
+    it('dismisses the modal on Close without re-running the automation or touching runtime state', async () => {
       executeHandler.mockResolvedValue({
         type: 'modal',
         modalName,
-        payload: { action: { name: actionName }, playerStats: createPlayerStats({ specialActions: [{ name: actionName, description: `${actionName} description.`, automation }] }), campaignName: 'test' },
+        payload: { action: { name: actionName } },
       });
 
       const playerStats = createPlayerStats({
@@ -81,15 +90,20 @@ describe('CharSpecialActions - Combat feature modal onClose handlers', () => {
         expect(screen.getByTestId(testId)).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Close'));
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
       await waitFor(() => {
         expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
       });
+
+      // Dismissal is inert: the automation ran once (the open click) and Close
+      // wrote nothing to the runtime store.
+      expect(executeHandler).toHaveBeenCalledTimes(1);
+      expect(mockRuntimeStore).toEqual({});
     });
   });
 
-  it('does not open any combat modal when cannotAct is true', async () => {
+  it('does not open any combat modal when cannotAct is true', () => {
     executeHandler.mockResolvedValue({
       type: 'modal',
       modalName: 'quiveringPalm',
@@ -106,8 +120,9 @@ describe('CharSpecialActions - Combat feature modal onClose handlers', () => {
 
     fireEvent.click(screen.getByText(/Quivering Palm/));
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('quivering-palm-modal')).not.toBeInTheDocument();
-    });
+    // The cannotAct guard returns synchronously before dispatch, so a plain
+    // post-click assertion is strong (no waitFor-negative that passes vacuously).
+    expect(executeHandler).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('quivering-palm-modal')).not.toBeInTheDocument();
   });
 });

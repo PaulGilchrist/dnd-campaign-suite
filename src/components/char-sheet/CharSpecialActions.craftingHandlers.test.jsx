@@ -1,198 +1,24 @@
+// @maintained-by-ai
+// CharSpecialActions crafting lane (seam map #68): the Replenishing Meal and
+// Bolstering Treats CONFIRM/DISTRIBUTE contract — per-target grants, crafter
+// stock decrement, campaign log, confirmation popup, and capping grants at the
+// remaining stock.
+// Owned elsewhere (do not re-pin here):
+// - Modal open rendering, Skip-close, and zero-stock "No meals/treats remaining"
+//   refusals: CharSpecialActions.modalsInline.test.jsx.
+// - brew_poison click refusals/success: CharSpecialActions.automationClickHandlers.test.jsx (#69).
+// - Mocks come from the shared CharSpecialActions.modalMocks.jsx family module.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+// Shared family mocks must load BEFORE the component so its imports are mocked.
+import './CharSpecialActions.modalMocks.jsx';
 import CharSpecialActions from './CharSpecialActions.jsx';
-
-// Mock executeHandler
-vi.mock('../../services/automation/index.js', () => ({
-  executeHandler: vi.fn(),
-}));
-
-// Mock automation service
-vi.mock('../../services/combat/automation/automationService.js', () => ({
-  hasAutomation: vi.fn((action) => !!(action?.automation)),
-  isInteractiveAutomation: vi.fn((action) => {
-    if (!action?.automation) return false;
-    const auto = Array.isArray(action.automation) ? action.automation[0] : action.automation;
-    const interactiveTypes = ['teleport', 'signature_spells', 'spell_mastery', 'combat_superiority', 'weapon_kind_mastery', 'weapon_mastery_choice', 'defensive_tactics', 'hunter_prey', 'animal_aspect', 'passive_rule', 'temp_hp_buff', 'brew_poison'];
-    if (auto.type === 'passive_rule') {
-      const interactiveEffects = ['abjuration_savant', 'divination_savant', 'evocation_savant', 'illusion_savant', 'bonus_healing'];
-      return interactiveEffects.includes(auto.effect);
-    }
-    return interactiveTypes.includes(auto.type);
-  }),
-}));
-
-// Mock TeleportModal
-vi.mock('./modals/TeleportModal.jsx', () => ({
-  default: ({ action, onClose }) => (
-    <div data-testid="teleport-modal">
-      <span>{action?.name || 'Teleport'}</span>
-      <button onClick={onClose}>Close</button>
-    </div>
-  ),
-}));
-
-// Mock SignatureSpellsModal
-vi.mock('./modals/arcane/SignatureSpellsModal.jsx', () => ({
-  default: ({ payload: _payload, onConfirm, onClose }) => (
-    <div data-testid="signature-spells-modal" role="presentation" onClick={onClose}>
-      <h3>Signature Spells</h3>
-      <button onClick={() => onConfirm('Fireball', 'Haste')}>Confirm</button>
-      <button onClick={onClose}>Close</button>
-    </div>
-  ),
-}));
-
-// Mock SpellMasteryModal
-vi.mock('./modals/arcane/SpellMasteryModal.jsx', () => ({
-  default: ({ payload: _payload, onConfirm, onClose }) => (
-    <div data-testid="spell-mastery-modal" role="presentation" onClick={onClose}>
-      <h3>Spell Mastery</h3>
-      <button onClick={() => onConfirm('Mage Armor', 'Shield')}>Confirm</button>
-      <button onClick={onClose}>Close</button>
-    </div>
-  ),
-}));
-
-// Mock SavantModal
-vi.mock('./modals/arcane/SavantModal.jsx', () => ({
-  default: ({ payload, onConfirm, onClose }) => (
-    <div data-testid={`${payload?.school?.toLowerCase() || 'savant'}-savant-modal`} role="presentation" onClick={onClose}>
-      <span>{payload?.school || 'Savant'} Savant</span>
-      <button onClick={() => onConfirm(payload?.spellOptions?.[0] || 'Shield', payload?.spellOptions?.[1] || 'Mage Armor')}>Confirm</button>
-      <button onClick={onClose}>Close</button>
-    </div>
-  ),
-}));
-
-// Mock WeaponKindMasteryModal
-vi.mock('./modals/WeaponKindMasteryModal.jsx', () => ({
-  default: ({ action, onClose }) => (
-    <div data-testid="weapon-kind-mastery-modal">
-      <span>{action?.name || 'Weapon Kind Mastery'}</span>
-      <button onClick={onClose}>Close</button>
-    </div>
-  ),
-}));
-
-// Mock WeaponMasteryChoiceModal
-vi.mock('./modals/WeaponMasteryChoiceModal.jsx', () => ({
-  default: ({ action: _action, onClose, onConfirm }) => (
-    <div data-testid="weapon-mastery-choice-modal">
-      <span>Weapon Mastery Choice</span>
-      <button onClick={onClose}>Close</button>
-      <button onClick={() => onConfirm && onConfirm('Finesse')}>Confirm</button>
-    </div>
-  ),
-}));
-
-// Mock CombatSuperiorityModal
-vi.mock('./modals/CombatSuperiorityModal.jsx', () => ({
-  default: ({ _payload, onConfirm, _onReopenSelection, _onClose }) => (
-    <div data-testid="combat-superiority-modal">
-      <span>Combat Superiority</span>
-      <button onClick={() => onConfirm([], null)}>Close</button>
-    </div>
-  ),
-}));
-
-// Mock renderMarkdownInline
-vi.mock('../../services/ui/sanitize.js', () => ({
-  sanitizeHtml: vi.fn((html) => html),
-  renderMarkdown: vi.fn((md) => md),
-  renderMarkdownInline: vi.fn((md) => md),
-}));
-
-// Mock fighting styles
-vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadFightingStyles: vi.fn(() => Promise.resolve([
-    { name: 'Great Weapon Fighting', description: 'When you roll damage for an attack you make with a Melee weapon that you are holding with two hands, you can treat any 1 or 2 on a damage die as a 3. The weapon must have the Two-Handed or Versatile property to gain this benefit.' },
-    { name: 'Protection', description: 'When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield.' },
-  ])),
-}));
-
-// Mock the handler functions called by modal confirm callbacks
-vi.mock('../../services/automation/handlers/class-wizard/signatureSpellsHandler.js', () => ({
-  onSignatureSpellsSelected: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-wizard/spellMasteryHandler.js', () => ({
-  onSpellMasterySelected: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-wizard/SavantHandler.js', () => ({
-  onSavantSelected: vi.fn(),
-}));
-
-// Mock runtime state
-const mockRuntimeStore = {};
-
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((_key, runtimeKey) => mockRuntimeStore[runtimeKey] ?? null),
-  setRuntimeValue: vi.fn((_key, runtimeKey, value, _campaign) => {
-    mockRuntimeStore[runtimeKey] = value;
-    return Promise.resolve();
-  }),
-  useRuntimeValue: vi.fn((_key, runtimeKey) => mockRuntimeStore[runtimeKey] ?? null),
-}));
-
-// Mock DiceRollContext — capture popup content for assertion
-let capturedPopup = null;
-vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
-  useDiceRollPopup: vi.fn(() => ({
-    setPopupHtml: (html) => { capturedPopup = html; },
-  })),
-}));
-
-// Mock useCombatSuperiorityModal
-vi.mock('../../hooks/combat/useCombatSuperiorityModal.js', () => ({
-  useCombatSuperiorityModal: vi.fn(() => ({
-    combatSuperiorityModal: null,
-    setCombatSuperiorityModal: vi.fn(),
-    handleCombatSuperiorityConfirm: vi.fn(),
-    handleCombatSuperiorityReopenSelection: vi.fn(),
-  })),
-}));
-
-// Mock useLoggedDiceRoll
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
-  default: vi.fn(() => ({
-    rollAttack: vi.fn(),
-    rollDamage: vi.fn(),
-  })),
-}));
-
-// Mock log service
-vi.mock('../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-// Mock normalizeAutoDamage / resolveAttackDamageStandalone
-vi.mock('./useAttackDamageResolution.js', () => ({
-  normalizeAutoDamage: vi.fn(() => ({ attack: {}, ctx: {} })),
-  resolveAttackDamageStandalone: vi.fn(() => Promise.resolve()),
-}));
-
-// Mock CreatureSelectionModal
-vi.mock('./modals/shared/CreatureSelectionModal.jsx', () => ({
-  default: ({ title, confirmLabel, description, onConfirm, onSkip, targets }) => (
-    <div data-testid="creature-selection-modal">
-      <span>{title}</span>
-      {description && <p>{description}</p>}
-      <button onClick={() => onConfirm && onConfirm(targets.map(t => t.name))}>{confirmLabel}</button>
-      <button onClick={onSkip}>Skip</button>
-    </div>
-  ),
-}));
-
-// Mock getCombatContext
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(() => Promise.resolve({ creatures: [] })),
-}));
-
-// Import mocked modules
+import { mockRuntimeStore } from './CharSpecialActions.modalMocks.jsx';
 import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
+
+let capturedPopup = null;
 
 const basePlayerStats = {
   name: 'TestCharacter',
@@ -207,213 +33,130 @@ const basePlayerStats = {
   proficiency: 2,
 };
 
-function createPlayerStats(overrides = {}) {
-  return { ...basePlayerStats, ...overrides };
-}
-
-// Feature configuration for parameterized tests — eliminates duplication between
-// Replenishing Meal and Bolstering Treats which share identical interaction patterns.
+// Two crafting features sharing one distribution seam, driven by different
+// automation configs (meal passive vs chef temp_hp_buff special action).
 const craftingFeatures = [
   {
     name: 'Replenishing Meal',
-    runtimeKey: 'replenishingMeals',
-    featureKey: 'replenishingMeals',
-    targetRuntimeKey: 'replenishingMeals',
+    stockKey: 'replenishingMeals',
+    targetKey: 'replenishingMeals',
     automation: { type: 'passive_rule', effect: 'bonus_healing', name: 'Replenishing Meal' },
     config: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'Replenishing Meal' }] },
     modalButton: 'Distribute Meals',
-    modalTitle: 'Choose creatures to receive a replenishing meal.',
-    singular: 'replenishing meal',
-    plural: 'replenishing meals',
-    noRemainingMsg: 'No meals remaining',
+    itemSingular: 'replenishing meal',
+    popupSingular: 'meal',
   },
   {
     name: 'Bolstering Treats',
-    runtimeKey: 'chefBolsteringTreats',
-    featureKey: 'chefBolsteringTreats',
-    targetRuntimeKey: 'bolsteringTreat',
+    stockKey: 'chefBolsteringTreats',
+    targetKey: 'bolsteringTreat',
     automation: { type: 'temp_hp_buff', craftCount: true },
     config: { specialActions: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
     modalButton: 'Distribute Treats',
-    modalTitle: 'Choose creatures to receive a bolstering treat.',
-    singular: 'bolstering treat',
-    plural: 'bolstering treats',
-    noRemainingMsg: 'No treats remaining',
+    itemSingular: 'bolstering treat',
+    popupSingular: 'treat',
   },
 ];
 
-describe('CharSpecialActions - Crafting Handlers', () => {
+// Distribution scenarios across the stock/selection boundary:
+// all selected targets fit, both fit with stock left over, and selection
+// exceeds stock so later targets are refused.
+const scenarios = [
+  {
+    label: 'single target, decrements stock and confirms in singular form',
+    stock: 2,
+    characters: ['Ally1'],
+    granted: ['Ally1'],
+    expectedStock: 1,
+  },
+  {
+    label: 'multiple targets, decrements by the count in plural form',
+    stock: 3,
+    characters: ['Ally1', 'Ally2'],
+    granted: ['Ally1', 'Ally2'],
+    expectedStock: 1,
+  },
+  {
+    label: 'caps grants at remaining stock when more targets are selected',
+    stock: 1,
+    characters: ['Ally1', 'Ally2'],
+    granted: ['Ally1'],
+    expectedStock: 0,
+  },
+];
+
+const distributeCases = craftingFeatures.flatMap(feature =>
+  scenarios.map(scenario => ({ ...feature, ...scenario }))
+);
+
+describe('CharSpecialActions - Crafting Distribution', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedPopup = null;
     Object.keys(mockRuntimeStore).forEach(k => delete mockRuntimeStore[k]);
+    // Capture popup writes (shared modalMocks default is an inert vi.fn setter).
+    vi.mocked(useDiceRollPopup).mockReturnValue({
+      setPopupHtml: (html) => { capturedPopup = html; },
+    });
   });
 
-  describe('Click handlers', () => {
-    it.each(craftingFeatures)(
-      'opens creature selection modal when $name count is positive',
-      async ({ name, runtimeKey, automation, config, modalTitle }) => {
-        mockRuntimeStore[runtimeKey] = 2;
+  it.each(distributeCases)(
+    'distributes $name: $label',
+    async ({ name, stockKey, targetKey, automation, config, modalButton, itemSingular, popupSingular, stock, characters, granted, expectedStock }) => {
+      mockRuntimeStore[stockKey] = stock;
 
-        const playerStats = createPlayerStats({
-          specialActions: [
-            { name, description: 'Distribute.', automation },
-          ],
-          automation: config,
-        });
-        render(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[{ name: 'Ally1' }]} />);
+      const playerStats = {
+        ...basePlayerStats,
+        specialActions: [{ name, description: 'Distribute.', automation }],
+        automation: config,
+      };
+      render(
+        <CharSpecialActions
+          playerStats={playerStats}
+          campaignName="test"
+          characters={characters.map(n => ({ name: n }))}
+        />
+      );
 
-        fireEvent.click(screen.getByText(new RegExp(name)));
+      fireEvent.click(screen.getByText(new RegExp(name)));
 
-        await waitFor(() => {
-          expect(screen.getByText(name)).toBeInTheDocument();
-          expect(screen.getByText(modalTitle)).toBeInTheDocument();
-        });
-      },
-    );
+      await waitFor(() => {
+        expect(screen.getByText(modalButton)).toBeInTheDocument();
+      });
 
-    it.each(craftingFeatures)(
-      'shows popup when $name count is zero',
-      async ({ name, runtimeKey, automation, config, noRemainingMsg }) => {
-        mockRuntimeStore[runtimeKey] = 0;
+      // The shared modal mock confirms with ALL listed targets.
+      fireEvent.click(screen.getByText(modalButton));
 
-        const playerStats = createPlayerStats({
-          specialActions: [
-            { name, description: 'Distribute.', automation },
-          ],
-          automation: config,
-        });
-        render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      await waitFor(() => {
+        expect(screen.queryByTestId('creature-selection-modal')).not.toBeInTheDocument();
+      });
 
-        fireEvent.click(screen.getByText(new RegExp(name)));
+      const count = granted.length;
+      const plural = count > 1 ? 's' : '';
 
-        await waitFor(() => {
-          expect(capturedPopup).toContain(noRemainingMsg);
-        });
-      },
-    );
-  });
+      // Every granted target receives exactly 1 unit of the resource;
+      // targets beyond the stock are refused nothing.
+      for (const target of characters) {
+        if (granted.includes(target)) {
+          expect(setRuntimeValue).toHaveBeenCalledWith(target, targetKey, 1, 'test');
+        } else {
+          expect(setRuntimeValue).not.toHaveBeenCalledWith(target, targetKey, 1, 'test');
+        }
+      }
 
-  describe('Confirm handlers', () => {
-    it.each(craftingFeatures)(
-      'distributes to single target, decrements counter, logs, and shows popup',
-      async ({ name, runtimeKey, featureKey, targetRuntimeKey, automation, config, modalButton, singular }) => {
-        mockRuntimeStore[runtimeKey] = 2;
+      // Crafter's stock decremented by the number actually granted.
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', stockKey, expectedStock, 'test');
 
-        const playerStats = createPlayerStats({
-          specialActions: [
-            { name, description: 'Distribute.', automation },
-          ],
-          automation: config,
-        });
-        render(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[{ name: 'Ally1' }]} />);
+      // Campaign log entry names the character, feature, and recipients.
+      expect(addEntry).toHaveBeenCalledWith('test', expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'TestCharacter',
+        abilityName: name,
+        description: expect.stringContaining(`distributed ${count} ${itemSingular}${plural} to ${granted.join(', ')}`),
+      }));
 
-        fireEvent.click(screen.getByText(new RegExp(name)));
-
-        await waitFor(() => {
-          expect(screen.getByText(modalButton)).toBeInTheDocument();
-        });
-
-        fireEvent.click(screen.getByText(modalButton));
-
-        await waitFor(() => {
-          expect(screen.queryByTestId('creature-selection-modal')).not.toBeInTheDocument();
-        });
-
-        // Verify setRuntimeValue was called to give Ally1 the resource
-        expect(setRuntimeValue).toHaveBeenCalledWith('Ally1', targetRuntimeKey, 1, 'test');
-
-        // Verify the counter was decremented (2 - 1 = 1)
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', featureKey, 1, 'test');
-
-        // Verify the log entry was created
-        expect(addEntry).toHaveBeenCalledWith('test', expect.objectContaining({
-          type: 'ability_use',
-          characterName: 'TestCharacter',
-          abilityName: name,
-          description: expect.stringContaining(`distributed 1 ${singular} to Ally1`),
-        }));
-
-        // Verify the popup was shown
-        expect(capturedPopup).toContain(name);
-        expect(capturedPopup).toContain('1');
-        expect(capturedPopup).toContain('Ally1');
-      },
-    );
-
-    it.each(craftingFeatures)(
-      'grants to multiple targets and decrements by the count',
-      async ({ name, runtimeKey, featureKey, targetRuntimeKey, automation, config, modalButton, plural }) => {
-        mockRuntimeStore[runtimeKey] = 3;
-
-        const playerStats = createPlayerStats({
-          specialActions: [
-            { name, description: 'Distribute.', automation },
-          ],
-          automation: config,
-        });
-        render(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[{ name: 'Ally1' }, { name: 'Ally2' }]} />);
-
-        fireEvent.click(screen.getByText(new RegExp(name)));
-
-        await waitFor(() => {
-          expect(screen.getByText(modalButton)).toBeInTheDocument();
-        });
-
-        fireEvent.click(screen.getByText(modalButton));
-
-        await waitFor(() => {
-          expect(screen.queryByTestId('creature-selection-modal')).not.toBeInTheDocument();
-        });
-
-        // Verify setRuntimeValue was called for both targets
-        expect(setRuntimeValue).toHaveBeenCalledWith('Ally1', targetRuntimeKey, 1, 'test');
-        expect(setRuntimeValue).toHaveBeenCalledWith('Ally2', targetRuntimeKey, 1, 'test');
-
-        // Verify the counter was decremented by 2 (3 - 2 = 1)
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', featureKey, 1, 'test');
-
-        // Verify plural in log and popup
-        expect(addEntry).toHaveBeenCalledWith('test', expect.objectContaining({
-          description: expect.stringContaining(`distributed 2 ${plural}`),
-        }));
-        expect(capturedPopup).toContain('2');
-      },
-    );
-
-    it.each(craftingFeatures)(
-      'caps distribution at maxTargets when more targets are selected',
-      async ({ name, runtimeKey, featureKey, targetRuntimeKey, automation, config, modalButton }) => {
-        mockRuntimeStore[runtimeKey] = 1;
-
-        const playerStats = createPlayerStats({
-          specialActions: [
-            { name, description: 'Distribute.', automation },
-          ],
-          automation: config,
-        });
-        render(<CharSpecialActions playerStats={playerStats} campaignName="test" characters={[{ name: 'Ally1' }, { name: 'Ally2' }]} />);
-
-        fireEvent.click(screen.getByText(new RegExp(name)));
-
-        await waitFor(() => {
-          expect(screen.getByText(modalButton)).toBeInTheDocument();
-        });
-
-        fireEvent.click(screen.getByText(modalButton));
-
-        await waitFor(() => {
-          expect(screen.queryByTestId('creature-selection-modal')).not.toBeInTheDocument();
-        });
-
-        // Only one available, so only one target should receive it
-        expect(setRuntimeValue).toHaveBeenCalledWith('Ally1', targetRuntimeKey, 1, 'test');
-        // Ally2 should NOT have received a call (only 1 available)
-        expect(setRuntimeValue).not.toHaveBeenCalledWith('Ally2', targetRuntimeKey, 1, 'test');
-
-        // Counter decremented by 1 (1 - 1 = 0)
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', featureKey, 0, 'test');
-      },
-    );
-  });
+      // Confirmation popup reports the grant.
+      expect(capturedPopup).toContain(`Granted ${count} ${popupSingular}${plural} to: ${granted.join(', ')}.`);
+    },
+  );
 });

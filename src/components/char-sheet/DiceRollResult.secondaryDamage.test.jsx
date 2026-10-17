@@ -1,272 +1,193 @@
 import { render } from '@testing-library/react';
 import DiceRollResult from './DiceRollResult.jsx';
 
-describe('DiceRollResult', () => {
-    describe('secondary damage display', () => {
-        it('renders secondary formula with rolls when secondaryRolls is null', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={5}
-                    secondaryFormula="1d8"
-                    secondaryRolls={null}
-                    secondaryTotal={5}
-                    secondaryModifier={0}
-                />
-            );
-            const formulaEl = container.querySelector('.dice-roll-secondary-formula');
-            expect(formulaEl).toBeInTheDocument();
-            expect(formulaEl.textContent).toContain('1d8');
-            expect(formulaEl.textContent).toContain('= 5');
-            expect(formulaEl.textContent).not.toContain('+');
-        });
+// Ownership map for this lane within the DiceRollResult.* test family:
+// OWNS  — SecondaryDamageSection (DiceRollResult.jsx): the whole
+//         .dice-roll-secondary-damage tree — label, .dice-roll-secondary-formula,
+//         .dice-roll-secondary-save-result, .dice-roll-secondary-total and the
+//         combined secondary .dice-roll-damage-applied row — plus the
+//         secondaryFormula presence gate that hides the entire section.
+// DEFER — primary breakdown/totals/crit notices: DiceRollResult.rendering.test.jsx;
+//         primary hit/miss, primary save-result line, primary damage-applied line:
+//         DiceRollResult.combatDisplay.test.jsx; resistance/lore/cantrip info notices:
+//         DiceRollResult.infoDisplay.test.jsx; feature offers, advantage toggles,
+//         click flows and reroll result rows: DiceRollResult.interactive /
+//         .toggles / .rerollResults / *.charge-bonus / *.two-handed /
+//         *.ranged-variant / *.hit-choice chooser lanes.
+// Seam is purely presentational: no fetch, timers, or Math.random path is hit
+// here (the component's only dice roll is the psi-knack click, owned by the
+// interactive lane), so there are no dice spies to restore in afterEach.
 
-        it('omits modifier from secondary formula when secondaryModifier is zero', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={5}
-                    secondaryFormula="1d8"
-                    secondaryRolls={[5]}
-                    secondaryTotal={5}
-                    secondaryModifier={0}
-                />
-            );
-            expect(container.querySelector('.dice-roll-secondary-formula').textContent).not.toContain('+0');
-        });
+function renderSecondary(overrides = {}) {
+    return render(
+        <DiceRollResult
+            name="Longsword"
+            type="attack"
+            rolls={[18]}
+            bonus={5}
+            secondaryFormula="1d8"
+            secondaryRolls={[5]}
+            secondaryTotal={5}
+            secondaryModifier={0}
+            {...overrides}
+        />
+    );
+}
 
-        it('includes negative modifier in secondary formula', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={5}
-                    secondaryFormula="1d8"
-                    secondaryRolls={[3]}
-                    secondaryTotal={1}
-                    secondaryModifier={-2}
-                />
-            );
-            expect(container.querySelector('.dice-roll-secondary-formula').textContent).toContain('-2');
-        });
+describe('DiceRollResult — secondary damage section (owned seam)', () => {
+    const formulaCases = [
+        { label: 'omits zero modifier', rolls: [5], modifier: 0, total: 5, exact: '1d8: 5 = 5' },
+        { label: 'includes positive modifier', rolls: [5], modifier: 3, total: 8, exact: '1d8: 5 +3 = 8' },
+        // Component template is `+${secondaryModifier}`, so a negative modifier
+        // currently renders as "+-2" (cosmetic defect — flagged to product).
+        { label: 'shows negative modifier as "+-2"', rolls: [3], modifier: -2, total: 1, exact: '1d8: 3 +-2 = 1' },
+        { label: 'leaves rolls blank when secondaryRolls is null', rolls: null, modifier: 0, total: 5, exact: '1d8:  = 5' },
+    ];
 
-        it('includes positive modifier in secondary formula', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={5}
-                    secondaryFormula="1d8"
-                    secondaryRolls={[5]}
-                    secondaryTotal={8}
-                    secondaryModifier={3}
-                />
-            );
-            expect(container.querySelector('.dice-roll-secondary-formula').textContent).toContain('+3');
+    it.each(formulaCases)('formats secondary formula — $label', ({ rolls, modifier, total, exact }) => {
+        if (rolls) {
+            expect(total).toBe(rolls.reduce((sum, r) => sum + r, 0) + modifier);
+        }
+        const { container } = renderSecondary({
+            secondaryRolls: rolls,
+            secondaryModifier: modifier,
+            secondaryTotal: total,
         });
+        expect(container.querySelector('.dice-roll-secondary-formula').textContent).toBe(exact);
+    });
 
-        it('shows combined damage applied and HP change when both damages are defined', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Eldritch Blast"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={3}
-                    finalDamage={12}
-                    damageApplied={true}
-                    secondaryFinalDamage={8}
-                    secondaryDamageType="force"
-                    targetName="Dragon"
-                    targetCurrentHp={100}
-                    secondaryFormula="1d8"
-                    secondaryRolls={[8]}
-                    secondaryTotal={8}
-                    secondaryModifier={0}
-                />
-            );
-            const secondaryContainer = container.querySelector('.dice-roll-secondary-damage');
-            const damageEls = secondaryContainer.querySelectorAll('.dice-roll-damage-applied');
-            const secondaryDamageEl = damageEls[damageEls.length - 1];
-            expect(secondaryDamageEl.textContent).toContain('20 damage applied');
-            expect(secondaryDamageEl.textContent).toContain('HP: 120 → 100');
+    // hasTotals = secondaryFinalDamage !== undefined && finalDamage !== undefined;
+    // the applied row additionally requires damageApplied.
+    const visibilityCases = [
+        {
+            label: 'renders total and applied rows when both totals are defined and damage applied',
+            finalDamage: 10,
+            secondaryFinalDamage: 5,
+            damageApplied: true,
+            totalText: '10 slashing damage + 5 radiant damage = 15 total damage',
+            appliedText: '15 damage applied to Goblin',
+        },
+        {
+            label: 'suppresses applied row when damageApplied is false',
+            finalDamage: 10,
+            secondaryFinalDamage: 5,
+            damageApplied: false,
+            totalText: '10 slashing damage + 5 radiant damage = 15 total damage',
+            appliedText: null,
+        },
+        {
+            label: 'suppresses total and applied rows when secondaryFinalDamage is undefined',
+            finalDamage: 10,
+            secondaryFinalDamage: undefined,
+            damageApplied: true,
+            totalText: null,
+            appliedText: null,
+        },
+        {
+            label: 'suppresses total and applied rows when finalDamage is undefined',
+            finalDamage: undefined,
+            secondaryFinalDamage: 5,
+            damageApplied: true,
+            totalText: null,
+            appliedText: null,
+        },
+    ];
+
+    it.each(visibilityCases)('gates total/applied rows — $label', ({ finalDamage, secondaryFinalDamage, damageApplied, totalText, appliedText }) => {
+        const { container } = renderSecondary({
+            damageType: 'slashing',
+            secondaryDamageType: 'radiant',
+            targetName: 'Goblin',
+            finalDamage,
+            secondaryFinalDamage,
+            damageApplied,
         });
+        const section = container.querySelector('.dice-roll-secondary-damage');
+        expect(section.querySelector('.dice-roll-secondary-label').textContent).toBe('Secondary Damage:');
+        expect(section.querySelector('.dice-roll-secondary-formula').textContent).toBe('1d8: 5 = 5');
 
-        it('does not show secondary damage applied when damageApplied is false', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={5}
-                    finalDamage={10}
-                    damageApplied={false}
-                    secondaryFinalDamage={5}
-                    targetName="Goblin"
-                    secondaryFormula="1d8"
-                    secondaryRolls={[5]}
-                    secondaryTotal={5}
-                    secondaryModifier={0}
-                />
-            );
-            const secondaryContainer = container.querySelector('.dice-roll-secondary-damage');
-            expect(secondaryContainer.querySelectorAll('.dice-roll-damage-applied').length).toBe(0);
+        const totalEl = section.querySelector('.dice-roll-secondary-total');
+        if (totalText) {
+            expect(totalEl.textContent).toBe(totalText);
+        } else {
+            expect(totalEl).not.toBeInTheDocument();
+        }
+
+        const appliedEl = section.querySelector('.dice-roll-damage-applied');
+        if (appliedText) {
+            expect(appliedEl.textContent).toBe(appliedText);
+        } else {
+            expect(appliedEl).not.toBeInTheDocument();
+        }
+    });
+
+    it('renders no secondary section without secondaryFormula', () => {
+        const { container } = renderSecondary({
+            secondaryFormula: undefined,
+            secondaryRolls: undefined,
+            secondaryTotal: undefined,
         });
+        expect(container.querySelector('.dice-roll-secondary-damage')).not.toBeInTheDocument();
+    });
 
-        it('does not show secondary damage applied when secondaryFinalDamage is undefined', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={5}
-                    finalDamage={10}
-                    damageApplied={true}
-                    targetName="Goblin"
-                    secondaryFormula="1d8"
-                    secondaryRolls={[5]}
-                    secondaryTotal={5}
-                    secondaryModifier={0}
-                />
-            );
-            const secondaryContainer = container.querySelector('.dice-roll-secondary-damage');
-            expect(secondaryContainer.querySelectorAll('.dice-roll-damage-applied').length).toBe(0);
+    const saveCases = [
+        { label: 'success', saveResult: { success: true, total: 16, roll: 12, bonus: 4 }, text: '✓ SAVE SUCCESS (16 vs DC 14)', cls: 'save-success' },
+        { label: 'failure', saveResult: { success: false, total: 10, roll: 6, bonus: 4 }, text: '✗ SAVE FAILURE (10 vs DC 14)', cls: 'save-failure' },
+    ];
+
+    it.each(saveCases)('renders secondary save row — $label', ({ saveResult, text, cls }) => {
+        expect(saveResult.total >= 14).toBe(saveResult.success); // save data consistent with DC 14
+        const { container } = renderSecondary({
+            name: 'Fireball',
+            type: 'damage',
+            rolls: [6],
+            bonus: 0,
+            secondaryFormula: '1d6',
+            secondaryRolls: [4],
+            secondaryTotal: 4,
+            secondarySaveResult: saveResult,
+            saveDc: 14,
         });
+        const saveEl = container.querySelector('.dice-roll-secondary-save-result');
+        expect(saveEl.textContent).toBe(text);
+        expect(saveEl.className).toContain(cls);
+    });
 
-        it('shows secondary total damage line with damage types when both damages are defined', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={5}
-                    finalDamage={10}
-                    damageType="slashing"
-                    secondaryFinalDamage={5}
-                    secondaryDamageType="radiant"
-                    damageApplied={true}
-                    targetName="Goblin"
-                    secondaryFormula="1d8"
-                    secondaryRolls={[5]}
-                    secondaryTotal={5}
-                    secondaryModifier={0}
-                />
-            );
-            const totalEl = container.querySelector('.dice-roll-secondary-total');
-            expect(totalEl).toBeInTheDocument();
-            expect(totalEl.textContent).toContain('10 slashing damage');
-            expect(totalEl.textContent).toContain('5 radiant damage');
-            expect(totalEl.textContent).toContain('15 total damage');
+    it('omits the secondary save row when secondarySaveResult is null', () => {
+        const { container } = renderSecondary({
+            name: 'Fireball',
+            type: 'damage',
+            rolls: [6],
+            bonus: 0,
+            secondaryFormula: '1d6',
+            secondaryRolls: [4],
+            secondaryTotal: 4,
+            secondarySaveResult: null,
         });
+        expect(container.querySelector('.dice-roll-secondary-save-result')).not.toBeInTheDocument();
+    });
 
-        it('omits secondary total when only primary damageType is missing', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={5}
-                    finalDamage={10}
-                    secondaryFinalDamage={5}
-                    secondaryDamageType="radiant"
-                    damageApplied={true}
-                    targetName="Goblin"
-                    secondaryFormula="1d8"
-                    secondaryRolls={[5]}
-                    secondaryTotal={5}
-                    secondaryModifier={0}
-                />
-            );
-            const totalEl = container.querySelector('.dice-roll-secondary-total');
-            expect(totalEl).toBeInTheDocument();
-            expect(totalEl.textContent).toContain('radiant damage');
-            expect(totalEl.textContent).toContain('total damage');
+    it('applies combined primary+secondary totals with HP cross-check', () => {
+        const { container } = renderSecondary({
+            name: 'Eldritch Blast',
+            bonus: 3,
+            finalDamage: 12,
+            damageApplied: true,
+            secondaryFinalDamage: 8,
+            secondaryDamageType: 'force',
+            secondaryRolls: [8],
+            secondaryTotal: 8,
+            targetName: 'Dragon',
+            targetCurrentHp: 100,
         });
-
-        it('shows secondary save result with success class on save success', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    secondaryFormula="1d6"
-                    secondaryRolls={[4]}
-                    secondaryTotal={4}
-                    secondaryModifier={0}
-                    secondarySaveResult={{ success: true, total: 16, roll: 12, bonus: 4 }}
-                    saveDc={14}
-                />
-            );
-            const saveEl = container.querySelector('.dice-roll-secondary-save-result');
-            expect(saveEl).toBeInTheDocument();
-            expect(saveEl.textContent).toContain('SAVE SUCCESS');
-            expect(saveEl.textContent).toContain('16 vs DC 14');
-            expect(saveEl.className).toContain('save-success');
-        });
-
-        it('shows secondary save result with failure class on save failure', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    secondaryFormula="1d6"
-                    secondaryRolls={[4]}
-                    secondaryTotal={4}
-                    secondaryModifier={0}
-                    secondarySaveResult={{ success: false, total: 10, roll: 6, bonus: 4 }}
-                    saveDc={14}
-                />
-            );
-            const saveEl = container.querySelector('.dice-roll-secondary-save-result');
-            expect(saveEl).toBeInTheDocument();
-            expect(saveEl.textContent).toContain('SAVE FAILURE');
-            expect(saveEl.textContent).toContain('10 vs DC 14');
-            expect(saveEl.className).toContain('save-failure');
-        });
-
-        it('does not render secondary save result element when secondarySaveResult is null', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Fireball"
-                    type="damage"
-                    rolls={[6]}
-                    bonus={0}
-                    secondaryFormula="1d6"
-                    secondaryRolls={[4]}
-                    secondaryTotal={4}
-                    secondaryModifier={0}
-                    secondarySaveResult={null}
-                />
-            );
-            expect(container.querySelector('.dice-roll-secondary-save-result')).not.toBeInTheDocument();
-        });
-
-        it('renders secondary formula section when only secondaryFormula is provided without finalDamage', () => {
-            const { container } = render(
-                <DiceRollResult
-                    name="Longsword"
-                    type="attack"
-                    rolls={[18]}
-                    bonus={5}
-                    secondaryFormula="1d8"
-                    secondaryRolls={[5]}
-                    secondaryTotal={5}
-                    secondaryModifier={0}
-                />
-            );
-            const secondaryContainer = container.querySelector('.dice-roll-secondary-damage');
-            expect(secondaryContainer).toBeInTheDocument();
-            expect(secondaryContainer.querySelector('.dice-roll-secondary-label')).toBeInTheDocument();
-            expect(secondaryContainer.querySelector('.dice-roll-secondary-formula')).toBeInTheDocument();
-        });
-
+        const section = container.querySelector('.dice-roll-secondary-damage');
+        expect(section.querySelector('.dice-roll-secondary-formula').textContent).toBe('1d8: 8 = 8');
+        expect(section.querySelector('.dice-roll-secondary-total').textContent).toBe('12  damage + 8 force damage = 20 total damage');
+        // 20 on the total line = 12 primary + 8 secondary, and 20 again on the
+        // applied line with HP 100 + 20 → 100 — one consistent arithmetic story.
+        expect(section.querySelector('.dice-roll-damage-applied').textContent).toBe('20 damage applied to Dragon — HP: 120 → 100');
+        // The primary lane (combatDisplay-owned) renders its own row untouched.
+        const primaryRow = [...container.querySelectorAll('.dice-roll-damage-applied')].find(el => !section.contains(el));
+        expect(primaryRow.textContent).toBe('12 damage applied to Dragon — HP: 112 → 100');
     });
 });

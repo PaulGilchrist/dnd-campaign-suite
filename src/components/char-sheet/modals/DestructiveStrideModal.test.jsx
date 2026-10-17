@@ -1,175 +1,260 @@
+/**
+ * Ownership: DestructiveStrideModal.jsx — the damage-type picker UI: exact
+ * option rendering, Choose Type gating/disabled state, verbatim pass-through
+ * args to the handler seam, same-object payload identity through onConfirm,
+ * unconditional onClose after skip, and inertness on overlay/panel clicks.
+ *
+ * Deferred (canon lives upstream): destructiveStrideHandler lanes pin
+ * applyDamageTypeChoice/skipTargetChoice internals (runtime stamps, buffs,
+ * campaign log); CharSpecialActions modals/modalOnClose elemental lanes pin
+ * the caller seams (open/close wiring, destructiveStrideTarget handoff).
+ */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import DestructiveStrideModal from './DestructiveStrideModal.jsx';
 import { applyDamageTypeChoice, skipTargetChoice } from '../../../services/automation/handlers/combat/destructiveStrideHandler.js';
 
-// Mock the handler functions that the modal calls
+// Mock the handler functions that the modal calls — payload shapes mirror the
+// real contracts; behaviour of those payloads is pinned in the handler tests.
 vi.mock('../../../services/automation/handlers/combat/destructiveStrideHandler.js', () => ({
     applyDamageTypeChoice: vi.fn(),
     skipTargetChoice: vi.fn(),
 }));
 
-// ── Test fixtures ──
-
-const mockAction = { name: 'Destructive Stride' };
-const mockPlayerStats = { name: 'TestMonk', level: 5 };
-const mockOnClose = vi.fn();
-const mockOnConfirm = vi.fn();
-
-const baseProps = {
-    action: mockAction,
-    playerStats: mockPlayerStats,
-    campaignName: 'test-campaign',
-    onConfirm: mockOnConfirm,
-    onClose: mockOnClose,
-};
+// Component-private DAMAGE_TYPES/DAMAGE_DATA mirrored as fixtures — drift
+// here fails the radio-name assertions below, which is the point.
+const DAMAGE_OPTIONS = [
+    { type: 'Acid', description: 'Corrosive acid damage.' },
+    { type: 'Cold', description: 'Biting cold damage.' },
+    { type: 'Fire', description: 'Searing fire damage.' },
+    { type: 'Lightning', description: 'Crackling lightning damage.' },
+    { type: 'Thunder', description: 'Deafening thunder damage.' },
+];
 
 function makeProps(overrides) {
-    return { ...baseProps, ...(overrides || {}) };
+    return {
+        action: { name: 'Destructive Stride' },
+        playerStats: { name: 'TestMonk', level: 5 },
+        campaignName: 'test-campaign',
+        onConfirm: vi.fn(),
+        onClose: vi.fn(),
+        ...overrides,
+    };
 }
 
-// ── Helpers ──
-
-function selectDamageType(type) {
-    const label = screen.getByRole('radio', { name: new RegExp(`^\\s*${type}\\s*`, 'i') })?.closest('label')
-        || screen.getByText(type).closest('label');
-    const radio = label.querySelector('input[type="radio"]');
-    fireEvent.click(radio);
+// Each radio is labelled by its wrapping <label>: "<Type> — <description>."
+function radioFor(option) {
+    return screen.getByRole('radio', { name: `${option.type} — ${option.description}` });
 }
 
-// ── Tests ──
+function chooseTypeButton() {
+    return screen.getByRole('button', { name: 'Choose Type' });
+}
+
+function skipButton() {
+    return screen.getByRole('button', { name: 'Skip Target' });
+}
+
+afterEach(() => {
+    applyDamageTypeChoice.mockReset();
+    skipTargetChoice.mockReset();
+});
 
 describe('DestructiveStrideModal', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
 
     // ── Initial render ──
 
     describe('initial render', () => {
-        it('renders the instruction text and all five damage type options with descriptions', () => {
+        it('renders the instruction, the proximity note, and exactly the five damage radios', () => {
             render(<DestructiveStrideModal {...makeProps()} />);
+
             expect(screen.getByText('Choose the damage type for Destructive Stride:')).toBeInTheDocument();
-            const damageTypes = ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'];
-            for (const type of damageTypes) {
-                expect(screen.getByText(type)).toBeInTheDocument();
+            expect(screen.getByText('Note: Choose a creature only if the monk comes within 5 ft. of them while striding.')).toBeInTheDocument();
+
+            const radios = screen.getAllByRole('radio');
+            expect(radios).toHaveLength(DAMAGE_OPTIONS.length);
+            for (const option of DAMAGE_OPTIONS) {
+                expect(radioFor(option)).toBeInTheDocument();
+                expect(radioFor(option)).not.toBeChecked();
             }
-            expect(screen.getByText(/Corrosive acid damage/)).toBeInTheDocument();
-            expect(screen.getByText(/Biting cold damage/)).toBeInTheDocument();
-            expect(screen.getByText(/Searing fire damage/)).toBeInTheDocument();
-            expect(screen.getByText(/Crackling lightning damage/)).toBeInTheDocument();
-            expect(screen.getByText(/Deafening thunder damage/)).toBeInTheDocument();
         });
 
-        it('disables the Choose Type button and shows the proximity note on initial render', () => {
-            render(<DestructiveStrideModal {...makeProps()} />);
-            expect(screen.getByRole('button', { name: /Choose Type/ })).toBeDisabled();
-            expect(screen.getByText(/Choose a creature only if the monk comes within 5 ft/)).toBeInTheDocument();
-        });
+        it.each(DAMAGE_OPTIONS)(
+            'selecting $type checks only that radio and arms Choose Type',
+            async (option) => {
+                render(<DestructiveStrideModal {...makeProps()} />);
 
-        it('displays custom action name when provided', () => {
-            render(<DestructiveStrideModal {...makeProps({ action: { name: 'Custom Stride' } })} />);
-            expect(screen.getByText('Custom Stride')).toBeInTheDocument();
-        });
-    });
+                expect(chooseTypeButton()).toBeDisabled();
+                fireEvent.click(radioFor(option));
 
-    // ── Radio selection ──
-
-    describe('radio selection', () => {
-        it('enables the Choose Type button after selecting a damage type', () => {
-            render(<DestructiveStrideModal {...makeProps()} />);
-            const chooseBtn = screen.getByRole('button', { name: /Choose Type/ });
-            expect(chooseBtn).toBeDisabled();
-            selectDamageType('Fire');
-            expect(chooseBtn).not.toBeDisabled();
-        });
+                expect(radioFor(option)).toBeChecked();
+                expect(screen.getAllByRole('radio').filter(r => r.checked)).toEqual([radioFor(option)]);
+                expect(chooseTypeButton()).not.toBeDisabled();
+            },
+        );
 
         it('switches selection when a different option is clicked', () => {
             render(<DestructiveStrideModal {...makeProps()} />);
-            selectDamageType('Acid');
-            const acidRadio = screen.getByRole('radio', { name: /Acid/ });
-            expect(acidRadio).toBeChecked();
-            selectDamageType('Fire');
-            const fireRadio = screen.getByRole('radio', { name: /Fire/ });
-            expect(fireRadio).toBeChecked();
-            expect(acidRadio).not.toBeChecked();
+
+            const [acid, fire] = DAMAGE_OPTIONS;
+            fireEvent.click(radioFor(acid));
+            fireEvent.click(radioFor(fire));
+
+            expect(radioFor(acid)).not.toBeChecked();
+            expect(radioFor(fire)).toBeChecked();
+        });
+
+        it.each([
+            ['no action', undefined],
+            ['action without a name', {}],
+        ])('falls back to the canonical title with %s', (_label, action) => {
+            render(<DestructiveStrideModal {...makeProps({ action })} />);
+            expect(screen.getByText('Destructive Stride')).toBeInTheDocument();
+        });
+
+        it('displays a custom action name in the header when provided', () => {
+            render(<DestructiveStrideModal {...makeProps({ action: { name: 'Custom Stride' } })} />);
+            expect(screen.getByText('Custom Stride')).toBeInTheDocument();
         });
     });
 
     // ── Confirm flow (handleApply) ──
 
     describe('confirm flow', () => {
-        it('calls applyDamageTypeChoice and onConfirm when a type is selected and Choose Type is clicked', async () => {
-            applyDamageTypeChoice.mockResolvedValue({ type: 'modal', modalName: 'destructiveStrideTarget' });
+        it.each(DAMAGE_OPTIONS)(
+            'confirms $type with verbatim pass-through args and forwards the modal result identity',
+            async (option) => {
+                const props = makeProps();
+                const result = {
+                    type: 'modal',
+                    modalName: 'destructiveStrideTarget',
+                    payload: { chosenType: option.type, targets: [] },
+                };
+                applyDamageTypeChoice.mockResolvedValue(result);
 
-            render(<DestructiveStrideModal {...makeProps()} />);
-            selectDamageType('Fire');
-            fireEvent.click(screen.getByRole('button', { name: /Choose Type/ }));
+                render(<DestructiveStrideModal {...props} />);
+                fireEvent.click(radioFor(option));
+                fireEvent.click(chooseTypeButton());
 
-            await waitFor(() => {
+                await waitFor(() => expect(applyDamageTypeChoice).toHaveBeenCalledTimes(1));
                 expect(applyDamageTypeChoice).toHaveBeenCalledWith(
-                    mockAction,
-                    mockPlayerStats,
-                    'test-campaign',
-                    'Fire',
+                    props.action,
+                    props.playerStats,
+                    props.campaignName,
+                    option.type,
                 );
-                expect(mockOnConfirm).toHaveBeenCalledWith({ type: 'modal', modalName: 'destructiveStrideTarget' });
-            });
+                await waitFor(() => expect(props.onConfirm).toHaveBeenCalledTimes(1));
+                expect(props.onConfirm.mock.calls[0][0]).toBe(result);
+                expect(props.onClose).not.toHaveBeenCalled();
+                expect(skipTargetChoice).not.toHaveBeenCalled();
+            },
+        );
+
+        it('forwards a popup result from applyDamageTypeChoice unchanged (modal stays the caller\'s to close)', async () => {
+            const props = makeProps();
+            const result = { type: 'popup', payload: { type: 'automation_info' } };
+            applyDamageTypeChoice.mockResolvedValue(result);
+
+            render(<DestructiveStrideModal {...props} />);
+            fireEvent.click(radioFor(DAMAGE_OPTIONS[2])); // Fire
+            fireEvent.click(chooseTypeButton());
+
+            await waitFor(() => expect(props.onConfirm).toHaveBeenCalledTimes(1));
+            expect(props.onConfirm.mock.calls[0][0]).toBe(result);
+            expect(props.onClose).not.toHaveBeenCalled();
         });
 
-        it('does not call onConfirm when applyDamageTypeChoice returns null', async () => {
-            applyDamageTypeChoice.mockResolvedValue(null);
+        it.each([
+            ['null', null],
+            ['undefined', undefined],
+            ['a non-forwarded result type', { type: 'none' }],
+        ])('stays open and silent when applyDamageTypeChoice returns %s', async (_label, result) => {
+            const props = makeProps();
+            applyDamageTypeChoice.mockResolvedValue(result);
 
-            render(<DestructiveStrideModal {...makeProps()} />);
-            selectDamageType('Fire');
-            fireEvent.click(screen.getByRole('button', { name: /Choose Type/ }));
+            render(<DestructiveStrideModal {...props} />);
+            fireEvent.click(radioFor(DAMAGE_OPTIONS[2])); // Fire
+            fireEvent.click(chooseTypeButton());
 
-            await waitFor(() => {
-                expect(mockOnConfirm).not.toHaveBeenCalled();
-            });
+            await waitFor(() => expect(applyDamageTypeChoice).toHaveBeenCalledTimes(1));
+            expect(props.onConfirm).not.toHaveBeenCalled();
+            expect(props.onClose).not.toHaveBeenCalled();
+            // Selection is preserved so the player can retry.
+            expect(radioFor(DAMAGE_OPTIONS[2])).toBeChecked();
+            expect(chooseTypeButton()).not.toBeDisabled();
         });
 
-        it('does not call applyDamageTypeChoice when no option is selected', async () => {
-            render(<DestructiveStrideModal {...makeProps()} />);
-            fireEvent.click(screen.getByRole('button', { name: /Choose Type/ }));
-            await Promise.resolve();
+        it('is inert before any selection: Choose Type starts disabled and never invokes the handler', () => {
+            const props = makeProps();
+
+            render(<DestructiveStrideModal {...props} />);
+            expect(chooseTypeButton()).toBeDisabled();
+            fireEvent.click(chooseTypeButton());
 
             expect(applyDamageTypeChoice).not.toHaveBeenCalled();
+            expect(props.onConfirm).not.toHaveBeenCalled();
+            expect(props.onClose).not.toHaveBeenCalled();
         });
     });
 
     // ── Skip flow (handleSkip) ──
 
     describe('skip flow', () => {
-        it('calls skipTargetChoice with correct args and onConfirm when result is popup', async () => {
-            skipTargetChoice.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
+        it('calls skipTargetChoice with verbatim args, forwards the popup result, and closes unconditionally', async () => {
+            const props = makeProps();
+            const result = { type: 'popup', payload: { type: 'automation_info' } };
+            skipTargetChoice.mockResolvedValue(result);
 
-            render(<DestructiveStrideModal {...makeProps()} />);
-            fireEvent.click(screen.getByRole('button', { name: /Skip Target/ }));
+            render(<DestructiveStrideModal {...props} />);
+            fireEvent.click(skipButton());
 
-            await waitFor(() => {
-                expect(skipTargetChoice).toHaveBeenCalledWith(
-                    mockAction,
-                    mockPlayerStats,
-                    'test-campaign',
-                );
-                expect(mockOnConfirm).toHaveBeenCalledWith({ type: 'popup', payload: { type: 'automation_info' } });
-            });
+            await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
+            expect(skipTargetChoice).toHaveBeenCalledWith(
+                props.action,
+                props.playerStats,
+                props.campaignName,
+            );
+            expect(props.onConfirm).toHaveBeenCalledTimes(1);
+            expect(props.onConfirm.mock.calls[0][0]).toBe(result);
+            expect(applyDamageTypeChoice).not.toHaveBeenCalled();
+        });
+
+        it('still closes without confirming when skipTargetChoice returns no result', async () => {
+            const props = makeProps();
+            skipTargetChoice.mockResolvedValue(null);
+
+            render(<DestructiveStrideModal {...props} />);
+            fireEvent.click(skipButton());
+
+            await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
+            expect(props.onConfirm).not.toHaveBeenCalled();
         });
     });
 
-    // ── Overlay click behavior ──
+    // ── Inertness: overlay, panel, and the absence of a close affordance ──
 
-    describe('overlay click behavior', () => {
-        it('does not call skipTargetChoice or onClose when the overlay background is clicked', () => {
-            skipTargetChoice.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
+    describe('inertness', () => {
+        it('overlay and panel clicks are inert and preserve the pending selection', () => {
+            const props = makeProps();
 
-            render(<DestructiveStrideModal {...makeProps()} />);
-            fireEvent.click(document.querySelector('.sp-overlay'));
+            const { container } = render(<DestructiveStrideModal {...props} />);
+            fireEvent.click(radioFor(DAMAGE_OPTIONS[2])); // Fire
+
+            const overlay = container.firstChild;
+            const panel = overlay.firstChild;
+            fireEvent.click(overlay);
+            fireEvent.click(panel);
 
             expect(skipTargetChoice).not.toHaveBeenCalled();
-            expect(mockOnClose).not.toHaveBeenCalled();
-            expect(screen.getByRole('button', { name: /Skip Target/ })).toBeInTheDocument();
+            expect(applyDamageTypeChoice).not.toHaveBeenCalled();
+            expect(props.onConfirm).not.toHaveBeenCalled();
+            expect(props.onClose).not.toHaveBeenCalled();
+            expect(radioFor(DAMAGE_OPTIONS[2])).toBeChecked();
+        });
+
+        it('offers no close button — dismissal is via Skip Target only', () => {
+            render(<DestructiveStrideModal {...makeProps()} />);
+            expect(screen.queryByRole('button', { name: /close|dismiss|cancel/i })).not.toBeInTheDocument();
         });
     });
 });

@@ -1,5 +1,11 @@
-// CLA-195 regression: handleReroll must consume Indomitable uses
-// (indomitableUses), enforce the per-long-rest max, and log each use.
+// @maintained-by-ai
+// CLA-195 regression + featureRiders #58 lane ownership: handleReroll must
+// consume Indomitable uses against the level-tier cap (indomitableUses),
+// spend exactly one focus point per Disciplined Survivor reroll (focusPoints,
+// refusing at zero), log every reroll by feature name, and never write a
+// sibling lane's resource. The raging lane's fanaticalFocusUsed store write
+// is owned by CharSheet.featureRiders.test.jsx — only the Fanatical Focus
+// log name and lane isolation are asserted here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handleReroll } from './CharSheet.handlers';
@@ -70,84 +76,91 @@ const createFighter = (level) => createMockPlayerStats({
 });
 
 // ---------------------------------------------------------------------------
-// Tests — handleReroll (Indomitable)
+// Tests — handleReroll reroll lanes
 // ---------------------------------------------------------------------------
 
-describe('handleReroll — Indomitable use consumption (CLA-195)', () => {
+describe('handleReroll — reroll lane resource consumption (CLA-195)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStore.clear();
   });
 
-  it('increments indomitableUses and logs an ability_use entry', () => {
-    const stats = createFighter(18);
+  it.each([
+    { level: 9, max: 1 },
+    { level: 12, max: 1 },
+    { level: 13, max: 2 },
+    { level: 17, max: 3 },
+  ])('Indomitable: lv$level consumes exactly $max use(s) per long rest and refuses the next silently', ({ level, max }) => {
+    const stats = createFighter(level);
     const conditionEffects = { autoRerollCondition: '', autoRerollBonus: 18 };
 
-    handleReroll(stats, campaignName, conditionEffects, { roll: 14, total: 37 });
+    // max successful rerolls plus one attempt over the cap.
+    for (let attempt = 0; attempt <= max; attempt++) {
+      handleReroll(stats, campaignName, conditionEffects, { roll: 14, total: 37 });
+    }
 
-    expect(mockStore.get('EvasiveFighter:indomitableUses')).toBe(1);
-    expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+    // Accumulates 1..max, stops at the cap, and the over-cap attempt logs nothing.
+    expect(mockStore.get('EvasiveFighter:indomitableUses')).toBe(max);
+    expect(addEntry).toHaveBeenCalledTimes(max);
+    addEntry.mock.calls.forEach(([, entry], i) => {
+      expect(entry).toMatchObject({
+        type: 'ability_use',
+        characterName: 'EvasiveFighter',
+        abilityName: 'Indomitable',
+      });
+      expect(entry.description).toContain('(+18)');
+      expect(entry.description).toContain(`Uses used: ${i + 1}/${max}`);
+      expect(entry.description).toContain('New d20 14, total 37');
+    });
+
+    // Lane isolation: the Indomitable lane never touches sibling resources.
+    expect(mockStore.get('EvasiveFighter:focusPoints')).toBeUndefined();
+    expect(mockStore.get('EvasiveFighter:fanaticalFocusUsed')).toBeUndefined();
+  });
+
+  it('raging reroll logs Fanatical Focus without touching focusPoints or indomitableUses', () => {
+    const stats = createFighter(18);
+
+    handleReroll(stats, campaignName, { autoRerollCondition: 'raging' }, { roll: 8, total: 11 });
+
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    const entry = addEntry.mock.calls[0][1];
+    expect(entry).toMatchObject({
       type: 'ability_use',
       characterName: 'EvasiveFighter',
-      abilityName: 'Indomitable',
-    }));
-    expect(addEntry.mock.calls[0][1].description).toContain('Indomitable');
-    expect(addEntry.mock.calls[0][1].description).toContain('+18');
+      abilityName: 'Fanatical Focus',
+    });
+    expect(entry.description).toContain('Fanatical Focus');
+    expect(entry.description).toContain('New d20 8, total 11');
+    // Lane isolation only — the fanaticalFocusUsed write itself is owned by
+    // CharSheet.featureRiders.test.jsx.
+    expect(mockStore.get('EvasiveFighter:focusPoints')).toBeUndefined();
+    expect(mockStore.get('EvasiveFighter:indomitableUses')).toBeUndefined();
   });
 
-  it('increments repeatedly up to the lv18 max of 3 uses', () => {
+  it('disciplined_survivor spends exactly one focus point per reroll and refuses at zero focus', () => {
     const stats = createFighter(18);
-    const conditionEffects = { autoRerollCondition: '', autoRerollBonus: 18 };
+    mockStore.set('EvasiveFighter:focusPoints', 1);
 
-    handleReroll(stats, campaignName, conditionEffects);
-    handleReroll(stats, campaignName, conditionEffects);
-    handleReroll(stats, campaignName, conditionEffects);
+    handleReroll(stats, campaignName, { autoRerollCondition: 'disciplined_survivor' }, { roll: 5, total: 9 });
 
-    expect(mockStore.get('EvasiveFighter:indomitableUses')).toBe(3);
-  });
+    expect(mockStore.get('EvasiveFighter:focusPoints')).toBe(0);
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    const entry = addEntry.mock.calls[0][1];
+    expect(entry).toMatchObject({
+      type: 'ability_use',
+      characterName: 'EvasiveFighter',
+      abilityName: 'Disciplined Survivor',
+    });
+    expect(entry.description).toContain('1 Focus Point');
+    expect(entry.description).toContain('New d20 5, total 9');
 
-  it('does not increment beyond the per-long-rest max and writes no log', () => {
-    const stats = createFighter(18);
-    const conditionEffects = { autoRerollCondition: '', autoRerollBonus: 18 };
-    mockStore.set('EvasiveFighter:indomitableUses', 3);
-
-    handleReroll(stats, campaignName, conditionEffects);
-
-    expect(mockStore.get('EvasiveFighter:indomitableUses')).toBe(3);
-    expect(addEntry).not.toHaveBeenCalled();
-  });
-
-  it('enforces max 1 use at fighter lv9-12', () => {
-    const stats = createFighter(9);
-    const conditionEffects = { autoRerollCondition: '', autoRerollBonus: 9 };
-
-    handleReroll(stats, campaignName, conditionEffects);
-    handleReroll(stats, campaignName, conditionEffects);
-
-    expect(mockStore.get('EvasiveFighter:indomitableUses')).toBe(1);
-  });
-
-  it('enforces max 2 uses at fighter lv13-16', () => {
-    const stats = createFighter(13);
-    const conditionEffects = { autoRerollCondition: '', autoRerollBonus: 13 };
-
-    handleReroll(stats, campaignName, conditionEffects);
-    handleReroll(stats, campaignName, conditionEffects);
-    handleReroll(stats, campaignName, conditionEffects);
-
-    expect(mockStore.get('EvasiveFighter:indomitableUses')).toBe(2);
-  });
-
-  it('logs Fanatical Focus and Disciplined Survivor rerolls by feature name', () => {
-    const stats = createFighter(18);
-    mockStore.set('EvasiveFighter:focusPoints', 2);
-
-    handleReroll(stats, campaignName, { autoRerollCondition: 'raging' });
-    expect(addEntry.mock.calls[0][1].abilityName).toBe('Fanatical Focus');
-
+    // Zero-focus guard: no second spend, no second log.
     handleReroll(stats, campaignName, { autoRerollCondition: 'disciplined_survivor' });
-    expect(addEntry.mock.calls[1][1].abilityName).toBe('Disciplined Survivor');
-    expect(mockStore.get('EvasiveFighter:focusPoints')).toBe(1);
-    expect(mockStore.get('EvasiveFighter:indomitableUses') ?? null).toBe(null);
+
+    expect(mockStore.get('EvasiveFighter:focusPoints')).toBe(0);
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    // Lane isolation: this lane never consumes Indomitable.
+    expect(mockStore.get('EvasiveFighter:indomitableUses')).toBeUndefined();
   });
 });

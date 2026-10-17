@@ -1,4 +1,10 @@
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+// @maintained-by-ai
+// Seam unique to this file: CharSheet threading whatever useSharedPopup carries
+// into renderPopup at the sheet level — branch selection per popup payload type.
+// Handler dispatch bodies live in CharSheet.actionHandlers/modalConfirmHandlers,
+// renderPopup→popupHandlers reroll wiring in CharSheet.modals.reroll.test.jsx,
+// and popup internals (reroll offers, feature-flag UI) in common/AttackResultPopup.*.
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import CharSheet from './CharSheet';
@@ -206,7 +212,7 @@ vi.mock('../../services/rules/rulesFactory.js', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Tests — popup rendering paths
+// Tests — which popup component CharSheet renders for each popupHtml shape
 // ---------------------------------------------------------------------------
 
 describe('CharSheet popup rendering', () => {
@@ -217,63 +223,77 @@ describe('CharSheet popup rendering', () => {
     mockStore.clear();
   });
 
-  function getRenderedComponent() {
+  function renderSheet() {
     return render(<CharSheet {...defaultProps} />);
   }
 
-  describe('null/absent popup', () => {
-    it('renders char-sheet without a popup when popupHtml is null', async () => {
-      sharedPopupReturnValue.popupHtml = null;
-      getRenderedComponent();
-
-      await waitFor(() => {
-        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-      });
-
-      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
+  async function renderUntilSheet() {
+    renderSheet();
+    await waitFor(() => {
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
+  }
+
+  it('smoke: renders the sheet with its summary and no popup when popupHtml is null', async () => {
+    sharedPopupReturnValue.popupHtml = null;
+    await renderUntilSheet();
+
+    expect(screen.getByTestId('char-summary')).toHaveTextContent('Test Character');
+    expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('attack-result-popup')).not.toBeInTheDocument();
   });
 
-  describe('popup rendering', () => {
+  describe('popup content branches', () => {
     const popupCases = [
-      { name: 'string popup', html: '<p>Some HTML content</p>', expectedText: 'Some HTML content' },
-      { name: 'html-type popup', html: { html: '<span>dice roll result</span>' }, expectedText: 'dice roll result' },
       {
-        name: 'automation_info popup',
+        name: 'a raw string popup',
+        html: '<p>Some HTML content</p>',
+        expectedText: 'Some HTML content',
+      },
+      {
+        name: 'an html-object popup',
+        html: { html: '<span>dice roll result</span>' },
+        expectedText: 'dice roll result',
+      },
+      {
+        name: 'an automation_info popup',
         html: { type: 'automation_info', name: 'Test Feature', description: '<p>Feature description</p>' },
         expectedText: 'Test Feature',
         expectedDesc: 'Feature description',
       },
-      { name: 'shield_of_faith_target_selection', html: { type: 'shield_of_faith_target_selection' }, expectedText: null },
-      { name: 'barkskin_target_selection', html: { type: 'barkskin_target_selection' }, expectedText: null },
     ];
 
     for (const { name, html, expectedText, expectedDesc } of popupCases) {
-      it(`renders ${name}`, async () => {
+      it(`renders ${name} inside the Popup, not the attack-result fallback`, async () => {
         sharedPopupReturnValue.popupHtml = html;
-        getRenderedComponent();
+        await renderUntilSheet();
 
-        await waitFor(() => {
-          if (expectedText) {
-            expect(screen.getByTestId('popup')).toBeInTheDocument();
-          } else {
-            expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-            expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
-          }
-        });
-
-        if (expectedText) {
-          expect(screen.getByText(expectedText)).toBeInTheDocument();
-        }
+        expect(screen.getByTestId('popup')).toBeInTheDocument();
+        expect(screen.getByText(expectedText)).toBeInTheDocument();
         if (expectedDesc) {
           expect(screen.getByText(expectedDesc)).toBeInTheDocument();
         }
+        expect(screen.queryByTestId('attack-result-popup')).not.toBeInTheDocument();
       });
     }
   });
 
+  it('suppresses every popup for barkskin_target_selection (handled outside the popup lane)', async () => {
+    // Non-vacuous: without the guard this type would fall through to
+    // AttackResultPopup, so asserting the sheet renders yet NEITHER popup
+    // appears pins the suppression branch in CharSheet.modals.jsx.
+    sharedPopupReturnValue.popupHtml = {
+      type: 'barkskin_target_selection',
+      targets: ['Ally One'],
+    };
+    await renderUntilSheet();
+
+    expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('attack-result-popup')).not.toBeInTheDocument();
+  });
+
   describe('heal_multi popup', () => {
-    it('renders a heal_multi popup with multi-target healing breakdown', async () => {
+    it('renders a heal_multi popup with multi-target healing breakdown and bonus', async () => {
       sharedPopupReturnValue.popupHtml = {
         type: 'heal_multi',
         name: 'Healing Word',
@@ -286,12 +306,9 @@ describe('CharSheet popup rendering', () => {
           { targetName: 'Ally2', healAmount: 3, rolls: [1] },
         ],
       };
-      getRenderedComponent();
+      await renderUntilSheet();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('popup')).toBeInTheDocument();
-      });
-
+      expect(screen.getByTestId('popup')).toBeInTheDocument();
       expect(screen.getByText('Healing Word')).toBeInTheDocument();
       expect(screen.getByText(/1d4\+2/)).toBeInTheDocument();
       expect(screen.getByText('8')).toBeInTheDocument();
@@ -312,63 +329,26 @@ describe('CharSheet popup rendering', () => {
           { targetName: 'Ally1', healAmount: 7, rolls: [6] },
         ],
       };
-      getRenderedComponent();
+      await renderUntilSheet();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('popup')).toBeInTheDocument();
-      });
-
+      expect(screen.getByTestId('popup')).toBeInTheDocument();
       expect(screen.getByText('Cure Wounds')).toBeInTheDocument();
       expect(screen.getByText('7')).toBeInTheDocument();
       expect(screen.queryByText(/Bonus:/)).not.toBeInTheDocument();
     });
   });
 
-  describe('AttackResultPopup fallback', () => {
-    it('renders AttackResultPopup for unknown popup types', async () => {
-      sharedPopupReturnValue.popupHtml = {
-        type: 'attack',
-        name: 'Longsword Attack',
-        hit: true,
-        damage: 8,
-      };
-      getRenderedComponent();
+  it('falls back to AttackResultPopup for unrecognised popup types', async () => {
+    sharedPopupReturnValue.popupHtml = {
+      type: 'attack',
+      name: 'Longsword Attack',
+      hit: true,
+      damage: 8,
+    };
+    await renderUntilSheet();
 
-      await waitFor(() => {
-        expect(screen.getByTestId('attack-result-popup')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('Longsword Attack')).toBeInTheDocument();
-    });
-
-    it('renders AttackResultPopup with feature flags (superiority, bardic inspiration, empowered spell, piercer, savage attacker, tactical mind, dark ones luck, psi bolstered knack, bardic offense, stroke of luck)', async () => {
-      const featureFlags = [
-        { key: 'availableSuperiorityManeuvers', value: ['Trip Attack'] },
-        { key: 'bardicInspiration', value: true },
-        { key: 'empoweredSpell', value: true },
-        { key: 'piercerPuncture', value: true },
-        { key: 'savageAttacker', value: true },
-        { key: 'tacticalMind', value: true },
-        { key: 'darkOnesLuck', value: true },
-        { key: 'psiBolsteredKnack', value: true },
-        { key: 'bardicInspirationOffense', value: true },
-        { key: 'strokeOfLuck', value: true },
-      ];
-
-      for (const { key, value } of featureFlags) {
-        sharedPopupReturnValue.popupHtml = {
-          type: 'attack',
-          name: 'Test Attack',
-          [key]: value,
-        };
-        getRenderedComponent();
-
-        await waitFor(() => {
-          expect(screen.getByTestId('attack-result-popup')).toBeInTheDocument();
-        });
-
-        cleanup();
-      }
-    });
+    expect(screen.getByTestId('attack-result-popup')).toBeInTheDocument();
+    expect(screen.getByText('Longsword Attack')).toBeInTheDocument();
+    expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
   });
 });

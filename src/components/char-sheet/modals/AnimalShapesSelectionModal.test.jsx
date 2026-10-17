@@ -1,9 +1,20 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+// LANE OWNERSHIP — AnimalShapesSelectionModal test trio
+// - behavior.test.jsx (behavior lane): interaction lifecycle and callback contract —
+//   loading/error states, Cancel/Close/Escape semantics, overlay click inertness,
+//   Transform gating transitions (disabled/enabled) and the exact onConfirm payload.
+//   Gating and click contracts are NOT re-asserted here.
+// - THIS FILE (rendering lane): modal skeleton structure, creature filtering rules
+//   (type / CR cap / size), per-target search filtering, and selection badge display
+//   (badge TEXT scoped per target section — never gating or callback assertions).
+// - .utils.test.jsx (presentation lane): custom title/icon, speed formatting,
+//   image-error fallback, sort order, custom-CR instruction text.
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AnimalShapesSelectionModal from './AnimalShapesSelectionModal.jsx';
 
-// Mock dataLoader.loadMonsters to return controlled beast data
-// Filtering rules: type='beast' (case-insensitive), CR <= maxCR, size Tiny/Small/Medium/Large (RAW "Large or smaller")
+// Mock dataLoader.loadMonsters to return controlled beast data.
+// Filtering rules exercised here: type='beast' (case-insensitive), CR <= maxCR,
+// size Tiny/Small/Medium/Large (RAW "Large or smaller").
 const mockBeasts = [
     {
         index: 'wolf',
@@ -120,279 +131,158 @@ const baseProps = {
     onCancel: vi.fn(),
 };
 
-// Helper to extract beast name from a beast-item element
-function getBeastName(itemEl) {
-    const nameEl = itemEl.querySelector('.animal-shapes-beast-name');
-    return nameEl ? nameEl.childNodes[0].textContent.trim() : '';
+// Every mock beast that survives the RAW filters (beast type, CR <= 4,
+// Large or smaller), in the component's CR-ascending / name-alphabetical order.
+// Exact-array equality here also pins the absence of Ghast (Undead) and
+// Giant Elk (Huge) without separate count checks.
+const FULL_SECTION_NAMES = [
+    'Owl', 'Rat',
+    'Eagle', 'Panther', 'Wolf',
+    'Brown Bear', 'Crocodile', 'Giant Spider', 'Hippogriff',
+];
+
+// Locate a target's section via its header's accessible text (exact name),
+// so every subsequent query is scoped to that target rather than positional.
+function sectionFor(targetName) {
+    return screen.getByText(targetName).closest('.animal-shapes-target-section');
 }
 
-// Helper to find a beast item by name within a specific target section
-function findBeastItemInSection(beastName, sectionIndex) {
-    const sections = document.querySelectorAll('.animal-shapes-target-section');
-    const section = sections[sectionIndex];
-    if (!section) return null;
-    const items = section.querySelectorAll('.animal-shapes-beast-item');
-    for (const item of items) {
-        if (getBeastName(item) === beastName) {
-            return item;
-        }
-    }
-    return null;
+function searchInputFor(targetName) {
+    return screen.getByPlaceholderText(`Search beasts for ${targetName}...`);
 }
 
-// Helper to find a beast item by name across all target sections (first match, section 0)
-function findBeastItem(beastName) {
-    return findBeastItemInSection(beastName, 0);
+function beastNamesInSection(targetName) {
+    return Array.from(sectionFor(targetName).querySelectorAll('.animal-shapes-beast-name'))
+        .map(el => el.childNodes[0].textContent.trim());
 }
 
-describe('AnimalShapesSelectionModal', () => {
+function beastItemFor(targetName, beastName) {
+    const item = Array.from(sectionFor(targetName).querySelectorAll('.animal-shapes-beast-item'))
+        .find(el => el.querySelector('.animal-shapes-beast-name')?.childNodes[0].textContent.trim() === beastName);
+    if (!item) throw new Error(`No beast item "${beastName}" in section for ${targetName}`);
+    return item;
+}
+
+// Exact badge TEXT (icon glyph produces only whitespace, so trim yields the name).
+function badgeTextFor(targetName) {
+    const badge = sectionFor(targetName).querySelector('.animal-shapes-selected-badge');
+    return badge ? badge.textContent.trim() : null;
+}
+
+async function renderLoaded(props) {
+    const result = render(<AnimalShapesSelectionModal {...props} />);
+    // Wait for the loaded footer; the accessible name pins title + live count atomically.
+    await screen.findByRole('button', { name: 'Transform (0/2)' });
+    return result;
+}
+
+describe('AnimalShapesSelectionModal - rendering', () => {
     beforeEach(async () => {
         vi.clearAllMocks();
         const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
         loadMonsters.mockImplementation(() => Promise.resolve(mockBeasts));
     });
 
-    describe('modal structure', () => {
-        it('renders the instruction text with CR limit', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getByText(/Choose a beast form \(CR 4 or lower, Large or smaller\)/)).toBeInTheDocument();
-            });
-        });
+    describe('modal skeleton', () => {
+        it('renders title, instruction text, one labelled section per target, and footer actions', async () => {
+            await renderLoaded(baseProps);
 
-        it('renders sections for each target', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getByText('Alric')).toBeInTheDocument();
-                expect(screen.getByText('Berenik')).toBeInTheDocument();
-            });
-        });
+            expect(screen.getByText('Animal Shapes')).toBeInTheDocument();
+            expect(screen.getByText('Choose a beast form (CR 4 or lower, Large or smaller) for each target:')).toBeInTheDocument();
 
-        it('renders Cancel and Transform buttons', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-                const transformBtn = screen.getByRole('button', { name: /Transform/ });
-                expect(transformBtn).toBeInTheDocument();
-                expect(transformBtn).toBeDisabled();
-            });
+            // One section per target, identified by exact header text and per-target placeholder.
+            expect(screen.getByText('Alric')).toBeInTheDocument();
+            expect(screen.getByText('Berenik')).toBeInTheDocument();
+            expect(searchInputFor('Alric')).toBeInTheDocument();
+            expect(searchInputFor('Berenik')).toBeInTheDocument();
+
+            // Exact accessible names. Disabled/enabled gating transitions are owned by the behavior lane.
+            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Transform (0/2)' })).toBeInTheDocument();
         });
     });
 
     describe('creature filtering', () => {
-        it('filters out non-beast creatures', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.queryAllByText('Ghast').length).toBe(0);
-            });
+        it('renders exactly the RAW-allowed beasts in both target sections', async () => {
+            await renderLoaded(baseProps);
+
+            // Type filter (no Ghast), size filter (no Huge Giant Elk), and CR cap in one equality check.
+            expect(beastNamesInSection('Alric')).toEqual(FULL_SECTION_NAMES);
+            expect(beastNamesInSection('Berenik')).toEqual(FULL_SECTION_NAMES);
         });
 
-        it('includes Tiny, Small, Medium and Large beasts (RAW "Large or smaller"), excludes Huge', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                const beasts = document.querySelectorAll('.animal-shapes-beast-name');
-                const names = Array.from(beasts).map(el => el.childNodes[0].textContent.trim());
-                // Medium creatures (Hippogriff) are selectable (CR 1)
-                expect(names).toContain('Hippogriff');
-                // Tiny creatures (Rat, Owl) are selectable (CR 0)
-                expect(names).toContain('Rat');
-                expect(names).toContain('Owl');
-                // Huge creatures (Giant Elk) are excluded even at CR <= 4
-                expect(names).not.toContain('Giant Elk');
-            });
+        it('honours a fractional CR cap', async () => {
+            await renderLoaded({ ...baseProps, maxCR: 0.25 });
+
+            expect(beastNamesInSection('Alric')).toEqual(['Owl', 'Rat', 'Eagle', 'Panther', 'Wolf']);
+            expect(screen.getByText('Choose a beast form (CR 0.25 or lower, Large or smaller) for each target:')).toBeInTheDocument();
         });
     });
 
-    describe('search functionality', () => {
-        function getBeastNamesInSection(sectionEl) {
-            const items = sectionEl.querySelectorAll('.animal-shapes-beast-item');
-            return Array.from(items).map(getBeastName);
-        }
+    describe('per-target search', () => {
+        it.each([
+            ['cro', ['Crocodile']],
+            ['CROC', ['Crocodile']],
+            ['an', ['Panther', 'Giant Spider']],
+        ])('filtering "%s" in one target shows exactly the matching beasts, case-insensitively, without affecting the other target', async (term, expectedNames) => {
+            await renderLoaded(baseProps);
 
-        it('filters beasts by name when searching', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getAllByText('Crocodile').length).toBe(2);
-                expect(screen.getAllByText('Panther').length).toBe(2);
-            });
+            fireEvent.change(searchInputFor('Alric'), { target: { value: term } });
 
-            const inputs = document.querySelectorAll('input[type="text"]');
-            fireEvent.change(inputs[0], { target: { value: 'cro' } });
-
-            await waitFor(() => {
-                const firstSection = document.querySelectorAll('.animal-shapes-target-section')[0];
-                const firstNames = getBeastNamesInSection(firstSection);
-                expect(firstNames).toContain('Crocodile');
-                expect(firstNames).not.toContain('Panther');
-            });
+            expect(beastNamesInSection('Alric')).toEqual(expectedNames);
+            // The other target keeps the unfiltered list.
+            expect(beastNamesInSection('Berenik')).toEqual(FULL_SECTION_NAMES);
         });
 
-        it('search is per-target (does not affect other targets)', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getAllByText('Crocodile').length).toBe(2);
-                expect(screen.getAllByText('Eagle').length).toBe(2);
-            });
+        it('restores the full list when the search input is cleared', async () => {
+            await renderLoaded(baseProps);
 
-            const inputs = document.querySelectorAll('input[type="text"]');
-            fireEvent.change(inputs[0], { target: { value: 'cro' } });
+            fireEvent.change(searchInputFor('Alric'), { target: { value: 'cro' } });
+            expect(beastNamesInSection('Alric')).toEqual(['Crocodile']);
 
-            await waitFor(() => {
-                const firstSection = document.querySelectorAll('.animal-shapes-target-section')[0];
-                const firstNames = getBeastNamesInSection(firstSection);
-                expect(firstNames).toContain('Crocodile');
-                expect(firstNames).not.toContain('Eagle');
-
-                const secondSection = document.querySelectorAll('.animal-shapes-target-section')[1];
-                const secondNames = getBeastNamesInSection(secondSection);
-                expect(secondNames).toContain('Eagle');
-            });
+            fireEvent.change(searchInputFor('Alric'), { target: { value: '' } });
+            expect(beastNamesInSection('Alric')).toEqual(FULL_SECTION_NAMES);
         });
 
-        it('clears search filter when input is cleared', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getAllByText('Crocodile').length).toBe(2);
-                expect(screen.getAllByText('Panther').length).toBe(2);
-            });
+        it('shows the exact "No beasts match." note only in the section being searched', async () => {
+            await renderLoaded(baseProps);
 
-            const inputs = document.querySelectorAll('input[type="text"]');
-            fireEvent.change(inputs[0], { target: { value: 'cro' } });
-            await waitFor(() => {
-                const firstSection = document.querySelectorAll('.animal-shapes-target-section')[0];
-                const firstNames = getBeastNamesInSection(firstSection);
-                expect(firstNames).not.toContain('Panther');
-            });
+            fireEvent.change(searchInputFor('Alric'), { target: { value: 'xyznonexistent' } });
 
-            fireEvent.change(inputs[0], { target: { value: '' } });
-            await waitFor(() => {
-                const firstSection = document.querySelectorAll('.animal-shapes-target-section')[0];
-                const firstNames = getBeastNamesInSection(firstSection);
-                expect(firstNames).toContain('Panther');
-            });
-        });
-
-        it('shows "No beasts match" when search has no results', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getAllByText('Crocodile').length).toBe(2);
-            });
-
-            const inputs = document.querySelectorAll('input[type="text"]');
-            fireEvent.change(inputs[0], { target: { value: 'xyznonexistent' } });
-
-            await waitFor(() => {
-                const firstSection = document.querySelectorAll('.animal-shapes-target-section')[0];
-                expect(firstSection.querySelector('.sp-note')).toBeInTheDocument();
-            });
-        });
-
-        it('performs case-insensitive search', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getAllByText('Eagle').length).toBe(2);
-            });
-
-            const inputs = document.querySelectorAll('input[type="text"]');
-            fireEvent.change(inputs[0], { target: { value: 'EAGLE' } });
-
-            await waitFor(() => {
-                const firstSection = document.querySelectorAll('.animal-shapes-target-section')[0];
-                const firstNames = getBeastNamesInSection(firstSection);
-                expect(firstNames).toContain('Eagle');
-                expect(firstNames).not.toContain('Crocodile');
-            });
+            expect(within(sectionFor('Alric')).getByText('No beasts match.')).toBeInTheDocument();
+            expect(within(sectionFor('Berenik')).queryByText('No beasts match.')).not.toBeInTheDocument();
         });
     });
 
-    describe('beast selection', () => {
-        it('selects a beast when clicking on it', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getAllByText('Crocodile').length).toBe(2);
-            });
+    describe('selection badge display', () => {
+        it('updates the target section badge text as it selects, deselects, and switches forms', async () => {
+            await renderLoaded(baseProps);
+            expect(badgeTextFor('Alric')).toBeNull();
 
-            const crocItem = findBeastItem('Crocodile');
-            fireEvent.click(crocItem);
+            fireEvent.click(beastItemFor('Alric', 'Crocodile'));
+            expect(badgeTextFor('Alric')).toBe('Crocodile');
 
-            await waitFor(() => {
-                const selectedBadge = document.querySelector('.animal-shapes-selected-badge');
-                expect(selectedBadge).toBeInTheDocument();
-                expect(selectedBadge.textContent).toContain('Crocodile');
-            });
+            // Clicking the same beast again deselects — badge disappears.
+            fireEvent.click(beastItemFor('Alric', 'Crocodile'));
+            expect(badgeTextFor('Alric')).toBeNull();
+
+            fireEvent.click(beastItemFor('Alric', 'Brown Bear'));
+            expect(badgeTextFor('Alric')).toBe('Brown Bear');
+
+            // Alric's choices never bleed into Berenik's section.
+            expect(badgeTextFor('Berenik')).toBeNull();
         });
 
-        it('toggles selection off when clicking the same beast again', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
+        it('renders an independent badge with the exact chosen form name in each target section', async () => {
+            await renderLoaded(baseProps);
+
+            fireEvent.click(beastItemFor('Alric', 'Crocodile'));
+            fireEvent.click(beastItemFor('Berenik', 'Panther'));
+
             await waitFor(() => {
-                expect(screen.getAllByText('Crocodile').length).toBe(2);
+                expect(badgeTextFor('Alric')).toBe('Crocodile');
+                expect(badgeTextFor('Berenik')).toBe('Panther');
             });
-
-            const crocItem = findBeastItem('Crocodile');
-            fireEvent.click(crocItem);
-            await waitFor(() => {
-                expect(document.querySelector('.animal-shapes-selected-badge')).toBeInTheDocument();
-            });
-
-            const selectedCroc = document.querySelector('.animal-shapes-beast-item.selected');
-            expect(getBeastName(selectedCroc)).toBe('Crocodile');
-            fireEvent.click(selectedCroc);
-            await waitFor(() => {
-                expect(document.querySelector('.animal-shapes-selected-badge')).not.toBeInTheDocument();
-            });
-        });
-
-        it('switches selection to a different beast for the same target', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getAllByText('Crocodile').length).toBe(2);
-                expect(screen.getAllByText('Brown Bear').length).toBe(2);
-            });
-
-            fireEvent.click(findBeastItem('Crocodile'));
-            await waitFor(() => {
-                expect(document.querySelector('.animal-shapes-selected-badge').textContent).toContain('Crocodile');
-            });
-
-            fireEvent.click(findBeastItem('Brown Bear'));
-            await waitFor(() => {
-                expect(document.querySelector('.animal-shapes-selected-badge').textContent).toContain('Brown Bear');
-            });
-        });
-
-        it('allows independent selection per target', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getAllByText('Crocodile').length).toBe(2);
-                expect(screen.getAllByText('Panther').length).toBe(2);
-            });
-
-            fireEvent.click(findBeastItemInSection('Crocodile', 0));
-            await waitFor(() => {
-                expect(document.querySelector('.animal-shapes-selected-badge').textContent).toContain('Crocodile');
-            });
-
-            fireEvent.click(findBeastItemInSection('Panther', 1));
-            await waitFor(() => {
-                const badges = document.querySelectorAll('.animal-shapes-selected-badge');
-                expect(badges.length).toBe(2);
-            });
-        });
-    });
-
-    describe('confirm behavior', () => {
-        it('does not call onConfirm when not all targets are selected', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getAllByText('Crocodile').length).toBe(2);
-            });
-
-            fireEvent.click(findBeastItem('Crocodile'));
-
-            const transformBtn = screen.getByRole('button', { name: /Transform/ });
-            fireEvent.click(transformBtn);
-
-            expect(baseProps.onConfirm).not.toHaveBeenCalled();
         });
     });
 });

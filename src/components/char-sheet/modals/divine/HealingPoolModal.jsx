@@ -511,29 +511,19 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         const filtered = conditions.filter(c => !conditionMatches(c, condition));
         setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
 
-        const targetCreature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
-        if (combatSummary && targetCreature && targetCreature.type === 'npc') {
-            const creature = combatSummary.creatures?.find(c => c.name === resolvedTargetName);
-            if (creature && Array.isArray(creature.conditions)) {
-                const conditions = getRuntimeValue(resolvedTargetName, 'activeConditions') || [];
-                const filtered = conditions.filter(c => !conditionMatches(String(c).toLowerCase(), condition.toLowerCase()));
-                setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
-            }
-        }
+        addEntry(campaignName, {
+            type: 'condition',
+            characterName: resolvedTargetName,
+            condition: condition,
+            action: 'broken',
+            sourceName: playerStats.name,
+            featureName,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
 
-            addEntry(campaignName, {
-                type: 'condition',
-                characterName: resolvedTargetName,
-                condition: condition,
-                action: 'broken',
-                sourceName: playerStats.name,
-                featureName,
-                timestamp: Date.now(),
-              }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
-
-            setLog(prev => [...prev, { action: `Cure ${condition}`, target: resolvedTargetName, amount: cureCost, poolAfter: newPool }]);
-            setHealAmount(Math.min(healAmount, newPool));
-         };
+        setLog(prev => [...prev, { action: `Cure ${condition}`, target: resolvedTargetName, amount: cureCost, poolAfter: newPool }]);
+        setHealAmount(Math.min(healAmount, newPool));
+    };
 
     const applyBatchCure = () => {
         if (selectedConditions.length === 0) return;
@@ -543,21 +533,10 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         const newPool = safePool - totalCost;
         setPoolRemaining(newPool);
 
-        const targetCreature = combatSummary?.creatures?.find(c => c.name === resolvedTargetName);
-
         selectedConditions.forEach((condition) => {
             const conditions = getRuntimeValue(resolvedTargetName, 'activeConditions') || [];
             const filtered = conditions.filter(c => !conditionMatches(c, condition));
             setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
-
-            if (combatSummary && targetCreature && targetCreature.type === 'npc') {
-                const creature = combatSummary.creatures?.find(c => c.name === resolvedTargetName);
-                if (creature && Array.isArray(creature.conditions)) {
-                    const conditions = getRuntimeValue(resolvedTargetName, 'activeConditions') || [];
-                    const filtered = conditions.filter(c => !conditionMatches(String(c).toLowerCase(), condition.toLowerCase()));
-                    setRuntimeValue(resolvedTargetName, 'activeConditions', filtered, campaignName);
-                }
-            }
 
             addEntry(campaignName, {
                 type: 'condition',

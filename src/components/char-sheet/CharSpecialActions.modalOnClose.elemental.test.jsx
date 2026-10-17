@@ -1,3 +1,16 @@
+// @maintained-by-ai
+// modalOnClose quartet seam map (#76-79):
+//   elemental (this file) — Elemental Affinity / Wild Magic Surge / Destructive Stride:
+//                           Close-dismiss rows (unmount + inertness: no executeHandler
+//                           re-dispatch, no runtime-store writes) + reopen-after-close
+//                           ordering (owned here; weapons owns same-modal reopen).
+//   arcane  — CharSpecialActions.modalOnClose.arcane.test.jsx
+//   combat  — CharSpecialActions.modalOnClose.combat.test.jsx
+//   weapons — CharSpecialActions.modalOnClose.weapons.test.jsx
+// Not duplicated here:
+//   Stride of the Elements open/close is subsumed by CharSpecialActions.elementalEffects.test.jsx
+//   (#72): chip-click → stride modal open, each option's confirm → buff write + modal unmount.
+//   Open routing (executeHandler args + modal render) lives in CharSpecialActions.modals.test.jsx.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import './CharSpecialActions.modalMocks.jsx';
@@ -36,12 +49,6 @@ const elementalModalTests = [
     testId: 'wild-magic-surge-modal',
   },
   {
-    name: 'Stride of the Elements',
-    modalName: 'strideOfTheElements',
-    automation: { type: 'stride_of_the_elements' },
-    testId: 'stride-of-the-elements-modal',
-  },
-  {
     name: 'Destructive Stride',
     modalName: 'destructiveStride',
     automation: { type: 'destructive_stride' },
@@ -56,7 +63,7 @@ describe('CharSpecialActions - Elemental modal onClose handlers', () => {
   });
 
   describe.each(elementalModalTests)('$name modal onClose', ({ modalName, name: actionName, automation, testId }) => {
-    it('opens the modal and closes it when onClose is called', async () => {
+    it('dismisses the modal on Close without re-running the automation or touching runtime state', async () => {
       executeHandler.mockResolvedValue({
         type: 'modal',
         modalName,
@@ -77,55 +84,63 @@ describe('CharSpecialActions - Elemental modal onClose handlers', () => {
         expect(screen.getByTestId(testId)).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Close'));
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
       await waitFor(() => {
         expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
       });
+
+      // Dismissal is inert: the automation ran once (the open click) and Close
+      // wrote nothing to the runtime store.
+      expect(executeHandler).toHaveBeenCalledTimes(1);
+      expect(mockRuntimeStore).toEqual({});
     });
   });
 
-  describe('Interaction ordering', () => {
-    it('opens a different elemental modal after closing the previous one', async () => {
-      executeHandler.mockResolvedValue({
+  // Unique seam: after a Close, a DIFFERENT elemental modal can open (the first
+  // modal slot is fully cleared). Same-modal reopen lives in weapons.test.jsx;
+  // stride confirm-dismiss in elementalEffects.test.jsx.
+  it('opens a different elemental modal after closing the previous one', async () => {
+    executeHandler
+      .mockResolvedValueOnce({
         type: 'modal',
         modalName: 'elementalAffinity',
         payload: { action: { name: 'Elemental Affinity' } },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Elemental Affinity', description: 'Boost damage.', automation: { type: 'elemental_affinity' } },
-          { name: 'Wild Magic Surge', description: 'Surge with magic.', automation: { type: 'wild_magic_surge' } },
-        ],
-      });
-
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-
-      // Open first modal
-      fireEvent.click(screen.getByText(/Elemental Affinity/));
-      await waitFor(() => {
-        expect(screen.getByTestId('elemental-affinity-modal')).toBeInTheDocument();
-      });
-
-      // Close first modal
-      fireEvent.click(screen.getByText('Close'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('elemental-affinity-modal')).not.toBeInTheDocument();
-      });
-
-      // Set up mock for the second action
-      executeHandler.mockResolvedValueOnce({
+      })
+      .mockResolvedValueOnce({
         type: 'modal',
         modalName: 'wildMagicSurge',
-        payload: {},
+        payload: { action: { name: 'Wild Magic Surge' } },
       });
 
-      // Open second modal
-      fireEvent.click(screen.getByText(/Wild Magic Surge/));
-      await waitFor(() => {
-        expect(screen.getByTestId('wild-magic-surge-modal')).toBeInTheDocument();
-      });
+    const playerStats = createPlayerStats({
+      specialActions: [
+        { name: 'Elemental Affinity', description: 'Boost damage.', automation: { type: 'elemental_affinity' } },
+        { name: 'Wild Magic Surge', description: 'Surge with magic.', automation: { type: 'wild_magic_surge' } },
+      ],
     });
+
+    render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+
+    // Open first modal
+    fireEvent.click(screen.getByText(/Elemental Affinity/));
+    await waitFor(() => {
+      expect(screen.getByTestId('elemental-affinity-modal')).toBeInTheDocument();
+    });
+
+    // Close first modal — inert dismissal (no runtime writes)
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => {
+      expect(screen.queryByTestId('elemental-affinity-modal')).not.toBeInTheDocument();
+    });
+    expect(mockRuntimeStore).toEqual({});
+
+    // Open second modal: re-dispatched, and the closed modal stays gone
+    fireEvent.click(screen.getByText(/Wild Magic Surge/));
+    await waitFor(() => {
+      expect(screen.getByTestId('wild-magic-surge-modal')).toBeInTheDocument();
+    });
+    expect(executeHandler).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId('elemental-affinity-modal')).not.toBeInTheDocument();
   });
 });

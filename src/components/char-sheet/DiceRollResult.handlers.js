@@ -221,7 +221,7 @@ export function createDiceRollHandlers(props, state) {
             const dieSize = evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
             const dieResult = Math.floor(Math.random() * dieSize) + 1;
             const newTotal = finalRoll + bonus + modifier + dieResult;
-            setSuperiorityResult({ dieValue: dieResult, maneuverName: maneuver.name, total: newTotal });
+            setSuperiorityResult({ dieValue: dieResult, dieSize, maneuverName: maneuver.name, total: newTotal });
             setSuperiorityUsed(true);
             await onSuperiorityManeuver(maneuver.name, dieResult);
         } catch (e) {

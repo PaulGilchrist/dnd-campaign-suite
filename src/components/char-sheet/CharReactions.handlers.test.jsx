@@ -1,7 +1,10 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharReactions from './CharReactions.jsx';
+
+const { mockSetPopupHtml } = vi.hoisted(() => ({ mockSetPopupHtml: vi.fn() }));
 
 vi.mock('../common/popup.jsx', () => ({
     default: ({ children }) => React.createElement('div', { 'data-testid': 'popup' }, children),
@@ -47,6 +50,7 @@ vi.mock('./modals/SearingVengeanceModal.jsx', () => ({
 }));
 vi.mock('../../services/ui/spellSectionUtils.js', () => ({
     getReactionSpellNames: vi.fn(() => new Set()),
+    applyPotentSpellcasting: vi.fn((s) => s),
 }));
 vi.mock('../../services/character/featureCategories.js', () => ({
     getCategories: vi.fn(() => ({ featuresToIgnore: [] })),
@@ -59,7 +63,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
     default: vi.fn(),
 }));
 vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
-    useDiceRollPopup: vi.fn(() => ({ setPopupHtml: vi.fn() })),
+    useDiceRollPopup: vi.fn(() => ({ setPopupHtml: mockSetPopupHtml })),
 }));
 vi.mock('../../services/combat/baseCombatActions.js', () => ({
     OPPORTUNITY_ATTACK: { name: 'Opportunity Attack', description: 'Can attack creature that moves out of your reach' },
@@ -168,92 +172,67 @@ function createProps(overrides = {}) {
         cannotAct: false,
         mapName: null,
         characters: [],
-        modalState: {},
-        setModalState: vi.fn(),
         ...overrides,
     };
 }
 
-describe('CharReactions - handleReactionClick', () => {
+// Runtime reads default to "nothing dynamic active"; override per key in tests.
+function runtimeWith(overrides = {}) {
+    useRuntimeValue.mockImplementation((_charKey, key) =>
+        key in overrides ? overrides[key] : []);
+}
+
+// Stand (Power Word Heal) click lane — this file owns the handleReactionClick
+// dispatch for this row. Row assembly/dedup lives in CharReactions.edgeCases.
+// test.jsx; the OA roll lane lives in CharReactions.opportunityAttack.test.jsx.
+describe('CharReactions - Stand (Power Word Heal) click', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockSetPopupHtml.mockReset();
         useLoggedDiceRoll.mockReturnValue({ rollAttack: vi.fn(), rollDamage: vi.fn() });
     });
 
-    it('handles Stand (Power Word Heal) reaction - removes prone condition and sets permission to false', () => {
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'powerWordHealStandPermission') return true;
-            if (key === 'activeBuffs') return [];
-            return [];
-        });
-        getRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'activeConditions') return ['Prone', 'Poisoned'];
-            return null;
-        });
+    // [label, activeConditions, expected written conditions | null = no write expected]
+    it.each([
+        ['removes Prone and preserves other conditions', ['Prone', 'Poisoned'], ['Poisoned']],
+        ['matches lowercase prone and writes remaining list', ['prone'], []],
+        ['writes no activeConditions when no prone is present', ['Poisoned'], null],
+        ['writes no activeConditions when there are no conditions', [], null],
+    ])('clicking the row — %s, consumes the permission, confirms via popup', async (_label, conditions, expected) => {
+        runtimeWith({ powerWordHealStandPermission: true });
+        getRuntimeValue.mockImplementation((_charKey, key) =>
+            key === 'activeConditions' ? conditions : null);
 
-        const props = createProps();
-        render(<CharReactions {...props} />);
+        render(<CharReactions {...createProps()} />);
+        fireEvent.click(screen.getByText('Stand (Power Word Heal):'));
 
-        const standReaction = screen.getByText('Stand (Power Word Heal):');
-        fireEvent.click(standReaction);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'TestFighter',
-            'activeConditions',
-            ['Poisoned'],
-            campaignName
-        );
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'TestFighter',
-            'powerWordHealStandPermission',
-            false,
-            campaignName
-        );
-    });
-
-    it('does not update activeConditions when prone is already absent', () => {
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'powerWordHealStandPermission') return true;
-            if (key === 'activeBuffs') return [];
-            return [];
-        });
-        getRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'activeConditions') return ['Poisoned'];
-            return null;
-        });
-
-        const props = createProps();
-        render(<CharReactions {...props} />);
-
-        const standReaction = screen.getByText('Stand (Power Word Heal):');
-        fireEvent.click(standReaction);
-
-        const conditionCalls = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions');
-        expect(conditionCalls.length).toBe(0);
-    });
-
-    it('sets permission to false even when no conditions change', () => {
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'powerWordHealStandPermission') return true;
-            if (key === 'activeBuffs') return [];
-            return [];
-        });
-        getRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'activeConditions') return [];
-            return null;
-        });
-
-        const props = createProps();
-        render(<CharReactions {...props} />);
-
-        const standReaction = screen.getByText('Stand (Power Word Heal):');
-        fireEvent.click(standReaction);
-
+        const conditionWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions');
+        if (expected) {
+            expect(conditionWrites).toEqual([['TestFighter', 'activeConditions', expected, campaignName]]);
+            expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+        } else {
+            expect(conditionWrites).toHaveLength(0);
+            expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+        }
+        // The stance permission is single-use — always consumed on click,
+        // even when no condition changed.
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'TestFighter',
             'powerWordHealStandPermission',
             false,
             campaignName
         );
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('stand up'));
+    });
+
+    it('does nothing when cannotAct — no runtime writes, no popup', () => {
+        runtimeWith({ powerWordHealStandPermission: true });
+        getRuntimeValue.mockReturnValue(null);
+
+        render(<CharReactions {...createProps({ cannotAct: true })} />);
+        fireEvent.click(screen.getByText('Stand (Power Word Heal):'));
+
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(mockSetPopupHtml).not.toHaveBeenCalled();
     });
 });

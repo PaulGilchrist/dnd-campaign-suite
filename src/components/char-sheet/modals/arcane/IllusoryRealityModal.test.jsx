@@ -1,5 +1,6 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import IllusoryRealityModal from './IllusoryRealityModal.jsx';
 
 // ── Mocked modules ──
@@ -8,68 +9,49 @@ vi.mock('../../../../services/automation/handlers/class-wizard/illusoryRealityHa
   confirmIllusoryReality: vi.fn(),
 }));
 
-vi.mock('../../../../services/ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-  setRuntimeBatch: vi.fn().mockResolvedValue(undefined),
-}));
-
-// ── Re-import mocked modules ──
-
+// Re-import mocked module after mocking
 import { confirmIllusoryReality } from '../../../../services/automation/handlers/class-wizard/illusoryRealityHandler.js';
 
 // ── Test fixtures ──
 
-const baseAction = {
+const defaultAction = {
   name: 'Illusory Reality',
-  automation: {},
+  automation: { type: 'illusory_reality' },
 };
 
-const basePlayerStats = {
-  name: 'Wizard1',
-  level: 14,
-  spellSlots: { 1: 4, 2: 3 },
-};
-
-const baseProps = {
-  action: baseAction,
-  playerStats: basePlayerStats,
-  campaignName: 'test-campaign',
-  onClose: vi.fn(),
-};
+const defaultPlayerStats = { name: 'Wizard1', level: 14, rules: '2024' };
+const defaultCampaignName = 'test-campaign';
 
 function makeProps(overrides) {
-  return { ...baseProps, ...(overrides || {}) };
+  return {
+    action: defaultAction,
+    playerStats: defaultPlayerStats,
+    campaignName: defaultCampaignName,
+    onClose: vi.fn(),
+    ...overrides,
+  };
 }
 
-function makePopupResult(featureName) {
+// Mirrors the popup shape returned by illusoryRealityHandler.confirmIllusoryReality —
+// confirmIllusoryReality is the component's ONLY server-first write path (the handler
+// itself writes illusoryRealityObject and logs the ability_use entry), so exact-arg
+// assertions on it here pin the modal's write contract. The modal passes the raw
+// input verbatim; trimming lives in the handler.
+function confirmResponse(featureName, objectName) {
   const name = featureName || 'Illusory Reality';
   return {
     type: 'popup',
     payload: {
       type: 'automation_info',
       name,
-      description: `<b>${name}</b><br/><br/>You use your Bonus Action to make the object <b>"stone"</b> real.<br/><br/>The object cannot deal damage or impose any conditions.<br/><br/><em>The object persists until you roll initiative, finish a short rest, or finish a long rest. It disappears if you use this feature again.</em>`,
+      description: `<b>${name}</b><br/><br/>You use your Bonus Action to make the object <b>"${objectName}"</b> real.<br/><br/>The object cannot deal damage or impose any conditions.<br/><br/><em>The object persists until you roll initiative, finish a short rest, or finish a long rest. It disappears if you use this feature again.</em>`,
+      automation: defaultAction.automation,
     },
   };
 }
 
-// ── Helpers ──
-
-function renderModal(props) {
-  return render(<IllusoryRealityModal {...makeProps(props)} />);
-}
-
-async function fillAndConfirm(objectValue) {
-  const input = screen.getByRole('textbox');
-  await act(async () => {
-    fireEvent.change(input, { target: { value: objectValue } });
-    fireEvent.click(screen.getByRole('button', { name: /Make Object Real/ }));
-  });
+function fill(objectValue) {
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: objectValue } });
 }
 
 // ── Tests ──
@@ -77,164 +59,150 @@ async function fillAndConfirm(objectValue) {
 describe('IllusoryRealityModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
+    confirmIllusoryReality.mockResolvedValue(confirmResponse('Illusory Reality', 'stone'));
+  });
+
+  afterEach(() => {
+    confirmIllusoryReality.mockReset();
   });
 
   // ── Initial render / display ──
 
-  describe('initial render', () => {
-    it('renders the modal with header, body, buttons, and input', () => {
-      renderModal();
-      expect(screen.getByText('Illusory Reality')).toBeInTheDocument();
-      expect(screen.getByText(/Choose one inanimate, nonmagical object/)).toBeInTheDocument();
-      expect(screen.getByText(/The object cannot deal damage or impose any conditions/)).toBeInTheDocument();
-      expect(screen.getByRole('textbox')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Make Object Real/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-    });
-
-    it('falls back to "Illusory Reality" when action name is absent or null', () => {
-      renderModal({ action: { automation: {} } });
-      expect(screen.getByText('Illusory Reality')).toBeInTheDocument();
-    });
-
-    it('is disabled when the input is empty or whitespace-only', () => {
-      renderModal();
-      const btn = screen.getByRole('button', { name: /Make Object Real/ });
-      expect(btn).toBeDisabled();
-
-      const input = screen.getByRole('textbox');
-      fireEvent.change(input, { target: { value: '   ' } });
-      expect(btn).toBeDisabled();
-    });
-
-    it('is enabled when the input has non-whitespace content', () => {
-      renderModal();
-      const input = screen.getByRole('textbox');
-      fireEvent.change(input, { target: { value: 'a 5-foot cube of stone' } });
-      const btn = screen.getByRole('button', { name: /Make Object Real/ });
-      expect(btn).toBeEnabled();
-    });
+  it('renders the header, rules text, object input, disabled action button, and Cancel', () => {
+    render(<IllusoryRealityModal {...makeProps()} />);
+    expect(screen.getByText('Illusory Reality')).toBeInTheDocument();
+    expect(screen.getByText(/Choose one inanimate, nonmagical object/)).toBeInTheDocument();
+    expect(screen.getByText(/The object cannot deal damage or impose any conditions/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Enter object name/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Make Object Real/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
   });
 
-  // ── Cancel button ──
-
-  describe('cancel button', () => {
-    it('calls onClose when clicked', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
+  // The header name is `action?.featureName || 'Illusory Reality'` — the modal
+  // never renders action.name, so absent/null action and featureName both fall
+  // back to the canonical label while a featureName wins over it.
+  it.each([
+    { action: undefined, header: 'Illusory Reality' },
+    { action: null, header: 'Illusory Reality' },
+    { action: { automation: {} }, header: 'Illusory Reality' },
+    { action: { name: 'Illusory Reality', featureName: 'Mind Over Matter' }, header: 'Mind Over Matter' },
+  ])('renders header "$header" for action %j', ({ action, header }) => {
+    render(<IllusoryRealityModal {...makeProps({ action })} />);
+    expect(screen.getByText(header)).toBeInTheDocument();
   });
 
-  // ── Overlay close behavior ──
+  // ── Input gating ──
 
-  describe('overlay close behavior', () => {
-    it('does not call onClose when the overlay background is clicked', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      const overlay = document.querySelector('.sp-overlay');
-      fireEvent.click(overlay);
-      expect(onClose).not.toHaveBeenCalled();
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
+  it('gates Make Object Real on non-whitespace input — empty and whitespace keep it disabled', () => {
+    render(<IllusoryRealityModal {...makeProps()} />);
+    const btn = screen.getByRole('button', { name: /Make Object Real/ });
+    expect(btn).toBeDisabled();
 
-    it('does not call onClose when the modal content is clicked', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      const modal = document.querySelector('.sp-modal');
-      fireEvent.click(modal);
-      expect(onClose).not.toHaveBeenCalled();
-    });
+    fill('   ');
+    expect(btn).toBeDisabled();
+
+    fill('a 5-foot cube of stone');
+    expect(btn).toBeEnabled();
+
+    fill('');
+    expect(btn).toBeDisabled();
   });
 
-  // ── Confirmation flow ──
+  // ── Close / dismiss behavior ──
 
-  describe('confirmation flow', () => {
-    beforeEach(() => {
-      confirmIllusoryReality.mockResolvedValue(makePopupResult('Illusory Reality'));
-    });
-
-    it('calls confirmIllusoryReality with correct parameters', async () => {
-      renderModal();
-      await fillAndConfirm('a 5-foot cube of stone');
-      expect(confirmIllusoryReality).toHaveBeenCalledWith(
-        baseAction,
-        basePlayerStats,
-        'test-campaign',
-        'a 5-foot cube of stone'
-      );
-    });
-
-    it('transitions to result state after confirm', async () => {
-      renderModal();
-      await fillAndConfirm('stone');
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-      });
-    });
-
-    it('hides the input and action buttons after confirm', async () => {
-      renderModal();
-      await fillAndConfirm('stone');
-      await waitFor(() => {
-        expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: /Make Object Real/ })).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
-      });
-    });
-
-    it('renders the result description after confirm', async () => {
-      renderModal();
-      await fillAndConfirm('stone');
-      await waitFor(() => {
-        expect(screen.getByText(/You use your Bonus Action to make the object/)).toBeInTheDocument();
-      });
-    });
-
-    it('uses custom featureName in the result header when provided', async () => {
-      renderModal({ action: { featureName: 'Custom Feature', automation: {} } });
-      confirmIllusoryReality.mockResolvedValue(makePopupResult('Custom Feature'));
-      await fillAndConfirm('stone');
-      await waitFor(() => {
-        const header = document.querySelector('.sp-header');
-        expect(header.textContent).toContain('Custom Feature');
-      });
-    });
-
-    it('calls onClose when Done button is clicked after confirm', async () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      await fillAndConfirm('stone');
-      await waitFor(() => {
-        fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-      });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
+  it('Cancel closes exactly once and submits nothing', () => {
+    const props = makeProps();
+    render(<IllusoryRealityModal {...props} />);
+    fill('stone');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(confirmIllusoryReality).not.toHaveBeenCalled();
   });
 
-  // ── Handler returns error popup ──
-
-  describe('handler returns error popup', () => {
-    it('displays the error message when handler returns a popup result', async () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      confirmIllusoryReality.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Illusory Reality',
-          description: 'Illusory Reality: You must specify an inanimate, nonmagical object.',
-        },
-      });
-      await fillAndConfirm('stone');
-      await waitFor(() => {
-        expect(screen.getByText(/Illusory Reality: You must specify/)).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-      });
-    });
+  it('clicking the overlay background and modal shell is inert — no close, no submission', () => {
+    const props = makeProps();
+    const { container } = render(<IllusoryRealityModal {...props} />);
+    fireEvent.click(container.querySelector('.sp-overlay'));
+    fireEvent.click(container.querySelector('.sp-modal'));
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(confirmIllusoryReality).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 
+  it('renders and ignores Cancel when onClose is omitted', () => {
+    const props = makeProps();
+    delete props.onClose;
+    render(<IllusoryRealityModal {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(confirmIllusoryReality).not.toHaveBeenCalled();
+  });
+
+  // ── Confirm flow — exact write payload ──
+
+  it('pressing Make Object Real submits the exact action, playerStats, campaignName, and raw input', async () => {
+    const props = makeProps({
+      action: { name: 'Illusory Reality', featureName: 'Custom Feature', automation: { type: 'illusory_reality' } },
+      playerStats: { name: 'CustomWizard', level: 10, rules: '2024' },
+    });
+    confirmIllusoryReality.mockResolvedValue(confirmResponse('Custom Feature', 'stone'));
+    render(<IllusoryRealityModal {...props} />);
+
+    fill('  stone  ');
+    fireEvent.click(screen.getByRole('button', { name: /Make Object Real/ }));
+    await screen.findByRole('button', { name: 'Done' });
+
+    expect(confirmIllusoryReality).toHaveBeenCalledTimes(1);
+    expect(confirmIllusoryReality).toHaveBeenCalledWith(
+      props.action,
+      props.playerStats,
+      props.campaignName,
+      '  stone  '
+    );
+  });
+
+  it('swaps to the Done-only result view with the handler description, and Done closes once without resubmitting', async () => {
+    const props = makeProps();
+    render(<IllusoryRealityModal {...props} />);
+    fill('stone');
+    fireEvent.click(screen.getByRole('button', { name: /Make Object Real/ }));
+
+    const done = await screen.findByRole('button', { name: 'Done' });
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Make Object Real/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+    expect(screen.getByText(/You use your Bonus Action to make the object/)).toBeInTheDocument();
+    expect(screen.getByText(/"stone"/)).toBeInTheDocument();
+
+    fireEvent.click(done);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(confirmIllusoryReality).toHaveBeenCalledTimes(1);
+  });
+
+  // Empty-object refusals live in the handler (the modal's trim-gating blocks the
+  // button) — verify the refusal popup payload still renders and closes cleanly.
+  it('renders the handler refusal popup and closes without resubmitting', async () => {
+    const props = makeProps();
+    confirmIllusoryReality.mockResolvedValue({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Illusory Reality',
+        description: 'Illusory Reality: You must specify an inanimate, nonmagical object that is part of an illusion spell you cast with a spell slot.',
+        automation: defaultAction.automation,
+      },
+    });
+    render(<IllusoryRealityModal {...props} />);
+    fill('stone');
+    fireEvent.click(screen.getByRole('button', { name: /Make Object Real/ }));
+
+    const done = await screen.findByRole('button', { name: 'Done' });
+    expect(screen.getByText('Illusory Reality: You must specify an inanimate, nonmagical object that is part of an illusion spell you cast with a spell slot.')).toBeInTheDocument();
+
+    fireEvent.click(done);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(confirmIllusoryReality).toHaveBeenCalledTimes(1);
+  });
 });

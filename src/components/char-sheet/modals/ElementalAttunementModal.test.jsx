@@ -1,5 +1,40 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+/**
+ * ElementalAttunementModal — MAIN lane: mount contract, open/close basics, props pass-through.
+ *
+ * Ownership map (siblings, do not duplicate here):
+ * - .elemental-data.test.jsx — ELEMENT_DATA/ELEMENT_DESCRIPTIONS as RENDERED: exact picker
+ *                              labels/icons/order, verbatim selection description/note per
+ *                              element, picker inertness. Subsumes this file's retired
+ *                              "renders all four elemental buttons with their descriptions"
+ *                              regex fragments (flagged there at :40-42).
+ * - .phase-flow.test.jsx     — element→targets→processing→summary transitions, DC math,
+ *                              map-overlay loading, processing overlay click-to-close guard,
+ *                              stranding pins, commit-seam UI.
+ * - .npc-save.test.jsx       — NPC save resolution, runtime condition writes, log content,
+ *                              persistAndNotify.
+ * - .player-save.test.jsx    — save prompts, save-result event handling, listener lifecycle.
+ * - .summary.test.jsx        — onClose invocation on Close, expiration log DESCRIPTION variants.
+ * - .deactivation.test.jsx   — handleResultsClose commit payloads, §39 single-clock order,
+ *                              double-commit defect pin, inertness on cancel/skip/overlay/unmount.
+ * - .error-handling.test.jsx — addEntry/loadMapData/addExpiration rejection survival.
+ *
+ * DELETED (subsumed by siblings, per family ownership): "renders all four elemental buttons
+ * with their descriptions" (regex fragments → .elemental-data exact full-line pins); the
+ * standalone "renders the Cancel button" (folded into the mount-contract test); processing
+ * overlay guard lives only in .phase-flow (element-phase click guard stays here).
+ *
+ * FLAG (component, cross-note — also .deactivation.test.jsx:25, .elemental-data.test.jsx:31):
+ * - ElementalAttunementModal.jsx:579-603,653 — inline styles in the element picker and the
+ *   "All targets resolved" note violate the no-inline-styles house rule.
+ *
+ * Anti-vacuity: frozen fixtures handed back BY IDENTITY at the selection seam (the skip test
+ * proves the component consumed the seeded summary, not a mock default); exact full-line text;
+ * role-scoped queries; fresh vi.fn onClose per render (props pass-through asserted on THAT
+ * function's identity); mount purity proven with an addEventListener spy plus zero-call
+ * assertions on every service; mockReset + re-arm per test; findBy idiom; no bare setTimeout.
+ */
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import ElementalAttunementModal from './ElementalAttunementModal.jsx';
 
 // ── Mocks ──
@@ -73,96 +108,153 @@ vi.mock('./shared/CreatureSelectionModal.jsx', () => ({
 
 // ── Re-import mocked modules ──
 
+import * as diceRoller from '../../../services/dice/diceRoller.js';
+import * as runtime from '../../../hooks/runtime/useRuntimeState.js';
+import * as savePromptService from '../../../services/combat/conditions/savePromptService.js';
+import * as aoeService from '../../../services/rules/combat/aoeService.js';
 import * as combatData from '../../../services/encounters/combatData.js';
+import * as logService from '../../../services/ui/logService.js';
+import * as mapsService from '../../../services/maps/mapsService.js';
+import * as expirations from '../../../services/rules/effects/expirations.js';
+import * as baseUtils from './shared/AreaEffectTargetModalBase.utils.jsx';
 
-// ── Test fixtures ──
+// ── Fixtures (frozen — the component may not mutate its inputs) ──
 
-const baseAction = { name: 'Elemental Attunement' };
-const basePlayerStats = {
-    name: 'Monk1',
+const PLAYER = 'Monk1';
+const CAMPAIGN = 'test-campaign';
+
+const baseAction = Object.freeze({ name: 'Elemental Attunement' });
+const basePlayerStats = Object.freeze({
+    name: PLAYER,
     level: 5,
     proficiency: 3,
-    abilities: [
-        { name: 'Strength', bonus: 2 },
-        { name: 'Dexterity', bonus: 4 },
-        { name: 'Constitution', bonus: 1 },
-        { name: 'Intelligence', bonus: 0 },
-        { name: 'Wisdom', bonus: 1 },
-        { name: 'Charisma', bonus: 0 },
-    ],
-};
-const baseProps = { action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', onClose: vi.fn() };
+    abilities: Object.freeze([
+        Object.freeze({ name: 'Strength', bonus: 2 }),
+        Object.freeze({ name: 'Dexterity', bonus: 4 }),
+        Object.freeze({ name: 'Constitution', bonus: 1 }),
+        Object.freeze({ name: 'Intelligence', bonus: 0 }),
+        Object.freeze({ name: 'Wisdom', bonus: 1 }),
+        Object.freeze({ name: 'Charisma', bonus: 0 }),
+    ]),
+});
 
-function makeProps(overrides = {}) { return { ...baseProps, ...overrides }; }
-function makeCombatSummary(creatures) { return { creatures }; }
+// Same-object identity: the targets-phase enumeration must hand back THIS fixture.
+const selectionFixture = Object.freeze({
+    creatures: Object.freeze([
+        Object.freeze({ name: 'Goblin1', type: 'npc', currentHp: 7, maxHp: 7, saveBonuses: Object.freeze({ dex: 2 }), resistances: Object.freeze([]), immunities: Object.freeze([]) }),
+    ]),
+});
+
+// Fresh vi.fn per render (house rule: no shared module-level onClose).
+function makeProps(overrides = {}) {
+    return {
+        action: baseAction,
+        playerStats: basePlayerStats,
+        campaignName: CAMPAIGN,
+        onClose: vi.fn(),
+        ...overrides,
+    };
+}
 
 function renderModal(props = {}) {
-    const handleClose = vi.fn();
-    return { ...render(<ElementalAttunementModal {...makeProps({ onClose: handleClose, ...props })} />), handleClose };
+    return render(<ElementalAttunementModal {...makeProps(props)} />);
 }
+
+// ── House lifecycle: cleanup + mockReset (not clearAllMocks) + re-arm defaults ──
+
+afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    diceRoller.rollExpression.mockReset().mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
+    runtime.getRuntimeValue.mockReset().mockReturnValue(null);
+    runtime.setRuntimeValue.mockReset().mockResolvedValue(undefined);
+    savePromptService.sendSavePrompt.mockReset();
+    aoeService.getAffectedCreatures.mockReset().mockReturnValue([]);
+    combatData.getCombatSummary.mockReset().mockReturnValue(null);
+    logService.addEntry.mockReset().mockResolvedValue(undefined);
+    mapsService.loadMapData.mockReset().mockResolvedValue(null);
+    expirations.addExpiration.mockReset();
+    baseUtils.persistAndNotify.mockReset();
+});
 
 // ── Tests ──
 
-describe('ElementalAttunementModal', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+describe('ElementalAttunementModal mount contract and open/close', () => {
+
+    it('mounts on the element phase — exact header, instruction and Cancel; no later phase renders without a choice', () => {
+        renderModal();
+        expect(screen.getByText('Elemental Attunement')).toBeInTheDocument();
+        expect(screen.getByText('Choose the element for your manifestation:')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+        // The element phase is the ONLY phase reachable before a choice is made.
+        expect(screen.queryByTestId('creature-selection-modal')).not.toBeInTheDocument();
+        expect(screen.queryByText('Resolving DEX saving throws (DC 12)...')).not.toBeInTheDocument();
+        expect(screen.queryByText('Elemental Attunement (Fire) — Results')).not.toBeInTheDocument();
     });
 
-    // ── Element selection phase ──
-
-    describe('element selection phase', () => {
-        it('renders the modal header with title and instruction text', () => {
-            renderModal();
-            expect(screen.getByText('Elemental Attunement')).toBeInTheDocument();
-            expect(screen.getByText('Choose the element for your manifestation:')).toBeInTheDocument();
-        });
-
-        it('renders all four elemental buttons with their descriptions', () => {
-            renderModal();
-            expect(screen.getByText('Cold')).toBeInTheDocument();
-            expect(screen.getByText('Fire')).toBeInTheDocument();
-            expect(screen.getByText('Lightning')).toBeInTheDocument();
-            expect(screen.getByText('Thunder')).toBeInTheDocument();
-            expect(screen.getByText(/5-ft radius area of extreme cold/)).toBeInTheDocument();
-            expect(screen.getByText(/5-ft radius flames/)).toBeInTheDocument();
-            expect(screen.getByText(/60-ft line of lightning/)).toBeInTheDocument();
-            expect(screen.getByText(/5-ft radius burst of sonic energy/)).toBeInTheDocument();
-        });
-
-        it('renders the Cancel button', () => {
-            renderModal();
-            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-        });
+    it('mount is pure — zero service calls and zero save-result listeners armed before any choice', () => {
+        const addSpy = vi.spyOn(window, 'addEventListener');
+        renderModal();
+        expect(addSpy).not.toHaveBeenCalledWith('save-result', expect.any(Function));
+        expect(combatData.getCombatSummary).not.toHaveBeenCalled();
+        expect(mapsService.loadMapData).not.toHaveBeenCalled();
+        expect(aoeService.getAffectedCreatures).not.toHaveBeenCalled();
+        expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+        expect(runtime.getRuntimeValue).not.toHaveBeenCalled();
+        expect(runtime.setRuntimeValue).not.toHaveBeenCalled();
+        expect(savePromptService.sendSavePrompt).not.toHaveBeenCalled();
+        expect(logService.addEntry).not.toHaveBeenCalled();
+        expect(expirations.addExpiration).not.toHaveBeenCalled();
+        expect(baseUtils.persistAndNotify).not.toHaveBeenCalled();
     });
 
-    // ── Skip / Cancel behavior ──
+    it.each([
+        { target: 'overlay', selector: '.sp-overlay' },
+        { target: 'modal content', selector: '.sp-modal' },
+    ])('clicking the $target cannot dismiss the element phase', ({ selector }) => {
+        const props = makeProps();
+        render(<ElementalAttunementModal {...props} />);
+        fireEvent.click(document.querySelector(selector));
+        expect(props.onClose).not.toHaveBeenCalled();
+        // Still exactly the element phase — nothing advanced, nothing closed.
+        expect(screen.getByText('Choose the element for your manifestation:')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    });
 
-    describe('skip and cancel', () => {
-        it('calls onClose when Cancel is clicked', () => {
-            const { handleClose } = renderModal();
-            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-            expect(handleClose).toHaveBeenCalledTimes(1);
-        });
+    it('Cancel invokes the onClose prop exactly once and never touches a service', () => {
+        const props = makeProps();
+        render(<ElementalAttunementModal {...props} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(props.onClose).toHaveBeenCalledTimes(1);
+        // Cancelling at the picker commits nothing anywhere.
+        expect(combatData.getCombatSummary).not.toHaveBeenCalled();
+        expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+        expect(runtime.setRuntimeValue).not.toHaveBeenCalled();
+        expect(expirations.addExpiration).not.toHaveBeenCalled();
+        expect(logService.addEntry).not.toHaveBeenCalled();
+        expect(baseUtils.persistAndNotify).not.toHaveBeenCalled();
+    });
 
-        it('does not call onClose when overlay is clicked (element phase)', () => {
-            const { handleClose } = renderModal();
-            fireEvent.click(document.querySelector('.sp-overlay'));
-            expect(handleClose).not.toHaveBeenCalled();
-            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-        });
+    it('Skip in creature selection invokes onClose once, consuming the campaign prop but committing nothing', async () => {
+        combatData.getCombatSummary.mockReturnValue(selectionFixture);
+        const props = makeProps();
+        render(<ElementalAttunementModal {...props} />);
+        fireEvent.click(screen.getByRole('button', { name: /^Fire/ }));
+        const skipBtn = await screen.findByTestId('cs-skip-btn');
 
-        it('does not call onClose when modal content is clicked', () => {
-            const { handleClose } = renderModal();
-            fireEvent.click(document.querySelector('.sp-modal'));
-            expect(handleClose).not.toHaveBeenCalled();
-        });
+        // Props pass-through: enumeration ran against THIS campaign and consumed THIS frozen
+        // fixture by identity — the selection view is real, not a mock default.
+        expect(combatData.getCombatSummary).toHaveBeenCalledWith(CAMPAIGN);
+        expect(combatData.getCombatSummary.mock.results[0].value).toBe(selectionFixture);
 
-        it('calls onClose when Skip is clicked in CreatureSelectionModal', async () => {
-            const { handleClose } = renderModal();
-            combatData.getCombatSummary.mockReturnValue(makeCombatSummary([]));
-            fireEvent.click(screen.getByText('Fire'));
-            await waitFor(() => fireEvent.click(screen.getByTestId('cs-skip-btn')));
-            expect(handleClose).toHaveBeenCalledTimes(1);
-        });
+        fireEvent.click(skipBtn);
+        expect(props.onClose).toHaveBeenCalledTimes(1);
+        // Skip resolves nothing: no dice, no prompts, no store writes, no logs, no persist.
+        expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+        expect(savePromptService.sendSavePrompt).not.toHaveBeenCalled();
+        expect(runtime.setRuntimeValue).not.toHaveBeenCalled();
+        expect(expirations.addExpiration).not.toHaveBeenCalled();
+        expect(logService.addEntry).not.toHaveBeenCalled();
+        expect(baseUtils.persistAndNotify).not.toHaveBeenCalled();
     });
 });

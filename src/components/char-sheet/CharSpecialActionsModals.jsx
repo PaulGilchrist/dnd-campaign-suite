@@ -76,7 +76,7 @@ const MoonlightStepFallbackBlock = ({ fallback, onConfirm, onDismiss }) => (
 
 const PortentBlock = ({ portentModal, handlePortentModalClose, handlePortentDieChoice }) => (
     <div className="portent-modal-overlay">
-        <div className="portent-modal">
+        <div className="portent-modal" data-testid="portent-modal">
             <h3>Portent</h3>
             <div className="portent-modal-section">
                 <div className="portent-modal-label">Creature: <span className="portent-modal-target">{portentModal.targetName}</span></div>

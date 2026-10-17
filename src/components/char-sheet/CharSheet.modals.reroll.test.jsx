@@ -1,96 +1,61 @@
+// @maintained-by-ai
 // CLA-195 regression: renderPopup must wire popupHandlers.onReroll into the
-// AttackResultPopup (DiceRollResult) so sheet save rerolls consume resources.
+// AttackResultPopup (DiceRollResult) when popupHtml.autoReroll is set, so
+// sheet save rerolls consume resources. Seam unique to this file: the
+// renderPopup → popupHandlers dispatch. Reroll button display/behavior is
+// covered by DiceRollResult tests; handleReroll's body lives in
+// CharSheet.actionHandlers — don't duplicate those here.
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 import { renderPopup } from './CharSheet.modals.jsx';
 
-describe('renderPopup — Indomitable reroll wiring (CLA-195)', () => {
-  it('passes onReroll through so the reroll button fires popupHandlers.onReroll', () => {
-    const onReroll = vi.fn();
-    const popupHandlers = {
-      onWildShapeConfirm: vi.fn(),
-      onPolymorphConfirm: vi.fn(),
-      onShapechangeConfirm: vi.fn(),
-      onAnimalShapesBeastConfirm: vi.fn(),
-      onTruePolymorphConfirm: vi.fn(),
-      onObjectTransformConfirm: vi.fn(),
-      onSuperiorityManeuver: vi.fn(),
-      onTacticalMind: vi.fn(),
-      onDarkOnesLuck: vi.fn(),
-      onPsiBolsteredKnack: vi.fn(),
-      onBardicInspiration: vi.fn(),
-      onBardicInspirationOffense: vi.fn(),
-      onEmpoweredSpell: vi.fn(),
-      onPuncture: vi.fn(),
-      onSavageAttacker: vi.fn(),
-      onBiDefenseCombatSummary: vi.fn(),
-      onStrokeOfLuck: vi.fn(),
-      onReroll,
-    };
-    const popupHtml = {
-      type: 'd20',
-      rollType: 'save',
-      name: 'Wisdom',
-      rolls: [3],
-      bonus: 5,
+function renderD20SavePopup(popupHtmlOverrides) {
+  const popupHandlers = { onReroll: vi.fn() };
+  render(
+    <div>
+      {renderPopup({
+        popupHtml: {
+          type: 'd20',
+          rollType: 'save',
+          name: 'Wisdom',
+          rolls: [3],
+          bonus: 5,
+          ...popupHtmlOverrides,
+        },
+        setPopupHtml: vi.fn(),
+        playerStats: { name: 'EvasiveFighter', level: 18 },
+        campaignName: 'test-campaign',
+        characters: [],
+        popupHandlers,
+      })}
+    </div>
+  );
+  return popupHandlers;
+}
+
+describe('renderPopup — autoReroll wiring (CLA-195)', () => {
+  it('routes a reroll click to popupHandlers.onReroll with a fresh d20 and the reroll bonus in the total', () => {
+    const popupHandlers = renderD20SavePopup({
       autoReroll: true,
       autoRerollBonus: 18,
       autoRerollCondition: '',
-    };
-
-    render(
-      <div>
-        {renderPopup({ popupHtml, setPopupHtml: vi.fn(), isLocalhost: true, playerStats: { name: 'EvasiveFighter', level: 18 }, campaignName: 'test-campaign', characters: [], popupHandlers })}
-      </div>
-    );
-
-    const rerollBtn = screen.getByRole('button', { name: /Reroll \(\+18\)/ });
-    fireEvent.click(rerollBtn);
-
-    expect(onReroll).toHaveBeenCalledTimes(1);
-    expect(onReroll.mock.calls[0][0]).toMatchObject({
-      roll: expect.any(Number),
-      total: expect.any(Number),
     });
-    expect(onReroll.mock.calls[0][0].total).toBe(onReroll.mock.calls[0][0].roll + 5 + 18);
+
+    fireEvent.click(screen.getByRole('button', { name: /Reroll \(\+18\)/ }));
+
+    expect(popupHandlers.onReroll).toHaveBeenCalledTimes(1);
+    const [[{ roll, total }]] = popupHandlers.onReroll.mock.calls;
+    expect(roll).toBeGreaterThanOrEqual(1);
+    expect(roll).toBeLessThanOrEqual(20);
+    expect(total).toBe(roll + 5 + 18); // save bonus + Indomitable reroll bonus
   });
 
-  it('does not offer a reroll when popupHtml.autoReroll is not set', () => {
-    const popupHandlers = {
-      onWildShapeConfirm: vi.fn(),
-      onPolymorphConfirm: vi.fn(),
-      onShapechangeConfirm: vi.fn(),
-      onAnimalShapesBeastConfirm: vi.fn(),
-      onTruePolymorphConfirm: vi.fn(),
-      onObjectTransformConfirm: vi.fn(),
-      onSuperiorityManeuver: vi.fn(),
-      onTacticalMind: vi.fn(),
-      onDarkOnesLuck: vi.fn(),
-      onPsiBolsteredKnack: vi.fn(),
-      onBardicInspiration: vi.fn(),
-      onBardicInspirationOffense: vi.fn(),
-      onEmpoweredSpell: vi.fn(),
-      onPuncture: vi.fn(),
-      onSavageAttacker: vi.fn(),
-      onBiDefenseCombatSummary: vi.fn(),
-      onStrokeOfLuck: vi.fn(),
-      onReroll: vi.fn(),
-    };
-    const popupHtml = {
-      type: 'd20',
-      rollType: 'save',
-      name: 'Wisdom',
-      rolls: [3],
-      bonus: 5,
-    };
+  it('shows the result popup but offers no reroll when autoReroll is not set', () => {
+    const popupHandlers = renderD20SavePopup({});
 
-    render(
-      <div>
-        {renderPopup({ popupHtml, setPopupHtml: vi.fn(), isLocalhost: true, playerStats: { name: 'EvasiveFighter', level: 18 }, campaignName: 'test-campaign', characters: [], popupHandlers })}
-      </div>
-    );
-
+    // Non-vacuous: the popup itself renders, only the reroll offer is absent.
+    expect(screen.getByText('Wisdom')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Reroll/ })).not.toBeInTheDocument();
     expect(popupHandlers.onReroll).not.toHaveBeenCalled();
   });

@@ -1,209 +1,85 @@
+// @maintained-by-ai
+// ---------------------------------------------------------------------------
+// Contract pins for CharSheet.test-utils.jsx fixture factories.
 //
-// Cleaned: removed 8 redundant/brittle tests from 20 total.
-// - createMockStore: consolidated duplicate type checks (store1+store2 both
-//   asserted as Map instances) into a single assertion.
-// - createDefaultProps: removed "callbacks not called" test (brittle — asserts
-//   internal vi.fn() call state, not observable behavior).
-// - createMockPlayerStats: replaced 13-assertion snapshot with focused critical
-//   field checks; removed redundant nested-object override test.
-// - createSharedPopupReturnValue: removed Provider children passthrough test
-//   (implementation detail); consolidated freshness checks.
-// - setPopup: removed null-clearing test (same assignment logic as set test).
-// - resetTestState: removed Provider-unchanged test (implementation detail).
+// Most of this util is pure object literals or one-line assignments
+// (createMockStore, mockPlayerSummary, createSharedPopupReturnValue,
+// setPopup, Provider passthrough) whose shapes are exercised by every
+// consumer test that renders CharSheet — testing them here just echoes
+// the literals and adds no confidence. Only the two default+override
+// merge factories and the multi-step resetTestState helper carry
+// derivation logic worth pinning directly.
+// ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi } from 'vitest';
 
 import {
-  createMockStore,
-  mockPlayerSummary,
   createDefaultProps,
   createMockPlayerStats,
-  createSharedPopupReturnValue,
-  setPopup,
   resetTestState,
+  createSharedPopupReturnValue,
 } from './CharSheet.test-utils.jsx';
 
-// ---------------------------------------------------------------------------
-// Tests — createMockStore
-// ---------------------------------------------------------------------------
-
-describe('createMockStore', () => {
-  it('returns a fresh empty Map on each call', () => {
-    const store1 = createMockStore();
-    const store2 = createMockStore();
-    expect(store1).toBeInstanceOf(Map);
-    expect(store1).not.toBe(store2);
-    expect(store1.size).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tests — mockPlayerSummary
-// ---------------------------------------------------------------------------
-
-describe('mockPlayerSummary', () => {
-  it('exposes the expected default character metadata', () => {
-    expect(mockPlayerSummary).toEqual({
-      name: 'Test Character',
-      rules: '5e',
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tests — createDefaultProps
-// ---------------------------------------------------------------------------
-
 describe('createDefaultProps', () => {
-  const defaultKeys = [
-    'allAbilityScores',
-    'allClasses',
-    'allClasses2024',
-    'allEquipment',
-    'allMagicItems',
-    'allRaces',
-    'allSpells',
-    'allSpells2024',
-    'playerSummary',
-    'allRaces2024',
-    'allMagicItems2024',
-    'campaignName',
-    'activeMapName',
-    'characters',
-    'onDeleteCharacter',
-    'onEditCharacter',
-    'onUploadClick',
-    'onSaveClick',
-  ];
-
-  it('returns an object with all expected default keys and correct types', () => {
+  it('shallow-merges overrides over safe defaults with fresh mocks per call', () => {
     const props = createDefaultProps();
-    defaultKeys.forEach((key) => {
-      expect(props).toHaveProperty(key);
-    });
-    expect(Array.isArray(props.allAbilityScores)).toBe(true);
-    expect(Array.isArray(props.characters)).toBe(true);
-    expect(typeof props.onDeleteCharacter).toBe('function');
+    expect(props.campaignName).toBe('test-campaign');
+    expect(props.playerSummary).toMatchObject({ name: 'Test Character', rules: '5e' });
     expect(typeof props.onSaveClick).toBe('function');
-  });
+    // Each call must mint independent mocks, or call-count assertions
+    // in consumer tests would leak between tests.
+    expect(props.onSaveClick).not.toBe(createDefaultProps().onSaveClick);
 
-  it('applies override properties to the returned object', () => {
     const customFn = vi.fn();
-    const props = createDefaultProps({
-      campaignName: 'my-campaign',
-      level: 10,
-      onDeleteCharacter: customFn,
-    });
-    expect(props.campaignName).toBe('my-campaign');
-    expect(props.level).toBe(10);
-    expect(props.onDeleteCharacter).toBe(customFn);
+    const overridden = createDefaultProps({ campaignName: 'other', onSaveClick: customFn });
+    expect(overridden.campaignName).toBe('other');
+    expect(overridden.onSaveClick).toBe(customFn);
+    // Unspecified defaults survive the override spread.
+    expect(overridden.playerSummary).toBe(props.playerSummary);
+    expect(overridden.characters).toEqual([]);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Tests — createMockPlayerStats
-// ---------------------------------------------------------------------------
 
 describe('createMockPlayerStats', () => {
-  const criticalFields = [
-    'name', 'level', 'hitPoints', 'abilities', 'spellAbilities',
-    'rules', 'class', 'speed', 'race', 'automation',
-    'actions', 'bonusActions', 'reactions', 'specialActions',
-  ];
-
-  it('returns an object with the expected default structure', () => {
+  it('provides the baseline stats consumers derive from and lets overrides win', () => {
     const stats = createMockPlayerStats();
-    criticalFields.forEach((field) => {
-      expect(stats).toHaveProperty(field);
+    expect(stats).toMatchObject({
+      name: 'Test Character',
+      level: 5,
+      hitPoints: { current: 40, max: 40 },
+      rules: '5e',
+      class: { name: 'Fighter' },
+      speed: 30,
     });
-    expect(stats.name).toBe('Test Character');
-    expect(stats.level).toBe(5);
-    expect(stats.hitPoints).toEqual({ current: 40, max: 40 });
-    expect(stats.abilities[0].name).toBe('Strength');
-    expect(stats.abilities[0].bonus).toBe(2);
-    expect(stats.rules).toBe('5e');
-    expect(stats.class.name).toBe('Fighter');
-    expect(stats.speed).toBe(30);
-  });
+    expect(stats.abilities[0]).toMatchObject({ name: 'Strength', bonus: 2 });
+    expect(Array.isArray(stats.actions)).toBe(true);
 
-  it('applies override properties to the returned object', () => {
-    const customFn = vi.fn();
-    const stats = createMockPlayerStats({
-      name: 'Custom Character',
-      level: 10,
-      rules: '2024',
-      speed: 40,
-      onTest: customFn,
-    });
-    expect(stats.name).toBe('Custom Character');
-    expect(stats.level).toBe(10);
-    expect(stats.rules).toBe('2024');
-    expect(stats.speed).toBe(40);
-    expect(stats.onTest).toBe(customFn);
+    const overridden = createMockPlayerStats({ name: 'Custom', level: 10, rules: '2024' });
+    expect(overridden.name).toBe('Custom');
+    expect(overridden.level).toBe(10);
+    expect(overridden.rules).toBe('2024');
+    // Partial overrides keep the rest of the baseline intact.
+    expect(overridden.hitPoints).toEqual({ current: 40, max: 40 });
+    expect(overridden.class).toEqual({ name: 'Fighter' });
   });
 });
-
-// ---------------------------------------------------------------------------
-// Tests — createSharedPopupReturnValue
-// ---------------------------------------------------------------------------
-
-describe('createSharedPopupReturnValue', () => {
-  it('returns an object with popupHtml, setPopupHtml, value, and Provider', () => {
-    const returnValue = createSharedPopupReturnValue();
-    expect(returnValue).toHaveProperty('popupHtml', null);
-    expect(returnValue).toHaveProperty('setPopupHtml');
-    expect(returnValue).toHaveProperty('value');
-    expect(returnValue).toHaveProperty('Provider');
-  });
-
-  it('returns fresh objects and mocks on each call', () => {
-    const returnValue1 = createSharedPopupReturnValue();
-    const returnValue2 = createSharedPopupReturnValue();
-    expect(returnValue1).not.toBe(returnValue2);
-    expect(returnValue1.value).not.toBe(returnValue2.value);
-    expect(returnValue1.setPopupHtml).not.toBe(returnValue2.setPopupHtml);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tests — setPopup
-// ---------------------------------------------------------------------------
-
-describe('setPopup', () => {
-  it('sets and overwrites popupHtml to the provided value', () => {
-    const returnValue = createSharedPopupReturnValue();
-    const testHtml = { type: 'wild_shape_select', name: 'Test' };
-    setPopup(returnValue, testHtml);
-    expect(returnValue.popupHtml).toBe(testHtml);
-    setPopup(returnValue, { type: 'second' });
-    expect(returnValue.popupHtml).toEqual({ type: 'second' });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tests — resetTestState
-// ---------------------------------------------------------------------------
 
 describe('resetTestState', () => {
-  it('clears mock history, resets popupHtml, replaces setPopupHtml, and resets value', () => {
-    const returnValue = createSharedPopupReturnValue();
-    returnValue.setPopupHtml('called');
-    expect(returnValue.setPopupHtml).toHaveBeenCalledTimes(1);
-    returnValue.popupHtml = { type: 'old' };
-    returnValue.value = { old: 'data' };
+  it('restores popup state to pristine and leaves a live, cleared setter', () => {
+    const popup = createSharedPopupReturnValue();
+    popup.setPopupHtml('called');
+    popup.popupHtml = { type: 'old' };
+    popup.value = { old: 'data' };
 
-    resetTestState(returnValue);
+    resetTestState(popup);
 
-    expect(returnValue.setPopupHtml).toHaveBeenCalledTimes(0);
-    expect(returnValue.popupHtml).toBeNull();
-    expect(typeof returnValue.setPopupHtml).toBe('function');
-    expect(returnValue.value).toEqual({});
-  });
-
-  it('leaves Provider unchanged', () => {
-    const returnValue = createSharedPopupReturnValue();
-    const oldProvider = returnValue.Provider;
-    resetTestState(returnValue);
-    expect(returnValue.Provider).toBe(oldProvider);
+    expect(popup.popupHtml).toBeNull();
+    expect(popup.value).toEqual({});
+    expect(popup.setPopupHtml).toHaveBeenCalledTimes(0);
+    // The setter must still be a working mock after reset — consumer
+    // tests assert on it in subsequent it() blocks.
+    popup.setPopupHtml('after-reset');
+    expect(popup.setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(popup.setPopupHtml).toHaveBeenCalledWith('after-reset');
   });
 });

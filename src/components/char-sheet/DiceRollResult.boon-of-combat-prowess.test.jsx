@@ -1,6 +1,8 @@
 // FT-007: Boon of Combat Prowess — once a miss is converted, the popup must
 // flip to a hit state: offer button hides, the conversion row appears, and the
 // Done button renders (computedHit authoritative flip) so auto-damage dispatches.
+// Offer-gate coverage lives in rerollResults.test.jsx; callback-identity
+// coverage lives in stroke-of-luck.test.jsx. This file owns the flip sequence.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import DiceRollResult from './DiceRollResult.jsx';
@@ -34,36 +36,30 @@ function renderBoonPopup(props = {}) {
 }
 
 describe('FT-007 Boon of Combat Prowess miss-to-hit resolution', () => {
-    it('offers the boon on a miss and shows the MISS line before accepting', () => {
+    it('stays a MISS until accepted: offers the boon, no HIT, no conversion row, no Done for auto-damage', () => {
         renderBoonPopup();
         expect(screen.getByRole('button', { name: /Boon of Combat Prowess/i })).toBeInTheDocument();
-        expect(screen.getByText(/✗ MISS/i)).toBeInTheDocument();
-        expect(screen.queryByText(/✓ HIT/i)).not.toBeInTheDocument();
+        expect(screen.getByText('✗ MISS (12 vs AC 18)')).toBeInTheDocument();
+        expect(screen.queryByText(/✓ HIT/)).not.toBeInTheDocument();
         expect(screen.queryByText(/Miss converted to Hit/i)).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Done/i })).not.toBeInTheDocument();
     });
 
-    it('after accepting, flips to HIT, hides the offer, shows the conversion row, and renders Done', () => {
-        renderBoonPopup();
-        fireEvent.click(screen.getByRole('button', { name: /Boon of Combat Prowess/i }));
-        expect(screen.queryByRole('button', { name: /Boon of Combat Prowess/i })).not.toBeInTheDocument();
-        expect(screen.getByText(/Miss converted to Hit/i)).toBeInTheDocument();
-        expect(screen.getByText(/✓ HIT/i)).toBeInTheDocument();
-        expect(screen.queryByText(/✗ MISS/i)).not.toBeInTheDocument();
-    });
-
-    it('renders the Done button after conversion so auto-damage can dispatch', () => {
-        renderBoonPopup();
-        const boonBtn = screen.getByRole('button', { name: /Boon of Combat Prowess/i });
-        fireEvent.click(boonBtn);
-        // Done button uses the reroll-btn class in this component
-        const done = document.querySelector('.dice-roll-reroll-btn');
-        expect(done).not.toBeNull();
-    });
-
-    it('invokes onStrokeOfLuck with boonOfCombatProwess when clicked', () => {
+    it('accepting notifies the host, flips the popup to a HIT despite 12 < AC 18, and Done dispatches auto-damage', () => {
         const onStrokeOfLuck = vi.fn();
-        renderBoonPopup({ onStrokeOfLuck });
+        const onDone = vi.fn();
+        renderBoonPopup({ onStrokeOfLuck, onDone });
+
         fireEvent.click(screen.getByRole('button', { name: /Boon of Combat Prowess/i }));
+
         expect(onStrokeOfLuck).toHaveBeenCalledWith('boonOfCombatProwess');
+        expect(screen.queryByRole('button', { name: /Boon of Combat Prowess/i })).not.toBeInTheDocument();
+        expect(screen.getByText(/Boon of Combat Prowess: Miss converted to Hit/)).toBeInTheDocument();
+        // computedHit flips authoritatively — the original total still shows below AC.
+        expect(screen.getByText('✓ HIT (12 vs AC 18)')).toBeInTheDocument();
+        expect(screen.queryByText(/✗ MISS/i)).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: /Done/i }));
+        expect(onDone).toHaveBeenCalledWith(true);
     });
 });

@@ -81,9 +81,17 @@ honestly — after a fix, the pinning test must be updated in the same commit).
 - ⚠ CharBonusActions.jsx:221 — bonus-attack hit-cell onClick fires even when cannotAct (row only visually disabled), unlike damage cell guard :253; SAME pattern at CharActions.jsx:69 (spell hit cell) vs guarded :169 — looks like house convention where parent onAttackClick self-guards via assertCanAct denial popup; needs owner ruling. Run2 #22.
 - ⚠ CharCharacterAdvancement.jsx:44 — object options never highlight: `opt === currentOption` compares object vs string fallback `options[0].name` (:32) → all object options render dim with no runtime pin; fix = compare resolved names. Run2 #32.
 - ⚠ CharInventory.jsx:14 zero-handling asymmetry — `if (item.weight)` drops genuine weight:0 disk rows (equipment.json:127/167/467) while cost:{quantity:0} renders 'Cost: 0 gp' in same function; needs owner ruling. Run2 #35.
+- ⚠ CharReactions.jsx:144 — guards `spellAbilities` but dereferences `.spells.length` unguarded; `{ spells: null }` character JSON crashes reactions section. Run2 #43.
+- ⚠ CharReactions.jsx:336-343 — ReactionSpellRow hit/damage chips dispatch rollAttack/gateMetamagic WITHOUT isSlowed() guard (only name cell :331 gated) — slowed creature bypasses SP-109 block via chip. Run2 #50.
+- ⚠ CharSheet.handlers.js:537 — psionicEnergy 0 + success logs 'Succeeded, energy expended' though nothing was expended (misleading prose); honestly pinned by handlers4 zero-energy test. Run2 #60.
+- 🗑 CharReactions.jsx:407/417 — comment claims modalState/setModalState passed as props; signature ignores them (local useState) — caller-supplied props silently dropped; stale-doc + dead-prop cleanup. Run2 #43.
 - ⚠ CharBonusActions.jsx:216 — hit cell renders literal 'NaN' when exhaustionPenalty prop undefined (confirmed live in test until :0 passed; real Intl.NumberFormat emits 'NaN'); :280 same class for saveDc+displaySaveDcBonus (lower confidence, current data always carries saveDc). Fix: default props. Run2 #27.
 
 ## 🗑 Dead exports / zero-consumer code (delete + retire pins)
+- 🗑 CharSpecialActions.jsx:428 'Short Rest' restMessage ternary arm unreachable — ranger choice-lanes early-return :404-419 (run2 #73; tests pin not.toContain).
+- 🗑 CharSpecialActions family mock bloat: handlers.test.jsx (52 inline mocks) + modalsInline.test.jsx (49) redeclare shared modalMocks.jsx — consolidation rec (run2 #68).
+- 🗑 useAttackDamageResolution.js:361,366 leftover `[sw-debug]` console.log statements in production damage-resolution path (run2 #68).
+- 🗑 CharSheet.test-utils.jsx:80-88 `export default` object — zero default-importers; all 12 consumers use named imports (run2 #66).
 
 Full list grows in the ledger; headline entries: rollHealingForAction,
 useActionPopup.loadBackgrounds, handle*Confirm trio, setUnerringStrikeUsed,

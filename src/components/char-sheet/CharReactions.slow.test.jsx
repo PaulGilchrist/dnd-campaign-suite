@@ -1,8 +1,11 @@
+// @maintained-by-ai
 // SP-109: a slowed creature can't take Reactions — every reaction row click
-// is refused with a popup and an 'automation' log entry.
+// (feature rows AND reaction-spell rows) is refused with a 'Reaction Blocked'
+// popup and a single 'automation' log entry, with no downstream dice/selection
+// side effects. Control lane: unslowed clicks fire normally and log nothing.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CharReactions from './CharReactions.jsx';
 
 const mockSetPopupHtml = vi.fn();
@@ -118,6 +121,7 @@ vi.mock('../../services/ui/formatUtils.js', () => ({
 
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
 const campaignName = 'test-campaign';
@@ -130,38 +134,74 @@ const playerStats = {
     spellAbilities: { spells: [], toHit: 9, saveDc: 17 },
 };
 
+const shieldSpell = { name: 'Shield', level: 1, range: '1 self', dc: { value: 15, dc_type: 'Save' } };
+
 beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useLoggedDiceRoll).mockReturnValue({ rollAttack: vi.fn(), rollDamage: vi.fn() });
     getRuntimeValue.mockReturnValue(null);
+    getReactionSpellNames.mockReturnValue(new Set());
 });
 
-function renderReactions() {
-    return render(<CharReactions playerStats={playerStats} campaignName={campaignName} cannotAct={false} mapName={null} characters={[]} />);
+function setConditions(conditions) {
+    getRuntimeValue.mockImplementation((name, key) => (key === 'activeConditions' ? conditions : null));
+}
+
+function renderReactions(stats = playerStats) {
+    return render(<CharReactions playerStats={stats} campaignName={campaignName} cannotAct={false} mapName={null} characters={[]} />);
 }
 
 describe('CharReactions — SP-109 slow reaction gate', () => {
-    it('refuses a reaction click with popup + automation log while slowed', () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeConditions') return ['slow'];
-            return null;
-        });
+    it('refuses a feature reaction click while slowed: block popup + Slow automation log, OA dice lane never fires', () => {
+        setConditions(['slow']);
+        const rollAttack = vi.fn();
+        vi.mocked(useLoggedDiceRoll).mockReturnValue({ rollAttack, rollDamage: vi.fn() });
         renderReactions();
+
         fireEvent.click(screen.getByText('Opportunity Attack:'));
+
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Reaction Blocked'));
         expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Slowed'));
-        expect(addEntry).toHaveBeenCalledWith(
-            campaignName,
-            expect.objectContaining({ type: 'automation', creatureName: 'AberrantSorcerer', name: 'Slow' }),
-        );
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'automation',
+            creatureName: 'AberrantSorcerer',
+            name: 'Slow',
+            description: expect.stringContaining('Opportunity Attack'),
+        }));
+        // Gate short-circuits before the OA lane — no dice, no detail popup.
+        expect(rollAttack).not.toHaveBeenCalled();
     });
 
-    it('still allows reactions when not slowed', () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'activeConditions') return [];
-            return null;
-        });
+    it('refuses a reaction-spell row click while slowed: block popup + Slow log names the spell', () => {
+        setConditions(['slow']);
+        getReactionSpellNames.mockReturnValue(new Set([shieldSpell.name]));
+
+        renderReactions({ ...playerStats, spellAbilities: { ...playerStats.spellAbilities, spells: [shieldSpell] } });
+
+        fireEvent.click(screen.getByText('Shield'));
+
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Reaction Blocked'));
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Slowed'));
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'automation',
+            creatureName: 'AberrantSorcerer',
+            name: 'Slow',
+            description: expect.stringContaining('Shield'),
+        }));
+    });
+
+    it('control: unslowed, the same click fires the OA dice lane — no block popup, no log', async () => {
+        setConditions([]);
+        const rollAttack = vi.fn();
+        vi.mocked(useLoggedDiceRoll).mockReturnValue({ rollAttack, rollDamage: vi.fn() });
         renderReactions();
+
         fireEvent.click(screen.getByText('Opportunity Attack:'));
+
+        await waitFor(() => expect(rollAttack).toHaveBeenCalledWith('Mace', 3, expect.objectContaining({ isOpportunityAttack: true })));
+        expect(mockSetPopupHtml).not.toHaveBeenCalledWith(expect.stringContaining('Slowed'));
         expect(addEntry).not.toHaveBeenCalled();
     });
 });

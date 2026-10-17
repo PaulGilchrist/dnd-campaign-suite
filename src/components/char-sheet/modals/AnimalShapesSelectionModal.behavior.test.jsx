@@ -1,7 +1,20 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// LANE OWNERSHIP — AnimalShapesSelectionModal test trio
+// - behavior.test.jsx (THIS FILE, behavior lane): interaction lifecycle and callback
+//   contract — loading/error states, close semantics (Cancel / Close / Escape), overlay
+//   click inertness, Transform gating transitions (select → switch → deselect), and the
+//   exact onConfirm payload. Asserts disabled-until-selected and inertness on cancel.
+// - AnimalShapesSelectionModal.test.jsx (rendering lane): modal structure, creature
+//   filtering rules, search UI behaviour, selection badge display.
+// - AnimalShapesSelectionModal.utils.test.jsx (presentation lane): custom title/icon,
+//   speed formatting, image-error fallback, sort order, instruction text.
+// Keep new interaction/contract tests here; keep pure display checks in the other two.
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import AnimalShapesSelectionModal from './AnimalShapesSelectionModal.jsx';
+import { loadMonsters } from '../../../services/ui/dataLoader.js';
 
+// Deterministic bestiary stub: CR sorts Eagle/Panther/Wolf (1/4) before
+// Brown Bear/Crocodile/Giant Spider (1); Ghast is Undead (filtered out).
 const mockBeasts = [
     {
         index: 'wolf',
@@ -72,6 +85,10 @@ vi.mock('../../../services/ui/dataLoader.js', () => ({
     loadMonsters: vi.fn(async () => mockBeasts),
 }));
 
+const crocodile = mockBeasts.find(b => b.index === 'crocodile');
+const panther = mockBeasts.find(b => b.index === 'panther');
+const brownBear = mockBeasts.find(b => b.index === 'bear');
+
 const baseProps = {
     targets: ['Alric', 'Berenik'],
     maxCR: 4,
@@ -86,218 +103,197 @@ function makeProps(overrides) {
     return { ...baseProps, ...(overrides || {}) };
 }
 
-// Helper to find a beast item by name within a specific target section
+// The Transform button's accessible name embeds the live selection count,
+// so locating it by full name asserts count display and identity atomically.
+function transformButton(label) {
+    return screen.getByRole('button', { name: `Transform (${label})` });
+}
+
+async function findByTransformButton(label) {
+    const btn = await screen.findByRole('button', { name: `Transform (${label})` });
+    return btn;
+}
+
 function findBeastItemInSection(beastName, sectionIndex) {
-    const sections = document.querySelectorAll('.animal-shapes-target-section');
-    const section = sections[sectionIndex];
-    if (!section) return null;
-    const items = section.querySelectorAll('.animal-shapes-beast-item');
-    for (const item of items) {
-        const nameEl = item.querySelector('.animal-shapes-beast-name');
-        if (nameEl && nameEl.childNodes[0].textContent.trim() === beastName) {
-            return item;
-        }
-    }
-    return null;
+    const section = document.querySelectorAll('.animal-shapes-target-section')[sectionIndex];
+    if (!section) throw new Error(`No target section at index ${sectionIndex}`);
+    const item = Array.from(section.querySelectorAll('.animal-shapes-beast-item')).find(el => {
+        const nameEl = el.querySelector('.animal-shapes-beast-name');
+        return nameEl && nameEl.childNodes[0].textContent.trim() === beastName;
+    });
+    if (!item) throw new Error(`No beast item "${beastName}" in section ${sectionIndex}`);
+    return item;
 }
 
-function findBeastItem(beastName) {
-    return findBeastItemInSection(beastName, 0);
+// Render and wait until the loaded selection UI is up (Transform footer rendered).
+async function renderLoaded(props) {
+    const result = render(<AnimalShapesSelectionModal {...props} />);
+    await findByTransformButton(`0/${props.targets.length}`);
+    return result;
 }
 
-function getTransformButton() {
-    return screen.getByRole('button', { name: /Transform/ });
+async function selectBeast(beastName, sectionIndex) {
+    fireEvent.click(findBeastItemInSection(beastName, sectionIndex));
 }
+
+let consoleErrorSpy;
+
+beforeEach(() => {
+    vi.clearAllMocks();
+    loadMonsters.mockImplementation(async () => mockBeasts);
+    // Silence the component's intentional error-state console.error in error tests.
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+});
+
+afterEach(() => {
+    consoleErrorSpy.mockRestore();
+});
 
 describe('AnimalShapesSelectionModal - behavior', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    describe('close behavior', () => {
-        it('calls onCancel when Cancel button is clicked', async () => {
+    describe('lifecycle states', () => {
+        it('blocks selection actions while loading, but Escape still cancels', async () => {
+            // Forever-pending load: deterministic, no timers — we only assert the loading snapshot.
+            loadMonsters.mockReturnValueOnce(new Promise(() => { }));
             render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-            });
 
-            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-            expect(baseProps.onCancel).toHaveBeenCalled();
-        });
-
-        it('does not call onCancel when clicking the overlay background', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getByText('Animal Shapes')).toBeInTheDocument();
-            });
-
-            const overlay = document.querySelector('.sp-overlay');
-            fireEvent.click(overlay);
-            expect(baseProps.onCancel).not.toHaveBeenCalled();
-            expect(screen.getByText('Animal Shapes')).toBeInTheDocument();
-        });
-
-        it('calls onCancel when Escape key is pressed', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getByText('Animal Shapes')).toBeInTheDocument();
-            });
+            expect(await screen.findByText('Loading available creatures...')).toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: /Transform/ })).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
 
             fireEvent.keyDown(document, { key: 'Escape' });
-            expect(baseProps.onCancel).toHaveBeenCalled();
+            expect(baseProps.onCancel).toHaveBeenCalledTimes(1);
+            expect(baseProps.onConfirm).not.toHaveBeenCalled();
         });
 
-        it('calls onCancel when Close button is clicked in error state', async () => {
-            const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
+        it('shows the error message with only a Close action, which cancels without confirming', async () => {
             loadMonsters.mockRejectedValueOnce(new Error('Network error'));
+            const props = makeProps();
+            render(<AnimalShapesSelectionModal {...props} />);
 
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-
-            await waitFor(() => {
-                expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
-            });
+            expect(await screen.findByText('Failed to load creature data.')).toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: /Transform/ })).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
 
             fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-            expect(baseProps.onCancel).toHaveBeenCalled();
+            expect(props.onCancel).toHaveBeenCalledTimes(1);
+            expect(props.onConfirm).not.toHaveBeenCalled();
         });
     });
 
-    describe('error handling', () => {
-        it('renders error message when loadMonsters fails', async () => {
-            const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
-            loadMonsters.mockRejectedValueOnce(new Error('Network error'));
+    describe('close interactions', () => {
+        it.each([
+            ['Cancel button click', () => fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))],
+            ['Escape key press', () => fireEvent.keyDown(document, { key: 'Escape' })],
+        ])('%s cancels exactly once and never confirms', async (_name, trigger) => {
+            const props = makeProps();
+            await renderLoaded(props);
 
-            render(<AnimalShapesSelectionModal {...baseProps} />);
+            trigger();
 
-            await waitFor(() => {
-                expect(screen.getByText('Failed to load creature data.')).toBeInTheDocument();
-                expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
-            });
+            expect(props.onCancel).toHaveBeenCalledTimes(1);
+            expect(props.onConfirm).not.toHaveBeenCalled();
+        });
+
+        it('is inert when clicking the overlay backdrop — neither callback fires', async () => {
+            const props = makeProps();
+            await renderLoaded(props);
+
+            fireEvent.click(document.querySelector('.sp-overlay'));
+            fireEvent.click(document.querySelector('.sp-modal'));
+
+            expect(props.onCancel).not.toHaveBeenCalled();
+            expect(props.onConfirm).not.toHaveBeenCalled();
+            expect(screen.getByText('Animal Shapes')).toBeInTheDocument();
         });
     });
 
-    describe('loading state', () => {
-        it('shows loading text while beasts are loading', async () => {
-            const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
-            loadMonsters.mockReturnValueOnce(new Promise(() => {}));
-
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-
-            expect(screen.getByText('Loading available creatures...')).toBeInTheDocument();
-            expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-        });
-    });
-
-    describe('Transform button state', () => {
-        it('updates count display and enabled state when selections change', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getAllByText('Crocodile').length).toBe(2);
-            });
-
-            // Initially disabled with 0/2
-            let transformBtn = getTransformButton();
-            expect(transformBtn).toBeDisabled();
-            expect(transformBtn.textContent).toContain('0/2');
-
-            // Select one target
-            fireEvent.click(findBeastItemInSection('Crocodile', 0));
-            await waitFor(() => {
-                transformBtn = getTransformButton();
-                expect(transformBtn.textContent).toContain('1/2');
-            });
-
-            // Select second target - should enable
-            fireEvent.click(findBeastItemInSection('Panther', 1));
-            await waitFor(() => {
-                transformBtn = getTransformButton();
-                expect(transformBtn).toBeEnabled();
-                expect(transformBtn.textContent).toContain('2/2');
-            });
-
-            // Deselect first target - should disable again
-            const selectedCroc = findBeastItemInSection('Crocodile', 0);
-            if (selectedCroc && selectedCroc.classList.contains('selected')) {
-                fireEvent.click(selectedCroc);
-            }
-            await waitFor(() => {
-                transformBtn = getTransformButton();
-                expect(transformBtn.textContent).toContain('1/2');
-                expect(transformBtn).toBeDisabled();
-            });
-        });
-
-        it('disables Transform button when there are no targets', async () => {
-            render(<AnimalShapesSelectionModal {...makeProps({ targets: [] })} />);
-            await waitFor(() => {
-                expect(screen.getByText('Animal Shapes')).toBeInTheDocument();
-            });
-
-            const transformBtn = getTransformButton();
-            expect(transformBtn).toBeDisabled();
-            expect(transformBtn.textContent).toContain('0/0');
-        });
-    });
-
-    describe('confirm behavior', () => {
-        it('calls onConfirm with selected beast map when all targets have selections', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getAllByText('Crocodile').length).toBe(2);
-            });
-
-            fireEvent.click(findBeastItemInSection('Crocodile', 0));
-            fireEvent.click(findBeastItemInSection('Panther', 1));
-
-            await waitFor(() => {
-                const transformBtn = getTransformButton();
-                expect(transformBtn).toBeEnabled();
-                fireEvent.click(transformBtn);
-            });
-
-            await waitFor(() => {
-                expect(baseProps.onConfirm).toHaveBeenCalled();
-                const map = baseProps.onConfirm.mock.calls[0][0];
-                expect(map).toHaveProperty('Alric');
-                expect(map).toHaveProperty('Berenik');
-            });
-        });
-
-        it('passes the correct beast index in the confirm map', async () => {
-            render(<AnimalShapesSelectionModal {...baseProps} />);
-            await waitFor(() => {
-                expect(screen.getAllByText('Crocodile').length).toBe(2);
-            });
-
-            fireEvent.click(findBeastItemInSection('Crocodile', 0));
-            fireEvent.click(findBeastItemInSection('Panther', 1));
-
-            await waitFor(() => {
-                const transformBtn = getTransformButton();
-                fireEvent.click(transformBtn);
-            });
-
-            await waitFor(() => {
-                const map = baseProps.onConfirm.mock.calls[0][0];
-                expect(map.Alric.index).toBe('crocodile');
-                expect(map.Berenik.index).toBe('panther');
-            });
-        });
-
-        it('keeps Transform button disabled when not all targets are selected with 3 targets', async () => {
-            const props = makeProps({
+    describe('Transform gating', () => {
+        it.each([
+            { label: 'no targets', targets: [], selections: [], count: '0/0' },
+            { label: 'one of two selected', targets: ['Alric', 'Berenik'], selections: [[0, 'Crocodile']], count: '1/2' },
+            {
+                label: 'two of three selected',
                 targets: ['Alric', 'Berenik', 'Cedric'],
-            });
-            render(<AnimalShapesSelectionModal {...props} />);
-            await waitFor(() => {
-                expect(screen.getAllByText('Crocodile').length).toBe(3);
-            });
+                selections: [[0, 'Crocodile'], [1, 'Panther']],
+                count: '2/3',
+            },
+        ])('stays disabled and inert with partial selection — $label', async ({ targets, selections, count }) => {
+            const props = makeProps({ targets });
+            await renderLoaded(props);
 
-            fireEvent.click(findBeastItem('Crocodile'));
+            for (const [sectionIndex, beastName] of selections) {
+                await selectBeast(beastName, sectionIndex);
+            }
 
-            const transformBtn = getTransformButton();
-            expect(transformBtn).toBeDisabled();
-            expect(transformBtn.textContent).toContain('1/3');
+            const btn = await findByTransformButton(count);
+            expect(btn).toBeDisabled();
+
+            fireEvent.click(btn);
+            expect(props.onConfirm).not.toHaveBeenCalled();
+            expect(props.onCancel).not.toHaveBeenCalled();
+        });
+
+        it('transitions enabled state through select, switch, deselect and re-select', async () => {
+            const props = makeProps();
+            await renderLoaded(props);
+            expect(transformButton('0/2')).toBeDisabled();
+
+            await selectBeast('Crocodile', 0);
+            expect(await findByTransformButton('1/2')).toBeDisabled();
+
+            // Switching Alric's choice keeps the count at 1/2 and stays disabled.
+            await selectBeast('Brown Bear', 0);
+            expect(await findByTransformButton('1/2')).toBeDisabled();
+
+            await selectBeast('Panther', 1);
+            expect(await findByTransformButton('2/2')).toBeEnabled();
+
+            // Deselect Alric's current choice (Brown Bear) — gates closed again.
+            await selectBeast('Brown Bear', 0);
+            expect(await findByTransformButton('1/2')).toBeDisabled();
+
+            await selectBeast('Crocodile', 0);
+            expect(await findByTransformButton('2/2')).toBeEnabled();
+        });
+    });
+
+    describe('confirm payload contract', () => {
+        it('confirms with the exact chosen beast payload per target, reflecting a mid-flow switch', async () => {
+            const props = makeProps();
+            await renderLoaded(props);
+
+            await selectBeast('Crocodile', 0);
+            await selectBeast('Panther', 1);
+            // Alric switches form after both targets are selected.
+            await selectBeast('Brown Bear', 0);
+
+            const btn = transformButton('2/2');
+            expect(btn).toBeEnabled();
+            fireEvent.click(btn);
+
+            expect(props.onConfirm).toHaveBeenCalledTimes(1);
+            expect(props.onConfirm).toHaveBeenCalledWith({
+                Alric: brownBear,
+                Berenik: panther,
+            });
+            expect(props.onCancel).not.toHaveBeenCalled();
+        });
+
+        it('allows both targets to pick the same form and confirms both selections', async () => {
+            const props = makeProps();
+            await renderLoaded(props);
+
+            await selectBeast('Crocodile', 0);
+            await selectBeast('Crocodile', 1);
+
+            fireEvent.click(transformButton('2/2'));
+
+            expect(props.onConfirm).toHaveBeenCalledTimes(1);
+            expect(props.onConfirm).toHaveBeenCalledWith({
+                Alric: crocodile,
+                Berenik: crocodile,
+            });
+            expect(props.onCancel).not.toHaveBeenCalled();
         });
     });
 });

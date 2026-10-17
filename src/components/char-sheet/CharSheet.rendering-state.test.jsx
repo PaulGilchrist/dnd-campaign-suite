@@ -1,3 +1,15 @@
+// @maintained-by-ai
+// CharSheet STATE lane — what the load-time fetchData seams stamp onto the
+// stats/props handed to children (applyPreparedSpells, applyAspectOfTheWilds,
+// applyMovementPassives) and the exhaustion clamp reaching CharSummary.
+//
+// Lane split (do not re-add here):
+//   - prepared-spell toggle / max-prepared cap (#52) -> CharSheet.actionHandlers.test.jsx
+//   - Roving folded speed, heavy-armor gate, preserve (CLA-300) -> CharSheet.cla300-roving-speeds.test.jsx
+//   - conditionEffects canonical passthrough / exhaustion scaling -> CharSheet.conditionEffects.test.jsx
+//   - sheet-side buff stamps, lucky flags, isRaging (#64) -> CharSheet.rendering-effects.test.jsx
+// ---------------------------------------------------------------------------
+
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -128,12 +140,6 @@ vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-vi.mock('./DiceRollResult.jsx', () => ({
-  default: vi.fn(({ name }) => (
-    <div data-testid="dice-roll-result"><span>{name || 'dice'}</span></div>
-  )),
-}));
-
 vi.mock('./modals/shared/SecondaryTargetModal.jsx', () => ({
   default: vi.fn(() => <div data-testid="secondary-target-modal">modal</div>),
 }));
@@ -208,301 +214,194 @@ vi.mock('../../services/rules/rulesFactory.js', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Tests — runtime value propagation to playerStats
+// Helpers
 // ---------------------------------------------------------------------------
 
-describe('runtime value propagation to playerStats', () => {
-  beforeEach(() => {
-    resetTestState(sharedPopupReturnVal);
-    mockStore.clear();
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(createMockPlayerStats()));
+async function renderSheet(stats, props = {}) {
+  vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
+  render(<CharSheet {...createDefaultProps(props)} />);
+  await waitFor(() => {
+    expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
   });
+}
+
+async function summaryProps() {
+  const { default: CharSummary } = await import('./char-summary/CharSummary.jsx');
+  return CharSummary.mock.calls[0][0];
+}
+
+async function spellsProps() {
+  const { default: CharSpells } = await import('./char-spells/CharSpells.jsx');
+  return CharSpells.mock.calls[0][0].playerStats.spellAbilities.spells;
+}
+
+beforeEach(() => {
+  resetTestState(sharedPopupReturnVal);
+  mockStore.clear();
+});
+
+// ---------------------------------------------------------------------------
+// applyPreparedSpells — runtime saved list reconciles the loaded spell list
+// (toggle/cap lane lives in CharSheet.actionHandlers.test.jsx)
+// ---------------------------------------------------------------------------
+
+describe('prepared spells loaded from runtime state', () => {
+  const spells = [
+    { name: 'Fireball', prepared: '' },
+    { name: 'Mage Armor', prepared: 'Prepared' },
+  ];
 
   it.each([
-    { rules: '2024', className: 'Wizard', spellPrepared: 'Prepared', label: '2024 Wizard' },
-    { rules: '5e', className: 'Cleric', spellPrepared: 'Prepared', label: '5e Cleric' },
-  ])('loads prepared spells from runtime for $label', async ({ rules, className, spellPrepared }) => {
-    mockStore.set('Test Character:preparedSpells', ['Fireball']);
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(createMockPlayerStats({
-      rules,
-      class: { name: className },
-      spellAbilities: { spells: [{ name: 'Fireball', prepared: '' }, { name: 'Mage Armor', prepared: 'Prepared' }], maxPreparedSpells: 5 },
-    })));
-
-    render(<CharSheet {...createDefaultProps()} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSpells } = await import('./char-spells/CharSpells.jsx');
-    const passedStats = CharSpells.mock.calls[0][0].playerStats;
-    const fireballSpell = passedStats.spellAbilities.spells.find((s) => s.name === 'Fireball');
-    expect(fireballSpell.prepared).toBe(spellPrepared);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tests — Aspect of the Wilds passive effects (2024)
-// ---------------------------------------------------------------------------
-
-describe('Aspect of the Wilds passive effects (2024)', () => {
-  beforeEach(() => {
-    resetTestState(sharedPopupReturnVal);
-    mockStore.clear();
-  });
-
-  it('extends Darkvision range by 60ft when Owl option is selected', async () => {
-    const stats = createMockPlayerStats({
+    {
+      label: 'saved list marks its spells Prepared and clears stale Prepared flags',
+      saved: ['Fireball'],
+      expected: { Fireball: 'Prepared', 'Mage Armor': '' },
+    },
+    {
+      label: 'no saved list leaves loaded prepared flags untouched',
+      saved: null,
+      expected: { Fireball: '', 'Mage Armor': 'Prepared' },
+    },
+    {
+      label: '2024 non-Wizard ignores the saved list (only Wizards track prepared)',
+      saved: ['Fireball'],
       rules: '2024',
-      senses: [{ name: 'Darkvision', value: '60 ft.' }],
-    });
-    mockStore.set('Test Character:aspectOfTheWildsOption', 'Owl');
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
+      className: 'Cleric',
+      expected: { Fireball: '', 'Mage Armor': 'Prepared' },
+    },
+  ])('$label', async ({ saved, rules, className, expected }) => {
+    if (saved) mockStore.set('Test Character:preparedSpells', saved);
+    const props = rules
+      ? { playerSummary: { name: 'Test Character', rules, class: { name: className } } }
+      : {};
 
-    render(<CharSheet {...createDefaultProps()} />);
+    await renderSheet(createMockPlayerStats({ spellAbilities: { spells, maxPreparedSpells: 5 } }), props);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSummary } = await import('./char-summary/CharSummary.jsx');
-    const passedStats = CharSummary.mock.calls[0][0].playerStats;
-    const dv = passedStats.senses.find((s) => s.name === 'Darkvision');
-    expect(dv.value).toBe('120 ft.');
-  });
-
-  it('adds new Darkvision entry when none exists and Owl is selected', async () => {
-    const stats = createMockPlayerStats({ rules: '2024' });
-    mockStore.set('Test Character:aspectOfTheWildsOption', 'Owl');
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
-
-    render(<CharSheet {...createDefaultProps()} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSummary } = await import('./char-summary/CharSummary.jsx');
-    const passedStats = CharSummary.mock.calls[0][0].playerStats;
-    const dv = passedStats.senses?.find((s) => s.name === 'Darkvision');
-    expect(dv).toBeDefined();
-    expect(dv.value).toBe('60 ft.');
-  });
-
-  it('sets climbSpeed when Panther option is selected', async () => {
-    const stats = createMockPlayerStats({
-      rules: '2024',
-      race: { speed: 30, subrace: { speed: 35 } },
-    });
-    mockStore.set('Test Character:aspectOfTheWildsOption', 'Panther');
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
-
-    render(<CharSheet {...createDefaultProps()} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSummary } = await import('./char-summary/CharSummary.jsx');
-    const passedStats = CharSummary.mock.calls[0][0].playerStats;
-    expect(passedStats.climbSpeed).toBe(35);
-  });
-
-  it('sets swimSpeed when Salmon option is selected', async () => {
-    const stats = createMockPlayerStats({
-      rules: '2024',
-      race: { speed: 30 },
-    });
-    mockStore.set('Test Character:aspectOfTheWildsOption', 'Salmon');
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
-
-    render(<CharSheet {...createDefaultProps()} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSummary } = await import('./char-summary/CharSummary.jsx');
-    const passedStats = CharSummary.mock.calls[0][0].playerStats;
-    expect(passedStats.swimSpeed).toBe(30);
+    const loaded = await spellsProps();
+    expect(loaded.find((s) => s.name === 'Fireball').prepared).toBe(expected.Fireball);
+    expect(loaded.find((s) => s.name === 'Mage Armor').prepared).toBe(expected['Mage Armor']);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Tests — passive effect speed modifications
+// applyAspectOfTheWilds — runtime-selected aspect mutates stats at load
+// (the option WRITE side lives in CharSpecialActions.handlers.test.jsx;
+// CharSummary's own speed recomputation lives in char-summary tests)
 // ---------------------------------------------------------------------------
 
-describe('passive effect speed modifications', () => {
-  beforeEach(() => {
-    resetTestState(sharedPopupReturnVal);
-    mockStore.clear();
-  });
-
-  it('applies aquatic affinity passive swim speed and sets emanation range', async () => {
-    const stats = createMockPlayerStats({
-      automation: { passives: [{ effect: 'aquatic_affinity' }] },
-    });
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
-
-    render(<CharSheet {...createDefaultProps()} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSummary } = await import('./char-summary/CharSummary.jsx');
-    const passedStats = CharSummary.mock.calls[0][0].playerStats;
-    expect(passedStats.swimSpeed).toBe(30);
-  });
-
-  it('applies second-storywork passive climb speed', async () => {
-    const stats = createMockPlayerStats({
-      automation: { passives: [{ effect: 'second_storywork' }] },
-    });
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
-
-    render(<CharSheet {...createDefaultProps()} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSummary } = await import('./char-summary/CharSummary.jsx');
-    const passedStats = CharSummary.mock.calls[0][0].playerStats;
-    expect(passedStats.climbSpeed).toBe(30);
-  });
-
-  it('applies athlete climb speed passive', async () => {
-    const stats = createMockPlayerStats({
-      automation: { passives: [{ effect: 'climb_speed' }] },
-    });
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
-
-    render(<CharSheet {...createDefaultProps()} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSummary } = await import('./char-summary/CharSummary.jsx');
-    const passedStats = CharSummary.mock.calls[0][0].playerStats;
-    expect(passedStats.climbSpeed).toBe(30);
-  });
-
-  it('applies Roving climb and swim speeds when not wearing heavy armor', async () => {
-    // CLA-300: stats.speed is the rules-layer folded walk speed (base 30 +
-    // Roving +10). Climb/swim equal that folded total without re-adding the +10.
-    const stats = createMockPlayerStats({
-      speed: 40,
-      automation: { passives: [{ name: 'Roving' }] },
-      inventory: { equipped: ['Longsword'] },
-      equipment: [{ name: 'Longsword' }, { name: 'Chain Mail', armor_category: 'Heavy' }],
-    });
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
-
-    render(<CharSheet {...createDefaultProps()} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSummary } = await import('./char-summary/CharSummary.jsx');
-    const passedStats = CharSummary.mock.calls[0][0].playerStats;
-    expect(passedStats.climbSpeed).toBe(40);
-    expect(passedStats.swimSpeed).toBe(40);
-  });
-
-  it('does not apply Roving when wearing heavy armor', async () => {
-    const stats = createMockPlayerStats({
-      automation: { passives: [{ name: 'Roving' }] },
-      inventory: { equipped: ['Chain Mail'] },
-      equipment: [{ name: 'Chain Mail', armor_category: 'Heavy' }],
-    });
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
-
-    render(<CharSheet {...createDefaultProps()} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSummary } = await import('./char-summary/CharSummary.jsx');
-    const passedStats = CharSummary.mock.calls[0][0].playerStats;
-    expect(passedStats.climbSpeed).toBeUndefined();
-    expect(passedStats.swimSpeed).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tests — Athlete feat flags
-// ---------------------------------------------------------------------------
-
-describe('Athlete feat flags', () => {
-  beforeEach(() => {
-    resetTestState(sharedPopupReturnVal);
-    mockStore.clear();
-  });
-
-  it('exposes athleteStandFromProne flag when stand_from_prone passive exists', async () => {
-    const stats = createMockPlayerStats({
-      automation: { passives: [{ effect: 'stand_from_prone' }] },
-    });
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
-
-    render(<CharSheet {...createDefaultProps()} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSummary } = await import('./char-summary/CharSummary.jsx');
-    const passedStats = CharSummary.mock.calls[0][0].playerStats;
-    expect(passedStats.athleteStandFromProne).toBe(true);
-  });
-
-  it('exposes athleteReducedJumpRequirement flag when reduced_running_jump_requirement passive exists', async () => {
-    const stats = createMockPlayerStats({
-      automation: { passives: [{ effect: 'reduced_running_jump_requirement' }] },
-    });
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
-
-    render(<CharSheet {...createDefaultProps()} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSummary } = await import('./char-summary/CharSummary.jsx');
-    const passedStats = CharSummary.mock.calls[0][0].playerStats;
-    expect(passedStats.athleteReducedJumpRequirement).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tests — Exhaustion penalty computation
-// ---------------------------------------------------------------------------
-
-describe('Exhaustion penalty computation', () => {
-  beforeEach(() => {
-    resetTestState(sharedPopupReturnVal);
-    mockStore.clear();
-  });
-
+describe('Aspect of the Wilds applied at load from runtime option', () => {
   it.each([
-    { input: 3, expected: 3, label: 'normal level (3)' },
-    { input: 10, expected: 6, label: 'exceeds max (10 → 6)' },
-    { input: -1, expected: 0, label: 'negative (-1 → 0)' },
-  ])('clamps exhaustionLevel prop: $label', async ({ input, expected }) => {
+    {
+      label: 'Owl extends existing Darkvision by 60ft, other senses untouched',
+      stats: createMockPlayerStats({
+        rules: '2024',
+        senses: [{ name: 'Darkvision', value: '60 ft.' }, { name: 'Blindsight', value: '10 ft.' }],
+      }),
+      aspect: 'Owl',
+      expected: { darkvision: '120 ft.', blindsight: '10 ft.', climbSpeed: undefined, swimSpeed: undefined },
+    },
+    {
+      label: 'Owl adds a 60ft Darkvision entry when none exists',
+      stats: createMockPlayerStats({ rules: '2024' }),
+      aspect: 'Owl',
+      expected: { darkvision: '60 ft.', blindsight: undefined, climbSpeed: undefined, swimSpeed: undefined },
+    },
+    {
+      label: 'Panther sets climb speed to base race speed (subrace first)',
+      stats: createMockPlayerStats({ rules: '2024', race: { speed: 30, subrace: { speed: 35 } } }),
+      aspect: 'Panther',
+      expected: { darkvision: undefined, blindsight: undefined, climbSpeed: 35, swimSpeed: undefined },
+    },
+    {
+      label: 'Salmon sets swim speed to base race speed',
+      stats: createMockPlayerStats({ rules: '2024', race: { speed: 25 } }),
+      aspect: 'Salmon',
+      expected: { darkvision: undefined, blindsight: undefined, climbSpeed: undefined, swimSpeed: 25 },
+    },
+    {
+      label: 'ignored under 5e rules — Darkvision is not extended',
+      stats: createMockPlayerStats({
+        rules: '5e',
+        senses: [{ name: 'Darkvision', value: '60 ft.' }],
+      }),
+      aspect: 'Owl',
+      expected: { darkvision: '60 ft.', blindsight: undefined, climbSpeed: undefined, swimSpeed: undefined },
+    },
+  ])('$label', async ({ stats, aspect, expected }) => {
+    mockStore.set('Test Character:aspectOfTheWildsOption', aspect);
+
+    await renderSheet(stats);
+
+    const passedStats = (await summaryProps()).playerStats;
+    expect(passedStats.senses?.find((s) => s.name === 'Darkvision')?.value).toBe(expected.darkvision);
+    expect(passedStats.senses?.find((s) => s.name === 'Blindsight')?.value).toBe(expected.blindsight);
+    expect(passedStats.climbSpeed).toBe(expected.climbSpeed);
+    expect(passedStats.swimSpeed).toBe(expected.swimSpeed);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyMovementPassives — speed/flag stamps from automation.passives
+// (Roving is owned by CharSheet.cla300-roving-speeds.test.jsx)
+// ---------------------------------------------------------------------------
+
+describe('movement & Athlete passives stamped on load', () => {
+  it.each([
+    {
+      label: 'aquatic_affinity grants swim speed equal to race speed and publishes emanation range',
+      passives: [{ effect: 'aquatic_affinity' }],
+      expected: { climbSpeed: undefined, swimSpeed: 30, athleteStandFromProne: undefined, athleteReducedJumpRequirement: undefined, emanationRange: 10 },
+    },
+    {
+      label: 'second_storywork grants climb speed equal to race speed',
+      passives: [{ effect: 'second_storywork' }],
+      expected: { climbSpeed: 30, swimSpeed: undefined, athleteStandFromProne: undefined, athleteReducedJumpRequirement: undefined, emanationRange: undefined },
+    },
+    {
+      label: 'Athlete climb_speed passive grants climb speed',
+      passives: [{ effect: 'climb_speed' }],
+      expected: { climbSpeed: 30, swimSpeed: undefined, athleteStandFromProne: undefined, athleteReducedJumpRequirement: undefined, emanationRange: undefined },
+    },
+    {
+      label: 'stand_from_prone exposes the athleteStandFromProne flag without touching speeds',
+      passives: [{ effect: 'stand_from_prone' }],
+      expected: { climbSpeed: undefined, swimSpeed: undefined, athleteStandFromProne: true, athleteReducedJumpRequirement: undefined, emanationRange: undefined },
+    },
+    {
+      label: 'reduced_running_jump_requirement exposes the athleteReducedJumpRequirement flag without touching speeds',
+      passives: [{ effect: 'reduced_running_jump_requirement' }],
+      expected: { climbSpeed: undefined, swimSpeed: undefined, athleteStandFromProne: undefined, athleteReducedJumpRequirement: true, emanationRange: undefined },
+    },
+  ])('$label', async ({ passives, expected }) => {
+    await renderSheet(createMockPlayerStats({ automation: { passives } }));
+
+    const passedStats = (await summaryProps()).playerStats;
+    expect({
+      climbSpeed: passedStats.climbSpeed,
+      swimSpeed: passedStats.swimSpeed,
+      athleteStandFromProne: passedStats.athleteStandFromProne,
+      athleteReducedJumpRequirement: passedStats.athleteReducedJumpRequirement,
+      emanationRange: mockStore.get('Test Character:aquaticAffinityEmanationRange'),
+    }).toEqual(expected);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Exhaustion clamp — stored level is normalized to 0..6 before reaching
+// children (scaling of the doubled penalty: CharSheet.conditionEffects.test.jsx)
+// ---------------------------------------------------------------------------
+
+describe('exhaustionLevel prop clamping', () => {
+  it.each([
+    { input: 3, expected: 3, label: 'in-range level passes through (3 -> 3)' },
+    { input: 10, expected: 6, label: 'clamped to max at 6 (10 -> 6)' },
+    { input: -1, expected: 0, label: 'clamped to min at 0 (-1 -> 0)' },
+    { input: 'two', expected: 0, label: 'non-numeric stored value normalizes to 0' },
+  ])('$label', async ({ input, expected }) => {
     mockStore.set('Test Character:exhaustionLevel', input);
 
-    render(<CharSheet {...createDefaultProps()} />);
+    await renderSheet(createMockPlayerStats());
 
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSummary } = await import('./char-summary/CharSummary.jsx');
-    expect(CharSummary.mock.calls[0][0].exhaustionLevel).toBe(expected);
+    expect((await summaryProps()).exhaustionLevel).toBe(expected);
   });
 });

@@ -1,6 +1,20 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import BastionOfLawModal from './BastionOfLawModal.jsx';
+
+// ── Ownership ──
+// This file owns the CREATE-ward modal UI in isolation: target radio selection,
+// SP input bounds/clamping, Create-Ward gating, and the confirm seam emitting
+// exactly (spAmount, selectedTargetName) before onClose.
+// Deferred to owners:
+// - CharActionModals.inline-modals.test.jsx — onConfirm → handleApply payload
+//   → setPopupHtml flow (CharActionModals.jsx wires the wrapper at its
+//   bastionOfLawModal render site).
+// - bastionOfLawHandler.js handleApply — SP pool enforcement, ward dice
+//   writes to bastionOfLawWard* runtime keys, popups.
+// - restRules-longRest.js resetBastionOfLaw — long-rest ward reset.
+// - BastionOfLawSpendModal.test.jsx / CharReactions.*.test.jsx — the
+//   reaction spend-dice lane (separate component).
 
 // ── Mocked modules ──
 
@@ -8,313 +22,234 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
 }));
 
-// ── Re-import mocked modules ──
-
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 
-// ── Test fixtures ──
+// ── Helpers ──
 
-const baseProps = {
-  featureName: 'Bastion of Law',
-  creatureTargets: [
-    { name: 'Sorcerer1', type: 'player', currentHp: 45, maxHp: 45 },
-    { name: 'AllyWarrior', type: 'npc', currentHp: 30, maxHp: 30 },
-    { name: 'AllyRogue', type: 'npc', currentHp: 25, maxHp: 25 },
-  ],
-  playerName: 'Sorcerer1',
-  campaignName: 'test-campaign',
-  auto: { maxSP: 5, minSP: 1, range: '30_ft' },
-  onClose: vi.fn(),
-};
+// Live mutable store the mocked runtime read drains from — tests mutate
+// spStore directly instead of re-mocking per scenario.
+let spStore;
 
-function makeProps(overrides) {
-  return { ...baseProps, ...(overrides || {}) };
+function makeProps(overrides = {}) {
+  return {
+    featureName: 'Bastion of Law',
+    creatureTargets: [
+      { name: 'Sorcerer1', type: 'player', currentHp: 45, maxHp: 45 },
+      { name: 'AllyWarrior', type: 'npc', currentHp: 30, maxHp: 30 },
+      { name: 'AllyRogue', type: 'npc', currentHp: 25, maxHp: 25 },
+    ],
+    playerName: 'Sorcerer1',
+    campaignName: 'test-campaign',
+    auto: { maxSP: 5, minSP: 1, range: '30_ft' },
+    onClose: vi.fn(),
+    onConfirm: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  };
 }
 
-function renderModal(propsOverrides) {
-  return render(<BastionOfLawModal {...makeProps(propsOverrides)} />);
+function renderModal(overrides) {
+  return render(<BastionOfLawModal {...makeProps(overrides)} />);
 }
+
+const spInput = () => screen.getByLabelText('Sorcery Points to spend:');
+const createBtn = () => screen.getByRole('button', { name: /Create Ward/ });
+const targetRadio = (name) => screen.getByRole('radio', { name: new RegExp(name) });
 
 // ── Tests ──
 
 describe('BastionOfLawModal', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    runtimeState.getRuntimeValue.mockImplementation((player, key, _campaign) => {
-      if (key === 'sorceryPoints') return 10;
-      return 10;
-    });
+    spStore = { sorceryPoints: 10 };
+    runtimeState.getRuntimeValue.mockImplementation(
+      (_player, key) => spStore[key]
+    );
   });
 
-  // ── Initial render / display ──
+  afterEach(() => {
+    runtimeState.getRuntimeValue.mockReset();
+  });
 
-  describe('initial render', () => {
-    it('renders the modal with feature name, description, and target list', () => {
+  // ── Rendering ──
+
+  describe('rendering', () => {
+    it('renders the ward prompt and every ward detail line verbatim', () => {
       renderModal();
       expect(screen.getByText('Bastion of Law')).toBeInTheDocument();
-      expect(screen.getByText(/Choose a creature to create a magical ward on/)).toBeInTheDocument();
+      expect(screen.getByText(
+        'Choose a creature to create a magical ward on. Each sorcery point spent creates one d8 in the ward dice pool.'
+      )).toBeInTheDocument();
+      expect(screen.getByText('Ward dice: 1d8')).toBeInTheDocument();
+      expect(screen.getByText('Range: 30 ft')).toBeInTheDocument();
+      expect(screen.getByText('Duration: Long Rest or until target uses it')).toBeInTheDocument();
+      expect(screen.getByText('Target uses Reaction when taking damage to spend dice')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
-    it('renders all creature targets in the selection list with HP and type labels', () => {
+    it('lists each creature as an unchecked radio with exact HP and type segments', () => {
       renderModal();
+      expect(screen.getAllByRole('radio')).toHaveLength(3);
       expect(screen.getByText('Sorcerer1')).toBeInTheDocument();
       expect(screen.getByText('AllyWarrior')).toBeInTheDocument();
       expect(screen.getByText('AllyRogue')).toBeInTheDocument();
       expect(screen.getByText('45/45 HP')).toBeInTheDocument();
       expect(screen.getByText('30/30 HP')).toBeInTheDocument();
       expect(screen.getByText('25/25 HP')).toBeInTheDocument();
+      expect(screen.queryByRole('radio', { checked: true })).not.toBeInTheDocument();
     });
 
-    it('renders SP input with correct min/max and defaults to min', () => {
+    it('reads the sorcery point pool from the runtime store once with exact arguments', () => {
       renderModal();
-      const input = screen.getByLabelText('Sorcery Points to spend:');
-      expect(input).toBeInTheDocument();
-      expect(input.min).toBe('1');
-      expect(input.max).toBe('5');
-      expect(input.value).toBe('1');
-    });
-
-    it('renders the Create Ward button and ward details section', () => {
-      renderModal();
-      expect(screen.getByText(/Creates 1d8 ward/)).toBeInTheDocument();
-      expect(screen.getByText(/Ward dice: 1d8/)).toBeInTheDocument();
-      expect(screen.getByText(/30 ft/)).toBeInTheDocument();
-      expect(screen.getByText(/Long Rest or until target uses it/)).toBeInTheDocument();
-      expect(screen.getByText(/Target uses Reaction when taking damage to spend dice/)).toBeInTheDocument();
-    });
-
-    it('renders the Cancel button', () => {
-      renderModal();
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
-
-    it('disables Create Ward button when no target selected', () => {
-      renderModal();
-      const createBtn = screen.getByRole('button', { name: /Create Ward/ });
-      expect(createBtn).toBeDisabled();
-    });
-
-    it('enables Create Ward button when a target is selected', () => {
-      renderModal();
-      const warriorLabel = screen.getByText('AllyWarrior');
-      fireEvent.click(warriorLabel);
-      const createBtn = screen.getByRole('button', { name: /Create Ward/ });
-      expect(createBtn).not.toBeDisabled();
+      expect(runtimeState.getRuntimeValue).toHaveBeenCalledTimes(1);
+      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
+        'Sorcerer1', 'sorceryPoints', 'test-campaign'
+      );
     });
   });
 
-  // ── Target selection ──
+  // ── SP input bounds and clamping ──
 
-  describe('target selection', () => {
-    function getTargetOption(text) {
-      const labels = document.querySelectorAll('.bastion-target-option');
-      for (const label of labels) {
-        if (label.textContent.includes(text)) {
-          return label;
-        }
-      }
-      return null;
-    }
+  describe('SP input bounds', () => {
+    it.each([
+      { label: 'defaults', auto: { maxSP: 5, minSP: 1, range: '30_ft' }, min: '1', max: '5', value: '1', rangeLine: 'Range: 30 ft' },
+      { label: 'custom bounds and underscore range', auto: { maxSP: 8, minSP: 2, range: '60_ft' }, min: '2', max: '8', value: '2', rangeLine: 'Range: 60 ft' },
+      { label: 'missing minSP and range', auto: { maxSP: 3 }, min: '1', max: '3', value: '1', rangeLine: 'Range: 30 ft' },
+      { label: 'null auto', auto: null, min: '1', max: '5', value: '1', rangeLine: 'Range: 30 ft' },
+      { label: 'undefined auto', auto: undefined, min: '1', max: '5', value: '1', rangeLine: 'Range: 30 ft' },
+    ])('applies min/max/default and range for $label', ({ auto, min, max, value, rangeLine }) => {
+      renderModal({ auto });
+      const input = spInput();
+      expect(input.min).toBe(min);
+      expect(input.max).toBe(max);
+      expect(input.value).toBe(value);
+      expect(screen.getByText(rangeLine)).toBeInTheDocument();
+    });
 
-    it('highlights selected target with selected class and switches selection on re-click', () => {
-      renderModal();
-      const warriorOption = getTargetOption('AllyWarrior');
-      fireEvent.click(warriorOption);
-      expect(warriorOption).toHaveClass('selected');
-
-      const rogueOption = getTargetOption('AllyRogue');
-      fireEvent.click(rogueOption);
-      expect(warriorOption).not.toHaveClass('selected');
-      expect(rogueOption).toHaveClass('selected');
+    it.each([
+      { typed: '0', expected: '1', auto: { maxSP: 5, minSP: 1, range: '30_ft' } },
+      { typed: '10', expected: '3', auto: { maxSP: 3, minSP: 1, range: '30_ft' } },
+      { typed: '', expected: '1', auto: { maxSP: 5, minSP: 1, range: '30_ft' } },
+      { typed: 'abc', expected: '1', auto: { maxSP: 5, minSP: 1, range: '30_ft' } },
+      { typed: '4', expected: '4', auto: { maxSP: 5, minSP: 1, range: '30_ft' } },
+    ])('clamps typed SP "$typed" to $expected and mirrors it in preview and button', ({ typed, expected, auto }) => {
+      renderModal({ auto });
+      const input = spInput();
+      fireEvent.change(input, { target: { value: typed } });
+      expect(input.value).toBe(expected);
+      expect(screen.getByText(`Creates ${expected}d8 ward`)).toBeInTheDocument();
+      expect(screen.getByText(`Ward dice: ${expected}d8`)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: `Create Ward (${expected}d8)` })).toBeInTheDocument();
     });
   });
 
-  // ── SP input clamping behavior ──
+  // ── Selection gating ──
 
-  describe('SP input clamping', () => {
-    it('clamps to min when input is below min', () => {
+  describe('selection gating', () => {
+    it('enables Create Ward only when a target radio is checked, and the check follows re-selection', () => {
       renderModal();
-      const input = screen.getByLabelText('Sorcery Points to spend:');
-      fireEvent.change(input, { target: { value: '0' } });
-      expect(input.value).toBe('1');
+      expect(createBtn()).toBeDisabled();
+
+      fireEvent.click(targetRadio('AllyWarrior'));
+      expect(createBtn()).not.toBeDisabled();
+      expect(targetRadio('AllyWarrior')).toBeChecked();
+      expect(targetRadio('AllyRogue')).not.toBeChecked();
+
+      fireEvent.click(targetRadio('AllyRogue'));
+      expect(targetRadio('AllyRogue')).toBeChecked();
+      expect(targetRadio('AllyWarrior')).not.toBeChecked();
+      expect(createBtn()).not.toBeDisabled();
     });
 
-    it('clamps to max when input is above max', () => {
-      renderModal({ auto: { maxSP: 3 } });
-      const input = screen.getByLabelText('Sorcery Points to spend:');
-      fireEvent.change(input, { target: { value: '10' } });
-      expect(input.value).toBe('3');
-    });
-
-    it('defaults to min for empty or non-numeric input', () => {
-      renderModal();
-      const input = screen.getByLabelText('Sorcery Points to spend:');
-      fireEvent.change(input, { target: { value: '' } });
-      expect(input.value).toBe('1');
-      fireEvent.change(input, { target: { value: 'abc' } });
-      expect(input.value).toBe('1');
-    });
-
-    it('clamps to minSP when sorcery points are lower than maxSP', () => {
-      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'sorceryPoints') return 3;
-        return 10;
-      });
-      renderModal({ auto: { maxSP: 5, minSP: 1 } });
-      const input = screen.getByLabelText('Sorcery Points to spend:');
-      expect(input.value).toBe('1');
-    });
-
-    it('respects minSP even when sorcery points are high', () => {
-      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'sorceryPoints') return 10;
-        return 10;
-      });
-      renderModal({ auto: { maxSP: 5, minSP: 2 } });
-      const input = screen.getByLabelText('Sorcery Points to spend:');
-      expect(input.value).toBe('2');
-    });
-
-    it('updates the Create Ward button dice count when SP changes', () => {
-      renderModal({ auto: { maxSP: 5 } });
-      const input = screen.getByLabelText('Sorcery Points to spend:');
-      fireEvent.change(input, { target: { value: '4' } });
-      expect(screen.getByText(/Creates 4d8 ward/)).toBeInTheDocument();
-    });
-  });
-
-  // ── Create Ward flow ──
-
-  describe('create ward flow', () => {
-    it('calls onConfirm with spAmount and selectedTargetName when Create Ward is clicked', async () => {
-      const onConfirm = vi.fn().mockResolvedValue({ type: 'popup', payload: { description: 'Ward created' } });
-      renderModal({ onConfirm, auto: { maxSP: 3 } });
-
-      const warriorLabel = screen.getByText('AllyWarrior');
-      fireEvent.click(warriorLabel);
-
-      const input = screen.getByLabelText('Sorcery Points to spend:');
-      fireEvent.change(input, { target: { value: '2' } });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
-      });
-
-      expect(onConfirm).toHaveBeenCalledWith(2, 'AllyWarrior');
-    });
-
-    it('calls onClose after successful ward creation', async () => {
-      const onClose = vi.fn();
-      const onConfirm = vi.fn().mockResolvedValue({ type: 'popup', payload: { description: 'Ward created' } });
-      render(<BastionOfLawModal {...makeProps({ onClose, onConfirm, auto: { maxSP: 3 } })} />);
-
-      const warriorLabel = screen.getByText('AllyWarrior');
-      fireEvent.click(warriorLabel);
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
-      });
-
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onConfirm when Create Ward is clicked and no target selected', async () => {
+    it('does not confirm or close when Create Ward is clicked with no target selected', async () => {
       const onConfirm = vi.fn();
-      renderModal({ onConfirm });
+      const onClose = vi.fn();
+      renderModal({ onConfirm, onClose });
 
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Create Ward/ }));
+        fireEvent.click(createBtn());
       });
 
       expect(onConfirm).not.toHaveBeenCalled();
-    });
-
-    it('calls onClose when Cancel button is clicked', async () => {
-      const onClose = vi.fn();
-      render(<BastionOfLawModal {...makeProps({ onClose })} />);
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      });
-
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onClose or onConfirm when overlay is clicked', async () => {
-      const onClose = vi.fn();
-      const onConfirm = vi.fn();
-      render(<BastionOfLawModal {...makeProps({ onClose, onConfirm })} />);
-
-      const warriorLabel = screen.getByText('AllyWarrior');
-      fireEvent.click(warriorLabel);
-
-      await act(async () => {
-        fireEvent.click(document.querySelector('.sp-overlay'));
-      });
-
       expect(onClose).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Confirm seam ──
+
+  describe('confirm seam', () => {
+    it('emits the exact (spAmount, selectedTargetName) payload, then closes once', async () => {
+      const onConfirm = vi.fn().mockResolvedValue(undefined);
+      const onClose = vi.fn();
+      renderModal({ onConfirm, onClose });
+
+      fireEvent.click(targetRadio('AllyWarrior'));
+      fireEvent.change(spInput(), { target: { value: '2' } });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Create Ward (2d8)' }));
+      });
+
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(onConfirm).toHaveBeenCalledWith(2, 'AllyWarrior');
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('confirms the untouched minSP default with the selected target', async () => {
+      const onConfirm = vi.fn().mockResolvedValue(undefined);
+      const onClose = vi.fn();
+      renderModal({ onConfirm, onClose, auto: { maxSP: 5, minSP: 3, range: '30_ft' } });
+
+      fireEvent.click(targetRadio('AllyRogue'));
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Create Ward (3d8)' }));
+      });
+
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(onConfirm).toHaveBeenCalledWith(3, 'AllyRogue');
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('closes without confirming when Cancel is clicked', () => {
+      const onConfirm = vi.fn();
+      const onClose = vi.fn();
+      renderModal({ onConfirm, onClose });
+
+      fireEvent.click(targetRadio('AllyWarrior'));
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(onClose).toHaveBeenCalledTimes(1);
       expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it('stays inert when the overlay is clicked after selecting a target', () => {
+      const onConfirm = vi.fn();
+      const onClose = vi.fn();
+      renderModal({ onConfirm, onClose });
+
+      fireEvent.click(targetRadio('AllyWarrior'));
+      fireEvent.click(document.querySelector('.sp-overlay'));
+
+      expect(onConfirm).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+      expect(targetRadio('AllyWarrior')).toBeChecked();
     });
   });
 
-  // ── Custom auto config ──
+  // ── Target list edges ──
 
-  describe('custom auto config', () => {
-    it('uses custom maxSP, minSP, and defaults to minSP value', () => {
-      renderModal({ auto: { maxSP: 8, minSP: 2, range: '30_ft' } });
-      const input = screen.getByLabelText('Sorcery Points to spend:');
-      expect(input.max).toBe('8');
-      expect(input.min).toBe('2');
-      expect(input.value).toBe('2');
-    });
-
-    it('formats range by replacing underscores with spaces', () => {
-      renderModal({ auto: { range: '30_ft' } });
-      expect(screen.getByText(/30 ft/)).toBeInTheDocument();
-    });
-
-    it('uses default range when auto.range is null', () => {
-      renderModal({ auto: { range: null } });
-      expect(screen.getByText(/30 ft/)).toBeInTheDocument();
-    });
-
-    it('uses default range when auto.range is undefined', () => {
-      renderModal({ auto: {} });
-      expect(screen.getByText(/30 ft/)).toBeInTheDocument();
-    });
-
-    it('uses default SP values when auto is null', () => {
-      renderModal({ auto: null });
-      const input = screen.getByLabelText('Sorcery Points to spend:');
-      expect(input.min).toBe('1');
-      expect(input.max).toBe('5');
-      expect(input.value).toBe('1');
-    });
-
-    it('uses default SP values when auto is undefined', () => {
-      renderModal({ auto: undefined });
-      const input = screen.getByLabelText('Sorcery Points to spend:');
-      expect(input.min).toBe('1');
-      expect(input.max).toBe('5');
-      expect(input.value).toBe('1');
-    });
-  });
-
-  // ── Edge cases ──
-
-  describe('edge cases', () => {
-    it('renders with empty creature targets list', () => {
+  describe('target list edges', () => {
+    it('renders no radios and keeps Create Ward disabled for an empty target list', () => {
       renderModal({ creatureTargets: [] });
-      expect(screen.getByText('Bastion of Law')).toBeInTheDocument();
-      expect(screen.getByText(/Choose a creature to create a magical ward on/)).toBeInTheDocument();
-      expect(screen.queryByText(/Sorcerer|AllyWarrior|AllyRogue/)).not.toBeInTheDocument();
+      expect(screen.queryAllByRole('radio')).toHaveLength(0);
+      expect(createBtn()).toBeDisabled();
     });
 
-    it('renders targets without HP gracefully', () => {
+    it('omits the HP segment for a target without HP', () => {
       renderModal({ creatureTargets: [{ name: 'Mystery', type: 'npc', currentHp: null, maxHp: null }] });
+      expect(screen.getByRole('radio')).toBeEnabled();
       expect(screen.getByText('Mystery')).toBeInTheDocument();
-      expect(screen.queryByText(/HP/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/\d+\/\d+ HP/)).not.toBeInTheDocument();
     });
   });
 });

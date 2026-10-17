@@ -1,26 +1,21 @@
+// @maintained-by-ai
+// Sheet-side handler lane for CharSheet.handlers: puncture damage/flag flow,
+// Savage Attacker click + choice math (incl. FT-069 rider delta), Tactical
+// Mind CLA-352 spend/refusal tiers, Dark One's Luck zero-uses guard,
+// superiority maneuver guards, and Psi-Bolstered Knack eligibility.
 //
-// Behavioral tests for CharSheet handler functions (handlePuncture,
-// handleSavageAttacker, handleTacticalMind, handleDarkOnesLuck,
-// handleSuperiorityManeuver, handlePsiBolsteredKnack).
-//
-// Cleaned: removed 14 redundant null/missing-parameter early-return tests
-// (they assert defensive programming patterns, not business behavior).
-// Removed 5 duplicate "default name when popupHtml.name is missing" tests
-// (consolidated into a single parameterized test).
-// Removed 2 TDZ-bug tests that asserted a temporal dead zone error in
-// handlePuncture (the bug was fixed; these tests now assert stale behavior).
-// Removed brittle setRuntimeValue key-filter assertions (tests now verify
-// the observable side effect — that the correct ability was logged — rather
-// than the internal runtime key name).
-//
-// Retained tests verify unique behavioral contracts:
-//   - Damage difference application (non-zero vs zero)
-//   - Resource decrement when available
-//   - Resource not expended when 0 / success is false
-//   - Maneuver found/not-found behavior
-//   - Initiative update on initiative rolls
-//   - Popup result info
-//   - Success/failure logging
+// Trimmed 2026-10-16 (29 → 23 tests):
+//   - Puncture "already used" early-return folded into the gate test (which
+//     also proves no damage and no log on the blocked second use).
+//   - Tactical Mind "null uses" folded into the zero-uses refusal via it.each.
+//   - Psi-Bolstered Knack "raw ability check" refusal folded into the
+//     non-proficient refusal via it.each (same ineligible branch).
+//   - Dark One's Luck positive path removed — CharSheet.featureRiders.test.jsx
+//     owns store decrement + exact log shape; only the zero-uses guard stays.
+//   - Superiority decrement/log and initiative-tracker lanes removed —
+//     CharSheet.featureRiders.test.jsx asserts the store write, tracker
+//     rewrite, persistence and initiative-rolled event strictly; the
+//     maneuver-not-found guard and popup content shape stay here.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -108,44 +103,7 @@ describe('handlePuncture', () => {
     vi.clearAllMocks();
   });
 
-  it('returns null when piercerPunctureUsedThisTurn is already true', async () => {
-    const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-    getRuntimeValue.mockReturnValue(true);
-
-    const result = await handlePuncture({ playerStats: mockPlayerStats, campaignName: mockCampaignName, characters: [], popupHtml: null, setPopupHtml: vi.fn(), punctureData: {
-      rawDamage: 10,
-      targetName: 'Goblin',
-      damageTypes: ['Piercing'],
-      originalRolls: [7, 3],
-      newRolls: [6, 4],
-      rerolledIndex: 0,
-      originalValue: 7,
-      newValue: 6,
-    } });
-    expect(result).toBeNull();
-  });
-
-  it('returns early when combatContext is missing', async () => {
-    const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-    const { getCombatContext } = await import('../../services/rules/combat/damageUtils.js');
-
-    getRuntimeValue.mockReturnValue(null);
-    getCombatContext.mockResolvedValue(null);
-
-    const result = await handlePuncture({ playerStats: mockPlayerStats, campaignName: mockCampaignName, characters: [], popupHtml: null, setPopupHtml: vi.fn(), punctureData: {
-      rawDamage: 10,
-      targetName: 'Goblin',
-      damageTypes: ['Piercing'],
-      originalRolls: [7, 3],
-      newRolls: [6, 4],
-      rerolledIndex: 0,
-      originalValue: 7,
-      newValue: 6,
-    } });
-    expect(result).toBeNull();
-  });
-
-  it('applies damage delta, writes piercerPunctureUsedThisTurn and logs when combat context exists', async () => {
+  it('applies damage delta, stamps piercerPunctureUsedThisTurn, and rewrites the popup total', async () => {
     const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
     const { getCombatContext } = await import('../../services/rules/combat/damageUtils.js');
     const { applyDamageToTarget } = await import('../../services/rules/combat/applyDamage.js');
@@ -176,12 +134,18 @@ describe('handlePuncture', () => {
       punctureData
     });
 
+    // Delta = newRolls 15 + modifier -1 − rawDamage 10 = +4.
     expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Zombie 1', 4, ['Piercing'], { campaignName: mockCampaignName, characters: [], ignoreResistance: false, attackerName: 'Test Character' });
     expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'piercerPunctureUsedThisTurn', true, mockCampaignName);
     expect(addEntry).toHaveBeenCalled();
     expect(addEntry.mock.calls[0][1].abilityName).toBe('Piercer - Puncture');
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+      total: 14,
+      adjustedTotal: 14,
+      rolls: [5, 5, 5],
+      finalDamage: 14,
+    }));
     expect(result.newDice).toEqual([5, 5, 5]);
-    expect(setPopupHtml).toHaveBeenCalled();
   });
 
   it('gates a second same-turn puncture after the flag is written', async () => {
@@ -216,10 +180,36 @@ describe('handlePuncture', () => {
     expect(applyDamageToTarget).not.toHaveBeenCalled();
     expect(addEntry).not.toHaveBeenCalled();
   });
+
+  it('consumes no use and applies no damage when combat context is missing', async () => {
+    const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+    const { getCombatContext } = await import('../../services/rules/combat/damageUtils.js');
+    const { applyDamageToTarget } = await import('../../services/rules/combat/applyDamage.js');
+    const { addEntry } = await import('../../services/ui/logService.js');
+
+    getRuntimeValue.mockReturnValue(null);
+    getCombatContext.mockResolvedValue(null);
+
+    const result = await handlePuncture({ playerStats: mockPlayerStats, campaignName: mockCampaignName, characters: [], popupHtml: null, setPopupHtml: vi.fn(), punctureData: {
+      rawDamage: 10,
+      targetName: 'Goblin',
+      damageTypes: ['Piercing'],
+      originalRolls: [7, 3],
+      newRolls: [6, 4],
+      rerolledIndex: 0,
+      originalValue: 7,
+      newValue: 6,
+    } });
+
+    expect(result).toBeNull();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
-// Tests — handleSavageAttacker
+// Tests — handleSavageAttacker (click) + handleSavageAttackerChoice
 // ---------------------------------------------------------------------------
 
 describe('handleSavageAttacker', () => {
@@ -232,9 +222,7 @@ describe('handleSavageAttacker', () => {
     const { applyDamageToTarget } = await import('../../services/rules/combat/applyDamage.js');
 
     getRuntimeValue.mockReturnValue(null);
-    applyDamageToTarget.mockReturnValue({});
 
-    const setPopupHtml = vi.fn();
     const savageData = {
       rawDamage: 10,
       targetName: 'Orc',
@@ -249,8 +237,8 @@ describe('handleSavageAttacker', () => {
       savageData
     });
 
+    // The click alone never moves damage — the sheet waits for the keep choice.
     expect(applyDamageToTarget).not.toHaveBeenCalled();
-    expect(setPopupHtml).not.toHaveBeenCalled();
     expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', '_Savage_Attacker_usedRound', true, mockCampaignName);
 
     const { addEntry } = await import('../../services/ui/logService.js');
@@ -260,6 +248,52 @@ describe('handleSavageAttacker', () => {
     expect(result).toBeDefined();
     expect(result.better).toBe(true);
     expect(result.awaitingChoice).toBe(true);
+  });
+
+  it('an equal-totals reroll still consumes the feature but resolves without awaiting a choice', async () => {
+    const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+    const { addEntry } = await import('../../services/ui/logService.js');
+
+    getRuntimeValue.mockReturnValue(null);
+
+    const result = await handleSavageAttacker({
+      playerStats: mockPlayerStats,
+      campaignName: mockCampaignName,
+      savageData: {
+        rawDamage: 10,
+        targetName: 'Orc',
+        damageTypes: ['Slashing'],
+        originalRolls: [4, 6],
+        newRolls: [4, 6],
+      }
+    });
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', '_Savage_Attacker_usedRound', true, mockCampaignName);
+    expect(result.better).toBe(false);
+    expect(result.awaitingChoice).toBe(false);
+    expect(addEntry.mock.calls[0][1].description).toContain('kept original total 10');
+  });
+
+  it('gates a second same-turn savage attacker after the flag is written', async () => {
+    const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+    const { addEntry } = await import('../../services/ui/logService.js');
+
+    getRuntimeValue.mockReturnValue(true);
+
+    const result = await handleSavageAttacker({
+      playerStats: mockPlayerStats,
+      campaignName: mockCampaignName,
+      savageData: {
+        rawDamage: 10,
+        targetName: 'Orc',
+        damageTypes: ['Slashing'],
+        originalRolls: [4, 6],
+        newRolls: [6, 6],
+      }
+    });
+
+    expect(result).toBeNull();
+    expect(addEntry).not.toHaveBeenCalled();
   });
 
   it('keep-reroll choice applies only a positive damage difference', async () => {
@@ -343,16 +377,17 @@ describe('handleSavageAttacker', () => {
     expect(result).toEqual({ kept: 'reroll', damageDifference: 6 });
   });
 
-  it('keep-original choice never touches target hp', async () => {
+  it('keep-original choice never touches target hp, damage, or the popup', async () => {
     const { applyDamageToTarget } = await import('../../services/rules/combat/applyDamage.js');
     const { addEntry } = await import('../../services/ui/logService.js');
 
+    const setPopupHtml = vi.fn();
     const result = await handleSavageAttackerChoice({
       playerStats: mockPlayerStats,
       campaignName: mockCampaignName,
       characters: [],
       popupHtml: { modifier: 0 },
-      setPopupHtml: vi.fn(),
+      setPopupHtml,
       choiceData: {
         keep: 'original',
         originalRolls: [4, 6],
@@ -367,12 +402,14 @@ describe('handleSavageAttacker', () => {
     });
 
     expect(applyDamageToTarget).not.toHaveBeenCalled();
+    expect(setPopupHtml).not.toHaveBeenCalled();
     expect(addEntry.mock.calls[0][1].description).toContain('kept original Savage Attacker total 10');
     expect(result).toEqual({ kept: 'original', damageDifference: 0 });
   });
 
   it('a lower-reroll keep-reroll request can never heal (negative diff refused)', async () => {
     const { applyDamageToTarget } = await import('../../services/rules/combat/applyDamage.js');
+    const { addEntry } = await import('../../services/ui/logService.js');
 
     const result = await handleSavageAttackerChoice({
       playerStats: mockPlayerStats,
@@ -395,53 +432,7 @@ describe('handleSavageAttacker', () => {
 
     expect(applyDamageToTarget).not.toHaveBeenCalled();
     expect(result).toEqual({ kept: 'original', damageDifference: 0 });
-  });
-
-  it('does not apply damage when difference is zero', async () => {
-    const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-    const { applyDamageToTarget } = await import('../../services/rules/combat/applyDamage.js');
-
-    getRuntimeValue.mockReturnValue(null);
-    applyDamageToTarget.mockReturnValue({});
-
-    const savageData = {
-      rawDamage: 10,
-      targetName: 'Orc',
-      damageTypes: ['Slashing'],
-      originalRolls: [4, 6],
-      newRolls: [4, 6],
-    };
-
-    const result = await handleSavageAttacker({
-      playerStats: mockPlayerStats,
-      campaignName: mockCampaignName,
-      savageData
-    });
-
-    expect(applyDamageToTarget).not.toHaveBeenCalled();
-    expect(result.awaitingChoice).toBe(false);
-  });
-
-  it('gates a second same-turn savage attacker after the flag is written', async () => {
-    const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-    const { addEntry } = await import('../../services/ui/logService.js');
-
-    getRuntimeValue.mockReturnValue(true);
-
-    const result = await handleSavageAttacker({
-      playerStats: mockPlayerStats,
-      campaignName: mockCampaignName,
-      savageData: {
-        rawDamage: 10,
-        targetName: 'Orc',
-        damageTypes: ['Slashing'],
-        originalRolls: [4, 6],
-        newRolls: [6, 6],
-      }
-    });
-
-    expect(result).toBeNull();
-    expect(addEntry).not.toHaveBeenCalled();
+    expect(addEntry.mock.calls[0][1].description).toContain('kept original Savage Attacker total 6');
   });
 });
 
@@ -489,16 +480,20 @@ describe('handleTacticalMind', () => {
     expect(addEntry.mock.calls[0][1].description).toContain('not expended');
   });
 
-  it('CLA-352: refuses at zero uses without refilling the pool to max', async () => {
+  it.each([
+    { label: 'zero', uses: 0 },
+    // A missing (null) uses key must read as zero — never a phantom refill.
+    { label: 'missing', uses: null },
+  ])('CLA-352: refuses at $label secondWindUses without any write', async ({ uses }) => {
     const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-    getRuntimeValue.mockReturnValue(0);
+    getRuntimeValue.mockReturnValue(uses);
     const setPopupHtml = vi.fn();
 
     await handleTacticalMind(
       mockPlayerStats,
       mockCampaignName,
       { name: 'Athletics Check', rolls: [15], bonus: 3, tacticalMindDie: 7, tacticalSuccess: true },
-        setPopupHtml
+      setPopupHtml
     );
 
     const { addEntry } = await import('../../services/ui/logService.js');
@@ -517,7 +512,7 @@ describe('handleTacticalMind', () => {
       mockPlayerStats,
       mockCampaignName,
       { name: 'Athletics Check', rolls: [19], bonus: 3, success: true, tacticalMindDie: 7, tacticalSuccess: true },
-        setPopupHtml
+      setPopupHtml
     );
 
     const { addEntry } = await import('../../services/ui/logService.js');
@@ -525,24 +520,10 @@ describe('handleTacticalMind', () => {
     expect(setPopupHtml.mock.calls[0][0].description).toContain('only be used when the ability check fails');
     expect(addEntry.mock.calls[0][1].description).toContain('refused');
   });
-
-  it('CLA-352: treats a null uses key as zero, never a phantom refill', async () => {
-    const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-    getRuntimeValue.mockReturnValue(null);
-
-    await handleTacticalMind(
-      mockPlayerStats,
-      mockCampaignName,
-      { name: 'Athletics Check', rolls: [4], bonus: 3, tacticalMindDie: 7, tacticalSuccess: true },
-      vi.fn()
-    );
-
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-  });
 });
 
 // ---------------------------------------------------------------------------
-// Tests — handleDarkOnesLuck
+// Tests — handleDarkOnesLuck (positive spend lane lives in featureRiders)
 // ---------------------------------------------------------------------------
 
 describe('handleDarkOnesLuck', () => {
@@ -550,23 +531,8 @@ describe('handleDarkOnesLuck', () => {
     vi.clearAllMocks();
   });
 
-  it('decrements darkOnesLuckUses when available', async () => {
-    const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-    getRuntimeValue.mockReturnValue(3);
-
-    await handleDarkOnesLuck(
-      mockPlayerStats,
-      mockCampaignName,
-      { name: 'Persuasion Check', rolls: [15], bonus: 3, darkOnesLuckValue: 7 }
-    );
-
-    const { addEntry } = await import('../../services/ui/logService.js');
-    expect(addEntry).toHaveBeenCalled();
-    expect(addEntry.mock.calls[0][1].abilityName).toBe("Dark One's Own Luck");
-  });
-
-  it('does nothing when darkOnesLuckUses is 0', async () => {
-    const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+  it('does nothing at zero uses — no write, no log', async () => {
+    const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
     getRuntimeValue.mockReturnValue(0);
 
     await handleDarkOnesLuck(
@@ -575,13 +541,15 @@ describe('handleDarkOnesLuck', () => {
       { name: 'Persuasion Check', rolls: [15], bonus: 3, darkOnesLuckValue: 7 }
     );
 
+    expect(setRuntimeValue).not.toHaveBeenCalled();
     const { addEntry } = await import('../../services/ui/logService.js');
     expect(addEntry).not.toHaveBeenCalled();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Tests — handleSuperiorityManeuver
+// Tests — handleSuperiorityManeuver guards + popup content
+// (die spend, log, and initiative-tracker lanes live in featureRiders)
 // ---------------------------------------------------------------------------
 
 describe('handleSuperiorityManeuver', () => {
@@ -589,9 +557,9 @@ describe('handleSuperiorityManeuver', () => {
     vi.clearAllMocks();
   });
 
-  it('does nothing when maneuver is not found', async () => {
-    const { getManeuversForRules } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
-    const { getSuperiorityDice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
+  it('spends no die and shows no popup when the maneuver is not found', async () => {
+    const { setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+    const { getManeuversForRules, getSuperiorityDice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
     getManeuversForRules.mockResolvedValue([{ name: 'Pushing Attack' }]);
     getSuperiorityDice.mockReturnValue(3);
 
@@ -606,58 +574,14 @@ describe('handleSuperiorityManeuver', () => {
       dieValue: 8
     });
 
+    expect(setRuntimeValue).not.toHaveBeenCalled();
     expect(setPopupHtml).not.toHaveBeenCalled();
-  });
-
-  it('decrements superiorityDice when maneuver is found', async () => {
-    const { getManeuversForRules } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
-    const { getSuperiorityDice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
-    getManeuversForRules.mockResolvedValue([{ name: 'Pushing Attack' }]);
-    getSuperiorityDice.mockReturnValue(3);
-
-    const setPopupHtml = vi.fn();
-
-    await handleSuperiorityManeuver({
-      playerStats: mockPlayerStats,
-      campaignName: mockCampaignName,
-      setPopupHtml,
-      popupHtml: { name: 'Athletics Check', rolls: [15], bonus: 3 },
-      maneuverName: 'Pushing Attack',
-      dieValue: 8
-    });
-
     const { addEntry } = await import('../../services/ui/logService.js');
-    expect(addEntry).toHaveBeenCalled();
-    expect(addEntry.mock.calls[0][1].abilityName).toBe('Pushing Attack');
+    expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('updates initiative when maneuver is on initiative roll', async () => {
-    const { getManeuversForRules } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
-    const { getSuperiorityDice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
-    const { loadCombatSummary } = await import('../../services/encounters/combatData.js');
-    getManeuversForRules.mockResolvedValue([{ name: 'Pushing Attack' }]);
-    getSuperiorityDice.mockReturnValue(3);
-    loadCombatSummary.mockResolvedValue({
-      creatures: [{ type: 'player', name: 'Test Character', initiative: '0' }],
-    });
-
-    const setPopupHtml = vi.fn();
-
-    await handleSuperiorityManeuver({
-      playerStats: mockPlayerStats,
-      campaignName: mockCampaignName,
-      setPopupHtml,
-      popupHtml: { name: 'Initiative', rolls: [15], bonus: 3 },
-      maneuverName: 'Pushing Attack',
-      dieValue: 8
-    });
-
-    expect(setPopupHtml).toHaveBeenCalled();
-  });
-
-  it('calls setPopupHtml with maneuver result info', async () => {
-    const { getManeuversForRules } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
-    const { getSuperiorityDice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
+  it('shows an automation_info popup with the die size and adjusted total', async () => {
+    const { getManeuversForRules, getSuperiorityDice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
     getManeuversForRules.mockResolvedValue([{ name: 'Pushing Attack' }]);
     getSuperiorityDice.mockReturnValue(3);
 
@@ -676,8 +600,10 @@ describe('handleSuperiorityManeuver', () => {
     const popupCall = setPopupHtml.mock.calls[0][0];
     expect(popupCall.type).toBe('automation_info');
     expect(popupCall.name).toBe('Pushing Attack');
-    expect(popupCall.description).toContain('18');
-    expect(popupCall.description).toContain('26');
+    // dieValue 8 + (d20 15 + bonus 3) = 18 → 26
+    expect(popupCall.description).toContain('Rolled d8 for 8');
+    expect(popupCall.description).toContain('Athletics Check: 18 →');
+    expect(popupCall.description).toContain('(+8)');
   });
 });
 
@@ -731,14 +657,12 @@ describe('handlePsiBolsteredKnack', () => {
         success: false
       });
 
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('Test Character', 'psionicEnergy', 2, mockCampaignName);
+    expect(setRuntimeValue).not.toHaveBeenCalled();
     const { addEntry } = await import('../../services/ui/logService.js');
-    expect(addEntry).toHaveBeenCalled();
-    const logCall = addEntry.mock.calls[0][1];
-    expect(logCall.description).toContain('Still failed, energy not expended');
+    expect(addEntry.mock.calls[0][1].description).toContain('Still failed, energy not expended');
   });
 
-  it('does not expend energy when psionicEnergy is 0', async () => {
+  it('writes nothing at zero energy (and logs success verbatim — honest pin of current wording)', async () => {
     const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
     getRuntimeValue.mockReturnValue(0);
 
@@ -754,8 +678,7 @@ describe('handlePsiBolsteredKnack', () => {
     expect(setRuntimeValue).not.toHaveBeenCalled();
     const { addEntry } = await import('../../services/ui/logService.js');
     expect(addEntry).toHaveBeenCalled();
-    const logCall = addEntry.mock.calls[0][1];
-    expect(logCall.description).toContain('Succeeded, energy expended');
+    expect(addEntry.mock.calls[0][1].description).toContain('Succeeded, energy expended');
   });
 
   it('allows a proficient tool check and spends on success', async () => {
@@ -776,7 +699,10 @@ describe('handlePsiBolsteredKnack', () => {
     expect(addEntry.mock.calls[0][1].description).toContain("Thieves' Tools");
   });
 
-  it('refuses a non-proficient skill check without spending energy', async () => {
+  it.each([
+    { label: 'a non-proficient skill check', popupHtml: { name: 'Arcana', rollType: 'skill', rolls: [3], bonus: 0 } },
+    { label: 'a raw ability check', popupHtml: { name: 'Intelligence', rollType: 'check', rolls: [8], bonus: -1 } },
+  ])('refuses $label without spending energy', async ({ popupHtml }) => {
     const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
     getRuntimeValue.mockReturnValue(5);
     const setPopupHtml = vi.fn();
@@ -784,7 +710,7 @@ describe('handlePsiBolsteredKnack', () => {
     await handlePsiBolsteredKnack({
         playerStats: soulknifeStats,
         campaignName: mockCampaignName,
-        popupHtml: { name: 'Arcana', rollType: 'skill', rolls: [3], bonus: 0 },
+        popupHtml,
         dieValue: 4,
         dieSize: 10,
         success: false,
@@ -797,25 +723,6 @@ describe('handlePsiBolsteredKnack', () => {
     }));
     const { addEntry } = await import('../../services/ui/logService.js');
     expect(addEntry.mock.calls[0][1].description).toContain('refused');
-  });
-
-  it('refuses a raw ability check without spending energy', async () => {
-    const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-    getRuntimeValue.mockReturnValue(5);
-    const setPopupHtml = vi.fn();
-
-    await handlePsiBolsteredKnack({
-        playerStats: soulknifeStats,
-        campaignName: mockCampaignName,
-        popupHtml: { name: 'Intelligence', rollType: 'check', rolls: [8], bonus: -1 },
-        dieValue: 4,
-        dieSize: 10,
-        success: false,
-        setPopupHtml
-      });
-
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-    expect(setPopupHtml).toHaveBeenCalled();
   });
 
   it('refuses when the popup records an explicit success', async () => {

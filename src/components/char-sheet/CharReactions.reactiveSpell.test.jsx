@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // FT-099: Reactive Spell picker must render clickable rows (not be swallowed
 // by the generic automation_info popup), the cast leg must route through the
 // real reaction cast machinery (gateMetamagic), and refusals must spend nothing.
@@ -196,6 +197,8 @@ describe('CharReactions — Reactive Spell picker (FT-099)', () => {
         expect(rows).toHaveLength(2);
         expect(screen.getByText('Fire Bolt')).toBeTruthy();
         expect(screen.getByText('Magic Missile')).toBeTruthy();
+        // The core FT-099 regression: rows render INSTEAD of the read-only popup.
+        expect(useDiceRollPopup().setPopupHtml).not.toHaveBeenCalled();
     });
 
     it('falls back to the read-only info popup when no spells are eligible', async () => {
@@ -207,7 +210,11 @@ describe('CharReactions — Reactive Spell picker (FT-099)', () => {
         await openPicker();
 
         expect(document.querySelectorAll('.reactive-spell-list')).toHaveLength(0);
-        expect(useDiceRollPopup().setPopupHtml).toHaveBeenCalled();
+        expect(useDiceRollPopup().setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'automation_info',
+            name: 'Reactive Spell',
+            description: 'No spells available.',
+        }));
     });
 
     it('picking a spell commits via applyWarCasterReaction and casts through gateMetamagic', async () => {
@@ -220,7 +227,8 @@ describe('CharReactions — Reactive Spell picker (FT-099)', () => {
 
         await waitFor(() => expect(mockGateMetamagic).toHaveBeenCalled());
         expect(mockApplyWarCasterReaction).toHaveBeenCalledWith('Thug 1', 'Fire Bolt', expect.objectContaining({ name: 'Fire Bolt' }), basePlayerStats, campaignName);
-        expect(mockGateMetamagic.mock.calls[0][0].name).toBe('Fire Bolt');
+        expect(mockGateMetamagic).toHaveBeenCalledWith(expect.objectContaining({ name: 'Fire Bolt' }), {});
+        // Negative path: a successful cast must not surface an info popup.
         expect(setPopupHtml).not.toHaveBeenCalled();
     });
 

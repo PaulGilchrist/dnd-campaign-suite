@@ -703,7 +703,7 @@ function DarkOnesLuckRow({ darkOnesLuckResult }) {
 function SuperiorityResultRow({ superiorityResult }) {
     return (
         <div className="dice-roll-reroll-result">
-            <i className="fa-solid fa-bolt"></i> {superiorityResult.maneuverName}: d12 {superiorityResult.dieValue} → <strong>{superiorityResult.total}</strong> (+{superiorityResult.dieValue})
+            <i className="fa-solid fa-bolt"></i> {superiorityResult.maneuverName}: d{superiorityResult.dieSize} {superiorityResult.dieValue} → <strong>{superiorityResult.total}</strong> (+{superiorityResult.dieValue})
         </div>
     );
 }
@@ -782,20 +782,19 @@ function DamageTypeChoiceSection({ props }) {
                 <i className="fa-solid fa-bolt"></i> {name}
             </div>
             <p>Choose the damage type for this hit:</p>
-            <div style={{ textAlign: 'center', marginTop: '16px' }}>
+            <div className="damage-type-choice-body">
                 <div className="dice-roll-breakdown">
                     <strong>Weapon Damage:</strong> {baseFormula}: {baseRolls?.join(', ')} = {baseTotal}
                 </div>
                 <div className="dice-roll-breakdown">
                     <strong>Divine Strike:</strong> {bonusFormula}: {bonusRolls?.join(', ')} = {bonusTotal}
                 </div>
-                <div style={{ marginTop: '12px' }}>
-                    <div style={{ marginBottom: '8px', fontWeight: 'bold' }}>Choose bonus damage type:</div>
+                <div className="damage-type-choice-options">
+                    <div className="damage-type-choice-label">Choose bonus damage type:</div>
                     {types?.map((typeChoice) => (
                         <button
                             key={typeChoice}
-                            className="sp-roll-btn"
-                            style={{ margin: '0 6px 8px 6px' }}
+                            className="sp-roll-btn damage-type-choice-btn"
                             onClick={() => {
                                 window.dispatchEvent(new CustomEvent('damage-type-choice', { detail: { chosenType: typeChoice } }));
                             }}

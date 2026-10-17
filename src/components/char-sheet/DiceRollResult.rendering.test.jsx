@@ -1,154 +1,116 @@
+// Rendering lane of the DiceRollResult family. Ownership map (per
+// displayFeatures' ownership notes):
+//   THIS FILE owns the Starry Form (Dragon) floor seam — the floored total
+//   (10 + bonus + modifier via computeFloorTotals/computeBaseTotal) and the
+//   verbatim floor notice — plus crit / Natural 20 / crit-miss notice gating,
+//   the forced-mode badge, and baseline totals (d20 arithmetic, the damage
+//   `total` prop verbatim, and missing/empty rolls fallbacks).
+// Deferred to sibling lanes (do not re-add here):
+//   hit/miss, auto-miss, save-result, damage-applied lines →
+//     DiceRollResult.combatDisplay.test.jsx
+//   breakdown line (formula, dice span, modifier text incl. comma-separated
+//     non-d20 rolls) → DiceRollResult.infoDisplay.test.jsx
+//   advantage/disadvantage toggles and their non-d20 suppression →
+//     DiceRollResult.toggles.test.jsx
+//   header icons, Reliable Talent, GWF, Elemental Adept, heal outcomes →
+//     DiceRollResult.displayFeatures.test.jsx
+//   Trance of Order floor → DiceRollResult.flooring.test.jsx
+//   crit-damage auto-damage notices → DiceRollResult.interactive.test.jsx
+// This seam is pure display: no interaction, no randomness, no spies needed.
 import { render, screen } from '@testing-library/react';
 import DiceRollResult from './DiceRollResult.jsx';
 
-describe('DiceRollResult', () => {
+const renderRoll = (props = {}) => render(
+    <DiceRollResult name="Test" type="d20" rolls={[10]} bonus={0} {...props} />
+);
+
+// The popup's authoritative total lives in the .dice-roll-total slot; feature
+// rows repeat numbers elsewhere, so target the slot directly.
+const totalText = (container) => container.querySelector('.dice-roll-total').textContent;
+
+describe('DiceRollResult rendering', () => {
     describe('totals', () => {
-        it.each`
-            rolls       | bonus | modifier | expected
-            ${[10]}     | ${5}  | ${0}     | ${15}
-            ${[12]}     | ${2}  | ${3}     | ${17}
-            ${[10]}     | ${0}  | ${-3}    | ${7}
-            ${[10]}     | ${-2} | ${0}     | ${8}
-        `('shows correct total with rolls: $rolls, bonus: $bonus, modifier: $modifier', ({ rolls, bonus, modifier, expected }) => {
-            render(
-                <DiceRollResult name="Test" type="d20" rolls={rolls} bonus={bonus} modifier={modifier} />
-            );
-            expect(screen.getByText(String(expected))).toBeInTheDocument();
-        });
-
-        it('shows total prop for damage type (uses total directly instead of calculating)', () => {
-            render(
-                <DiceRollResult name="Test" type="damage" rolls={[6, 4]} bonus={0} total={10} modifier={3} />
-            );
-            expect(screen.getByText('10')).toBeInTheDocument();
-        });
-
-        it.each`
-            rolls          | type     | bonus | total | expected
-            ${null}        | ${'d20'} | ${0}  | ${0}  | ${'0'}
-            ${undefined}   | ${'d20'} | ${5}  | ${0}  | ${'5'}
-            ${[]}          | ${'d20'} | ${3}  | ${0}  | ${'3'}
-            ${[]}          | ${'damage'} | ${0} | ${5} | ${'5'}
-        `('handles empty/missing rolls with type: $type', ({ rolls, type, bonus, total, expected }) => {
-            const { container } = render(<DiceRollResult name="Test" type={type} rolls={rolls} bonus={bonus} total={total} />);
-            expect(container.querySelector('.dice-roll-total').textContent).toBe(expected);
+        it.each([
+            { label: 'd20 roll + bonus', props: { rolls: [10], bonus: 5 }, total: '15' },
+            { label: 'd20 roll + bonus + modifier', props: { rolls: [12], bonus: 2, modifier: 3 }, total: '17' },
+            { label: 'negative modifier subtracts', props: { rolls: [10], bonus: 0, modifier: -3 }, total: '7' },
+            { label: 'negative bonus subtracts', props: { rolls: [10], bonus: -2, modifier: 0 }, total: '8' },
+            { label: 'damage uses total prop verbatim, ignoring modifier', props: { name: 'Fireball', type: 'damage', rolls: [6, 4], bonus: 0, total: 10, modifier: 3 }, total: '10' },
+            { label: 'null rolls fall back to 0', props: { rolls: null, bonus: 0 }, total: '0' },
+            { label: 'undefined rolls keep the bonus', props: { rolls: undefined, bonus: 5 }, total: '5' },
+            { label: 'empty rolls keep the bonus', props: { rolls: [], bonus: 3 }, total: '3' },
+            { label: 'damage with empty rolls uses total prop', props: { type: 'damage', rolls: [], bonus: 0, total: 5 }, total: '5' },
+        ])('$label — total slot shows $total', ({ props, total }) => {
+            const { container } = renderRoll(props);
+            expect(totalText(container)).toBe(total);
         });
     });
 
-    describe('advantage and disadvantage', () => {
-        it.each`
-            forcedMode     | rangeReason
-            ${'advantage'} | ${'Ranged disadvantage'}
-            ${'disadvantage'} | ${null}
-        `('shows forced mode badge with reason: $rangeReason', ({ forcedMode, rangeReason }) => {
-            const { container } = render(
-                <DiceRollResult name="Attack" type="d20" rolls={[8, 15]} bonus={2} forcedMode={forcedMode} rangeReason={rangeReason} />
-            );
-            const badge = container.querySelector('.forced-mode-badge');
-            expect(badge).toBeInTheDocument();
-            if (rangeReason) {
-                expect(badge.textContent).toContain(rangeReason);
-            } else {
-                expect(badge.getAttribute('title')).toBe('Automatically set by active conditions');
-            }
+    describe('forced-mode badge', () => {
+        it.each([
+            {
+                label: 'advantage forced by range',
+                props: { name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'advantage', rangeReason: 'Ranged disadvantage' },
+                badgeText: 'Adv (Ranged disadvantage)',
+                title: 'Ranged disadvantage',
+            },
+            {
+                label: 'disadvantage forced with no explicit reason',
+                props: { name: 'Attack', rollType: 'attack', rolls: [8, 15], bonus: 2, forcedMode: 'disadvantage', rangeReason: null },
+                badgeText: 'Disadv (conditions)',
+                title: 'Automatically set by active conditions',
+            },
+        ])('$label — badge "$badgeText" carries title "$title"', ({ props, badgeText, title }) => {
+            renderRoll(props);
+            const badge = screen.getByText(badgeText);
+            expect(badge).toHaveAttribute('title', title);
         });
     });
 
-    describe('non-d20 types', () => {
-        it('does NOT show advantage/disadvantage toggles for non-d20 types', () => {
-            render(
-                <DiceRollResult name="Fireball" type="damage" rolls={[6, 5, 4, 3, 2, 1]} bonus={0} />
-            );
-            expect(screen.queryByLabelText(/Advantage/)).not.toBeInTheDocument();
-            expect(screen.queryByLabelText(/Disadvantage/)).not.toBeInTheDocument();
-        });
-
-        it('shows rolls separated by commas in breakdown for non-d20 type', () => {
-            render(
-                <DiceRollResult name="Fireball" type="damage" rolls={[6, 5, 4]} bonus={0} />
-            );
-            expect(screen.getByText(/6, 5, 4/)).toBeInTheDocument();
-        });
-    });
-
-    describe('critical hit display', () => {
-        it.each`
-            isCrit     | isAutoCrit | name       | type       | rolls       | rollType
-            ${true}    | ${false}   | ${'Attack'}| ${'d20'}   | ${[20, 5]}  | ${'attack'}
-            ${false}   | ${true}    | ${'Attack'}| ${'d20'}   | ${[5, 3]}   | ${'attack'}
-            ${true}    | ${false}   | ${'Fireball'}| ${'damage'}| ${[6, 5, 4]}| ${undefined}
-        `('shows "Critical Hit!" when isCrit=$isCrit isAutoCrit=$isAutoCrit for $name ($type)', ({ isCrit, isAutoCrit, name, type, rolls, rollType }) => {
-            render(
-                <DiceRollResult name={name} type={type} rolls={rolls} bonus={type === 'damage' ? 0 : 3} isCrit={isCrit} isAutoCrit={isAutoCrit} rollType={rollType} />
-            );
-            expect(screen.getByText(/Critical Hit!/)).toBeInTheDocument();
-        });
-
-        it('shows "Natural 20!" for non-attack d20 rolls with natural 20', () => {
-            render(
-                <DiceRollResult name="Athletics" type="d20" rolls={[20]} bonus={5} rollType="check" />
-            );
-            expect(screen.getByText('Natural 20!')).toBeInTheDocument();
-            expect(screen.queryByText(/Critical Hit!/)).not.toBeInTheDocument();
-        });
-
-        it.each`
-            rolls        | type       | name
-            ${[19, 5]}   | ${'d20'}   | ${'Attack'}
-            ${[20]}      | ${'damage'}| ${'Damage'}
-            ${[20]}      | ${'save'}  | ${'DEX Save'}
-        `('does NOT show "Critical Hit!" for rolls: $rolls, type: $type', ({ rolls, type }) => {
-            render(
-                <DiceRollResult name="Roll" type={type} rolls={rolls} bonus={3} />
-            );
-            expect(screen.queryByText(/Critical Hit!/)).not.toBeInTheDocument();
+    describe('crit / Natural 20 / crit-miss notices', () => {
+        it.each([
+            { label: 'isCrit attack d20', props: { name: 'Attack', rollType: 'attack', rolls: [20, 5], bonus: 3, isCrit: true }, crit: true, natural20: false, miss: false },
+            { label: 'isAutoCrit attack d20', props: { name: 'Attack', rollType: 'attack', rolls: [5, 3], bonus: 3, isAutoCrit: true }, crit: true, natural20: false, miss: false },
+            { label: 'Natural 20 on a check', props: { name: 'Athletics', rollType: 'check', rolls: [20], bonus: 5 }, crit: false, natural20: true, miss: false },
+            { label: 'Natural 20 on a save', props: { name: 'Constitution', rollType: 'save', rolls: [20], bonus: 2 }, crit: false, natural20: true, miss: false },
+            { label: 'near-miss 19 on an attack', props: { name: 'Attack', rollType: 'attack', rolls: [19, 5], bonus: 3 }, crit: false, natural20: false, miss: false },
+            { label: 'nat 20 die face on a damage roll', props: { name: 'Damage', type: 'damage', rolls: [20], total: 20 }, crit: false, natural20: false, miss: false },
+            { label: 'nat 20 die face on a save-type roll', props: { name: 'DEX Save', type: 'save', rolls: [20], bonus: 3 }, crit: false, natural20: false, miss: false },
+            { label: 'isNatural1 on an attack', props: { name: 'Attack', rollType: 'attack', rolls: [1, 15], bonus: 3, isNatural1: true }, crit: false, natural20: false, miss: true },
+            ...['initiative', 'check', 'skill', 'save'].map((rollType) => ({
+                label: `isNatural1 on a ${rollType} roll`,
+                props: { name: 'Roll', rollType, rolls: [1, 10], bonus: 2, isNatural1: true },
+                crit: false, natural20: false, miss: false,
+            })),
+        ])('$label', ({ props, crit, natural20, miss }) => {
+            renderRoll(props);
+            expect(Boolean(screen.queryByText('Critical Hit! — damage dice doubled'))).toBe(crit);
+            expect(Boolean(screen.queryByText('Natural 20!'))).toBe(natural20);
+            expect(Boolean(screen.queryByText('Critical Miss!'))).toBe(miss);
         });
     });
 
-    describe('critical miss display', () => {
-        it('shows "Critical Miss!" when isNatural1 is true and rollType is attack', () => {
-            render(
-                <DiceRollResult name="Attack" type="d20" rolls={[1, 15]} bonus={3} rollType="attack" isNatural1={true} />
-            );
-            expect(screen.getByText('Critical Miss!')).toBeInTheDocument();
-        });
+    describe('Starry Form (Dragon) floor (owned seam)', () => {
+        const floorCases = [
+            { label: 'floors a d20 save of 8', props: { name: 'Constitution', rollType: 'save', rolls: [8], bonus: 3 }, total: '13', notice: 'Starry Form (Dragon): d20 8 → 10' },
+            { label: 'floors at the boundary roll of 9', props: { name: 'Constitution', rollType: 'check', rolls: [9], bonus: 4 }, total: '14', notice: 'Starry Form (Dragon): d20 9 → 10' },
+            { label: 'floors attacks too (rollType-agnostic, unlike Reliable Talent)', props: { name: 'Attack', rollType: 'attack', rolls: [4], bonus: 5 }, total: '15', notice: 'Starry Form (Dragon): d20 4 → 10' },
+            { label: 'leaves a natural 10 alone', props: { name: 'Constitution', rollType: 'save', rolls: [10], bonus: 3 }, total: '13', notice: null },
+            { label: 'leaves rolls above the threshold alone', props: { name: 'Constitution', rollType: 'save', rolls: [11], bonus: 3 }, total: '14', notice: null },
+            { label: 'never floors when the flag is false', props: { name: 'Constitution', rollType: 'save', rolls: [8], bonus: 3, starryDragonFloor: false }, total: '11', notice: null },
+        ];
+        const floorRows = floorCases.map(({ label, props, total, notice }) => ({
+            label, total, notice, starryDragonFloor: true, ...props,
+        }));
+        it.each(floorRows)('$label — total $total', ({ rolls, bonus, rollType, starryDragonFloor, total, notice }) => {
+                const { container } = renderRoll({ rolls, bonus, rollType, starryDragonFloor });
 
-        it.each`
-            rollType       | name
-            ${'initiative'}| ${'Initiative'}
-            ${'check'}     | ${'Athletics'}
-            ${'skill'}     | ${'Stealth'}
-            ${'save'}      | ${'DEX Save'}
-        `('does NOT show "Critical Miss!" for non-attack rollType: $name', ({ rollType }) => {
-            render(
-                <DiceRollResult name={rollType} type="d20" rolls={[1, 10]} bonus={2} rollType={rollType} isNatural1={true} />
-            );
-            expect(screen.queryByText('Critical Miss!')).not.toBeInTheDocument();
-        });
-    });
-
-    describe('Starry Form (Dragon) floor', () => {
-        it('floors the total to 10 + bonus when starryDragonFloor and roll <= 9', () => {
-            render(
-                <DiceRollResult name="Constitution" type="d20" rolls={[8]} bonus={3} rollType="save" starryDragonFloor />
-            );
-            expect(screen.getByText('13')).toBeInTheDocument();
-            expect(screen.getByText(/Starry Form \(Dragon\): d20 8 → 10/)).toBeInTheDocument();
-        });
-
-        it('keeps the normal total when the roll is above 9', () => {
-            render(
-                <DiceRollResult name="Constitution" type="d20" rolls={[11]} bonus={3} rollType="save" starryDragonFloor />
-            );
-            expect(screen.getByText('14')).toBeInTheDocument();
-            expect(screen.queryByText(/Starry Form \(Dragon\)/)).not.toBeInTheDocument();
-        });
-
-        it('does not floor when starryDragonFloor is false', () => {
-            render(
-                <DiceRollResult name="Constitution" type="d20" rolls={[8]} bonus={3} rollType="save" starryDragonFloor={false} />
-            );
-            expect(screen.getByText('11')).toBeInTheDocument();
-        });
+                expect(totalText(container)).toBe(total);
+                if (notice) {
+                    expect(screen.getByText(notice)).toBeInTheDocument();
+                } else {
+                    expect(screen.queryByText(/Starry Form \(Dragon\)/)).not.toBeInTheDocument();
+                }
+            });
     });
 });

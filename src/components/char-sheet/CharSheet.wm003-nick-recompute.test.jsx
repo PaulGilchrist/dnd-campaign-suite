@@ -1,12 +1,19 @@
-// WM-003 F1: the CharSheet compute effect subscribes to the Nick latch and the
-// weapon-kind mastery bucket, so stamping _Nick_UsedRound re-runs getPlayerStats
-// and the recomputed attack rows reach the consumed playerStats.attacks prop.
+// @maintained-by-ai
+// WM-003 sheet seam only: CharSheet's compute effect subscribes to the Nick latch
+// (_Nick_UsedRound) and the weapon-kind mastery bucket
+// (_Weapon_Kind_Mastery_chosenWeapons). Stamping either key must re-run
+// getPlayerStats AND deliver the recomputed stats (with the promoted off-hand
+// row) to CharActions' consumed playerStats prop.
+// Rules internals (resolveOffHandActionType) live in attackCalc2024.wm003-nick.test.js;
+// latch stamping lives in weaponMasteryHandler.nick.test.js — not re-tested here.
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import CharSheet from './CharSheet';
+import CharActions from './CharActions.jsx';
+import rulesFactory from '../../services/rules/rulesFactory.js';
+import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import {
-    createMockStore,
     createDefaultProps,
     createMockPlayerStats,
     createSharedPopupReturnValue,
@@ -95,9 +102,7 @@ vi.mock('../common/AttackResultPopup.jsx', () => ({
     default: vi.fn(() => <div data-testid="attack-result-popup" />),
 }));
 
-const mockStore = createMockStore();
-
-let sharedPopupReturnVal = createSharedPopupReturnValue();
+const sharedPopupReturnVal = createSharedPopupReturnValue();
 
 vi.mock('../../hooks/combat/useSharedPopup.js', () => {
     const mockFn = vi.fn();
@@ -117,8 +122,6 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', async () => {
     const EMPTY = [];
     const defaultFor = (prop) => (ARRAY_DEFAULTS.includes(prop) ? EMPTY : null);
     return {
-        getStore: () => store,
-        listeners,
         useSyncedState: (_key, _prop, def) => React.useState(def ?? null),
         getRuntimeValue: (name, prop) => store.get(keyOf(name, prop)) ?? null,
         setRuntimeValue: (name, prop, val) => {
@@ -142,7 +145,10 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', async () => {
     };
 });
 
-const computeCalls = [];
+// Counts every getPlayerStats run so each computed stats object carries a
+// computeSeq the rendered sheet can echo — proves the recomputed output (not
+// just the fetch) reached the consumed playerStats prop.
+const computeState = { seq: 0 };
 
 // Mirrors attackCalc2024 resolveOffHandActionType: Nick latched this round
 // promotes the Nick off-hand row to 'Action'.
@@ -150,14 +156,14 @@ vi.mock('../../services/rules/rulesFactory.js', () => ({
     default: {
         getPlayerStats: vi.fn(async () => {
             const rt = await import('../../hooks/runtime/useRuntimeState.js');
-            const latch = rt.getRuntimeValue('Test Character', '_Nick_UsedRound');
-            computeCalls.push(latch ?? null);
-            const offHandType = latch === 1 ? 'Action' : 'Bonus Action';
+            const nickLatched = rt.getRuntimeValue('Test Character', '_Nick_UsedRound') === 1;
+            computeState.seq += 1;
             return createMockPlayerStats({
                 rules: '2024',
+                computeSeq: computeState.seq,
                 attacks: [
                     { name: 'Scimitar', type: 'Action', mastery: 'Nick', properties: ['Finesse', 'Light'], hitBonus: 8, damage: '1d6+2', damageType: 'Slashing', range: 5 },
-                    { name: 'Dagger', type: offHandType, mastery: 'Nick', properties: ['Finesse', 'Light'], hitBonus: 8, damage: '1d4+2', damageType: 'Piercing', range: 5 },
+                    { name: 'Dagger', type: nickLatched ? 'Action' : 'Bonus Action', mastery: 'Nick', properties: ['Finesse', 'Light'], hitBonus: 8, damage: '1d4+2', damageType: 'Piercing', range: 5 },
                 ],
             });
         }),
@@ -168,6 +174,7 @@ vi.mock('./CharActions.jsx', () => ({
     default: vi.fn(({ playerStats }) => (
         <div data-testid="char-actions">
             <span>{playerStats?.name || 'none'}</span>
+            <span data-testid="compute-seq">{playerStats?.computeSeq}</span>
         </div>
     )),
 }));
@@ -200,50 +207,44 @@ vi.mock('./char-spells/CharSpells.jsx', () => ({
     default: vi.fn(() => <div data-testid="char-spells" />),
 }));
 
-const nickRowType = (CharActions) => {
-    const last = CharActions.mock.calls[CharActions.mock.calls.length - 1][0];
-    return last.playerStats.attacks.find(a => a.name === 'Dagger').type;
-};
+const lastConsumedStats = () => CharActions.mock.calls.at(-1)[0].playerStats;
+const nickOffHandRow = (stats) => stats.attacks.find(a => a.name === 'Dagger').type;
 
 describe('CharSheet WM-003 recompute seam — Nick latch re-derives attacks', () => {
     beforeEach(() => {
         resetTestState(sharedPopupReturnVal);
-        mockStore.clear();
-        computeCalls.length = 0;
+        computeState.seq = 0;
     });
 
-    it('re-runs getPlayerStats when _Nick_UsedRound latches and the promoted row reaches the consumed attacks prop', async () => {
-        const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-        const rulesFactoryMock = (await import('../../services/rules/rulesFactory.js')).default;
-        const getPlayerStats = rulesFactoryMock.getPlayerStats;
-        const { default: CharActions } = await import('./CharActions.jsx');
-
+    it('re-runs getPlayerStats when _Nick_UsedRound latches and delivers the promoted off-hand row to CharActions', async () => {
         render(<CharSheet {...createDefaultProps({ playerSummary: { name: 'Test Character', rules: '2024' } })} />);
 
         await waitFor(() => expect(screen.getByTestId('char-actions')).toBeInTheDocument());
-        expect(nickRowType(CharActions)).toBe('Bonus Action');
-        const callsBefore = getPlayerStats.mock.calls.length;
+        expect(nickOffHandRow(lastConsumedStats())).toBe('Bonus Action');
+        expect(screen.getByTestId('compute-seq').textContent).toBe('1');
 
         setRuntimeValue('Test Character', '_Nick_UsedRound', 1, 'test-campaign');
 
-        await waitFor(() => expect(getPlayerStats.mock.calls.length).toBeGreaterThan(callsBefore));
-        await waitFor(() => expect(nickRowType(CharActions)).toBe('Action'));
-        expect(getRuntimeValue('Test Character', '_Nick_UsedRound')).toBe(1);
-        expect(getPlayerStats.mock.calls.at(-1)[0].playerSummary.campaignName).toBe('test-campaign');
+        // Recompute ran AND its output (promoted row) reached the consumed prop.
+        await waitFor(() => {
+            const latest = lastConsumedStats();
+            expect(latest.computeSeq).toBeGreaterThan(1);
+            expect(nickOffHandRow(latest)).toBe('Action');
+        });
+        // attackCalc2024 reads playerStats.campaignName to honour the latch — pin pass-through.
+        expect(rulesFactory.getPlayerStats.mock.calls.at(-1)[0].playerSummary.campaignName).toBe('test-campaign');
     });
 
     it('re-runs getPlayerStats when the weapon-kind mastery bucket is armed', async () => {
-        const { setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-        const rulesFactoryMock = (await import('../../services/rules/rulesFactory.js')).default;
-        const getPlayerStats = rulesFactoryMock.getPlayerStats;
-
         render(<CharSheet {...createDefaultProps({ playerSummary: { name: 'Test Character', rules: '2024' } })} />);
 
-        await waitFor(() => expect(screen.getByTestId('char-actions')).toBeInTheDocument());
-        const callsBefore = getPlayerStats.mock.calls.length;
+        await waitFor(() => expect(screen.getByTestId('compute-seq').textContent).toBe('1'));
 
         setRuntimeValue('Test Character', '_Weapon_Kind_Mastery_chosenWeapons', ['Scimitar', 'Dagger'], 'test-campaign');
 
-        await waitFor(() => expect(getPlayerStats.mock.calls.length).toBeGreaterThan(callsBefore));
+        // The bucket is the only input written here, so the advanced seq rendered
+        // on the sheet attributes the recompute to the kind-bucket subscription.
+        await waitFor(() => expect(screen.getByTestId('compute-seq').textContent).not.toBe('1'));
+        expect(screen.getByTestId('compute-seq').textContent).toBe(String(computeState.seq));
     });
 });

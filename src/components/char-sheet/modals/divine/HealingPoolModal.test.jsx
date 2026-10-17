@@ -1,6 +1,38 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import HealingPoolModal from './HealingPoolModal.jsx';
+
+// ── Ownership ──
+// BASE lane (migrated to the live-store template used by all five siblings —
+// former clearAllMocks/static-mock style retired here). This file owns the
+// generic open/close contract only: the loading → loaded transition, static
+// pool/target/feature-name display strings, heal-input display capping at
+// render, section rendering (no log table until an action), target-selection
+// rendering and the generic select/skip flow into the main modal, and generic
+// Done/Escape/overlay close plumbing (onClose callback contract, non-bloodied,
+// no action taken).
+// Deferred to owners:
+// - HealingPoolModal.healing.test.jsx — applyHeal plumbing, applyHealingToTarget
+//   args, live pool deduction, healing_pool log payloads, post-heal amount
+//   re-clamp, gating matrix, and inertness of closes without healing.
+// - HealingPoolModal.curing.test.jsx — cure-section rendering, condition
+//   filtering/merge, activeConditions writes, cure gating, and closes with a
+//   pending selection curing nothing.
+// - HealingPoolModal.bloodied.test.jsx — bloodied badge/gate/restriction note.
+// - HealingPoolModal.dice.test.jsx — dice-pool lane (Pool: n / m dX, Roll a dX,
+//   accumulation, close-heal, Escape-applies-pending).
+// - HealingPoolModal.channel-divinity.test.jsx — channel_divinity charge
+//   consumption and ability_use logging.
+// (Subsumes former cases: "renders heal amount input" — folded into the input
+// attributes test, which queries the same spinbutton exactly; "updates heal
+// amount on input change" and "caps heal amount to remaining pool" —
+// consolidated into the parameterised input-change test; "displays pool amount
+// / shows pool as 0" — consolidated into the parameterised pool-display test;
+// the three target-heading resolution cases — consolidated into the
+// parameterised target-resolution test with the live hp store replacing
+// per-test getRuntimeValue re-mocks; the loading test now pins BOTH sides of
+// the transition via a deferred combat context, absorbing the mount-contract
+// and no-log-table cases.)
 
 // ── Mocked modules ──
 
@@ -14,8 +46,8 @@ vi.mock('../../../../hooks/runtime/useTrackedResource.js', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('../../../../services/ui/storage.js', () => ({
-  default: { set: vi.fn() },
+vi.mock('../../../../services/ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../../services/rules/combat/damageUtils.js', () => ({
@@ -45,231 +77,283 @@ vi.mock('../../../../services/combat/conditions/conditionUtils.js', () => ({
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import useTrackedResource from '../../../../hooks/runtime/useTrackedResource.js';
 import * as damageUtils from '../../../../services/rules/combat/damageUtils.js';
+import * as applyHealingService from '../../../../services/rules/combat/applyHealing.js';
+import * as logService from '../../../../services/ui/logService.js';
 
-// ── Test fixtures ──
+// ── Fixtures / live stores ──
 
-const mockPlayerStats = {
+const CAMPAIGN = 'test-campaign';
+
+const basePlayerStats = {
   name: 'Paladin1',
   level: 3,
   hitPoints: 40,
   abilities: { CHA: 14 },
 };
-const mockCampaignName = 'test-campaign';
-const npcTarget = {
-  name: 'Orc Warrior',
-  type: 'npc',
-  maxHp: 30,
-  currentHp: 15,
-  conditions: [{ key: 'blinded' }],
-};
 
-const mockCombatSummary = {
+const combatSummary = {
   creatures: [
-    { name: 'Paladin1', type: 'player', targetName: 'Orc Warrior' },
-    npcTarget,
+    { name: 'Paladin1', type: 'player' },
+    { name: 'Orc Warrior', type: 'npc', maxHp: 30, currentHp: 15, conditions: [{ key: 'blinded' }] },
   ],
 };
 
-// ── Test helpers ──
+// Live mutable stores — tests mutate/read these directly instead of re-mocking.
+let poolStore; // { current, max } — poolUpdate writes land in current
+let hpStore; // { [characterName]: { currentHitPoints, hitPoints, activeConditions } }
+let poolUpdate;
 
-function setupPoolMock(current = 15, max = 20) {
-  const updateFn = vi.fn();
-  useTrackedResource.mockReturnValue({ current, max, update: updateFn });
-  return updateFn;
+function setupPoolStore(current = 15, max = 20) {
+  poolStore = { current, max };
+  useTrackedResource.mockImplementation(() => ({
+    current: poolStore.current,
+    max: poolStore.max,
+    update: poolUpdate,
+  }));
 }
 
-function makeProps(overrides) {
+function makeProps(overrides = {}) {
   return {
-    playerStats: mockPlayerStats,
-    campaignName: mockCampaignName,
+    playerStats: basePlayerStats,
+    campaignName: CAMPAIGN,
     alsoCures: ['Blinded'],
     cureCost: 3,
     restoringTouchConditions: null,
     onClose: vi.fn(),
-    ...(overrides ?? {}),
+    ...overrides,
   };
 }
 
-async function renderModal(poolConfig, overrides) {
-  setupPoolMock(poolConfig?.current, poolConfig?.max);
+async function renderModal(overrides = {}, pool = { current: 15, max: 20 }) {
+  setupPoolStore(pool.current, pool.max);
   const rendered = render(<HealingPoolModal {...makeProps(overrides)} />);
-  await waitFor(() => {
-    expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
-  });
+  if (overrides?.creatureTargets?.length > 1) {
+    await screen.findByRole('button', { name: 'Heal' });
+  } else {
+    await waitFor(() => {
+      expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
+    });
+  }
   return rendered;
 }
 
-function getPoolParagraph() {
-  const poolSection = document.querySelector('.short-rest-section');
-  if (!poolSection) return null;
-  const p = poolSection.querySelector('p');
-  return p?.textContent || null;
+const doneBtn = () => screen.getByRole('button', { name: 'Done' });
+const healInput = () => screen.getByRole('spinbutton');
+const featureHeading = (name) => screen.getByRole('heading', { level: 3, name });
+const healHeading = (name) => screen.getByRole('heading', { level: 4, name });
+
+// The pool <p> nests a <b>, so match the whole paragraph by textContent.
+const poolLine = (text) =>
+  screen.getByText((_, el) => el?.tagName === 'P' && el.textContent === text);
+
+async function selectTarget(name) {
+  fireEvent.click(await screen.findByRole('radio', { name: new RegExp(`^${name}`) }));
+  fireEvent.click(screen.getByRole('button', { name: 'Heal' }));
 }
+
+// NOTE — flagged component quirk (unchanged, also flagged in sibling lanes):
+// the heal amount input and dice roll-details block use inline styles.
 
 // ── Tests ──
 
-describe('HealingPoolModal', () => {
+describe('HealingPoolModal - base open/close contract', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: vi.fn() });
-    damageUtils.getCombatContext.mockResolvedValue(mockCombatSummary);
-    damageUtils.getTargetFromAttacker.mockReturnValue(npcTarget);
+    poolUpdate = vi.fn((v) => { poolStore.current = v; });
+    hpStore = {
+      Paladin1: { currentHitPoints: 15, hitPoints: 40, activeConditions: [] },
+    };
     useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeConditions') return ['blinded'];
-      return null;
+      const entry = hpStore[name];
+      return entry && key in entry ? entry[key] : null;
     });
-    setupPoolMock();
-  });
-
-  // ── Loading state ──
-
-  it('hides loading spinner after combat context resolves', async () => {
-    await renderModal({ current: 15, max: 20 });
-    expect(screen.queryByText(/Loading/)).not.toBeInTheDocument();
-  });
-
-  // ── Pool display ──
-
-  it('displays pool amount and maximum after loading', async () => {
-    await renderModal({ current: 15, max: 20 });
-    const poolText = getPoolParagraph();
-    expect(poolText).toBe('Pool: 15 / 20 HP');
-  });
-
-  it('shows pool as 0 when tracked resource current is zero', async () => {
-    await renderModal({ current: 0, max: 20 });
-    const poolText = getPoolParagraph();
-    expect(poolText).toBe('Pool: 0 / 20 HP');
-  });
-
-  // ── Target display ──
-
-  it('shows target name with current and max HP', async () => {
-    damageUtils.getCombatContext.mockResolvedValue(mockCombatSummary);
-    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentHitPoints') return 15;
-      if (key === 'hitPoints') return 40;
-      if (key === 'activeConditions') return [];
-      return null;
+    useRuntimeState.setRuntimeValue.mockImplementation((name, key, value) => {
+      const entry = hpStore[name] ??= {};
+      entry[key] = value;
     });
-    await renderModal({ current: 15, max: 20 });
-    expect(screen.getByText(/Heal — Paladin1 \(15 \/ 40 HP\)/)).toBeInTheDocument();
+    damageUtils.getCombatContext.mockResolvedValue(combatSummary);
   });
 
-  it('uses player stats as fallback when no target found', async () => {
-    damageUtils.getCombatContext.mockResolvedValue(null);
-    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentHitPoints') return 30;
-      if (key === 'activeConditions') return [];
-      return null;
-    });
-    await renderModal({ current: 15, max: 20 });
-    expect(screen.getByText(/Heal — Paladin1 \(30 \/ 40 HP\)/)).toBeInTheDocument();
+  afterEach(() => {
+    useRuntimeState.getRuntimeValue.mockReset();
+    useRuntimeState.setRuntimeValue.mockReset();
+    useTrackedResource.mockReset();
+    damageUtils.getCombatContext.mockReset();
+    damageUtils.getTargetFromAttacker.mockReset();
+    applyHealingService.applyHealingToTarget.mockReset();
+    logService.addEntry.mockReset();
   });
 
-  it('uses playerStats.hitPoints when currentHitPoints runtime value is missing', async () => {
-    damageUtils.getCombatContext.mockResolvedValue(null);
-    useRuntimeState.getRuntimeValue.mockReturnValue(null);
-    await renderModal({ current: 15, max: 20 });
-    expect(screen.getByText(/Heal — Paladin1 \(40 \/ 40 HP\)/)).toBeInTheDocument();
-  });
+  // ── Loading / mount contract ──
 
-  // ── Heal input and button ──
+  it('shows the loading spinner while combat context is pending, then renders the loaded modal shell with no log table', async () => {
+    let resolveContext;
+    damageUtils.getCombatContext.mockImplementation(
+      () => new Promise((resolve) => { resolveContext = resolve; })
+    );
+    setupPoolStore(15, 20);
+    render(<HealingPoolModal {...makeProps()} />);
 
-  it('renders heal amount input', async () => {
-    await renderModal({ current: 15, max: 20 });
-    const input = screen.getByRole('spinbutton');
-    expect(input).toBeInTheDocument();
-  });
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
 
-  it('updates heal amount on input change', async () => {
-    await renderModal({ current: 15, max: 20 });
-    const input = screen.getByRole('spinbutton');
-    fireEvent.change(input, { target: { value: '10' } });
-    expect(input.value).toBe('10');
-  });
+    await act(async () => { resolveContext(combatSummary); });
 
-  it('caps heal amount to remaining pool in the input display', async () => {
-    await renderModal({ current: 3, max: 20 });
-    const input = screen.getByRole('spinbutton');
-    fireEvent.change(input, { target: { value: '10' } });
-    expect(input.value).toBe('3');
-  });
-
-  // ── Log section ──
-
-  it('does not render log section when no actions taken', async () => {
-    await renderModal({ current: 15, max: 20 });
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(featureHeading('Lay On Hands')).toBeInTheDocument();
+    expect(doneBtn()).toBeInTheDocument();
+    // No action has been taken, so the log section never mounts
+    // (log-table content is owned by the healing/curing/dice lanes).
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(logService.addEntry).not.toHaveBeenCalled();
   });
 
-  // ── Modal close interactions ──
+  // ── Pool display strings ──
 
-  it('calls onClose when Done button is clicked', async () => {
+  it.each([
+    { current: 15, max: 20, text: 'Pool: 15 / 20 HP' },
+    { current: 0, max: 20, text: 'Pool: 0 / 20 HP' },
+    { current: 3, max: 3, text: 'Pool: 3 / 3 HP' },
+  ])('displays the pool line as "$text"', async ({ current, max, text }) => {
+    await renderModal({}, { current, max });
+    expect(poolLine(text)).toBeInTheDocument();
+  });
+
+  // ── Target heading resolution display strings ──
+
+  it.each([
+    {
+      lane: 'combat player creature via the live hp store',
+      summary: combatSummary,
+      store: { currentHitPoints: 15, hitPoints: 40 },
+      heading: 'Heal — Paladin1 (15 / 40 HP)',
+    },
+    {
+      lane: 'no-combat fallback via runtime currentHitPoints',
+      summary: null,
+      store: { currentHitPoints: 30, hitPoints: 40 },
+      heading: 'Heal — Paladin1 (30 / 40 HP)',
+    },
+    {
+      lane: 'missing currentHitPoints falls back to playerStats.hitPoints',
+      summary: null,
+      store: { hitPoints: 40 },
+      heading: 'Heal — Paladin1 (40 / 40 HP)',
+    },
+    {
+      lane: 'empty-string currentHitPoints is treated as missing',
+      summary: null,
+      store: { currentHitPoints: '', hitPoints: 40 },
+      heading: 'Heal — Paladin1 (40 / 40 HP)',
+    },
+  ])('resolves the heal heading "$heading" from the $lane', async ({ summary, store: storeHp, heading }) => {
+    damageUtils.getCombatContext.mockResolvedValue(summary);
+    hpStore.Paladin1 = { activeConditions: [], ...storeHp };
+    await renderModal();
+    expect(healHeading(heading)).toBeInTheDocument();
+  });
+
+  // ── Heal input display ──
+
+  it('renders the heal amount input with default 1 and max pinned to the pool', async () => {
+    await renderModal({}, { current: 7, max: 20 });
+    const input = healInput();
+    expect(input.value).toBe('1');
+    expect(input.getAttribute('max')).toBe('7');
+  });
+
+  it.each([
+    { lane: 'accepts an amount within the pool', pool: 15, typed: '5', display: '5' },
+    { lane: 'caps display at the pool when over it', pool: 3, typed: '10', display: '3' },
+    { lane: 'clamps a negative amount to 0', pool: 15, typed: '-4', display: '0' },
+  ])('$lane', async ({ pool, typed, display }) => {
+    await renderModal({}, { current: pool, max: 20 });
+    const input = healInput();
+    fireEvent.change(input, { target: { value: typed } });
+    expect(input.value).toBe(display);
+  });
+
+  // ── Feature name ──
+
+  it.each([
+    { lane: 'defaults to "Lay On Hands" when name is omitted', name: undefined, heading: 'Lay On Hands' },
+    { lane: 'renders a custom name verbatim', name: 'Channel Divinity: Preserve Life', heading: 'Channel Divinity: Preserve Life' },
+  ])('feature heading $lane', async ({ name, heading }) => {
+    await renderModal({ name });
+    expect(featureHeading(heading)).toBeInTheDocument();
+  });
+
+  // ── Target selection rendering ──
+
+  it.each([
+    { lane: 'one creatureTarget', creatureTargets: [{ name: 'Orc Warrior', maxHp: 30, currentHp: 15 }] },
+    { lane: 'empty creatureTargets array', creatureTargets: [] },
+    { lane: 'undefined creatureTargets', creatureTargets: undefined },
+  ])('opens the main modal directly when $lane is passed', async ({ creatureTargets }) => {
+    await renderModal({ creatureTargets });
+    expect(screen.queryByText(/Choose target for/i)).not.toBeInTheDocument();
+    expect(doneBtn()).toBeInTheDocument();
+  });
+
+  it('renders the target selection modal with exact title, note, per-target HP, and Skip/Heal actions', async () => {
+    const creatureTargets = [
+      { name: 'Orc Warrior', maxHp: 30, currentHp: 15 },
+      { name: 'Goblin', maxHp: 7, currentHp: 3 },
+    ];
+    await renderModal({ creatureTargets });
+
+    expect(screen.getByText('Choose target for Lay On Hands')).toBeInTheDocument();
+    expect(screen.getByText('Choose a creature within range to heal with Lay On Hands.')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /^Orc Warrior/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /^Goblin/ })).toBeInTheDocument();
+    expect(screen.getByText('15/30 HP (50%)')).toBeInTheDocument();
+    expect(screen.getByText('3/7 HP (43%)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Heal' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { lane: 'confirm replaces selection with the chosen target', select: 'Orc Warrior', heading: 'Heal — Orc Warrior (15 / 30 HP)' },
+    { lane: 'skip resolves to self', skip: true, heading: 'Heal — Paladin1 (15 / 40 HP)' },
+  ])('target selection: $lane', async ({ select, skip, heading }) => {
+    const creatureTargets = [
+      { name: 'Orc Warrior', maxHp: 30, currentHp: 15 },
+      { name: 'Goblin', maxHp: 7, currentHp: 3 },
+    ];
+    await renderModal({ creatureTargets });
+
+    if (skip) {
+      fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    } else {
+      await selectTarget(select);
+    }
+
+    expect(healHeading(heading)).toBeInTheDocument();
+    expect(screen.queryByText(/Choose target for/i)).not.toBeInTheDocument();
+  });
+
+  // ── Generic close plumbing (onClose callback contract) ──
+
+  it('calls onClose exactly once when Done is clicked', async () => {
     const onClose = vi.fn();
-    await renderModal({ current: 15, max: 20 }, { onClose });
-    fireEvent.click(screen.getByText('Done'));
+    await renderModal({ onClose }, { current: 15, max: 20 });
+    fireEvent.click(doneBtn());
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('closes on Escape key press', async () => {
+  it('calls onClose exactly once on Escape keydown', async () => {
     const onClose = vi.fn();
-    await renderModal({ current: 15, max: 20 }, { onClose });
+    await renderModal({ onClose }, { current: 15, max: 20 });
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('does not close when clicking the overlay background', async () => {
     const onClose = vi.fn();
-    await renderModal({ current: 15, max: 20 }, { onClose });
-    const overlay = document.querySelector('.short-rest-overlay');
-    fireEvent.click(overlay);
+    await renderModal({}, { current: 15, max: 20 });
+    fireEvent.click(document.querySelector('.short-rest-overlay'));
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByText('Done')).toBeInTheDocument();
-  });
-
-  // ── Default feature name ──
-
-  it('uses default feature name "Lay On Hands" when name prop is omitted', async () => {
-    await renderModal({ current: 15, max: 20 }, { name: undefined });
-    expect(screen.getByText('Lay On Hands')).toBeInTheDocument();
-  });
-
-  // ── Creature target selection ──
-
-  it.each([
-    { label: 'one creatureTarget', creatureTargets: [{ name: 'Orc Warrior', maxHp: 30, currentHp: 15 }] },
-    { label: 'empty creatureTargets array', creatureTargets: [] },
-    { label: 'undefined creatureTargets', creatureTargets: undefined },
-  ])('does not show target selection modal when $label', async ({ creatureTargets }) => {
-    damageUtils.getCombatContext.mockResolvedValue(null);
-    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentHitPoints') return 40;
-      if (key === 'activeConditions') return [];
-      return null;
-    });
-
-    await renderModal({ current: 15, max: 20 }, { creatureTargets });
-
-    expect(screen.queryByText(/Choose target for/i)).not.toBeInTheDocument();
-  });
-
-  it('shows target selection modal when multiple creatureTargets are provided', async () => {
-    damageUtils.getCombatContext.mockResolvedValue(null);
-    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentHitPoints') return 40;
-      if (key === 'activeConditions') return [];
-      return null;
-    });
-
-    const creatureTargets = [
-      { name: 'Orc Warrior', maxHp: 30, currentHp: 15 },
-      { name: 'Goblin', maxHp: 7, currentHp: 3 },
-    ];
-    await renderModal({ current: 15, max: 20 }, { creatureTargets });
-
-    expect(screen.getByText(/Choose target for/i)).toBeInTheDocument();
-    expect(screen.getByText('Orc Warrior')).toBeInTheDocument();
-    expect(screen.getByText('Goblin')).toBeInTheDocument();
+    expect(doneBtn()).toBeInTheDocument();
   });
 });

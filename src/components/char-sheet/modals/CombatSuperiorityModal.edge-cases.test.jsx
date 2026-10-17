@@ -1,8 +1,51 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+// CombatSuperiorityModal — EDGE-CASE lane. Renders only; no runtime-store writes.
+//
+// Ownership map (siblings own the rest — do NOT re-test here):
+// .test.jsx ........... selection/use happy paths, toggling & confirm/clear/cancel at
+//                       maxOptions 3/5, Select-header & Use-header without context,
+//                       "no maneuvers selected" prefix notice, onClose via Cancel.
+// .runtime.test.jsx ... superiority-dice resolution (getRuntimeValue / _trackedResources
+//                       fallback / missing playerStats), no-dice notice + its Close button.
+// .triggers.test.jsx .. trigger predicates, MN-014 group labels & hints, availableManeuvers
+//                       override, prompt headers WITH attackContext (both modes), skillContext
+//                       equivalence, lastAttack fallback, onReopenSelection invoke/fallback/
+//                       reject, handleUseManeuver reject, descriptions present (both modes).
+// .mn003UseMode ....... use-mode reachability, Grant Attack single-use confirm.
+//
+// This lane owns edge cases only:
+//  - null/undefined payload renders nothing
+//  - overlay containment (clicks on background/content never dismiss)
+//  - maxOptions 0 and 1; seeded selection ABOVE maxOptions (over-cap guard dance)
+//  - exact action-type group ORDER (siblings check membership only)
+//  - description OMISSION branch (missing / empty-string) in both views
+//  - duplicate maneuver names share one selection; confirm sends the name once
+//  - known ∩ allManeuvers intersection cardinality in use mode
+//  - applied-result-view transition after a RESOLVED use (the success half of the state
+//    machine — triggers covers only the reject half "no Done"; mn003 resolves null)
+//
+// Trimmed from this file (ownership now noted above):
+//  - prompt-mode header variants → triggers.test.jsx (Choose/Use w/ attackContext) +
+//    test.jsx (Select/Use w/o context) — every variant there, deleted here.
+//  - use-maneuver reject & onReopenSelection reject → triggers.test.jsx (identical
+//    scenarios with stricter objectContaining message match; old reopen test also had a
+//    never-awaited waitFor). Deleted.
+//  - "missing prop" null-payload row → same code path as payload=undefined, merged.
+//  - "no maneuvers empty state" variant 1 → folded into the it.each below as the
+//    empty-knownManeuvers row (test.jsx owns the prefix match; this lane pins the
+//    FULL sentence — new exactness).
+//
+// Conventions: fresh vi.fn per makeProps call; afterEach restoreAllMocks (not
+// clearAllMocks) so spy impls never leak; findBy idiom for the async applied screen;
+// role-scoped queries; same-object identity on the pass-through seed array.
+// FLAGGED (component, not fixed): inline styles throughout SpOverlay/SelectionGroupCheckbox/
+// ManeuverRadioItem/SelectionView/UseView violate the no-inline-styles convention — tests
+// deliberately avoid style-attribute selectors so the migration to CSS classes stays cheap.
+
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import CombatSuperiorityModal from './CombatSuperiorityModal.jsx';
 
-// ── Test fixtures ──
+// ── Fixtures / helpers ──
 
 const BASE_MANEUVERS = [
   { name: 'Trip Attack', actionType: 'attack_rider' },
@@ -15,19 +58,32 @@ const BASE_MANEUVERS = [
   { name: 'Grasping Vine', actionType: 'grant_attack' },
 ];
 
-function renderModal({ payload, ...rest } = {}) {
-  const defaultProps = {
-    payload: { allManeuvers: BASE_MANEUVERS, maxOptions: 3, knownManeuvers: [], ...payload },
+// BASE_MANEUVERS as they appear in the DOM (ACTION_TYPE_ORDER grouping order).
+const NAMES_IN_DOM_ORDER = [
+  'Trip Attack', 'Disarming Attack', // Attack Riders (on hit — no miss triggers)
+  'Ki-Fueled Attack',                // Bonus Actions
+  'Evasive Footwork',                // Reactions
+  'Kicking Attack',                  // Skill Checks
+  'Pushing Attack', 'Rally',         // Movement
+  'Grasping Vine',                   // Grant Attack
+];
+
+function makeProps(payloadOverrides = {}, propsOverrides = {}) {
+  return {
+    payload: { allManeuvers: BASE_MANEUVERS, maxOptions: 3, knownManeuvers: [], ...payloadOverrides },
     onConfirm: vi.fn(),
     onClose: vi.fn(),
-    ...rest,
+    ...propsOverrides,
   };
-  return render(<CombatSuperiorityModal {...defaultProps} />);
 }
 
-function renderModalDirect(props) {
-  return render(<CombatSuperiorityModal {...props} />);
+function renderModal(payloadOverrides = {}, propsOverrides = {}) {
+  return render(<CombatSuperiorityModal {...makeProps(payloadOverrides, propsOverrides)} />);
 }
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 // ── Null/undefined payload ──
 
@@ -35,420 +91,295 @@ describe('CombatSuperiorityModal - null/undefined payload', () => {
   it.each([
     ['null', null],
     ['undefined', undefined],
-    ['missing prop', undefined],
-  ])('renders nothing when payload is %s', (label, payloadValue) => {
-    const props = { onConfirm: vi.fn(), onClose: vi.fn() };
-    if (label !== 'missing prop') {
-      props.payload = payloadValue;
-    }
-    renderModalDirect(props);
+  ])('renders nothing when payload is %s', (_label, payloadValue) => {
+    render(
+      <CombatSuperiorityModal
+        payload={payloadValue}
+        onConfirm={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
     expect(document.body.textContent).toBe('');
   });
 });
 
-// ── Overlay click behavior (unique: not in test.jsx) ──
+// ── Overlay containment ──
 
-describe('CombatSuperiorityModal - overlay clicks', () => {
-  it('does not close when clicking the overlay background or modal content', () => {
+describe('CombatSuperiorityModal - overlay clicks never dismiss', () => {
+  it('clicking the overlay background or modal content does not close; inner clicks apply', () => {
     const onClose = vi.fn();
-    renderModal({
-      payload: { selectionMode: true },
-      onClose,
-    });
+    renderModal({ selectionMode: true }, { onClose });
     const overlay = document.querySelector('.sp-overlay');
     const modal = document.querySelector('.sp-modal');
     expect(overlay).toBeTruthy();
     expect(modal).toBeTruthy();
 
-    // Clicking modal content should NOT close
     fireEvent.click(modal);
-    expect(onClose).not.toHaveBeenCalled();
-
-    // Clicking overlay should not close
     fireEvent.click(overlay);
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+
+    // Interaction inside the modal applies normally and still does not dismiss
+    // (Cancel is the only dismissal control in this view — see .test.jsx).
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Trip Attack' }));
+    expect(screen.getByRole('checkbox', { name: 'Trip Attack' })).toBeChecked();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
 
-// ── maxOptions = 0 edge case (unique: test.jsx only has maxOptions=5) ──
+// ── maxOptions = 0 ──
 
 describe('CombatSuperiorityModal - maxOptions zero', () => {
-  it('disables all checkboxes and shows 0/0 selected when maxOptions is 0', () => {
-    renderModal({
-      payload: { selectionMode: true, maxOptions: 0 },
+  it('disables every maneuver checkbox and blocks confirm when maxOptions is 0', () => {
+    renderModal({ selectionMode: true, maxOptions: 0 });
+    NAMES_IN_DOM_ORDER.forEach(name => {
+      const cb = screen.getByRole('checkbox', { name });
+      expect(cb).toBeDisabled();
+      expect(cb).not.toBeChecked();
     });
-    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-    checkboxes.forEach(cb => expect(cb.disabled).toBe(true));
-    expect(screen.getByText(/0\/0 selected/)).toBeInTheDocument();
+    expect(screen.getByText('0/0 selected')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Confirm Selection/ })).toBeDisabled();
   });
 });
 
-// ── maxOptions = 1 edge case (unique: test.jsx only has maxOptions=5) ──
+// ── maxOptions = 1 ──
 
 describe('CombatSuperiorityModal - maxOptions one', () => {
-  it('allows selecting exactly one and disables remaining checkboxes', () => {
-    renderModal({
-      payload: { selectionMode: true, maxOptions: 1 },
+  it('allows selecting exactly one, disables all others, and re-enables on deselect', () => {
+    renderModal({ selectionMode: true, maxOptions: 1 });
+    const trip = screen.getByRole('checkbox', { name: 'Trip Attack' });
+
+    fireEvent.click(trip);
+    expect(trip).toBeChecked();
+    expect(trip).not.toBeDisabled();
+    expect(screen.getByText('1/1 selected')).toBeInTheDocument();
+    NAMES_IN_DOM_ORDER.filter(n => n !== 'Trip Attack').forEach(name => {
+      expect(screen.getByRole('checkbox', { name })).toBeDisabled();
     });
-    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-    fireEvent.click(checkboxes[0]);
-    expect(screen.getByText(/1\/1 selected/)).toBeInTheDocument();
-    // Remaining checkboxes should be disabled
-    for (let i = 1; i < checkboxes.length; i++) {
-      expect(checkboxes[i].disabled).toBe(true);
-    }
-    // First checkbox should still be toggleable off
-    expect(checkboxes[0].disabled).toBe(false);
-    fireEvent.click(checkboxes[0]);
-    expect(screen.getByText(/0\/1 selected/)).toBeInTheDocument();
-    // All checkboxes re-enabled after deselect
-    for (let i = 0; i < checkboxes.length; i++) {
-      expect(checkboxes[i].disabled).toBe(false);
-    }
+
+    // The selected one stays toggleable off; everything re-enables below cap.
+    fireEvent.click(trip);
+    expect(trip).not.toBeChecked();
+    expect(screen.getByText('0/1 selected')).toBeInTheDocument();
+    NAMES_IN_DOM_ORDER.forEach(name => {
+      expect(screen.getByRole('checkbox', { name })).not.toBeDisabled();
+    });
   });
 });
 
-// ── Action type ordering (unique: test.jsx checks grouping but not order) ──
+// ── Action type ordering (siblings assert membership, never order) ──
 
 describe('CombatSuperiorityModal - action type ordering', () => {
-  it('renders action types in the defined order in selection mode', () => {
-    renderModal({ payload: { selectionMode: true } });
-    const headings = document.querySelectorAll('h4');
-    const headingTexts = Array.from(headings).map(h => h.textContent);
-    const expectedOrder = [
+  it('renders action-type group headings in ACTION_TYPE_ORDER exactly', () => {
+    renderModal({ selectionMode: true });
+    const headings = screen.getAllByRole('heading', { level: 4 }).map(h => h.textContent);
+    expect(headings).toEqual([
       'Attack Riders (on hit)',
       'Bonus Actions',
       'Reactions',
       'Skill Checks',
       'Movement',
       'Grant Attack',
-    ];
-    expectedOrder.forEach((text, i) => {
-      expect(headingTexts[i]).toBe(text);
-    });
+    ]);
   });
 });
 
-// ── Maneuver descriptions in use mode (unique: triggers.test.jsx only covers selection mode) ──
+// ── Description omission branch (triggers covers presence, not omission) ──
 
-describe('CombatSuperiorityModal - maneuver descriptions in use mode', () => {
-  it('renders descriptions when present and omits them when absent', () => {
-    // With description
-    renderModalDirect({
-      payload: {
-        allManeuvers: [
-          { name: 'Trip Attack', actionType: 'bonus_action', description: 'Prone the target.' },
-          { name: 'Simple Move', actionType: 'movement', description: null },
-        ],
-        knownManeuvers: ['Trip Attack', 'Simple Move'],
-        maxOptions: 3,
-        selectionMode: false,
-      },
-      onConfirm: vi.fn(),
-      onClose: vi.fn(),
+describe('CombatSuperiorityModal - description omission branch', () => {
+  const DESC = 'Prone the target.';
+
+  it.each([
+    ['selection mode', { selectionMode: true }],
+    ['use mode', { selectionMode: false, knownManeuvers: ['Trip Attack', 'Silent Maneuver', 'Blank Maneuver'] }],
+  ])('renders a description block only for non-empty descriptions — %s', (_label, modePayload) => {
+    renderModal({
+      allManeuvers: [
+        { name: 'Trip Attack', actionType: 'bonus_action', description: DESC },
+        { name: 'Silent Maneuver', actionType: 'movement' },
+        { name: 'Blank Maneuver', actionType: 'reaction', description: '' },
+      ],
+      ...modePayload,
     });
-    expect(screen.getByText('Trip Attack')).toBeInTheDocument();
-    expect(screen.getByText('Prone the target.')).toBeInTheDocument();
-    expect(screen.getByText('Simple Move')).toBeInTheDocument();
-    expect(screen.queryByText('Simple Move')).toBeInTheDocument();
+    // Item structure in both views: <label>[input, flexDiv[name div (+ desc div)]].
+    const itemBody = name => screen.getByText(name).closest('label').lastElementChild;
+    const withDesc = itemBody('Trip Attack');
+    expect(withDesc).toHaveTextContent(DESC);
+    expect(withDesc.children).toHaveLength(2);
+    expect(itemBody('Silent Maneuver').children).toHaveLength(1);
+    expect(itemBody('Blank Maneuver').children).toHaveLength(1);
   });
 });
 
-// ── Prompt mode headers (unique: triggers.test.jsx checks header text but not all prompt variants) ──
-
-describe('CombatSuperiorityModal - prompt mode headers', () => {
-  it('shows the correct header based on selectionMode and attackContext', () => {
-    // selectionMode with attackContext → "Choose Maneuver"
-    renderModalDirect({
-      payload: {
-        allManeuvers: [{ name: 'A', actionType: 'bonus_action' }],
-        knownManeuvers: [],
-        maxOptions: 3,
-        selectionMode: true,
-        attackContext: { hit: true, weaponType: 'melee' },
-      },
-      onConfirm: vi.fn(),
-      onClose: vi.fn(),
-    });
-    expect(screen.getByText(/Combat Superiority — Choose Maneuver/)).toBeInTheDocument();
-
-    // use mode with attackContext → "Use Maneuver"
-    renderModalDirect({
-      payload: {
-        allManeuvers: [{ name: 'Ki-Fueled Attack', actionType: 'bonus_action' }],
-        knownManeuvers: ['Ki-Fueled Attack'],
-        maxOptions: 3,
-        selectionMode: false,
-        attackContext: { hit: true, weaponType: 'melee' },
-      },
-      onConfirm: vi.fn(),
-      onClose: vi.fn(),
-    });
-    expect(screen.getByText(/Combat Superiority — Use Maneuver/)).toBeInTheDocument();
-
-    // selectionMode without attackContext → "Select Maneuvers"
-    renderModalDirect({
-      payload: {
-        allManeuvers: [{ name: 'A', actionType: 'bonus_action' }],
-        knownManeuvers: [],
-        maxOptions: 3,
-        selectionMode: true,
-      },
-      onConfirm: vi.fn(),
-      onClose: vi.fn(),
-    });
-    expect(screen.getByText(/Combat Superiority — Select Maneuvers/)).toBeInTheDocument();
-  });
-});
-
-// ── Known maneuvers pre-selected in selection state (unique: runtime.test.jsx covers this but edge case behavior is different) ──
+// ── knownManeuvers pre-selected in selection state ──
 
 describe('CombatSuperiorityModal - knownManeuvers pre-selected', () => {
-  it('pre-selects known maneuvers and allows toggling them off', () => {
-    renderModalDirect({
-      payload: {
-        allManeuvers: [
-          { name: 'Ki-Fueled Attack', actionType: 'bonus_action' },
-          { name: 'Pushing Attack', actionType: 'movement' },
-        ],
-        knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
-        maxOptions: 3,
-        selectionMode: true,
-      },
-      onConfirm: vi.fn(),
-      onClose: vi.fn(),
-    });
-    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-    expect(checkboxes.length).toBe(2);
-    expect(checkboxes[0].checked).toBe(true);
-    expect(checkboxes[1].checked).toBe(true);
+  const PRE_ALL = [
+    { name: 'Ki-Fueled Attack', actionType: 'bonus_action' },
+    { name: 'Pushing Attack', actionType: 'movement' },
+    { name: 'Evasive Footwork', actionType: 'reaction' },
+  ];
+  const PRE_KNOWN = ['Ki-Fueled Attack', 'Pushing Attack'];
 
-    // Toggle one off
-    fireEvent.click(checkboxes[0]);
-    expect(checkboxes[0].checked).toBe(false);
-    expect(checkboxes[1].checked).toBe(true);
+  it('seeds checkboxes from knownManeuvers and allows toggling them off', () => {
+    renderModal({ selectionMode: true, allManeuvers: PRE_ALL, knownManeuvers: PRE_KNOWN });
+    expect(screen.getByRole('checkbox', { name: 'Ki-Fueled Attack' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Pushing Attack' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Evasive Footwork' })).not.toBeChecked();
+    expect(screen.getByText('2/3 selected')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ki-Fueled Attack' }));
+    expect(screen.getByRole('checkbox', { name: 'Ki-Fueled Attack' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Pushing Attack' })).toBeChecked();
+    expect(screen.getByText('1/3 selected')).toBeInTheDocument();
   });
 
-  it('confirm sends pre-selected known maneuvers without user interaction', () => {
+  it('confirm submits the untouched seeded selection (same array reference)', () => {
     const onConfirm = vi.fn();
-    renderModalDirect({
-      payload: {
-        allManeuvers: [
-          { name: 'Ki-Fueled Attack', actionType: 'bonus_action' },
-          { name: 'Pushing Attack', actionType: 'movement' },
-        ],
-        knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
-        maxOptions: 3,
-        selectionMode: true,
-      },
-      onConfirm,
-      onClose: vi.fn(),
-    });
+    renderModal(
+      { selectionMode: true, allManeuvers: PRE_ALL, knownManeuvers: PRE_KNOWN },
+      { onConfirm },
+    );
     fireEvent.click(screen.getByRole('button', { name: /Confirm Selection/ }));
-    expect(onConfirm).toHaveBeenCalledWith(['Ki-Fueled Attack', 'Pushing Attack'], null);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith(PRE_KNOWN, null);
+    // Seed array flows through untouched — no copy, no reorder.
+    expect(onConfirm.mock.calls[0][0]).toBe(PRE_KNOWN);
   });
 
-  it('pre-selected known maneuvers respect maxOptions limit', () => {
-    renderModalDirect({
-      payload: {
-        allManeuvers: [
-          { name: 'A', actionType: 'bonus_action' },
-          { name: 'B', actionType: 'movement' },
-          { name: 'C', actionType: 'reaction' },
-          { name: 'D', actionType: 'skill_check' },
-        ],
-        knownManeuvers: ['A', 'B', 'C', 'D'],
-        maxOptions: 2,
-        selectionMode: true,
-      },
-      onConfirm: vi.fn(),
-      onClose: vi.fn(),
+  it('guards an over-cap seeded selection: deselect always, re-add only below cap', () => {
+    renderModal({
+      selectionMode: true,
+      maxOptions: 2,
+      allManeuvers: [
+        { name: 'A', actionType: 'bonus_action' },
+        { name: 'B', actionType: 'movement' },
+        { name: 'C', actionType: 'reaction' },
+        { name: 'D', actionType: 'skill_check' },
+      ],
+      knownManeuvers: ['A', 'B', 'C', 'D'],
     });
-    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-    expect(checkboxes.length).toBe(4);
-    // All are pre-selected (knownManeuvers seeds state)
-    expect(checkboxes[0].checked).toBe(true);
-    expect(checkboxes[1].checked).toBe(true);
-    expect(checkboxes[2].checked).toBe(true);
-    expect(checkboxes[3].checked).toBe(true);
-    // Toggle off C — length goes from 4 to 3, still >= 2
-    fireEvent.click(checkboxes[2]);
-    expect(checkboxes[2].checked).toBe(false);
-    // Now length is 3, so D is disabled (atMax = 3>=2 && !isSelected(true→false) = true)
-    // But checkbox 2 itself is not disabled (atMax = 3>=2 && !isSelected(false) = true → disabled)
-    expect(checkboxes[2].disabled).toBe(true);
-    // Can't re-add C because length(3) >= 2
-    // Must first toggle off another to get below maxOptions
-    fireEvent.click(checkboxes[3]);
-    expect(checkboxes[3].checked).toBe(false);
-    // Now length is 2, still at max — checkbox 2 is still disabled
-    expect(checkboxes[2].disabled).toBe(true);
-    // Toggle off A to get to length 1
-    fireEvent.click(checkboxes[0]);
-    expect(checkboxes[0].checked).toBe(false);
-    // Now length is 1 < 2, so checkbox 2 is re-enabled
-    expect(checkboxes[2].disabled).toBe(false);
-    // Can now re-add C
-    fireEvent.click(checkboxes[2]);
-    expect(checkboxes[2].checked).toBe(true);
+    // Seeded above cap: counter shows the truth, confirm stays enabled (no clamp).
+    expect(screen.getByText('4/2 selected')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Confirm Selection/ })).toBeEnabled();
+
+    // Deselect C — unselected at/over cap means it cannot be re-added yet.
+    fireEvent.click(screen.getByRole('checkbox', { name: 'C' }));
+    expect(screen.getByRole('checkbox', { name: 'C' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'C' })).toBeDisabled();
+    expect(screen.getByText('3/2 selected')).toBeInTheDocument();
+
+    // Deselecting remains possible at or above cap (selected rows are never blocked).
+    fireEvent.click(screen.getByRole('checkbox', { name: 'D' }));
+    expect(screen.getByText('2/2 selected')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'A' }));
+    expect(screen.getByText('1/2 selected')).toBeInTheDocument();
+
+    // Below cap, C re-enables and can be re-added; unselected rows re-enable too.
+    expect(screen.getByRole('checkbox', { name: 'C' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'C' }));
+    expect(screen.getByRole('checkbox', { name: 'C' })).toBeChecked();
+    expect(screen.getByText('2/2 selected')).toBeInTheDocument();
+
+    // Back at cap: selected rows (B, C) stay enabled, unselected rows (A, D) are blocked.
+    expect(screen.getByRole('checkbox', { name: 'C' })).not.toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'B' })).not.toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'A' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'D' })).toBeDisabled();
   });
 });
 
-// ── Duplicate maneuver names (unique behavior) ──
+// ── Duplicate maneuver names ──
 
 describe('CombatSuperiorityModal - duplicate maneuver names', () => {
-  it('treats duplicate names as the same maneuver in selection', () => {
-    renderModal({
-      payload: {
-        selectionMode: true,
-        allManeuvers: [
-          { name: 'Same Name', actionType: 'bonus_action' },
-          { name: 'Same Name', actionType: 'movement' },
-        ],
-      },
-    });
-    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-    expect(checkboxes.length).toBe(2);
-    fireEvent.click(checkboxes[0]);
-    expect(checkboxes[0].checked).toBe(true);
-    expect(screen.getByText(/1\/3 selected/)).toBeInTheDocument();
-    // Clicking the duplicate should toggle the first one off (same name)
-    fireEvent.click(checkboxes[1]);
-    expect(checkboxes[1].checked).toBe(false);
-    expect(checkboxes[0].checked).toBe(false);
-    expect(screen.getByText(/0\/3 selected/)).toBeInTheDocument();
-  });
-
-  it('confirm with duplicate names sends name only once', () => {
+  it('shares one selection across duplicate names; confirm sends the name once', () => {
     const onConfirm = vi.fn();
-    renderModal({
-      payload: {
+    renderModal(
+      {
         selectionMode: true,
         allManeuvers: [
           { name: 'Same Name', actionType: 'bonus_action' },
           { name: 'Same Name', actionType: 'movement' },
-          { name: 'Other', actionType: 'reaction' },
         ],
       },
-      onConfirm,
-      onClose: vi.fn(),
-    });
-    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-    // Due to React key collision (both "Same Name" share same key),
-    // clicking checkbox 0 selects "Same Name", and the state reflects that.
-    // Confirm sends the name once (not duplicated).
-    fireEvent.click(checkboxes[0]);
-    expect(checkboxes[0].checked).toBe(true);
-    expect(screen.getByText(/1\/3 selected/)).toBeInTheDocument();
+      { onConfirm },
+    );
+    const dups = screen.getAllByRole('checkbox', { name: 'Same Name' });
+    expect(dups).toHaveLength(2);
+
+    fireEvent.click(dups[0]);
+    // Selection is keyed by NAME — both duplicate rows reflect the single selection.
+    expect(dups[0]).toBeChecked();
+    expect(dups[1]).toBeChecked();
+    expect(screen.getByText('1/3 selected')).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: /Confirm Selection/ }));
     expect(onConfirm).toHaveBeenCalledWith(['Same Name'], null);
+
+    // Toggling off via the other row deselects both.
+    fireEvent.click(dups[1]);
+    expect(dups[0]).not.toBeChecked();
+    expect(dups[1]).not.toBeChecked();
+    expect(screen.getByText('0/3 selected')).toBeInTheDocument();
   });
 });
 
-// ── Use maneuver error path (unique: triggers.test.jsx covers rejection but not applied state) ──
-
-describe('CombatSuperiorityModal - use maneuver error path', () => {
-  it('does not set applied/result state when onConfirm rejects', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
-    const onConfirm = vi.fn().mockRejectedValue(new Error('use failed'));
-    renderModalDirect({
-      payload: {
-        allManeuvers: [{ name: 'Ki-Fueled Attack', actionType: 'bonus_action' }],
-        knownManeuvers: ['Ki-Fueled Attack'],
-        maxOptions: 3,
-        selectionMode: false,
-      },
-      onConfirm,
-      onClose: vi.fn(),
-    });
-    const radios = document.querySelectorAll('input[name="combatManeuver"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-    await waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[CombatSuperiorityModal] Use maneuver failed:',
-        expect.any(Error)
-      );
-      expect(screen.queryByText('Done')).not.toBeInTheDocument();
-    });
-    consoleSpy.mockRestore();
-  });
-});
-
-// ── onReopenSelection error handling (unique) ──
-
-describe('CombatSuperiorityModal - onReopenSelection error handling', () => {
-  it('logs error when onReopenSelection rejects', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
-    const onReopenSelection = vi.fn().mockRejectedValue(new Error('fail'));
-    renderModalDirect({
-      payload: {
-        allManeuvers: [{ name: 'Ki-Fueled Attack', actionType: 'bonus_action' }],
-        knownManeuvers: ['Ki-Fueled Attack'],
-        maxOptions: 3,
-        selectionMode: false,
-      },
-      onReopenSelection: onReopenSelection,
-      onConfirm: vi.fn(),
-    });
-    const btn = screen.getByRole('button', { name: /Manage Maneuvers/ });
-    fireEvent.click(btn);
-    waitFor(() => {
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[CombatSuperiorityModal] Reopen selection failed:',
-        expect.any(Error)
-      );
-    });
-    consoleSpy.mockRestore();
-  });
-});
-
-// ── No maneuvers message variants (unique: test.jsx covers general use mode but not empty state) ──
+// ── No-maneuvers empty state (use mode) ──
 
 describe('CombatSuperiorityModal - no maneuvers empty state', () => {
-  it('shows no maneuvers message when knownManeuvers is empty and selectionMode is false', () => {
-    renderModal({
-      payload: {
-        selectionMode: false,
-        knownManeuvers: [],
-      },
-    });
-    expect(screen.getByText('Combat Superiority')).toBeInTheDocument();
-    expect(screen.getByText(/No maneuvers selected/)).toBeInTheDocument();
-    expect(screen.getByText(/Use Combat Superiority again to select your maneuvers/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Close/ })).toBeInTheDocument();
-  });
+  it.each([
+    ['knownManeuvers is empty', []],
+    ['knownManeuvers match nothing in allManeuvers', ['Nonexistent Maneuver']],
+  ])('shows the full select-first notice when %s', (_label, knownManeuvers) => {
+    const onClose = vi.fn();
+    renderModal({ selectionMode: false, knownManeuvers }, { onClose });
+    expect(screen.getByText('No maneuvers selected. Use Combat Superiority again to select your maneuvers.')).toBeInTheDocument();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /Use Maneuver/ })).not.toBeInTheDocument();
 
-  it('shows no maneuvers when knownManeuvers contains maneuvers not in allManeuvers', () => {
-    renderModal({
-      payload: {
-        selectionMode: false,
-        knownManeuvers: ['Nonexistent Maneuver'],
-        allManeuvers: [{ name: 'Real Maneuver', actionType: 'bonus_action' }],
-      },
-    });
-    expect(screen.getByText(/No maneuvers selected/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
 
-// ── Known maneuver objects filtering in use mode (unique) ──
+// ── Known ∩ allManeuvers filtering in use mode ──
 
-describe('CombatSuperiorityModal - known maneuver objects filtering', () => {
-  it('only shows maneuvers that are both known and in allManeuvers in use mode', () => {
+describe('CombatSuperiorityModal - known maneuver intersection in use mode', () => {
+  it('shows exactly the maneuvers both known AND listed in allManeuvers', () => {
     renderModal({
-      payload: {
-        selectionMode: false,
-        knownManeuvers: ['Ki-Fueled Attack', 'Unknown Maneuver'],
-        allManeuvers: [
-          { name: 'Ki-Fueled Attack', actionType: 'bonus_action' },
-          { name: 'Known But Not Listed', actionType: 'reaction' },
-        ],
-      },
+      selectionMode: false,
+      knownManeuvers: ['Ki-Fueled Attack', 'Unknown Maneuver'],
+      allManeuvers: [
+        { name: 'Ki-Fueled Attack', actionType: 'bonus_action' },
+        { name: 'Known But Not Listed', actionType: 'reaction' },
+      ],
     });
-    expect(screen.getByText('Ki-Fueled Attack')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Ki-Fueled Attack/ })).toBeInTheDocument();
     expect(screen.queryByText('Unknown Maneuver')).not.toBeInTheDocument();
     expect(screen.queryByText('Known But Not Listed')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('radio')).toHaveLength(1);
+  });
+});
+
+// ── Applied result view (success half of the use flow) ──
+
+describe('CombatSuperiorityModal - applied result view after resolved use', () => {
+  it('swaps the use list for the result view and closes via Done', async () => {
+    const onClose = vi.fn();
+    const result = { payload: { name: 'Ki-Fueled Attack', description: 'Take an additional bonus action move.' } };
+    const onConfirm = vi.fn().mockResolvedValue(result);
+    renderModal(
+      { selectionMode: false, knownManeuvers: ['Ki-Fueled Attack'] },
+      { onConfirm, onClose },
+    );
+    fireEvent.click(screen.getByRole('radio', { name: /Ki-Fueled Attack/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
+
+    const done = await screen.findByRole('button', { name: 'Done' });
+    expect(screen.getByText('Ki-Fueled Attack')).toBeInTheDocument();
+    expect(screen.getByText('Take an additional bonus action move.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Use Maneuver/ })).not.toBeInTheDocument();
+
+    fireEvent.click(done);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

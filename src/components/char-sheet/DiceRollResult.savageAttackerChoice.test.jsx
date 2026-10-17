@@ -1,107 +1,92 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+
 import DiceRollResult from './DiceRollResult.jsx';
+
+// Ownership of the Savage Attacker seam:
+//  - DiceRollResult.handlers.savageAttacker.test.js — handler seam: reroll/keep
+//    payload contracts and inertness. It is the source of truth for the full
+//    choice payload asserted here: { keep, originalRolls, newRolls, originalTotal,
+//    newTotal, rawDamage, modifier, targetName, damageTypes }.
+//  - rerollResults — SavageAttackerResult row text copy ('Original kept',
+//    'Reroll kept (+N)'); the row copy is not re-asserted in this lane.
+//  - This file — the rendered chooser UI: trigger consumption, chooser buttons
+//    labelled with the exact totals, click wiring with the exact payload, and the
+//    chooser disappearing once a decision is made.
+
+// Deterministic dice: a constant Math.random makes every d6 roll the same face.
+const rollMax = () => vi.spyOn(Math, 'random').mockReturnValue(0.999); // d6 → 6
+const rollMin = () => vi.spyOn(Math, 'random').mockReturnValue(0.001); // d6 → 1
+
+function renderSavageRoll() {
+    const props = {
+        name: 'Greatsword',
+        type: 'damage',
+        rolls: [2, 3],
+        bonus: 0,
+        total: 5,
+        formula: '2d6',
+        savageAttacker: true,
+        targetName: 'Orc',
+        damageType: 'Slashing',
+        modifier: 0,
+        onSavageAttacker: vi.fn().mockResolvedValue(undefined),
+        onSavageAttackerChoice: vi.fn().mockResolvedValue(undefined),
+    };
+    render(<DiceRollResult {...props} />);
+    return props;
+}
 
 describe('DiceRollResult savage attacker chooser', () => {
     afterEach(() => {
         vi.restoreAllMocks();
     });
 
-    it('offers Keep First / Keep Reroll chooser when the reroll is higher', () => {
-        vi.spyOn(Math, 'random').mockReturnValue(0.999);
-        render(
-            <DiceRollResult
-                name="Greatsword"
-                type="damage"
-                rolls={[2, 3]}
-                bonus={0}
-                total={5}
-                formula="2d6"
-                savageAttacker={true}
-                onSavageAttacker={vi.fn().mockResolvedValue(undefined)}
-                onSavageAttackerChoice={vi.fn().mockResolvedValue(undefined)}
-            />
-        );
-        fireEvent.click(screen.getByRole('button', { name: /Savage Attacker/ }));
-        expect(screen.getByRole('button', { name: /Keep First \(5\)/ })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Keep Reroll \(12\)/ })).toBeInTheDocument();
-    });
+    it.each([
+        ['original', 'Keep First (5)'],
+        ['reroll', 'Keep Reroll (12)'],
+    ])('higher reroll offers a chooser, Keep %s forwards the exact payload and closes it', (keep, buttonName) => {
+        rollMax();
+        const props = renderSavageRoll();
 
-    it('keep-reroll click forwards the keep-reroll decision and hides the chooser', () => {
-        vi.spyOn(Math, 'random').mockReturnValue(0.999);
-        const onSavageAttackerChoice = vi.fn().mockResolvedValue(undefined);
-        render(
-            <DiceRollResult
-                name="Greatsword"
-                type="damage"
-                rolls={[2, 3]}
-                bonus={0}
-                total={5}
-                formula="2d6"
-                savageAttacker={true}
-                onSavageAttacker={vi.fn().mockResolvedValue(undefined)}
-                onSavageAttackerChoice={onSavageAttackerChoice}
-            />
-        );
-        fireEvent.click(screen.getByRole('button', { name: /Savage Attacker/ }));
-        fireEvent.click(screen.getByRole('button', { name: /Keep Reroll \(12\)/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Savage Attacker' }));
 
-        expect(onSavageAttackerChoice).toHaveBeenCalledTimes(1);
-        expect(onSavageAttackerChoice.mock.calls[0][0]).toEqual(expect.objectContaining({
-            keep: 'reroll',
+        // Chooser visible while the decision is pending, each option labelled
+        // with its exact total.
+        expect(screen.getByRole('button', { name: 'Keep First (5)' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Keep Reroll (12)' })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: buttonName }));
+
+        // Exact payload per the handlers-lane contract — no objectContaining.
+        expect(props.onSavageAttackerChoice).toHaveBeenCalledWith({
+            keep,
+            originalRolls: [2, 3],
+            newRolls: [6, 6],
             originalTotal: 5,
             newTotal: 12,
             rawDamage: 5,
-        }));
+            modifier: 0,
+            targetName: 'Orc',
+            damageTypes: ['Slashing'],
+        });
+        expect(props.onSavageAttackerChoice).toHaveBeenCalledTimes(1);
+
+        // Chooser UI and trigger are gone once the decision is made.
         expect(screen.queryByRole('button', { name: /Keep First/ })).not.toBeInTheDocument();
-        expect(screen.getByText(/Reroll kept/)).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Keep Reroll/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Savage Attacker' })).not.toBeInTheDocument();
     });
 
-    it('keep-first click records the decision with no damage movement', () => {
-        vi.spyOn(Math, 'random').mockReturnValue(0.999);
-        const onSavageAttackerChoice = vi.fn().mockResolvedValue(undefined);
-        const { container } = render(
-            <DiceRollResult
-                name="Greatsword"
-                type="damage"
-                rolls={[2, 3]}
-                bonus={0}
-                total={5}
-                formula="2d6"
-                savageAttacker={true}
-                onSavageAttacker={vi.fn().mockResolvedValue(undefined)}
-                onSavageAttackerChoice={onSavageAttackerChoice}
-            />
-        );
-        fireEvent.click(screen.getByRole('button', { name: /Savage Attacker/ }));
-        fireEvent.click(screen.getByRole('button', { name: /Keep First \(5\)/ }));
+    it('lower reroll auto-keeps the original: no chooser offered, trigger consumed', () => {
+        rollMin();
+        const props = renderSavageRoll();
 
-        expect(onSavageAttackerChoice).toHaveBeenCalledTimes(1);
-        expect(onSavageAttackerChoice.mock.calls[0][0].keep).toBe('original');
-        expect(screen.queryByRole('button', { name: /Keep Reroll/ })).not.toBeInTheDocument();
-        expect(container.querySelector('.dice-roll-reroll-result').textContent).toContain('Original kept');
-    });
+        fireEvent.click(screen.getByRole('button', { name: 'Savage Attacker' }));
 
-    it('offers no chooser and keeps original when the reroll is lower', () => {
-        vi.spyOn(Math, 'random').mockReturnValue(0.001);
-        const onSavageAttackerChoice = vi.fn().mockResolvedValue(undefined);
-        const { container } = render(
-            <DiceRollResult
-                name="Shortsword"
-                type="damage"
-                rolls={[6]}
-                bonus={0}
-                total={6}
-                formula="1d6"
-                savageAttacker={true}
-                onSavageAttacker={vi.fn().mockResolvedValue(undefined)}
-                onSavageAttackerChoice={onSavageAttackerChoice}
-            />
-        );
-        fireEvent.click(screen.getByRole('button', { name: /Savage Attacker/ }));
-
-        expect(screen.queryByRole('button', { name: /Keep Reroll/ })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /Keep First/ })).not.toBeInTheDocument();
-        expect(container.querySelector('.dice-roll-reroll-result').textContent).toContain('Original kept');
+        expect(screen.queryByRole('button', { name: /Keep Reroll/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Savage Attacker' })).not.toBeInTheDocument();
+        expect(props.onSavageAttackerChoice).not.toHaveBeenCalled();
     });
 });

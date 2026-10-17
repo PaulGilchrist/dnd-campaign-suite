@@ -1,11 +1,23 @@
+// @maintained-by-ai
+// CharSheet UI lane: runtime-driven injection of synthetic Bardic Inspiration
+// features into the playerStats handed to CharSpecialActions / CharReactions.
+// Grant/eligibility state machine: services/combat/auras/bardicInspirationState.test.js
+// Spend handlers + log shapes: CharSheet.featureRiders.test.jsx
+// Offer modals/popups: BardicInspirationReactionModal + AttackResultPopup tests.
+
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import CharSheet from './CharSheet';
 import rulesFactory from '../../services/rules/rulesFactory.js';
+import {
+  createMockStore,
+  createDefaultProps,
+  createMockPlayerStats,
+} from './CharSheet.test-utils.jsx';
 
 // ---------------------------------------------------------------------------
-// Mocks — child components
+// Mocks — child components (props inspection is the observable surface here)
 // ---------------------------------------------------------------------------
 
 vi.mock('./char-summary/CharSummary.jsx', () => ({
@@ -46,9 +58,7 @@ vi.mock('./CharSpecialActions.jsx', () => ({
 
 vi.mock('./CharCharacterAdvancement.jsx', () => ({
   default: vi.fn(({ playerStats }) => (
-    <div data-testid="char-character-advancement">
-      <span>{playerStats?.name || 'none'}</span>
-    </div>
+    <div data-testid="char-character-advancement"><span>{playerStats?.name || 'none'}</span></div>
   )),
 }));
 
@@ -117,28 +127,6 @@ vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-vi.mock('./DiceRollResult.jsx', () => ({
-  default: vi.fn(({ name }) => (
-    <div data-testid="dice-roll-result"><span>{name || 'dice'}</span></div>
-  )),
-}));
-
-vi.mock('./modals/shared/SecondaryTargetModal.jsx', () => ({
-  default: vi.fn(() => <div data-testid="secondary-target-modal">modal</div>),
-}));
-
-vi.mock('./modals/PolymorphSelectionModal.jsx', () => ({
-  default: vi.fn(() => <div data-testid="polymorph-selection-modal">modal</div>),
-}));
-
-vi.mock('./modals/AnimalShapesSelectionModal.jsx', () => ({
-  default: vi.fn(() => <div data-testid="animal-shapes-selection-modal">modal</div>),
-}));
-
-vi.mock('./modals/ObjectTransformModal.jsx', () => ({
-  default: vi.fn(() => <div data-testid="object-transform-modal">modal</div>),
-}));
-
 vi.mock('../common/popup.jsx', () => ({
   default: vi.fn(({ children }) => <div data-testid="popup">{children}</div>),
 }));
@@ -152,38 +140,27 @@ vi.mock('../common/AttackResultPopup.jsx', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mocks — hooks
+// Mocks — hooks (store passthrough, no business-logic defaults duplicated)
 // ---------------------------------------------------------------------------
 
-const mockStore = new Map();
+const mockStore = createMockStore();
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getStore: vi.fn(() => new Map()),
+  getStore: vi.fn(() => mockStore),
   useSyncedState: vi.fn(() => [null, vi.fn()]),
   listeners: new Map(),
   getRuntimeValue: vi.fn((key, prop, _camp) => mockStore.get(`${key}:${prop}`) ?? null),
   setRuntimeValue: vi.fn((_key, _prop, _val, _camp) => mockStore.set(`${_key}:${_prop}`, _val)),
   useRuntimeValue: vi.fn((key, prop) => {
-    if (prop === 'exhaustionLevel') return 0;
-    if (prop === 'activeConditions' || prop === 'activeBuffs' || prop === 'targetEffects') return [];
-    if (prop === 'bardicInspirationGrantedBy') return mockStore.get(`${key}:bardicInspirationGrantedBy`) ?? 'unknown';
-    const zeroDefaultProps = ['indomitableUses', 'bardicInspirationUses', 'secondWindUses', 'superiorityDice', 'psionicEnergy'];
-    if (zeroDefaultProps.includes(prop)) return mockStore.get(`${key}:${prop}`) ?? 0;
-    const storePassThroughProps = [
-      'bardicInspirationDie', 'bardicInspirationCombatOptions', 'preparedSpells', 'aspectOfTheWildsOption',
-      'stunned_speedHalved', 'fanaticalFocusUsed', 'focusPoints', 'disciplinedSurvivorUsed', 'strokeOfLuckUsed',
-      'peerlessAthleteActive', 'largeFormActive', 'holyNimbusActive', '_Defensive_Tactics_choice',
-      'luckyAdvantageActive', 'luckyDisadvantageActive', '_circleOfTheLandType', '_Energy_Resistances_chosenTypes',
-      '_Fiendish_Resilience_chosenType', '_spellThiefCasterBlock', '_spellThiefStolenList',
-    ];
-    if (storePassThroughProps.includes(prop)) return mockStore.get(`${key}:${prop}`) ?? null;
-    return null;
+    const defaults = { activeConditions: [], activeBuffs: [], targetEffects: [] };
+    const def = Object.prototype.hasOwnProperty.call(defaults, prop) ? defaults[prop] : null;
+    return mockStore.get(`${key}:${prop}`) ?? def;
   }),
 }));
 
 vi.mock('../../services/rules/rulesFactory.js', () => ({
   default: {
-    getPlayerStats: vi.fn().mockImplementation(() => Promise.resolve(createMockPlayerStats())),
+    getPlayerStats: vi.fn(),
   },
 }));
 
@@ -191,191 +168,124 @@ vi.mock('../../services/rules/rulesFactory.js', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-const createMockPlayerStats = (overrides = {}) => ({
-  name: 'Test Bard',
-  level: 5,
-  hitPoints: { current: 40, max: 40 },
-  abilities: [{ name: 'Strength', bonus: 2, save: 4, skills: [] }],
-  spellAbilities: { spells: [], maxPreparedSpells: 5 },
-  rules: '5e',
-  automation: { passives: [] },
-  class: { name: 'Bard' },
-  speed: 30,
-  race: { speed: 30 },
-  actions: [],
-  bonusActions: [],
-  reactions: [],
-  specialActions: [],
-  characterAdvancement: [],
-  skillProficiencies: [],
-  ...overrides,
-});
+const BI_SPECIAL = 'Use Bardic Inspiration';
+const BI_DEFENSE = 'Combat Inspiration - Defense';
+const BI_OFFENSE = 'Combat Inspiration - Offense';
 
-const mockPlayerSummary = {
-  name: 'Test Bard',
-  rules: '5e',
+const grantBI = ({ die, options, grantedBy }) => {
+  if (die != null) mockStore.set('Test Character:bardicInspirationDie', die);
+  if (options !== undefined) mockStore.set('Test Character:bardicInspirationCombatOptions', options);
+  if (grantedBy !== undefined) mockStore.set('Test Character:bardicInspirationGrantedBy', grantedBy);
 };
 
-const defaultProps = {
-  allAbilityScores: [],
-  allClasses: [],
-  allClasses2024: [],
-  allEquipment: [],
-  allMagicItems: [],
-  allRaces: [],
-  allSpells: [],
-  allSpells2024: [],
-  playerSummary: mockPlayerSummary,
-  allRaces2024: [],
-  allMagicItems2024: [],
-  campaignName: 'test-campaign',
-  activeMapName: null,
-  characters: [],
-  onDeleteCharacter: vi.fn(),
-  onEditCharacter: vi.fn(),
-  onUploadClick: vi.fn(),
-  onSaveClick: vi.fn(),
+// Renders CharSheet and returns the feature lists actually delivered to the
+// child components (the injection's only observable output).
+async function renderAndReadFeatures(stats) {
+  vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(stats));
+  render(<CharSheet {...createDefaultProps()} />);
+  await waitFor(() => {
+    expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+  });
+  const { default: CharSpecialActions } = await import('./CharSpecialActions.jsx');
+  const { default: CharReactions } = await import('./CharReactions.jsx');
+  return {
+    specialActions: CharSpecialActions.mock.calls.at(-1)[0].playerStats.specialActions || [],
+    reactions: CharReactions.mock.calls.at(-1)[0].playerStats.reactions || [],
+  };
+}
+
+const assertFeature = (feature, { automationType, descriptionIncludes }) => {
+  expect(feature.automation.type).toBe(automationType);
+  descriptionIncludes.forEach((fragment) => expect(feature.description).toContain(fragment));
 };
 
 // ---------------------------------------------------------------------------
-// Tests — Bardic Inspiration feature injection
+// Injection matrix — die presence gates everything; combat options select reactions
 // ---------------------------------------------------------------------------
 
 describe('bardic inspiration feature injection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStore.clear();
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(createMockPlayerStats()));
   });
 
   it.each([
-    { die: null, combatOptions: [], expectedReactions: 0, expectedSpecial: 0, label: 'no die, no options' },
-    { die: 6, combatOptions: [], expectedReactions: 0, expectedSpecial: 1, label: 'die only' },
-    { die: 6, combatOptions: ['defense_add_to_ac'], expectedReactions: 1, expectedSpecial: 1, label: 'die + defense' },
-    { die: 6, combatOptions: ['offense_add_to_damage'], expectedReactions: 1, expectedSpecial: 1, label: 'die + offense' },
-    { die: 6, combatOptions: ['defense_add_to_ac', 'offense_add_to_damage'], expectedReactions: 2, expectedSpecial: 1, label: 'die + both' },
-  ])('special actions and reactions counts are $expectedSpecial/$expectedReactions when $label', async ({ die, combatOptions, expectedReactions, expectedSpecial }) => {
-    mockStore.set('Test Bard:bardicInspirationDie', die);
-    mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(combatOptions));
-
-    render(<CharSheet {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSpecialActions } = await import('./CharSpecialActions.jsx');
-    const { default: CharReactions } = await import('./CharReactions.jsx');
-
-    expect(CharSpecialActions).toHaveBeenCalled();
-    expect(CharReactions).toHaveBeenCalled();
-
-    const specialActions = CharSpecialActions.mock.calls[0][0].playerStats.specialActions;
-    expect(specialActions.length).toBe(expectedSpecial);
-
-    const reactions = CharReactions.mock.calls[0][0].playerStats.reactions;
-    expect(reactions.length).toBe(expectedReactions);
-  });
-
-  it('handles invalid JSON in bardicInspirationCombatOptions gracefully', async () => {
-    mockStore.set('Test Bard:bardicInspirationDie', 6);
-    mockStore.set('Test Bard:bardicInspirationCombatOptions', 'not-valid-json');
-
-    render(<CharSheet {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSpecialActions } = await import('./CharSpecialActions.jsx');
-    const { default: CharReactions } = await import('./CharReactions.jsx');
-
-    // Should still inject BI special action but no combat reactions (invalid JSON parses to [] via catch)
-    const specialActions = CharSpecialActions.mock.calls[0][0].playerStats.specialActions;
-    expect(specialActions.length).toBe(1);
-
-    const reactions = CharReactions.mock.calls[0][0].playerStats.reactions;
-    expect(reactions.length).toBe(0);
-  });
-
-  it('does not duplicate "Use Bardic Inspiration" if already in specialActions', async () => {
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(createMockPlayerStats({
-      specialActions: [{ name: 'Use Bardic Inspiration', description: 'existing' }],
-    })));
-    mockStore.set('Test Bard:bardicInspirationDie', 6);
-
-    render(<CharSheet {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharSpecialActions } = await import('./CharSpecialActions.jsx');
-    const passedStats = CharSpecialActions.mock.calls[0][0].playerStats;
-    const biActions = passedStats.specialActions.filter((a) => a.name === 'Use Bardic Inspiration');
-    expect(biActions.length).toBe(1);
-  });
-
-  it('does not duplicate Combat Inspiration reactions if already present', async () => {
-    mockStore.set('Test Bard:bardicInspirationDie', 6);
-    mockStore.set('Test Bard:bardicInspirationGrantedBy', 'Bard');
-    mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(['defense_add_to_ac', 'offense_add_to_damage']));
-    vi.mocked(rulesFactory.getPlayerStats).mockImplementation(() => Promise.resolve(createMockPlayerStats({
+    {
+      label: 'no die granted — fully inert even with combat options set',
+      grant: { die: null, options: JSON.stringify(['defense_add_to_ac', 'offense_add_to_damage']) },
+      specials: [],
+      reactions: [],
+    },
+    {
+      label: 'die granted, options unset',
+      grant: { die: 6, options: undefined },
+      specials: [{ name: BI_SPECIAL, automationType: 'bardic_inspiration_use', descriptionIncludes: ['1d6', 'Die granted by unknown'] }],
+      reactions: [],
+    },
+    {
+      label: 'invalid JSON options fail soft (special survives, no reactions)',
+      grant: { die: 6, options: 'not-valid-json' },
+      specials: [{ name: BI_SPECIAL, automationType: 'bardic_inspiration_use', descriptionIncludes: ['1d6'] }],
+      reactions: [],
+    },
+    {
+      label: 'defense option adds the defense reaction',
+      grant: { die: 10, options: JSON.stringify(['defense_add_to_ac']), grantedBy: 'Bard' },
+      specials: [{ name: BI_SPECIAL, automationType: 'bardic_inspiration_use', descriptionIncludes: ['1d10', 'Die granted by Bard'] }],
+      reactions: [{ name: BI_DEFENSE, automationType: 'bardic_inspiration_defense', descriptionIncludes: ['1d10', ' Reaction ', 'AC'] }],
+    },
+    {
+      label: 'offense option adds the offense reaction',
+      grant: { die: 12, options: JSON.stringify(['offense_add_to_damage']), grantedBy: 'Bard' },
+      specials: [{ name: BI_SPECIAL, automationType: 'bardic_inspiration_use', descriptionIncludes: ['1d12'] }],
+      reactions: [{ name: BI_OFFENSE, automationType: 'bardic_inspiration_offense', descriptionIncludes: ['1d12', 'damage'] }],
+    },
+    {
+      label: 'both options coexist',
+      grant: { die: 8, options: JSON.stringify(['defense_add_to_ac', 'offense_add_to_damage']), grantedBy: 'Bard' },
+      specials: [{ name: BI_SPECIAL, automationType: 'bardic_inspiration_use', descriptionIncludes: ['1d8'] }],
       reactions: [
-        { name: 'Combat Inspiration - Defense' },
-        { name: 'Combat Inspiration - Offense' },
+        { name: BI_DEFENSE, automationType: 'bardic_inspiration_defense', descriptionIncludes: ['1d8'] },
+        { name: BI_OFFENSE, automationType: 'bardic_inspiration_offense', descriptionIncludes: ['1d8'] },
       ],
-    })));
+    },
+  ])('injects $specials.length special / $reactions.length reaction(s) — $label', async ({ grant, specials, reactions }) => {
+    grantBI(grant);
 
-    render(<CharSheet {...defaultProps} />);
+    const { specialActions, reactions: deliveredReactions } = await renderAndReadFeatures(createMockPlayerStats({
+      class: { name: 'Bard' },
+    }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+    const deliveredSpecials = specialActions.filter((f) => f.name === BI_SPECIAL);
+    expect(deliveredSpecials.length).toBe(specials.length);
+    specials.forEach((expected) => {
+      assertFeature(deliveredSpecials.find((f) => f.name === expected.name), expected);
     });
 
-    const { default: CharReactions } = await import('./CharReactions.jsx');
-    const passedStats = CharReactions.mock.calls[0][0].playerStats;
-    const defenseReactions = passedStats.reactions.filter((r) => r.name === 'Combat Inspiration - Defense');
-    const offenseReactions = passedStats.reactions.filter((r) => r.name === 'Combat Inspiration - Offense');
-    expect(defenseReactions.length).toBe(1);
-    expect(offenseReactions.length).toBe(1);
+    const deliveredBIReactions = deliveredReactions.filter((f) => f.name === BI_DEFENSE || f.name === BI_OFFENSE);
+    expect(deliveredBIReactions.map((f) => f.name).sort()).toEqual(reactions.map((f) => f.name).sort());
+    reactions.forEach((expected) => {
+      assertFeature(deliveredBIReactions.find((f) => f.name === expected.name), expected);
+    });
   });
 
-  it('injects the correct die size into reaction descriptions for defense', async () => {
-    mockStore.set('Test Bard:bardicInspirationDie', 10);
-    mockStore.set('Test Bard:bardicInspirationGrantedBy', 'Bard');
-    mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(['defense_add_to_ac']));
+  it('never duplicates or overwrites Bardic Inspiration entries already on the sheet', async () => {
+    grantBI({ die: 8, options: JSON.stringify(['defense_add_to_ac', 'offense_add_to_damage']), grantedBy: 'Bard' });
 
-    render(<CharSheet {...defaultProps} />);
+    const { specialActions, reactions } = await renderAndReadFeatures(createMockPlayerStats({
+      class: { name: 'Bard' },
+      specialActions: [{ name: BI_SPECIAL, description: 'existing special' }],
+      reactions: [
+        { name: BI_DEFENSE, description: 'existing defense' },
+        { name: BI_OFFENSE, description: 'existing offense' },
+      ],
+    }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharReactions } = await import('./CharReactions.jsx');
-    expect(CharReactions.mock.calls.length).toBeGreaterThan(0);
-    const passedStats = CharReactions.mock.calls[0][0].playerStats;
-    expect(passedStats.reactions.length).toBe(1);
-    expect(passedStats.reactions[0].name).toBe('Combat Inspiration - Defense');
-    expect(passedStats.reactions[0].description).toContain('1d10');
-  });
-
-  it('injects the correct die size into reaction descriptions for offense', async () => {
-    mockStore.set('Test Bard:bardicInspirationDie', 12);
-    mockStore.set('Test Bard:bardicInspirationGrantedBy', 'Bard');
-    mockStore.set('Test Bard:bardicInspirationCombatOptions', JSON.stringify(['offense_add_to_damage']));
-
-    render(<CharSheet {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-
-    const { default: CharReactions } = await import('./CharReactions.jsx');
-    expect(CharReactions.mock.calls.length).toBeGreaterThan(0);
-    const passedStats = CharReactions.mock.calls[0][0].playerStats;
-    expect(passedStats.reactions.length).toBe(1);
-    expect(passedStats.reactions[0].name).toBe('Combat Inspiration - Offense');
-    expect(passedStats.reactions[0].description).toContain('1d12');
+    expect(specialActions.filter((f) => f.name === BI_SPECIAL)).toHaveLength(1);
+    expect(specialActions.find((f) => f.name === BI_SPECIAL).description).toBe('existing special');
+    expect(reactions.filter((f) => f.name === BI_DEFENSE)).toHaveLength(1);
+    expect(reactions.find((f) => f.name === BI_DEFENSE).description).toBe('existing defense');
+    expect(reactions.filter((f) => f.name === BI_OFFENSE)).toHaveLength(1);
+    expect(reactions.find((f) => f.name === BI_OFFENSE).description).toBe('existing offense');
   });
 });

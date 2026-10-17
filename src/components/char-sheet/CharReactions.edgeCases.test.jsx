@@ -1,7 +1,10 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CharReactions from './CharReactions.jsx';
+
+const { mockSetPopupHtml } = vi.hoisted(() => ({ mockSetPopupHtml: vi.fn() }));
 
 vi.mock('../common/popup.jsx', () => ({
     default: ({ children }) => React.createElement('div', { 'data-testid': 'popup' }, children),
@@ -47,6 +50,7 @@ vi.mock('./modals/SearingVengeanceModal.jsx', () => ({
 }));
 vi.mock('../../services/ui/spellSectionUtils.js', () => ({
     getReactionSpellNames: vi.fn(() => new Set()),
+    applyPotentSpellcasting: vi.fn((s) => s),
 }));
 vi.mock('../../services/character/featureCategories.js', () => ({
     getCategories: vi.fn(() => ({ featuresToIgnore: [] })),
@@ -59,7 +63,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
     default: vi.fn(),
 }));
 vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
-    useDiceRollPopup: vi.fn(() => ({ setPopupHtml: vi.fn() })),
+    useDiceRollPopup: vi.fn(() => ({ setPopupHtml: mockSetPopupHtml })),
 }));
 vi.mock('../../services/combat/baseCombatActions.js', () => ({
     OPPORTUNITY_ATTACK: { name: 'Opportunity Attack', description: 'Can attack creature that moves out of your reach' },
@@ -132,13 +136,11 @@ vi.mock('../../services/ui/formatUtils.js', () => ({
     signFormatter: { format: (val) => (val >= 0 ? '+' : '') + val },
 }));
 
-import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { useRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js';
 import { getCategories } from '../../services/character/featureCategories.js';
-import { getReactionSpellNames } from '../../services/ui/spellSectionUtils.js';
-import { resolveSpellDamageAtLevel } from '../../services/rules/core/spellDamageUtils.js';
 import { executeHandler } from '../../services/automation/index.js';
 
 const campaignName = 'test-campaign';
@@ -167,103 +169,157 @@ const basePlayerStats = {
 };
 
 function createProps(overrides = {}) {
-    const playerStats = { ...basePlayerStats, ...overrides.playerStats };
     return {
-        playerStats,
+        playerStats: { ...basePlayerStats, ...overrides.playerStats },
         campaignName,
         cannotAct: false,
         mapName: null,
         characters: [],
-        modalState: {},
-        setModalState: vi.fn(),
         ...overrides,
     };
 }
 
-describe('CharReactions - Edge Cases', () => {
+// Runtime reads default to "nothing dynamic active"; override per key in tests.
+function runtimeWith(overrides = {}) {
+    useRuntimeValue.mockImplementation((_charKey, key) =>
+        key in overrides ? overrides[key] : []);
+}
+
+describe('CharReactions - dynamic reaction list assembly', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        useRuntimeValue.mockReturnValue([]);
+        mockSetPopupHtml.mockReset();
+        runtimeWith();
         getRuntimeValue.mockReturnValue(null);
-        setRuntimeValue.mockReturnValue(undefined);
         hasAutomation.mockReturnValue(false);
         buildFeatureDetailHtml.mockImplementation((r) => `<div>${r.name}</div>`);
         getCategories.mockReturnValue({ featuresToIgnore: [] });
-        getReactionSpellNames.mockReturnValue(new Set());
-        resolveSpellDamageAtLevel.mockReturnValue(null);
+        executeHandler.mockResolvedValue(null);
         useLoggedDiceRoll.mockReturnValue({ rollAttack: vi.fn(), rollDamage: vi.fn() });
     });
 
-    // ─── Null/undefined prop handling ──────────────────────────────────────────
-    // Consolidated: removed 20+ individual null/undefined tests that all asserted
-    // the same thing (header renders). Coverage is provided by rendering.test.jsx
-    // and integration.test.jsx which test the same structural resilience.
+    // ─── Opportunity Attack is the base reaction everyone gets ─────────────
+    // (Click-through roll lane is covered in CharReactions.handlers.test.jsx.)
 
-    it('throws when playerStats is null', () => {
-        expect(() => render(<CharReactions playerStats={null} campaignName={campaignName} />)).toThrow();
-    });
-
-    it('renders header and opportunity attack when reactions is null', () => {
-        const props = createProps({ playerStats: { ...basePlayerStats, reactions: null } });
+    it.each([
+        ['null', null],
+        ['an empty array', []],
+        ['reactions without one', [{ name: 'Other Reaction', description: 'other' }]],
+    ])('renders exactly one clickable Opportunity Attack row when reactions is %s', (_label, reactions) => {
+        const props = createProps({ playerStats: { ...basePlayerStats, reactions } });
         render(<CharReactions {...props} />);
         expect(screen.getByText('Reactions')).toBeInTheDocument();
-        expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
+        const rows = screen.queryAllByText('Opportunity Attack:');
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toHaveClass('clickable');
     });
 
-    it('renders header and opportunity attack when reactions is an empty array', () => {
-        const props = createProps({ playerStats: { ...basePlayerStats, reactions: [] } });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-        expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
-    });
-
-    it('throws when spellAbilities.spells is null (cannot access .length)', () => {
+    it('keeps a character-provided Opportunity Attack without duplicating or overwriting it', () => {
         const props = createProps({
             playerStats: {
                 ...basePlayerStats,
-                spellAbilities: { ...basePlayerStats.spellAbilities, spells: null },
+                reactions: [{ name: 'Opportunity Attack', description: 'Custom OA desc' }],
             },
         });
-        expect(() => render(<CharReactions {...props} />)).toThrow();
+        render(<CharReactions {...props} />);
+        expect(screen.queryAllByText('Opportunity Attack:')).toHaveLength(1);
+        expect(screen.getByText('Custom OA desc')).toBeInTheDocument();
     });
 
-    it('throws when reactions contains null element', () => {
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                reactions: [null, { name: 'Opportunity Attack', description: '...' }],
-            },
+    // ─── Revivification rides in on active buffs ─────────────────────────────
+
+    it('adds exactly one Revivification row from reactionSave buffs, never duplicated', () => {
+        runtimeWith({
+            activeBuffs: [
+                { reactionSave: { dc: 15, type: 'CON' } },
+                { reactionSave: { dc: 12, type: 'CHA' } },
+            ],
         });
-        expect(() => render(<CharReactions {...props} />)).toThrow();
+        render(<CharReactions {...createProps()} />);
+        expect(screen.queryAllByText('Revivification:')).toHaveLength(1);
     });
 
-    it('throws when getCategories throws', () => {
-        getCategories.mockImplementation(() => { throw new Error('category error'); });
-        const props = createProps();
-        expect(() => render(<CharReactions {...props} />)).toThrow('category error');
+    it('does not add Revivification when active buffs carry no reactionSave', () => {
+        runtimeWith({ activeBuffs: [{ effect: 'some_buff' }] });
+        render(<CharReactions {...createProps()} />);
+        expect(screen.queryByText('Revivification:')).not.toBeInTheDocument();
     });
 
-    // ─── Reaction rendering ────────────────────────────────────────────────────
-
-    it('renders reaction with details property as clickable', () => {
+    it('does not duplicate the Stand (Power Word Heal) row when it is already in reactions', () => {
+        runtimeWith({ powerWordHealStandPermission: true });
         const props = createProps({
             playerStats: {
                 ...basePlayerStats,
                 reactions: [
-                    { name: 'Custom Reaction', description: 'Has details', details: 'Some detail' },
+                    { name: 'Opportunity Attack', description: '...' },
+                    { name: 'Stand (Power Word Heal)', description: 'Already present' },
                 ],
             },
         });
         render(<CharReactions {...props} />);
-        expect(screen.getByText('Custom Reaction:')).toHaveClass('clickable');
+        expect(screen.queryAllByText('Stand (Power Word Heal):')).toHaveLength(1);
+    });
+
+    // ─── Bastion of Law ward state drives the row ────────────────────────────
+
+    it.each([
+        ['ward active but no dice', true, []],
+        ['ward inactive but dice held', false, [{ value: 8 }]],
+    ])('does not show a Bastion of Law ward row when %s', (_label, wardActive, wardDice) => {
+        runtimeWith({ bastionOfLawActive: wardActive, bastionOfLawWardDice: wardDice });
+        render(<CharReactions {...createProps()} />);
+        expect(screen.getByText('Reactions')).toBeInTheDocument();
+        expect(screen.queryByText('Bastion of Law:')).not.toBeInTheDocument();
+    });
+
+    it('adds a Bastion of Law ward row with remaining dice count when ward is active', () => {
+        runtimeWith({ bastionOfLawActive: true, bastionOfLawWardDice: [{ value: 8 }] });
+        render(<CharReactions {...createProps()} />);
+        expect(screen.queryAllByText('Bastion of Law:')).toHaveLength(1);
+        expect(screen.getByText(/1d8 remaining/)).toBeInTheDocument();
+    });
+
+    // FT-103 contrast: the existing bastion_of_law ACTION row is REPLACED by the
+    // spend variant so clicking spends dice instead of creating a new ward.
+    it('replaces a Bastion of Law action row with the spend reaction and dispatches it on click', async () => {
+        runtimeWith({ bastionOfLawActive: true, bastionOfLawWardDice: [{ value: 8 }] });
+        hasAutomation.mockImplementation((feature) => feature?.automation?.type === 'bastion_of_law_spend');
+        executeHandler.mockResolvedValue(null);
+        const props = createProps({
+            playerStats: {
+                ...basePlayerStats,
+                reactions: [
+                    { name: 'Opportunity Attack', description: 'Can attack creature that moves out of your reach' },
+                    { name: 'Bastion of Law', description: 'Action desc', automation: { type: 'bastion_of_law' } },
+                ],
+            },
+        });
+        render(<CharReactions {...props} />);
+        const rows = screen.queryAllByText('Bastion of Law:');
+        expect(rows).toHaveLength(1);
+        fireEvent.click(rows[0]);
+        await waitFor(() => expect(executeHandler).toHaveBeenCalledTimes(1));
+        expect(executeHandler.mock.calls[0][0].automation.type).toBe('bastion_of_law_spend');
+    });
+});
+
+describe('CharReactions - row clickability and popup lane', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockSetPopupHtml.mockReset();
+        runtimeWith();
+        getRuntimeValue.mockReturnValue(null);
+        hasAutomation.mockReturnValue(false);
+        buildFeatureDetailHtml.mockImplementation((r) => `<div>${r.name}</div>`);
+        getCategories.mockReturnValue({ featuresToIgnore: [] });
+        executeHandler.mockResolvedValue(null);
+        useLoggedDiceRoll.mockReturnValue({ rollAttack: vi.fn(), rollDamage: vi.fn() });
     });
 
     // FT-103 (inverted pin): the `reaction.name !== 'Reactive Strike'` hard-block
-    // was removed — the automation-backed row is clickable and dispatches through
-    // the generic hasAutomation → executeHandler lane.
-    it('renders reactive strike as clickable when it carries automation (FT-103)', async () => {
+    // was removed — automation-backed rows ride the generic executeHandler lane.
+    it('clicking an automation-backed reaction dispatches through executeHandler', async () => {
         hasAutomation.mockImplementation((r) => !!(r && r.automation));
-        executeHandler.mockResolvedValue(null);
         const props = createProps({
             playerStats: {
                 ...basePlayerStats,
@@ -280,284 +336,96 @@ describe('CharReactions - Edge Cases', () => {
         const row = screen.getByText('Reactive Strike:');
         expect(row).toHaveClass('clickable');
         fireEvent.click(row);
-        await waitFor(() => expect(executeHandler).toHaveBeenCalled());
+        await waitFor(() => expect(executeHandler).toHaveBeenCalledTimes(1));
+        expect(executeHandler.mock.calls[0][0].name).toBe('Reactive Strike');
     });
 
-    it('renders automation-less reactive strike as non-clickable', () => {
+    it('renders a non-automated custom reaction as non-clickable', () => {
         const props = createProps({
             playerStats: {
                 ...basePlayerStats,
-                reactions: [
-                    { name: 'Reactive Strike', description: 'Reactive strike desc' },
-                ],
+                reactions: [{ name: 'Reactive Strike', description: 'No automation here' }],
             },
         });
         render(<CharReactions {...props} />);
         expect(screen.getByText('Reactive Strike:')).not.toHaveClass('clickable');
     });
 
-    it('renders header when buildFeatureDetailHtml returns null for a reaction', () => {
-        buildFeatureDetailHtml.mockReturnValue(null);
+    it('clicking a details-only reaction opens its detail popup', () => {
         const props = createProps({
             playerStats: {
                 ...basePlayerStats,
-                reactions: [{ name: 'No Detail Reaction', description: 'No details' }],
+                reactions: [{ name: 'Custom Reaction', description: 'Has details', details: 'Some detail' }],
             },
         });
         render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
+        const row = screen.getByText('Custom Reaction:');
+        expect(row).toHaveClass('clickable');
+        fireEvent.click(row);
+        expect(mockSetPopupHtml).toHaveBeenCalledWith('<div>Custom Reaction</div>');
     });
 
-    it('renders header when buildFeatureDetailHtml returns empty string', () => {
-        buildFeatureDetailHtml.mockReturnValue('');
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                reactions: [{ name: 'Empty Detail Reaction', description: 'Empty' }],
-            },
+    it.each([['empty string', ''], ['null', null]])(
+        'opens no popup when the detail html is %s', (_label, html) => {
+            buildFeatureDetailHtml.mockReturnValue(html);
+            const props = createProps({
+                playerStats: {
+                    ...basePlayerStats,
+                    reactions: [{ name: 'No Detail Reaction', description: 'desc', details: 'd' }],
+                },
+            });
+            render(<CharReactions {...props} />);
+            fireEvent.click(screen.getByText('No Detail Reaction:'));
+            expect(mockSetPopupHtml).not.toHaveBeenCalled();
+            expect(screen.getByText('Reactions')).toBeInTheDocument();
         });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-    });
 
-    // ─── Dynamic reactions from runtime values ─────────────────────────────────
-
-    it('adds Revivification reaction when activeBuffs has buff with reactionSave', () => {
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'activeBuffs') return [{ reactionSave: { dc: 15, type: 'CON' } }];
-            return [];
-        });
-        const props = createProps();
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-        expect(screen.getByText('Revivification:')).toBeInTheDocument();
-    });
-
-    it('does not add Revivification when activeBuffs has buff without reactionSave', () => {
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'activeBuffs') return [{ effect: 'some_buff' }];
-            return [];
-        });
-        const props = createProps();
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-        expect(screen.queryByText('Revivification:')).not.toBeInTheDocument();
-    });
-
-    it('does not add duplicate Revivification when multiple buffs have reactionSave', () => {
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'activeBuffs') return [
-                { reactionSave: { dc: 15, type: 'CON' } },
-                { reactionSave: { dc: 12, type: 'CHA' } },
-                { reactionSave: { dc: 10, type: 'WIS' } },
-            ];
-            return [];
-        });
-        const props = createProps();
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-        const revivificationElements = screen.queryAllByText(/Revivification/);
-        expect(revivificationElements).toHaveLength(1);
-    });
-
-    it('does not add duplicate Stand reaction when pwhStance is true and reaction already present', () => {
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'powerWordHealStandPermission') return true;
-            return [];
-        });
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                reactions: [
-                    { name: 'Opportunity Attack', description: '...' },
-                    { name: 'Stand (Power Word Heal)', description: 'Already present' },
-                ],
-            },
-        });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-    });
-
-    it('does not add Bastion of Law when wardActive is true but wardDice is empty', () => {
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'bastionOfLawActive') return true;
-            if (key === 'bastionOfLawWardDice') return [];
-            return [];
-        });
-        const props = createProps();
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-        expect(screen.queryByText('Bastion of Law:')).not.toBeInTheDocument();
-    });
-
-    it('adds Bastion of Law when wardActive is true and wardDice has one element', () => {
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'bastionOfLawActive') return true;
-            if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
-            return [];
-        });
-        const props = createProps();
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-        expect(screen.getByText('Bastion of Law:')).toBeInTheDocument();
-    });
-
-    it('does not add Bastion of Law when wardActive is falsy but wardDice has elements', () => {
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'bastionOfLawActive') return false;
-            if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
-            return [];
-        });
-        const props = createProps();
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-        expect(screen.queryByText('Bastion of Law:')).not.toBeInTheDocument();
-    });
-
-    it('replaces Bastion of Law action with spend reaction when ward is active', () => {
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'bastionOfLawActive') return true;
-            if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
-            return [];
-        });
-        hasAutomation.mockImplementation((feature) => {
-            if (feature?.automation?.type === 'bastion_of_law_spend') return true;
-            return false;
-        });
-        executeHandler.mockResolvedValue({ type: 'modal', modalName: 'bastionOfLawSpend', payload: {} });
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                reactions: [
-                    { name: 'Opportunity Attack', description: 'Can attack creature that moves out of your reach' },
-                    { name: 'Bastion of Law', description: 'Action desc', automation: { type: 'bastion_of_law' } },
-                ],
-            },
-        });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-        const bastionElements = screen.queryAllByText(/Bastion of Law:/);
-        expect(bastionElements).toHaveLength(1);
-        bastionElements[0].click();
-        expect(executeHandler).toHaveBeenCalledTimes(1);
-        const actionArg = executeHandler.mock.calls[0][0];
-        expect(actionArg.automation.type).toBe('bastion_of_law_spend');
-    });
-
-    it('does not add duplicate Bastion of Law when wardActive is true and action already exists', () => {
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'bastionOfLawActive') return true;
-            if (key === 'bastionOfLawWardDice') return [{ value: 8 }];
-            return [];
-        });
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                reactions: [
-                    { name: 'Opportunity Attack', description: 'Can attack creature that moves out of your reach' },
-                    { name: 'Bastion of Law', description: 'Action desc', automation: { type: 'bastion_of_law' } },
-                ],
-            },
-        });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-        const bastionElements = screen.queryAllByText(/Bastion of Law:/);
-        expect(bastionElements).toHaveLength(1);
-    });
-
-    it('does not add duplicate Opportunity Attack when already in reactions', () => {
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                reactions: [
-                    { name: 'Opportunity Attack', description: 'Custom desc' },
-                ],
-            },
-        });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-        const oaElements = screen.queryAllByText(/Opportunity Attack/);
-        expect(oaElements).toHaveLength(1);
-    });
-
-    it('adds Opportunity Attack automatically when missing from reactions', () => {
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                reactions: [],
-            },
-        });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-        expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
-    });
-
-    // ─── Ignore list filtering ─────────────────────────────────────────────────
-
-    it('hides all reactions when getCategories returns featuresToIgnore with all reaction names', () => {
+    it('hides every listed reaction — static and buff-granted — via featuresToIgnore', () => {
+        runtimeWith({ activeBuffs: [{ reactionSave: { dc: 15, type: 'CON' } }] });
         getCategories.mockReturnValue({
             featuresToIgnore: ['Opportunity Attack', 'Revivification', "Stone's Endurance", "Storm's Thunder", 'Bastion of Law', 'Stand (Power Word Heal)', 'Reactive Strike'],
         });
-        const props = createProps();
-        render(<CharReactions {...props} />);
+        render(<CharReactions {...createProps()} />);
         expect(screen.getByText('Reactions')).toBeInTheDocument();
         expect(screen.queryByText('Opportunity Attack:')).not.toBeInTheDocument();
+        expect(screen.queryByText('Revivification:')).not.toBeInTheDocument();
+    });
+});
+
+describe('CharReactions - tracked uses display', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockSetPopupHtml.mockReset();
+        runtimeWith();
+        hasAutomation.mockReturnValue(false);
+        buildFeatureDetailHtml.mockImplementation((r) => `<div>${r.name}</div>`);
+        getCategories.mockReturnValue({ featuresToIgnore: [] });
+        useLoggedDiceRoll.mockReturnValue({ rollAttack: vi.fn(), rollDamage: vi.fn() });
     });
 
-    // ─── Uses remaining display ────────────────────────────────────────────────
-
-    it('renders "No uses remaining" when getRuntimeValue returns 0 for stonesEnduranceUses', () => {
-        getRuntimeValue.mockReturnValue(0);
+    it.each([
+        ["Stone's Endurance", 'stonesEnduranceUses', 5, null],
+        ["Storm's Thunder", 'stormsThunderUses', 2, null],
+        ["Stone's Endurance", 'stonesEnduranceUses', null, { current: 5 }],
+        ["Storm's Thunder", 'stormsThunderUses', null, { current: 3 }],
+    ])('shows the live use count for %s (runtime=%s, tracked fallback=%o)', (_name, resourceKey, runtimeValue, tracked) => {
+        getRuntimeValue.mockImplementation((_charKey, key) => (key === resourceKey ? runtimeValue : null));
         const props = createProps({
             playerStats: {
                 ...basePlayerStats,
-                reactions: [{ name: "Stone's Endurance", description: 'Original desc' }],
+                _trackedResources: tracked ? { [resourceKey]: tracked } : {},
+                reactions: [{ name: _name, description: 'Original desc' }],
             },
         });
         render(<CharReactions {...props} />);
-        expect(screen.getByText(/No uses remaining/)).toBeInTheDocument();
+        expect(screen.getByText(new RegExp(`${runtimeValue ?? tracked.current} uses remaining`))).toBeInTheDocument();
     });
 
-    it('renders "No uses remaining" when getRuntimeValue returns 0 for stormsThunderUses', () => {
-        getRuntimeValue.mockReturnValue(0);
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                reactions: [{ name: "Storm's Thunder", description: 'Original desc' }],
-            },
-        });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText(/No uses remaining/)).toBeInTheDocument();
-    });
-
-    it('renders uses from _trackedResources fallback when getRuntimeValue returns null for stonesEnduranceUses', () => {
-        getRuntimeValue.mockReturnValue(null);
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                _trackedResources: { stonesEnduranceUses: { current: 5 } },
-                reactions: [{ name: "Stone's Endurance", description: 'Original desc' }],
-            },
-        });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText(/5 uses remaining/)).toBeInTheDocument();
-    });
-
-    it('renders uses from _trackedResources fallback when getRuntimeValue returns null for stormsThunderUses', () => {
-        getRuntimeValue.mockReturnValue(null);
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                _trackedResources: { stormsThunderUses: { current: 3 } },
-                reactions: [{ name: "Storm's Thunder", description: 'Original desc' }],
-            },
-        });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText(/3 uses remaining/)).toBeInTheDocument();
-    });
-
-    it('renders "No uses remaining" when both runtime and _trackedResources sources are missing', () => {
-        getRuntimeValue.mockReturnValue(null);
+    it.each([
+        ['runtime reports zero', () => getRuntimeValue.mockReturnValue(0)],
+        ['no source reports any uses', () => getRuntimeValue.mockReturnValue(null)],
+    ])('shows "No uses remaining" for Stone\'s Endurance when %s', (_label, setup) => {
+        setup();
         const props = createProps({
             playerStats: {
                 ...basePlayerStats,
@@ -567,108 +435,5 @@ describe('CharReactions - Edge Cases', () => {
         });
         render(<CharReactions {...props} />);
         expect(screen.getByText(/No uses remaining/)).toBeInTheDocument();
-    });
-
-    // ─── Automation reaction types ─────────────────────────────────────────────
-
-    it('renders header when playerStats.reactions has reaction with automation type revivification', () => {
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                reactions: [
-                    {
-                        name: 'Revivification',
-                        description: 'Rage reaction',
-                        automation: { type: 'revivification', reactionSave: { dc: 15, type: 'CON' } },
-                    },
-                ],
-            },
-        });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-    });
-
-    it('renders header when playerStats.reactions has reaction with automation type bastion_of_law_spend', () => {
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                reactions: [
-                    {
-                        name: 'Bastion of Law',
-                        description: 'Ward reaction',
-                        automation: { type: 'bastion_of_law_spend' },
-                    },
-                ],
-            },
-        });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-    });
-
-    it('renders header when hasAutomation returns true for a reaction', () => {
-        hasAutomation.mockReturnValue(true);
-        const props = createProps();
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-    });
-
-    // ─── Runtime value error handling ──────────────────────────────────────────
-
-    it('renders header when getRuntimeValue for activeConditions throws', () => {
-        getRuntimeValue.mockImplementation((_charKey, key, _cn) => {
-            if (key === 'activeConditions') throw new Error('runtime error');
-            return null;
-        });
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                reactions: [{ name: 'Stand (Power Word Heal)', description: 'Stand up' }],
-            },
-        });
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'powerWordHealStandPermission') return true;
-            return [];
-        });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-    });
-
-    it('renders header when setRuntimeValue for activeConditions throws', () => {
-        setRuntimeValue.mockImplementation(() => { throw new Error('set error'); });
-        getRuntimeValue.mockImplementation((_charKey, key, _cn) => {
-            if (key === 'activeConditions') return ['Prone'];
-            return null;
-        });
-        const props = createProps({
-            playerStats: {
-                ...basePlayerStats,
-                reactions: [{ name: 'Stand (Power Word Heal)', description: 'Stand up' }],
-            },
-        });
-        useRuntimeValue.mockImplementation((_charKey, key) => {
-            if (key === 'powerWordHealStandPermission') return true;
-            return [];
-        });
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-    });
-
-    // ─── Hooks arguments verification ──────────────────────────────────────────
-
-    it('calls useRuntimeValue with correct keys for runtime reads', () => {
-        const calls = [];
-        useRuntimeValue.mockImplementation((charKey, key) => {
-            calls.push({ charKey, key });
-            return [];
-        });
-        getRuntimeValue.mockImplementation((charKey, key) => {
-            calls.push({ charKey, key });
-            return null;
-        });
-        const props = createProps();
-        render(<CharReactions {...props} />);
-        expect(screen.getByText('Reactions')).toBeInTheDocument();
-        expect(calls.some(c => c.key === 'stonesEnduranceUses')).toBe(true);
-        expect(calls.some(c => c.key === 'stormsThunderUses')).toBe(true);
     });
 });

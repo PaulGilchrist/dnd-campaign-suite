@@ -18,74 +18,97 @@ const basePlayerStats = {
   proficiency: 2,
 };
 
-function createPlayerStats(overrides = {}) {
-  return { ...basePlayerStats, ...overrides };
-}
+// CharSpecialActions renders each clickable row label as `<b>Name:</b>`.
+const rowLabel = (name) => `${name}:`;
 
 const weaponModalTests = [
   {
-    name: 'WeaponKindMasteryModal',
-    modalName: 'weaponKindMastery',
     actionName: 'Weapon Kind Mastery',
     automation: { type: 'weapon_kind_mastery' },
+    modalName: 'weaponKindMastery',
     payload: { action: { name: 'Weapon Kind Mastery' } },
     testId: 'weapon-kind-mastery-modal',
+    otherTestId: 'weapon-mastery-choice-modal',
+    // The kind-mastery modal is view-only (no onConfirm wired at the host).
+    confirmCloses: false,
   },
   {
-    name: 'WeaponMasteryChoiceModal',
-    modalName: 'weaponMasteryChoice',
     actionName: 'Weapon Mastery',
     automation: { type: 'weapon_mastery_choice' },
+    modalName: 'weaponMasteryChoice',
     payload: { action: { name: 'Weapon Mastery' } },
     testId: 'weapon-mastery-choice-modal',
+    otherTestId: 'weapon-kind-mastery-modal',
+    // The choice modal also closes via its Confirm button.
+    confirmCloses: true,
   },
 ];
 
-describe('CharSpecialActions - Weapon modal onClose handlers', () => {
+describe('CharSpecialActions - weapon modal onClose handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.keys(mockRuntimeStore).forEach(key => delete mockRuntimeStore[key]);
   });
 
-  describe.each(weaponModalTests)('$name ($actionName)', ({ modalName, actionName, automation, payload, testId }) => {
-    it('reopens the modal after closing (re-click behavior)', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName,
-        payload,
-      });
-
-      const playerStats = createPlayerStats({
+  it.each(weaponModalTests)(
+    'opens, closes, and reopens the $modalName modal via the $actionName row',
+    async ({ actionName, automation, modalName, payload, testId, otherTestId, confirmCloses }) => {
+      const playerStats = {
+        ...basePlayerStats,
         specialActions: [
           { name: actionName, description: `${actionName} description.`, automation },
         ],
-      });
+      };
+      executeHandler.mockResolvedValue({ type: 'modal', modalName, payload });
 
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      const clickRow = () => fireEvent.click(screen.getByText(rowLabel(actionName)));
 
-      // First open
-      fireEvent.click(screen.getAllByText(new RegExp(actionName))[0]);
-      await waitFor(() => {
-        expect(executeHandler).toHaveBeenCalledTimes(1);
-      });
+      // First click routes the clicked action through executeHandler and
+      // opens exactly the modal its modalName maps to (not its sibling).
+      clickRow();
       await waitFor(() => {
         expect(screen.getByTestId(testId)).toBeInTheDocument();
       });
+      expect(executeHandler).toHaveBeenCalledTimes(1);
+      expect(executeHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: actionName, automation }),
+        expect.objectContaining({ name: basePlayerStats.name }),
+        'test',
+        undefined,
+        undefined,
+      );
+      expect(screen.queryByTestId(otherTestId)).not.toBeInTheDocument();
 
-      // Close
+      // Closing unmounts the modal and must not mutate any game state.
       fireEvent.click(screen.getByRole('button', { name: 'Close' }));
       await waitFor(() => {
         expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
       });
+      expect(mockRuntimeStore).toEqual({});
 
-      // Re-click should call executeHandler again
-      fireEvent.click(screen.getAllByText(new RegExp(actionName))[0]);
-      await waitFor(() => {
-        expect(executeHandler).toHaveBeenCalledTimes(2);
-      });
+      // Re-click after close re-executes the automation and reopens the modal.
+      clickRow();
       await waitFor(() => {
         expect(screen.getByTestId(testId)).toBeInTheDocument();
       });
-    });
-  });
+      expect(executeHandler).toHaveBeenCalledTimes(2);
+
+      if (confirmCloses) {
+        // Confirm closes the choice modal without re-running the automation...
+        fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+        await waitFor(() => {
+          expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
+        });
+        expect(executeHandler).toHaveBeenCalledTimes(2);
+
+        // ...and the row still reopens the modal after a confirm-close.
+        clickRow();
+        await waitFor(() => {
+          expect(screen.getByTestId(testId)).toBeInTheDocument();
+        });
+        expect(executeHandler).toHaveBeenCalledTimes(3);
+      }
+    },
+  );
 });

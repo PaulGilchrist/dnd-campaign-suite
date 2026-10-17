@@ -1,6 +1,25 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import AttackRiderManeuverPrompt from './AttackRiderManeuverPrompt.jsx';
+
+// AttackRiderManeuverPrompt — component-only unit tests (presentational chooser).
+//
+// Caller seam deferred elsewhere (deliberately NOT covered here):
+// - onUse/onSkip handler contract (handleAttackRiderManeuverUse / handleAttackRiderManeuverSkip,
+//   pipeline resume, MN-015 size-gate, precision-miss reroll): useAttackDamageResolution.*.test.js
+// - CharActionModals mounting of this prompt: CharActionModals.secondary-targets.test.jsx
+//   (this component is mocked there, so its behavior lives solely in this file).
+// - Superiority-die lane inside the dice popup: DiceRollResult.interactive.test.jsx and
+//   DiceRollResult.superiorityDie.test.jsx (separate UI, not this modal).
+// - MN-018 Sweeping Attack secondary-target chooser — the external chooser whose
+//   `chooserOpened` result this prompt defers to: CharActionModals.inline-modals.test.jsx.
+//
+// FLAG (not fixed here): the component uses inline styles on the maneuver list
+// (sp-body div/label/input/span, lines ~86-109). Should move to co-located CSS.
+//
+// Conventions: makeProps returns fresh vi.fn callbacks per call (no cross-test bleed);
+// no module mocks are required (the component imports only React), so no mockReset needed;
+// findBy idiom for async result screens; role-scoped queries throughout.
 
 const baseManeuvers = [
     { name: 'Disarming Attack', damageBonus: true, saveType: 'STR', effect: 'disarm' },
@@ -35,258 +54,204 @@ function renderPrompt(overrides = {}) {
     return render(<AttackRiderManeuverPrompt {...makeProps(overrides)} />);
 }
 
-// ── Initial rendering ──
+function getManeuverRadio(name) {
+    return screen.getByRole('radio', { name: new RegExp(name) });
+}
 
-describe('AttackRiderManeuverPrompt - initial rendering', () => {
-    it('renders the overlay, modal, header, and instruction text', () => {
+// ── Prompt chrome, descriptors, and gating ──
+
+describe('AttackRiderManeuverPrompt - prompt rendering and gating', () => {
+    it('renders header, instruction, all maneuver radios, and gates Use Maneuver behind a selection', () => {
         renderPrompt();
-        expect(screen.getByRole('button', { name: /Use Maneuver/ })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Skip/ })).toBeInTheDocument();
         expect(screen.getByText(/Battle Master — Attack Rider Maneuver/)).toBeInTheDocument();
         expect(screen.getByText(/Choose an attack rider maneuver to use on this hit/)).toBeInTheDocument();
-    });
-
-    it('renders all maneuvers with their descriptors', () => {
-        renderPrompt();
-        expect(screen.getByText('Disarming Attack')).toBeInTheDocument();
-        expect(screen.getByText('Distracting Strike')).toBeInTheDocument();
-        expect(screen.getByText('Goading Attack')).toBeInTheDocument();
-        expect(screen.getByText('Trip Attack')).toBeInTheDocument();
-        expect(screen.getAllByText(/save/).length).toBe(3);
-        expect(screen.getByText(/WIS save/)).toBeInTheDocument();
-    });
-
-    it('does not show save descriptor for maneuvers without saveType', () => {
-        renderPrompt();
-        const distractLabel = screen.getByText('Distracting Strike');
-        expect(distractLabel.closest('label').textContent).not.toContain('save');
-    });
-
-    it('has Use Maneuver button disabled and Skip button present when no selection', () => {
-        renderPrompt();
+        baseManeuvers.forEach((m) => {
+            expect(getManeuverRadio(m.name)).toBeInTheDocument();
+        });
         expect(screen.getByRole('button', { name: /Use Maneuver/ })).toBeDisabled();
-        expect(screen.getByRole('button', { name: /Skip/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Skip' })).toBeEnabled();
     });
-});
 
-// ── Selection behavior ──
-
-describe('AttackRiderManeuverPrompt - selection behavior', () => {
-    it('selects a maneuver and enables the Use Maneuver button', () => {
+    it('renders each maneuver with its exact descriptor fragments', () => {
         renderPrompt();
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        expect(screen.getByRole('button', { name: /Use Maneuver/ })).not.toBeDisabled();
+        const labelOf = (name) => getManeuverRadio(name).closest('label');
+        expect(labelOf('Disarming Attack').textContent).toContain('adds superiority die to damage');
+        expect(labelOf('Disarming Attack').textContent).toContain('STR save');
+        expect(labelOf('Goading Attack').textContent).toContain('WIS save');
+        expect(labelOf('Trip Attack').textContent).toContain('STR save');
+        // Distracting Strike has saveType: null — no save fragment.
+        expect(labelOf('Distracting Strike').textContent).not.toContain('save');
     });
 
-});
-
-// ── Use maneuver flow ──
-
-describe('AttackRiderManeuverPrompt - use maneuver', () => {
-    it('calls onUse with selected maneuver, attack, and popupHtml when Use Maneuver is clicked', async () => {
-        const onUse = vi.fn().mockResolvedValue(null);
-        renderPrompt({ onUse });
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        await waitFor(() => {
-            expect(onUse).toHaveBeenCalledWith(baseManeuvers[0], baseAttack, basePopupHtml);
-        });
+    it.each([
+        ['attack_roll_bonus effect', { name: 'Menacing Attack', effect: 'attack_roll_bonus' }, 'adds superiority die to attack roll'],
+        ['damageBonus only', { name: 'Pushing Attack', damageBonus: true }, 'adds superiority die to damage'],
+        ['no bonus flags or save', { name: 'Evasive Footwork' }, null],
+    ])('renders descriptor for %s', (_case, maneuver, expectedText) => {
+        renderPrompt({ maneuvers: [maneuver] });
+        const label = getManeuverRadio(maneuver.name).closest('label');
+        if (expectedText) {
+            expect(label.textContent).toContain(expectedText);
+        } else {
+            expect(label.textContent).toBe(maneuver.name);
+        }
     });
 
-    it('does not call onUse when Use Maneuver is clicked with no selection', async () => {
-        const onUse = vi.fn();
-        renderPrompt({ onUse });
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        expect(onUse).not.toHaveBeenCalled();
-    });
-
-    it('renders result state after onUse resolves with payload', async () => {
-        const onUse = vi.fn().mockResolvedValue({
-            payload: { name: 'Disarming Attack', description: 'Weapon dropped!' },
-        });
-        renderPrompt({ onUse });
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        await waitFor(() => {
-            expect(screen.getByText('Disarming Attack')).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
-        });
-    });
-
-    it('renders result with fallback name when payload.name is missing', async () => {
-        const onUse = vi.fn().mockResolvedValue({
-            payload: { description: 'No name description.' },
-        });
-        renderPrompt({ onUse });
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        await waitFor(() => {
-            expect(screen.getByText('Maneuver')).toBeInTheDocument();
-        });
-    });
-
-    it('renders "Maneuver Applied" state when onUse resolves without payload or isMissResult', async () => {
-        const onUse = vi.fn().mockResolvedValue({});
-        renderPrompt({ onUse });
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        await waitFor(() => {
-            expect(screen.getByText('Maneuver Applied')).toBeInTheDocument();
-            expect(screen.getByText(/Maneuver applied\. Proceed with damage/)).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
-        });
-    });
-
-    it('calls onSkip when Done button is clicked in result state', async () => {
-        const onSkip = vi.fn();
-        const onUse = vi.fn().mockResolvedValue({
-            payload: { name: 'Disarming Attack', description: 'Desc.' },
-        });
-        renderPrompt({ onSkip, onUse });
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        await waitFor(() => {
-            expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
-        });
-        fireEvent.click(screen.getByRole('button', { name: /Done/ }));
-        expect(onSkip).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onSkip when overlay is clicked in result state', async () => {
-        const onSkip = vi.fn();
-        const onUse = vi.fn().mockResolvedValue({
-            payload: { name: 'Disarming Attack', description: 'Desc.' },
-        });
-        renderPrompt({ onSkip, onUse });
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        await waitFor(() => {
-            expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
-        });
-        fireEvent.click(document.querySelector('.sp-overlay'));
-        expect(onSkip).not.toHaveBeenCalled();
-        expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
-    });
-});
-
-// ── Skip / cancel flow ──
-
-describe('AttackRiderManeuverPrompt - skip and cancel', () => {
-    it('calls onSkip when Skip button is clicked', () => {
-        const onSkip = vi.fn();
-        renderPrompt({ onSkip });
-        fireEvent.click(screen.getByRole('button', { name: /Skip/ }));
-        expect(onSkip).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onSkip when overlay is clicked', () => {
-        const onSkip = vi.fn();
-        renderPrompt({ onSkip });
-        const overlay = document.querySelector('.sp-overlay');
-        fireEvent.click(overlay);
-        expect(onSkip).not.toHaveBeenCalled();
-        expect(screen.getByRole('button', { name: /Skip/ })).toBeInTheDocument();
-    });
-
-    it('does not close when clicking inside modal', () => {
-        const onSkip = vi.fn();
-        renderPrompt({ onSkip });
-        const modal = document.querySelector('.sp-modal');
-        fireEvent.click(modal);
-        expect(onSkip).not.toHaveBeenCalled();
-    });
-});
-
-// ── isMiss path ──
-
-describe('AttackRiderManeuverPrompt - isMiss path', () => {
-    it('renders Precision Attack header and instruction text when isMiss is true', () => {
+    it('switches header and instruction to Precision Attack mode when isMiss', () => {
         renderPrompt({ isMiss: true });
         expect(screen.getByText(/Battle Master — Precision Attack/)).toBeInTheDocument();
-        expect(screen.getByText(/The attack missed/)).toBeInTheDocument();
+        expect(screen.getByText(/The attack missed\. Choose a maneuver to attempt to turn the miss into a hit/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Use Maneuver/ })).toBeDisabled();
     });
 
-    it('renders isMissResult state with Precision Attack header', async () => {
-        const onUse = vi.fn().mockResolvedValue({
-            isMissResult: true,
-            description: '<strong>Turned miss into hit!</strong>',
-        });
-        renderPrompt({ isMiss: true, onUse });
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        await waitFor(() => {
-            expect(screen.getByText(/Precision Attack/)).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
-        });
-    });
-
-    it('calls onSkip when Done button clicked in isMissResult state', async () => {
-        const onSkip = vi.fn();
-        const onUse = vi.fn().mockResolvedValue({
-            isMissResult: true,
-            description: 'Miss turned into hit.',
-        });
-        renderPrompt({ isMiss: true, onSkip, onUse });
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        await waitFor(() => {
-            expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
-        });
-        fireEvent.click(screen.getByRole('button', { name: /Done/ }));
-        expect(onSkip).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onSkip when overlay is clicked in isMissResult state', async () => {
-        const onSkip = vi.fn();
-        const onUse = vi.fn().mockResolvedValue({
-            isMissResult: true,
-            description: 'Miss turned into hit.',
-        });
-        renderPrompt({ isMiss: true, onSkip, onUse });
-        const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
-        fireEvent.click(radios[0]);
-        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-        await waitFor(() => {
-            expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
-        });
-        fireEvent.click(document.querySelector('.sp-overlay'));
-        expect(onSkip).not.toHaveBeenCalled();
-        expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument();
+    it('renders an empty maneuver list without crashing — no radios, Use stays disabled', () => {
+        renderPrompt({ maneuvers: [] });
+        expect(screen.queryAllByRole('radio')).toHaveLength(0);
+        expect(screen.getByRole('button', { name: /Use Maneuver/ })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Skip' })).toBeEnabled();
     });
 });
 
-// ── Edge cases ──
+// ── Selection and the onUse write contract ──
 
-describe('AttackRiderManeuverPrompt - edge cases', () => {
-    it('renders empty maneuver list without crash', () => {
-        renderPrompt({ maneuvers: [] });
-        expect(screen.getByRole('button', { name: /Use Maneuver/ })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Skip/ })).toBeInTheDocument();
-        expect(screen.getByText(/Choose an attack rider maneuver/)).toBeInTheDocument();
+describe('AttackRiderManeuverPrompt - selection and onUse contract', () => {
+    it('enables Use Maneuver and marks the chosen radio checked', () => {
+        renderPrompt();
+        fireEvent.click(getManeuverRadio('Goading Attack'));
+        expect(getManeuverRadio('Goading Attack')).toBeChecked();
+        expect(screen.getByRole('button', { name: /Use Maneuver/ })).toBeEnabled();
     });
 
-    it('shows attack_roll_bonus descriptor for maneuvers with that effect', () => {
-        const maneuvers = [
-            { name: 'Menacing Attack', effect: 'attack_roll_bonus' },
-        ];
-        renderPrompt({ maneuvers });
-        expect(screen.getByText(/adds superiority die to attack roll/)).toBeInTheDocument();
+    it.each([
+        [0],
+        [baseManeuvers.length - 1],
+    ])('calls onUse once with the exact maneuver, attack, and popupHtml objects (index %i)', (index) => {
+        const onUse = vi.fn().mockResolvedValue({});
+        renderPrompt({ onUse });
+        fireEvent.click(getManeuverRadio(baseManeuvers[index].name));
+        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
+
+        expect(onUse).toHaveBeenCalledTimes(1);
+        const [maneuverArg, attackArg, popupArg] = onUse.mock.calls[0];
+        expect(maneuverArg).toBe(baseManeuvers[index]);
+        expect(attackArg).toBe(baseAttack);
+        expect(popupArg).toBe(basePopupHtml);
     });
 
-    it('shows damageBonus descriptor for maneuvers with damageBonus', () => {
-        const maneuvers = [
-            { name: 'Pushing Attack', damageBonus: true },
-        ];
-        renderPrompt({ maneuvers });
-        expect(screen.getByText(/adds superiority die to damage/)).toBeInTheDocument();
+    it('is inert with no selection — disabled Use, overlay, and inner-modal clicks fire nothing', () => {
+        const onUse = vi.fn();
+        const onSkip = vi.fn();
+        renderPrompt({ onUse, onSkip });
+
+        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
+        fireEvent.click(document.querySelector('.sp-overlay'));
+        fireEvent.click(document.querySelector('.sp-modal'));
+
+        expect(onUse).not.toHaveBeenCalled();
+        expect(onSkip).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+    });
+});
+
+// ── Result screens ──
+
+describe('AttackRiderManeuverPrompt - result screens', () => {
+    const appliedCases = [
+        [
+            'payload screen',
+            { payload: { name: 'Rider Result', description: '<strong>Rider applied.</strong>' } },
+            'Rider Result',
+            'Rider applied.',
+        ],
+        [
+            'payload screen with fallback header when payload.name is missing',
+            { payload: { description: 'Nameless body.' } },
+            'Maneuver',
+            'Nameless body.',
+        ],
+        [
+            'generic applied screen when result carries no payload',
+            {},
+            'Maneuver Applied',
+            'Maneuver applied. Proceed with damage.',
+        ],
+    ];
+
+    it.each(appliedCases)('renders the %s, replacing the chooser', async (_case, res, headerText, bodyText) => {
+        const onUse = vi.fn().mockResolvedValue(res);
+        renderPrompt({ onUse });
+        fireEvent.click(getManeuverRadio('Disarming Attack'));
+        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
+
+        await screen.findByRole('button', { name: 'Done' });
+        expect(screen.getByText(headerText)).toBeInTheDocument();
+        expect(screen.getByText(bodyText)).toBeInTheDocument();
+        expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
+    });
+
+    it('renders the isMissResult screen with a Precision Attack header even when the prompt was not in miss mode', async () => {
+        const onUse = vi.fn().mockResolvedValue({
+            isMissResult: true,
+            description: 'Turned into a hit!',
+        });
+        renderPrompt({ isMiss: false, onUse });
+        fireEvent.click(getManeuverRadio('Trip Attack'));
+        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
+
+        await screen.findByRole('button', { name: 'Done' });
+        expect(screen.getByText(/Precision Attack/)).toBeInTheDocument();
+        expect(screen.getByText('Turned into a hit!')).toBeInTheDocument();
+        expect(screen.queryByText(/Attack Rider Maneuver/)).not.toBeInTheDocument();
+    });
+
+    it.each([
+        ['payload screen', { payload: { name: 'Rider Result', description: 'Applied.' } }],
+        ['generic applied screen', {}],
+        ['isMissResult screen', { isMissResult: true, description: 'Turned into a hit.' }],
+    ])('calls onSkip exactly once when Done is clicked on the %s', async (_case, res) => {
+        const onUse = vi.fn().mockResolvedValue(res);
+        const onSkip = vi.fn();
+        renderPrompt({ isMiss: !!res.isMissResult, onUse, onSkip });
+        fireEvent.click(getManeuverRadio('Disarming Attack'));
+        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Done' }));
+        expect(onSkip).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays inert to overlay and inner-modal clicks in the result state', async () => {
+        const onUse = vi.fn().mockResolvedValue({});
+        const onSkip = vi.fn();
+        renderPrompt({ onUse, onSkip });
+        fireEvent.click(getManeuverRadio('Disarming Attack'));
+        fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
+
+        await screen.findByRole('button', { name: 'Done' });
+        fireEvent.click(document.querySelector('.sp-overlay'));
+        fireEvent.click(document.querySelector('.sp-modal'));
+
+        expect(onSkip).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+    });
+
+    it.each([
+        ['chooserOpened (MN-018 external chooser)', { chooserOpened: true }],
+        ['null result', null],
+    ])('stays on the chooser when onUse resolves %s — no result screen, selection retained', async (_case, res) => {
+        const onUse = vi.fn().mockResolvedValue(res);
+        const onSkip = vi.fn();
+        renderPrompt({ onUse, onSkip });
+        fireEvent.click(getManeuverRadio('Disarming Attack'));
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
+        });
+
+        expect(onUse).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+        expect(screen.getAllByRole('radio')).toHaveLength(baseManeuvers.length);
+        expect(getManeuverRadio('Disarming Attack')).toBeChecked();
+        expect(screen.getByRole('button', { name: /Use Maneuver/ })).toBeEnabled();
+        expect(onSkip).not.toHaveBeenCalled();
     });
 });

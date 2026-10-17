@@ -1,7 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import ArcaneWardRestoreModal from './ArcaneWardRestoreModal.jsx';
-import { getRuntimeValue, setRuntimeBatch } from '../../../../hooks/runtime/useRuntimeState.js';
 
 // ── Mocked modules ──
 
@@ -10,36 +9,47 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeBatch: vi.fn(),
 }));
 
+// Re-import mocked module after mocking
+import { getRuntimeValue, setRuntimeBatch } from '../../../../hooks/runtime/useRuntimeState.js';
+
 // ── Test fixtures ──
 
-const defaultAction = { name: 'Arcane Ward Restore' };
-const defaultPlayerStats = { name: 'Sorcerer1' };
-const defaultCampaignName = 'test-campaign';
-const defaultOnClose = vi.fn();
-const defaultOnConfirm = vi.fn();
+const PLAYER = 'Sorcerer1';
+const CAMPAIGN = 'test-campaign';
 
 function makeProps(overrides) {
   return {
-    action: { ...defaultAction, ...(overrides?.action || {}) },
-    playerStats: { ...defaultPlayerStats, ...(overrides?.playerStats || {}) },
-    campaignName: overrides?.campaignName ?? defaultCampaignName,
-    onClose: overrides?.onClose ?? defaultOnClose,
-    onConfirm: overrides?.onConfirm ?? defaultOnConfirm,
+    action: { name: 'Arcane Ward Restore' },
+    playerStats: { name: PLAYER },
+    campaignName: CAMPAIGN,
+    onClose: vi.fn(),
+    onConfirm: vi.fn(),
+    ...overrides,
   };
 }
 
-function setupRuntimeValues(wardHp, wardMax, spellSlots) {
+// Mirrors the component's runtime read path (ward HP, ward max, slot levels 1-9).
+// setRuntimeBatch is the component's ONLY server-first write path — exact-arg
+// assertions on it pin the write contract.
+function stubRuntime(wardHp, wardMax, slots = {}) {
   getRuntimeValue.mockImplementation((key, prop) => {
-    if (key !== 'Sorcerer1') return null;
+    if (key !== PLAYER) return null;
     if (prop === 'arcaneWardHp') return wardHp;
     if (prop === 'arcaneWardMax') return wardMax;
     const match = prop.match(/^spell_slots_level_(\d+)$/);
-    if (match) {
-      const lvl = parseInt(match[1], 10);
-      return spellSlots[lvl] ?? 0;
-    }
+    if (match) return slots[Number(match[1])] ?? 0;
     return null;
   });
+}
+
+// Label spans concatenate without spaces ("Level 12 available+2 HP"), so anchor
+// on "Level N" — each digit 1-9 still uniquely identifies its radio.
+function slotRadio(level) {
+  return screen.getByRole('radio', { name: new RegExp(`^Level ${level}`) });
+}
+
+function slotOption(level) {
+  return slotRadio(level).closest('label');
 }
 
 // ── Tests ──
@@ -47,224 +57,186 @@ function setupRuntimeValues(wardHp, wardMax, spellSlots) {
 describe('ArcaneWardRestoreModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setupRuntimeValues(10, 20, { 1: 2, 2: 1, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 });
+    stubRuntime(10, 20, { 1: 2, 2: 1 });
   });
 
-  describe('initial render', () => {
-    // Consolidated from 5 tests: original "renders the modal…", "renders all 9 spell slot levels…",
-    // "marks levels with 0 slots as disabled…", "renders radio inputs…", "renders the preview section…".
-    // Removed "renders with a custom action name" (redundant — same render path, action.name is interpolated).
-    it('renders the modal with ward HP display, slot grid, action buttons, and correct slot states', () => {
-      render(<ArcaneWardRestoreModal {...makeProps()} />);
-      expect(screen.getByText('Arcane Ward Restore')).toBeInTheDocument();
-      expect(screen.getByText(/Choose a spell slot level to expend/)).toBeInTheDocument();
-      expect(screen.getByText(/Ward HP restored = 2 × slot level/)).toBeInTheDocument();
-      const p = document.querySelector('.sp-body p');
-      expect(p.textContent).toContain('Arcane Ward HP:');
-      expect(p.textContent).toContain('10/20');
+  afterEach(() => {
+    getRuntimeValue.mockReset();
+    setRuntimeBatch.mockReset();
+  });
 
-      for (let lvl = 1; lvl <= 9; lvl++) {
-        expect(screen.getByText(`Level ${lvl}`)).toBeInTheDocument();
-        expect(screen.getByText(`+${lvl * 2} HP`)).toBeInTheDocument();
+  // ── Initial render / display ──
+
+  it('renders header, ward HP, slot grid states, and a disabled Restore button with no selection', async () => {
+    render(<ArcaneWardRestoreModal {...makeProps()} />);
+    expect(screen.getByText('Arcane Ward Restore')).toBeInTheDocument();
+    expect(screen.getByText('Arcane Ward HP:')).toBeInTheDocument();
+    expect(await screen.findByText('10/20')).toBeInTheDocument();
+    expect(screen.getByText(/Choose a spell slot level to expend/)).toBeInTheDocument();
+
+    // Levels 1-2 have slots (selectable), levels 3-9 are exhausted and disabled
+    for (let lvl = 1; lvl <= 9; lvl++) {
+      const radio = slotRadio(lvl);
+      expect(screen.getByText(`+${lvl * 2} HP`)).toBeInTheDocument();
+      expect(radio).not.toBeChecked();
+      if (lvl <= 2) {
+        expect(radio).toBeEnabled();
+      } else {
+        expect(radio).toBeDisabled();
       }
+    }
+    expect(slotOption(1)).toHaveTextContent('2 available');
+    expect(slotOption(3)).toHaveTextContent('0 available');
 
-      // Levels 1-2 have slots (enabled), levels 3-9 have 0 slots (disabled)
-      const level1Option = screen.getByText('Level 1').closest('.arcane-ward-slot-option');
-      const level3Option = screen.getByText('Level 3').closest('.arcane-ward-slot-option');
-      expect(level1Option).not.toHaveClass('disabled');
-      expect(level3Option).toHaveClass('disabled');
-
-      // Radio inputs: 9 total, first 2 enabled, rest disabled
-      const radios = document.querySelectorAll('input[type="radio"]');
-      expect(radios).toHaveLength(9);
-      radios.forEach((radio, idx) => {
-        expect(radio.checked).toBe(false);
-        const lvl = idx + 1;
-        if (lvl <= 2) {
-          expect(radio.disabled).toBe(false);
-        } else {
-          expect(radio.disabled).toBe(true);
-        }
-      });
-
-      // No preview yet, restore button disabled
-      expect(document.querySelector('.arcane-ward-preview')).toBeNull();
-      expect(screen.getByRole('button', { name: /Restore Ward/ })).toBeDisabled();
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
-
-    // Kept: verifies null/undefined runtime values default to "0/0"
-    it('defaults to 0/0 when runtime values are null or undefined', () => {
-      getRuntimeValue.mockReturnValue(null);
-      render(<ArcaneWardRestoreModal {...makeProps()} />);
-      const p = document.querySelector('.sp-body p');
-      expect(p.textContent).toContain('0/0');
-    });
-
-    // Removed: "renders with ward already at max HP" — preview portion is covered by cap-preview test;
-    // HP display portion is covered by the consolidated initial-render test above.
+    expect(screen.queryByText('Preview:')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Restore Ward' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
-  describe('selection behavior', () => {
-    // Consolidated from 6 tests: original "selects a level…", "switches selection…",
-    // "does not select a disabled…", "caps preview at max…", "selects highest available level (level 9)",
-    // "keeps preview visible when clicking a disabled slot after selecting one".
-    // The "keeps preview" test was removed: preview persistence is an implementation detail;
-    // the component's behavior (selection disabled → no state change) is already verified.
-    it('selects available levels, blocks disabled levels, and shows capped preview', () => {
-      render(<ArcaneWardRestoreModal {...makeProps()} />);
-
-      // Select level 1
-      const level1Option = screen.getByText('Level 1').closest('.arcane-ward-slot-option');
-      fireEvent.click(level1Option);
-      expect(level1Option).toHaveClass('selected');
-      expect(screen.getByText(/Preview:/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Restore Ward/ })).toBeEnabled();
-
-      // Switch to level 2
-      const level2Option = screen.getByText('Level 2').closest('.arcane-ward-slot-option');
-      fireEvent.click(level2Option);
-      expect(level2Option).toHaveClass('selected');
-      expect(level1Option).not.toHaveClass('selected');
-
-      // Clicking disabled level 3 does nothing — level 2 stays selected, button stays enabled
-      const level3Option = screen.getByText('Level 3').closest('.arcane-ward-slot-option');
-      fireEvent.click(level3Option);
-      expect(level3Option).not.toHaveClass('selected');
-      expect(level2Option).toHaveClass('selected'); // selection unchanged
-      expect(screen.getByRole('button', { name: /Restore Ward/ })).toBeEnabled();
-    });
-
-    // Kept: verifies no selection → restore button disabled
-    it('does not enable restore button when no level is selected', () => {
-      render(<ArcaneWardRestoreModal {...makeProps()} />);
-      expect(screen.getByRole('button', { name: /Restore Ward/ })).toBeDisabled();
-    });
-
-    // Kept: unique — verifies HP capping at max value
-    it('caps preview at max HP when restore would exceed max', () => {
-      setupRuntimeValues(18, 20, { 1: 2, 2: 1, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 });
-      render(<ArcaneWardRestoreModal {...makeProps()} />);
-      const level2Option = screen.getByText('Level 2').closest('.arcane-ward-slot-option');
-      fireEvent.click(level2Option);
-      const preview = document.querySelector('.arcane-ward-preview');
-      expect(preview.textContent).toContain('18 → 20/20');
-    });
+  it('defaults ward HP to 0/0 when runtime values are missing', async () => {
+    getRuntimeValue.mockReturnValue(null);
+    render(<ArcaneWardRestoreModal {...makeProps()} />);
+    expect(await screen.findByText('0/0')).toBeInTheDocument();
   });
 
-  describe('restore flow', () => {
-    // Consolidated from 6 tests: original "calls setRuntimeBatch and onConfirm…",
-    // "caps arcaneWardHp at max…", "does not apply when no level is selected",
-    // "does not call onConfirm when onConfirm prop is undefined",
-    // "decrements the selected spell slot by exactly 1", "uses level 2 slot…".
-    // The "decrements" and "uses level 2" tests were removed — they assert the same
-    // setRuntimeBatch call structure as the main apply test with different slot levels.
-    // The "restores ward to full HP" test was removed — it only asserts preview text
-    // (already covered by cap-preview test) and contains stale comments.
-    it('calls setRuntimeBatch and onConfirm when applying with an available level', () => {
-      render(<ArcaneWardRestoreModal {...makeProps()} />);
-      const level1Option = screen.getByText('Level 1').closest('.arcane-ward-slot-option');
-      fireEvent.click(level1Option);
-      fireEvent.click(screen.getByRole('button', { name: /Restore Ward/ }));
-      expect(setRuntimeBatch).toHaveBeenCalledWith(
-        'Sorcerer1',
-        expect.objectContaining({ arcaneWardHp: 12, spell_slots_level_1: 1 }),
-        'test-campaign'
-      );
-      expect(defaultOnConfirm).toHaveBeenCalledWith(1, 2, 10, 12);
-      expect(defaultOnClose).toHaveBeenCalledTimes(1);
-    });
+  // ── Selection behavior ──
 
-    it('caps arcaneWardHp at max when restore would exceed max', () => {
-      setupRuntimeValues(18, 20, { 1: 2, 2: 1, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 });
-      render(<ArcaneWardRestoreModal {...makeProps()} />);
-      const level2Option = screen.getByText('Level 2').closest('.arcane-ward-slot-option');
-      fireEvent.click(level2Option);
-      fireEvent.click(screen.getByRole('button', { name: /Restore Ward/ }));
-      expect(setRuntimeBatch).toHaveBeenCalledWith(
-        'Sorcerer1',
-        expect.objectContaining({ arcaneWardHp: 20 }),
-        'test-campaign'
-      );
-      expect(defaultOnConfirm).toHaveBeenCalledWith(2, 4, 18, 20);
-    });
+  it('selects an available level, switches cleanly, and blocks exhausted levels', async () => {
+    const { container } = render(<ArcaneWardRestoreModal {...makeProps()} />);
+    await screen.findByText('10/20');
 
-    it('does not apply when no level is selected', () => {
-      render(<ArcaneWardRestoreModal {...makeProps()} />);
-      fireEvent.click(screen.getByRole('button', { name: /Restore Ward/ }));
-      expect(setRuntimeBatch).not.toHaveBeenCalled();
-      expect(defaultOnClose).not.toHaveBeenCalled();
-    });
+    fireEvent.click(slotOption(1));
+    expect(slotRadio(1)).toBeChecked();
+    expect(container.querySelector('.arcane-ward-preview').textContent).toContain('10 → 12/20');
+    expect(screen.getByRole('button', { name: 'Restore Ward' })).toBeEnabled();
 
-    it('does not call onConfirm when onConfirm prop is undefined', () => {
-      render(<ArcaneWardRestoreModal {...makeProps({ onConfirm: undefined })} />);
-      const level1Option = screen.getByText('Level 1').closest('.arcane-ward-slot-option');
-      fireEvent.click(level1Option);
-      fireEvent.click(screen.getByRole('button', { name: /Restore Ward/ }));
-      expect(defaultOnClose).toHaveBeenCalledTimes(1);
-    });
+    fireEvent.click(slotOption(2));
+    expect(slotRadio(2)).toBeChecked();
+    expect(slotRadio(1)).not.toBeChecked();
+    expect(container.querySelector('.arcane-ward-preview').textContent).toContain('10 → 14/20');
+
+    // Exhausted level 3 stays inert: selection unchanged, button still enabled
+    fireEvent.click(slotOption(3));
+    expect(slotRadio(3)).not.toBeChecked();
+    expect(slotRadio(2)).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Restore Ward' })).toBeEnabled();
   });
 
-  describe('close behavior', () => {
-    // Consolidated from 3 tests: original "calls onClose when overlay clicked",
-    // "does not call onClose when modal content clicked", "calls onClose when Cancel clicked".
-    // The "modal content click" test was removed: e.stopPropagation() on the modal container
-    // is a standard React pattern; testing it separately adds no behavioral confidence.
-    it('does not call onClose on overlay click', () => {
-      const onClose = vi.fn();
-      render(<ArcaneWardRestoreModal {...makeProps({ onClose })} />);
-      fireEvent.click(document.querySelector('.arcane-ward-restore-overlay'));
-      expect(onClose).not.toHaveBeenCalled();
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
+  // ── Restore flow — exact write payload + confirm args ──
 
-    it('calls onClose on Cancel button click', () => {
-      const onClose = vi.fn();
-      render(<ArcaneWardRestoreModal {...makeProps({ onClose })} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
+  // Consolidates the old cap-HP, decrement-slot, zero-HP, and highest-level cases:
+  // each row exercises the full flow (select → preview → apply) at a different
+  // ward/slot boundary, asserting the exact setRuntimeBatch payload (the server-first
+  // write contract), exact onConfirm args, and a single close.
+  it.each([
+    {
+      label: 'restores from partial HP',
+      wardHp: 10, wardMax: 20, slots: { 1: 2, 2: 1 }, level: 1,
+      write: { arcaneWardHp: 12, spell_slots_level_1: 1 },
+      confirm: [1, 2, 10, 12],
+    },
+    {
+      label: 'caps at max and fully exhausts the slot',
+      wardHp: 18, wardMax: 20, slots: { 1: 2, 2: 1 }, level: 2,
+      write: { arcaneWardHp: 20, spell_slots_level_2: 0 },
+      confirm: [2, 4, 18, 20],
+    },
+    {
+      label: 'restores from an empty ward using the highest remaining slot',
+      wardHp: 0, wardMax: 30, slots: { 9: 1 }, level: 9,
+      write: { arcaneWardHp: 18, spell_slots_level_9: 0 },
+      confirm: [9, 18, 0, 18],
+    },
+  ])('$label: spends exactly one slot with an exact batch write', async ({
+    wardHp, wardMax, slots, level, write, confirm,
+  }) => {
+    stubRuntime(wardHp, wardMax, slots);
+    const props = makeProps();
+    const { container } = render(<ArcaneWardRestoreModal {...props} />);
+    await screen.findByText(`${wardHp}/${wardMax}`);
+
+    fireEvent.click(slotOption(level));
+    expect(slotRadio(level)).toBeChecked();
+    expect(container.querySelector('.arcane-ward-preview').textContent)
+      .toContain(`${wardHp} → ${write.arcaneWardHp}/${wardMax}`);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore Ward' }));
+
+    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(setRuntimeBatch).toHaveBeenCalledWith(PLAYER, write, CAMPAIGN);
+    expect(props.onConfirm).toHaveBeenCalledTimes(1);
+    expect(props.onConfirm).toHaveBeenCalledWith(...confirm);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
-  describe('runtime state defaults', () => {
-    // Kept: verifies all slots disabled when no spell slots available
-    it('renders all slots as disabled when all spell slots are 0', () => {
-      setupRuntimeValues(10, 20, { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 });
-      render(<ArcaneWardRestoreModal {...makeProps()} />);
-      const options = document.querySelectorAll('.arcane-ward-slot-option');
-      options.forEach((option) => {
-        expect(option).toHaveClass('disabled');
-      });
-      expect(screen.getByRole('button', { name: /Restore Ward/ })).toBeDisabled();
-    });
-
-    // Removed: "allows selection when only the highest slot level is available" —
-    // covered by the consolidated selection behavior test above (uses level 9 in the
-    // parametric flow).
+  it('keeps Restore inert when nothing is selected — no write, no confirm, no close', async () => {
+    const props = makeProps();
+    render(<ArcaneWardRestoreModal {...props} />);
+    await screen.findByText('10/20');
+    fireEvent.click(screen.getByRole('button', { name: 'Restore Ward' }));
+    expect(setRuntimeBatch).not.toHaveBeenCalled();
+    expect(props.onConfirm).not.toHaveBeenCalled();
+    expect(props.onClose).not.toHaveBeenCalled();
   });
 
-  describe('edge cases', () => {
-    // Kept: basic sanity — component renders without crashing on missing props
-    it('renders without throwing when props are undefined', () => {
-      render(<ArcaneWardRestoreModal {...makeProps({
-        onClose: undefined,
-        onConfirm: undefined,
-        playerStats: undefined,
-        campaignName: undefined,
-      })} />);
-      expect(screen.getByText('Arcane Ward Restore')).toBeInTheDocument();
-    });
+  it('still writes the ward and closes exactly once when onConfirm is omitted', async () => {
+    const props = makeProps({ onConfirm: undefined });
+    render(<ArcaneWardRestoreModal {...props} />);
+    await screen.findByText('10/20');
+    fireEvent.click(slotOption(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore Ward' }));
+    expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+    expect(setRuntimeBatch).toHaveBeenCalledWith(
+      PLAYER,
+      { arcaneWardHp: 12, spell_slots_level_1: 1 },
+      CAMPAIGN
+    );
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
 
-    // Kept: boundary condition — ward at 0 HP
-    it('renders with ward at 0 HP', () => {
-      setupRuntimeValues(0, 20, { 1: 2, 2: 1, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 });
-      render(<ArcaneWardRestoreModal {...makeProps()} />);
-      const p = document.querySelector('.sp-body p');
-      expect(p.textContent).toContain('0/20');
-      const level1Option = screen.getByText('Level 1').closest('.arcane-ward-slot-option');
-      fireEvent.click(level1Option);
-      const preview = document.querySelector('.arcane-ward-preview');
-      expect(preview.textContent).toContain('0 → 2/20');
-    });
+  it('disables every slot and blocks selection when no spell slots remain', async () => {
+    stubRuntime(10, 20, {});
+    const { container } = render(<ArcaneWardRestoreModal {...makeProps()} />);
+    await screen.findByText('10/20');
+
+    for (let lvl = 1; lvl <= 9; lvl++) {
+      expect(slotRadio(lvl)).toBeDisabled();
+      fireEvent.click(slotOption(lvl));
+    }
+    expect(container.querySelector('.arcane-ward-preview')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Restore Ward' })).toBeDisabled();
+    expect(setRuntimeBatch).not.toHaveBeenCalled();
+  });
+
+  // ── Close / dismiss behavior ──
+
+  it('Cancel closes exactly once and submits nothing', () => {
+    const props = makeProps();
+    render(<ArcaneWardRestoreModal {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(setRuntimeBatch).not.toHaveBeenCalled();
+  });
+
+  it('clicking the overlay background is inert — no close, no write, selection kept', async () => {
+    const props = makeProps();
+    const { container } = render(<ArcaneWardRestoreModal {...props} />);
+    await screen.findByText('10/20');
+    fireEvent.click(slotOption(1));
+
+    fireEvent.click(container.querySelector('.arcane-ward-restore-overlay'));
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(setRuntimeBatch).not.toHaveBeenCalled();
+    expect(slotRadio(1)).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+  });
+
+  it('renders and ignores Cancel when onClose is omitted', () => {
+    const props = makeProps();
+    delete props.onClose;
+    render(<ArcaneWardRestoreModal {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(setRuntimeBatch).not.toHaveBeenCalled();
   });
 });

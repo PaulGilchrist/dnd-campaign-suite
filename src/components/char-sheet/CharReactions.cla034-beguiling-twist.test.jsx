@@ -1,5 +1,8 @@
-// CLA-034: Beguiling Twist redirect confirm — DC from the spell_save_dc seam (17),
-// save carries its condition, failing save stamps a 10-round ("1 minute") clock.
+// @maintained-by-ai
+// CLA-034: Beguiling Twist redirect confirm — char-sheet UI lane pins only (DC flows from the
+// spell_save_dc payload seam, never a CHA-baked 13; save prompt carries the redirect condition;
+// failing save merges + stamps a 10-round "1 minute" clock; passing save grants nothing).
+// Handler internals (trigger tables, target eligibility) are owned by beguilingTwistHandler.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -8,8 +11,7 @@ import { executeHandler } from '../../services/automation/index.js';
 import { createSaveListener } from '../../services/automation/common/savePrompt.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { addExpiration } from '../../services/rules/effects/expirations.js';
-import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeValue, getRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../common/popup.jsx', () => ({
     default: ({ children }) => React.createElement('div', { 'data-testid': 'popup' }, children),
@@ -185,71 +187,75 @@ function renderSheet() {
     );
 }
 
+function logEntryByType(type) {
+    return addEntry.mock.calls.map(c => c[1]).find(e => e.type === type);
+}
+
+async function openPicker() {
+    fireEvent.click(screen.getByText('Beguiling Twist:'));
+    await waitFor(() => expect(screen.getByTestId('secondary-target-modal')).toBeInTheDocument());
+}
+
 describe('CharReactions — CLA-034 Beguiling Twist confirm', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         useLoggedDiceRoll.mockReturnValue({ rollAttack: vi.fn(), rollDamage: vi.fn() });
         useRuntimeValue.mockReturnValue([]);
+        getRuntimeValue.mockReturnValue(null);
         executeHandler.mockResolvedValue(modalPayload());
         createSaveListener.mockReturnValue({ promptId: 'cla034-prompt' });
     });
 
-    async function openPickerAndConfirm() {
-        fireEvent.click(screen.getByText('Beguiling Twist:'));
-        await waitFor(() => expect(screen.getByTestId('secondary-target-modal')).toBeInTheDocument());
+    it('picker shows the seam DC (17, never a CHA-baked 13) and confirm wires the WIS save prompt + ability_use log at that DC', async () => {
+        renderSheet();
+        await openPicker();
+        const desc = screen.getByTestId('modal-desc').textContent;
+        expect(desc).toContain('DC 17');
+        expect(desc).toContain('frightened');
+        expect(desc).not.toContain('DC 13');
+
         fireEvent.click(screen.getByTestId('confirm-btn'));
-        await waitFor(() => expect(createSaveListener).toHaveBeenCalled());
-    }
+        await waitFor(() => expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
+            targetName: 'Bandit 1',
+            saveType: 'WIS',
+            saveDc: 17,
+            condition: 'frightened',
+            saveConditions: ['frightened'],
+        }));
 
-    it('picker prose shows the spell_save_dc (17), never the CHA-baked 13', async () => {
-        renderSheet();
-        fireEvent.click(screen.getByText('Beguiling Twist:'));
-        await waitFor(() => expect(screen.getByTestId('secondary-target-modal')).toBeInTheDocument());
-        expect(screen.getByTestId('modal-desc').textContent).toContain('DC 17');
-        expect(screen.getByTestId('modal-desc').textContent).not.toContain('DC 13');
-    });
-
-    it('save prompt carries the redirect condition on its own saveConditions/condition', async () => {
-        renderSheet();
-        await openPickerAndConfirm();
-        const config = createSaveListener.mock.calls[0][1];
-        expect(config.saveDc).toBe(17);
-        expect(config.saveConditions).toEqual(['frightened']);
-        expect(config.condition).toBe('frightened');
-    });
-
-    it('ability_use log names the different-creature redirect at the correct DC', async () => {
-        renderSheet();
-        await openPickerAndConfirm();
-        const entry = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use');
+        const entry = logEntryByType('ability_use');
+        expect(entry.characterName).toBe('FeyRanger');
         expect(entry.description).toContain('DC 17');
         expect(entry.description).toContain('different creature from FeyRanger');
         expect(entry.description).toContain('Bandit 1');
     });
 
-    it('failed save grants the condition WITH a 1-minute (10 round) expiry clock', async () => {
+    it('failed save merges frightened into existing conditions and stamps a 10-round (1 minute) clock', async () => {
+        getRuntimeValue.mockImplementation((_name, key) => (key === 'activeConditions' ? ['poisoned'] : null));
         renderSheet();
-        await openPickerAndConfirm();
+        await openPicker();
+        fireEvent.click(screen.getByTestId('confirm-btn'));
         window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: 'cla034-prompt', success: false } }));
-        await waitFor(() => expect(addExpiration).toHaveBeenCalled());
-        expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
+
+        await waitFor(() => expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({
             attackerName: 'FeyRanger',
             targetName: 'Bandit 1',
             campaignName,
             rounds: 10,
             effects: [{ type: 'condition', condition: 'frightened' }],
-        }));
-        const condWrite = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
-        expect(condWrite[2]).toEqual(['frightened']);
+        })));
+        expect(setRuntimeValue).toHaveBeenCalledWith('Bandit 1', 'activeConditions', ['poisoned', 'frightened'], campaignName);
+        expect(logEntryByType('save_result')).toMatchObject({ targetName: 'Bandit 1', saveDc: 17, saveType: 'WIS', success: false });
     });
 
-    it('successful save grants nothing and sets no clock', async () => {
+    it('successful save logs the pass and grants no condition, no clock', async () => {
         renderSheet();
-        await openPickerAndConfirm();
+        await openPicker();
+        fireEvent.click(screen.getByTestId('confirm-btn'));
         window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: 'cla034-prompt', success: true } }));
-        await waitFor(() => expect(addEntry).toHaveBeenCalled());
+
+        await waitFor(() => expect(logEntryByType('save_result')).toMatchObject({ targetName: 'Bandit 1', success: true }));
         expect(addExpiration).not.toHaveBeenCalled();
-        const condWrite = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
-        expect(condWrite).toBeUndefined();
+        expect(setRuntimeValue.mock.calls.some(c => c[1] === 'activeConditions')).toBe(false);
     });
 });
