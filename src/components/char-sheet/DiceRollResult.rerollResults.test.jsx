@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // DiceRollResult — reroll RESULTS display/transition seam.
 //
 // Seam ownership map:

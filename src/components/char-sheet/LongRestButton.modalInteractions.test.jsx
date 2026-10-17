@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * LongRestButton.modalInteractions.test.jsx — owns the POST-MODAL lane.
  *

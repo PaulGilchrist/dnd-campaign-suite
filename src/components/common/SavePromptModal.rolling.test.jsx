@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 // SavePromptModal — Rolling Mechanics
 // Canonical roll-resolution lanes for a save prompt: which die survives

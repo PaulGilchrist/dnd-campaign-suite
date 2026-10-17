@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * HurlThroughHellModal — BRANCH lane (unreached conditionals, fallbacks, guards, ledger shapes).
  *
@@ -186,15 +187,15 @@ const triggerRow = (pid, target = TARGET) => ({
   promptId: pid,
   timestamp: FROZEN_TS,
 });
-const saveFailRow = (desc = 'Goblin1 failed WIS save (rolled 8 + 2 = 10 vs DC 16) — hurled through the lower planes.') => ({
+const saveFailRow = (desc = 'Goblin1 failed WIS save (rolled 8 + 2 = 10 vs DC 16) — hurled through the lower planes.', saveRoll = 8, saveTotal = 10) => ({
   type: 'save_result',
   characterName: PLAYER,
   targetName: TARGET,
   saveDc: 16,
   saveType: 'WIS',
   success: false,
-  saveRoll: 8,
-  saveTotal: 10,
+  saveRoll,
+  saveTotal,
   description: desc,
   timestamp: FROZEN_TS,
 });
@@ -236,6 +237,7 @@ const flush = () => act(async () => { await Promise.resolve(); });
 const confirmModal = async () => {
   fireEvent.click(screen.getByRole('button', { name: /Hurl Through Hell/ }));
   await flush();
+  return lastPromptId();
 };
 const dispatchSave = async (detail) => {
   await act(async () => {
@@ -361,7 +363,7 @@ describe('HurlThroughHellModal — branch lane', () => {
     })} />);
 
     expect(screen.getByText(`Cost: Expend a Pact Magic spell slot (${cost}) to restore a use.`)).toBeInTheDocument();
-    await confirmModal();
+    const pid = await confirmModal();
 
     await waitFor(() => {
       expect(addEntry).toHaveBeenCalledTimes(2);
@@ -377,7 +379,7 @@ describe('HurlThroughHellModal — branch lane', () => {
         description: `Throg expended a Pact Magic spell slot (${cost}) to restore a use of ${FEATURE}.`,
         timestamp: FROZEN_TS,
       }],
-      [CAMPAIGN, triggerRow()],
+      [CAMPAIGN, triggerRow(pid)],
     ]);
   });
 
@@ -409,7 +411,7 @@ describe('HurlThroughHellModal — branch lane', () => {
   });
 
   it('hasUse arm leaves the pact ledger unwritten and opens the save prompt on the exact contract', async () => {
-    await confirmModalFor(makeProps({
+    const pid = await confirmModalFor(makeProps({
       pactMagicRecharge: true,
       pactSlotLevel: 2,
       pactSlotsAvailable: true,
@@ -421,12 +423,12 @@ describe('HurlThroughHellModal — branch lane', () => {
     expect(cells.get(`${PLAYER}|hurlThroughHellUses`)).toBe(1); // 0 + 1 through the live store
     expect(getCurrentCombatRound.mock.calls).toEqual([[CAMPAIGN]]);
     expect(createSaveListener.mock.calls).toEqual([[CAMPAIGN, { targetName: TARGET, attackerName: PLAYER, saveType: 'WIS', saveDc: 16 }]]);
-    expect(addEntry.mock.calls).toStrictEqual([[CAMPAIGN, triggerRow()]]);
+    expect(addEntry.mock.calls).toStrictEqual([[CAMPAIGN, triggerRow(pid)]]);
   });
 
   async function confirmModalFor(props) {
     render(<HurlThroughHellModal {...props} />);
-    await confirmModal();
+    return confirmModal();
   }
 
   // ── featureName: || fallback and hardcoded-copy drift (:15 vs :91/:97/:124/:133) ──
@@ -444,8 +446,8 @@ describe('HurlThroughHellModal — branch lane', () => {
     render(<HurlThroughHellModal {...props} />);
     expect(screen.getByText('Hellfire Claws')).toBeInTheDocument();
 
-    await confirmModal();
-    await dispatchSave(FAIL);
+    const pid = await confirmModal();
+    await dispatchSave(saveResultDetail(pid));
 
     await waitFor(() => {
       expect(screen.getByText('Goblin1 failed WIS save — hurled through the lower planes.')).toBeInTheDocument();
@@ -457,7 +459,7 @@ describe('HurlThroughHellModal — branch lane', () => {
         abilityName: 'Hellfire Claws',
         description: 'Hellfire Claws triggered — Goblin1 must make WIS save (DC 16) or be hurled through the lower planes.',
         targetName: TARGET,
-        promptId: PROMPT_ID,
+        promptId: pid,
         timestamp: FROZEN_TS,
       }],
       [CAMPAIGN, saveFailRow()],
@@ -480,14 +482,14 @@ describe('HurlThroughHellModal — branch lane', () => {
 
   it('fiend copy hardcodes "Psychic" whatever damageType the props carry (flag 3)', async () => {
     render(<HurlThroughHellModal {...makeProps({ targetName: FIEND, damageType: 'Necrotic' })} />);
-    await confirmModal();
-    await dispatchSave(FAIL);
+    const pid = await confirmModal();
+    await dispatchSave(saveResultDetail(pid));
 
     await waitFor(() => {
       expect(addEntry).toHaveBeenCalledTimes(2);
     });
     expect(addEntry.mock.calls).toStrictEqual([
-      [CAMPAIGN, triggerRow(FIEND)],
+      [CAMPAIGN, triggerRow(pid, FIEND)],
       [CAMPAIGN, {
         type: 'save_result',
         characterName: PLAYER,
@@ -516,16 +518,16 @@ describe('HurlThroughHellModal — branch lane', () => {
     {
       case: 'non-fiend fail',
       props: {},
-      detail: FAIL,
-      rows: () => [[CAMPAIGN, triggerRow()], [CAMPAIGN, saveFailRow()], [CAMPAIGN, rollRow(31, 'Goblin1 takes 31 Psychic damage from Hurl Through Hell.')]],
+      core: FAIL_CORE,
+      rows: (pid) => [[CAMPAIGN, triggerRow(pid)], [CAMPAIGN, saveFailRow()], [CAMPAIGN, rollRow(31, 'Goblin1 takes 31 Psychic damage from Hurl Through Hell.')]],
       popup: () => popupOf('Goblin1 failed WIS save — hurled through the lower planes and takes 31 Psychic damage.', { rolls: ROLL_OK.rolls, formula: '4d10' }),
       resultText: 'Goblin1 failed WIS save — hurled through the lower planes.',
     },
     {
       case: 'fiend fail (no roll row, popup has no rolls/formula keys)',
       props: { targetName: FIEND },
-      detail: FAIL,
-      rows: () => [[CAMPAIGN, triggerRow(FIEND)], [CAMPAIGN, {
+      core: FAIL_CORE,
+      rows: (pid) => [[CAMPAIGN, triggerRow(pid, FIEND)], [CAMPAIGN, {
         type: 'save_result',
         characterName: PLAYER,
         targetName: FIEND,
@@ -549,8 +551,8 @@ describe('HurlThroughHellModal — branch lane', () => {
     {
       case: 'success (two rows, no roll row, inert cells)',
       props: {},
-      detail: Object.freeze({ promptId: PROMPT_ID, roll: 15, total: 17, success: true }),
-      rows: () => [[CAMPAIGN, triggerRow()], [CAMPAIGN, {
+      core: SUCC_CORE,
+      rows: (pid) => [[CAMPAIGN, triggerRow(pid)], [CAMPAIGN, {
         type: 'save_result',
         characterName: PLAYER,
         targetName: TARGET,
@@ -568,19 +570,19 @@ describe('HurlThroughHellModal — branch lane', () => {
     {
       case: 'negative modifier fail renders "rolled 12 + -4 = 8" verbatim (flag 5)',
       props: {},
-      detail: Object.freeze({ roll: 12, total: 8, success: false }),
-      rows: () => [[CAMPAIGN, triggerRow()], [CAMPAIGN, saveFailRow('Goblin1 failed WIS save (rolled 12 + -4 = 8 vs DC 16) — hurled through the lower planes.')], [CAMPAIGN, rollRow(31, 'Goblin1 takes 31 Psychic damage from Hurl Through Hell.')]],
+      core: Object.freeze({ roll: 12, total: 8, success: false }),
+      rows: (pid) => [[CAMPAIGN, triggerRow(pid)], [CAMPAIGN, saveFailRow('Goblin1 failed WIS save (rolled 12 + -4 = 8 vs DC 16) — hurled through the lower planes.', 12, 8)], [CAMPAIGN, rollRow(31, 'Goblin1 takes 31 Psychic damage from Hurl Through Hell.')]],
       popup: () => popupOf('Goblin1 failed WIS save — hurled through the lower planes and takes 31 Psychic damage.', { rolls: ROLL_OK.rolls, formula: '4d10' }),
       resultText: 'Goblin1 failed WIS save — hurled through the lower planes.',
     },
-  ])('$case: full addEntry ledger byte-exact, popup detail strict-equal, exact result copy, Done closes once', async ({ props: overrides, detail, rows, popup, resultText }) => {
+  ])('$case: full addEntry ledger byte-exact, popup detail strict-equal, exact result copy, Done closes once', async ({ props: overrides, core, rows, popup, resultText }) => {
     const props = makeProps(overrides);
     render(<HurlThroughHellModal {...props} />);
-    await confirmModal();
-    await dispatchSave(detail);
+    const pid = await confirmModal();
+    await dispatchSave(saveResultDetail(pid, core));
 
     await waitFor(() => {
-      expect(addEntry.mock.calls).toStrictEqual(rows());
+      expect(addEntry.mock.calls).toStrictEqual(rows(pid));
     });
     expect(popups).toHaveLength(1);
     expect(popups[0].detail).toStrictEqual(popup());
@@ -625,8 +627,8 @@ describe('HurlThroughHellModal — branch lane', () => {
     rollExpression.mockReturnValue(roll);
     applyDamageToTarget.mockReturnValue(apply);
     render(<HurlThroughHellModal {...makeProps()} />);
-    await confirmModal();
-    await dispatchSave(FAIL);
+    const pid = await confirmModal();
+    await dispatchSave(saveResultDetail(pid));
 
     await waitFor(() => {
       expect(addEntry.mock.calls).toHaveLength(3);
@@ -641,8 +643,8 @@ describe('HurlThroughHellModal — branch lane', () => {
   it('null combatSummary flows into the damage engine as-is with an empty characters roster (flag 7)', async () => {
     getCombatSummary.mockReturnValue(null);
     render(<HurlThroughHellModal {...makeProps()} />);
-    await confirmModal();
-    await dispatchSave(FAIL);
+    const pid = await confirmModal();
+    await dispatchSave(saveResultDetail(pid));
 
     await waitFor(() => {
       expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
@@ -664,8 +666,8 @@ describe('HurlThroughHellModal — branch lane', () => {
     if (conds !== undefined) cells.set(`${TARGET}|activeConditions`, conds);
     if (effects !== undefined) cells.set('campaign|targetEffects', effects);
     render(<HurlThroughHellModal {...makeProps()} />);
-    await confirmModal();
-    await dispatchSave(FAIL);
+    const pid = await confirmModal();
+    await dispatchSave(saveResultDetail(pid));
 
     await waitFor(() => {
       expect(cells.get(`${TARGET}|activeConditions`)).toStrictEqual(expectedConds);
@@ -679,8 +681,8 @@ describe('HurlThroughHellModal — branch lane', () => {
     const MARK = Object.freeze({ marker: 'pre-existing' });
     cells.set('campaign|targetEffects', [MARK]);
     render(<HurlThroughHellModal {...makeProps()} />);
-    await confirmModal();
-    await dispatchSave(FAIL);
+    const pid = await confirmModal();
+    await dispatchSave(saveResultDetail(pid));
 
     await waitFor(() => {
       expect(cells.get('campaign|targetEffects')).toHaveLength(2);
@@ -699,9 +701,10 @@ describe('HurlThroughHellModal — branch lane', () => {
     // step='result', result=null → :296 blank stage; button unmounted with the info screen.
     expect(container.querySelector('.sp-modal')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Hurl Through Hell/ })).not.toBeInTheDocument();
-    expect(addEntry.mock.calls).toHaveLength(1); // trigger row only
+    expect(addEntry).not.toHaveBeenCalled(); // confirm's await chain still pending — nothing logged yet
 
-    await dispatchSave(FAIL);
+    await flush(); // let handleConfirm finish: prompt issued, save-result listener registered
+    await dispatchSave(saveResultDetail(lastPromptId()));
     await waitFor(() => {
       expect(screen.getByText('Goblin1 failed WIS save — hurled through the lower planes.')).toBeInTheDocument();
     });
@@ -709,7 +712,7 @@ describe('HurlThroughHellModal — branch lane', () => {
 
   it('a mismatched promptId is fully inert — state, log, popups and stage untouched until the matching save lands', async () => {
     render(<HurlThroughHellModal {...makeProps()} />);
-    await confirmModal();
+    const pid = await confirmModal();
 
     await dispatchSave({ promptId: 'someone-elses-prompt', roll: 8, total: 10, success: false });
 
@@ -719,7 +722,7 @@ describe('HurlThroughHellModal — branch lane', () => {
     expect(cells.has('campaign|targetEffects')).toBe(false);
     expect(document.querySelector('.sp-modal')).not.toBeInTheDocument();
 
-    await dispatchSave(FAIL);
+    await dispatchSave(saveResultDetail(pid));
     await waitFor(() => {
       expect(screen.getByText('Goblin1 failed WIS save — hurled through the lower planes.')).toBeInTheDocument();
     });
@@ -728,8 +731,8 @@ describe('HurlThroughHellModal — branch lane', () => {
 
   it('the listener detaches at resolution — a duplicate resolved prompt cannot double-write, double-log or double-popup', async () => {
     render(<HurlThroughHellModal {...makeProps()} />);
-    await confirmModal();
-    await dispatchSave(FAIL);
+    const pid = await confirmModal();
+    await dispatchSave(saveResultDetail(pid));
 
     await waitFor(() => {
       expect(addEntry.mock.calls).toHaveLength(3);
@@ -737,8 +740,8 @@ describe('HurlThroughHellModal — branch lane', () => {
     const conds = cells.get(`${TARGET}|activeConditions`);
     const effects = cells.get('campaign|targetEffects');
 
-    await dispatchSave(FAIL);
-    await dispatchSave({ promptId: PROMPT_ID, roll: 8, total: 10, success: true });
+    await dispatchSave(saveResultDetail(pid)); // exact same resolved prompt — dead
+    await dispatchSave(saveResultDetail(pid, SUCC_CORE)); // success re-fire — dead
 
     expect(addEntry.mock.calls).toHaveLength(3);
     expect(popups).toHaveLength(1);
@@ -749,10 +752,10 @@ describe('HurlThroughHellModal — branch lane', () => {
 
   it('unmounting mid-save leaks the listener: the late save still writes, logs and pops up on the dead tree (flag 4)', async () => {
     const { unmount, container } = render(<HurlThroughHellModal {...makeProps()} />);
-    await confirmModal();
+    const pid = await confirmModal();
     unmount();
 
-    await dispatchSave(FAIL);
+    await dispatchSave(saveResultDetail(pid));
 
     await waitFor(() => {
       expect(addEntry.mock.calls).toHaveLength(3);
@@ -769,8 +772,8 @@ describe('HurlThroughHellModal — branch lane', () => {
     errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     addEntry.mockImplementation(() => Promise.reject(new Error('log down')));
     render(<HurlThroughHellModal {...makeProps()} />);
-    await confirmModal();
-    await dispatchSave(Object.freeze({ promptId: PROMPT_ID, roll: 15, total: 17, success: true }));
+    const pid = await confirmModal();
+    await dispatchSave(saveResultDetail(pid, SUCC_CORE));
 
     await waitFor(() => {
       expect(screen.getByText('Goblin1 succeeded on WIS save — resists the effect and is not hurled through the lower planes.')).toBeInTheDocument();

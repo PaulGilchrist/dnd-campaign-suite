@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * Ownership: DestructiveStrideModal.jsx — the damage-type picker UI: exact
  * option rendering, Choose Type gating/disabled state, verbatim pass-through

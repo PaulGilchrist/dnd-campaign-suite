@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0007: Aarakocra Skirmisher Talons charge-damage clause — the GM-adjudication
 // offer ("30+ ft Charge: +3d4+2 Slashing?") rides the monster attack result popup
 // (CLA-325 advisory + CLA-352 offer-on-result pattern). Offer on HIT only.

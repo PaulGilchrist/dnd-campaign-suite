@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // Rendering lane of the DiceRollResult family. Ownership map (per
 // displayFeatures' ownership notes):
 //   THIS FILE owns the Starry Form (Dragon) floor seam — the floored total

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * ElementalAttunementModal — ELEMENTAL DATA presentation lane.
  *

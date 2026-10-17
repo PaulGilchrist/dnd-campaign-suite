@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // BulwarkOfForceModal — thin wrapper over shared/CreatureSelectionModal.jsx.
 // Caller/mount: CharActionModals.SecondaryModals.jsx (EnemySelectionModals) renders it
 // from modalState.bulwarkOfForceModal { creatureTargets, maxTargets }.

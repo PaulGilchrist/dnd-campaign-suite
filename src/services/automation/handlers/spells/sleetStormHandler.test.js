@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // ── sleetStorm QUARTET seam map (shared subject: sleetStormHandler.js) ──
 // lane (this) — #1963 .test (main): handle() GATES + FRONT DOOR ONLY —
 //   early returns (spellNoticePopup on empty/missing combat context, empty

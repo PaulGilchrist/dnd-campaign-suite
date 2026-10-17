@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0436: Bugbear Javelin melee-or-ranged dual-mode variant — GM-adjudicated
 // damage-dice CHOICE on the monster attack HIT popup (monsters.json
 // damage_dice_ranged; MA-0325 two-handed mirror, MA-0007 offer-on-result

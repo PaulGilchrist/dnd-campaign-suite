@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // Command spell lane — canonical home for commandHandler.handle (save-or-suck latch, no clock).
 // Live path (grep-verified 2026-10-16): triggerSpells.js handleCommand → modalName 'commandChoice'
 // → useSpellCastExecutor.js:130 → CommandModal.jsx (exact 5 options Approach/Drop/Flee/Grovel/Halt)

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // ── #1997 index.test.js — MAIN canonical MECHANICS lane for automation/index.js ──
 // Seam map: index.mistyWanderer.test.js header (#1995, closed 2 KEEP law) plus
 // #1996 index.psychicTeleportation.test.js (closed 3 shed). Subject: resolveHandler

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // compulsionHandler lane — canonical home for Compulsion (SP-027): WIS save-or-suck charm,
 // concentration, direction-pull prose. Single-target handler; no clock — the charm latch and
 // addExpiration ride the turn seams (new initiative / rests clear them), the spell's

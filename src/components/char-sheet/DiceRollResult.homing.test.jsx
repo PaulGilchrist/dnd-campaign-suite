@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // CLA-320: Homing Strikes (Soul Blades) popup seam — the popup must mirror the
 // authoritative resolver's miss→hit conversion folded with the psionic die:
 // flipped HIT line at the folded total, one exact homing add line, and a Done

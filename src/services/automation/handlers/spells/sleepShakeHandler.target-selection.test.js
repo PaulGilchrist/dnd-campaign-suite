@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * sleepShakeHandler.target-selection.test.js — #1958 (family quad #1957–#1959, seam map in sleepHandler.test.js header)
  *

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // Owns the modal's OWN behavior via its own props: option description rendering
 // per isTwinkled, self-application on Choose with autoApply defaulting to true
 // (the live CharSpecialActionsModals wiring shape), the autoApply={false}

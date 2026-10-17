@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // CombatSuperiorityModal — TRIGGERS lane. Owns the trigger-filtering seam:
 // computeManeuverList predicate table, availableManeuvers override, prompt headers
 // WITH attackContext / skillContext, lastAttack fallback, MN-014 group labels &

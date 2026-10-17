@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // blessHandler lane contract — Bless popup-builder (automation registry 'bless:' @ index.js:607).
 // Live dispatch: spellCastService/execution/index.js:291 → triggerSpells.handleBless →
 // blessService.triggerBlessSpell → executeHandler → handle(). Live side effects: one

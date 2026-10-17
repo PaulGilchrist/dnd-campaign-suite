@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 // Behavior-focused tests for AllySelectionModal: what the user sees and can do
 // (select via checkbox or row, bulk actions, confirm/cancel payloads), queried

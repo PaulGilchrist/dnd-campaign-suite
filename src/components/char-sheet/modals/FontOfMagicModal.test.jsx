@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * FontOfMagicModal — conversion-flow lane (modal UI ⇄ LIVE runtime store ledger).
  *

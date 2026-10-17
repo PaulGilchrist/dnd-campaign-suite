@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * LongRestButton.rendering.test.jsx — owns the DOM CONTRACT lane.
  *

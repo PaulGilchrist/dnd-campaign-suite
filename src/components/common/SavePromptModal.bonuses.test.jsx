@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 /**
  * SavePromptModal — save bonus & advantage sources.

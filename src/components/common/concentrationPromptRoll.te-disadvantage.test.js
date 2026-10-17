@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 // MA-0038 unit tests — resolveConcentrationRoll: te-driven concentration
 // disadvantage (Adult Black Dragon's Cloud of Insects failed-save clause).

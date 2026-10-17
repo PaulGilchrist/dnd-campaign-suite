@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * ClairvoyantCombatantModal — EDGE CASES lane (non-empty-store behavior only).
  *

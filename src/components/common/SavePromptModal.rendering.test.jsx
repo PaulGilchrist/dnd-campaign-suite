@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 // SavePromptModal — rendering
 // Static prompt-copy contract: overlay visibility, the target/ability/DC line,

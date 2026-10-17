@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // spellCastHandler .multiSpell lane (#1968) — owns handleMultiSpellFreeCast
 // (L251-304) of spellCastHandler.js: the perSpellTracking used/freeKey stamping +
 // availableSpells list + "All spells… used" popup, and the non-tracking

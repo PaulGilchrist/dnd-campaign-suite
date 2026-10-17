@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * ElementalAttunementModal — DEACTIVATION lane (handleResultsClose seam only).
  *

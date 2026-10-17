@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // ── webAreaSave QUINTET lane #1990 .edgeCases ──
 // (full seam map: webAreaSaveHandler.areaSave.test.js header — that lane owns
 // recurring STR-save content incl exact addTargetResult shapes; this file is

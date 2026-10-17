@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // #1902 dominateHandler.monster — NAME-VARIANT lane of the dominate trio
 // (#1901 beast / THIS monster / #1903 person). Internals canon lives in
 // dominateHandler.beast.test.js (read its header first): cast seam, createSaveListener

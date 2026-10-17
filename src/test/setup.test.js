@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 /**
  * Pinning suite for src/test/setup.js — the shared Vitest harness.

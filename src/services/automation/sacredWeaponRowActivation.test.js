@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // CLA-301 regression — fingerprint-delegation lane at the service level (row-activation pair #2001).
 // The production row is public/data/2024/classes.json → Paladin → Oath of Devotion lv3
 // "Sacred Weapon" with automation {type:'temp_buff', effect:'sacred_weapon'} (verified on disk —

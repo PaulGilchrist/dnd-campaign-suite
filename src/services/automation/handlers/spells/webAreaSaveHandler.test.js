@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // ── webAreaSave QUINTET #1992 (main) — handle() CAST ORCHESTRATION canonical ──
 // Full seam map: webAreaSaveHandler.areaSave.test.js header (#1989, owns the
 // recurring processWebAreaSave lane). Liveness: automation/index.js:271 import,

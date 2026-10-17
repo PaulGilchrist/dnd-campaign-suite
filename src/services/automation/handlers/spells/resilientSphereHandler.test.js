@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Liveness verification (2026-10-16) ─────────────────────────────

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 // SavePromptModal — shared test-utility contract.
 // These fixtures and harness defaults feed EVERY SavePromptModal test lane

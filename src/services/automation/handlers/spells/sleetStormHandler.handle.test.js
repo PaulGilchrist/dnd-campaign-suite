@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // ── sleetStorm QUARTET seam map (shared subject: sleetStormHandler.js) ──
 // lane (this) — .handle CAST-TIME: application/tracking/duration-expiration/
 //   concentration-registration of handle() (L25-158) + applySleetStormProneTarget

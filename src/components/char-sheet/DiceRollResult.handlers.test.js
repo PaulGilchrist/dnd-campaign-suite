@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // Unit tests for createDiceRollHandlers (DiceRollResult.handlers.js).
 //
 // Seam ownership map:

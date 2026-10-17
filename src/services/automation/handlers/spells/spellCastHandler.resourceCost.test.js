@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // spellCastHandler .resourceCost lane (#1970) — owns the resource-cost accounting
 // of spellCastHandler.js: handleChannelDivinity charge math + resolveChannelDivinity
 // MaxCharges (L139-163), FREE_CAST_ROUTES + both counter handlers

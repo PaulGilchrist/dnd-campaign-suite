@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import CelestialRevelationModal from './CelestialRevelationModal.jsx';

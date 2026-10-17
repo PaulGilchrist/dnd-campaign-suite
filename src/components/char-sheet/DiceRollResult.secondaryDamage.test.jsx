@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { render } from '@testing-library/react';
 import DiceRollResult from './DiceRollResult.jsx';
 

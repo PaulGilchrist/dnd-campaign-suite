@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * mazeHandler SP-080 fix lane — SECOND of the maze TRIO (spells/):
  *

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // truePolymorph HEXAD lane #1982 — .ResolveMaxCR: canonical resolveTruePolymorphMaxCR MATH.
 // Owns (truePolymorphHandler.js :44-55 + parseChallengeRating :13-21): the numeric
 // creature→creature CR-cap table. This is the canonical math home — the full unit

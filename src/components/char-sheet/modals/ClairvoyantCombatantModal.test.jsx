@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * ClairvoyantCombatantModal — BASE lane (initial-render / mount contract only).
  *

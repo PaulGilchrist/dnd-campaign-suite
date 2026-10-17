@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // ── webAreaSave QUINTET #1993 (.zone) — handle() ZONE PERSISTENCE canonical ──
 // (full seam map: webAreaSaveHandler.areaSave.test.js header #1989; quintet
 // closes HERE — 1990 .edgeCases / 1991 .errors / 1992 .test main / this .zone,

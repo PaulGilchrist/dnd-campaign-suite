@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // featBuffService.computeAllFeatBuffs.5e.test.js — LANE #4/9 of the featBuffService
 // nine-lane cluster (queue #2016-2024). Subject: src/services/character/featBuffService.js
 // computeAllFeatBuffs (L583-633) on the 5e TEXT path. Canonical seam map lives in the

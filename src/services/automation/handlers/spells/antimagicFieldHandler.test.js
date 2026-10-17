@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Lane map: antimagicFieldHandler.js (#1868) ─────────────────────────

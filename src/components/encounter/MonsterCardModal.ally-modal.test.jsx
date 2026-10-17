@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // Cleanup applied (redundant test removal):
 //
 //   Removed 2 redundant tests:

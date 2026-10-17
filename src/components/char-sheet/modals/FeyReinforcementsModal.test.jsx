@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * FeyReinforcementsModal — arm-flow lane (modal UI ⇄ LIVE handler through a LIVE store).
  *

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * ClairvoyantCombatantModal — RESULT lane (result-view rendering/UI + save_result log content).
  *

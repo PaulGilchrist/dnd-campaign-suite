@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // Info-display lane of the DiceRollResult family: the breakdown line (formula,
 // d20/dice span, modifier text incl. bonusDetail and the zero-modifier suppression),
 // the Save DC info line and its visibility gates (dc defined, no success outcome,

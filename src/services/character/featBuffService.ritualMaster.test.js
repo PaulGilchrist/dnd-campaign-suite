@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // featBuffService.ritualMaster.test.js — LANE #9/9 (FINAL) of the featBuffService
 // nine-lane cluster (queue #2016-2024) — CLOSURES the cluster. Subject: the
 // ritual_spells automation threading seam of src/services/character/featBuffService.js:

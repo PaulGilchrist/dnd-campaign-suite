@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // DiceRollResult — superiority die-size selection rendering seam tests.
 //
 // Seam ownership map (consolidated per the DiceRollResult.handlers.test.js header):

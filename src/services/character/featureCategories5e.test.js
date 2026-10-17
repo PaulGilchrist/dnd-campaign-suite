@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // Factory + 5e disk-anchor lane for featureCategories.js (categories5e half).
 // featureCategories.js is DATA, not logic: getCategories(ruleset) is a
 // same-reference ternary selector (featureCategories.js:241-243) consumed by

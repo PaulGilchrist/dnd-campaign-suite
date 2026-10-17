@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // CombatSuperiorityModal — EDGE-CASE lane. Renders only; no runtime-store writes.
 //
 // Ownership map (siblings own the rest — do NOT re-test here):

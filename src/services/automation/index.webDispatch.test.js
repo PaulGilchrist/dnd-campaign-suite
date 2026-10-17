@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // ── Registry QUINTET lane #1999 index.webDispatch.test.js — web_area_save row/dispatch family ──
 // (seam map: index.mistyWanderer.test.js header #1995, closed KEEP law; siblings
 // #1996 psychic route / #1997 index.test.js MAIN mechanics / #1998 implosion

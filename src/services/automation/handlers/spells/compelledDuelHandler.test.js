@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, isCompelledDuelActive, endCompelledDuel, checkCompelledDuelAttackExpiry } from './compelledDuelHandler.js';
 

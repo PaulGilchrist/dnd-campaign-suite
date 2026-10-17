@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * settlementGenerator lane — pure procedural settlement CREATION (the
  * settlementsService lane owns CRUD persistence).

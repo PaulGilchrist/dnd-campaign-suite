@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * EyebiteEffectModal — BASE lane (mount contract, UI navigation, effect presentation).
  *

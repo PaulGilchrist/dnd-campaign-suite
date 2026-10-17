@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * LongRestButton.clickHandlers.test.jsx — owns the CLICK-DISPATCH seam.
  *

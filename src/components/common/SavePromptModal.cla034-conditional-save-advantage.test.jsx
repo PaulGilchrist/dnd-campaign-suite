@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 // CLA-034: Beguiling Twist conditional_advantage ("advantage on saving throws
 // to avoid/end Charmed or Frightened") must key on the SAVE's own condition

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // beaconOfHopeHandler lane contract — Beacon of Hope (automation registry 'beacon_of_hope:' @ index.js:608).
 // Live dispatch: spellCastService/execution/triggerSpells.js → beaconOfHopeService.triggerBeaconOfHope →
 // executeHandler → handle(). handle() side effects: one resolveMapPositions + one getCombatContext read;

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * EyebiteEffectModal — PLAYER SAVE lane (prompt dispatch, the save-result listener
  * lifecycle, and handleSaveResult resolution: fail / suppress / pass).

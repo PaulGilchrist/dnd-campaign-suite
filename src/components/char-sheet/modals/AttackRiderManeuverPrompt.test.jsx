@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import AttackRiderManeuverPrompt from './AttackRiderManeuverPrompt.jsx';

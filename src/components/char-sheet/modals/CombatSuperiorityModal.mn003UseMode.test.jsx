@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MN-003 lane: with maneuvers known the modal must render the USE flow (radio list
 // incl. the Grant Attack group) instead of being pinned to Select-View — the
 // dispatcher now passes selectionMode=false when known > 0 (known < all used to

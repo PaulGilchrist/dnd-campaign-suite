@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 // Rendering seam: AttackResultPopup owns WHICH content branch renders (raw
 // sanitized-HTML string vs live DiceRollResult), threads the popup roll data

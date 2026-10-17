@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * ClairvoyantCombatantModal — CONFIRM seam lane.
  *

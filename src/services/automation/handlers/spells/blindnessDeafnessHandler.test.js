@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // blindnessDeafnessHandler lane contract — save-or-suck modal-opener (automation registry
 // 'blindness_deafness' @ index.js:526; modalName routed via useSpellCastExecutor.js:132 →
 // BlindnessDeafnessModal, rendered at CharActionModals.jsx:161). Pure payload builder:

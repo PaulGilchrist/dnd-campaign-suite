@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * SOLE lane for powerWordStunHandler.js (verified: no sibling *.test files).
  * Live: automation/index.js `power_word_stun` → automationRouter → triggerSpells

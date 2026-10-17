@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── QUAD seam map — counterSpellHandler.js ─────────────────────────────

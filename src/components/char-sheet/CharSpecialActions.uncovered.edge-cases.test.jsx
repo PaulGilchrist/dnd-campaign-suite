@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // Branch-coverage lane for CharSpecialActions — pins ONLY the branches no
 // other CharSpecialActions.* test reaches:
 //   1. buildUniqueSpecialActions cross-list collision guards: name filtering

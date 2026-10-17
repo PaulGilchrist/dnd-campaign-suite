@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // DiceRollResult — advantage/disadvantage toggle lane + psi-knack + console.error paths.
 //
 // Seam ownership map (consolidated per the DiceRollResult.rendering.test.jsx and

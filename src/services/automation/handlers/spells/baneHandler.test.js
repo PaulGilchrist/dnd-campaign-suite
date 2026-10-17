@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // baneHandler lane contract — Bane popup-builder (automation registry 'bane:' @ index.js:606).
 // Live dispatch: spellCastService/execution/index.js:290 → triggerSpells.handleBane →
 // baneService.triggerBaneSpell → executeHandler → handle(). Live side effects: one

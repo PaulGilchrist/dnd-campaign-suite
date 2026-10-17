@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // ── webAreaSave QUINTET seam map (shared subject: webAreaSaveHandler.js) ──
 // lane (this file, .areaSave) — RECURRING area-save CONTENT:
 //   processWebAreaSave ONLY (+ its private callees webTargetIsImmune,

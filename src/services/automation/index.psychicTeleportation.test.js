@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // CLA-320 dispatch lane: Soulknife Psychic Teleportation ships as an
 // auto_effect row (no type-level handler key exists — HANDLER_MAP has no
 // 'auto_effect' entry), so resolveHandler's effect-route branch

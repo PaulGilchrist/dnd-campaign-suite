@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // Disk-anchor lane for categories2024 (src/services/character/featureCategories.js).
 // featureCategories.js is DATA, not logic: categories2024 is a curated set of
 // name lists consumed by two engines:

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * ElementalBurstModal — single-file lane (jsx:1-113, the whole modal). No siblings: this is the
  * ONLY lane for ElementalBurst. The modal is a two-phase pass-through: element-type chooser →

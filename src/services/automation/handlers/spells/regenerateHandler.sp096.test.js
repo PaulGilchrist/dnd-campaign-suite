@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // SP-096: PC initial heal computed negative (-82) from combatSummary placeholder maxHp=1.
 // FIX-SPECIFIC lock lane (#1948) — pins ONLY what commit d6e630823 changed or guarded:
 // PC max-HP truth = runtime/change-data hitPoints, heal floored at 0, hp_change log

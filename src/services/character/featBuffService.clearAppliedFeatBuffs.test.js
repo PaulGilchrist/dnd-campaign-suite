@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // featBuffService.clearAppliedFeatBuffs.test.js — LANE #2/9 of the featBuffService
 // nine-lane cluster (queue #2016-2024). Subject: src/services/character/featBuffService.js (662 l).
 // Canonical seam map lives in the lane #1 header (featBuffService.applyFeatBuffsToFormData.test.js) — READ FIRST.

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // Spells lane: Feign Death — touch, auto-success (no save). Modal target
 // selection + buff/condition latch that persists until an event seam
 // (initiative roll / short / long rest clears the expiration — never a clock).

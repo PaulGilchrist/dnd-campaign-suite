@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 // MA-0367 Infernal Wound — SavePromptModal behavior locks (prompt copy + reroll branch).
 //

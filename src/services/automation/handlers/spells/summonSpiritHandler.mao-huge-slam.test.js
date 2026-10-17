@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0284 guard: Animated Object (Huge) actions[0] "Slam" is caster-dependent
 // 2024 text ("+spell attack modifier", "2d12+3+spellcasting modifier").
 // Verdict SKIPPED (no data/code change): a numeric authoring would fabricate

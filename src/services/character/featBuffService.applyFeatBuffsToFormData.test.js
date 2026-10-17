@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // featBuffService.applyFeatBuffsToFormData.test.js — LANE #1/9 of the featBuffService
 // nine-lane cluster (queue #2016-2024). Subject: src/services/character/featBuffService.js (662 l).
 //

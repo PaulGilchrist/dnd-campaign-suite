@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * mazeHandler MAIN lane — THIRD of the maze TRIO (spells/), closes the family:
  *

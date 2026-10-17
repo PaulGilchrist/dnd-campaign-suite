@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * ElementalAttunementModal — ERROR-HANDLING lane.
  *

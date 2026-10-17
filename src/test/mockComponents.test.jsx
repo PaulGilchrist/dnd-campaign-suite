@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 /**
  * Contract tests for src/test/mockComponents.jsx.

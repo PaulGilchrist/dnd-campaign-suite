@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // SP-092 regression: 2024 canonical Prismatic Spray damage rays roll 12d6,
 // half on a successful DEX save. 5e twin stays 10d6 (RAW, unautomated).
 //

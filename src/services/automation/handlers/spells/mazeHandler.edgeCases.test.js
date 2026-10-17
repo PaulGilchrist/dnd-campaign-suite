@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * mazeHandler edge-case lane — FIRST of the maze TRIO (spells/):
  *

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * sleepHandler.test.js — FAMILY QUAD seam map (Sleep / shake-awake family, queue #1957–#1959)
  *

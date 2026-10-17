@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // ── sleetStorm QUARTET seam map (shared subject: sleetStormHandler.js) ──
 // lane (this) — #1962 .handleResults — outcome-reporting of handle()'s body
 //   (L25-158): storeSpellLastAttack, per-target ability_use entries, the

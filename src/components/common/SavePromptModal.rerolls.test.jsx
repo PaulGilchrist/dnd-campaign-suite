@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 // SavePromptModal — reroll lanes.
 // Behavioral coverage for the reroll features offered on a failed save prompt:

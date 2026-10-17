@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * ClairvoyantCombatantModal — EXPIRATION lane (clock queue depth + round-seam semantics).
  *

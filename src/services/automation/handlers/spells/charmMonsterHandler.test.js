@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // # charmMonsterHandler — Charm Monster (WIS save-or-suck charm, concentration, freed-on-damage).
 // Production module is an 11-line DELEGATION shell: handle() → handleCharmSpell(action, playerStats,
 // campaignName, config) in charmSpellUtils.js. This lane pins DELEGATION only — the charmMonster

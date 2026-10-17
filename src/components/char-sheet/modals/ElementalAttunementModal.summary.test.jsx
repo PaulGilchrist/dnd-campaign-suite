@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * ElementalAttunementModal — SUMMARY SECTION lane (jsx:661-695 rendering + the Close commit
  * DESCRIPTION variants). This lane owns what only the summary view can show: the per-element

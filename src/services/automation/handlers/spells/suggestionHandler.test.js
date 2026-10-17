@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // # suggestionHandler — Suggestion (SP-113): single-target WIS save, dcSuccess 'none', Charmed
 // on fail, damage-break ender. NOT a delegation shell — unlike the charmMonster/charmPerson pair
 // (#1883, 11-line shells over charmSpellUtils; #1884/#1885 own those utils' internals), this

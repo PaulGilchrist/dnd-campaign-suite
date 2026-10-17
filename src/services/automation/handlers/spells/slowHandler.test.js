@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // ── slow LANE seam map (subject: slowHandler.js — handle() cast-time lane) ──
 // lane (this) — slowHandler.handle() end-to-end: DC → per-target WIS save
 //   prompt → slow condition + activeConditionMeta stamp → targetEffects rewrite

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * ElementalAttunementModal — MAIN lane: mount contract, open/close basics, props pass-through.
  *

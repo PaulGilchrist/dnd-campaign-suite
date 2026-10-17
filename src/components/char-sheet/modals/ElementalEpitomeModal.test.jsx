@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * ElementalEpitomeModal — single-file lane (jsx:1-70, the whole modal). Ownership (grep ElementalEpitome):
  * - elementalEpitomeHandle.test.js — how the modal is OPENED (payload {action, playerStats,

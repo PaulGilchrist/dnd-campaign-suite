@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // Root composition-seam lane for CharSpecialActions:
 //   - section header + row composition (names, descriptions, unnamed fallback)
 //   - fresh mount renders NO modals (open-routing → modals.test.jsx,

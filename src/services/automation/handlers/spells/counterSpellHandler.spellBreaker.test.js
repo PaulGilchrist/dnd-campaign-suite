@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // ── QUAD seam map — counterSpellHandler.js ─────────────────────────────
 // Subject is LIVE: automation/index.js imports `handle` (l.201) and registers
 // it as `reaction_counterspell` in the dispatch table (l.525).

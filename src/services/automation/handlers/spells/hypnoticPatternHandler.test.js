@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * hypnoticPatternHandler.test.js — cast-resolution lane (FIRST of the hypnoticPattern pair).
  *

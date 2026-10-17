@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // #1943 .save-results lane — save-result event flow for prismaticSprayHandler.js.
 // SEXTET seam map lives in prismaticSprayHandler.damage-regression.test.js — READ FIRST.
 // Owns: immunity-skip plumbing, disadvantage flags, save_result/addTargetResult log

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 // BI-defense seam: AttackResultPopup owns the bookkeeping that runs when a defender
 // accepts the "Bardic Inspiration - Defense" offer in the roll popup — before/after

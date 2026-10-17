@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0855: Githzerai Psion Psychic Warp — GM-adjudicated CONDITION CHOICE on
 // the monster attack HIT popup (monsters.json hit_choice — Charmed-or-Prone).
 // MA-0325 two-handed chooser mirror: one button per option, HIT-only, resolved

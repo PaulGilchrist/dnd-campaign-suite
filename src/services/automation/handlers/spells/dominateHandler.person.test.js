@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // #1903 dominateHandler.person — NAME-VARIANT lane closing the dominate trio
 // (#1901 beast / #1902 monster / THIS person). Internals canon lives in
 // dominateHandler.beast.test.js (read its header first): cast seam keys, effects latch,

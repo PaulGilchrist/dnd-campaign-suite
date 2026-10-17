@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // @improved-by-ai
 // Unit tests for the save-prompt selectors in savePromptUtils.js — the
 // rules folded at the GM save-prompt seam.

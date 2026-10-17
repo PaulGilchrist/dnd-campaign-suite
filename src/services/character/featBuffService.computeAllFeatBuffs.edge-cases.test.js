@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // featBuffService.computeAllFeatBuffs.edge-cases.test.js — LANE #5/9 of the featBuffService
 // nine-lane cluster (queue #2016-2024). Subject: src/services/character/featBuffService.js
 // computeAllFeatBuffs (L583-633) NULL/UNDEFINED-TOLERANCE SEAMS. Canonical seam map lives in

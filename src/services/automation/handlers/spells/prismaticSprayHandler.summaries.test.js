@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // prismaticSpray SEXTET lane #1944 — SUMMARY composition (subject prismaticSprayHandler.js).
 // Owns the popup/result-summary prose templates built at the bottom of handle():
 //   `Prismatic Spray affects N creature(s). ${results.join(' ')} N creature(s) saved. N ray(s) immune.`

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * sleepShakeHandler.test.js — #1959 (main) — family quad #1957–#1959 CLOSED 2026-10-16
  * (seam map in sleepHandler.test.js header; handoff from #1958 executed here)

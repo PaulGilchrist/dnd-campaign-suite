@@ -1,3 +1,4 @@
+// @maintained-by-ai
 /**
  * HexAbilityModal — chooser lane (fully-controlled presentational modal, pure props).
  *
